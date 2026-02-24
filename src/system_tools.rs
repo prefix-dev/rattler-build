@@ -37,6 +37,8 @@ pub enum Tool {
     InstallNameTool,
     /// The git tool
     Git,
+    /// The signtool tool (for Windows code signing)
+    Signtool,
 }
 
 impl std::fmt::Display for Tool {
@@ -51,6 +53,7 @@ impl std::fmt::Display for Tool {
                 Tool::Patchelf => "patchelf".to_string(),
                 Tool::InstallNameTool => "install_name_tool".to_string(),
                 Tool::Git => "git".to_string(),
+                Tool::Signtool => "signtool".to_string(),
             }
         )
     }
@@ -170,6 +173,10 @@ impl SystemTools {
                     .expect("Failed to execute `patch` command");
                 let version = String::from_utf8_lossy(&version.stdout);
                 (path, version.to_string())
+            }
+            Tool::Signtool => {
+                let path = which("signtool")?;
+                (path, "".to_string())
             }
             Tool::RattlerBuild => {
                 let path = std::env::current_exe().expect("Failed to get current executable path");

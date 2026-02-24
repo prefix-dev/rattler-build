@@ -355,6 +355,151 @@ pub struct Build {
     /// Post-processing operations
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub post_process: Vec<PostProcess>,
+
+    /// Code signing configuration
+    #[serde(default, skip_serializing_if = "Signing::is_default")]
+    pub signing: Signing,
+}
+
+/// Code signing configuration for native binaries (evaluated)
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct Signing {
+    /// macOS code signing configuration
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub macos: Option<MacOsSigning>,
+    /// Windows code signing configuration
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub windows: Option<WindowsSigning>,
+}
+
+impl Signing {
+    /// Check if this is the default (no signing) configuration
+    pub fn is_default(&self) -> bool {
+        self.macos.is_none() && self.windows.is_none()
+    }
+}
+
+/// macOS code signing configuration using `codesign` (evaluated)
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MacOsSigning {
+    /// Signing identity (e.g., "Developer ID Application: Company (TEAMID)")
+    /// Use "-" for ad-hoc signing
+    pub identity: String,
+    /// Path to the keychain containing the signing certificate
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub keychain: Option<String>,
+    /// Entitlements plist file path
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub entitlements: Option<String>,
+    /// Additional codesign options (e.g., "runtime" for hardened runtime)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub options: Vec<String>,
+}
+
+/// Windows code signing configuration (evaluated).
+///
+/// Two methods are supported:
+/// - **Local certificate**: Set `certificate_file` (uses `signtool sign`)
+/// - **Azure Trusted Signing**: Set `azure_endpoint`, `azure_account_name`,
+///   `azure_certificate_profile` (uses the Azure Trusted Signing CLI/action)
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct WindowsSigning {
+    // --- Local certificate signing (signtool) ---
+    /// Path to the certificate file (.pfx / .p12)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub certificate_file: Option<String>,
+    /// Certificate password
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub certificate_password: Option<String>,
+
+    // --- Azure Trusted Signing ---
+    /// Azure Trusted Signing endpoint URL
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub azure_endpoint: Option<String>,
+    /// Azure Trusted Signing account name
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub azure_account_name: Option<String>,
+    /// Azure Trusted Signing certificate profile name
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub azure_certificate_profile: Option<String>,
+
+    // --- Shared settings ---
+    /// RFC 3161 timestamp server URL
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timestamp_url: Option<String>,
+    /// Digest algorithm (default: sha256)
+    #[serde(default = "default_digest_algorithm")]
+    pub digest_algorithm: String,
+}
+
+/// The Windows signing method as determined from the configuration.
+#[derive(Debug, Clone, PartialEq)]
+pub enum WindowsSigningMethod<'a> {
+    /// Local certificate signing via signtool
+    Signtool {
+        /// Path to the .pfx/.p12 certificate
+        certificate_file: &'a str,
+        /// Certificate password
+        certificate_password: Option<&'a str>,
+    },
+    /// Azure Trusted Signing
+    AzureTrustedSigning {
+        /// Azure signing endpoint URL
+        endpoint: &'a str,
+        /// Azure signing account name
+        account_name: &'a str,
+        /// Azure certificate profile name
+        certificate_profile: &'a str,
+    },
+}
+
+impl WindowsSigning {
+    /// Determine which signing method is configured.
+    ///
+    /// Returns an error message if neither or both methods are configured.
+    pub fn method(&self) -> Result<WindowsSigningMethod<'_>, &'static str> {
+        let has_local = self.certificate_file.is_some();
+        let has_azure = self.azure_endpoint.is_some()
+            || self.azure_account_name.is_some()
+            || self.azure_certificate_profile.is_some();
+
+        match (has_local, has_azure) {
+            (true, true) => Err(
+                "Both local certificate and Azure Trusted Signing are configured. \
+                 Please use only one signing method.",
+            ),
+            (false, false) => Err(
+                "No Windows signing method configured. \
+                 Set either 'certificate_file' for signtool or \
+                 'azure_endpoint'/'azure_account_name'/'azure_certificate_profile' \
+                 for Azure Trusted Signing.",
+            ),
+            (true, false) => Ok(WindowsSigningMethod::Signtool {
+                certificate_file: self.certificate_file.as_deref().unwrap(),
+                certificate_password: self.certificate_password.as_deref(),
+            }),
+            (false, true) => {
+                let endpoint = self.azure_endpoint.as_deref().ok_or(
+                    "Azure Trusted Signing requires 'azure_endpoint'",
+                )?;
+                let account_name = self.azure_account_name.as_deref().ok_or(
+                    "Azure Trusted Signing requires 'azure_account_name'",
+                )?;
+                let certificate_profile = self.azure_certificate_profile.as_deref().ok_or(
+                    "Azure Trusted Signing requires 'azure_certificate_profile'",
+                )?;
+                Ok(WindowsSigningMethod::AzureTrustedSigning {
+                    endpoint,
+                    account_name,
+                    certificate_profile,
+                })
+            }
+        }
+    }
+}
+
+fn default_digest_algorithm() -> String {
+    "sha256".to_string()
 }
 
 /// Dynamic linking configuration
@@ -527,6 +672,7 @@ impl Build {
             && self.prefix_detection.ignore.is_none()
             && !self.prefix_detection.ignore_binary_files
             && self.post_process.is_empty()
+            && self.signing.is_default()
     }
 }
 

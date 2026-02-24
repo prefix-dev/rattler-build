@@ -40,9 +40,11 @@ use crate::{
         Stage0Recipe, TestType as Stage0TestType,
         build::{
             BinaryRelocation as Stage0BinaryRelocation, DynamicLinking as Stage0DynamicLinking,
-            ForceFileType as Stage0ForceFileType, PostProcess as Stage0PostProcess,
-            PrefixDetection as Stage0PrefixDetection, PrefixIgnore as Stage0PrefixIgnore,
-            PythonBuild as Stage0PythonBuild, VariantKeyUsage as Stage0VariantKeyUsage,
+            ForceFileType as Stage0ForceFileType, MacOsSigning as Stage0MacOsSigning,
+            PostProcess as Stage0PostProcess, PrefixDetection as Stage0PrefixDetection,
+            PrefixIgnore as Stage0PrefixIgnore, PythonBuild as Stage0PythonBuild,
+            Signing as Stage0Signing, VariantKeyUsage as Stage0VariantKeyUsage,
+            WindowsSigning as Stage0WindowsSigning,
         },
         requirements::{
             IgnoreRunExports as Stage0IgnoreRunExports, RunExports as Stage0RunExports,
@@ -69,9 +71,10 @@ use crate::{
         Requirements as Stage1Requirements, Rpaths,
         build::{
             Build as Stage1Build, BuildString, DynamicLinking as Stage1DynamicLinking,
-            ForceFileType as Stage1ForceFileType, PostProcess as Stage1PostProcess,
-            PrefixDetection as Stage1PrefixDetection, PythonBuild as Stage1PythonBuild,
-            VariantKeyUsage as Stage1VariantKeyUsage,
+            ForceFileType as Stage1ForceFileType, MacOsSigning as Stage1MacOsSigning,
+            PostProcess as Stage1PostProcess, PrefixDetection as Stage1PrefixDetection,
+            PythonBuild as Stage1PythonBuild, Signing as Stage1Signing,
+            VariantKeyUsage as Stage1VariantKeyUsage, WindowsSigning as Stage1WindowsSigning,
         },
         requirements::{
             IgnoreRunExports as Stage1IgnoreRunExports, RunExports as Stage1RunExports,
@@ -1975,6 +1978,104 @@ impl Evaluate for Stage0DynamicLinking {
     }
 }
 
+impl Evaluate for Stage0MacOsSigning {
+    type Output = Stage1MacOsSigning;
+
+    fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
+        let identity = evaluate_string_value(&self.identity, context)?;
+        let keychain = self
+            .keychain
+            .as_ref()
+            .map(|v| evaluate_string_value(v, context))
+            .transpose()?;
+        let entitlements = self
+            .entitlements
+            .as_ref()
+            .map(|v| evaluate_string_value(v, context))
+            .transpose()?;
+        let options = evaluate_string_list(&self.options, context)?;
+
+        Ok(Stage1MacOsSigning {
+            identity,
+            keychain,
+            entitlements,
+            options,
+        })
+    }
+}
+
+impl Evaluate for Stage0WindowsSigning {
+    type Output = Stage1WindowsSigning;
+
+    fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
+        let certificate_file = self
+            .certificate_file
+            .as_ref()
+            .map(|v| evaluate_string_value(v, context))
+            .transpose()?;
+        let certificate_password = self
+            .certificate_password
+            .as_ref()
+            .map(|v| evaluate_string_value(v, context))
+            .transpose()?;
+        let azure_endpoint = self
+            .azure_endpoint
+            .as_ref()
+            .map(|v| evaluate_string_value(v, context))
+            .transpose()?;
+        let azure_account_name = self
+            .azure_account_name
+            .as_ref()
+            .map(|v| evaluate_string_value(v, context))
+            .transpose()?;
+        let azure_certificate_profile = self
+            .azure_certificate_profile
+            .as_ref()
+            .map(|v| evaluate_string_value(v, context))
+            .transpose()?;
+        let timestamp_url = self
+            .timestamp_url
+            .as_ref()
+            .map(|v| evaluate_string_value(v, context))
+            .transpose()?;
+        let digest_algorithm = self
+            .digest_algorithm
+            .as_ref()
+            .map(|v| evaluate_string_value(v, context))
+            .transpose()?
+            .unwrap_or_else(|| "sha256".to_string());
+
+        Ok(Stage1WindowsSigning {
+            certificate_file,
+            certificate_password,
+            azure_endpoint,
+            azure_account_name,
+            azure_certificate_profile,
+            timestamp_url,
+            digest_algorithm,
+        })
+    }
+}
+
+impl Evaluate for Stage0Signing {
+    type Output = Stage1Signing;
+
+    fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
+        let macos = self
+            .macos
+            .as_ref()
+            .map(|m| m.evaluate(context))
+            .transpose()?;
+        let windows = self
+            .windows
+            .as_ref()
+            .map(|w| w.evaluate(context))
+            .transpose()?;
+
+        Ok(Stage1Signing { macos, windows })
+    }
+}
+
 impl Evaluate for Stage0Build {
     type Output = Stage1Build;
 
@@ -2098,6 +2199,9 @@ impl Evaluate for Stage0Build {
             false,
         )?;
 
+        // Evaluate signing configuration
+        let signing = self.signing.evaluate(context)?;
+
         Ok(Stage1Build {
             number,
             string,
@@ -2113,6 +2217,7 @@ impl Evaluate for Stage0Build {
             variant,
             prefix_detection,
             post_process,
+            signing,
         })
     }
 }
@@ -2927,6 +3032,13 @@ fn merge_stage1_build(
         output.post_process
     };
 
+    // Signing: use output if not default, otherwise inherit from top-level
+    let signing = if output.signing.is_default() {
+        toplevel.signing
+    } else {
+        output.signing
+    };
+
     stage1::Build {
         script,
         number,
@@ -2942,6 +3054,7 @@ fn merge_stage1_build(
         variant,
         prefix_detection,
         post_process,
+        signing,
     }
 }
 

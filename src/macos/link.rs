@@ -329,6 +329,13 @@ impl Relinker for Dylib {
     }
 }
 
+/// Ad-hoc codesign a binary after relinking.
+///
+/// This applies an ad-hoc signature (`-s -`) to make the binary valid after
+/// binary modifications (rpath changes, install_name changes). If the recipe
+/// configures real code signing via `build.signing.macos`, the signing module
+/// (`post_process::signing`) will overwrite this with a proper signature later
+/// in the packaging pipeline.
 fn codesign(path: &Path, system_tools: &SystemTools) -> Result<(), RelinkError> {
     let codesign = system_tools.find_tool(Tool::Codesign).map_err(|e| {
         tracing::error!("codesign not found: {}", e);

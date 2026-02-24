@@ -5,3 +5,4 @@ pub mod path_checks;
 pub mod python;
 pub mod regex_replacements;
 pub mod relink;
+pub mod signing;

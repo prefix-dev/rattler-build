@@ -5,8 +5,8 @@ use rattler_conda_types::NoArchType;
 use crate::stage0::{
     Conditional, ConditionalList, Item, JinjaExpression, NestedItemList,
     build::{
-        BinaryRelocation, Build, DynamicLinking, ForceFileType, PostProcess, PrefixDetection,
-        PrefixIgnore, PythonBuild, VariantKeyUsage,
+        BinaryRelocation, Build, DynamicLinking, ForceFileType, MacOsSigning, PostProcess,
+        PrefixDetection, PrefixIgnore, PythonBuild, Signing, VariantKeyUsage, WindowsSigning,
     },
     parser::helpers::get_span,
     types::{IncludeExclude, Value},
@@ -453,10 +453,13 @@ fn parse_build_from_mapping(mapping: &MarkedMappingNode) -> Result<Build, ParseE
             "post_process" => {
                 build.post_process = parse_post_process_list(value_node)?;
             }
+            "signing" => {
+                build.signing = parse_signing(value_node)?;
+            }
             _ => {
                 return Err(
                     ParseError::invalid_value("build", format!("unknown field '{}'", key), *key_node.span())
-                        .with_suggestion("Valid fields are: number, string, script, noarch, python, skip, always_copy_files, always_include_files, merge_build_and_host_envs, files, dynamic_linking, variant, prefix_detection, post_process")
+                        .with_suggestion("Valid fields are: number, string, script, noarch, python, skip, always_copy_files, always_include_files, merge_build_and_host_envs, files, dynamic_linking, variant, prefix_detection, post_process, signing")
                 );
             }
         }
@@ -823,6 +826,178 @@ fn parse_post_process_list_as_values(
     }
 }
 
+fn parse_signing(node: &Node) -> Result<Signing, ParseError> {
+    let mapping = node.as_mapping().ok_or_else(|| {
+        ParseError::expected_type("mapping", "non-mapping", get_span(node))
+            .with_message("Expected 'signing' to be a mapping")
+    })?;
+
+    let mut signing = Signing::default();
+
+    for (key_node, value_node) in mapping.iter() {
+        let key = key_node.as_str();
+
+        match key {
+            "macos" => {
+                signing.macos = Some(parse_macos_signing(value_node)?);
+            }
+            "windows" => {
+                signing.windows = Some(parse_windows_signing(value_node)?);
+            }
+            _ => {
+                return Err(ParseError::invalid_value(
+                    "signing",
+                    format!("unknown field '{}'", key),
+                    *key_node.span(),
+                )
+                .with_suggestion("Valid fields are: macos, windows"));
+            }
+        }
+    }
+
+    Ok(signing)
+}
+
+fn parse_macos_signing(node: &Node) -> Result<MacOsSigning, ParseError> {
+    let mapping = node.as_mapping().ok_or_else(|| {
+        ParseError::expected_type("mapping", "non-mapping", get_span(node))
+            .with_message("Expected 'signing.macos' to be a mapping")
+    })?;
+
+    let mut identity = None;
+    let mut keychain = None;
+    let mut entitlements = None;
+    let mut options = ConditionalList::default();
+
+    for (key_node, value_node) in mapping.iter() {
+        let key = key_node.as_str();
+
+        match key {
+            "identity" => {
+                identity = Some(parse_field!("signing.macos.identity", value_node));
+            }
+            "keychain" => {
+                keychain = Some(parse_field!("signing.macos.keychain", value_node));
+            }
+            "entitlements" => {
+                entitlements = Some(parse_field!("signing.macos.entitlements", value_node));
+            }
+            "options" => {
+                options = parse_conditional_list(value_node)?;
+            }
+            _ => {
+                return Err(ParseError::invalid_value(
+                    "signing.macos",
+                    format!("unknown field '{}'", key),
+                    *key_node.span(),
+                )
+                .with_suggestion("Valid fields are: identity, keychain, entitlements, options"));
+            }
+        }
+    }
+
+    let identity =
+        identity.ok_or_else(|| ParseError::missing_field("identity", get_span(node)))?;
+
+    Ok(MacOsSigning {
+        identity,
+        keychain,
+        entitlements,
+        options,
+    })
+}
+
+fn parse_windows_signing(node: &Node) -> Result<WindowsSigning, ParseError> {
+    let mapping = node.as_mapping().ok_or_else(|| {
+        ParseError::expected_type("mapping", "non-mapping", get_span(node))
+            .with_message("Expected 'signing.windows' to be a mapping")
+    })?;
+
+    let mut certificate_file = None;
+    let mut certificate_password = None;
+    let mut azure_endpoint = None;
+    let mut azure_account_name = None;
+    let mut azure_certificate_profile = None;
+    let mut timestamp_url = None;
+    let mut digest_algorithm = None;
+
+    for (key_node, value_node) in mapping.iter() {
+        let key = key_node.as_str();
+
+        match key {
+            "certificate_file" => {
+                certificate_file =
+                    Some(parse_field!("signing.windows.certificate_file", value_node));
+            }
+            "certificate_password" => {
+                certificate_password = Some(parse_field!(
+                    "signing.windows.certificate_password",
+                    value_node
+                ));
+            }
+            "azure_endpoint" => {
+                azure_endpoint =
+                    Some(parse_field!("signing.windows.azure_endpoint", value_node));
+            }
+            "azure_account_name" => {
+                azure_account_name =
+                    Some(parse_field!("signing.windows.azure_account_name", value_node));
+            }
+            "azure_certificate_profile" => {
+                azure_certificate_profile = Some(parse_field!(
+                    "signing.windows.azure_certificate_profile",
+                    value_node
+                ));
+            }
+            "timestamp_url" => {
+                timestamp_url =
+                    Some(parse_field!("signing.windows.timestamp_url", value_node));
+            }
+            "digest_algorithm" => {
+                digest_algorithm =
+                    Some(parse_field!("signing.windows.digest_algorithm", value_node));
+            }
+            _ => {
+                return Err(ParseError::invalid_value(
+                    "signing.windows",
+                    format!("unknown field '{}'", key),
+                    *key_node.span(),
+                )
+                .with_suggestion(
+                    "Valid fields are: certificate_file, certificate_password, \
+                     azure_endpoint, azure_account_name, azure_certificate_profile, \
+                     timestamp_url, digest_algorithm",
+                ));
+            }
+        }
+    }
+
+    // Validate: at least one signing method must be specified
+    let has_local = certificate_file.is_some();
+    let has_azure = azure_endpoint.is_some()
+        || azure_account_name.is_some()
+        || azure_certificate_profile.is_some();
+
+    if !has_local && !has_azure {
+        return Err(ParseError::missing_field("certificate_file or azure_endpoint", get_span(node))
+            .with_message(
+                "Windows signing requires either 'certificate_file' (for signtool) or \
+                 'azure_endpoint'/'azure_account_name'/'azure_certificate_profile' \
+                 (for Azure Trusted Signing)",
+            ));
+    }
+
+    Ok(WindowsSigning {
+        certificate_file,
+        certificate_password,
+        azure_endpoint,
+        azure_account_name,
+        azure_certificate_profile,
+        timestamp_url,
+        digest_algorithm,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -953,5 +1128,196 @@ post_process:
         } else {
             panic!("Expected conditional item");
         }
+    }
+
+    #[test]
+    fn test_parse_signing_macos() {
+        let yaml = r#"
+signing:
+  macos:
+    identity: "Developer ID Application: Test (ABC123)"
+    keychain: "/path/to/keychain.keychain-db"
+    entitlements: "entitlements.plist"
+    options:
+      - runtime
+"#;
+        let node = marked_yaml::parse_yaml(0, yaml).unwrap();
+        let build = parse_build(&node).unwrap();
+        let signing = &build.signing;
+        assert!(signing.macos.is_some());
+        assert!(signing.windows.is_none());
+
+        let macos = signing.macos.as_ref().unwrap();
+        assert_eq!(
+            macos.identity.as_concrete().unwrap(),
+            "Developer ID Application: Test (ABC123)"
+        );
+        assert_eq!(
+            macos.keychain.as_ref().unwrap().as_concrete().unwrap(),
+            "/path/to/keychain.keychain-db"
+        );
+        assert_eq!(
+            macos
+                .entitlements
+                .as_ref()
+                .unwrap()
+                .as_concrete()
+                .unwrap(),
+            "entitlements.plist"
+        );
+        assert_eq!(macos.options.len(), 1);
+    }
+
+    #[test]
+    fn test_parse_signing_windows_signtool() {
+        let yaml = r#"
+signing:
+  windows:
+    certificate_file: "/path/to/cert.pfx"
+    certificate_password: "secret123"
+    timestamp_url: "http://timestamp.digicert.com"
+    digest_algorithm: "sha256"
+"#;
+        let node = marked_yaml::parse_yaml(0, yaml).unwrap();
+        let build = parse_build(&node).unwrap();
+        let signing = &build.signing;
+        assert!(signing.macos.is_none());
+        assert!(signing.windows.is_some());
+
+        let windows = signing.windows.as_ref().unwrap();
+        assert_eq!(
+            windows
+                .certificate_file
+                .as_ref()
+                .unwrap()
+                .as_concrete()
+                .unwrap(),
+            "/path/to/cert.pfx"
+        );
+        assert_eq!(
+            windows
+                .certificate_password
+                .as_ref()
+                .unwrap()
+                .as_concrete()
+                .unwrap(),
+            "secret123"
+        );
+    }
+
+    #[test]
+    fn test_parse_signing_windows_azure() {
+        let yaml = r#"
+signing:
+  windows:
+    azure_endpoint: "https://wus2.codesigning.azure.net"
+    azure_account_name: "my-signing-account"
+    azure_certificate_profile: "my-profile"
+    timestamp_url: "http://timestamp.acs.microsoft.com"
+    digest_algorithm: "sha256"
+"#;
+        let node = marked_yaml::parse_yaml(0, yaml).unwrap();
+        let build = parse_build(&node).unwrap();
+        let signing = &build.signing;
+        assert!(signing.windows.is_some());
+
+        let windows = signing.windows.as_ref().unwrap();
+        assert!(windows.certificate_file.is_none());
+        assert_eq!(
+            windows
+                .azure_endpoint
+                .as_ref()
+                .unwrap()
+                .as_concrete()
+                .unwrap(),
+            "https://wus2.codesigning.azure.net"
+        );
+        assert_eq!(
+            windows
+                .azure_account_name
+                .as_ref()
+                .unwrap()
+                .as_concrete()
+                .unwrap(),
+            "my-signing-account"
+        );
+        assert_eq!(
+            windows
+                .azure_certificate_profile
+                .as_ref()
+                .unwrap()
+                .as_concrete()
+                .unwrap(),
+            "my-profile"
+        );
+    }
+
+    #[test]
+    fn test_parse_signing_both_platforms() {
+        let yaml = r#"
+signing:
+  macos:
+    identity: "-"
+  windows:
+    azure_endpoint: "https://endpoint"
+    azure_account_name: "account"
+    azure_certificate_profile: "profile"
+"#;
+        let node = marked_yaml::parse_yaml(0, yaml).unwrap();
+        let build = parse_build(&node).unwrap();
+        assert!(build.signing.macos.is_some());
+        assert!(build.signing.windows.is_some());
+    }
+
+    #[test]
+    fn test_parse_signing_missing_identity() {
+        let yaml = r#"
+signing:
+  macos:
+    keychain: "/path/to/keychain"
+"#;
+        let node = marked_yaml::parse_yaml(0, yaml).unwrap();
+        let result = parse_build(&node);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_signing_missing_any_method() {
+        let yaml = r#"
+signing:
+  windows:
+    certificate_password: "secret"
+"#;
+        let node = marked_yaml::parse_yaml(0, yaml).unwrap();
+        let result = parse_build(&node);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_signing_unknown_field() {
+        let yaml = r#"
+signing:
+  linux:
+    key: "something"
+"#;
+        let node = marked_yaml::parse_yaml(0, yaml).unwrap();
+        let result = parse_build(&node);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(matches!(err, ParseError::InvalidValue { .. }));
+    }
+
+    #[test]
+    fn test_parse_signing_with_jinja_template() {
+        let yaml = r#"
+signing:
+  macos:
+    identity: "${{ SIGNING_IDENTITY }}"
+"#;
+        let node = marked_yaml::parse_yaml(0, yaml).unwrap();
+        let build = parse_build(&node).unwrap();
+        let macos = build.signing.macos.as_ref().unwrap();
+        // Should be a template, not a concrete value
+        assert!(macos.identity.as_concrete().is_none());
     }
 }

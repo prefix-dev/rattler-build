@@ -93,6 +93,9 @@ pub enum PackagingError {
 
     #[error("Invalid MenuInst schema file: {0} - {1}")]
     InvalidMenuInstSchema(PathBuf, serde_json::Error),
+
+    #[error("Code signing error: {0}")]
+    SigningError(#[from] crate::post_process::signing::SigningError),
 }
 
 /// This function copies the license files to the info/licenses folder.
@@ -701,6 +704,13 @@ pub fn package_conda(
     post_process::regex_replacements::regex_post_process(&tmp, output)?;
 
     tracing::info!("Post-processing done!");
+
+    // Sign binaries with real certificates (if configured in recipe)
+    let signed_files = post_process::signing::sign_binaries(&tmp, output)?;
+
+    // Check that signed binaries don't contain the build prefix
+    // (prefix replacement at install time would destroy signatures)
+    post_process::signing::check_signed_binaries_no_prefix(&signed_files, output)?;
 
     // Validate any dsolist JSON files being packaged (CEP-28)
     post_process::checks::validate_dsolist_files(tmp.temp_dir.path())?;

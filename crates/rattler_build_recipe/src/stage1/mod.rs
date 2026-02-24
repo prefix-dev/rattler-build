@@ -29,7 +29,9 @@ pub mod tests;
 mod variant_tests;
 
 pub use about::About;
-pub use build::{Build, Rpaths};
+pub use build::{
+    Build, MacOsSigning, Rpaths, Signing, WindowsSigning, WindowsSigningMethod,
+};
 pub use extra::Extra;
 pub use hash::{HashInfo, HashInput, compute_hash};
 use indexmap::IndexMap;

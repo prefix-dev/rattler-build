@@ -39,6 +39,9 @@ build:
     ignore: false
     ignore_binary_files: false
   post_process: []
+  signing:
+    macos: null
+    windows: null
 about:
   homepage: null
   license: null
@@ -117,6 +120,9 @@ outputs:
       ignore: false
       ignore_binary_files: false
     post_process: []
+    signing:
+      macos: null
+      windows: null
   about:
     homepage: null
     license: BSD-3-Clause

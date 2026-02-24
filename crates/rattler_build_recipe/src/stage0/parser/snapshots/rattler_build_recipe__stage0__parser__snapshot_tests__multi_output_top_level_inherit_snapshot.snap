@@ -44,6 +44,9 @@ build:
     ignore: false
     ignore_binary_files: false
   post_process: []
+  signing:
+    macos: null
+    windows: null
 about:
   homepage: https://top-level-example.com/
   license: GPL-3.0-or-later
@@ -94,6 +97,9 @@ outputs:
       ignore: false
       ignore_binary_files: false
     post_process: []
+    signing:
+      macos: null
+      windows: null
   about:
     homepage: null
     license: null
@@ -147,6 +153,9 @@ outputs:
       ignore: false
       ignore_binary_files: false
     post_process: []
+    signing:
+      macos: null
+      windows: null
   about:
     homepage: null
     license: null
@@ -201,6 +210,9 @@ outputs:
       ignore: false
       ignore_binary_files: false
     post_process: []
+    signing:
+      macos: null
+      windows: null
   about:
     homepage: null
     license: MIT
