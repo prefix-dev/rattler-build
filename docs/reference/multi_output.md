@@ -89,9 +89,13 @@ outputs:
 
 ### Topological sorting
 
-Outputs are topologically sorted based on `pin_subpackage` references. An output
-that depends on another will always be built after its dependency. The order of entries in `outputs:` does not affect build order.
-Build order is determined by the `pin_subpackage` dependency graph.
+
+Outputs are topologically sorted based on their dependency relationships.
+If one output depends on another (for example via `pin_subpackage` or by
+referencing its name in requirements), the dependent output will be built
+after its dependency.
+
+The order of entries in `outputs:` does not affect build order.
 
 
 ## Inheritance Behavior
