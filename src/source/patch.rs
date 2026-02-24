@@ -918,7 +918,8 @@ mod tests {
         // silent skip (after the empty-path guard was added).
         let (tempdir, _) = setup_patch_test_dir();
 
-        let patch_content = b"From c73bf83977f540a63a974841f79be1e2d7d6616e Mon Sep 17 00:00:00 2001
+        let patch_content =
+            b"From c73bf83977f540a63a974841f79be1e2d7d6616e Mon Sep 17 00:00:00 2001
 From: Matthew Feickert <matthew.feickert@cern.ch>
 Date: Tue, 3 Jun 2025 23:18:31 -0600
 Subject: [PATCH] fix: Add pyproject.toml for build-system
@@ -951,11 +952,7 @@ index 0000000..638dd9c
             &patches_dir,
             apply_patch_custom,
         );
-        assert!(
-            result.is_ok(),
-            "Patch should not error: {:?}",
-            result.err()
-        );
+        assert!(result.is_ok(), "Patch should not error: {:?}", result.err());
 
         let pyproject = work_dir.join("pyproject.toml");
         assert!(
