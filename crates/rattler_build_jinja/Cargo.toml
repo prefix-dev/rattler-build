@@ -28,4 +28,4 @@ toml = { workspace = true }
 [dev-dependencies]
 insta = { workspace = true, features = ["yaml"] }
 tempfile = { workspace = true }
-anyhow = "1.0"
+anyhow = { workspace = true }

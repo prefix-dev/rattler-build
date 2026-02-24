@@ -615,7 +615,7 @@ where
 }
 
 /// Python test - imports modules and optionally runs pip check
-#[pyclass(name = "PythonTest")]
+#[pyclass(name = "PythonTest", from_py_object)]
 #[derive(Clone)]
 pub struct PyPythonTest {
     inner: PythonTest,
@@ -666,7 +666,7 @@ impl PyPythonTest {
 }
 
 /// Python version specification
-#[pyclass(name = "PythonVersion")]
+#[pyclass(name = "PythonVersion", from_py_object)]
 #[derive(Clone)]
 pub struct PyPythonVersion {
     inner: PythonVersion,
@@ -705,7 +705,7 @@ impl PyPythonVersion {
 }
 
 /// Commands test - runs arbitrary shell commands
-#[pyclass(name = "CommandsTest")]
+#[pyclass(name = "CommandsTest", from_py_object)]
 #[derive(Clone)]
 pub struct PyCommandsTest {
     inner: CommandsTest,
@@ -765,7 +765,7 @@ impl PyCommandsTest {
 }
 
 /// Perl test - tests Perl modules
-#[pyclass(name = "PerlTest")]
+#[pyclass(name = "PerlTest", from_py_object)]
 #[derive(Clone)]
 pub struct PyPerlTest {
     inner: PerlTest,
@@ -799,7 +799,7 @@ impl PyPerlTest {
 }
 
 /// R test - tests R libraries
-#[pyclass(name = "RTest")]
+#[pyclass(name = "RTest", from_py_object)]
 #[derive(Clone)]
 pub struct PyRTest {
     inner: RTest,
@@ -833,7 +833,7 @@ impl PyRTest {
 }
 
 /// Ruby test - tests Ruby modules
-#[pyclass(name = "RubyTest")]
+#[pyclass(name = "RubyTest", from_py_object)]
 #[derive(Clone)]
 pub struct PyRubyTest {
     inner: RubyTest,
@@ -867,7 +867,7 @@ impl PyRubyTest {
 }
 
 /// Downstream test - tests a downstream package that depends on this package
-#[pyclass(name = "DownstreamTest")]
+#[pyclass(name = "DownstreamTest", from_py_object)]
 #[derive(Clone)]
 pub struct PyDownstreamTest {
     inner: DownstreamTest,
@@ -901,7 +901,7 @@ impl PyDownstreamTest {
 }
 
 /// Package contents test - checks that files exist or don't exist in the package
-#[pyclass(name = "PackageContentsTest")]
+#[pyclass(name = "PackageContentsTest", from_py_object)]
 #[derive(Clone)]
 pub struct PyPackageContentsTest {
     inner: PackageContentsTest,
@@ -975,7 +975,7 @@ impl PyPackageContentsTest {
 }
 
 /// File existence checks (glob patterns)
-#[pyclass(name = "FileChecks")]
+#[pyclass(name = "FileChecks", from_py_object)]
 #[derive(Clone)]
 pub struct PyFileChecks {
     inner: PackageContentsCheckFiles,
@@ -1015,7 +1015,7 @@ impl PyFileChecks {
 }
 
 /// Result of running a test
-#[pyclass(name = "TestResult")]
+#[pyclass(name = "TestResult", from_py_object)]
 #[derive(Clone)]
 pub struct PyTestResult {
     /// Whether the test passed
@@ -1042,7 +1042,7 @@ impl PyTestResult {
 }
 
 /// Path entry from paths.json
-#[pyclass(name = "PathEntry")]
+#[pyclass(name = "PathEntry", from_py_object)]
 #[derive(Clone)]
 pub struct PyPathEntry {
     inner: PathsEntry,

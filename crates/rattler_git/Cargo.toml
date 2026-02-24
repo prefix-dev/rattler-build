@@ -11,7 +11,7 @@ description = "Git operations support for rattler-build"
 dashmap = { workspace = true }
 dunce = { workspace = true }
 fs-err = { workspace = true, features = ["tokio"] }
-rattler_prefix_guard = { path = "../rattler_prefix_guard" }
+rattler_prefix_guard = { workspace = true }
 reqwest = { workspace = true, features = ["blocking"] }
 reqwest-middleware = { workspace = true }
 serde = { workspace = true }

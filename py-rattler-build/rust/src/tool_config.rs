@@ -9,7 +9,7 @@ use rattler_solve::ChannelPriority;
 use crate::error::RattlerBuildError;
 
 /// Python wrapper for ToolConfiguration
-#[pyclass(name = "ToolConfiguration")]
+#[pyclass(name = "ToolConfiguration", from_py_object)]
 #[derive(Clone)]
 pub struct PyToolConfiguration {
     pub(crate) inner: Configuration,

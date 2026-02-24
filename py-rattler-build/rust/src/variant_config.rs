@@ -10,7 +10,7 @@ use rattler_build_variant_config::config::VariantConfig;
 use std::path::PathBuf;
 
 /// Python wrapper for VariantConfig
-#[pyclass(name = "VariantConfig")]
+#[pyclass(name = "VariantConfig", from_py_object)]
 #[derive(Clone)]
 pub struct PyVariantConfig {
     pub(crate) inner: VariantConfig,

@@ -6,7 +6,7 @@ use pyo3::types::PyDict;
 use rattler_build_recipe::stage1;
 
 /// Stage1 Recipe - The fully evaluated recipe ready for building
-#[pyclass(name = "Stage1Recipe")]
+#[pyclass(name = "Stage1Recipe", from_py_object)]
 #[derive(Clone)]
 pub struct PyStage1Recipe {
     pub(crate) inner: stage1::Recipe,
@@ -116,7 +116,7 @@ impl PyStage1Recipe {
 }
 
 /// Stage1 Package metadata
-#[pyclass(name = "Stage1Package")]
+#[pyclass(name = "Stage1Package", from_py_object)]
 #[derive(Clone)]
 pub struct PyStage1Package {
     pub(crate) inner: stage1::Package,
@@ -151,7 +151,7 @@ impl PyStage1Package {
 }
 
 /// Stage1 Build configuration
-#[pyclass(name = "Stage1Build")]
+#[pyclass(name = "Stage1Build", from_py_object)]
 #[derive(Clone)]
 pub struct PyStage1Build {
     pub(crate) inner: stage1::Build,
@@ -209,7 +209,7 @@ impl PyStage1Build {
 }
 
 /// Stage1 Requirements
-#[pyclass(name = "Stage1Requirements")]
+#[pyclass(name = "Stage1Requirements", from_py_object)]
 #[derive(Clone)]
 pub struct PyStage1Requirements {
     pub(crate) inner: stage1::Requirements,
@@ -277,7 +277,7 @@ impl PyStage1Requirements {
 }
 
 /// Stage1 About metadata
-#[pyclass(name = "Stage1About")]
+#[pyclass(name = "Stage1About", from_py_object)]
 #[derive(Clone)]
 pub struct PyStage1About {
     pub(crate) inner: stage1::About,
@@ -335,7 +335,7 @@ impl PyStage1About {
 }
 
 /// Stage1 Source
-#[pyclass(name = "Stage1Source")]
+#[pyclass(name = "Stage1Source", from_py_object)]
 #[derive(Clone)]
 pub struct PyStage1Source {
     pub(crate) inner: stage1::Source,
@@ -352,7 +352,7 @@ impl PyStage1Source {
 }
 
 /// Stage1 Staging Cache
-#[pyclass(name = "Stage1StagingCache")]
+#[pyclass(name = "Stage1StagingCache", from_py_object)]
 #[derive(Clone)]
 pub struct PyStage1StagingCache {
     pub(crate) inner: stage1::StagingCache,

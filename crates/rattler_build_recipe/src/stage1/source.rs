@@ -19,7 +19,7 @@ pub enum Source {
 }
 
 /// A git revision (branch, tag or commit) - evaluated
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, PartialEq, Eq)]
 pub enum GitRev {
     /// A git branch
     Branch(String),
@@ -28,6 +28,7 @@ pub enum GitRev {
     /// A specific git commit hash
     Commit(String),
     /// The default revision (HEAD)
+    #[default]
     Head,
 }
 
@@ -79,12 +80,6 @@ impl FromStr for GitRev {
         } else {
             Ok(Self::Commit(s.to_owned()))
         }
-    }
-}
-
-impl Default for GitRev {
-    fn default() -> Self {
-        Self::Head
     }
 }
 

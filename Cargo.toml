@@ -111,6 +111,19 @@ sigstore-verify = { version = "0.6.3", default-features = false }
 sigstore-trust-root = { version = "0.6.3", default-features = false }
 sigstore-types = { version = "0.6.3" }
 
+anyhow = "1.0.102"
+content_inspector = "0.2.4"
+memchr = "2.8.0"
+memmap2 = "0.9.10"
+rayon = "1.11.0"
+serial_test = "3.4.0"
+rattler_build_networking = { path = "crates/rattler_build_networking" }
+rattler_build_script = { path = "crates/rattler_build_script" }
+rattler_build_variant_config = { path = "crates/rattler_build_variant_config" }
+rattler_build_yaml_parser = { path = "crates/rattler_build_yaml_parser" }
+rattler_git = { path = "crates/rattler_git" }
+rattler_prefix_guard = { path = "crates/rattler_prefix_guard" }
+
 [features]
 default = ['rustls-tls', 'recipe-generation', 's3', 'sigstore']
 # Enable optimized memory allocators for release builds.
@@ -180,9 +193,9 @@ path = "./scripts/patch-apply-gen-test-data.rs"
 serde = { workspace = true }
 serde_yaml = { workspace = true }
 serde-untagged = "0.1.9"
-anyhow = "1.0.100"
+anyhow = { workspace = true }
 walkdir = { workspace = true }
-hex = "0.4.3"
+hex = { workspace = true }
 serde_json = { workspace = true }
 sha1 = { workspace = true }
 reqwest = { workspace = true, features = ["multipart"] }
@@ -193,7 +206,7 @@ tokio = { workspace = true, features = [
   "process",
 ] }
 itertools = { workspace = true }
-content_inspector = "0.2.4"
+content_inspector = { workspace = true }
 serde_with = { workspace = true }
 url = { workspace = true }
 tracing = { workspace = true }
@@ -214,41 +227,41 @@ miette = { workspace = true, features = ["fancy"] }
 num_cpus = "1.17.0"
 goblin = "0.10.4"
 scroll = "0.13.0"
-pathdiff = "0.2.3"
+pathdiff = { workspace = true }
 comfy-table = "7.2.2"
 futures = { workspace = true }
-indicatif = { version = "0.18.0", features = ["in_memory"] }
+indicatif = { workspace = true, features = ["in_memory"] }
 console = { workspace = true }
 thiserror = { workspace = true }
 tempfile = { workspace = true }
-chrono = "0.4.43"
-spdx = "0.13.3"
+chrono = { workspace = true }
+spdx = { workspace = true }
 ignore = "0.4.25"
 globset = { workspace = true }
 text-stub-library = "0.9.0"
 clap-verbosity-flag = "3.0.4"
 tracing-core = "0.1.36"
 indexmap = { workspace = true }
-dunce = "1.0.5"
+dunce = { workspace = true }
 fs-err = { workspace = true }
-which = "8.0.0"
+which = { workspace = true }
 clap_complete = "4.5.65"
 clap_complete_nushell = "4.5.10"
-tokio-util = { version = "0.7.18", features = ["codec", "compat"] }
-flickzeug = { version = "0.4.5" }
+tokio-util = { workspace = true }
+flickzeug = { version = "0.5.1" }
 toml = { workspace = true }
-memmap2 = "0.9.9"
+memmap2 = { workspace = true }
 reqwest-middleware = { version = "0.4.2", features = ["json"] }
 async-once-cell = { workspace = true }
 terminal_size = "0.4.3"
-memchr = "2.7.6"
+memchr = { workspace = true }
 ratatui = { version = "0.29.0", optional = true }
 crossterm = { version = "0.28.1", features = ["event-stream"], optional = true }
 ansi-to-tui = { version = "7.0.0", optional = true }
 throbber-widgets-tui = { version = "0.8", optional = true }
 tui-input = { version = "0.14.0", optional = true }
 reflink-copy = "0.1.28"
-rayon = "1.11.0"
+rayon = { workspace = true }
 regex = { workspace = true }
 async-recursion = { workspace = true }
 
@@ -272,7 +285,7 @@ rattler_repodata_gateway = { version = "0.26.0", default-features = false, featu
 rattler_shell = { version = "0.26.0", default-features = false, features = [
   "sysinfo",
 ] }
-rattler_prefix_guard = { path = "crates/rattler_prefix_guard" }
+rattler_prefix_guard = { workspace = true }
 rattler_solve = { version = "4.2.4", default-features = false, features = [
   "resolvo",
   "serde",
@@ -286,30 +299,30 @@ retry-policies = "0.5.1"
 strum = "0.27.2"
 unicode-normalization = "0.1.25"
 line-ending = "1.5.1"
-http-range-client = { git = "https://github.com/pka/http-range-client.git", default-features = false, features = [
+http-range-client = { version = "0.9.1", default-features = false, features = [
   "reqwest-sync",
 ] }
-sevenz-rust2 = "0.20.1"
+sevenz-rust2 = { workspace = true }
 dialoguer = "0.12.0"
 
 # Local rattler-build crates
 rattler_build_recipe_generator = { path = "crates/rattler_build_recipe_generator", optional = true, default-features = false, features = [
   "cli",
 ] }
-rattler_build_types = { path = "crates/rattler_build_types" }
-rattler_build_variant_config = { path = "crates/rattler_build_variant_config", features = [
+rattler_build_types = { workspace = true }
+rattler_build_variant_config = { workspace = true, features = [
   "parser",
 ] }
-rattler_build_jinja = { path = "crates/rattler_build_jinja" }
-rattler_build_recipe = { path = "crates/rattler_build_recipe", features = [
+rattler_build_jinja = { workspace = true }
+rattler_build_recipe = { workspace = true, features = [
   "variant-config",
 ] }
-rattler_git = { path = "crates/rattler_git" }
-rattler_build_networking = { path = "crates/rattler_build_networking", features = [
+rattler_git = { workspace = true }
+rattler_build_networking = { workspace = true, features = [
   "middleware",
 ] }
 rattler_build_source_cache = { path = "crates/rattler_build_source_cache", default-features = false }
-rattler_build_script = { path = "crates/rattler_build_script" }
+rattler_build_script = { workspace = true }
 rattler_build_allocator = { path = "crates/rattler_build_allocator", optional = true }
 
 [target.'cfg(not(target_os = "windows"))'.dependencies]
@@ -323,7 +336,7 @@ insta = { workspace = true, features = ["yaml", "filters"] }
 rstest = { workspace = true }
 tracing-test = "0.2.5"
 tracing-indicatif = "0.3.13"
-serial_test = "3.3.1"
+serial_test = { workspace = true }
 criterion = { version = "0.8.2", features = ["html_reports"] }
 pretty_assertions = "1.4.1"
 

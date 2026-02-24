@@ -16,7 +16,7 @@ use crate::stage1::PyStage1Recipe;
 use crate::variant_config::PyVariantConfig;
 
 /// Configuration for rendering recipes with variants
-#[pyclass(name = "RenderConfig")]
+#[pyclass(name = "RenderConfig", from_py_object)]
 #[derive(Clone)]
 pub struct PyRenderConfig {
     pub(crate) inner: RustRenderConfig,
@@ -142,7 +142,7 @@ impl PyRenderConfig {
 }
 
 /// Hash information for a rendered variant
-#[pyclass(name = "HashInfo")]
+#[pyclass(name = "HashInfo", from_py_object)]
 #[derive(Clone, Debug)]
 pub struct PyHashInfo {
     #[pyo3(get)]
@@ -159,7 +159,7 @@ impl PyHashInfo {
 }
 
 /// Information about a pin_subpackage dependency
-#[pyclass(name = "PinSubpackageInfo")]
+#[pyclass(name = "PinSubpackageInfo", from_py_object)]
 #[derive(Clone, Debug)]
 pub struct PyPinSubpackageInfo {
     #[pyo3(get)]
@@ -183,7 +183,7 @@ impl PyPinSubpackageInfo {
 }
 
 /// Result of rendering a recipe with a specific variant combination
-#[pyclass(name = "RenderedVariant")]
+#[pyclass(name = "RenderedVariant", from_py_object)]
 #[derive(Clone)]
 pub struct PyRenderedVariant {
     pub(crate) inner: RustRenderedVariant,

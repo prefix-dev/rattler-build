@@ -27,9 +27,9 @@ rattler_build_types = { workspace = true, optional = true }
 fs-err = { workspace = true }
 walkdir = { workspace = true }
 globset = { workspace = true }
-content_inspector = "0.2"
-memmap2 = "0.9"
-memchr = "2.7"
+content_inspector = { workspace = true }
+memmap2 = { workspace = true }
+memchr = { workspace = true }
 pathdiff = { workspace = true }
 
 # Serialization
@@ -37,7 +37,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 
 # Parallelism
-rayon = "1.10"
+rayon = { workspace = true }
 
 # Utilities
 chrono = { workspace = true }
