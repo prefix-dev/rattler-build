@@ -181,6 +181,7 @@ mod sys {
 
     #[allow(dead_code)]
     pub fn error_unsupported(err: &Error) -> bool {
+        #[allow(unreachable_patterns)]
         matches!(
             err.raw_os_error(),
             Some(libc::ENOTSUP | libc::EOPNOTSUPP | libc::ENOSYS)
