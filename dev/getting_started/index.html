@@ -3068,8 +3068,9 @@
 </span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>rattler-build<span class="w"> </span>build<span class="w"> </span>-m<span class="w"> </span>variants.yaml
 </span></code></pre></div>
 <h3 id="debugging-failed-builds">Debugging failed builds<a class="headerlink" href="#debugging-failed-builds" title="Permanent link">#</a></h3>
-<p>When a build fails, use <code>debug-shell</code> to enter an interactive shell in the build environment:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>rattler-build<span class="w"> </span>debug-shell
+<p>When a build fails, the build directory is preserved automatically. Open a debug
+shell to investigate:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>rattler-build<span class="w"> </span>debug<span class="w"> </span>shell
 </span></code></pre></div>
 <p>This opens a shell with:</p>
 <ul>

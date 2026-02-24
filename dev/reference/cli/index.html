@@ -2601,28 +2601,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#create-patch" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        create-patch
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#debug-shell" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        debug-shell
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#package" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2859,28 +2837,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#create-patch" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        create-patch
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#debug-shell" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        debug-shell
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#package" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2946,9 +2902,7 @@
 <li><code>completion</code> — Generate shell completion script</li>
 <li><code>generate-recipe</code> — Generate a recipe from PyPI, CRAN, CPAN, or LuaRocks</li>
 <li><code>auth</code> — Handle authentication to external channels</li>
-<li><code>debug</code> — Debug a recipe by setting up the environment without running the build script</li>
-<li><code>create-patch</code> — Create a patch for a directory</li>
-<li><code>debug-shell</code> — Open a debug shell in the build environment</li>
+<li><code>debug</code> — Debug a recipe build</li>
 <li><code>package</code> — Package-related subcommands</li>
 <li><code>bump-recipe</code> — Bump a recipe to a new version</li>
 </ul>
@@ -3952,17 +3906,31 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 </li>
 </ul>
 <h3 id="debug"><code>debug</code><a class="headerlink" href="#debug" title="Permanent link">#</a></h3>
-<p>Debug a recipe by setting up the environment without running the build script</p>
-<p><strong>Usage:</strong> <code>rattler-build debug [OPTIONS] --recipe &lt;RECIPE&gt;</code></p>
+<p>Debug a recipe build.</p>
+<p>Subcommands: setup     - Set up a debug environment from a recipe shell     - Open an interactive debug shell host-add  - Install additional packages into the host prefix build-add - Install additional packages into the build prefix</p>
+<p><strong>Usage:</strong> <code>rattler-build debug &lt;COMMAND&gt;</code></p>
+<h5 id="subcommands_4"><strong>Subcommands:</strong><a class="headerlink" href="#subcommands_4" title="Permanent link">#</a></h5>
+<ul>
+<li><code>setup</code> — Set up a debug environment from a recipe</li>
+<li><code>shell</code> — Open an interactive debug shell in an existing build environment</li>
+<li><code>host-add</code> — Install additional packages into the host prefix</li>
+<li><code>build-add</code> — Install additional packages into the build prefix</li>
+<li><code>workdir</code> — Print the work directory path</li>
+<li><code>run</code> — Re-run the build script in an existing debug environment</li>
+<li><code>create-patch</code> — Create a patch from changes in the work directory</li>
+</ul>
+<h4 id="setup"><code>setup</code><a class="headerlink" href="#setup" title="Permanent link">#</a></h4>
+<p>Set up a debug environment from a recipe.</p>
+<p>Resolves dependencies, downloads sources, applies patches, installs build/host environments, and creates the build script — then stops. Use <code>debug shell</code> or <code>debug run</code> afterwards to work in the environment.</p>
+<p><strong>Usage:</strong> <code>rattler-build debug setup [OPTIONS]</code></p>
 <h5 id="options_17"><strong>Options:</strong><a class="headerlink" href="#options_17" title="Permanent link">#</a></h5>
 <ul>
 <li>
 <p><code>-r</code>, <code>--recipe &lt;RECIPE&gt;</code></p>
-<p>Recipe file to debug</p>
-</li>
-<li>
-<p><code>-o</code>, <code>--output &lt;OUTPUT&gt;</code></p>
-<p>Output directory for build artifacts</p>
+<p>Recipe file or directory to debug</p>
+<ul>
+<li>Default value: <code>.</code></li>
+</ul>
 </li>
 <li>
 <p><code>--target-platform &lt;TARGET_PLATFORM&gt;</code></p>
@@ -3981,6 +3949,10 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <p>Channels to use when building</p>
 </li>
 <li>
+<p><code>--output-name &lt;OUTPUT_NAME&gt;</code></p>
+<p>Name of the specific output to debug (only required when a recipe has multiple outputs)</p>
+</li>
+<li>
 <p><code>--experimental</code></p>
 <p>Enable experimental features</p>
 </li>
@@ -3992,10 +3964,6 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <p><code>--channel-priority &lt;CHANNEL_PRIORITY&gt;</code></p>
 <p>Channel priority to use when solving</p>
 </li>
-<li>
-<p><code>--output-name &lt;OUTPUT_NAME&gt;</code></p>
-<p>Name of the specific output to debug</p>
-</li>
 </ul>
 <h6 id="modifying-result_4"><strong>Modifying result</strong><a class="headerlink" href="#modifying-result_4" title="Permanent link">#</a></h6>
 <ul>
@@ -4004,10 +3972,163 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <p>Output directory for build artifacts.</p>
 </li>
 </ul>
-<h3 id="create-patch"><code>create-patch</code><a class="headerlink" href="#create-patch" title="Permanent link">#</a></h3>
-<p>Create a patch for a directory</p>
-<p><strong>Usage:</strong> <code>rattler-build create-patch [OPTIONS]</code></p>
+<h4 id="shell"><code>shell</code><a class="headerlink" href="#shell" title="Permanent link">#</a></h4>
+<p>Open an interactive debug shell in an existing build environment.</p>
+<p>By default, reads the work directory from the last build in rattler-build-log.txt. You can also specify --work-dir explicitly.</p>
+<p><strong>Usage:</strong> <code>rattler-build debug shell [OPTIONS]</code></p>
 <h5 id="options_18"><strong>Options:</strong><a class="headerlink" href="#options_18" title="Permanent link">#</a></h5>
+<ul>
+<li>
+<p><code>--work-dir &lt;WORK_DIR&gt;</code></p>
+<p>Work directory to use (reads from last build in rattler-build-log.txt if not specified)</p>
+</li>
+<li>
+<p><code>--experimental</code></p>
+<p>Enable experimental features</p>
+</li>
+<li>
+<p><code>--allow-insecure-host &lt;ALLOW_INSECURE_HOST&gt;</code></p>
+<p>List of hosts for which SSL certificate verification should be skipped</p>
+</li>
+<li>
+<p><code>--channel-priority &lt;CHANNEL_PRIORITY&gt;</code></p>
+<p>Channel priority to use when solving</p>
+</li>
+</ul>
+<h6 id="modifying-result_5"><strong>Modifying result</strong><a class="headerlink" href="#modifying-result_5" title="Permanent link">#</a></h6>
+<ul>
+<li>
+<p><code>--output-dir &lt;OUTPUT_DIR&gt;</code></p>
+<p>Output directory for build artifacts.</p>
+</li>
+</ul>
+<h4 id="host-add"><code>host-add</code><a class="headerlink" href="#host-add" title="Permanent link">#</a></h4>
+<p>Install additional packages into the host prefix</p>
+<p>This command resolves and installs the specified packages into the host environment of an existing debug build. Useful for iterating on dependencies without re-running the full debug setup.</p>
+<p><strong>Usage:</strong> <code>rattler-build debug host-add [OPTIONS] &lt;SPECS&gt;...</code></p>
+<h5 id="arguments_8"><strong>Arguments:</strong><a class="headerlink" href="#arguments_8" title="Permanent link">#</a></h5>
+<ul>
+<li>
+<p><code>&lt;SPECS&gt;</code></p>
+<p>Package specs to install (e.g. "python&gt;=3.11", "cmake", "numpy 1.26.*")</p>
+</li>
+</ul>
+<h5 id="options_19"><strong>Options:</strong><a class="headerlink" href="#options_19" title="Permanent link">#</a></h5>
+<ul>
+<li>
+<p><code>-c</code>, <code>--channel &lt;CHANNELS&gt;</code></p>
+<p>Channels to search for packages in</p>
+</li>
+<li>
+<p><code>--work-dir &lt;WORK_DIR&gt;</code></p>
+<p>Work directory to use (reads from last build in rattler-build-log.txt if not specified)</p>
+</li>
+<li>
+<p><code>-o</code>, <code>--output-dir &lt;OUTPUT_DIR&gt;</code></p>
+<p>Output directory containing rattler-build-log.txt</p>
+<ul>
+<li>Default value: <code>./output</code></li>
+</ul>
+</li>
+</ul>
+<h4 id="build-add"><code>build-add</code><a class="headerlink" href="#build-add" title="Permanent link">#</a></h4>
+<p>Install additional packages into the build prefix</p>
+<p>This command resolves and installs the specified packages into the build environment of an existing debug build. Useful for adding build tools without re-running the full debug setup.</p>
+<p><strong>Usage:</strong> <code>rattler-build debug build-add [OPTIONS] &lt;SPECS&gt;...</code></p>
+<h5 id="arguments_9"><strong>Arguments:</strong><a class="headerlink" href="#arguments_9" title="Permanent link">#</a></h5>
+<ul>
+<li>
+<p><code>&lt;SPECS&gt;</code></p>
+<p>Package specs to install (e.g. "python&gt;=3.11", "cmake", "numpy 1.26.*")</p>
+</li>
+</ul>
+<h5 id="options_20"><strong>Options:</strong><a class="headerlink" href="#options_20" title="Permanent link">#</a></h5>
+<ul>
+<li>
+<p><code>-c</code>, <code>--channel &lt;CHANNELS&gt;</code></p>
+<p>Channels to search for packages in</p>
+</li>
+<li>
+<p><code>--work-dir &lt;WORK_DIR&gt;</code></p>
+<p>Work directory to use (reads from last build in rattler-build-log.txt if not specified)</p>
+</li>
+<li>
+<p><code>-o</code>, <code>--output-dir &lt;OUTPUT_DIR&gt;</code></p>
+<p>Output directory containing rattler-build-log.txt</p>
+<ul>
+<li>Default value: <code>./output</code></li>
+</ul>
+</li>
+</ul>
+<h4 id="workdir"><code>workdir</code><a class="headerlink" href="#workdir" title="Permanent link">#</a></h4>
+<p>Print the work directory path.</p>
+<p>Prints the absolute path to the work directory from the last debug setup (or the directory given by --work-dir). Useful for scripts and AI agents that need to locate the build directory.</p>
+<p><strong>Usage:</strong> <code>rattler-build debug workdir [OPTIONS]</code></p>
+<h5 id="options_21"><strong>Options:</strong><a class="headerlink" href="#options_21" title="Permanent link">#</a></h5>
+<ul>
+<li>
+<p><code>--work-dir &lt;WORK_DIR&gt;</code></p>
+<p>Work directory to use (reads from last build in rattler-build-log.txt if not specified)</p>
+</li>
+<li>
+<p><code>--experimental</code></p>
+<p>Enable experimental features</p>
+</li>
+<li>
+<p><code>--allow-insecure-host &lt;ALLOW_INSECURE_HOST&gt;</code></p>
+<p>List of hosts for which SSL certificate verification should be skipped</p>
+</li>
+<li>
+<p><code>--channel-priority &lt;CHANNEL_PRIORITY&gt;</code></p>
+<p>Channel priority to use when solving</p>
+</li>
+</ul>
+<h6 id="modifying-result_6"><strong>Modifying result</strong><a class="headerlink" href="#modifying-result_6" title="Permanent link">#</a></h6>
+<ul>
+<li>
+<p><code>--output-dir &lt;OUTPUT_DIR&gt;</code></p>
+<p>Output directory for build artifacts.</p>
+</li>
+</ul>
+<h4 id="run"><code>run</code><a class="headerlink" href="#run" title="Permanent link">#</a></h4>
+<p>Re-run the build script in an existing debug environment.</p>
+<p>Sources <code>build_env.sh</code> and executes <code>conda_build.sh</code> (or <code>.bat</code> on Windows). Use --trace to enable <code>bash -x</code> for verbose output. The exit code of the build script is propagated.</p>
+<p><strong>Usage:</strong> <code>rattler-build debug run [OPTIONS]</code></p>
+<h5 id="options_22"><strong>Options:</strong><a class="headerlink" href="#options_22" title="Permanent link">#</a></h5>
+<ul>
+<li>
+<p><code>--work-dir &lt;WORK_DIR&gt;</code></p>
+<p>Work directory to use (reads from last build in rattler-build-log.txt if not specified)</p>
+</li>
+<li>
+<p><code>--trace</code></p>
+<p>Enable shell tracing (bash -x) for verbose build output</p>
+</li>
+<li>
+<p><code>--experimental</code></p>
+<p>Enable experimental features</p>
+</li>
+<li>
+<p><code>--allow-insecure-host &lt;ALLOW_INSECURE_HOST&gt;</code></p>
+<p>List of hosts for which SSL certificate verification should be skipped</p>
+</li>
+<li>
+<p><code>--channel-priority &lt;CHANNEL_PRIORITY&gt;</code></p>
+<p>Channel priority to use when solving</p>
+</li>
+</ul>
+<h6 id="modifying-result_7"><strong>Modifying result</strong><a class="headerlink" href="#modifying-result_7" title="Permanent link">#</a></h6>
+<ul>
+<li>
+<p><code>--output-dir &lt;OUTPUT_DIR&gt;</code></p>
+<p>Output directory for build artifacts.</p>
+</li>
+</ul>
+<h4 id="create-patch"><code>create-patch</code><a class="headerlink" href="#create-patch" title="Permanent link">#</a></h4>
+<p>Create a patch from changes in the work directory.</p>
+<p>Generates a unified diff between the original sources and your modifications. The patch file is written to the recipe directory so you can add it to the recipe's <code>patches:</code> list.</p>
+<p><strong>Usage:</strong> <code>rattler-build debug create-patch [OPTIONS]</code></p>
+<h5 id="options_23"><strong>Options:</strong><a class="headerlink" href="#options_23" title="Permanent link">#</a></h5>
 <ul>
 <li>
 <p><code>-d</code>, <code>--directory &lt;DIRECTORY&gt;</code></p>
@@ -4045,27 +4166,10 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <p>Perform a dry-run: analyze changes and log the diff, but don't write the patch file</p>
 </li>
 </ul>
-<h3 id="debug-shell"><code>debug-shell</code><a class="headerlink" href="#debug-shell" title="Permanent link">#</a></h3>
-<p>Open a debug shell in the build environment</p>
-<p><strong>Usage:</strong> <code>rattler-build debug-shell [OPTIONS]</code></p>
-<h5 id="options_19"><strong>Options:</strong><a class="headerlink" href="#options_19" title="Permanent link">#</a></h5>
-<ul>
-<li>
-<p><code>--work-dir &lt;WORK_DIR&gt;</code></p>
-<p>Work directory to use (reads from last build in rattler-build-log.txt if not specified)</p>
-</li>
-<li>
-<p><code>-o</code>, <code>--output-dir &lt;OUTPUT_DIR&gt;</code></p>
-<p>Output directory containing rattler-build-log.txt</p>
-<ul>
-<li>Default value: <code>./output</code></li>
-</ul>
-</li>
-</ul>
 <h3 id="package"><code>package</code><a class="headerlink" href="#package" title="Permanent link">#</a></h3>
 <p>Package-related subcommands</p>
 <p><strong>Usage:</strong> <code>rattler-build package &lt;COMMAND&gt;</code></p>
-<h5 id="subcommands_4"><strong>Subcommands:</strong><a class="headerlink" href="#subcommands_4" title="Permanent link">#</a></h5>
+<h5 id="subcommands_5"><strong>Subcommands:</strong><a class="headerlink" href="#subcommands_5" title="Permanent link">#</a></h5>
 <ul>
 <li><code>inspect</code> — Inspect and display information about a built package</li>
 <li><code>extract</code> — Extract a conda package to a directory</li>
@@ -4073,14 +4177,14 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <h4 id="inspect"><code>inspect</code><a class="headerlink" href="#inspect" title="Permanent link">#</a></h4>
 <p>Inspect and display information about a built package</p>
 <p><strong>Usage:</strong> <code>rattler-build package inspect [OPTIONS] &lt;PACKAGE_FILE&gt;</code></p>
-<h5 id="arguments_8"><strong>Arguments:</strong><a class="headerlink" href="#arguments_8" title="Permanent link">#</a></h5>
+<h5 id="arguments_10"><strong>Arguments:</strong><a class="headerlink" href="#arguments_10" title="Permanent link">#</a></h5>
 <ul>
 <li>
 <p><code>&lt;PACKAGE_FILE&gt;</code></p>
 <p>Path to the package file (.conda, .tar.bz2)</p>
 </li>
 </ul>
-<h5 id="options_20"><strong>Options:</strong><a class="headerlink" href="#options_20" title="Permanent link">#</a></h5>
+<h5 id="options_24"><strong>Options:</strong><a class="headerlink" href="#options_24" title="Permanent link">#</a></h5>
 <ul>
 <li>
 <p><code>--paths</code></p>
@@ -4106,14 +4210,14 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <h4 id="extract"><code>extract</code><a class="headerlink" href="#extract" title="Permanent link">#</a></h4>
 <p>Extract a conda package to a directory</p>
 <p><strong>Usage:</strong> <code>rattler-build package extract [OPTIONS] &lt;PACKAGE_FILE&gt;</code></p>
-<h5 id="arguments_9"><strong>Arguments:</strong><a class="headerlink" href="#arguments_9" title="Permanent link">#</a></h5>
+<h5 id="arguments_11"><strong>Arguments:</strong><a class="headerlink" href="#arguments_11" title="Permanent link">#</a></h5>
 <ul>
 <li>
 <p><code>&lt;PACKAGE_FILE&gt;</code></p>
 <p>Path to the package file (.conda, .tar.bz2) or a URL to download from</p>
 </li>
 </ul>
-<h5 id="options_21"><strong>Options:</strong><a class="headerlink" href="#options_21" title="Permanent link">#</a></h5>
+<h5 id="options_25"><strong>Options:</strong><a class="headerlink" href="#options_25" title="Permanent link">#</a></h5>
 <ul>
 <li>
 <p><code>-d</code>, <code>--dest &lt;DEST&gt;</code></p>
@@ -4124,7 +4228,7 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <p>Bump a recipe to a new version</p>
 <p>This command updates the version and SHA256 checksum(s) in a recipe file. It can either use a specified version or auto-detect the latest version from supported providers (GitHub, PyPI, crates.io).</p>
 <p><strong>Usage:</strong> <code>rattler-build bump-recipe [OPTIONS]</code></p>
-<h5 id="options_22"><strong>Options:</strong><a class="headerlink" href="#options_22" title="Permanent link">#</a></h5>
+<h5 id="options_26"><strong>Options:</strong><a class="headerlink" href="#options_26" title="Permanent link">#</a></h5>
 <ul>
 <li>
 <p><code>-r</code>, <code>--recipe &lt;RECIPE&gt;</code></p>
