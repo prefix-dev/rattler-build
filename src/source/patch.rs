@@ -916,6 +916,69 @@ mod tests {
         );
     }
 
+    #[test]
+    fn test_git_format_patch_new_file_issue_2177() {
+        // Regression test for https://github.com/prefix-dev/rattler-build/issues/2177
+        // A git format-patch creating a new file from /dev/null must actually
+        // create the file, not silently skip it or fail with "Is a directory".
+        //
+        // Root cause: flickzeug strips a/b prefixes when a `diff --git` header
+        // is present, so "b/pyproject.toml" becomes "pyproject.toml" (1 component).
+        // If guess_strip_level falls back to 1 (because no files match — the file
+        // is new), stripping 1 component from "pyproject.toml" gives an empty
+        // path. This caused either an "Is a directory" error (v0.57.2) or a
+        // silent skip (after the empty-path guard was added).
+        let (tempdir, _) = setup_patch_test_dir();
+
+        let patch_content = b"From c73bf83977f540a63a974841f79be1e2d7d6616e Mon Sep 17 00:00:00 2001
+From: Matthew Feickert <matthew.feickert@cern.ch>
+Date: Tue, 3 Jun 2025 23:18:31 -0600
+Subject: [PATCH] fix: Add pyproject.toml for build-system
+
+---
+ pyproject.toml | 3 +++
+ 1 file changed, 3 insertions(+)
+ create mode 100644 pyproject.toml
+
+diff --git a/pyproject.toml b/pyproject.toml
+new file mode 100644
+index 0000000..638dd9c
+--- /dev/null
++++ b/pyproject.toml
+@@ -0,0 +1,3 @@
++[build-system]
++requires = [\"setuptools>=61.0\"]
++build-backend = \"setuptools.build_meta\"
+--
+2.49.0
+";
+
+        let work_dir = tempdir.path().join("workdir");
+        let patches_dir = tempdir.path().join("patches");
+        fs_err::write(patches_dir.join("git_format_new_file.patch"), patch_content).unwrap();
+
+        let result = apply_patches(
+            &[PathBuf::from("git_format_new_file.patch")],
+            &work_dir,
+            &patches_dir,
+            apply_patch_custom,
+        );
+        assert!(
+            result.is_ok(),
+            "Patch should not error: {:?}",
+            result.err()
+        );
+
+        let pyproject = work_dir.join("pyproject.toml");
+        assert!(
+            pyproject.exists(),
+            "pyproject.toml should be created by the patch"
+        );
+        let content = fs_err::read_to_string(&pyproject).unwrap();
+        assert!(content.contains("[build-system]"));
+        assert!(content.contains("setuptools"));
+    }
+
     /// Prepare all information needed to test patches for package info path.
     #[cfg(feature = "patch-test-extra")]
     async fn prepare_sources(recipe_dir: &Path) -> miette::Result<(Configuration, Vec<Source>)> {
