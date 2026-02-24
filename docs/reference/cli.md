@@ -17,7 +17,6 @@ This document contains the help content for the `rattler-build` command-line pro
 * `generate-recipe` — Generate a recipe from PyPI, CRAN, CPAN, or LuaRocks
 * `auth` — Handle authentication to external channels
 * `debug` — Debug a recipe build
-* `create-patch` — Create a patch for a directory
 * `package` — Package-related subcommands
 * `bump-recipe` — Bump a recipe to a new version
 
@@ -1250,6 +1249,9 @@ Subcommands: setup     - Set up a debug environment from a recipe shell     - Op
 * `shell` — Open an interactive debug shell in an existing build environment
 * `host-add` — Install additional packages into the host prefix
 * `build-add` — Install additional packages into the build prefix
+* `workdir` — Print the work directory path
+* `run` — Re-run the build script in an existing debug environment
+* `create-patch` — Create a patch from changes in the work directory
 
 
 
@@ -1433,11 +1435,98 @@ This command resolves and installs the specified packages into the build environ
 
 
 
-### `create-patch`
+#### `workdir`
 
-Create a patch for a directory
+Print the work directory path.
 
-**Usage:** `rattler-build create-patch [OPTIONS]`
+Prints the absolute path to the work directory from the last debug setup (or the directory given by --work-dir). Useful for scripts and AI agents that need to locate the build directory.
+
+**Usage:** `rattler-build debug workdir [OPTIONS]`
+
+##### **Options:**
+
+- `--work-dir <WORK_DIR>`
+
+	Work directory to use (reads from last build in rattler-build-log.txt if not specified)
+
+
+- `--experimental`
+
+	Enable experimental features
+
+
+- `--allow-insecure-host <ALLOW_INSECURE_HOST>`
+
+	List of hosts for which SSL certificate verification should be skipped
+
+
+- `--channel-priority <CHANNEL_PRIORITY>`
+
+	Channel priority to use when solving
+
+
+###### **Modifying result**
+
+- `--output-dir <OUTPUT_DIR>`
+
+	Output directory for build artifacts.
+
+
+
+
+
+#### `run`
+
+Re-run the build script in an existing debug environment.
+
+Sources `build_env.sh` and executes `conda_build.sh` (or `.bat` on Windows). Use --trace to enable `bash -x` for verbose output. The exit code of the build script is propagated.
+
+**Usage:** `rattler-build debug run [OPTIONS]`
+
+##### **Options:**
+
+- `--work-dir <WORK_DIR>`
+
+	Work directory to use (reads from last build in rattler-build-log.txt if not specified)
+
+
+- `--trace`
+
+	Enable shell tracing (bash -x) for verbose build output
+
+
+- `--experimental`
+
+	Enable experimental features
+
+
+- `--allow-insecure-host <ALLOW_INSECURE_HOST>`
+
+	List of hosts for which SSL certificate verification should be skipped
+
+
+- `--channel-priority <CHANNEL_PRIORITY>`
+
+	Channel priority to use when solving
+
+
+###### **Modifying result**
+
+- `--output-dir <OUTPUT_DIR>`
+
+	Output directory for build artifacts.
+
+
+
+
+
+#### `create-patch`
+
+Create a patch from changes in the work directory.
+
+Generates a unified diff between the original sources and your modifications. The patch file is written to the recipe directory so you can add it to the recipe's `patches:` list.
+
+**Usage:** `rattler-build debug create-patch [OPTIONS]`
 
 ##### **Options:**
 

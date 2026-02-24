@@ -18,10 +18,11 @@ build:
     - exit 1
 ```
 
-Running `rattler-build build --recipe recipe.yaml` will fail. When a build
+Running `rattler-build build` will fail. When a build
 fails, the build directory is automatically preserved so you can investigate.
+There are multiple things you can do to investigate
 
-### Step 1: Enter the Debug Shell
+### Enter the Debug Shell
 
 Jump straight into the failed build environment:
 
@@ -33,7 +34,15 @@ This opens an interactive shell in the work directory with the build environment
 loaded. All environment variables (`$PREFIX`, `$BUILD_PREFIX`, etc.) are set up
 exactly as they were during the build.
 
-### Step 2: Re-run the Build Script
+Now you can modify files and run individual commands to isolate the issue:
+
+```bash
+./configure --prefix=$PREFIX
+make VERBOSE=1
+make install
+```
+
+### Re-run the Build Script
 
 Use `debug run` to re-execute the build script with the full environment already
 loaded:
@@ -46,15 +55,15 @@ rattler-build debug run
 rattler-build debug run --trace
 ```
 
-Or drop into the shell and run individual commands to isolate the issue:
+You can find the working directory by running the following:
 
-```bash
-./configure --prefix=$PREFIX
-make VERBOSE=1
-make install
+```
+rattler-build debug workdir
 ```
 
-### Step 3: Modify Dependencies (Optional)
+Modify files inside that directory and run `rattler-build debug run` to check whether that fixed the problem.
+
+### Modify Dependencies
 
 If you need additional packages in the host or build environment, you can add
 them without re-running the full setup:
@@ -67,7 +76,10 @@ rattler-build debug host-add libfoo libbar
 rattler-build debug build-add gdb valgrind
 ```
 
-### Step 4: Create a Patch for Fixes
+Remember to add them to your recipe.yaml once you found the right set of dependencies.
+
+
+### Create a Patch for Fixes
 
 After fixing issues in the source code:
 
@@ -94,7 +106,10 @@ rattler-build debug create-patch \
   --add "*.txt,src/new_file.c"
 ```
 
-### Step 5: Update Recipe and Rebuild
+In the end, you will have a patch file that you can include in your recipe
+
+
+### Update Recipe and Rebuild
 
 Add the patch to your recipe:
 
@@ -123,18 +138,6 @@ rattler-build build --recipe recipe.yaml --keep-build
 rattler-build debug shell
 ```
 
-### Locating the Work Directory
-
-Use `debug workdir` to print the absolute path to the work directory. This is
-handy for scripts or when you need to navigate there manually:
-
-```bash
-# Print the work directory from the last build
-rattler-build debug workdir
-
-# Use in a script
-WORK_DIR=$(rattler-build debug workdir)
-```
 
 ### Setting Up a Debug Environment Without Building
 
@@ -298,9 +301,9 @@ Code, Codex, etc.) that cannot use interactive shells. The key principle is:
 rattler-build debug setup --recipe recipe.yaml
 
 # 2. Get the work directory
-WORK_DIR=$(rattler-build debug workdir)
+rattler-build debug workdir
 
-# 3. Edit source files in $WORK_DIR to fix the issue
+# 3. Edit source files in work directory to fix the issue
 #    (agent edits files directly)
 
 # 4. Re-run the build script (fast — no dependency resolution)

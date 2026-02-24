@@ -272,10 +272,7 @@ pub fn debug_run(opts: DebugRunOpts) -> std::io::Result<i32> {
     if !build_script.exists() {
         return Err(std::io::Error::new(
             std::io::ErrorKind::NotFound,
-            format!(
-                "build script not found: {}",
-                build_script.display()
-            ),
+            format!("build script not found: {}", build_script.display()),
         ));
     }
 
@@ -287,10 +284,7 @@ pub fn debug_run(opts: DebugRunOpts) -> std::io::Result<i32> {
         bash_flag,
     );
 
-    let status = Command::new("bash")
-        .arg("-c")
-        .arg(&script)
-        .status()?;
+    let status = Command::new("bash").arg("-c").arg(&script).status()?;
 
     Ok(status.code().unwrap_or(1))
 }
