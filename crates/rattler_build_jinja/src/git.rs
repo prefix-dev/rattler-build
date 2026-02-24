@@ -60,22 +60,28 @@ fn git_command_in_dir(dir: &Path, args: &[&str]) -> Result<String, minijinja::Er
 }
 
 impl Git {
-    /// Try to resolve `src` as a local path. First tries relative to the
-    /// recipe directory (if set), then as an absolute path, then relative to
-    /// the current working directory.
+    /// Try to resolve `src` as a local path. Relative paths are resolved
+    /// against the recipe directory only. Absolute paths are checked directly.
+    /// Returns `None` if `src` does not point to a local directory (i.e. it is
+    /// likely a remote URL).
     fn resolve_local_path(&self, src: &str) -> Option<PathBuf> {
-        // Try relative to recipe directory first
+        let path = Path::new(src);
+
+        // Absolute paths are checked directly
+        if path.is_absolute() {
+            return if path.is_dir() {
+                Some(path.to_path_buf())
+            } else {
+                None
+            };
+        }
+
+        // Relative paths are resolved against the recipe directory
         if let Some(recipe_dir) = &self.recipe_dir {
             let resolved = recipe_dir.join(src);
             if resolved.is_dir() {
                 return Some(resolved);
             }
-        }
-
-        // Try as-is (absolute or relative to cwd)
-        let path = Path::new(src);
-        if path.is_dir() {
-            return Some(path.to_path_buf());
         }
 
         None
