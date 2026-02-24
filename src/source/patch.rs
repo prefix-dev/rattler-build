@@ -17,12 +17,6 @@ use flickzeug::{
 use fs_err::File;
 use itertools::Itertools;
 
-fn is_dev_null(path: &str) -> bool {
-    // flickzeug already returns None for /dev/null (including a/dev/null and
-    // b/dev/null), so this is just a safety check for edge cases.
-    path.trim() == "/dev/null"
-}
-
 /// Summarize a single patch file by reading and parsing it.
 pub fn summarize_single_patch(
     patch_path: &Path,
@@ -69,13 +63,11 @@ fn parse_patch(patch: &Patch<[u8]>) -> HashSet<PathBuf> {
         let original_path = diff
             .original()
             .and_then(|p| std::str::from_utf8(p).ok())
-            .filter(|p| !is_dev_null(p))
             .map(PathBuf::from);
 
         let modified_path = diff
             .modified()
             .and_then(|p| std::str::from_utf8(p).ok())
-            .filter(|p| !is_dev_null(p))
             .map(PathBuf::from);
 
         let (normalized_orig, normalized_mod) =
@@ -136,7 +128,6 @@ fn apply(base_image: &[u8], diff: &Diff<'_, [u8]>) -> Result<Vec<u8>, ApplyError
 // successfully applied, or returns and error if no such number could
 // be determined.
 fn guess_strip_level(patch: &Patch<[u8]>, work_dir: &Path) -> Result<usize, SourceError> {
-    // There is no /dev/null in here by construction from `parse_patch`.
     let patched_files = parse_patch(patch);
 
     let max_components = patched_files
@@ -181,9 +172,6 @@ fn custom_patch_stripped_paths(
 ) -> (Option<PathBuf>, Option<PathBuf>) {
     let strip_path = |path_bytes: &[u8]| -> Option<PathBuf> {
         std::str::from_utf8(path_bytes).ok().and_then(|p| {
-            if is_dev_null(p) {
-                return None;
-            }
             let path: PathBuf = PathBuf::from(p).components().skip(strip_level).collect();
             // Skip empty paths - they would resolve to work_dir itself
             if path.as_os_str().is_empty() {
