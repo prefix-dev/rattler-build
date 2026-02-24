@@ -179,9 +179,8 @@ mod sys {
         err.raw_os_error() == Some(libc::EWOULDBLOCK)
     }
 
-    #[allow(dead_code)]
+    #[allow(dead_code, unreachable_patterns)]
     pub fn error_unsupported(err: &Error) -> bool {
-        #[allow(unreachable_patterns)]
         matches!(
             err.raw_os_error(),
             Some(libc::ENOTSUP | libc::EOPNOTSUPP | libc::ENOSYS)
