@@ -88,10 +88,11 @@ rattler-build build -m variants.yaml
 
 ### Debugging failed builds
 
-When a build fails, use `debug-shell` to enter an interactive shell in the build environment:
+When a build fails, the build directory is preserved automatically. Open a debug
+shell to investigate:
 
 ```bash
-rattler-build debug-shell
+rattler-build debug shell
 ```
 
 This opens a shell with:
