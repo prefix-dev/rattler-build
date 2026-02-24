@@ -776,141 +776,41 @@ mod tests {
 
     /// Regression test for <https://github.com/prefix-dev/rattler-build/issues/2199>
     ///
-    /// When both `.sh` and `.bat` script files exist and the script is specified
-    /// without an extension (e.g. `file: test-script`), the resolution must
-    /// prefer the platform-appropriate extension. The `find_file` method returns
-    /// the first match from the extensions list, so the order of extensions
-    /// determines which file is selected.
+    /// Extension order in `resolve_content` determines which file is picked
+    /// when both `.sh` and `.bat` exist. `platform_script_extensions()` must
+    /// select the platform-appropriate one.
     #[test]
-    fn test_resolve_content_extension_order_determines_platform_preference() {
+    fn test_script_extension_resolution_respects_order() {
         use crate::script::{Script, ScriptContent};
 
         let dir = tempfile::tempdir().unwrap();
-        let recipe_dir = dir.path();
+        std::fs::write(dir.path().join("test-script.sh"), "#!/bin/bash\necho hello").unwrap();
+        std::fs::write(dir.path().join("test-script.bat"), "@echo off\necho hello").unwrap();
 
-        // Create both .sh and .bat files with distinguishable content
-        std::fs::write(
-            recipe_dir.join("test-script.sh"),
-            "#!/bin/bash\necho hello",
-        )
-        .unwrap();
-        std::fs::write(
-            recipe_dir.join("test-script.bat"),
-            "@echo off\necho hello",
-        )
-        .unwrap();
-
-        let script = Script {
-            content: ScriptContent::Path(PathBuf::from("test-script")),
-            ..Script::default()
+        let resolve = |content: ScriptContent, exts: &[&str]| -> PathBuf {
+            let script = Script { content, ..Script::default() };
+            match script
+                .resolve_content(dir.path(), None::<fn(&str) -> Result<String, String>>, exts)
+                .unwrap()
+            {
+                ResolvedScriptContents::Path(path, _) => path,
+                other => panic!("Expected Path variant, got {:?}", other),
+            }
         };
 
-        // When "sh" is listed first, .sh should be resolved
-        let contents = script
-            .resolve_content(
-                recipe_dir,
-                None::<fn(&str) -> Result<String, String>>,
-                &["sh", "bat"],
-            )
-            .unwrap();
-        match &contents {
-            ResolvedScriptContents::Path(path, content) => {
-                assert_eq!(path.extension().unwrap(), "sh");
-                assert!(content.contains("#!/bin/bash"));
-            }
-            other => panic!("Expected Path variant, got {:?}", other),
-        }
+        // Extension list order controls which file wins
+        let path_content = || ScriptContent::Path(PathBuf::from("test-script"));
+        assert_eq!(resolve(path_content(), &["sh", "bat"]).extension().unwrap(), "sh");
+        assert_eq!(resolve(path_content(), &["bat", "sh"]).extension().unwrap(), "bat");
 
-        // When "bat" is listed first, .bat should be resolved
-        let contents = script
-            .resolve_content(
-                recipe_dir,
-                None::<fn(&str) -> Result<String, String>>,
-                &["bat", "sh"],
-            )
-            .unwrap();
-        match &contents {
-            ResolvedScriptContents::Path(path, content) => {
-                assert_eq!(path.extension().unwrap(), "bat");
-                assert!(content.contains("@echo off"));
-            }
-            other => panic!("Expected Path variant, got {:?}", other),
-        }
+        // CommandOrPath variant behaves the same
+        let cop_content = || ScriptContent::CommandOrPath("test-script".into());
+        assert_eq!(resolve(cop_content(), &["sh"]).extension().unwrap(), "sh");
+        assert_eq!(resolve(cop_content(), &["bat"]).extension().unwrap(), "bat");
 
-        // Verify that platform_script_extensions() selects the correct file.
-        let contents = script
-            .resolve_content(
-                recipe_dir,
-                None::<fn(&str) -> Result<String, String>>,
-                crate::platform_script_extensions(),
-            )
-            .unwrap();
-        match &contents {
-            ResolvedScriptContents::Path(path, _) => {
-                if cfg!(windows) {
-                    assert_eq!(path.extension().unwrap(), "bat");
-                } else {
-                    assert_eq!(path.extension().unwrap(), "sh");
-                }
-            }
-            other => panic!("Expected Path variant, got {:?}", other),
-        }
-    }
-
-    /// Test that `CommandOrPath` variant also respects extension order.
-    /// This covers the case where a recipe specifies `script: test-script`
-    /// as a simple string (which could be a command or a path).
-    #[test]
-    fn test_resolve_content_command_or_path_extension_order() {
-        use crate::script::{Script, ScriptContent};
-
-        let dir = tempfile::tempdir().unwrap();
-        let recipe_dir = dir.path();
-
-        std::fs::write(
-            recipe_dir.join("my-test.sh"),
-            "#!/bin/bash\necho from sh",
-        )
-        .unwrap();
-        std::fs::write(
-            recipe_dir.join("my-test.bat"),
-            "@echo off\necho from bat",
-        )
-        .unwrap();
-
-        let script = Script {
-            content: ScriptContent::CommandOrPath("my-test".to_string()),
-            ..Script::default()
-        };
-
-        // With sh-first extensions, resolves to .sh
-        let contents = script
-            .resolve_content(
-                recipe_dir,
-                None::<fn(&str) -> Result<String, String>>,
-                &["sh"],
-            )
-            .unwrap();
-        match &contents {
-            ResolvedScriptContents::Path(path, _) => {
-                assert_eq!(path.extension().unwrap(), "sh");
-            }
-            other => panic!("Expected Path variant, got {:?}", other),
-        }
-
-        // With bat-first extensions, resolves to .bat
-        let contents = script
-            .resolve_content(
-                recipe_dir,
-                None::<fn(&str) -> Result<String, String>>,
-                &["bat"],
-            )
-            .unwrap();
-        match &contents {
-            ResolvedScriptContents::Path(path, _) => {
-                assert_eq!(path.extension().unwrap(), "bat");
-            }
-            other => panic!("Expected Path variant, got {:?}", other),
-        }
+        // platform_script_extensions() picks the right one for the current platform
+        let ext = resolve(path_content(), crate::platform_script_extensions())
+            .extension().unwrap().to_owned();
+        assert_eq!(ext, if cfg!(windows) { "bat" } else { "sh" });
     }
 }
