@@ -17,11 +17,11 @@ async-trait = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 fs-err = { workspace = true, features = ["tokio"] }
 futures = { workspace = true }
-rattler_prefix_guard = { path = "../rattler_prefix_guard" }
+rattler_prefix_guard = { workspace = true }
 reqwest = { workspace = true, features = ["stream"] }
 reqwest-middleware = { workspace = true }
 reqwest-retry = { workspace = true }
-rattler_build_networking = { path = "../rattler_build_networking" }
+rattler_build_networking = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
@@ -48,7 +48,7 @@ zstd = { workspace = true }
 indicatif = { workspace = true }
 tempfile = { workspace = true }
 dunce = { workspace = true }
-rattler_git = { path = "../rattler_git" }
+rattler_git = { workspace = true }
 hex = { workspace = true }
 sigstore-verify = { workspace = true }
 sigstore-trust-root = { workspace = true }

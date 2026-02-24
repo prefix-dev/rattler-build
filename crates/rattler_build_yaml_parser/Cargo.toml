@@ -8,7 +8,7 @@ description = "Shared YAML parsing infrastructure for rattler-build with Jinja2 
 
 [dependencies]
 marked-yaml = { workspace = true }
-rattler_build_jinja = { path = "../rattler_build_jinja", version = "0.1.0" }
+rattler_build_jinja = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 thiserror = { workspace = true }
 miette = { workspace = true }

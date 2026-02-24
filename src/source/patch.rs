@@ -18,8 +18,9 @@ use fs_err::File;
 use itertools::Itertools;
 
 fn is_dev_null(path: &str) -> bool {
-    let trimmed = path.trim();
-    trimmed == "/dev/null" || trimmed == "a/dev/null" || trimmed == "b/dev/null"
+    // flickzeug already returns None for /dev/null (including a/dev/null and
+    // b/dev/null), so this is just a safety check for edge cases.
+    path.trim() == "/dev/null"
 }
 
 /// Summarize a single patch file by reading and parsing it.
@@ -97,6 +98,7 @@ fn patch_from_bytes(input: &[u8]) -> Result<Patch<'_, [u8]>, ParsePatchError> {
         ParserConfig {
             hunk_strategy: HunkRangeStrategy::Recount,
             skip_order_check: true,
+            strip_ab_prefix: true,
         },
     )
 }
@@ -144,13 +146,10 @@ fn guess_strip_level(patch: &Patch<[u8]>, work_dir: &Path) -> Result<usize, Sour
         }
     }
 
-    // XXX: This is not entirely correct way of handling this, since
-    // path is not necessarily starts with meaningless one letter
-    // component. Proper handling requires more in-depth analysis.
-    // For example this is fine if source is /dev/null and target is
-    // not, but may be incorrect otherwise, if original file does not
-    // exist.
-    Ok(1)
+    // Default to strip level 0 since flickzeug already strips a/b prefixes.
+    // This handles the case where all files are new (from /dev/null) and
+    // no existing files can be matched.
+    Ok(0)
 }
 
 fn custom_patch_stripped_paths(
@@ -577,11 +576,12 @@ mod tests {
         let (tempdir, _) = setup_patch_test_dir();
         let work_dir = tempdir.path().join("workdir");
 
-        // The current implementation should find strip level 4 based on existing deep file
+        // The current implementation should find strip level 3 based on existing deep file
+        // (was 4 before flickzeug started stripping a/b prefixes)
         let strip_level = guess_strip_level(&patch, &work_dir).unwrap();
         assert_eq!(
-            strip_level, 4,
-            "Current 'any' logic should find strip level 4"
+            strip_level, 3,
+            "Current 'any' logic should find strip level 3"
         );
 
         // Let's also test what the old 'all' logic would have found
@@ -629,10 +629,10 @@ mod tests {
         // Work dir exists but contains no files matching the patch
         let strip_level = guess_strip_level(&patch, tempdir.path()).unwrap();
 
-        // Should return 1 (strip the 'b' prefix), not 2 (which would make path empty)
+        // Should return 0 since flickzeug already strips the b/ prefix
         assert_eq!(
-            strip_level, 1,
-            "Strip level should be 1, not 2 (empty paths should not match workdir)"
+            strip_level, 0,
+            "Strip level should be 0 since a/b prefixes are already stripped"
         );
     }
 
@@ -645,7 +645,8 @@ mod tests {
         let diff = patch.into_iter().next().unwrap();
 
         // Test the backup file logic
-        let paths = custom_patch_stripped_paths(&diff, 1);
+        // strip_level=0 because flickzeug already strips a/b prefixes
+        let paths = custom_patch_stripped_paths(&diff, 0);
 
         // Should treat this as modifying file.txt in place
         assert_eq!(paths.0, Some(PathBuf::from("file.txt")));
@@ -657,7 +658,7 @@ mod tests {
         let patch = patch_from_bytes(patch_content).unwrap();
         let diff = patch.into_iter().next().unwrap();
 
-        let paths = custom_patch_stripped_paths(&diff, 1);
+        let paths = custom_patch_stripped_paths(&diff, 0);
         assert_eq!(paths.0, Some(PathBuf::from("file.txt")));
         assert_eq!(paths.1, Some(PathBuf::from("file.txt")));
 
@@ -667,7 +668,7 @@ mod tests {
         let patch = patch_from_bytes(patch_content).unwrap();
         let diff = patch.into_iter().next().unwrap();
 
-        let paths = custom_patch_stripped_paths(&diff, 1);
+        let paths = custom_patch_stripped_paths(&diff, 0);
         // Should NOT apply backup logic because different.txt.orig is not a backup of file.txt
         assert_eq!(paths.0, Some(PathBuf::from("different.txt.orig")));
         assert_eq!(paths.1, Some(PathBuf::from("file.txt")));
@@ -867,10 +868,8 @@ mod tests {
     fn test_patch_with_nonexistent_file_no_panic() {
         // Regression test for https://github.com/prefix-dev/rattler-build/issues/2137
         // When a patch references a file that doesn't exist in the work directory
-        // (e.g., because file_name renamed it), and the strip level falls back to 1,
-        // a single-component path like "original_name.md" would be stripped to an
-        // empty path, causing work_dir.join("") to resolve to work_dir itself.
-        // Reading a directory as a file produces "Is a directory" error.
+        // (e.g., because file_name renamed it), the patch should fail with a proper
+        // PatchApplyError rather than panicking or producing "Is a directory" error.
         let (tempdir, _) = setup_patch_test_dir();
 
         // Apply a patch that references "original_name.md" which doesn't exist
@@ -883,11 +882,12 @@ mod tests {
             apply_patch_custom,
         );
 
-        // The patch should succeed by creating a new file (since the original doesn't exist)
+        // The patch should fail with a PatchApplyError (not "Is a directory")
+        // since the referenced file doesn't exist and the patch expects existing content.
         assert!(
-            result.is_ok(),
-            "Patch referencing non-existent file should not fail with 'Is a directory': {:?}",
-            result.err()
+            matches!(result, Err(SourceError::PatchApplyError(_))),
+            "Expected PatchApplyError, got: {:?}",
+            result
         );
     }
 
