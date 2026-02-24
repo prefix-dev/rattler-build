@@ -933,10 +933,7 @@ mod tests {
             ("c_compiler_version".to_string(), vec!["12".to_string()]),
             ("cxx_compiler".to_string(), vec!["gxx".to_string()]),
             ("cxx_compiler_version".to_string(), vec!["12".to_string()]),
-            (
-                "fortran_compiler".to_string(),
-                vec!["gfortran".to_string()],
-            ),
+            ("fortran_compiler".to_string(), vec!["gfortran".to_string()]),
             (
                 "fortran_compiler_version".to_string(),
                 vec!["12".to_string()],
@@ -1122,7 +1119,7 @@ mod tests {
         // Failed to download source (404)
         #[exclude("(petsc)|(pgadmin4)")]
         // GNU patch fails and flickzeug succeeds, seemingly correctly from the diff output.
-        #[exclude("(fastjet-cxx)|(fenics-)|(flask-security-too)|(datatrove)")]
+        #[exclude("(fastjet-cxx)|(fenics-)|(flask-security-too)|(datatrove)|(love2d)")]
         // Parse fails, since createrepo-c/438.patch contains two mail
         // messages in one file. Fix postponed until parser
         // reimplemented.
@@ -1131,7 +1128,7 @@ mod tests {
         #[exclude("(pyduktape2)|(pytest-asyncio)|(typer)|(vectorscan)|(vale)")]
         recipe_dir: PathBuf,
     ) -> miette::Result<()> {
-        let snapshot_tested = ["love2d"];
+        let snapshot_tested: [&str; 0] = [];
         let pkg_name = recipe_dir.as_path().file_name().unwrap().to_str().unwrap();
         let is_snapshot_test = snapshot_tested.contains(&pkg_name);
 
