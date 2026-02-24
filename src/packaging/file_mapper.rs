@@ -26,9 +26,7 @@ fn copy_with_normalized_line_endings(src: &Path, dst: &Path) -> Result<(), Packa
         let mut normalized = Vec::with_capacity(content.len());
         let mut i = 0;
         while i < content.len() {
-            if content[i] == b'\r' && i + 1 < content.len() && content[i + 1] == b'\n' {
-                // Skip the \r; the \n will be written in the next iteration
-            } else {
+            if !(content[i] == b'\r' && i + 1 < content.len() && content[i + 1] == b'\n') {
                 normalized.push(content[i]);
             }
             i += 1;
@@ -339,49 +337,26 @@ mod test {
     use crate::packaging::file_mapper::filter_pyc;
 
     #[test]
-    fn test_copy_with_normalized_line_endings_text() {
+    fn test_copy_with_normalized_line_endings() {
         let temp_dir = tempfile::tempdir().unwrap();
-        let src = temp_dir.path().join("src.txt");
-        let dst = temp_dir.path().join("dst.txt");
-
-        // Write a file with CRLF line endings
-        std::fs::write(&src, b"line1\r\nline2\r\nline3\r\n").unwrap();
-
+        let cases: &[(&str, &[u8], &[u8])] = &[
+            ("crlf.txt", b"line1\r\nline2\r\n", b"line1\nline2\n"), // CRLF → LF
+            ("lf.txt", b"line1\nline2\n", b"line1\nline2\n"),       // LF unchanged
+        ];
+        for (name, input, expected) in cases {
+            let src = temp_dir.path().join(name);
+            let dst = temp_dir.path().join(format!("out_{name}"));
+            std::fs::write(&src, input).unwrap();
+            super::copy_with_normalized_line_endings(&src, &dst).unwrap();
+            assert_eq!(&std::fs::read(&dst).unwrap(), expected, "{name}");
+        }
+        // Binary data (null bytes) is copied verbatim, CRLF preserved
+        let binary: &[u8] = &[0x00, 0x01, 0x02, 0x0D, 0x0A, 0xFF];
+        let src = temp_dir.path().join("data.bin");
+        let dst = temp_dir.path().join("data_out.bin");
+        std::fs::write(&src, binary).unwrap();
         super::copy_with_normalized_line_endings(&src, &dst).unwrap();
-
-        let result = std::fs::read(&dst).unwrap();
-        assert_eq!(result, b"line1\nline2\nline3\n");
-    }
-
-    #[test]
-    fn test_copy_with_normalized_line_endings_binary_unchanged() {
-        let temp_dir = tempfile::tempdir().unwrap();
-        let src = temp_dir.path().join("src.bin");
-        let dst = temp_dir.path().join("dst.bin");
-
-        // Write binary data that should not be modified
-        let binary_data: Vec<u8> = vec![0x00, 0x01, 0x02, 0x0D, 0x0A, 0xFF];
-        std::fs::write(&src, &binary_data).unwrap();
-
-        super::copy_with_normalized_line_endings(&src, &dst).unwrap();
-
-        let result = std::fs::read(&dst).unwrap();
-        assert_eq!(result, binary_data);
-    }
-
-    #[test]
-    fn test_copy_with_normalized_line_endings_lf_unchanged() {
-        let temp_dir = tempfile::tempdir().unwrap();
-        let src = temp_dir.path().join("src.txt");
-        let dst = temp_dir.path().join("dst.txt");
-
-        // Write a file that already has LF-only line endings
-        std::fs::write(&src, b"line1\nline2\nline3\n").unwrap();
-
-        super::copy_with_normalized_line_endings(&src, &dst).unwrap();
-
-        let result = std::fs::read(&dst).unwrap();
-        assert_eq!(result, b"line1\nline2\nline3\n");
+        assert_eq!(std::fs::read(&dst).unwrap(), binary);
     }
 
     #[test]
