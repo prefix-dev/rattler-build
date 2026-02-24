@@ -189,3 +189,6 @@ channels = [
 
 [package.build.config]
 compilers = ["rust", "c"]
+
+[package.build.target.win.config]
+env = { CARGO_HOME = "D:\\cargo" }
