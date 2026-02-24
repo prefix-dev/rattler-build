@@ -18,10 +18,11 @@ use std::{
     hash::Hash,
     ops::Sub,
     path::{Path, PathBuf},
+    str::FromStr,
 };
 
 /// The nature of a package
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, serde::Serialize, serde::Deserialize)]
 pub enum PackageNature {
     /// Libraries
     RunExportsLibrary,
@@ -212,6 +213,57 @@ impl PrefixInfo {
         }
 
         Ok(prefix_info)
+    }
+
+    /// Merge cached prefix info (from a staging cache) into this PrefixInfo.
+    /// Cached entries are only added if they don't already exist.
+    pub fn merge_cached(&mut self, cached: &CachedPrefixInfo) {
+        for (name_str, nature) in &cached.package_to_nature {
+            if let Ok(name) = PackageName::from_str(name_str) {
+                self.package_to_nature.entry(name).or_insert(nature.clone());
+            }
+        }
+        for (path_str, name_str) in &cached.path_to_package {
+            if let Ok(name) = PackageName::from_str(name_str) {
+                let path_buf: CaseInsensitivePathBuf = PathBuf::from(path_str).into();
+                self.path_to_package.entry(path_buf).or_insert(name);
+            }
+        }
+    }
+}
+
+/// Serializable prefix info for storing in staging cache metadata.
+/// Maps file paths to their owning packages and packages to their nature,
+/// so that linking checks can attribute libraries without needing the
+/// original conda-meta records installed.
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+pub struct CachedPrefixInfo {
+    /// Maps file paths (relative to prefix) to package names
+    pub path_to_package: HashMap<String, String>,
+    /// Maps package names to their nature
+    pub package_to_nature: HashMap<String, PackageNature>,
+}
+
+impl CachedPrefixInfo {
+    /// Build a CachedPrefixInfo from a PrefixInfo
+    pub(crate) fn from_prefix_info(info: &PrefixInfo) -> Self {
+        Self {
+            path_to_package: info
+                .path_to_package
+                .iter()
+                .map(|(path, name)| {
+                    (
+                        path.path.to_string_lossy().to_string(),
+                        name.as_normalized().to_string(),
+                    )
+                })
+                .collect(),
+            package_to_nature: info
+                .package_to_nature
+                .iter()
+                .map(|(name, nature)| (name.as_normalized().to_string(), nature.clone()))
+                .collect(),
+        }
     }
 }
 

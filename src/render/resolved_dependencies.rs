@@ -1145,58 +1145,6 @@ impl Output {
             return Ok(());
         }
 
-        // When inheriting from a staging cache, the cache's host packages
-        // (e.g. zlib, libiconv) must also be installed in the host prefix.
-        // Without them the linking checks cannot attribute shared libraries
-        // to their providing packages and will report false overlinking.
-        if let Some(cache_deps) = &self.finalized_cache_dependencies {
-            if let Some(cache_host) = &cache_deps.host {
-                let mut merged = dependencies.clone();
-
-                let host = merged.host.get_or_insert_with(|| ResolvedDependencies {
-                    specs: Vec::new(),
-                    resolved: Vec::new(),
-                });
-
-                // Add cache host packages that aren't already present
-                let existing_names: std::collections::HashSet<_> = host
-                    .resolved
-                    .iter()
-                    .map(|r| r.package_record.name.clone())
-                    .collect();
-
-                for record in &cache_host.resolved {
-                    if !existing_names.contains(&record.package_record.name) {
-                        host.resolved.push(record.clone());
-                        // Also add the spec so the package is tracked as explicit
-                        for spec in &cache_host.specs {
-                            if spec.spec().name.as_ref()
-                                == Some(&rattler_conda_types::PackageNameMatcher::Exact(
-                                    record.package_record.name.clone(),
-                                ))
-                            {
-                                host.specs.push(spec.clone());
-                                break;
-                            }
-                        }
-                    }
-                }
-
-                tracing::info!(
-                    "Merged {} host packages from staging cache into host environment",
-                    cache_host.resolved.len().saturating_sub(
-                        cache_host
-                            .resolved
-                            .iter()
-                            .filter(|r| existing_names.contains(&r.package_record.name))
-                            .count()
-                    )
-                );
-
-                return install_environments(self, &merged, tool_configuration).await;
-            }
-        }
-
         install_environments(self, dependencies, tool_configuration).await
     }
 }

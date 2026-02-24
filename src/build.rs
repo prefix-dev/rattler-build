@@ -137,10 +137,12 @@ pub async fn run_build(
     // This will build or restore staging caches and return their dependencies/sources if inherited
     let staging_result = output.process_staging_caches(tool_configuration).await?;
 
-    // If we inherit from a staging cache, store its dependencies and sources
-    if let Some((deps, sources)) = staging_result {
+    // If we inherit from a staging cache, store its dependencies, sources,
+    // and cached prefix info (for linking checks)
+    if let Some((deps, sources, cached_prefix_info)) = staging_result {
         output.finalized_cache_dependencies = Some(deps);
         output.finalized_cache_sources = Some(sources);
+        output.cached_prefix_info = Some(cached_prefix_info);
     }
 
     // Fetch sources for this output

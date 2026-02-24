@@ -528,7 +528,15 @@ pub fn perform_linking_checks(
     let dynamic_linking = &output.recipe.build().dynamic_linking;
     let system_libs = find_system_libs(output)?;
 
-    let prefix_info = PrefixInfo::from_prefix(output.prefix())?;
+    let mut prefix_info = PrefixInfo::from_prefix(output.prefix())?;
+
+    // Merge cached prefix info from the staging cache (if any).
+    // The staging cache's host packages are not physically installed in the
+    // prefix (their conda-meta records are absent), so we merge the cached
+    // mappings to allow the linking checks to attribute shared libraries.
+    if let Some(cached) = &output.cached_prefix_info {
+        prefix_info.merge_cached(cached);
+    }
 
     let host_dso_packages = host_run_export_dso_packages(output, &prefix_info.package_to_nature);
     tracing::trace!("Host run_export DSO packages: {host_dso_packages:#?}",);
