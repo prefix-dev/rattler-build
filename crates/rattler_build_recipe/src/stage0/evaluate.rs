@@ -39,11 +39,13 @@ use crate::{
         Package as Stage0Package, Requirements as Stage0Requirements, Source as Stage0Source,
         Stage0Recipe, TestType as Stage0TestType,
         build::{
+            AzureTrustedSigningConfig as Stage0AzureTrustedSigningConfig,
             BinaryRelocation as Stage0BinaryRelocation, DynamicLinking as Stage0DynamicLinking,
             ForceFileType as Stage0ForceFileType, MacOsSigning as Stage0MacOsSigning,
             PostProcess as Stage0PostProcess, PrefixDetection as Stage0PrefixDetection,
             PrefixIgnore as Stage0PrefixIgnore, PythonBuild as Stage0PythonBuild,
-            Signing as Stage0Signing, VariantKeyUsage as Stage0VariantKeyUsage,
+            Signing as Stage0Signing, SigntoolConfig as Stage0SigntoolConfig,
+            VariantKeyUsage as Stage0VariantKeyUsage,
             WindowsSigning as Stage0WindowsSigning,
         },
         requirements::{
@@ -70,10 +72,12 @@ use crate::{
         Extra as Stage1Extra, GlobVec, Package as Stage1Package, Recipe as Stage1Recipe,
         Requirements as Stage1Requirements, Rpaths,
         build::{
+            AzureTrustedSigningConfig as Stage1AzureTrustedSigningConfig,
             Build as Stage1Build, BuildString, DynamicLinking as Stage1DynamicLinking,
             ForceFileType as Stage1ForceFileType, MacOsSigning as Stage1MacOsSigning,
             PostProcess as Stage1PostProcess, PrefixDetection as Stage1PrefixDetection,
             PythonBuild as Stage1PythonBuild, Signing as Stage1Signing,
+            SigntoolConfig as Stage1SigntoolConfig,
             VariantKeyUsage as Stage1VariantKeyUsage, WindowsSigning as Stage1WindowsSigning,
         },
         requirements::{
@@ -2004,34 +2008,53 @@ impl Evaluate for Stage0MacOsSigning {
     }
 }
 
-impl Evaluate for Stage0WindowsSigning {
-    type Output = Stage1WindowsSigning;
+impl Evaluate for Stage0SigntoolConfig {
+    type Output = Stage1SigntoolConfig;
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
-        let certificate_file = self
-            .certificate_file
-            .as_ref()
-            .map(|v| evaluate_string_value(v, context))
-            .transpose()?;
+        let certificate_file = evaluate_string_value(&self.certificate_file, context)?;
         let certificate_password = self
             .certificate_password
             .as_ref()
             .map(|v| evaluate_string_value(v, context))
             .transpose()?;
-        let azure_endpoint = self
-            .azure_endpoint
+
+        Ok(Stage1SigntoolConfig {
+            certificate_file,
+            certificate_password,
+        })
+    }
+}
+
+impl Evaluate for Stage0AzureTrustedSigningConfig {
+    type Output = Stage1AzureTrustedSigningConfig;
+
+    fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
+        let endpoint = evaluate_string_value(&self.endpoint, context)?;
+        let account_name = evaluate_string_value(&self.account_name, context)?;
+        let certificate_profile = evaluate_string_value(&self.certificate_profile, context)?;
+
+        Ok(Stage1AzureTrustedSigningConfig {
+            endpoint,
+            account_name,
+            certificate_profile,
+        })
+    }
+}
+
+impl Evaluate for Stage0WindowsSigning {
+    type Output = Stage1WindowsSigning;
+
+    fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
+        let signtool = self
+            .signtool
             .as_ref()
-            .map(|v| evaluate_string_value(v, context))
+            .map(|s| s.evaluate(context))
             .transpose()?;
-        let azure_account_name = self
-            .azure_account_name
+        let azure_trusted_signing = self
+            .azure_trusted_signing
             .as_ref()
-            .map(|v| evaluate_string_value(v, context))
-            .transpose()?;
-        let azure_certificate_profile = self
-            .azure_certificate_profile
-            .as_ref()
-            .map(|v| evaluate_string_value(v, context))
+            .map(|a| a.evaluate(context))
             .transpose()?;
         let timestamp_url = self
             .timestamp_url
@@ -2046,11 +2069,8 @@ impl Evaluate for Stage0WindowsSigning {
             .unwrap_or_else(|| "sha256".to_string());
 
         Ok(Stage1WindowsSigning {
-            certificate_file,
-            certificate_password,
-            azure_endpoint,
-            azure_account_name,
-            azure_certificate_profile,
+            signtool,
+            azure_trusted_signing,
             timestamp_url,
             digest_algorithm,
         })

@@ -398,30 +398,19 @@ pub struct MacOsSigning {
 
 /// Windows code signing configuration (evaluated).
 ///
-/// Two methods are supported:
-/// - **Local certificate**: Set `certificate_file` (uses `signtool sign`)
-/// - **Azure Trusted Signing**: Set `azure_endpoint`, `azure_account_name`,
-///   `azure_certificate_profile` (uses the Azure Trusted Signing CLI/action)
+/// Exactly one signing method must be configured:
+/// - **Local certificate** (`signtool`): Configure the `signtool` sub-object.
+/// - **Azure Trusted Signing**: Configure the `azure_trusted_signing` sub-object.
+///
+/// Shared settings (`timestamp_url`, `digest_algorithm`) live at the top level.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct WindowsSigning {
-    // --- Local certificate signing (signtool) ---
-    /// Path to the certificate file (.pfx / .p12)
+    /// Local certificate signing via `signtool`
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub certificate_file: Option<String>,
-    /// Certificate password
+    pub signtool: Option<SigntoolConfig>,
+    /// Azure Trusted Signing configuration
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub certificate_password: Option<String>,
-
-    // --- Azure Trusted Signing ---
-    /// Azure Trusted Signing endpoint URL
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub azure_endpoint: Option<String>,
-    /// Azure Trusted Signing account name
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub azure_account_name: Option<String>,
-    /// Azure Trusted Signing certificate profile name
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub azure_certificate_profile: Option<String>,
+    pub azure_trusted_signing: Option<AzureTrustedSigningConfig>,
 
     // --- Shared settings ---
     /// RFC 3161 timestamp server URL
@@ -430,6 +419,27 @@ pub struct WindowsSigning {
     /// Digest algorithm (default: sha256)
     #[serde(default = "default_digest_algorithm")]
     pub digest_algorithm: String,
+}
+
+/// Local certificate signing configuration for `signtool` (evaluated)
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SigntoolConfig {
+    /// Path to the certificate file (.pfx / .p12)
+    pub certificate_file: String,
+    /// Certificate password
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub certificate_password: Option<String>,
+}
+
+/// Azure Trusted Signing configuration (evaluated)
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AzureTrustedSigningConfig {
+    /// Azure Trusted Signing endpoint URL
+    pub endpoint: String,
+    /// Azure Trusted Signing account name
+    pub account_name: String,
+    /// Azure Trusted Signing certificate profile name
+    pub certificate_profile: String,
 }
 
 /// The Windows signing method as determined from the configuration.
@@ -458,42 +468,24 @@ impl WindowsSigning {
     ///
     /// Returns an error message if neither or both methods are configured.
     pub fn method(&self) -> Result<WindowsSigningMethod<'_>, &'static str> {
-        let has_local = self.certificate_file.is_some();
-        let has_azure = self.azure_endpoint.is_some()
-            || self.azure_account_name.is_some()
-            || self.azure_certificate_profile.is_some();
-
-        match (has_local, has_azure) {
-            (true, true) => Err(
-                "Both local certificate and Azure Trusted Signing are configured. \
+        match (&self.signtool, &self.azure_trusted_signing) {
+            (Some(_), Some(_)) => Err(
+                "Both 'signtool' and 'azure_trusted_signing' are configured. \
                  Please use only one signing method.",
             ),
-            (false, false) => Err(
+            (None, None) => Err(
                 "No Windows signing method configured. \
-                 Set either 'certificate_file' for signtool or \
-                 'azure_endpoint'/'azure_account_name'/'azure_certificate_profile' \
-                 for Azure Trusted Signing.",
+                 Set either 'signtool' or 'azure_trusted_signing'.",
             ),
-            (true, false) => Ok(WindowsSigningMethod::Signtool {
-                certificate_file: self.certificate_file.as_deref().unwrap(),
-                certificate_password: self.certificate_password.as_deref(),
+            (Some(st), None) => Ok(WindowsSigningMethod::Signtool {
+                certificate_file: &st.certificate_file,
+                certificate_password: st.certificate_password.as_deref(),
             }),
-            (false, true) => {
-                let endpoint = self.azure_endpoint.as_deref().ok_or(
-                    "Azure Trusted Signing requires 'azure_endpoint'",
-                )?;
-                let account_name = self.azure_account_name.as_deref().ok_or(
-                    "Azure Trusted Signing requires 'azure_account_name'",
-                )?;
-                let certificate_profile = self.azure_certificate_profile.as_deref().ok_or(
-                    "Azure Trusted Signing requires 'azure_certificate_profile'",
-                )?;
-                Ok(WindowsSigningMethod::AzureTrustedSigning {
-                    endpoint,
-                    account_name,
-                    certificate_profile,
-                })
-            }
+            (None, Some(az)) => Ok(WindowsSigningMethod::AzureTrustedSigning {
+                endpoint: &az.endpoint,
+                account_name: &az.account_name,
+                certificate_profile: &az.certificate_profile,
+            }),
         }
     }
 }

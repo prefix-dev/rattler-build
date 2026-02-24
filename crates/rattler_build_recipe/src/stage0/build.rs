@@ -224,34 +224,19 @@ pub struct MacOsSigning {
 
 /// Windows code signing configuration.
 ///
-/// Supports two signing methods:
-/// 1. **Local certificate**: Uses `signtool` with a `.pfx`/`.p12` certificate file.
-///    Set `certificate_file` (and optionally `certificate_password`).
-/// 2. **Azure Trusted Signing**: Uses the Azure Trusted Signing service.
-///    Set `azure_endpoint`, `azure_account_name`, and `azure_certificate_profile`.
-///    Requires `az login` (OIDC) for authentication.
+/// Supports two signing methods (exactly one must be configured):
+/// 1. **Local certificate** (`signtool`): Configure the `signtool` sub-object.
+/// 2. **Azure Trusted Signing**: Configure the `azure_trusted_signing` sub-object.
 ///
-/// Exactly one method must be configured. If both are specified, an error is raised.
+/// Shared settings (`timestamp_url`, `digest_algorithm`) live at the top level.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct WindowsSigning {
-    // --- Local certificate signing (signtool) ---
-    /// Path to the certificate file (.pfx / .p12)
+    /// Local certificate signing via `signtool`
     #[serde(default)]
-    pub certificate_file: Option<Value<String>>,
-    /// Certificate password
+    pub signtool: Option<SigntoolConfig>,
+    /// Azure Trusted Signing configuration
     #[serde(default)]
-    pub certificate_password: Option<Value<String>>,
-
-    // --- Azure Trusted Signing ---
-    /// Azure Trusted Signing endpoint URL
-    #[serde(default)]
-    pub azure_endpoint: Option<Value<String>>,
-    /// Azure Trusted Signing account name
-    #[serde(default)]
-    pub azure_account_name: Option<Value<String>>,
-    /// Azure Trusted Signing certificate profile name
-    #[serde(default)]
-    pub azure_certificate_profile: Option<Value<String>>,
+    pub azure_trusted_signing: Option<AzureTrustedSigningConfig>,
 
     // --- Shared settings ---
     /// RFC 3161 timestamp server URL
@@ -260,6 +245,29 @@ pub struct WindowsSigning {
     /// Digest algorithm (default: sha256)
     #[serde(default)]
     pub digest_algorithm: Option<Value<String>>,
+}
+
+/// Local certificate signing configuration for `signtool`
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct SigntoolConfig {
+    /// Path to the certificate file (.pfx / .p12)
+    pub certificate_file: Value<String>,
+    /// Certificate password
+    #[serde(default)]
+    pub certificate_password: Option<Value<String>>,
+}
+
+/// Azure Trusted Signing configuration
+///
+/// Requires `az login` (OIDC) for authentication.
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct AzureTrustedSigningConfig {
+    /// Azure Trusted Signing endpoint URL
+    pub endpoint: Value<String>,
+    /// Azure Trusted Signing account name
+    pub account_name: Value<String>,
+    /// Azure Trusted Signing certificate profile name
+    pub certificate_profile: Value<String>,
 }
 
 /// Post-processing operations using regex replacements
@@ -497,20 +505,16 @@ impl Build {
             vars.extend(macos.options.used_variables());
         }
         if let Some(windows) = &signing.windows {
-            if let Some(cert_file) = &windows.certificate_file {
-                vars.extend(cert_file.used_variables());
+            if let Some(signtool) = &windows.signtool {
+                vars.extend(signtool.certificate_file.used_variables());
+                if let Some(password) = &signtool.certificate_password {
+                    vars.extend(password.used_variables());
+                }
             }
-            if let Some(password) = &windows.certificate_password {
-                vars.extend(password.used_variables());
-            }
-            if let Some(endpoint) = &windows.azure_endpoint {
-                vars.extend(endpoint.used_variables());
-            }
-            if let Some(account) = &windows.azure_account_name {
-                vars.extend(account.used_variables());
-            }
-            if let Some(profile) = &windows.azure_certificate_profile {
-                vars.extend(profile.used_variables());
+            if let Some(azure) = &windows.azure_trusted_signing {
+                vars.extend(azure.endpoint.used_variables());
+                vars.extend(azure.account_name.used_variables());
+                vars.extend(azure.certificate_profile.used_variables());
             }
             if let Some(timestamp_url) = &windows.timestamp_url {
                 vars.extend(timestamp_url.used_variables());

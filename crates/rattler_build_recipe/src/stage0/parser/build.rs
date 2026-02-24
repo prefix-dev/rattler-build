@@ -5,8 +5,9 @@ use rattler_conda_types::NoArchType;
 use crate::stage0::{
     Conditional, ConditionalList, Item, JinjaExpression, NestedItemList,
     build::{
-        BinaryRelocation, Build, DynamicLinking, ForceFileType, MacOsSigning, PostProcess,
-        PrefixDetection, PrefixIgnore, PythonBuild, Signing, VariantKeyUsage, WindowsSigning,
+        AzureTrustedSigningConfig, BinaryRelocation, Build, DynamicLinking, ForceFileType,
+        MacOsSigning, PostProcess, PrefixDetection, PrefixIgnore, PythonBuild, Signing,
+        SigntoolConfig, VariantKeyUsage, WindowsSigning,
     },
     parser::helpers::get_span,
     types::{IncludeExclude, Value},
@@ -913,11 +914,8 @@ fn parse_windows_signing(node: &Node) -> Result<WindowsSigning, ParseError> {
             .with_message("Expected 'signing.windows' to be a mapping")
     })?;
 
-    let mut certificate_file = None;
-    let mut certificate_password = None;
-    let mut azure_endpoint = None;
-    let mut azure_account_name = None;
-    let mut azure_certificate_profile = None;
+    let mut signtool = None;
+    let mut azure_trusted_signing = None;
     let mut timestamp_url = None;
     let mut digest_algorithm = None;
 
@@ -925,29 +923,11 @@ fn parse_windows_signing(node: &Node) -> Result<WindowsSigning, ParseError> {
         let key = key_node.as_str();
 
         match key {
-            "certificate_file" => {
-                certificate_file =
-                    Some(parse_field!("signing.windows.certificate_file", value_node));
+            "signtool" => {
+                signtool = Some(parse_signtool_config(value_node)?);
             }
-            "certificate_password" => {
-                certificate_password = Some(parse_field!(
-                    "signing.windows.certificate_password",
-                    value_node
-                ));
-            }
-            "azure_endpoint" => {
-                azure_endpoint =
-                    Some(parse_field!("signing.windows.azure_endpoint", value_node));
-            }
-            "azure_account_name" => {
-                azure_account_name =
-                    Some(parse_field!("signing.windows.azure_account_name", value_node));
-            }
-            "azure_certificate_profile" => {
-                azure_certificate_profile = Some(parse_field!(
-                    "signing.windows.azure_certificate_profile",
-                    value_node
-                ));
+            "azure_trusted_signing" => {
+                azure_trusted_signing = Some(parse_azure_trusted_signing_config(value_node)?);
             }
             "timestamp_url" => {
                 timestamp_url =
@@ -964,37 +944,147 @@ fn parse_windows_signing(node: &Node) -> Result<WindowsSigning, ParseError> {
                     *key_node.span(),
                 )
                 .with_suggestion(
-                    "Valid fields are: certificate_file, certificate_password, \
-                     azure_endpoint, azure_account_name, azure_certificate_profile, \
+                    "Valid fields are: signtool, azure_trusted_signing, \
                      timestamp_url, digest_algorithm",
                 ));
             }
         }
     }
 
-    // Validate: at least one signing method must be specified
-    let has_local = certificate_file.is_some();
-    let has_azure = azure_endpoint.is_some()
-        || azure_account_name.is_some()
-        || azure_certificate_profile.is_some();
+    // Validate: exactly one signing method must be specified
+    if signtool.is_none() && azure_trusted_signing.is_none() {
+        return Err(
+            ParseError::missing_field("signtool or azure_trusted_signing", get_span(node))
+                .with_message(
+                    "Windows signing requires either 'signtool' (for local certificate) or \
+                     'azure_trusted_signing' (for Azure Trusted Signing)",
+                ),
+        );
+    }
 
-    if !has_local && !has_azure {
-        return Err(ParseError::missing_field("certificate_file or azure_endpoint", get_span(node))
-            .with_message(
-                "Windows signing requires either 'certificate_file' (for signtool) or \
-                 'azure_endpoint'/'azure_account_name'/'azure_certificate_profile' \
-                 (for Azure Trusted Signing)",
-            ));
+    if signtool.is_some() && azure_trusted_signing.is_some() {
+        return Err(ParseError::invalid_value(
+            "signing.windows",
+            "both 'signtool' and 'azure_trusted_signing' are set; use only one",
+            get_span(node),
+        )
+        .with_message(
+            "Windows signing supports only one method at a time. \
+             Use either 'signtool' or 'azure_trusted_signing', not both.",
+        ));
     }
 
     Ok(WindowsSigning {
-        certificate_file,
-        certificate_password,
-        azure_endpoint,
-        azure_account_name,
-        azure_certificate_profile,
+        signtool,
+        azure_trusted_signing,
         timestamp_url,
         digest_algorithm,
+    })
+}
+
+fn parse_signtool_config(node: &Node) -> Result<SigntoolConfig, ParseError> {
+    let mapping = node.as_mapping().ok_or_else(|| {
+        ParseError::expected_type("mapping", "non-mapping", get_span(node))
+            .with_message("Expected 'signing.windows.signtool' to be a mapping")
+    })?;
+
+    let mut certificate_file = None;
+    let mut certificate_password = None;
+
+    for (key_node, value_node) in mapping.iter() {
+        let key = key_node.as_str();
+
+        match key {
+            "certificate_file" => {
+                certificate_file = Some(parse_field!(
+                    "signing.windows.signtool.certificate_file",
+                    value_node
+                ));
+            }
+            "certificate_password" => {
+                certificate_password = Some(parse_field!(
+                    "signing.windows.signtool.certificate_password",
+                    value_node
+                ));
+            }
+            _ => {
+                return Err(ParseError::invalid_value(
+                    "signing.windows.signtool",
+                    format!("unknown field '{}'", key),
+                    *key_node.span(),
+                )
+                .with_suggestion("Valid fields are: certificate_file, certificate_password"));
+            }
+        }
+    }
+
+    let certificate_file = certificate_file
+        .ok_or_else(|| ParseError::missing_field("certificate_file", get_span(node)))?;
+
+    Ok(SigntoolConfig {
+        certificate_file,
+        certificate_password,
+    })
+}
+
+fn parse_azure_trusted_signing_config(
+    node: &Node,
+) -> Result<AzureTrustedSigningConfig, ParseError> {
+    let mapping = node.as_mapping().ok_or_else(|| {
+        ParseError::expected_type("mapping", "non-mapping", get_span(node))
+            .with_message("Expected 'signing.windows.azure_trusted_signing' to be a mapping")
+    })?;
+
+    let mut endpoint = None;
+    let mut account_name = None;
+    let mut certificate_profile = None;
+
+    for (key_node, value_node) in mapping.iter() {
+        let key = key_node.as_str();
+
+        match key {
+            "endpoint" => {
+                endpoint = Some(parse_field!(
+                    "signing.windows.azure_trusted_signing.endpoint",
+                    value_node
+                ));
+            }
+            "account_name" => {
+                account_name = Some(parse_field!(
+                    "signing.windows.azure_trusted_signing.account_name",
+                    value_node
+                ));
+            }
+            "certificate_profile" => {
+                certificate_profile = Some(parse_field!(
+                    "signing.windows.azure_trusted_signing.certificate_profile",
+                    value_node
+                ));
+            }
+            _ => {
+                return Err(ParseError::invalid_value(
+                    "signing.windows.azure_trusted_signing",
+                    format!("unknown field '{}'", key),
+                    *key_node.span(),
+                )
+                .with_suggestion(
+                    "Valid fields are: endpoint, account_name, certificate_profile",
+                ));
+            }
+        }
+    }
+
+    let endpoint =
+        endpoint.ok_or_else(|| ParseError::missing_field("endpoint", get_span(node)))?;
+    let account_name =
+        account_name.ok_or_else(|| ParseError::missing_field("account_name", get_span(node)))?;
+    let certificate_profile = certificate_profile
+        .ok_or_else(|| ParseError::missing_field("certificate_profile", get_span(node)))?;
+
+    Ok(AzureTrustedSigningConfig {
+        endpoint,
+        account_name,
+        certificate_profile,
     })
 }
 
@@ -1173,8 +1263,9 @@ signing:
         let yaml = r#"
 signing:
   windows:
-    certificate_file: "/path/to/cert.pfx"
-    certificate_password: "secret123"
+    signtool:
+      certificate_file: "/path/to/cert.pfx"
+      certificate_password: "secret123"
     timestamp_url: "http://timestamp.digicert.com"
     digest_algorithm: "sha256"
 "#;
@@ -1185,23 +1276,29 @@ signing:
         assert!(signing.windows.is_some());
 
         let windows = signing.windows.as_ref().unwrap();
+        let signtool = windows.signtool.as_ref().unwrap();
+        assert!(windows.azure_trusted_signing.is_none());
         assert_eq!(
-            windows
-                .certificate_file
-                .as_ref()
-                .unwrap()
-                .as_concrete()
-                .unwrap(),
+            signtool.certificate_file.as_concrete().unwrap(),
             "/path/to/cert.pfx"
         );
         assert_eq!(
-            windows
+            signtool
                 .certificate_password
                 .as_ref()
                 .unwrap()
                 .as_concrete()
                 .unwrap(),
             "secret123"
+        );
+        assert_eq!(
+            windows
+                .timestamp_url
+                .as_ref()
+                .unwrap()
+                .as_concrete()
+                .unwrap(),
+            "http://timestamp.digicert.com"
         );
     }
 
@@ -1210,9 +1307,10 @@ signing:
         let yaml = r#"
 signing:
   windows:
-    azure_endpoint: "https://wus2.codesigning.azure.net"
-    azure_account_name: "my-signing-account"
-    azure_certificate_profile: "my-profile"
+    azure_trusted_signing:
+      endpoint: "https://wus2.codesigning.azure.net"
+      account_name: "my-signing-account"
+      certificate_profile: "my-profile"
     timestamp_url: "http://timestamp.acs.microsoft.com"
     digest_algorithm: "sha256"
 "#;
@@ -1222,32 +1320,18 @@ signing:
         assert!(signing.windows.is_some());
 
         let windows = signing.windows.as_ref().unwrap();
-        assert!(windows.certificate_file.is_none());
+        assert!(windows.signtool.is_none());
+        let azure = windows.azure_trusted_signing.as_ref().unwrap();
         assert_eq!(
-            windows
-                .azure_endpoint
-                .as_ref()
-                .unwrap()
-                .as_concrete()
-                .unwrap(),
+            azure.endpoint.as_concrete().unwrap(),
             "https://wus2.codesigning.azure.net"
         );
         assert_eq!(
-            windows
-                .azure_account_name
-                .as_ref()
-                .unwrap()
-                .as_concrete()
-                .unwrap(),
+            azure.account_name.as_concrete().unwrap(),
             "my-signing-account"
         );
         assert_eq!(
-            windows
-                .azure_certificate_profile
-                .as_ref()
-                .unwrap()
-                .as_concrete()
-                .unwrap(),
+            azure.certificate_profile.as_concrete().unwrap(),
             "my-profile"
         );
     }
@@ -1259,9 +1343,10 @@ signing:
   macos:
     identity: "-"
   windows:
-    azure_endpoint: "https://endpoint"
-    azure_account_name: "account"
-    azure_certificate_profile: "profile"
+    azure_trusted_signing:
+      endpoint: "https://endpoint"
+      account_name: "account"
+      certificate_profile: "profile"
 "#;
         let node = marked_yaml::parse_yaml(0, yaml).unwrap();
         let build = parse_build(&node).unwrap();
@@ -1286,7 +1371,24 @@ signing:
         let yaml = r#"
 signing:
   windows:
-    certificate_password: "secret"
+    timestamp_url: "http://example.com"
+"#;
+        let node = marked_yaml::parse_yaml(0, yaml).unwrap();
+        let result = parse_build(&node);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_signing_both_methods_errors() {
+        let yaml = r#"
+signing:
+  windows:
+    signtool:
+      certificate_file: "cert.pfx"
+    azure_trusted_signing:
+      endpoint: "https://endpoint"
+      account_name: "account"
+      certificate_profile: "profile"
 "#;
         let node = marked_yaml::parse_yaml(0, yaml).unwrap();
         let result = parse_build(&node);

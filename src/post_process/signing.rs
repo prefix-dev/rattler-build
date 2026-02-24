@@ -13,6 +13,9 @@ use std::path::{Path, PathBuf};
 use rattler_build_recipe::stage1::build::{
     MacOsSigning, Signing, WindowsSigning, WindowsSigningMethod,
 };
+
+#[cfg(test)]
+use rattler_build_recipe::stage1::build::{AzureTrustedSigningConfig, SigntoolConfig};
 use rattler_conda_types::Platform;
 use thiserror::Error;
 
@@ -538,11 +541,11 @@ mod tests {
 
     fn make_windows_signtool() -> WindowsSigning {
         WindowsSigning {
-            certificate_file: Some("cert.pfx".to_string()),
-            certificate_password: None,
-            azure_endpoint: None,
-            azure_account_name: None,
-            azure_certificate_profile: None,
+            signtool: Some(SigntoolConfig {
+                certificate_file: "cert.pfx".to_string(),
+                certificate_password: None,
+            }),
+            azure_trusted_signing: None,
             timestamp_url: None,
             digest_algorithm: "sha256".to_string(),
         }
@@ -550,11 +553,12 @@ mod tests {
 
     fn make_windows_azure() -> WindowsSigning {
         WindowsSigning {
-            certificate_file: None,
-            certificate_password: None,
-            azure_endpoint: Some("https://wus2.codesigning.azure.net".to_string()),
-            azure_account_name: Some("my-account".to_string()),
-            azure_certificate_profile: Some("my-profile".to_string()),
+            signtool: None,
+            azure_trusted_signing: Some(AzureTrustedSigningConfig {
+                endpoint: "https://wus2.codesigning.azure.net".to_string(),
+                account_name: "my-account".to_string(),
+                certificate_profile: "my-profile".to_string(),
+            }),
             timestamp_url: Some("http://timestamp.acs.microsoft.com".to_string()),
             digest_algorithm: "sha256".to_string(),
         }
@@ -652,11 +656,15 @@ mod tests {
     #[test]
     fn test_windows_signing_method_both_errors() {
         let config = WindowsSigning {
-            certificate_file: Some("cert.pfx".to_string()),
-            certificate_password: None,
-            azure_endpoint: Some("https://endpoint".to_string()),
-            azure_account_name: None,
-            azure_certificate_profile: None,
+            signtool: Some(SigntoolConfig {
+                certificate_file: "cert.pfx".to_string(),
+                certificate_password: None,
+            }),
+            azure_trusted_signing: Some(AzureTrustedSigningConfig {
+                endpoint: "https://endpoint".to_string(),
+                account_name: "account".to_string(),
+                certificate_profile: "profile".to_string(),
+            }),
             timestamp_url: None,
             digest_algorithm: "sha256".to_string(),
         };
@@ -666,11 +674,8 @@ mod tests {
     #[test]
     fn test_windows_signing_method_neither_errors() {
         let config = WindowsSigning {
-            certificate_file: None,
-            certificate_password: None,
-            azure_endpoint: None,
-            azure_account_name: None,
-            azure_certificate_profile: None,
+            signtool: None,
+            azure_trusted_signing: None,
             timestamp_url: None,
             digest_algorithm: "sha256".to_string(),
         };
