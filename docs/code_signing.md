@@ -283,6 +283,19 @@ build:
       timestamp_url: "http://timestamp.acs.microsoft.com"
 ```
 
+## End-to-end example
+
+The [`examples/code-signing/`](https://github.com/prefix-dev/rattler-build/tree/main/examples/code-signing)
+directory contains a complete, copy-paste-ready example:
+
+- A small C project (executable + shared library) built with CMake
+- A `recipe.yaml` with signing configured for both macOS and Windows
+- A GitHub Actions workflow that imports certificates from secrets, builds the
+  package, and signs the binaries
+
+To try it in your own repo, copy the example directory and configure the
+required GitHub secrets (see the workflow file for the full list).
+
 ## Which files are signed?
 
 Rattler-build automatically detects signable binaries by inspecting file headers:

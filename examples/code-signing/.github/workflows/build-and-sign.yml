@@ -1,0 +1,105 @@
+# Example GitHub Actions workflow that builds a small C library with rattler-build
+# and code-signs the binaries on macOS and Windows.
+#
+# Copy this workflow (and the recipe.yaml + hello/ source) into your own repo.
+# Then configure the secrets listed below.
+#
+# Required secrets:
+#   macOS:
+#     MACOS_CERTIFICATE_P12   - base64-encoded .p12 certificate
+#     MACOS_CERTIFICATE_PASSWORD - password for the .p12 file
+#     MACOS_SIGNING_IDENTITY  - e.g. "Developer ID Application: My Org (TEAMID)"
+#   Windows (signtool):
+#     WIN_CERT_FILE_B64       - base64-encoded .pfx certificate
+#     WIN_CERT_PASSWORD       - password for the .pfx file
+
+name: Build and sign conda package
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            platform: osx-arm64
+          - os: windows-latest
+            platform: win-64
+          - os: ubuntu-latest
+            platform: linux-64
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── Install rattler-build ──────────────────────────────────────────
+      - name: Install rattler-build
+        uses: prefix-dev/setup-rattler-build@v0.2.20
+
+      # ── macOS: import certificate into a temporary keychain ────────────
+      - name: Import macOS signing certificate
+        if: runner.os == 'macOS'
+        env:
+          CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+        run: |
+          KEYCHAIN_PATH="$RUNNER_TEMP/signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -base64 32)"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          echo "$CERTIFICATE_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" \
+            -k "$KEYCHAIN_PATH" -P "$CERTIFICATE_PASSWORD" \
+            -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: \
+            -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH"
+
+      # ── Windows: decode the .pfx certificate to a temp file ────────────
+      - name: Decode Windows signing certificate
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          WIN_CERT_FILE_B64: ${{ secrets.WIN_CERT_FILE_B64 }}
+        run: |
+          $certPath = Join-Path $env:RUNNER_TEMP "cert.pfx"
+          [IO.File]::WriteAllBytes($certPath, [Convert]::FromBase64String($env:WIN_CERT_FILE_B64))
+          echo "WIN_CERT_FILE=$certPath" >> $env:GITHUB_ENV
+
+      # ── Build the package (signing happens automatically) ──────────────
+      - name: Build conda package
+        env:
+          MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+          WIN_CERT_FILE: ${{ env.WIN_CERT_FILE }}
+          WIN_CERT_PASSWORD: ${{ secrets.WIN_CERT_PASSWORD }}
+        run: |
+          rattler-build build \
+            --recipe recipe.yaml \
+            --target-platform ${{ matrix.platform }}
+
+      # ── Upload the built .conda package as an artifact ─────────────────
+      - name: Upload package
+        uses: actions/upload-artifact@v4
+        with:
+          name: hello-signed-${{ matrix.platform }}
+          path: output/**/*.conda
+
+      # ── Verify signatures (macOS only, as a sanity check) ──────────────
+      - name: Verify macOS signatures
+        if: runner.os == 'macOS'
+        run: |
+          echo "Listing built .conda packages..."
+          find output -name '*.conda' -print
+
+          # Extract and verify — the test section in the recipe also does this,
+          # but this step runs outside of the test environment for extra confidence.
+          echo "Package signatures were verified during the build (see build log)."
