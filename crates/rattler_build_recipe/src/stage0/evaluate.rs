@@ -98,6 +98,12 @@ use rattler_build_jinja::Variable;
 pub const ALWAYS_INCLUDED_VARS: &[&str] =
     &["target_platform", "channel_targets", "channel_sources"];
 
+/// Compiler/stdlib variables whose presence triggers inclusion of CONDA_BUILD_SYSROOT
+/// in the used variant (for hash computation). This matches conda-build's behavior
+/// in variants.py where CONDA_BUILD_SYSROOT is automatically added when compiler
+/// or stdlib functions are detected.
+const COMPILER_STDLIB_VARS: &[&str] = &["c_compiler", "cxx_compiler", "c_stdlib"];
+
 /// Helper to render a Jinja template to a Variable (preserving type information)
 fn render_template_to_variable(
     template: &str,
@@ -2801,6 +2807,22 @@ impl Evaluate for Stage0Recipe {
             })
             .collect();
 
+        // If any compiler/stdlib variable is in the used variant, also include
+        // CONDA_BUILD_SYSROOT if it exists in the variant. This matches conda-build's
+        // behavior where different sysroot paths should produce different package hashes.
+        if actual_variant
+            .keys()
+            .any(|k| COMPILER_STDLIB_VARS.contains(&k.normalize().as_str()))
+        {
+            let sysroot_key = NormalizedKey::from("CONDA_BUILD_SYSROOT");
+            if !actual_variant.contains_key(&sysroot_key) {
+                if let Some(sysroot_val) = context_with_vars.variables().get("CONDA_BUILD_SYSROOT")
+                {
+                    actual_variant.insert(sysroot_key, sysroot_val.clone());
+                }
+            }
+        }
+
         // Ensure that `target_platform` is set to "noarch" for noarch packages
         if !noarch.is_none() {
             actual_variant.insert("target_platform".into(), Variable::from_string("noarch"));
@@ -3219,6 +3241,20 @@ fn evaluate_package_output_to_recipe(
         .map(|(k, v)| (NormalizedKey::from(k.as_str()), v.clone()))
         .collect();
 
+    // If any compiler/stdlib variable is in the used variant, also include
+    // CONDA_BUILD_SYSROOT if it exists in the variant.
+    if actual_variant
+        .keys()
+        .any(|k| COMPILER_STDLIB_VARS.contains(&k.normalize().as_str()))
+    {
+        let sysroot_key = NormalizedKey::from("CONDA_BUILD_SYSROOT");
+        if !actual_variant.contains_key(&sysroot_key) {
+            if let Some(sysroot_val) = context.variables().get("CONDA_BUILD_SYSROOT") {
+                actual_variant.insert(sysroot_key, sysroot_val.clone());
+            }
+        }
+    }
+
     // Ensure that `target_platform` is set to "noarch" for noarch packages
     if !noarch.is_none() {
         actual_variant.insert("target_platform".into(), Variable::from_string("noarch"));
@@ -3327,7 +3363,7 @@ impl Evaluate for crate::stage0::MultiOutputRecipe {
                     &["target_platform", "channel_targets", "channel_sources"];
 
                 let os_env_var_keys = context_with_vars.os_env_var_keys();
-                let actual_variant: BTreeMap<NormalizedKey, Variable> = context_with_vars
+                let mut actual_variant: BTreeMap<NormalizedKey, Variable> = context_with_vars
                     .variables()
                     .iter()
                     .filter(|(k, _)| {
@@ -3347,6 +3383,22 @@ impl Evaluate for crate::stage0::MultiOutputRecipe {
                     })
                     .map(|(k, v)| (NormalizedKey::from(k.as_str()), v.clone()))
                     .collect();
+
+                // If any compiler/stdlib variable is in the used variant, also include
+                // CONDA_BUILD_SYSROOT if it exists in the variant.
+                if actual_variant
+                    .keys()
+                    .any(|k| COMPILER_STDLIB_VARS.contains(&k.normalize().as_str()))
+                {
+                    let sysroot_key = NormalizedKey::from("CONDA_BUILD_SYSROOT");
+                    if !actual_variant.contains_key(&sysroot_key) {
+                        if let Some(sysroot_val) =
+                            context_with_vars.variables().get("CONDA_BUILD_SYSROOT")
+                        {
+                            actual_variant.insert(sysroot_key, sysroot_val.clone());
+                        }
+                    }
+                }
 
                 let staging_cache = StagingCache::new(
                     staging_name.clone(),
