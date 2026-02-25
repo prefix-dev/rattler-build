@@ -1,7 +1,7 @@
 github_url = "https://github.com/prefix-dev/rattler-build"
 
 [version]
-current = "0.57.2"
+current = "0.58.0"
 
 # Example of a semver regexp.
 # Make sure this matches current_version before
@@ -30,4 +30,8 @@ src = "Cargo.toml"
 
 [[file]]
 search = '^version = "{current_version}"'
-src = "py-rattler-build/Cargo.toml"
+src = "py-rattler-build/rust/Cargo.toml"
+
+[[file]]
+search = '^version = "{current_version}"'
+src = "py-rattler-build/pyproject.toml"
