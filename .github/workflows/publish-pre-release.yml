@@ -35,7 +35,8 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
         with:
           submodules: recursive
-      - run: |
+      - name: Copy checkout directory
+        run: |
           New-Item ${{ matrix.working-directory }} -ItemType Directory
           Copy-Item D:/a/rattler-build/rattler-build/* ${{ matrix.working-directory }} -Recurse -Force
         working-directory: "D:/"
