@@ -6,16 +6,7 @@ A multi-output recipe produces multiple packages from a single `recipe.yaml` fil
 Multi-output recipes are used when a single source tree produces multiple packages.
 Common examples include splitting a C library into runtime, development, and language binding packages.
 
-In a multi-output recipe:
-
-- The top-level `package:` key is replaced by `recipe:`.
-- `recipe.version` provides a default version for all outputs.
-- `recipe.name` is optional and determines the shared build directory name for all outputs.
-It does not create a package artifact.
-- The `outputs:` key contains a list of independent package definitions.
-
-Each output is a self-contained recipe with its own `package`, `build`,
-`requirements`, `tests`, and `about` sections.
+In a multi-output recipe each output is a self-contained recipe with its own `package`, `build`, `requirements`, `tests`, and `about` sections.
 
 ## Basic Structure
 
@@ -218,14 +209,6 @@ inherit:
   run_exports: false  # do not inherit run exports from staging
 ```
 
-**Top-level inheritance** (default) — when `inherit:` is omitted or set to
-`null`, the output inherits from the top-level `source`, `build`, and other
-sections but not from any staging cache:
-
-```yaml
-inherit: null  # explicit; same as omitting inherit entirely
-```
-
 ### Run exports from staging
 
 Run exports from the staging output's build/host dependencies are propagated to
@@ -271,16 +254,3 @@ build:
 
 For more advanced selection with include/exclude patterns, see the
 [build options documentation](../build_options.md#include-only-certain-files-in-the-package).
-
-
-## Differences from conda-build
-
-| Aspect                  | conda-build                              | rattler-build                                    |
-|-------------------------|------------------------------------------|--------------------------------------------------|
-| Output structure        | Abbreviated keys (`script`, `name`)      | Full recipe keys (`build: script:`, `package: name:`) |
-| Implicit meta-package   | Top-level `package:` creates meta-package | No implicit meta-packages                        |
-| Jinja syntax            | `{{ }}`, `{% set %}`                     | `${{ }}`, `context:` section, no control flow     |
-| Output build caching    | Separate `cache:` key                    | `staging:` outputs with `inherit:`                |
-| Output ordering         | Manual or implicit                       | Topological sort via `pin_subpackage` graph       |
-| Recipe filename         | `meta.yaml`                              | `recipe.yaml`                                     |
-| Selectors               | Comment-based (`# [osx]`)                | YAML `if/then/else` preprocessing selectors     |
