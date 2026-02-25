@@ -94,6 +94,7 @@ requirements:
         assert!(used_vars.contains(&"c_compiler_version".to_string()));
         assert!(used_vars.contains(&"c_stdlib".to_string()));
         assert!(used_vars.contains(&"c_stdlib_version".to_string()));
+        assert!(used_vars.contains(&"CONDA_BUILD_SYSROOT".to_string()));
         assert!(used_vars.contains(&"abcdef".to_string()));
         assert!(!used_vars.contains(&"foobar".to_string()));
         assert!(used_vars.contains(&"compatible".to_string()));

@@ -262,7 +262,10 @@ mod tests {
 
         assert!(!req.is_empty());
         let vars = req.used_variables();
-        assert_eq!(vars, vec!["c_compiler", "c_compiler_version"]);
+        assert_eq!(
+            vars,
+            vec!["CONDA_BUILD_SYSROOT", "c_compiler", "c_compiler_version"]
+        );
     }
 
     #[test]

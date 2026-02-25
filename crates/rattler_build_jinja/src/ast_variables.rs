@@ -253,10 +253,13 @@ fn collect_variables_from_call(
 
         match function_name.as_str() {
             "compiler" => {
-                // compiler('c') expands to c_compiler and c_compiler_version
+                // compiler('c') expands to c_compiler, c_compiler_version,
+                // and CONDA_BUILD_SYSROOT (matching conda-build behavior where
+                // different sysroot paths produce different package hashes)
                 if let Some(lang) = extract_first_string_arg(&call.args) {
                     variables.insert(format!("{}_compiler", lang));
                     variables.insert(format!("{}_compiler_version", lang));
+                    variables.insert("CONDA_BUILD_SYSROOT".to_string());
                 } else {
                     // If we can't extract the argument, collect the arguments as variables
                     for arg in &call.args {
@@ -265,10 +268,12 @@ fn collect_variables_from_call(
                 }
             }
             "stdlib" => {
-                // stdlib('c') expands to c_stdlib and c_stdlib_version
+                // stdlib('c') expands to c_stdlib, c_stdlib_version,
+                // and CONDA_BUILD_SYSROOT (matching conda-build behavior)
                 if let Some(lang) = extract_first_string_arg(&call.args) {
                     variables.insert(format!("{}_stdlib", lang));
                     variables.insert(format!("{}_stdlib_version", lang));
+                    variables.insert("CONDA_BUILD_SYSROOT".to_string());
                 } else {
                     for arg in &call.args {
                         collect_variables_from_call_arg(arg, variables);
@@ -490,8 +495,11 @@ mod tests {
         let template = JinjaTemplate::new("${{ compiler('c') }}".to_string()).unwrap();
         let mut vars = template.used_variables().to_vec();
         vars.sort();
-        // compiler('c') expands to c_compiler and c_compiler_version
-        assert_eq!(vars, vec!["c_compiler", "c_compiler_version"]);
+        // compiler('c') expands to CONDA_BUILD_SYSROOT, c_compiler, and c_compiler_version
+        assert_eq!(
+            vars,
+            vec!["CONDA_BUILD_SYSROOT", "c_compiler", "c_compiler_version"]
+        );
     }
 
     #[test]
@@ -499,8 +507,11 @@ mod tests {
         let template = JinjaTemplate::new("${{ stdlib('c') }}".to_string()).unwrap();
         let mut vars = template.used_variables().to_vec();
         vars.sort();
-        // stdlib('c') expands to c_stdlib and c_stdlib_version
-        assert_eq!(vars, vec!["c_stdlib", "c_stdlib_version"]);
+        // stdlib('c') expands to CONDA_BUILD_SYSROOT, c_stdlib, and c_stdlib_version
+        assert_eq!(
+            vars,
+            vec!["CONDA_BUILD_SYSROOT", "c_stdlib", "c_stdlib_version"]
+        );
     }
 
     #[test]
