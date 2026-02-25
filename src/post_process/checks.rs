@@ -597,6 +597,27 @@ pub fn perform_linking_checks(
                                 file_dsos.push((libpath.to_path_buf(), package.clone()));
                             }
                         }
+                        // Fallback: if the library wasn't resolved on disk (e.g. host deps
+                        // not physically installed due to staging cache optimization), try
+                        // to match by relative path against the cached prefix info.
+                        else if resolved.is_none() {
+                            // Try stripping common prefixes like @rpath/
+                            let rel_path = lib
+                                .strip_prefix("@rpath")
+                                .or_else(|_| lib.strip_prefix("@loader_path"))
+                                .unwrap_or(lib);
+                            // Search cached prefix info for a matching path
+                            if let Some(package) = prefix_info
+                                .find_package_by_filename(rel_path)
+                                && let Some(nature) =
+                                    prefix_info.package_to_nature.get(&package)
+                                && nature.provides_shared_objects()
+                            {
+                                // Use the original unresolved path as key so it matches
+                                // the entry in shared_libraries
+                                file_dsos.push((lib.to_path_buf(), package));
+                            }
+                        }
                     }
 
                     Some(PackageFile {
@@ -677,6 +698,23 @@ pub fn perform_linking_checks(
                 continue;
             }
 
+            // Check if the library is a build artifact from the staging cache
+            // (i.e. it will be packaged by a sibling output).
+            if let Some(cached) = &output.cached_prefix_info {
+                let lib_str = lib.to_string_lossy();
+                if cached
+                    .staging_prefix_files
+                    .iter()
+                    .any(|f| f == lib_str.as_ref() || Path::new(f) == lib)
+                {
+                    link_info.linked_packages.push(LinkedPackage {
+                        name: lib.to_path_buf(),
+                        link_origin: LinkOrigin::PackageItself,
+                    });
+                    continue;
+                }
+            }
+
             // Check if we allow overlinking.
             if dynamic_linking.missing_dso_allowlist.is_match(lib) {
                 tracing::info!(
@@ -720,6 +758,16 @@ pub fn perform_linking_checks(
     // If there are any host packages with DSOs that we didn't link against,
     // it is "overdepending".
     for host_package in host_dso_packages.iter() {
+        // Skip overdepending check for packages inherited from the staging cache.
+        // These are transitive dependencies needed by the staging cache's build
+        // artifacts (sibling outputs) and are expected to not be directly linked
+        // by this output's files.
+        if let Some(cached) = &output.cached_prefix_info {
+            if cached.package_to_nature.contains_key(host_package) {
+                continue;
+            }
+        }
+
         if !package_files
             .iter()
             .map(|package| {
