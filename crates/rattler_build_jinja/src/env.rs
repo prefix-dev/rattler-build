@@ -13,6 +13,7 @@ impl std::fmt::Display for Env {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl Env {
     fn get(&self, env_var: &str, kwargs: Kwargs) -> Result<Value, minijinja::Error> {
         let default_value = kwargs.get::<String>("default").ok();
@@ -32,6 +33,28 @@ impl Env {
 
     fn exists(&self, env_var: &str) -> Result<Value, minijinja::Error> {
         Ok(Value::from(std::env::var(env_var).is_ok()))
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+impl Env {
+    fn get(&self, env_var: &str, kwargs: Kwargs) -> Result<Value, minijinja::Error> {
+        let default_value = kwargs.get::<String>("default").ok();
+        kwargs.assert_all_used()?;
+
+        match default_value {
+            Some(default_value) => Ok(Value::from(default_value)),
+            None => Err(minijinja::Error::new(
+                minijinja::ErrorKind::InvalidOperation,
+                format!(
+                    "Environment variable {env_var} not found (env access not available in WASM)"
+                ),
+            )),
+        }
+    }
+
+    fn exists(&self, _env_var: &str) -> Result<Value, minijinja::Error> {
+        Ok(Value::from(false))
     }
 }
 

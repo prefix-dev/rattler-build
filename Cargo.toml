@@ -27,6 +27,9 @@ members = [
   "crates/rattler_build_allocator",
   "crates/rattler_build_package",
 ]
+exclude = [
+  "crates/rattler_build_playground",
+]
 
 [workspace.package]
 authors = ["rattler-build contributors <hi@prefix.dev>"]

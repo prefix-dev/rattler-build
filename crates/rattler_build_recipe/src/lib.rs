@@ -13,8 +13,11 @@ pub use stage1::{Evaluate, EvaluationContext, Recipe as Stage1Recipe};
 #[cfg(feature = "variant-config")]
 pub use variant_render::{
     RenderConfig, RenderError, RenderedVariant, TopologicalSortError,
-    render_recipe_with_variant_config, render_recipe_with_variants,
+    render_recipe_with_variant_config,
 };
+
+#[cfg(all(feature = "variant-config", not(target_arch = "wasm32")))]
+pub use variant_render::render_recipe_with_variants;
 
 pub use marked_yaml::Span;
 

@@ -1,17 +1,22 @@
+use std::sync::Arc;
+
+#[cfg(not(target_arch = "wasm32"))]
 use std::{
     path::{Path, PathBuf},
     process::Command,
-    sync::Arc,
 };
 
 use minijinja::{
     Value,
-    value::{Object, from_args},
+    value::Object,
 };
+#[cfg(not(target_arch = "wasm32"))]
+use minijinja::value::from_args;
 
 #[derive(Debug)]
 pub(crate) struct Git {
     pub(crate) experimental: bool,
+    #[cfg(not(target_arch = "wasm32"))]
     pub(crate) recipe_dir: Option<PathBuf>,
 }
 
@@ -21,6 +26,7 @@ impl std::fmt::Display for Git {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn get_command_output(command: &str, args: &[&str]) -> Result<String, minijinja::Error> {
     let output = Command::new(command).args(args).output().map_err(|e| {
         minijinja::Error::new(minijinja::ErrorKind::InvalidOperation, e.to_string())
@@ -38,6 +44,7 @@ fn get_command_output(command: &str, args: &[&str]) -> Result<String, minijinja:
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn git_command_in_dir(dir: &Path, args: &[&str]) -> Result<String, minijinja::Error> {
     let output = Command::new("git")
         .current_dir(dir)
@@ -59,6 +66,7 @@ fn git_command_in_dir(dir: &Path, args: &[&str]) -> Result<String, minijinja::Er
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl Git {
     /// Try to resolve `src` as a local path. Relative paths are resolved
     /// against the recipe directory only. Absolute paths are checked directly.
@@ -172,15 +180,28 @@ impl Object for Git {
                 "Experimental feature: provide the `--experimental` flag to enable this feature",
             ));
         }
-        let (src,) = from_args(args)?;
-        match name {
-            "head_rev" => self.head_rev(src),
-            "latest_tag_rev" => self.latest_tag_rev(src),
-            "latest_tag" => self.latest_tag(src),
-            name => Err(minijinja::Error::new(
-                minijinja::ErrorKind::UnknownMethod,
-                format!("object has no method named {name}"),
-            )),
+
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let (src,) = from_args(args)?;
+            match name {
+                "head_rev" => self.head_rev(src),
+                "latest_tag_rev" => self.latest_tag_rev(src),
+                "latest_tag" => self.latest_tag(src),
+                name => Err(minijinja::Error::new(
+                    minijinja::ErrorKind::UnknownMethod,
+                    format!("object has no method named {name}"),
+                )),
+            }
+        }
+
+        #[cfg(target_arch = "wasm32")]
+        {
+            let _ = (name, args);
+            Err(minijinja::Error::new(
+                minijinja::ErrorKind::InvalidOperation,
+                "Git operations are not available in WASM",
+            ))
         }
     }
 }

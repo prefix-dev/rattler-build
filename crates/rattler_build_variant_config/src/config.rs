@@ -4,6 +4,7 @@ use rattler_build_jinja::Variable;
 use rattler_build_types::NormalizedKey;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashSet};
+#[cfg(not(target_arch = "wasm32"))]
 use std::path::Path;
 
 use crate::{
@@ -59,6 +60,7 @@ impl VariantConfig {
     /// Conditionals are evaluated using a default JinjaConfig based on the current platform.
     ///
     /// For more control over the evaluation context, use `from_file_with_context` instead.
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn from_file(path: &Path) -> Result<Self, VariantConfigError> {
         // Use a default JinjaConfig for evaluation
         let jinja_config = rattler_build_jinja::JinjaConfig::default();
@@ -86,6 +88,7 @@ impl VariantConfig {
     ///     &jinja_config
     /// ).unwrap();
     /// ```
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn from_file_with_context(
         path: &Path,
         jinja_config: &rattler_build_jinja::JinjaConfig,
@@ -147,6 +150,7 @@ impl VariantConfig {
     /// with `if/then/else` conditionals.
     ///
     /// The `target_platform` is used for evaluating platform-specific selectors.
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn from_files(
         paths: &[impl AsRef<Path>],
         target_platform: rattler_conda_types::Platform,
@@ -166,6 +170,7 @@ impl VariantConfig {
     ///
     /// Files named `conda_build_config.yaml` are loaded using the legacy loader
     /// which supports `# [selector]` syntax. Other files use the modern loader.
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn from_files_with_context(
         paths: &[impl AsRef<Path>],
         jinja_config: &rattler_build_jinja::JinjaConfig,

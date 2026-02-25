@@ -1,0 +1,70 @@
+name: Deploy Playground
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "crates/rattler_build_playground/**"
+      - "crates/rattler_build_jinja/**"
+      - "crates/rattler_build_recipe/**"
+      - "crates/rattler_build_variant_config/**"
+      - "crates/rattler_build_types/**"
+      - "crates/rattler_build_yaml_parser/**"
+      - ".github/workflows/playground.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "crates/rattler_build_playground/**"
+      - "crates/rattler_build_jinja/**"
+      - "crates/rattler_build_recipe/**"
+      - "crates/rattler_build_variant_config/**"
+      - "crates/rattler_build_types/**"
+      - "crates/rattler_build_yaml_parser/**"
+      - ".github/workflows/playground.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: playground-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+      - name: Build WASM playground
+        working-directory: crates/rattler_build_playground
+        run: wasm-pack build --target web --release
+
+      - name: Prepare deployment directory
+        run: |
+          mkdir -p deploy
+          cp crates/rattler_build_playground/www/* deploy/
+          cp crates/rattler_build_playground/pkg/rattler_build_playground_bg.wasm deploy/
+          cp crates/rattler_build_playground/pkg/rattler_build_playground.js deploy/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: playground
+          path: deploy/
+
+      - name: Deploy to Cloudflare Pages
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy deploy --project-name=rattler-build-playground
