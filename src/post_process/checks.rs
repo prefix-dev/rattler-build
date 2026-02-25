@@ -6,7 +6,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::post_process::{package_nature::PackageNature, relink};
+use crate::post_process::{
+    package_nature::{CaseInsensitivePathBuf, PackageNature},
+    relink,
+};
 use crate::{
     metadata::Output,
     post_process::{package_nature::PrefixInfo, relink::RelinkError},
@@ -531,9 +534,9 @@ pub fn perform_linking_checks(
     let mut prefix_info = PrefixInfo::from_prefix(output.prefix())?;
 
     // Merge cached prefix info from the staging cache (if any).
-    // The staging cache's host packages are not physically installed in the
-    // prefix (their conda-meta records are absent), so we merge the cached
-    // mappings to allow the linking checks to attribute shared libraries.
+    // The staging cache's host packages may not be physically installed in
+    // the prefix, but we need their path-to-package and nature mappings
+    // for linking checks to attribute shared libraries correctly.
     if let Some(cached) = &output.cached_prefix_info {
         prefix_info.merge_cached(cached);
     }
@@ -584,39 +587,54 @@ pub fn perform_linking_checks(
                             continue;
                         }
 
-                        let lib = resolved.as_ref().unwrap_or(lib);
-                        if let Ok(libpath) = lib.strip_prefix(host_prefix)
-                            && let Some(package) = prefix_info
-                                .path_to_package
-                                .get(&libpath.to_path_buf().into())
-                            && let Some(nature) = prefix_info.package_to_nature.get(package)
-                        {
-                            // Accept any package that provides shared objects (DSO libraries,
-                            // interpreters like python providing python3XX.dll, plugin libraries, etc.)
-                            if nature.provides_shared_objects() {
-                                file_dsos.push((libpath.to_path_buf(), package.clone()));
+                        let effective_lib = resolved.as_ref().unwrap_or(lib);
+
+                        // Try to attribute the library to a host package.
+                        // First attempt: resolved path stripped of host prefix.
+                        let attributed =
+                            if let Ok(libpath) = effective_lib.strip_prefix(host_prefix) {
+                                let key: CaseInsensitivePathBuf = libpath.to_path_buf().into();
+                                if let Some(package) = prefix_info.path_to_package.get(&key)
+                                    && let Some(nature) = prefix_info.package_to_nature.get(package)
+                                    && nature.provides_shared_objects()
+                                {
+                                    Some((libpath.to_path_buf(), package.clone()))
+                                } else {
+                                    None
+                                }
+                            } else {
+                                None
+                            };
+
+                        // Second attempt: for unresolved @rpath/@loader_path libraries
+                        // (host dep files may not be on disk due to staging cache
+                        // optimization), resolve virtually against path_to_package.
+                        let attributed = attributed.or_else(|| {
+                            if resolved.is_some() {
+                                return None;
                             }
-                        }
-                        // Fallback: if the library wasn't resolved on disk (e.g. host deps
-                        // not physically installed due to staging cache optimization), try
-                        // to match by relative path against the cached prefix info.
-                        else if resolved.is_none() {
-                            // Try stripping common prefixes like @rpath/
-                            let rel_path = lib
+                            let rel = lib
                                 .strip_prefix("@rpath")
                                 .or_else(|_| lib.strip_prefix("@loader_path"))
-                                .unwrap_or(lib);
-                            // Search cached prefix info for a matching path
-                            if let Some(package) = prefix_info
-                                .find_package_by_filename(rel_path)
-                                && let Some(nature) =
-                                    prefix_info.package_to_nature.get(&package)
-                                && nature.provides_shared_objects()
-                            {
-                                // Use the original unresolved path as key so it matches
-                                // the entry in shared_libraries
-                                file_dsos.push((lib.to_path_buf(), package));
+                                .ok()?;
+                            // Try common library directories
+                            for dir in &["lib", "bin", "Library/bin"] {
+                                let candidate: CaseInsensitivePathBuf =
+                                    Path::new(dir).join(rel).into();
+                                if let Some(package) = prefix_info.path_to_package.get(&candidate)
+                                    && let Some(nature) = prefix_info.package_to_nature.get(package)
+                                    && nature.provides_shared_objects()
+                                {
+                                    // Use the unresolved path as key so it matches
+                                    // the entry in shared_libraries downstream
+                                    return Some((lib.to_path_buf(), package.clone()));
+                                }
                             }
+                            None
+                        });
+
+                        if let Some((libpath, package)) = attributed {
+                            file_dsos.push((libpath, package));
                         }
                     }
 

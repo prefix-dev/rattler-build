@@ -215,26 +215,6 @@ impl PrefixInfo {
         Ok(prefix_info)
     }
 
-    /// Find a package that provides a file matching the given relative path
-    /// (e.g., `libz.1.dylib`). Searches path_to_package entries by filename.
-    pub fn find_package_by_filename(&self, rel_path: &Path) -> Option<PackageName> {
-        // First try direct lookup with common lib/ prefix
-        let with_lib_prefix: CaseInsensitivePathBuf = Path::new("lib").join(rel_path).into();
-        if let Some(package) = self.path_to_package.get(&with_lib_prefix) {
-            return Some(package.clone());
-        }
-
-        // Fallback: search by filename
-        if let Some(filename) = rel_path.file_name() {
-            for (path, package) in &self.path_to_package {
-                if path.path.file_name() == Some(filename) {
-                    return Some(package.clone());
-                }
-            }
-        }
-        None
-    }
-
     /// Merge cached prefix info (from a staging cache) into this PrefixInfo.
     /// Cached entries are only added if they don't already exist.
     pub fn merge_cached(&mut self, cached: &CachedPrefixInfo) {
@@ -272,10 +252,7 @@ pub struct CachedPrefixInfo {
 impl CachedPrefixInfo {
     /// Build a CachedPrefixInfo from a PrefixInfo and the staging cache's
     /// prefix files (build artifacts).
-    pub(crate) fn from_prefix_info(
-        info: &PrefixInfo,
-        staging_prefix_files: &[PathBuf],
-    ) -> Self {
+    pub(crate) fn from_prefix_info(info: &PrefixInfo, staging_prefix_files: &[PathBuf]) -> Self {
         Self {
             path_to_package: info
                 .path_to_package

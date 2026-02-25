@@ -382,8 +382,7 @@ impl Output {
         // from the host environment while conda-meta records are still present.
         // This data is needed by linking checks in inheriting outputs.
         let prefix_info = PrefixInfo::from_prefix(self.prefix()).into_diagnostic()?;
-        let cached_prefix_info =
-            CachedPrefixInfo::from_prefix_info(&prefix_info, &copied_files);
+        let cached_prefix_info = CachedPrefixInfo::from_prefix_info(&prefix_info, &copied_files);
 
         // Save metadata
         let metadata = StagingCacheMetadata {
