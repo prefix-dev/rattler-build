@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - wasm-support
     paths:
       - "crates/rattler_build_playground/**"
       - "crates/rattler_build_jinja/**"
