@@ -3675,9 +3675,10 @@ mod tests {
 
         // Variables used during template rendering (functions like `compiler` are excluded)
         let accessed = ctx.accessed_variables();
-        assert_eq!(accessed.len(), 3);
+        assert_eq!(accessed.len(), 4);
         assert!(accessed.contains("c_compiler"));
         assert!(accessed.contains("c_compiler_version"));
+        assert!(accessed.contains("CONDA_BUILD_SYSROOT"));
         assert!(accessed.contains("version"));
         // Note: compiler() adds '=' before alphanumeric versions
         assert_eq!(result[0], "supergcc_linux-64 =15.0");

@@ -512,9 +512,12 @@ fn compiler_stdlib_eval(
     let variant_key_version = NormalizedKey(format!("{lang}_{prefix}_version")).normalize();
 
     // Track that we're accessing these variant keys
+    // Also track CONDA_BUILD_SYSROOT since different sysroot paths should
+    // produce different package hashes (matching conda-build behavior)
     if let Ok(mut accessed) = accessed_variables.lock() {
         accessed.insert(variant_key.clone());
         accessed.insert(variant_key_version.clone());
+        accessed.insert("CONDA_BUILD_SYSROOT".to_string());
     }
 
     let default_fn = if prefix == "compiler" {
