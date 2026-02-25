@@ -658,7 +658,7 @@ Co-authored-by: Bas Zalmstra <bas@prefix.dev>
 - Skip upload existing package to prefix (#1501)
 - Add `io_concurrency_limit` support to prevent resource exhaustion (#1489)
 - Add `source.filter` to `PathSource` (#1545)
-- Add error handling for hypen in context variables (#1557)
+- Add error handling for hyphen in context variables (#1557)
 - Emscripten build outputs will be produced with .js and .wasm extensions (#1558)
 
 ### 🐛 Bug Fixes
@@ -1218,7 +1218,7 @@ Co-authored-by: Bas Zalmstra <bas@prefix.dev>
 
 ### 🚀 Features
 
-- Seperate solving from installing (#1030)
+- Separate solving from installing (#1030)
 - Print detected virtual packages for debugging purposes (#1059)
 - Delay jinja evaluation for script (#894)
 
@@ -1756,7 +1756,7 @@ files:
 
 ### 📚 Documentation
 
-- Write about variants, priorization and mutex packages
+- Write about variants, prioritization and mutex packages
 - Simplify CLI documentation for autocompletion (#618)
 - Advanced build options (#624)
 - Start adding some examples (#625)
@@ -1793,7 +1793,7 @@ files:
 - *(ci)* Bump prefix-dev/setup-pixi from 0.4.3 to 0.5.0 (#582)
 - *(ci)* Bump prefix-dev/setup-pixi from 0.5.0 to 0.5.1 (#591)
 - Suppress noisy auth storage warnings (#599)
-- Update all depencies and release 0.9.0 (#609)
+- Update all dependencies and release 0.9.0 (#609)
 ## [0.8.1] - 2024-02-01
 
 ### 🚀 Features
@@ -2065,7 +2065,7 @@ Fix banner reference typo
 
 ### 🚀 Features
 
-- Make copy_dir() return copied pathes (#199)
+- Make copy_dir() return copied paths (#199)
 - New recipe parser (#205)
 - *(recipe)* Improvements to error messages (#224)
 - Add more explanatory error message when not copying license files (#221)
@@ -2219,7 +2219,7 @@ Fix #176
 
 ### 🚀 Features
 
-- Add source.path as a option or specifing source (#131)
+- Add source.path as a option or specifying source (#131)
 - Simplify CLI by allowing for recipe path and defaulting to '.' (#132)
 
 ### 🐛 Bug Fixes
@@ -2233,7 +2233,7 @@ Fix #176
 - Add pre-commit config and ran it. (#133)
 - Make git sources useable (#137)
 
-* feat: improve handeling of git errors and give it more options
+* feat: improve handling of git errors and give it more options
 * feat: Implement local git url's, fix fetching, fix copy_dir
 * test: add test to git source and fix found issues
 - Improve error reporting when parsing files and remove some unwrap (#143)
