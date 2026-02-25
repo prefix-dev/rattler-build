@@ -310,17 +310,11 @@ rattler_build_recipe_generator = { path = "crates/rattler_build_recipe_generator
   "cli",
 ] }
 rattler_build_types = { workspace = true }
-rattler_build_variant_config = { workspace = true, features = [
-  "parser",
-] }
+rattler_build_variant_config = { workspace = true, features = ["parser"] }
 rattler_build_jinja = { workspace = true }
-rattler_build_recipe = { workspace = true, features = [
-  "variant-config",
-] }
+rattler_build_recipe = { workspace = true, features = ["variant-config"] }
 rattler_git = { workspace = true }
-rattler_build_networking = { workspace = true, features = [
-  "middleware",
-] }
+rattler_build_networking = { workspace = true, features = ["middleware"] }
 rattler_build_source_cache = { path = "crates/rattler_build_source_cache", default-features = false }
 rattler_build_script = { workspace = true }
 rattler_build_allocator = { path = "crates/rattler_build_allocator", optional = true }
