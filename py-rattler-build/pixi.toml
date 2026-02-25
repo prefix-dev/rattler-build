@@ -19,7 +19,7 @@ extra-input-globs = ["../src", "../crates"]
 
 [package.host-dependencies]
 python = "*"
-maturin = "~=1.2.2"
+maturin = "~=1.12.0"
 
 [package.target.linux.build-dependencies]
 patchelf = "~=0.17.2"
