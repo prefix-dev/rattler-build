@@ -7,10 +7,10 @@ use std::collections::{BTreeMap, HashSet};
 #[cfg(not(target_arch = "wasm32"))]
 use std::path::Path;
 
-use crate::{
-    combination::compute_combinations,
-    error::{VariantConfigError, VariantExpandError},
-};
+use crate::combination::compute_combinations;
+#[cfg(not(target_arch = "wasm32"))]
+use crate::error::VariantConfigError;
+use crate::error::VariantExpandError;
 
 /// The variant configuration structure.
 ///
@@ -138,6 +138,7 @@ impl VariantConfig {
     }
 
     /// The name of the conda_build_config.yaml file (legacy format with `# [selector]` syntax)
+    #[cfg(not(target_arch = "wasm32"))]
     const CONDA_BUILD_CONFIG_FILENAME: &'static str = "conda_build_config.yaml";
 
     /// Load multiple variant configuration files and merge them
