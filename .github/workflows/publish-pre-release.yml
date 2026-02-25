@@ -26,7 +26,7 @@ jobs:
           - os: ubuntu-latest
           - os: macos-latest
           - os: windows-latest
-            checkout-path: 'D:\pixi'
+            checkout-path: 'D:/pixi'
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -35,7 +35,11 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
         with:
           submodules: recursive
-          path: ${{ matrix.checkout-path || '.' }}
+      - run: |
+          New-Item ${{ matrix.checkout-path }} -ItemType Directory
+          Copy-Item D:/a/rattler-build/rattler-build/* ${{ matrix.checkout-path }} -Recurse -Force
+        working-directory: 'D:/'
+        if: ${{ matrix.os=='windows-latest' }}
       - uses: prefix-dev/setup-pixi@v0.9.4
         with:
           environments: packaging
