@@ -8,6 +8,7 @@ pub mod bump_recipe;
 // pub mod conda_build_config;
 pub mod console_utils;
 pub mod metadata;
+pub mod migrate_recipe;
 pub mod opt;
 pub mod package_test;
 pub mod packaging;
@@ -343,6 +344,18 @@ pub async fn get_build_output(
 
     // Read the recipe content
     let recipe_content = fs::read_to_string(recipe_path).into_diagnostic()?;
+
+    // Detect deprecated `cache:` key and give a helpful error
+    if migrate_recipe::has_cache_key(&recipe_content) {
+        return Err(miette::miette!(
+            "this recipe uses the deprecated top-level 'cache:' key. \
+             The 'cache' format has been replaced by 'staging' outputs. \
+             To automatically migrate your recipe, run:\n\n\
+             rattler-build migrate-recipe --recipe {}\n\n\
+             For more information, see: https://rattler-build.prefix.dev/latest/multiple_output_cache/",
+            recipe_path.display()
+        ));
+    }
 
     // Check if there is a `variants.yaml` or `conda_build_config.yaml` file next to
     // the recipe that we should potentially use.
