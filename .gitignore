@@ -12,6 +12,9 @@ checkouts
 .cache
 site
 
+# playground
+deploy/
+
 # pixi environments
 .pixi
 target-pixi
