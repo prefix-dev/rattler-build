@@ -49,12 +49,6 @@ fn evaluate_condition(condition: &str, jinja: &Jinja) -> bool {
 fn conda_build_config_jinja(jinja_config: &JinjaConfig) -> Jinja {
     let mut jinja = Jinja::new(jinja_config.clone());
 
-    // Add platform shorthands to jinja context
-    let short_target_platform = jinja_config.target_platform.to_string().replace("-", "");
-    jinja
-        .context_mut()
-        .insert(short_target_platform, Value::from(true));
-
     // Add environ_get function for environment variable access
     jinja.env_mut().add_function(
         "environ_get",
