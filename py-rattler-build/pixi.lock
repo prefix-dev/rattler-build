@@ -3799,7 +3799,7 @@ packages:
   timestamp: 1733569518868
 - conda: .
   name: py-rattler-build
-  version: 0.58.0
+  version: 0.58.1
   build: py310h4656880_0
   subdir: win-64
   variants:
@@ -3811,7 +3811,7 @@ packages:
   license: BSD-3-Clause
 - conda: .
   name: py-rattler-build
-  version: 0.58.0
+  version: 0.58.1
   build: py310h8e7c8fa_0
   subdir: linux-64
   variants:
@@ -3825,7 +3825,7 @@ packages:
   license: BSD-3-Clause
 - conda: .
   name: py-rattler-build
-  version: 0.58.0
+  version: 0.58.1
   build: py310h8ff6bd7_0
   subdir: osx-64
   variants:
@@ -3839,7 +3839,7 @@ packages:
   license: BSD-3-Clause
 - conda: .
   name: py-rattler-build
-  version: 0.58.0
+  version: 0.58.1
   build: py310hbd7d6ef_0
   subdir: osx-arm64
   variants:
