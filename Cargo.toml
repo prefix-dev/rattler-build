@@ -62,16 +62,16 @@ minijinja = { version = "2.15.1", features = [
   "unstable_machinery",
   "custom_syntax",
 ] }
-rattler_conda_types = { version = "0.43.3", default-features = false }
+rattler_conda_types = { version = "0.43.5", default-features = false }
 rattler_digest = { version = "1.2.2", default-features = false, features = [
   "serde",
 ] }
 rattler_build_types = { path = "crates/rattler_build_types" }
 rattler_build_jinja = { path = "crates/rattler_build_jinja" }
 rattler_build_recipe = { path = "crates/rattler_build_recipe" }
-rattler_networking = { version = "0.26.0", default-features = false }
-rattler_package_streaming = { version = "0.24.0", default-features = false }
-rattler_shell = { version = "0.26.0", default-features = false, features = [
+rattler_networking = { version = "0.26.2", default-features = false }
+rattler_package_streaming = { version = "0.24.2", default-features = false }
+rattler_shell = { version = "0.26.2", default-features = false, features = [
   "sysinfo",
 ] }
 regex = "1.12.3"
@@ -266,33 +266,33 @@ regex = { workspace = true }
 async-recursion = { workspace = true }
 
 # Rattler crates
-rattler_config = { version = "0.3.0" }
-rattler = { version = "0.39.13", default-features = false, features = [
+rattler_config = { version = "0.3.2" }
+rattler = { version = "0.39.15", default-features = false, features = [
   "cli-tools",
   "indicatif",
 ] }
-rattler_cache = { version = "0.6.12", default-features = false }
+rattler_cache = { version = "0.6.14", default-features = false }
 rattler_conda_types = { workspace = true, features = ["rayon"] }
 rattler_digest = { workspace = true }
-rattler_index = { version = "0.27.14", default-features = false }
+rattler_index = { version = "0.27.16", default-features = false }
 rattler_networking = { workspace = true, features = ["rattler_config"] }
-rattler_upload = { version = "0.4.13", default-features = false }
-rattler_s3 = { version = "0.1.23", optional = true }
+rattler_upload = { version = "0.4.15", default-features = false }
+rattler_s3 = { version = "0.1.25", optional = true }
 rattler_redaction = { version = "0.1.13", default-features = false }
-rattler_repodata_gateway = { version = "0.26.0", default-features = false, features = [
+rattler_repodata_gateway = { version = "0.26.2", default-features = false, features = [
   "gateway",
 ] }
-rattler_shell = { version = "0.26.0", default-features = false, features = [
+rattler_shell = { version = "0.26.2", default-features = false, features = [
   "sysinfo",
 ] }
 rattler_prefix_guard = { workspace = true }
-rattler_solve = { version = "4.2.4", default-features = false, features = [
+rattler_solve = { version = "4.2.6", default-features = false, features = [
   "resolvo",
   "serde",
 ] }
-rattler_virtual_packages = { version = "2.3.9", default-features = false }
+rattler_virtual_packages = { version = "2.3.11", default-features = false }
 rattler_package_streaming = { workspace = true, default-features = false }
-rattler_menuinst = "0.2.47"
+rattler_menuinst = "0.2.49"
 lazy_static = { workspace = true }
 reqwest-retry = "0.8.0"
 retry-policies = "0.5.1"

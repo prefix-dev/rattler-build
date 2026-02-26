@@ -364,7 +364,9 @@ fn create_authenticated_client() -> miette::Result<reqwest_middleware::ClientWit
         .with_arc(Arc::new(AuthenticationMiddleware::from_auth_storage(
             authentication_storage,
         )))
-        .with(rattler_networking::OciMiddleware)
+        .with(rattler_networking::OciMiddleware::new(
+            rattler_networking::LazyClient::default(),
+        ))
         .build();
 
     Ok(client)
