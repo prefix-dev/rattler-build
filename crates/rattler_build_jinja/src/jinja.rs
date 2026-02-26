@@ -206,6 +206,17 @@ impl Jinja {
             "win".to_string(),
             Value::from(config.host_platform.is_windows()),
         );
+        context.insert(
+            "emscripten".to_string(),
+            Value::from(matches!(
+                config.host_platform,
+                Platform::EmscriptenWasm32
+            )),
+        );
+        context.insert(
+            "wasi".to_string(),
+            Value::from(matches!(config.host_platform, Platform::WasiWasm32)),
+        );
 
         // Add architecture aliases (e.g., "x86_64", "aarch64", "ppc64le")
         // All known architectures are defined, with only the host platform's architecture being true
