@@ -9,9 +9,16 @@
 #     MACOS_CERTIFICATE_P12   - base64-encoded .p12 certificate
 #     MACOS_CERTIFICATE_PASSWORD - password for the .p12 file
 #     MACOS_SIGNING_IDENTITY  - e.g. "Developer ID Application: My Org (TEAMID)"
-#   Windows (signtool):
+#   Windows (signtool with local .pfx):
 #     WIN_CERT_FILE_B64       - base64-encoded .pfx certificate
 #     WIN_CERT_PASSWORD       - password for the .pfx file
+#   Windows (Azure Trusted Signing) — used by the azure-signing job:
+#     AZURE_CLIENT_ID         - Azure AD app registration client ID
+#     AZURE_TENANT_ID         - Azure AD tenant ID
+#     AZURE_SUBSCRIPTION_ID   - Azure subscription ID
+#     AZURE_SIGNING_ENDPOINT  - e.g. https://wus2.codesigning.azure.net
+#     AZURE_SIGNING_ACCOUNT   - Azure Trusted Signing account name
+#     AZURE_SIGNING_PROFILE   - certificate profile name
 
 name: Build and sign conda package
 
@@ -21,6 +28,9 @@ on:
   pull_request:
 
 jobs:
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Job 1: macOS + Windows (local cert) + Linux
+  # ═══════════════════════════════════════════════════════════════════════════
   build:
     name: Build (${{ matrix.os }})
     strategy:
@@ -83,6 +93,7 @@ jobs:
           WIN_CERT_PASSWORD: ${{ secrets.WIN_CERT_PASSWORD }}
         run: |
           rattler-build build \
+            --experimental \
             --recipe recipe.yaml \
             --target-platform ${{ matrix.platform }}
 
@@ -103,3 +114,105 @@ jobs:
           # Extract and verify — the test section in the recipe also does this,
           # but this step runs outside of the test environment for extra confidence.
           echo "Package signatures were verified during the build (see build log)."
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Job 2: Windows with Azure Trusted Signing (no local certificate needed)
+  #
+  # This job shows how to install the Azure Trusted Signing tools from NuGet
+  # and sign binaries without relying on the azure/trusted-signing-action.
+  # ═══════════════════════════════════════════════════════════════════════════
+  azure-signing:
+    name: Build (Windows + Azure Trusted Signing)
+    runs-on: windows-latest
+    permissions:
+      id-token: write  # required for Azure OIDC login
+
+    env:
+      # NuGet package versions — update these as new versions are released
+      BUILD_TOOLS_VERSION: "10.0.26100.4188"
+      TRUSTED_SIGNING_CLIENT_VERSION: "1.0.95"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── Install rattler-build ──────────────────────────────────────────
+      - name: Install rattler-build
+        uses: prefix-dev/setup-rattler-build@v0.2.20
+
+      # ── Azure login via OIDC (federated credentials) ───────────────────
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      # ── Install Azure Trusted Signing tools from NuGet ─────────────────
+      # This replaces the azure/trusted-signing-action by installing the
+      # required components directly:
+      #   1. signtool.exe   — from Microsoft.Windows.SDK.BuildTools
+      #   2. dlib + headers — from Microsoft.Trusted.Signing.Client
+      - name: Install signing tools from NuGet
+        shell: pwsh
+        run: |
+          $toolsDir = Join-Path $env:RUNNER_TEMP "signing-tools"
+          New-Item -ItemType Directory -Force -Path $toolsDir | Out-Null
+
+          # Download and extract Windows SDK BuildTools (contains signtool.exe)
+          $buildToolsPkg = Join-Path $toolsDir "buildtools.nupkg.zip"
+          $buildToolsDir = Join-Path $toolsDir "buildtools"
+          Invoke-WebRequest `
+            -Uri "https://www.nuget.org/api/v2/package/Microsoft.Windows.SDK.BuildTools/$env:BUILD_TOOLS_VERSION" `
+            -OutFile $buildToolsPkg
+          Expand-Archive -Path $buildToolsPkg -DestinationPath $buildToolsDir -Force
+
+          # Find signtool.exe (x64)
+          $signtool = Get-ChildItem -Path $buildToolsDir -Recurse -Filter "signtool.exe" |
+            Where-Object { $_.FullName -match "x64" } |
+            Select-Object -First 1
+          if (-not $signtool) { throw "signtool.exe not found in BuildTools package" }
+
+          $signtoolDir = $signtool.DirectoryName
+          Write-Host "Found signtool at: $($signtool.FullName)"
+
+          # Download and extract Trusted Signing Client (contains the dlib)
+          $clientPkg = Join-Path $toolsDir "tsclient.nupkg.zip"
+          $clientDir = Join-Path $toolsDir "tsclient"
+          Invoke-WebRequest `
+            -Uri "https://www.nuget.org/api/v2/package/Microsoft.Trusted.Signing.Client/$env:TRUSTED_SIGNING_CLIENT_VERSION" `
+            -OutFile $clientPkg
+          Expand-Archive -Path $clientPkg -DestinationPath $clientDir -Force
+
+          # Find the dlib (x64)
+          $dlib = Get-ChildItem -Path $clientDir -Recurse -Filter "Azure.CodeSigning.Dlib.dll" |
+            Where-Object { $_.FullName -match "x64" } |
+            Select-Object -First 1
+          if (-not $dlib) { throw "Azure.CodeSigning.Dlib.dll not found in Trusted Signing Client package" }
+
+          Write-Host "Found dlib at: $($dlib.FullName)"
+
+          # Copy the dlib next to signtool so it can be found via /dlib
+          Copy-Item -Path $dlib.FullName -Destination $signtoolDir
+
+          # Add signtool directory to PATH
+          echo "$signtoolDir" >> $env:GITHUB_PATH
+          Write-Host "Added $signtoolDir to PATH"
+
+      # ── Build the package (Azure Trusted Signing) ──────────────────────
+      - name: Build conda package
+        env:
+          AZURE_SIGNING_ENDPOINT: ${{ secrets.AZURE_SIGNING_ENDPOINT }}
+          AZURE_SIGNING_ACCOUNT: ${{ secrets.AZURE_SIGNING_ACCOUNT }}
+          AZURE_SIGNING_PROFILE: ${{ secrets.AZURE_SIGNING_PROFILE }}
+        run: |
+          rattler-build build \
+            --experimental \
+            --recipe recipe.yaml \
+            --target-platform win-64
+
+      # ── Upload ─────────────────────────────────────────────────────────
+      - name: Upload package
+        uses: actions/upload-artifact@v4
+        with:
+          name: hello-signed-win-64-azure
+          path: output/**/*.conda

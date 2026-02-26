@@ -897,8 +897,7 @@ fn parse_macos_signing(node: &Node) -> Result<MacOsSigning, ParseError> {
         }
     }
 
-    let identity =
-        identity.ok_or_else(|| ParseError::missing_field("identity", get_span(node)))?;
+    let identity = identity.ok_or_else(|| ParseError::missing_field("identity", get_span(node)))?;
 
     Ok(MacOsSigning {
         identity,
@@ -930,8 +929,7 @@ fn parse_windows_signing(node: &Node) -> Result<WindowsSigning, ParseError> {
                 azure_trusted_signing = Some(parse_azure_trusted_signing_config(value_node)?);
             }
             "timestamp_url" => {
-                timestamp_url =
-                    Some(parse_field!("signing.windows.timestamp_url", value_node));
+                timestamp_url = Some(parse_field!("signing.windows.timestamp_url", value_node));
             }
             "digest_algorithm" => {
                 digest_algorithm =
@@ -989,7 +987,7 @@ fn parse_signtool_config(node: &Node) -> Result<SigntoolConfig, ParseError> {
     })?;
 
     let mut certificate_file = None;
-    let mut certificate_password = None;
+    let mut certificate_password_env = None;
 
     for (key_node, value_node) in mapping.iter() {
         let key = key_node.as_str();
@@ -1001,9 +999,9 @@ fn parse_signtool_config(node: &Node) -> Result<SigntoolConfig, ParseError> {
                     value_node
                 ));
             }
-            "certificate_password" => {
-                certificate_password = Some(parse_field!(
-                    "signing.windows.signtool.certificate_password",
+            "certificate_password_env" => {
+                certificate_password_env = Some(parse_field!(
+                    "signing.windows.signtool.certificate_password_env",
                     value_node
                 ));
             }
@@ -1013,7 +1011,7 @@ fn parse_signtool_config(node: &Node) -> Result<SigntoolConfig, ParseError> {
                     format!("unknown field '{}'", key),
                     *key_node.span(),
                 )
-                .with_suggestion("Valid fields are: certificate_file, certificate_password"));
+                .with_suggestion("Valid fields are: certificate_file, certificate_password_env"));
             }
         }
     }
@@ -1023,7 +1021,7 @@ fn parse_signtool_config(node: &Node) -> Result<SigntoolConfig, ParseError> {
 
     Ok(SigntoolConfig {
         certificate_file,
-        certificate_password,
+        certificate_password_env,
     })
 }
 
@@ -1067,15 +1065,12 @@ fn parse_azure_trusted_signing_config(
                     format!("unknown field '{}'", key),
                     *key_node.span(),
                 )
-                .with_suggestion(
-                    "Valid fields are: endpoint, account_name, certificate_profile",
-                ));
+                .with_suggestion("Valid fields are: endpoint, account_name, certificate_profile"));
             }
         }
     }
 
-    let endpoint =
-        endpoint.ok_or_else(|| ParseError::missing_field("endpoint", get_span(node)))?;
+    let endpoint = endpoint.ok_or_else(|| ParseError::missing_field("endpoint", get_span(node)))?;
     let account_name =
         account_name.ok_or_else(|| ParseError::missing_field("account_name", get_span(node)))?;
     let certificate_profile = certificate_profile
@@ -1247,12 +1242,7 @@ signing:
             "/path/to/keychain.keychain-db"
         );
         assert_eq!(
-            macos
-                .entitlements
-                .as_ref()
-                .unwrap()
-                .as_concrete()
-                .unwrap(),
+            macos.entitlements.as_ref().unwrap().as_concrete().unwrap(),
             "entitlements.plist"
         );
         assert_eq!(macos.options.len(), 1);
@@ -1265,7 +1255,7 @@ signing:
   windows:
     signtool:
       certificate_file: "/path/to/cert.pfx"
-      certificate_password: "secret123"
+      certificate_password_env: "CERT_PASSWORD"
     timestamp_url: "http://timestamp.digicert.com"
     digest_algorithm: "sha256"
 "#;
@@ -1284,12 +1274,12 @@ signing:
         );
         assert_eq!(
             signtool
-                .certificate_password
+                .certificate_password_env
                 .as_ref()
                 .unwrap()
                 .as_concrete()
                 .unwrap(),
-            "secret123"
+            "CERT_PASSWORD"
         );
         assert_eq!(
             windows

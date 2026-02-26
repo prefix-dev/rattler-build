@@ -37,24 +37,15 @@ pub enum SigningError {
 
     /// macOS codesign failed
     #[error("macOS codesign failed for {path}: {message}")]
-    MacOsCodesignFailed {
-        path: PathBuf,
-        message: String,
-    },
+    MacOsCodesignFailed { path: PathBuf, message: String },
 
     /// Windows signtool failed
     #[error("Windows signtool failed for {path}: {message}")]
-    WindowsSigntoolFailed {
-        path: PathBuf,
-        message: String,
-    },
+    WindowsSigntoolFailed { path: PathBuf, message: String },
 
     /// Signature verification failed
     #[error("Signature verification failed for {path}: {message}")]
-    VerificationFailed {
-        path: PathBuf,
-        message: String,
-    },
+    VerificationFailed { path: PathBuf, message: String },
 
     /// Signed binary contains the build prefix, which would be corrupted at install time
     #[error(
@@ -63,9 +54,7 @@ pub enum SigningError {
          Either ensure the binary doesn't embed the prefix path, or add the file \
          to build.prefix_detection.ignore"
     )]
-    SignedBinaryContainsPrefix {
-        path: PathBuf,
-    },
+    SignedBinaryContainsPrefix { path: PathBuf },
 
     /// System tool not found
     #[error("System tool error: {0}")]
@@ -121,10 +110,12 @@ fn sign_macos_binary(
 
     tracing::debug!("Running codesign: {:?}", cmd);
 
-    let output = cmd.output().map_err(|e| SigningError::MacOsCodesignFailed {
-        path: path.to_path_buf(),
-        message: format!("Failed to execute codesign: {}", e),
-    })?;
+    let output = cmd
+        .output()
+        .map_err(|e| SigningError::MacOsCodesignFailed {
+            path: path.to_path_buf(),
+            message: format!("Failed to execute codesign: {}", e),
+        })?;
 
     if !output.status.success() {
         return Err(SigningError::MacOsCodesignFailed {
@@ -143,10 +134,7 @@ fn sign_macos_binary(
 }
 
 /// Verify a macOS signature using `codesign --verify`
-fn verify_macos_signature(
-    path: &Path,
-    system_tools: &SystemTools,
-) -> Result<(), SigningError> {
+fn verify_macos_signature(path: &Path, system_tools: &SystemTools) -> Result<(), SigningError> {
     let codesign = system_tools
         .find_tool(Tool::Codesign)
         .map_err(|e| ToolError::ToolNotFound(Tool::Codesign, e))?;
@@ -182,18 +170,24 @@ fn sign_windows_binary(
     config: &WindowsSigning,
     system_tools: &SystemTools,
 ) -> Result<(), SigningError> {
-    let method = config.method().map_err(|e| SigningError::WindowsSigntoolFailed {
-        path: path.to_path_buf(),
-        message: e.to_string(),
-    })?;
+    let method = config
+        .method()
+        .map_err(|e| SigningError::WindowsSigntoolFailed {
+            path: path.to_path_buf(),
+            message: e.to_string(),
+        })?;
 
     match method {
         WindowsSigningMethod::Signtool {
             certificate_file,
-            certificate_password,
-        } => {
-            sign_windows_signtool(path, certificate_file, certificate_password, config, system_tools)
-        }
+            certificate_password_env,
+        } => sign_windows_signtool(
+            path,
+            certificate_file,
+            certificate_password_env,
+            config,
+            system_tools,
+        ),
         WindowsSigningMethod::AzureTrustedSigning {
             endpoint,
             account_name,
@@ -206,7 +200,7 @@ fn sign_windows_binary(
 fn sign_windows_signtool(
     path: &Path,
     certificate_file: &str,
-    certificate_password: Option<&str>,
+    certificate_password_env: Option<&str>,
     config: &WindowsSigning,
     system_tools: &SystemTools,
 ) -> Result<(), SigningError> {
@@ -220,7 +214,14 @@ fn sign_windows_signtool(
     cmd.arg("/f");
     cmd.arg(certificate_file);
 
-    if let Some(password) = certificate_password {
+    if let Some(env_var) = certificate_password_env {
+        let password = std::env::var(env_var).map_err(|_| SigningError::WindowsSigntoolFailed {
+            path: path.to_path_buf(),
+            message: format!(
+                "Environment variable '{}' not set (required for certificate password)",
+                env_var
+            ),
+        })?;
         cmd.arg("/p");
         cmd.arg(password);
     }
@@ -239,10 +240,12 @@ fn sign_windows_signtool(
 
     tracing::debug!("Running signtool: {:?}", cmd);
 
-    let output = cmd.output().map_err(|e| SigningError::WindowsSigntoolFailed {
-        path: path.to_path_buf(),
-        message: format!("Failed to execute signtool: {}", e),
-    })?;
+    let output = cmd
+        .output()
+        .map_err(|e| SigningError::WindowsSigntoolFailed {
+            path: path.to_path_buf(),
+            message: format!("Failed to execute signtool: {}", e),
+        })?;
 
     if !output.status.success() {
         return Err(SigningError::WindowsSigntoolFailed {
@@ -294,7 +297,7 @@ fn sign_windows_azure(
     // Write metadata to a temp file
     let temp_dir = tempfile::tempdir().map_err(SigningError::Io)?;
     let metadata_path = temp_dir.path().join("signing-metadata.json");
-    std::fs::write(&metadata_path, metadata.to_string()).map_err(SigningError::Io)?;
+    fs_err::write(&metadata_path, metadata.to_string()).map_err(SigningError::Io)?;
 
     // Try the Azure Code Signing tool first
     let azure_tool = which::which("AzureCodeSigning")
@@ -312,10 +315,7 @@ fn sign_windows_azure(
 
     let mut cmd = std::process::Command::new(&tool_path);
 
-    let tool_name = tool_path
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("");
+    let tool_name = tool_path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
 
     if tool_name.eq_ignore_ascii_case("signtool") {
         // Use signtool with Azure Code Signing DLib
@@ -357,10 +357,12 @@ fn sign_windows_azure(
 
     tracing::debug!("Running Azure Trusted Signing: {:?}", cmd);
 
-    let output = cmd.output().map_err(|e| SigningError::WindowsSigntoolFailed {
-        path: path.to_path_buf(),
-        message: format!("Failed to execute Azure Trusted Signing: {}", e),
-    })?;
+    let output = cmd
+        .output()
+        .map_err(|e| SigningError::WindowsSigntoolFailed {
+            path: path.to_path_buf(),
+            message: format!("Failed to execute Azure Trusted Signing: {}", e),
+        })?;
 
     if !output.status.success() {
         return Err(SigningError::WindowsSigntoolFailed {
@@ -379,10 +381,7 @@ fn sign_windows_azure(
 }
 
 /// Verify a Windows signature using `signtool verify`
-fn verify_windows_signature(
-    path: &Path,
-    system_tools: &SystemTools,
-) -> Result<(), SigningError> {
+fn verify_windows_signature(path: &Path, system_tools: &SystemTools) -> Result<(), SigningError> {
     let signtool = system_tools
         .find_tool(Tool::Signtool)
         .map_err(|e| ToolError::ToolNotFound(Tool::Signtool, e))?;
@@ -459,9 +458,7 @@ pub fn sign_binaries(
             continue;
         }
 
-        let rel_path = file_path
-            .strip_prefix(tmp_prefix)
-            .unwrap_or(file_path);
+        let rel_path = file_path.strip_prefix(tmp_prefix).unwrap_or(file_path);
 
         if let Some(config) = macos_config {
             sign_macos_binary(file_path, config, system_tools)?;
@@ -543,7 +540,7 @@ mod tests {
         WindowsSigning {
             signtool: Some(SigntoolConfig {
                 certificate_file: "cert.pfx".to_string(),
-                certificate_password: None,
+                certificate_password_env: None,
             }),
             azure_trusted_signing: None,
             timestamp_url: None,
@@ -658,7 +655,7 @@ mod tests {
         let config = WindowsSigning {
             signtool: Some(SigntoolConfig {
                 certificate_file: "cert.pfx".to_string(),
-                certificate_password: None,
+                certificate_password_env: None,
             }),
             azure_trusted_signing: Some(AzureTrustedSigningConfig {
                 endpoint: "https://endpoint".to_string(),

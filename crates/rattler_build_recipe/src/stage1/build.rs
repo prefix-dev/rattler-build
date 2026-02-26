@@ -356,8 +356,8 @@ pub struct Build {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub post_process: Vec<PostProcess>,
 
-    /// Code signing configuration
-    #[serde(default, skip_serializing_if = "Signing::is_default")]
+    /// Code signing configuration (not serialized into rendered recipe output)
+    #[serde(default, skip_serializing)]
     pub signing: Signing,
 }
 
@@ -426,9 +426,11 @@ pub struct WindowsSigning {
 pub struct SigntoolConfig {
     /// Path to the certificate file (.pfx / .p12)
     pub certificate_file: String,
-    /// Certificate password
+    /// Name of the environment variable containing the certificate password.
+    /// The password is read from this env var at build time to avoid leaking
+    /// secrets into the rendered recipe.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub certificate_password: Option<String>,
+    pub certificate_password_env: Option<String>,
 }
 
 /// Azure Trusted Signing configuration (evaluated)
@@ -449,8 +451,8 @@ pub enum WindowsSigningMethod<'a> {
     Signtool {
         /// Path to the .pfx/.p12 certificate
         certificate_file: &'a str,
-        /// Certificate password
-        certificate_password: Option<&'a str>,
+        /// Name of the env var containing the certificate password
+        certificate_password_env: Option<&'a str>,
     },
     /// Azure Trusted Signing
     AzureTrustedSigning {
@@ -473,13 +475,11 @@ impl WindowsSigning {
                 "Both 'signtool' and 'azure_trusted_signing' are configured. \
                  Please use only one signing method.",
             ),
-            (None, None) => Err(
-                "No Windows signing method configured. \
-                 Set either 'signtool' or 'azure_trusted_signing'.",
-            ),
+            (None, None) => Err("No Windows signing method configured. \
+                 Set either 'signtool' or 'azure_trusted_signing'."),
             (Some(st), None) => Ok(WindowsSigningMethod::Signtool {
                 certificate_file: &st.certificate_file,
-                certificate_password: st.certificate_password.as_deref(),
+                certificate_password_env: st.certificate_password_env.as_deref(),
             }),
             (None, Some(az)) => Ok(WindowsSigningMethod::AzureTrustedSigning {
                 endpoint: &az.endpoint,

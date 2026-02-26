@@ -118,17 +118,17 @@ build:
     windows:
       signtool:
         certificate_file: "path/to/certificate.pfx"
-        certificate_password: "${{ env.CERT_PASSWORD }}"
+        certificate_password_env: CERT_PASSWORD
       timestamp_url: "http://timestamp.digicert.com"
       digest_algorithm: sha256
 ```
 
 #### Signtool fields
 
-| Field | Required | Description |
-|-------|----------|-------------|
-| `certificate_file` | Yes | Path to the `.pfx` / `.p12` certificate file. |
-| `certificate_password` | No | Password for the certificate file. Use a Jinja template to read from an environment variable. |
+| Field                      | Required | Description                                                                                                      |
+|----------------------------|----------|------------------------------------------------------------------------------------------------------------------|
+| `certificate_file`         | Yes      | Path to the `.pfx` / `.p12` certificate file.                                                                    |
+| `certificate_password_env` | No       | Name of the environment variable containing the certificate password. The password is read at build time to avoid leaking secrets into the rendered recipe. |
 
 ### Method 2: Azure Trusted Signing
 
@@ -185,7 +185,7 @@ build:
     windows:
       signtool:
         certificate_file: "${{ env.WIN_CERT_PATH }}"
-        certificate_password: "${{ env.WIN_CERT_PASSWORD }}"
+        certificate_password_env: WIN_CERT_PASSWORD
       timestamp_url: "http://timestamp.digicert.com"
 ```
 
@@ -230,7 +230,7 @@ jobs:
           security list-keychains -d user -s "$KEYCHAIN_PATH"
 
       - name: Build package
-        run: rattler-build build --recipe recipe.yaml
+        run: rattler-build build --experimental --recipe recipe.yaml
 ```
 
 With this `recipe.yaml`:
@@ -246,12 +246,23 @@ build:
 
 ### GitHub Actions (Windows with Azure Trusted Signing)
 
+Azure Trusted Signing requires two tools on PATH:
+
+1. **`signtool.exe`** -- from the `Microsoft.Windows.SDK.BuildTools` NuGet package
+2. **`Azure.CodeSigning.Dlib.dll`** -- from the `Microsoft.Trusted.Signing.Client` NuGet package (place next to `signtool.exe`)
+
+The workflow below installs both directly from NuGet, without needing the
+`azure/trusted-signing-action`:
+
 ```yaml title=".github/workflows/build.yml"
 jobs:
   build-windows:
     runs-on: windows-latest
     permissions:
-      id-token: write
+      id-token: write  # required for Azure OIDC
+    env:
+      BUILD_TOOLS_VERSION: "10.0.26100.4188"
+      TRUSTED_SIGNING_CLIENT_VERSION: "1.0.95"
     steps:
       - uses: actions/checkout@v4
 
@@ -262,12 +273,42 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+      - name: Install signing tools from NuGet
+        shell: pwsh
+        run: |
+          $toolsDir = Join-Path $env:RUNNER_TEMP "signing-tools"
+          New-Item -ItemType Directory -Force -Path $toolsDir | Out-Null
+
+          # signtool.exe
+          $pkg = Join-Path $toolsDir "buildtools.zip"
+          $dir = Join-Path $toolsDir "buildtools"
+          Invoke-WebRequest `
+            -Uri "https://www.nuget.org/api/v2/package/Microsoft.Windows.SDK.BuildTools/$env:BUILD_TOOLS_VERSION" `
+            -OutFile $pkg
+          Expand-Archive -Path $pkg -DestinationPath $dir -Force
+          $signtool = Get-ChildItem $dir -Recurse -Filter "signtool.exe" |
+            Where-Object { $_.FullName -match "x64" } | Select-Object -First 1
+          $signtoolDir = $signtool.DirectoryName
+
+          # Azure.CodeSigning.Dlib.dll
+          $pkg = Join-Path $toolsDir "tsclient.zip"
+          $dir = Join-Path $toolsDir "tsclient"
+          Invoke-WebRequest `
+            -Uri "https://www.nuget.org/api/v2/package/Microsoft.Trusted.Signing.Client/$env:TRUSTED_SIGNING_CLIENT_VERSION" `
+            -OutFile $pkg
+          Expand-Archive -Path $pkg -DestinationPath $dir -Force
+          $dlib = Get-ChildItem $dir -Recurse -Filter "Azure.CodeSigning.Dlib.dll" |
+            Where-Object { $_.FullName -match "x64" } | Select-Object -First 1
+          Copy-Item $dlib.FullName -Destination $signtoolDir
+
+          echo "$signtoolDir" >> $env:GITHUB_PATH
+
       - name: Build package
         env:
           AZURE_SIGNING_ENDPOINT: ${{ secrets.AZURE_SIGNING_ENDPOINT }}
           AZURE_SIGNING_ACCOUNT: ${{ secrets.AZURE_SIGNING_ACCOUNT }}
           AZURE_SIGNING_PROFILE: ${{ secrets.AZURE_SIGNING_PROFILE }}
-        run: rattler-build build --recipe recipe.yaml
+        run: rattler-build build --experimental --recipe recipe.yaml
 ```
 
 With this `recipe.yaml`:
@@ -334,7 +375,7 @@ The signing identity was not found in any accessible keychain. Check that:
 The certificate file path is incorrect or the password is wrong. Verify that:
 
 - The `certificate_file` path is correct relative to the build working directory
-- The `certificate_password` is set correctly (check Jinja template evaluation)
+- The environment variable specified in `certificate_password_env` is set and contains the correct password
 
 ## See also
 

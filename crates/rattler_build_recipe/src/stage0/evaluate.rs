@@ -45,8 +45,7 @@ use crate::{
             PostProcess as Stage0PostProcess, PrefixDetection as Stage0PrefixDetection,
             PrefixIgnore as Stage0PrefixIgnore, PythonBuild as Stage0PythonBuild,
             Signing as Stage0Signing, SigntoolConfig as Stage0SigntoolConfig,
-            VariantKeyUsage as Stage0VariantKeyUsage,
-            WindowsSigning as Stage0WindowsSigning,
+            VariantKeyUsage as Stage0VariantKeyUsage, WindowsSigning as Stage0WindowsSigning,
         },
         requirements::{
             IgnoreRunExports as Stage0IgnoreRunExports, RunExports as Stage0RunExports,
@@ -72,13 +71,13 @@ use crate::{
         Extra as Stage1Extra, GlobVec, Package as Stage1Package, Recipe as Stage1Recipe,
         Requirements as Stage1Requirements, Rpaths,
         build::{
-            AzureTrustedSigningConfig as Stage1AzureTrustedSigningConfig,
-            Build as Stage1Build, BuildString, DynamicLinking as Stage1DynamicLinking,
+            AzureTrustedSigningConfig as Stage1AzureTrustedSigningConfig, Build as Stage1Build,
+            BuildString, DynamicLinking as Stage1DynamicLinking,
             ForceFileType as Stage1ForceFileType, MacOsSigning as Stage1MacOsSigning,
             PostProcess as Stage1PostProcess, PrefixDetection as Stage1PrefixDetection,
             PythonBuild as Stage1PythonBuild, Signing as Stage1Signing,
-            SigntoolConfig as Stage1SigntoolConfig,
-            VariantKeyUsage as Stage1VariantKeyUsage, WindowsSigning as Stage1WindowsSigning,
+            SigntoolConfig as Stage1SigntoolConfig, VariantKeyUsage as Stage1VariantKeyUsage,
+            WindowsSigning as Stage1WindowsSigning,
         },
         requirements::{
             IgnoreRunExports as Stage1IgnoreRunExports, RunExports as Stage1RunExports,
@@ -2013,15 +2012,15 @@ impl Evaluate for Stage0SigntoolConfig {
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
         let certificate_file = evaluate_string_value(&self.certificate_file, context)?;
-        let certificate_password = self
-            .certificate_password
+        let certificate_password_env = self
+            .certificate_password_env
             .as_ref()
             .map(|v| evaluate_string_value(v, context))
             .transpose()?;
 
         Ok(Stage1SigntoolConfig {
             certificate_file,
-            certificate_password,
+            certificate_password_env,
         })
     }
 }

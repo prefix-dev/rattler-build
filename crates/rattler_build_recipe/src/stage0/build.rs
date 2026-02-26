@@ -252,9 +252,11 @@ pub struct WindowsSigning {
 pub struct SigntoolConfig {
     /// Path to the certificate file (.pfx / .p12)
     pub certificate_file: Value<String>,
-    /// Certificate password
+    /// Name of the environment variable containing the certificate password.
+    /// The password is read from this env var at build time to avoid leaking
+    /// secrets into the rendered recipe.
     #[serde(default)]
-    pub certificate_password: Option<Value<String>>,
+    pub certificate_password_env: Option<Value<String>>,
 }
 
 /// Azure Trusted Signing configuration
@@ -507,7 +509,7 @@ impl Build {
         if let Some(windows) = &signing.windows {
             if let Some(signtool) = &windows.signtool {
                 vars.extend(signtool.certificate_file.used_variables());
-                if let Some(password) = &signtool.certificate_password {
+                if let Some(password) = &signtool.certificate_password_env {
                     vars.extend(password.used_variables());
                 }
             }

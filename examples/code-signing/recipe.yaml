@@ -31,7 +31,7 @@ build:
     windows:
       signtool:
         certificate_file: "${{ env.WIN_CERT_FILE }}"
-        certificate_password: "${{ env.WIN_CERT_PASSWORD }}"
+        certificate_password_env: WIN_CERT_PASSWORD
       timestamp_url: "http://timestamp.digicert.com"
       digest_algorithm: sha256
 
