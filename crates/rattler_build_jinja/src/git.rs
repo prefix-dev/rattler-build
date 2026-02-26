@@ -6,12 +6,9 @@ use std::{
     process::Command,
 };
 
-use minijinja::{
-    Value,
-    value::Object,
-};
 #[cfg(not(target_arch = "wasm32"))]
 use minijinja::value::from_args;
+use minijinja::{Value, value::Object};
 
 #[derive(Debug)]
 pub(crate) struct Git {

@@ -950,10 +950,7 @@ fn set_jinja(
         );
 
         // Add git object (experimental)
-        env.add_global(
-            "git",
-            Value::from_object(crate::git::Git { experimental }),
-        );
+        env.add_global("git", Value::from_object(crate::git::Git { experimental }));
     }
 
     // Add env object
