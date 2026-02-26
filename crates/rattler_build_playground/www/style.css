@@ -195,11 +195,38 @@ html, body {
   overflow: hidden;
 }
 
-.editor-container textarea {
+.editor-highlight {
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 100%;
   height: 100%;
+  margin: 0;
+  padding: 12px;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: 1.5;
+  tab-size: 2;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow: hidden;
+  pointer-events: none;
   background: var(--bg-editor);
   color: var(--text-primary);
+}
+
+.editor-highlight code {
+  background: transparent;
+  font-family: inherit;
+}
+
+.editor-container textarea {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  color: transparent;
+  caret-color: var(--text-primary);
   border: none;
   padding: 12px;
   font-family: var(--font-mono);
@@ -246,13 +273,18 @@ html, body {
   padding: 12px;
 }
 
-.output-json {
+.output-yaml {
   font-family: var(--font-mono);
   font-size: 13px;
   line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-word;
   color: var(--text-primary);
+}
+
+.output-yaml code {
+  background: transparent;
+  font-family: inherit;
 }
 
 .output-error {
@@ -300,13 +332,6 @@ html, body {
   font-family: var(--font-mono);
   font-size: 11px;
 }
-
-/* Syntax highlighting for JSON output */
-.json-key { color: #82aaff; }
-.json-string { color: #c3e88d; }
-.json-number { color: #f78c6c; }
-.json-bool { color: #c792ea; }
-.json-null { color: #89ddff; }
 
 /* ===== Variant Cards ===== */
 .variants-view {
@@ -478,11 +503,11 @@ html, body {
 }
 
 /* Collapsible JSON details */
-.variants-json-details {
+.variants-yaml-details {
   margin-top: 8px;
 }
 
-.variants-json-details summary {
+.variants-yaml-details summary {
   cursor: pointer;
   color: var(--text-muted);
   font-size: 12px;
@@ -490,11 +515,11 @@ html, body {
   user-select: none;
 }
 
-.variants-json-details summary:hover {
+.variants-yaml-details summary:hover {
   color: var(--text-secondary);
 }
 
-.variants-json-details[open] summary {
+.variants-yaml-details[open] summary {
   margin-bottom: 8px;
 }
 

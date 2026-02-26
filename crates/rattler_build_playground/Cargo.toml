@@ -23,6 +23,8 @@ rattler_build_yaml_parser = { path = "../rattler_build_yaml_parser" }
 indexmap = "2"
 rattler_conda_types = { version = "0.43", default-features = false }
 getrandom = { version = "0.3", features = ["wasm_js"] }
+serde_yaml = "0.9"
+arborium = { version = "2", default-features = false, features = ["lang-yaml"] }
 
 [profile.release]
 opt-level = "s"

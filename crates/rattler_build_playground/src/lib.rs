@@ -1,5 +1,8 @@
+use std::cell::RefCell;
 use std::str::FromStr;
 
+use arborium::Highlighter;
+use arborium::theme::builtin;
 use indexmap::IndexMap;
 use rattler_build_jinja::{JinjaConfig, Variable};
 use rattler_build_recipe::{
@@ -12,21 +15,75 @@ use rattler_conda_types::Platform;
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
 
+thread_local! {
+    static HIGHLIGHTER: RefCell<Highlighter> = RefCell::new(Highlighter::new());
+}
+
+/// Serialize a value to YAML and syntax-highlight it, returning HTML.
+fn highlight_yaml(value: &impl Serialize) -> Result<String, String> {
+    let yaml = serde_yaml::to_string(value).map_err(|e| e.to_string())?;
+    HIGHLIGHTER.with(|hl| {
+        hl.borrow_mut()
+            .highlight("yaml", &yaml)
+            .map_err(|e| e.to_string())
+    })
+}
+
+/// Build a JSON success response containing highlighted HTML.
+fn ok_html(html: &str) -> String {
+    serde_json::to_string(&serde_json::json!({
+        "ok": true,
+        "result_html": html,
+    }))
+    .expect("serialization of ok response cannot fail")
+}
+
 /// Initialize the panic hook for better WASM error messages.
 #[wasm_bindgen(start)]
 pub fn start() {
     console_error_panic_hook::set_once();
 }
 
+/// Return the CSS for the syntax-highlighting theme.
+///
+/// Call once after WASM init and inject into a `<style>` element.
+#[wasm_bindgen]
+pub fn get_theme_css() -> String {
+    let theme = builtin::catppuccin_mocha();
+    let output_css = theme.to_css("pre.output-yaml");
+    let editor_css = theme.to_css("pre.editor-highlight");
+    format!("{output_css}\n{editor_css}")
+}
+
+/// Syntax-highlight a raw YAML source string, returning HTML.
+///
+/// Used by the editor overlay to highlight user input in real time.
+#[wasm_bindgen]
+pub fn highlight_source_yaml(source: &str) -> String {
+    HIGHLIGHTER
+        .with(|hl| {
+            hl.borrow_mut()
+                .highlight("yaml", source)
+                .map_err(|e| e.to_string())
+        })
+        .unwrap_or_else(|_| {
+            // Fallback: return HTML-escaped source
+            source
+                .replace('&', "&amp;")
+                .replace('<', "&lt;")
+                .replace('>', "&gt;")
+        })
+}
+
 /// Parse a recipe YAML string to Stage 0 (preserving templates and conditionals).
 ///
-/// Returns a JSON string: `{ "ok": true, "result": {...} }` or `{ "ok": false, "error": {...} }`
+/// Returns a JSON string: `{ "ok": true, "result_html": "..." }` or `{ "ok": false, "error": {...} }`
 #[wasm_bindgen]
 pub fn parse_recipe(yaml_source: &str) -> String {
     match stage0::parse_recipe_or_multi_from_source(yaml_source) {
-        Ok(recipe) => match serde_json::to_string_pretty(&recipe) {
-            Ok(json) => format!(r#"{{"ok":true,"result":{json}}}"#),
-            Err(e) => error_json(&e.to_string(), None, None),
+        Ok(recipe) => match highlight_yaml(&recipe) {
+            Ok(html) => ok_html(&html),
+            Err(e) => error_json(&e, None, None),
         },
         Err(e) => format_parse_error(&e),
     }
@@ -38,7 +95,7 @@ pub fn parse_recipe(yaml_source: &str) -> String {
 /// - `variables_json`: JSON object mapping variable names to values, e.g. `{"python": "3.11"}`
 /// - `target_platform`: Platform string like "linux-64", "osx-arm64", etc.
 ///
-/// Returns a JSON string: `{ "ok": true, "result": {...} }` or `{ "ok": false, "error": {...} }`
+/// Returns a JSON string: `{ "ok": true, "result_html": "..." }` or `{ "ok": false, "error": {...} }`
 #[wasm_bindgen]
 pub fn evaluate_recipe(yaml_source: &str, variables_json: &str, target_platform: &str) -> String {
     // Parse the recipe to Stage 0
@@ -80,9 +137,9 @@ pub fn evaluate_recipe(yaml_source: &str, variables_json: &str, target_platform:
             };
 
             match r.evaluate(&eval_context) {
-                Ok(stage1) => match serde_json::to_string_pretty(&stage1) {
-                    Ok(json) => format!(r#"{{"ok":true,"result":{json}}}"#),
-                    Err(e) => error_json(&e.to_string(), None, None),
+                Ok(stage1) => match highlight_yaml(&stage1) {
+                    Ok(html) => ok_html(&html),
+                    Err(e) => error_json(&e, None, None),
                 },
                 Err(e) => format_parse_error(&e),
             }
@@ -98,9 +155,9 @@ pub fn evaluate_recipe(yaml_source: &str, variables_json: &str, target_platform:
             };
 
             match r.evaluate(&eval_context) {
-                Ok(outputs) => match serde_json::to_string_pretty(&outputs) {
-                    Ok(json) => format!(r#"{{"ok":true,"result":{json}}}"#),
-                    Err(e) => error_json(&e.to_string(), None, None),
+                Ok(outputs) => match highlight_yaml(&outputs) {
+                    Ok(html) => ok_html(&html),
+                    Err(e) => error_json(&e, None, None),
                 },
                 Err(e) => format_parse_error(&e),
             }
@@ -110,7 +167,8 @@ pub fn evaluate_recipe(yaml_source: &str, variables_json: &str, target_platform:
 
 /// Get the list of variables used in a recipe (for UI hints).
 ///
-/// Returns a JSON string: `{ "ok": true, "result": [...] }` or `{ "ok": false, "error": {...} }`
+/// Returns a JSON string with both structured data and highlighted HTML:
+/// `{ "ok": true, "result": [...], "result_html": "..." }` or `{ "ok": false, "error": {...} }`
 #[wasm_bindgen]
 pub fn get_used_variables(yaml_source: &str) -> String {
     match stage0::parse_recipe_or_multi_from_source(yaml_source) {
@@ -119,10 +177,15 @@ pub fn get_used_variables(yaml_source: &str) -> String {
                 Recipe::SingleOutput(r) => r.used_variables(),
                 Recipe::MultiOutput(r) => r.used_variables(),
             };
-            match serde_json::to_string(&vars) {
-                Ok(json) => format!(r#"{{"ok":true,"result":{json}}}"#),
-                Err(e) => error_json(&e.to_string(), None, None),
-            }
+            // Return both highlighted YAML and structured JSON
+            // (the JSON array is still needed for the used-vars hint in the UI)
+            let html = highlight_yaml(&vars).unwrap_or_default();
+            serde_json::to_string(&serde_json::json!({
+                "ok": true,
+                "result": vars,
+                "result_html": html,
+            }))
+            .expect("serialization of ok response cannot fail")
         }
         Err(e) => format_parse_error(&e),
     }
@@ -176,8 +239,8 @@ struct VariantSummary {
 /// - `variant_config_yaml`: Variant configuration YAML (e.g. `python:\n  - "3.11"\n  - "3.12"`)
 /// - `target_platform`: Platform string like "linux-64", "osx-arm64", etc.
 ///
-/// Returns a JSON string with both full data and a concise summary:
-/// `{ "ok": true, "result": { "variants": [...full data...], "summary": [...concise...] } }`
+/// Returns a JSON string with summary cards and highlighted YAML:
+/// `{ "ok": true, "result": { "variants_html": "...", "summary": [...concise...] } }`
 #[wasm_bindgen]
 pub fn render_variants(
     yaml_source: &str,
@@ -278,17 +341,18 @@ pub fn render_variants(
                 })
                 .collect();
 
-            // Return both full data and summary
-            let full_json = serde_json::to_value(&rendered).unwrap_or_default();
-            let summary_json = serde_json::to_value(&summary).unwrap_or_default();
+            // Highlight full variant data as YAML
+            let variants_html = highlight_yaml(&rendered).unwrap_or_default();
+
             let result = serde_json::json!({
-                "variants": full_json,
-                "summary": summary_json,
+                "ok": true,
+                "result": {
+                    "variants_html": variants_html,
+                    "summary": summary,
+                },
             });
-            match serde_json::to_string_pretty(&result) {
-                Ok(json) => format!(r#"{{"ok":true,"result":{json}}}"#),
-                Err(e) => error_json(&e.to_string(), None, None),
-            }
+            serde_json::to_string(&result)
+                .expect("serialization of ok response cannot fail")
         }
         Err(e) => error_json(&e.to_string(), None, None),
     }

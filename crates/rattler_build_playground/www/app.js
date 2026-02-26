@@ -1,4 +1,4 @@
-import wasmInit, { parse_recipe, evaluate_recipe, get_used_variables, get_platforms, render_variants } from './rattler_build_playground.js';
+import wasmInit, { parse_recipe, evaluate_recipe, get_used_variables, get_platforms, render_variants, get_theme_css, highlight_source_yaml } from './rattler_build_playground.js';
 
 const DEFAULT_RECIPE = `context:
   name: flask
@@ -54,10 +54,22 @@ let debounceTimer = null;
 // DOM elements
 const recipeEditor = document.getElementById('recipe-editor');
 const variantsEditor = document.getElementById('variants-editor');
+const recipeHighlight = document.getElementById('recipe-highlight');
+const variantsHighlight = document.getElementById('variants-highlight');
 const outputContainer = document.getElementById('output-container');
 const outputBadge = document.getElementById('output-badge');
 const platformSelect = document.getElementById('platform-select');
 const usedVarsEl = document.getElementById('used-vars');
+
+// Editor syntax highlighting
+function highlightEditor(textarea, pre) {
+  pre.innerHTML = highlight_source_yaml(textarea.value);
+}
+
+function syncScroll(textarea, pre) {
+  pre.scrollTop = textarea.scrollTop;
+  pre.scrollLeft = textarea.scrollLeft;
+}
 
 // Load saved state or defaults
 recipeEditor.value = localStorage.getItem('playground-recipe') || DEFAULT_RECIPE;
@@ -86,13 +98,19 @@ if (savedMode) {
 // Debounced update on input
 recipeEditor.addEventListener('input', () => {
   localStorage.setItem('playground-recipe', recipeEditor.value);
+  if (wasm) highlightEditor(recipeEditor, recipeHighlight);
   scheduleUpdate();
 });
 
 variantsEditor.addEventListener('input', () => {
   localStorage.setItem('playground-variants', variantsEditor.value);
+  if (wasm) highlightEditor(variantsEditor, variantsHighlight);
   scheduleUpdate();
 });
+
+// Sync scroll between textarea and highlight overlay
+recipeEditor.addEventListener('scroll', () => syncScroll(recipeEditor, recipeHighlight));
+variantsEditor.addEventListener('scroll', () => syncScroll(variantsEditor, variantsHighlight));
 
 platformSelect.addEventListener('change', () => {
   localStorage.setItem('playground-platform', platformSelect.value);
@@ -115,6 +133,7 @@ loadPinningBtn.addEventListener('click', async () => {
     }
     variantsEditor.value = pinningCache;
     localStorage.setItem('playground-variants', pinningCache);
+    if (wasm) highlightEditor(variantsEditor, variantsHighlight);
     scheduleUpdate();
   } catch (e) {
     alert(`Failed to load pinning: ${e.message}`);
@@ -174,7 +193,7 @@ function update() {
       if (currentMode === 'variants') {
         renderVariantsOutput(result.result);
       } else {
-        renderOutput(result.result);
+        renderOutput(result.result_html);
       }
     } else {
       outputBadge.textContent = 'error';
@@ -238,14 +257,12 @@ function buildVarsFromVariantConfig(yamlStr) {
   }
 }
 
-function renderOutput(data) {
-  const json = JSON.stringify(data, null, 2);
-  outputContainer.innerHTML = `<pre class="output-json">${highlightJson(json)}</pre>`;
+function renderOutput(html) {
+  outputContainer.innerHTML = `<pre class="output-yaml">${html}</pre>`;
 }
 
 function renderVariantsOutput(data) {
   const summary = data.summary;
-  const fullData = data.variants;
 
   if (!summary || summary.length === 0) {
     outputContainer.innerHTML = '<div class="output-placeholder">No outputs produced (recipe may be skipped for this platform)</div>';
@@ -314,10 +331,10 @@ function renderVariantsOutput(data) {
   }
   html += '</div>';
 
-  // Collapsible full JSON
-  html += `<details class="variants-json-details">`;
-  html += `<summary>Full JSON output (${summary.length} variant${summary.length !== 1 ? 's' : ''})</summary>`;
-  html += `<pre class="output-json">${highlightJson(JSON.stringify(fullData, null, 2))}</pre>`;
+  // Collapsible full YAML
+  html += `<details class="variants-yaml-details">`;
+  html += `<summary>Full YAML output (${summary.length} variant${summary.length !== 1 ? 's' : ''})</summary>`;
+  html += `<pre class="output-yaml">${data.variants_html}</pre>`;
   html += `</details>`;
 
   html += '</div>';
@@ -331,25 +348,6 @@ function renderError(error) {
   }
   html += '</div>';
   outputContainer.innerHTML = html;
-}
-
-function highlightJson(json) {
-  return escapeHtml(json).replace(
-    /("(?:\\.|[^"\\])*")\s*:/g,
-    '<span class="json-key">$1</span>:'
-  ).replace(
-    /:\s*("(?:\\.|[^"\\])*")/g,
-    ': <span class="json-string">$1</span>'
-  ).replace(
-    /:\s*(-?\d+\.?\d*(?:e[+-]?\d+)?)/gi,
-    ': <span class="json-number">$1</span>'
-  ).replace(
-    /:\s*(true|false)/g,
-    ': <span class="json-bool">$1</span>'
-  ).replace(
-    /:\s*(null)/g,
-    ': <span class="json-null">$1</span>'
-  );
 }
 
 function escapeHtml(str) {
@@ -426,6 +424,11 @@ async function main() {
   try {
     wasm = await wasmInit();
 
+    // Inject arborium syntax-highlighting theme CSS
+    const style = document.createElement('style');
+    style.textContent = get_theme_css();
+    document.head.appendChild(style);
+
     // Populate platform dropdown
     const platforms = JSON.parse(get_platforms());
     const savedPlatform = localStorage.getItem('playground-platform') || 'linux-64';
@@ -436,6 +439,10 @@ async function main() {
       if (p === savedPlatform) opt.selected = true;
       platformSelect.appendChild(opt);
     }
+
+    // Initial editor highlighting
+    highlightEditor(recipeEditor, recipeHighlight);
+    highlightEditor(variantsEditor, variantsHighlight);
 
     // Initial render
     update();
