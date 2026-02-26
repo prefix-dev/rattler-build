@@ -9,7 +9,10 @@ use std::{
 use miette::IntoDiagnostic;
 use rattler_build::{
     console_utils::LoggingOutputHandler,
-    opt::{CreatePatchOpts, DebugEnvAddOpts, DebugRunOpts, DebugShellOpts, DebugWorkdirOpts},
+    opt::{
+        CreatePatchOpts, DebugEditOpts, DebugEnvAddOpts, DebugRunOpts, DebugShellOpts,
+        DebugWorkdirOpts,
+    },
     source::create_patch,
 };
 use rattler_conda_types::MatchSpec;
@@ -138,9 +141,10 @@ fn print_debug_banner(work_dir: &Path, directories_json: &Option<serde_json::Val
 
     println!();
     println!("  Available commands:");
-    println!("    rattler-build debug create-patch         Create a patch from your changes");
-    println!("    rattler-build debug host-add <pkg>       Add packages to host env");
-    println!("    rattler-build debug build-add <pkg>      Add packages to build env");
+    println!("    rattler-build debug edit                  Open recipe in $EDITOR");
+    println!("    rattler-build debug create-patch          Create a patch from your changes");
+    println!("    rattler-build debug host-add <pkg>        Add packages to host env");
+    println!("    rattler-build debug build-add <pkg>       Add packages to build env");
     println!();
     println!("  The build environment has been sourced. Run `bash -x conda_build.sh` to");
     println!("  execute the build script, or make changes and use create-patch.");
@@ -232,6 +236,65 @@ pub fn debug_workdir(opts: DebugWorkdirOpts) -> std::io::Result<()> {
         .unwrap_or_else(|| PathBuf::from("./output"));
     let (work_dir, _) = parse_directories_info(opts.work_dir, &output_dir)?;
     println!("{}", work_dir.display());
+    Ok(())
+}
+
+/// Open the recipe file in the user's editor.
+pub fn debug_edit(opts: DebugEditOpts) -> std::io::Result<()> {
+    let output_dir = opts
+        .common
+        .output_dir
+        .unwrap_or_else(|| PathBuf::from("./output"));
+    let (_, directories_json) = parse_directories_info(opts.work_dir, &output_dir)?;
+
+    let recipe_path = directories_json
+        .as_ref()
+        .and_then(|json| json["recipe_path"].as_str())
+        .ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "recipe_path not found in build directories info. \
+                 Run `rattler-build debug setup` first.",
+            )
+        })?;
+
+    let recipe_path = Path::new(recipe_path);
+    if !recipe_path.exists() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            format!("Recipe file not found: {}", recipe_path.display()),
+        ));
+    }
+
+    // Determine editor: $EDITOR → $VISUAL → nano → vim → vi
+    let editor = std::env::var("EDITOR")
+        .or_else(|_| std::env::var("VISUAL"))
+        .unwrap_or_else(|_| {
+            for candidate in &["nano", "vim", "vi"] {
+                if Command::new("which")
+                    .arg(candidate)
+                    .stdout(std::process::Stdio::null())
+                    .stderr(std::process::Stdio::null())
+                    .status()
+                    .is_ok_and(|s| s.success())
+                {
+                    return (*candidate).to_string();
+                }
+            }
+            "vi".to_string()
+        });
+
+    eprintln!("Opening {} with {}", recipe_path.display(), editor);
+
+    let status = Command::new(&editor).arg(recipe_path).status()?;
+
+    if !status.success() {
+        return Err(std::io::Error::other(format!(
+            "Editor exited with status: {}",
+            status
+        )));
+    }
+
     Ok(())
 }
 

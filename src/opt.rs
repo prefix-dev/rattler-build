@@ -158,6 +158,14 @@ pub enum DebugSubCommands {
     /// modifications. The patch file is written to the recipe directory
     /// so you can add it to the recipe's `patches:` list.
     CreatePatch(CreatePatchOpts),
+
+    /// Open the recipe file in your editor.
+    ///
+    /// Opens the recipe file from the current debug environment using $EDITOR
+    /// (falls back to $VISUAL, then common editors like nano, vim, vi).
+    /// Reads the recipe path from the debug environment, rattler-build-log.txt,
+    /// or --work-dir.
+    Edit(DebugEditOpts),
 }
 
 /// Options for the `debug setup` command.
@@ -209,6 +217,19 @@ pub struct DebugShellOpts {
 /// Options for the `debug workdir` command.
 #[derive(Parser, Debug, Clone)]
 pub struct DebugWorkdirOpts {
+    /// Work directory to use (reads from last build in rattler-build-log.txt
+    /// if not specified)
+    #[arg(long)]
+    pub work_dir: Option<PathBuf>,
+
+    /// Common options (provides --output-dir among others)
+    #[clap(flatten)]
+    pub common: CommonOpts,
+}
+
+/// Options for the `debug edit` command.
+#[derive(Parser, Debug, Clone)]
+pub struct DebugEditOpts {
     /// Work directory to use (reads from last build in rattler-build-log.txt
     /// if not specified)
     #[arg(long)]

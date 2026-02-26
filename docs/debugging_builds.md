@@ -109,6 +109,17 @@ rattler-build debug create-patch \
 In the end, you will have a patch file that you can include in your recipe
 
 
+### Edit the Recipe
+
+You can quickly open the recipe file in your editor from a debug environment:
+
+```bash
+rattler-build debug edit
+```
+
+This opens the recipe file using `$EDITOR` (falls back to `$VISUAL`, then `nano`,
+`vim`, `vi`). It automatically finds the recipe path from the debug environment.
+
 ### Update Recipe and Rebuild
 
 Add the patch to your recipe:
@@ -366,6 +377,7 @@ rattler-build debug setup --recipe recipe.yaml         # Set up environment
 rattler-build debug shell                              # Open shell in last build
 rattler-build debug shell --work-dir /path/to/work     # Open shell in specific build
 rattler-build debug workdir                            # Print work directory path
+rattler-build debug edit                               # Open recipe in $EDITOR
 rattler-build debug run                                # Re-run build script
 rattler-build debug run --trace                        # Re-run with bash -x tracing
 rattler-build debug host-add python numpy              # Add packages to host env

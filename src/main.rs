@@ -245,6 +245,7 @@ async fn async_main() -> miette::Result<()> {
                 Ok(())
             }
             DebugSubCommands::CreatePatch(opts) => debug::debug_create_patch(opts),
+            DebugSubCommands::Edit(opts) => debug::debug_edit(opts).into_diagnostic(),
         },
         Some(SubCommands::Package(cmd)) => match cmd {
             PackageCommands::Inspect(opts) => show_package_info(opts),
