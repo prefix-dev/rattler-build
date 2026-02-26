@@ -1121,6 +1121,122 @@ Due to the variant config file, this will build two versions of `libtest`. We
 will also build two versions of `test`, one that depends on `libtest (openssl
 1)` and one that depends on `libtest (openssl 3)`.
 
+### Staging outputs
+
+!!!note
+
+    Staging outputs are an experimental feature. You need to pass the
+    `--experimental` flag or set `RATTLER_BUILD_EXPERIMENTAL=true` to use them.
+    See the [staging outputs guide](../multiple_output_cache.md) for a full
+    walkthrough.
+
+A staging output builds code once and caches the results. Other package outputs
+can **inherit** from a staging cache to receive the built files directly in
+their `$PREFIX` without rebuilding. Staging outputs do **not** produce package
+artifacts themselves.
+
+```yaml
+outputs:
+  - staging:
+      name: my-staging-cache   # required, follows package name rules
+    source:                     # optional, additional sources
+      - url: https://example.com/src.tar.gz
+        sha256: abc123...
+    requirements:
+      build:                    # build-time dependencies
+        - ${{ compiler('c') }}
+        - cmake
+      host:                     # host dependencies
+        - zlib
+      ignore_run_exports:       # optional, filter run exports at the staging level
+        from_package:
+          - zlib
+    build:
+      script:                   # build script (only field allowed under build)
+        - cmake -B build
+        - cmake --build build --target install
+```
+
+The `staging:` output supports:
+
+- `staging.name` — required, the cache name that inheriting packages reference
+- `source` — optional source sections (in addition to top-level sources)
+- `requirements` — `build`, `host`, and `ignore_run_exports` (no `run` requirements)
+- `build.script` — the build script to execute
+
+#### Inheriting from staging
+
+Package outputs use the `inherit:` key to receive files from a staging cache.
+Two forms are supported:
+
+```yaml
+outputs:
+  - staging:
+      name: my-build
+    build:
+      script:
+        - make install
+
+  # Short form — inherits all files and run exports
+  - package:
+      name: mylib
+    inherit: my-build
+    build:
+      files:
+        - lib/**
+
+  # Extended form — control run exports inheritance
+  - package:
+      name: mylib-dev
+    inherit:
+      from: my-build
+      run_exports: false   # do not inherit run exports from staging deps
+    build:
+      files:
+        - include/**
+```
+
+When a package inherits from staging:
+
+1. The staging cache's prefix files are copied into the package's `$PREFIX`
+2. The staging cache's work directory is restored (allowing incremental builds)
+3. Run exports from staging dependencies are added to the package's run
+   requirements (unless `run_exports: false` is set)
+4. The `files` globs select which subset of the inherited files end up in the
+   final package
+
+#### Top-level inheritance
+
+In recipes that have both a top-level `build:` section and staging outputs,
+package outputs can choose to inherit from the top-level build instead of from
+staging by setting `inherit: null`:
+
+```yaml
+build:
+  script:
+    - echo "top-level" > $PREFIX/share/data.txt
+
+outputs:
+  - staging:
+      name: compile-stage
+    build:
+      script:
+        - echo "compiled" > $PREFIX/lib/compiled.so
+
+  - package:
+      name: compiled-pkg
+    inherit: compile-stage       # gets files from staging
+    build:
+      files:
+        - lib/**
+
+  - package:
+      name: data-pkg
+    inherit: null                # gets files from top-level build
+    build:
+      files:
+        - share/**
+```
 
 ## About section
 
