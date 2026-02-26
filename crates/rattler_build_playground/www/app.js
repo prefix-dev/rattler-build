@@ -19,15 +19,14 @@ build:
   python:
     entry_points:
       - flask = flask.cli:main
-  noarch: python
 
 requirements:
   host:
-    - python >=3.8
+    - python
     - flit-core <4
     - pip
   run:
-    - python >=3.8
+    - python
     - werkzeug >=3.0.0
     - jinja2 >=3.1.2
     - click >=8.1.3
@@ -273,6 +272,18 @@ function renderVariantsOutput(data) {
       html += `<span class="variant-badge variant-badge-noarch">${escapeHtml(s.noarch)}</span>`;
     }
     html += `</div>`;
+
+    // Context table
+    const contextEntries = s.context ? Object.entries(s.context) : [];
+    if (contextEntries.length > 0) {
+      html += `<table class="context-table">`;
+      html += `<thead><tr><th colspan="2">context</th></tr></thead><tbody>`;
+      for (const [k, v] of contextEntries) {
+        const display = typeof v === 'string' ? v : JSON.stringify(v);
+        html += `<tr><td class="context-key">${escapeHtml(k)}</td><td class="context-value">${escapeHtml(display)}</td></tr>`;
+      }
+      html += `</tbody></table>`;
+    }
 
     // Variant keys
     if (s.variant.length > 0) {

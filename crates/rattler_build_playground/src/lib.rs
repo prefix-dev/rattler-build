@@ -40,11 +40,7 @@ pub fn parse_recipe(yaml_source: &str) -> String {
 ///
 /// Returns a JSON string: `{ "ok": true, "result": {...} }` or `{ "ok": false, "error": {...} }`
 #[wasm_bindgen]
-pub fn evaluate_recipe(
-    yaml_source: &str,
-    variables_json: &str,
-    target_platform: &str,
-) -> String {
+pub fn evaluate_recipe(yaml_source: &str, variables_json: &str, target_platform: &str) -> String {
     // Parse the recipe to Stage 0
     let recipe = match stage0::parse_recipe_or_multi_from_source(yaml_source) {
         Ok(r) => r,
@@ -170,6 +166,8 @@ struct VariantSummary {
     host_deps: Vec<String>,
     /// Run dependencies (display strings)
     run_deps: Vec<String>,
+    /// Resolved context variables (key -> evaluated JSON value)
+    context: IndexMap<String, Variable>,
 }
 
 /// Render a recipe with variant configuration, producing all output variants.
@@ -275,6 +273,7 @@ pub fn render_variants(
                         build_deps,
                         host_deps,
                         run_deps,
+                        context: recipe.context.clone(),
                     }
                 })
                 .collect();
