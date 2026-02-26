@@ -188,35 +188,21 @@ impl Jinja {
             Value::from(config.host_platform.to_string()),
         );
 
-        // Add common platform shortcuts based on the host platform
-        // (the platform where the package will run)
+        // Add cross-family platform shortcut
         context.insert(
             "unix".to_string(),
             Value::from(config.host_platform.is_unix()),
         );
-        context.insert(
-            "linux".to_string(),
-            Value::from(config.host_platform.is_linux()),
-        );
-        context.insert(
-            "osx".to_string(),
-            Value::from(config.host_platform.is_osx()),
-        );
-        context.insert(
-            "win".to_string(),
-            Value::from(config.host_platform.is_windows()),
-        );
-        context.insert(
-            "emscripten".to_string(),
-            Value::from(matches!(
-                config.host_platform,
-                Platform::EmscriptenWasm32
-            )),
-        );
-        context.insert(
-            "wasi".to_string(),
-            Value::from(matches!(config.host_platform, Platform::WasiWasm32)),
-        );
+
+        // Derive the host platform's family name (e.g., "linux" from "linux-64",
+        // "emscripten" from "emscripten-wasm32")
+        let host_family = config
+            .host_platform
+            .to_string()
+            .split('-')
+            .next()
+            .unwrap_or_default()
+            .to_string();
 
         // Add architecture aliases (e.g., "x86_64", "aarch64", "ppc64le")
         // All known architectures are defined, with only the host platform's architecture being true
@@ -225,16 +211,30 @@ impl Jinja {
             context.insert(arch.to_string(), Value::from(current_arch == Some(arch)));
         }
 
-        // Add platform aliases (e.g., "linux64", "osx64", "win64")
-        // These are the platform string with "-" removed (e.g., "linux-64" -> "linux64")
-        // All known platforms get an alias, with only the current host_platform being true
+        let mut seen_families = HashSet::new();
         for platform in Platform::iter() {
             // Skip noarch and unknown platforms
             if matches!(platform, Platform::NoArch | Platform::Unknown) {
                 continue;
             }
-            let alias = platform.to_string().replace('-', "");
+
+            // Add platform aliases (e.g., "linux64", "osx64", "emscriptenwasm32")
+            // These are the platform string with "-" removed
+            let platform_str = platform.to_string();
+            let alias = platform_str.replace('-', "");
             context.insert(alias, Value::from(platform == config.host_platform));
+
+            // Add platform family selectors (e.g., "linux", "osx", "win", "emscripten", "wasi")
+            // derived from platform names by extracting the part before the architecture suffix.
+            // This automatically supports new platforms added to rattler_conda_types.
+            if let Some(family) = platform_str.split('-').next() {
+                if seen_families.insert(family.to_string()) {
+                    context.insert(
+                        family.to_string(),
+                        Value::from(family == host_family),
+                    );
+                }
+            }
         }
 
         // Add variant variables to context
