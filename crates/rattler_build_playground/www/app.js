@@ -102,13 +102,19 @@ const loadPinningBtn = document.getElementById('load-pinning-btn');
 // ===== Editor helpers =====
 
 function highlightEditor(textarea, pre) {
-  // highlight_source_yaml returns pre-escaped HTML from the WASM module
-  pre.innerHTML = highlight_source_yaml(textarea.value);
+  // highlight_source_yaml returns pre-escaped HTML from the WASM module.
+  // Append '\n' because arborium trims trailing newlines, but the textarea
+  // keeps them — without this the <pre> content is shorter.
+  pre.innerHTML = highlight_source_yaml(textarea.value) + '\n';
 }
 
-function syncScroll(textarea, pre) {
-  pre.scrollTop = textarea.scrollTop;
-  pre.scrollLeft = textarea.scrollLeft;
+// Fallback auto-resize for browsers without CSS field-sizing: content.
+// Sizes the textarea to its content so it never scrolls internally;
+// the parent .editor-container scrolls both textarea and highlight <pre>.
+function autoResize(textarea) {
+  if (CSS.supports('field-sizing', 'content')) return;
+  textarea.style.height = 'auto';
+  textarea.style.height = Math.max(textarea.scrollHeight, textarea.parentElement.clientHeight) + 'px';
 }
 
 // ===== Rendering =====
@@ -289,18 +295,16 @@ if (savedMode) {
 recipeEditor.addEventListener('input', () => {
   localStorage.setItem('playground-recipe', recipeEditor.value);
   if (wasmReady) highlightEditor(recipeEditor, recipeHighlight);
+  autoResize(recipeEditor);
   scheduleUpdate();
 });
 
 variantsEditor.addEventListener('input', () => {
   localStorage.setItem('playground-variants', variantsEditor.value);
   if (wasmReady) highlightEditor(variantsEditor, variantsHighlight);
+  autoResize(variantsEditor);
   scheduleUpdate();
 });
-
-// Sync scroll between textarea and highlight overlay
-recipeEditor.addEventListener('scroll', () => syncScroll(recipeEditor, recipeHighlight));
-variantsEditor.addEventListener('scroll', () => syncScroll(variantsEditor, variantsHighlight));
 
 platformSelect.addEventListener('change', () => {
   localStorage.setItem('playground-platform', platformSelect.value);
@@ -320,6 +324,7 @@ loadPinningBtn.addEventListener('click', async () => {
     variantsEditor.value = pinningCache;
     localStorage.setItem('playground-variants', pinningCache);
     if (wasmReady) highlightEditor(variantsEditor, variantsHighlight);
+    autoResize(variantsEditor);
     scheduleUpdate();
   } catch (e) {
     alert(`Failed to load pinning: ${e.message}`);
@@ -430,9 +435,11 @@ async function main() {
       platformSelect.appendChild(opt);
     }
 
-    // Initial editor highlighting
+    // Initial editor highlighting and sizing
     highlightEditor(recipeEditor, recipeHighlight);
     highlightEditor(variantsEditor, variantsHighlight);
+    autoResize(recipeEditor);
+    autoResize(variantsEditor);
 
     // Initial render
     update();
