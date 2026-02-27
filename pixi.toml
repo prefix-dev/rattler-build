@@ -35,7 +35,13 @@ python = ">=3.12,<4"
 clang = ">=21.1.8,<23"
 
 [feature.playground.tasks]
-playground-build = { cmd = "python scripts/build_playground.py", description = "Build the WASM playground" }
+playground-build = { cmd = "python scripts/build_playground.py", description = "Build the WASM playground", inputs = [
+  "crates/**",
+  "scripts/build_playground.py",
+  "Cargo.lock",
+], outputs = [
+  "deploy/*",
+] }
 playground-serve = { cmd = "python -m http.server 8080 --directory deploy", depends-on = [
   "playground-build",
 ], description = "Build and serve the playground locally" }
