@@ -45,16 +45,11 @@ jobs:
       - name: Install wasm-pack
         run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 
-      - name: Build WASM playground
-        working-directory: crates/rattler_build_playground
-        run: wasm-pack build --target web --release
+      - name: Setup pixi
+        uses: prefix-dev/setup-pixi@v0.8.8
 
-      - name: Prepare deployment directory
-        run: |
-          mkdir -p deploy
-          cp crates/rattler_build_playground/www/* deploy/
-          cp crates/rattler_build_playground/pkg/rattler_build_playground_bg.wasm deploy/
-          cp crates/rattler_build_playground/pkg/rattler_build_playground.js deploy/
+      - name: Build WASM playground
+        run: pixi run --environment playground playground-build
 
       - name: Upload artifact
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v4
