@@ -4,39 +4,7 @@ We're using `rattler-build` to build a Rust package for the `cargo-edit` utility
 This utility manages Cargo dependencies from the command line.
 
 ```yaml title="recipe.yaml"
-context:
-  version: "0.11.9"
-
-package:
-  name: cargo-edit
-  version: ${{ version }}
-
-source:
-  url: https://github.com/killercup/cargo-edit/archive/refs/tags/v${{ version }}.tar.gz
-  sha256: 46670295e2323fc2f826750cdcfb2692fbdbea87122fe530a07c50c8dba1d3d7
-
-build:
-  script:
-    - cargo-bundle-licenses --format yaml --output ${SRC_DIR}/THIRDPARTY.yml  # !(1)
-    - $BUILD_PREFIX/bin/cargo install --locked --bins --root ${PREFIX} --path .
-
-requirements:
-  build:
-    - ${{ compiler('rust') }}
-    - cargo-bundle-licenses
-
-tests:
-  - script:
-      - cargo-upgrade --help # !(2)
-
-about:
-  homepage: https://github.com/killercup/cargo-edit
-  license: MIT
-  license_file:
-    - LICENSE
-    - THIRDPARTY.yml
-  description: "A utility for managing cargo dependencies from the command line."
-  summary: "A utility for managing cargo dependencies from the command line."
+--8<-- "docs/snippets/recipes/cargo-edit.yaml"
 ```
 
 !!! note

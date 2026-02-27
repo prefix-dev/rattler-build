@@ -129,169 +129,19 @@ There is a GitHub Action for `rattler-build`. It can be used to install `rattler
 A simple example recipe for the `xtensor` header-only C++ library:
 
 ```yaml title="recipe.yaml"
-context:
-  name: xtensor
-  version: 0.24.6
-
-package:
-  name: ${{ name|lower }}
-  version: ${{ version }}
-
-source:
-  url: https://github.com/xtensor-stack/xtensor/archive/${{ version }}.tar.gz
-  sha256: f87259b51aabafdd1183947747edfff4cff75d55375334f2e81cee6dc68ef655
-
-build:
-  number: 0
-  script:
-    - if: win
-      then: |
-        cmake -G "NMake Makefiles" -D BUILD_TESTS=OFF -D CMAKE_INSTALL_PREFIX=%LIBRARY_PREFIX% %SRC_DIR%
-        nmake
-        nmake install
-      else: |
-        cmake ${CMAKE_ARGS} -DBUILD_TESTS=OFF -DCMAKE_INSTALL_PREFIX=$PREFIX $SRC_DIR -DCMAKE_INSTALL_LIBDIR=lib
-        make install
-
-requirements:
-  build:
-    - ${{ compiler('cxx') }}
-    - cmake
-    - if: unix
-      then: make
-  host:
-    - xtl >=0.7,<0.8
-  run:
-    - xtl >=0.7,<0.8
-  run_constraints:
-    - xsimd >=8.0.3,<10
-
-tests:
-  - script:
-    - if: unix or emscripten
-      then:
-        - test -d ${PREFIX}/include/xtensor
-        - test -f ${PREFIX}/include/xtensor/xarray.hpp
-        - test -f ${PREFIX}/share/cmake/xtensor/xtensorConfig.cmake
-        - test -f ${PREFIX}/share/cmake/xtensor/xtensorConfigVersion.cmake
-    - if: win
-      then:
-        - if not exist %LIBRARY_PREFIX%\include\xtensor\xarray.hpp (exit 1)
-        - if not exist %LIBRARY_PREFIX%\share\cmake\xtensor\xtensorConfig.cmake (exit 1)
-        - if not exist %LIBRARY_PREFIX%\share\cmake\xtensor\xtensorConfigVersion.cmake (exit 1)
-
-about:
-  homepage: https://github.com/xtensor-stack/xtensor
-  license: BSD-3-Clause
-  license_file: LICENSE
-  summary: The C++ tensor algebra library
-  description: Multi dimensional arrays with broadcasting and lazy computing
-  documentation: https://xtensor.readthedocs.io
-  repository: https://github.com/xtensor-stack/xtensor
-
-extra:
-  recipe-maintainers:
-    - some-maintainer
+--8<-- "docs/snippets/recipes/xtensor-index.yaml"
 ```
 
 A recipe for the `rich` Python package (using `noarch`):
 
 ```yaml title="recipe.yaml"
-context:
-  version: "13.4.2"
-
-package:
-  name: "rich"
-  version: ${{ version }}
-
-source:
-  - url: https://pypi.io/packages/source/r/rich/rich-${{ version }}.tar.gz
-    sha256: d653d6bccede5844304c605d5aac802c7cf9621efd700b46c7ec2b51ea914898
-
-build:
-  # Thanks to `noarch: python` this package works on all platforms
-  noarch: python
-  script:
-    - python -m pip install . -vv
-
-requirements:
-  host:
-    - pip
-    - poetry-core >=1.0.0
-    - python 3.10.*
-  run:
-    # sync with normalized deps from poetry-generated setup.py
-    - markdown-it-py >=2.2.0
-    - pygments >=2.13.0,<3.0.0
-    - python 3.10.*
-    - typing_extensions >=4.0.0,<5.0.0
-
-tests:
-  - python:
-      imports:
-        - rich
-      pip_check: true
-
-about:
-  homepage: https://github.com/Textualize/rich
-  license: MIT
-  license_file: LICENSE
-  summary: Render rich text, tables, progress bars, syntax highlighting, markdown and more to the terminal
-  description: |
-    Rich is a Python library for rich text and beautiful formatting in the terminal.
-
-    The Rich API makes it easy to add color and style to terminal output. Rich
-    can also render pretty tables, progress bars, markdown, syntax highlighted
-    source code, tracebacks, and more — out of the box.
-  documentation: https://rich.readthedocs.io
-  repository: https://github.com/Textualize/rich
+--8<-- "docs/snippets/recipes/rich-index.yaml"
 ```
 
 A recipe for the `curl` library:
 
 ```yaml title="recipe.yaml"
-context:
-  version: "8.0.1"
-
-package:
-  name: curl
-  version: ${{ version }}
-
-source:
-  url: http://curl.haxx.se/download/curl-${{ version }}.tar.bz2
-  sha256: 9b6b1e96b748d04b968786b6bdf407aa5c75ab53a3d37c1c8c81cdb736555ccf
-
-build:
-  number: 0
-
-requirements:
-  build:
-    - ${{ compiler('c') }}
-    - if: win
-      then:
-        - cmake
-        - ninja
-    - if: unix
-      then:
-        - make
-        - perl
-        - pkg-config
-        - libtool
-  host:
-    - if: linux
-      then:
-        - openssl
-
-about:
-  homepage: http://curl.haxx.se/
-  license: MIT/X derivate (http://curl.haxx.se/docs/copyright.html)
-  license_file: COPYING
-  summary: tool and library for transferring data with URL syntax
-  description: |
-    Curl is an open source command line tool and library for transferring data
-    with URL syntax. It is used in command lines or scripts to transfer data.
-  documentation: https://curl.haxx.se/docs/
-  repository: https://github.com/curl/curl
+--8<-- "docs/snippets/recipes/curl-index.yaml"
 ```
 
 For the `curl` library recipe, two additional script files (`build.sh` and `build.bat`) are needed.

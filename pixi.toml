@@ -58,21 +58,26 @@ convert-notebooks = { cmd = "jupyter nbconvert --execute --to markdown py-rattle
 ], outputs = [
   "docs/py-rattler-build/tutorials/*.md",
 ] }
+validate-recipes = "python docs/scripts/validate_recipes.py"
 build-docs = { cmd = "mkdocs build --strict", depends-on = [
   "download-font",
   "convert-notebooks",
+  "validate-recipes",
 ] }
 docs = { cmd = "mkdocs serve", depends-on = [
   "download-font",
   "convert-notebooks",
+  "validate-recipes",
 ] }
 deploy-latest = { cmd = "mike deploy --push --update-aliases $RELEASE_VERSION latest", depends-on = [
   "download-font",
   "convert-notebooks",
+  "validate-recipes",
 ] }
 deploy-dev = { cmd = "mike deploy --push dev devel", depends-on = [
   "download-font",
   "convert-notebooks",
+  "validate-recipes",
 ] }
 
 [dependencies]

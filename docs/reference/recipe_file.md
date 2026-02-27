@@ -81,57 +81,7 @@ Examples
 --------
 
 ```yaml title="recipe.yaml"
-# this sets up "context variables" (in this case name and version) that
-# can later be used in Jinja expressions
-context:
-  version: 1.1.0
-  name: imagesize
-
-# top level package information (name and version)
-package:
-  name: ${{ name }}
-  version: ${{ version }}
-
-# location to get the source from
-source:
-  url: https://pypi.io/packages/source/${{ name[0] }}/${{ name }}/${{ name }}-${{ version }}.tar.gz
-  sha256: f3832918bc3c66617f92e35f5d70729187676313caa60c187eb0f28b8fe5e3b5
-
-# build number (should be incremented if a new build is made, but version is not incrementing)
-build:
-  number: 1
-  script: python -m pip install .
-
-# the requirements at build and runtime
-requirements:
-  host:
-    - python
-    - pip
-  run:
-    - python
-
-# tests to validate that the package works as expected
-tests:
-  - python:
-      imports:
-        - imagesize
-
-# information about the package
-about:
-  homepage: https://github.com/shibukawa/imagesize_py
-  license: MIT
-  summary: 'Getting image size from png/jpeg/jpeg2000/gif file'
-  description: |
-    This module analyzes jpeg/jpeg2000/png/gif image header and
-    return image size.
-  repository: https://github.com/shibukawa/imagesize_py
-  documentation: https://pypi.python.org/pypi/imagesize
-
-# the below is conda-forge specific!
-extra:
-  recipe-maintainers:
-    - somemaintainer
-
+--8<-- "docs/snippets/recipes/imagesize.yaml"
 ```
 
 

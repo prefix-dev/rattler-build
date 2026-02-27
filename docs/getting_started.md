@@ -7,28 +7,7 @@ This tutorial walks you through building and publishing your first conda package
 A recipe is a YAML file that describes how to build a package. Create a file called `recipe.yaml`:
 
 ```yaml title="recipe.yaml"
-context:
-  version: "1.0.0"
-
-package:
-  name: hello-world
-  version: ${{ version }}
-
-build:
-  number: 0
-  script:
-    - mkdir -p $PREFIX/bin
-    - echo '#!/bin/bash' > $PREFIX/bin/hello
-    - echo 'echo "Hello, World!"' >> $PREFIX/bin/hello
-    - chmod +x $PREFIX/bin/hello
-
-tests:
-  - script:
-      - hello
-
-about:
-  summary: A simple hello world package
-  license: MIT
+--8<-- "docs/snippets/recipes/hello-world.yaml"
 ```
 
 This recipe creates a simple shell script that prints "Hello, World!".

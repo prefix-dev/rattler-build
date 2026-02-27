@@ -24,49 +24,7 @@ Additionally, `noarch: python` packages work with a range of Python versions (co
 
 
 ```yaml title="recipe.yaml"
-context:
-  version: "8.1.2"
-
-package:
-  name: ipywidgets
-  version: ${{ version }}
-
-source:
-  url: https://pypi.io/packages/source/i/ipywidgets/ipywidgets-${{ version }}.tar.gz
-  sha256: d0b9b41e49bae926a866e613a39b0f0097745d2b9f1f3dd406641b4a57ec42c9
-
-build:
-  noarch: python # (1)!
-  script: pip install . -v
-
-requirements:
-  # note that there is no build section
-  host:
-    - pip
-    - python >=3.7
-    - setuptools
-    - wheel
-  run:
-    - comm >=0.1.3
-    - ipython >=6.1.0
-    - jupyterlab_widgets >=3.0.10,<3.1.0
-    - python >=3.7
-    - traitlets >=4.3.1
-    - widgetsnbextension >=4.0.10,<4.1.0
-
-tests:
-  - python:
-      imports:
-        - ipywidgets # (2)!
-
-about:
-  homepage: https://github.com/ipython/ipywidgets
-  license: BSD-3-Clause
-  license_file: LICENSE
-  summary: Jupyter Interactive Widgets
-  description: |
-    ipywidgets are interactive HTML widgets for Jupyter notebooks and the IPython kernel.
-  documentation: https://ipywidgets.readthedocs.io/en/latest/
+--8<-- "docs/snippets/recipes/ipywidgets.yaml"
 ```
 
 1. The `noarch: python` line tells `rattler-build` that this package is pure
@@ -100,67 +58,7 @@ python:
 This will replace any `python` found in the recipe with the versions specified in the `variants.yaml` file.
 
 ```yaml title="recipe.yaml"
-context:
-  version: 2.0.1
-  default_abi_level: 1.21
-
-package:
-  name: numpy
-  version: ${{ version }}
-
-source:
-  - url: https://github.com/numpy/numpy/releases/download/v${{ version }}/numpy-${{ version }}.tar.gz
-    sha256: 485b87235796410c3519a699cfe1faab097e509e90ebb05dcd098db2ae87e7b3
-
-build:
-  python:
-    entry_points:
-      - f2py = numpy.f2py.f2py2e:main  # [win]
-      - numpy-config = numpy._configtool:main
-
-requirements:
-  build:
-    - ${{ compiler('c') }}
-    - ${{ compiler('cxx') }}
-    # note: some `host` dependencies that run at build time (e.g., `cython`, `meson-python`)
-    #       should ideally be in `build` instead, this is because cross compilation of
-    #       Python packages in conda-forge uses `crossenv` rather than regular cross compilation.
-  host:
-    # note: variant is injected here!
-    - python
-    - pip
-    - meson-python
-    - pkg-config
-    - python-build
-    - cython
-    - libblas
-    - libcblas
-    - liblapack
-  run:
-    - python
-  run_exports:
-    - numpy >=${{ default_abi_level }},<3.0.0a0
-
-tests:
-  - python:
-      imports:
-        - numpy
-        - numpy.fft
-        - numpy.linalg
-        - numpy.random
-        - numpy.ctypeslib
-
-  - script:
-    - f2py -v
-    - numpy-config --cflags
-
-about:
-  homepage: http://numpy.org/
-  license: BSD-3-Clause
-  license_file: LICENSE.txt
-  summary: The fundamental package for scientific computing with Python.
-  documentation: https://numpy.org/doc/stable/
-  repository: https://github.com/numpy/numpy
+--8<-- "docs/snippets/recipes/numpy.yaml"
 ```
 
 The build script for Unix:
@@ -236,68 +134,7 @@ Note: this feature relies on the `python-abi3` package which exists in the `cond
 The full recipe can be found on [`conda-forge/py-rattler-feedstock`](https://github.com/conda-forge/py-rattler-feedstock)
 
 ```yaml title="recipe.yaml"
-context:
-  name: py-rattler
-  python_name: py_rattler
-  version: "0.11.0"
-  python_min: "3.8"
-
-package:
-  name: py-rattler
-  version: ${{ version }}
-
-source:
-  url: https://pypi.org/packages/source/${{ name[0] }}/${{ name }}/${{ python_name }}-${{ version }}.tar.gz
-  sha256: b00f91e19863741ce137a504eff3082c0b0effd84777444919bd83357530867f
-
-build:
-  number: 0
-  script: build.sh
-  python:
-    version_independent: true
-
-requirements:
-  build:
-    - ${{ compiler('c') }}
-    - ${{ compiler('rust') }}
-    - cargo-bundle-licenses
-  host:
-    - python      ${{ python_min }}.*
-    - python-abi3 ${{ python_min }}.*  # (1)!
-    - maturin >=1.2.2,<2
-    - pip
-    - if: unix
-      then:
-        - openssl
-  run:
-    - python >=${{ python_min }}
-
-tests:
-  - python:
-      imports:
-        - rattler
-      python_version: ${{ python_min }}.*  # (2)!
-  # You could run `abi3audit` here, but it is not necessary
-  # - script:
-  #     - abi3audit ${{ SP_DIR }}/spam.abi3.so -s -v --assume-minimum-abi3 ${{ python_min }}
-  #   requirements:
-  #     run:
-  #       - abi3audit
-
-about:
-  homepage: https://github.com/conda/rattler
-  license: BSD-3-Clause
-  license_file:
-    - LICENSE
-    - py-rattler/THIRDPARTY.yml
-  summary: A blazing fast library to work with the conda ecosystem
-  description: |
-    Rattler is a library that provides common functionality used within the conda
-    ecosystem. The goal of the library is to enable programs and other libraries to
-    easily interact with the conda ecosystem without being dependent on Python. Its
-    primary use case is as a library that you can use to provide conda related
-    workflows in your own tools.
-  repository: https://github.com/conda/rattler
+--8<-- "docs/snippets/recipes/py-rattler.yaml"
 ```
 
 1. The `python-abi3` package is a special package that ensures that the   run dependencies
