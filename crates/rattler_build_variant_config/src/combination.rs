@@ -262,10 +262,7 @@ mod tests {
         // If only some keys in a zip group exist (because others were filtered
         // by conditionals), the zip group should be skipped.
         let mut variants = BTreeMap::new();
-        variants.insert(
-            "c_compiler_version".into(),
-            vec!["9".into()],
-        );
+        variants.insert("c_compiler_version".into(), vec!["9".into()]);
         // cxx_compiler_version is missing (filtered by conditional)
 
         let zip_keys = vec![vec![

@@ -196,13 +196,7 @@ impl Jinja {
 
         // Derive the host platform's family name (e.g., "linux" from "linux-64",
         // "emscripten" from "emscripten-wasm32")
-        let host_family = config
-            .host_platform
-            .to_string()
-            .split('-')
-            .next()
-            .unwrap_or_default()
-            .to_string();
+        let host_family = config.host_platform.only_platform();
 
         // Add architecture aliases (e.g., "x86_64", "aarch64", "ppc64le")
         // All known architectures are defined, with only the host platform's architecture being true
@@ -227,12 +221,9 @@ impl Jinja {
             // Add platform family selectors (e.g., "linux", "osx", "win", "emscripten", "wasi")
             // derived from platform names by extracting the part before the architecture suffix.
             // This automatically supports new platforms added to rattler_conda_types.
-            if let Some(family) = platform_str.split('-').next() {
+            if let Some(family) = platform.only_platform() {
                 if seen_families.insert(family.to_string()) {
-                    context.insert(
-                        family.to_string(),
-                        Value::from(family == host_family),
-                    );
+                    context.insert(family.to_string(), Value::from(Some(family) == host_family));
                 }
             }
         }
