@@ -1025,9 +1025,23 @@ pub(crate) async fn resolve_dependencies(
         host_run_exports.extend(host_env.run_exports(true));
     }
 
+    // For version-independent (abi3) packages, ignore run exports from
+    // `python` itself (e.g. `python_abi`) since these packages are
+    // Python-version independent. Run exports from `python-abi3` (e.g.
+    // `cpython >=3.X`) are still kept. See CEP-20.
+    let ignore_run_exports = if output.is_python_version_independent() {
+        let mut ignore = requirements.ignore_run_exports.clone();
+        let python: PackageName = "python".parse().expect("valid package name");
+        ignore.from_package.push(python.clone());
+        ignore.by_name.push(python);
+        ignore
+    } else {
+        requirements.ignore_run_exports.clone()
+    };
+
     // And filter the run exports
     let host_run_exports =
-        filter_run_exports(&requirements.ignore_run_exports, &host_run_exports, "host")?;
+        filter_run_exports(&ignore_run_exports, &host_run_exports, "host")?;
 
     // add the host run exports to the run dependencies
     if output.target_platform() == &Platform::NoArch {
