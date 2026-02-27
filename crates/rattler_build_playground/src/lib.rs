@@ -194,18 +194,8 @@ pub fn get_used_variables(yaml_source: &str) -> String {
 /// Get available platform strings for the UI dropdown.
 #[wasm_bindgen]
 pub fn get_platforms() -> String {
-    serde_json::to_string(&[
-        "linux-64",
-        "linux-aarch64",
-        "linux-ppc64le",
-        "linux-s390x",
-        "osx-64",
-        "osx-arm64",
-        "win-64",
-        "win-arm64",
-        "noarch",
-    ])
-    .unwrap_or_default()
+    let platforms: Vec<&str> = Platform::all().map(|p| p.as_str()).collect();
+    serde_json::to_string(&platforms).unwrap_or_default()
 }
 
 /// A concise summary of a rendered variant for display in the UI
