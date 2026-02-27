@@ -1,19 +1,20 @@
 :root {
-  --bg-primary: #1a1a2e;
-  --bg-secondary: #16213e;
-  --bg-editor: #0f0f23;
-  --bg-panel: #1e1e3a;
-  --bg-toolbar: #252547;
-  --text-primary: #e0e0e0;
-  --text-secondary: #a0a0b8;
-  --text-muted: #6e6e8a;
-  --accent: #4fc3f7;
-  --accent-hover: #29b6f6;
-  --error: #ef5350;
-  --error-bg: rgba(239, 83, 80, 0.1);
-  --success: #66bb6a;
-  --border: #2a2a4a;
-  --divider: #3a3a5a;
+  /* Catppuccin Mocha palette */
+  --bg-primary: #1e1e2e;   /* Base */
+  --bg-secondary: #181825;  /* Mantle */
+  --bg-editor: #11111b;     /* Crust */
+  --bg-panel: #313244;      /* Surface 0 */
+  --bg-toolbar: #181825;    /* Mantle */
+  --text-primary: #cdd6f4;  /* Text */
+  --text-secondary: #a6adc8; /* Subtext 0 */
+  --text-muted: #6c7086;    /* Overlay 0 */
+  --accent: #74c7ec;        /* Sapphire */
+  --accent-hover: #89dceb;  /* Sky */
+  --error: #f38ba8;         /* Red */
+  --error-bg: rgba(243, 139, 168, 0.1);
+  --success: #a6e3a1;       /* Green */
+  --border: #313244;        /* Surface 0 */
+  --divider: #45475a;       /* Surface 1 */
   --font-mono: "JetBrains Mono", "Fira Code", "SF Mono", Consolas, monospace;
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
@@ -407,7 +408,7 @@ html, body {
 }
 
 .variant-badge-noarch {
-  background: rgba(102, 187, 106, 0.1);
+  background: rgba(166, 227, 161, 0.1);
   color: var(--success);
   border: 1px solid var(--success);
 }
@@ -443,7 +444,7 @@ html, body {
 }
 
 .context-table .context-value {
-  color: #c3e88d;
+  color: var(--success);
 }
 
 .variant-keys {
