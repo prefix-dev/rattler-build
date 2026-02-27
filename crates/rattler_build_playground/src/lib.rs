@@ -370,6 +370,48 @@ fn parse_variables(json: &str) -> Result<IndexMap<String, Variable>, String> {
     Ok(result)
 }
 
+/// Parse variant config YAML and return a JSON object with the first value of each key.
+///
+/// Used by the "Evaluated" tab to build a simple variables map from the variant config.
+/// For example, `python:\n  - "3.11"\n  - "3.12"` becomes `{"python": "3.11"}`.
+#[wasm_bindgen]
+pub fn first_variant_values(variant_yaml: &str) -> String {
+    let parsed: Result<IndexMap<String, serde_yaml::Value>, _> =
+        serde_yaml::from_str(variant_yaml);
+
+    let map = match parsed {
+        Ok(m) => m,
+        Err(_) => return "{}".to_string(),
+    };
+
+    let mut result = serde_json::Map::new();
+    for (key, value) in map {
+        let first = match &value {
+            serde_yaml::Value::Sequence(seq) => seq.first().unwrap_or(&value).clone(),
+            other => other.clone(),
+        };
+        let json_val = match first {
+            serde_yaml::Value::Bool(b) => serde_json::Value::Bool(b),
+            serde_yaml::Value::Number(n) => {
+                if let Some(i) = n.as_i64() {
+                    serde_json::Value::Number(i.into())
+                } else if let Some(f) = n.as_f64() {
+                    serde_json::Number::from_f64(f)
+                        .map(serde_json::Value::Number)
+                        .unwrap_or(serde_json::Value::String(n.to_string()))
+                } else {
+                    serde_json::Value::String(n.to_string())
+                }
+            }
+            serde_yaml::Value::String(s) => serde_json::Value::String(s),
+            other => serde_json::Value::String(format!("{other:?}")),
+        };
+        result.insert(key, json_val);
+    }
+
+    serde_json::to_string(&result).unwrap_or_else(|_| "{}".to_string())
+}
+
 fn error_json(message: &str, line: Option<usize>, column: Option<usize>) -> String {
     let escaped = serde_json::to_string(message).unwrap_or_else(|_| format!(r#""{message}""#));
     match (line, column) {

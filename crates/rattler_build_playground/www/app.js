@@ -1,4 +1,4 @@
-import wasmInit, { parse_recipe, evaluate_recipe, get_used_variables, get_platforms, render_variants, get_theme_css, highlight_source_yaml } from './rattler_build_playground.js';
+import wasmInit, { parse_recipe, evaluate_recipe, get_used_variables, get_platforms, render_variants, get_theme_css, highlight_source_yaml, first_variant_values } from './rattler_build_playground.js';
 
 const DEFAULT_RECIPE = `context:
   name: flask
@@ -175,8 +175,8 @@ function update() {
     if (currentMode === 'stage0') {
       resultJson = parse_recipe(yaml);
     } else if (currentMode === 'stage1') {
-      // For stage1, build a simple variables JSON from the variant config (first values)
-      const varsJson = buildVarsFromVariantConfig(variantYaml);
+      // For stage1, extract the first value of each variant key
+      const varsJson = first_variant_values(variantYaml);
       resultJson = evaluate_recipe(yaml, varsJson, platform);
     } else if (currentMode === 'vars') {
       resultJson = get_used_variables(yaml);
@@ -222,40 +222,6 @@ function update() {
   }
 }
 
-/// Build a simple JSON object from variant YAML, taking the first value of each key.
-/// This is used for the "Evaluated" tab when no full variant rendering is needed.
-function buildVarsFromVariantConfig(yamlStr) {
-  try {
-    // Simple YAML-to-first-value parser for the common case
-    // Handles: `key:\n  - "value1"\n  - "value2"` -> `{"key": "value1"}`
-    const result = {};
-    const lines = yamlStr.split('\n');
-    let currentKey = null;
-    for (const line of lines) {
-      const keyMatch = line.match(/^(\w[\w_-]*):\s*$/);
-      if (keyMatch) {
-        currentKey = keyMatch[1];
-        continue;
-      }
-      const inlineMatch = line.match(/^(\w[\w_-]*):\s+(.+)$/);
-      if (inlineMatch) {
-        const val = inlineMatch[2].replace(/^["']|["']$/g, '');
-        result[inlineMatch[1]] = val;
-        currentKey = null;
-        continue;
-      }
-      if (currentKey && line.match(/^\s+-\s+/)) {
-        if (!(currentKey in result)) {
-          const val = line.replace(/^\s+-\s+/, '').replace(/^["']|["']$/g, '');
-          result[currentKey] = val;
-        }
-      }
-    }
-    return JSON.stringify(result);
-  } catch {
-    return '{}';
-  }
-}
 
 function renderOutput(html) {
   outputContainer.innerHTML = `<pre class="output-yaml">${html}</pre>`;
