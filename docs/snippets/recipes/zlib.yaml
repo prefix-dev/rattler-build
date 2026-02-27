@@ -18,12 +18,12 @@ build:
     # build script to install the package into the $PREFIX (host prefix)
     - if: unix
       then:
-      - ./configure --prefix=$PREFIX
-      - make -j$CPU_COUNT
+        - ./configure --prefix=$PREFIX
+        - make -j$CPU_COUNT
     - if: win
       then:
-      - cmake -G "Ninja" -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=%LIBRARY_PREFIX%
-      - ninja install
+        - cmake -G "Ninja" -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=%LIBRARY_PREFIX%
+        - ninja install
 
 requirements:
   build:

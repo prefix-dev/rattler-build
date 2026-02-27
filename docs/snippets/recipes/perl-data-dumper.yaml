@@ -33,4 +33,4 @@ tests:
 about:
   homepage: https://metacpan.org/pod/Data::Dumper
   license: GPL-1.0-or-later OR Artistic-1.0-Perl
-  summary: 'seeds germane, yet not germinated'
+  summary: "seeds germane, yet not germinated"

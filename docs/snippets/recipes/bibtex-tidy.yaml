@@ -25,4 +25,4 @@ requirements:
 
 tests:
   - script:
-    - bibtex-tidy --version
+      - bibtex-tidy --version

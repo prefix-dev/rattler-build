@@ -35,6 +35,6 @@ requirements:
 
 tests:
   - script:
-      - pdfinfo -listenc  # (3)!
+      - pdfinfo -listenc # (3)!
       - pdfunite --help
       - pdftocairo --help

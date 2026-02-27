@@ -6,34 +6,34 @@ package:
   version: ${{ version }}
 
 source:
-- url: https://cran.r-project.org/src/contrib/Archive/knitr/knitr_${{ version }}.tar.gz
-  sha256: fadd849bf94a4e02520088a6626577c3c636227fe11c5cd7e8fcc5d51a7aa6cf
+  - url: https://cran.r-project.org/src/contrib/Archive/knitr/knitr_${{ version }}.tar.gz
+    sha256: fadd849bf94a4e02520088a6626577c3c636227fe11c5cd7e8fcc5d51a7aa6cf
 
 build:
-  noarch: generic  # (4)!
-  script: R CMD INSTALL --build .  # (1)!
+  noarch: generic # (4)!
+  script: R CMD INSTALL --build . # (1)!
 
 requirements:
   host:
-  - r-base  # (2)!
-  - r-evaluate >=0.15
-  - r-highr >=0.11
-  - r-xfun >=0.44
-  - r-yaml >=2.1.19
+    - r-base # (2)!
+    - r-evaluate >=0.15
+    - r-highr >=0.11
+    - r-xfun >=0.44
+    - r-yaml >=2.1.19
   run:
-  - r-base
-  - r-evaluate >=0.15
-  - r-highr >=0.11
-  - r-xfun >=0.44
-  - r-yaml >=2.1.19
+    - r-base
+    - r-evaluate >=0.15
+    - r-highr >=0.11
+    - r-xfun >=0.44
+    - r-yaml >=2.1.19
 
 tests:
-# This is a shorthand test for R packages to ensure that the library loads correctly.
-- r:
-    libraries:
-      - knitr
-# You can also run arbitrary R code in the test section.
-- script: test_package.R  # (3)!
+  # This is a shorthand test for R packages to ensure that the library loads correctly.
+  - r:
+      libraries:
+        - knitr
+  # You can also run arbitrary R code in the test section.
+  - script: test_package.R # (3)!
 
 about:
   homepage: https://yihui.org/knitr/

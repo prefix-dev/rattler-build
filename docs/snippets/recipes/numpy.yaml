@@ -13,7 +13,7 @@ source:
 build:
   python:
     entry_points:
-      - f2py = numpy.f2py.f2py2e:main  # [win]
+      - f2py = numpy.f2py.f2py2e:main # [win]
       - numpy-config = numpy._configtool:main
 
 requirements:
@@ -49,8 +49,8 @@ tests:
         - numpy.ctypeslib
 
   - script:
-    - f2py -v
-    - numpy-config --cflags
+      - f2py -v
+      - numpy-config --cflags
 
 about:
   homepage: http://numpy.org/

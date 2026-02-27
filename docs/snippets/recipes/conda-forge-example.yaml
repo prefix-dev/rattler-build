@@ -11,7 +11,7 @@ source:
 
 build:
   number: 0
-  script: python -m pip install . -vv  # example for Python
+  script: python -m pip install . -vv # example for Python
 
 requirements:
   host:

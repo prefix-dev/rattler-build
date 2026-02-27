@@ -1,4 +1,5 @@
 """Validate all recipe snippets render correctly with py-rattler-build."""
+
 import sys
 from pathlib import Path
 

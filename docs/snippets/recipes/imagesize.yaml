@@ -37,7 +37,7 @@ tests:
 about:
   homepage: https://github.com/shibukawa/imagesize_py
   license: MIT
-  summary: 'Getting image size from png/jpeg/jpeg2000/gif file'
+  summary: "Getting image size from png/jpeg/jpeg2000/gif file"
   description: |
     This module analyzes jpeg/jpeg2000/png/gif image header and
     return image size.

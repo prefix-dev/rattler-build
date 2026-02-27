@@ -19,6 +19,7 @@ This document contains the help content for the `rattler-build` command-line pro
 * `debug` — Debug a recipe build
 * `package` — Package-related subcommands
 * `bump-recipe` — Bump a recipe to a new version
+* `migrate-recipe` — Migrate a recipe from the deprecated `cache:` format to `staging:` outputs
 
 ##### **Options:**
 
@@ -1700,6 +1701,28 @@ This command updates the version and SHA256 checksum(s) in a recipe file. It can
 - `--keep-build-number`
 
 	Keep the current build number instead of resetting it to 0
+
+
+
+
+
+### `migrate-recipe`
+
+Migrate a recipe from the deprecated `cache:` format to `staging:` outputs
+
+**Usage:** `rattler-build migrate-recipe [OPTIONS]`
+
+##### **Options:**
+
+- `-r`, `--recipe <RECIPE>`
+
+	Path to the recipe file or directory containing recipe.yaml. Defaults to current directory
+
+	- Default value: `.`
+
+- `--dry-run`
+
+	Perform a dry-run: show the migrated recipe without writing to the file
 
 
 
