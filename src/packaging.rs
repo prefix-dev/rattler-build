@@ -465,6 +465,23 @@ fn print_enhanced_file_listing(
         perform_path_checks(output, &pj.paths);
     }
 
+    // Warn if prefix contains spaces: shebang lines don't support quoted paths on Linux,
+    // so any generated entry point scripts may fail to execute at runtime.
+    let prefix_str = output.prefix().to_string_lossy();
+    if prefix_str.contains(' ') && !output.recipe.build().python.entry_points.is_empty() {
+        tracing::warn!(
+            "The prefix path '{}' contains spaces. Entry point shebang lines do not support \
+            quoted paths on Linux, so the generated scripts may fail to execute.",
+            prefix_str
+        );
+        output.record_warning(&format!(
+            "Prefix path '{}' contains spaces — entry point shebangs may not work on Linux",
+            prefix_str
+        ));
+    }
+
+    let is_noarch_python = output.is_python_version_independent();
+
     // Collect per-file warnings for content files
     let mut path_warnings: HashMap<&Path, Vec<String>> = HashMap::new();
     if let Some(ref pj) = paths_json {
@@ -481,6 +498,15 @@ fn print_enhanced_file_listing(
                 }
                 if path_str.len() > 200 {
                     warnings.push(format!("Path too long ({} > 200)", path_str.len()));
+                }
+                // For noarch:python packages, files in python-scripts/ were placed there
+                // because they are not registered as entry_points.
+                if is_noarch_python && path_str.starts_with("python-scripts/") {
+                    warnings.push(
+                        "not registered as an entry_point; consider adding to \
+                        'build.python.entry_points' (e.g. `cmd = pkg.module:main`)"
+                            .to_string(),
+                    );
                 }
             }
 
