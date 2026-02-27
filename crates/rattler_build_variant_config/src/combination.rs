@@ -149,7 +149,11 @@ pub fn compute_combinations(
     Ok(result)
 }
 
-/// Validate that zip keys are properly structured and have matching lengths
+/// Validate that zip keys are properly structured and have matching lengths.
+///
+/// Zip key groups where some keys are missing from the variants map are skipped,
+/// since those keys may have been filtered out by platform-conditional evaluation
+/// (e.g., `if: emscripten` conditions that don't match the current target platform).
 fn validate_zip_keys(
     variants: &BTreeMap<NormalizedKey, Vec<Variable>>,
     zip_keys: &[Vec<NormalizedKey>],
@@ -159,14 +163,15 @@ fn validate_zip_keys(
             return Err(VariantExpandError::InvalidZipKeyStructure);
         }
 
+        // Skip validation for zip groups where any key is missing from variants.
+        // This happens when conditionals filter out keys for the current platform.
+        if zip.iter().any(|key| !variants.contains_key(key)) {
+            continue;
+        }
+
         let mut prev_len = None;
         for key in zip {
-            let value = match variants.get(key) {
-                None => {
-                    return Err(VariantExpandError::MissingVariantKey(key.normalize()));
-                }
-                Some(value) => value,
-            };
+            let value = variants.get(key).expect("checked above");
 
             if let Some(l) = prev_len
                 && l != value.len()
@@ -233,5 +238,39 @@ mod tests {
 
         let result = validate_zip_keys(&variants, &zip_keys);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_zip_keys_with_missing_keys_from_conditionals() {
+        // When conditionals filter out variant keys (e.g., `if: emscripten` on a
+        // linux build), the zip group referencing those keys should be skipped
+        // rather than causing a MissingVariantKey error.
+        let variants = BTreeMap::new(); // no keys at all (all filtered out)
+
+        let zip_keys = vec![vec![
+            "cxx_compiler_version".into(),
+            "c_compiler_version".into(),
+        ]];
+
+        // Should succeed - missing keys are skipped
+        let result = validate_zip_keys(&variants, &zip_keys);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_zip_keys_with_partially_missing_keys() {
+        // If only some keys in a zip group exist (because others were filtered
+        // by conditionals), the zip group should be skipped.
+        let mut variants = BTreeMap::new();
+        variants.insert("c_compiler_version".into(), vec!["9".into()]);
+        // cxx_compiler_version is missing (filtered by conditional)
+
+        let zip_keys = vec![vec![
+            "cxx_compiler_version".into(),
+            "c_compiler_version".into(),
+        ]];
+
+        let result = validate_zip_keys(&variants, &zip_keys);
+        assert!(result.is_ok());
     }
 }
