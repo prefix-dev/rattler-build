@@ -26,43 +26,7 @@ This example shows how to package the [Temporal
 CLI](https://github.com/temporalio/cli).
 
 ```yaml title="recipe.yaml"
-context:
-    version: "0.13.1"
-
-package:
-  name: temporal
-  version: ${{ version }}
-
-source:
-  url: https://github.com/temporalio/cli/archive/refs/tags/v${{ version }}.tar.gz
-  sha256: 9d8812c96d3404490659fec3915dcd23c4142b421ef4cb7e9622bd9a459e1f74
-
-build:
-  number: 0
-
-requirements:
-  build:
-    - ${{ compiler('go-nocgo') }}
-    - go-licenses
-
-tests:
-  - script:
-      - temporal --version
-
-about:
-  homepage: https://temporal.io
-  repository: https://github.com/temporalio/cli
-  documentation: https://docs.temporal.io/cli
-  summary: Temporal CLI
-  description: |
-    Command-line interface for running Temporal Server and interacting with
-    Workflows, Activities, Namespaces, and other parts of Temporal.
-  license: MIT
-  license_file:
-    - LICENSE
-    # These license files are generated at build time in the `build.sh` script
-    # from all the dependencies of `temporal.io`.
-    - license-files/
+--8<-- "docs/snippets/recipes/temporal.yaml"
 ```
 
 The build script (on Unix) should look something like this:

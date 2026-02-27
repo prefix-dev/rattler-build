@@ -33,65 +33,7 @@ This approach ensures that the headers and libraries are installed in the correc
 
 ### Recipe
 ```yaml title="recipe.yaml"
-context:
-  version: "0.24.6"
-
-package:
-  name: xtensor
-  version: ${{ version }}
-
-source:
-  url: https://github.com/xtensor-stack/xtensor/archive/${{ version }}.tar.gz
-  sha256: f87259b51aabafdd1183947747edfff4cff75d55375334f2e81cee6dc68ef655
-
-build:
-  number: 0
-  script:
-    - if: win # (1)!
-      then: |
-        cmake -GNinja ^
-            -D BUILD_TESTS=OFF -DCMAKE_INSTALL_PREFIX=%LIBRARY_PREFIX% ^
-            %SRC_DIR%
-        ninja install
-      else: |
-        cmake -GNinja \
-              -DBUILD_TESTS=OFF -DCMAKE_INSTALL_PREFIX=$PREFIX \
-              $SRC_DIR
-        ninja install
-
-requirements:
-  build:
-    - ${{ compiler('cxx') }} # (2)!
-    - cmake
-    - ninja
-  host:
-    - xtl >=0.7,<0.8
-  run:
-    - xtl >=0.7,<0.8
-  run_constraints: # (3)!
-    - xsimd >=8.0.3,<10
-
-tests:
-  - package_contents:
-      include: # (4)!
-        - xtensor/xarray.hpp
-      files: # (5)!
-        exists:
-          - ${{ "Library/" if win }}share/cmake/xtensor/xtensorConfig.cmake
-          - ${{ "Library/" if win }}share/cmake/xtensor/xtensorConfigVersion.cmake
-
-about:
-  homepage: https://github.com/xtensor-stack/xtensor
-  license: BSD-3-Clause
-  license_file: LICENSE
-  summary: The C++ tensor algebra library
-  description: Multi dimensional arrays with broadcasting and lazy computing
-  documentation: https://xtensor.readthedocs.io
-  repository: https://github.com/xtensor-stack/xtensor
-
-extra:
-  recipe-maintainers:
-    - some-maintainer
+--8<-- "docs/snippets/recipes/xtensor-tutorial.yaml"
 ```
 
 1. The `if:` condition allows the user to switch behavior of the build based on some checks like, the operating system.
@@ -134,46 +76,7 @@ We'll use external build scripts and run actual scripts in the test.
 ### Recipe
 
 ```yaml title="recipe.yaml"
-context:
-  version: "24.01.0"
-
-package:
-  name: poppler
-  version: ${{ version }}
-
-source:
-  url: https://poppler.freedesktop.org/poppler-${{ version }}.tar.xz
-  sha256: c7def693a7a492830f49d497a80cc6b9c85cb57b15e9be2d2d615153b79cae08
-
-build:
-  script: poppler-build.sh
-
-requirements:
-  build:
-    - ${{ compiler('c') }} # (1)!
-    - ${{ compiler('cxx') }}
-    - pkg-config
-    - cmake
-    - ninja
-  host:
-    - cairo # (2)!
-    - fontconfig
-    - freetype
-    - glib
-    - libboost-headers
-    - libjpeg-turbo
-    - lcms2
-    - libiconv
-    - libpng
-    - libtiff
-    - openjpeg
-    - zlib
-
-tests:
-  - script:
-      - pdfinfo -listenc  # (3)!
-      - pdfunite --help
-      - pdftocairo --help
+--8<-- "docs/snippets/recipes/poppler.yaml"
 ```
 
 1. The `compiler` jinja function to get the correct compiler for C and C++ on the build system.

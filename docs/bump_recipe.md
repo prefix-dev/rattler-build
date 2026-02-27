@@ -66,39 +66,13 @@ For URLs that don't match any known provider, you must specify the version manua
 The command works with recipes that use Jinja2 templating in the context section:
 
 ```yaml title="recipe.yaml"
-context:
-  name: mypackage
-  version: "1.0.0"
-
-package:
-  name: ${{ name }}
-  version: ${{ version }}
-
-source:
-  url: https://github.com/owner/${{ name }}/archive/v${{ version }}.tar.gz
-  sha256: abc123...
-
-build:
-  number: 5
+--8<-- "docs/snippets/recipes/bump-before.yaml"
 ```
 
 After running `rattler-build bump-recipe --recipe recipe.yaml --version 2.0.0`:
 
 ```yaml title="recipe.yaml (updated)"
-context:
-  name: mypackage
-  version: "2.0.0"
-
-package:
-  name: ${{ name }}
-  version: ${{ version }}
-
-source:
-  url: https://github.com/owner/${{ name }}/archive/v${{ version }}.tar.gz
-  sha256: def456...  # automatically updated
-
-build:
-  number: 0  # Note: build number was reset back to `0`
+--8<-- "docs/snippets/recipes/bump-after.yaml"
 ```
 
 ## Derived context variables

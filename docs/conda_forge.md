@@ -44,46 +44,7 @@ recipes/
 Ensure your recipe includes all required metadata:
 
 ```yaml title="recipe.yaml"
-context:
-  version: "1.2.3"
-
-package:
-  name: my-package
-  version: ${{ version }}
-
-source:
-  url: https://github.com/owner/repo/archive/v${{ version }}.tar.gz
-  sha256: abc123...
-
-build:
-  number: 0
-  script: python -m pip install . -vv  # example for Python
-
-requirements:
-  host:
-    - python
-    - pip
-  run:
-    - python
-
-tests:
-  - python:
-      imports:
-        - my_package
-
-about:
-  homepage: https://github.com/owner/repo
-  license: MIT
-  license_file: LICENSE
-  summary: Short description of the package
-  description: |
-    Longer description of what the package does.
-  repository: https://github.com/owner/repo
-  documentation: https://my-package.readthedocs.io
-
-extra:
-  recipe-maintainers:
-    - your-github-username
+--8<-- "docs/snippets/recipes/conda-forge-example.yaml"
 ```
 
 ### Important considerations

@@ -1,0 +1,62 @@
+context:
+  name: py-rattler
+  python_name: py_rattler
+  version: "0.11.0"
+  python_min: "3.8"
+
+package:
+  name: py-rattler
+  version: ${{ version }}
+
+source:
+  url: https://pypi.org/packages/source/${{ name[0] }}/${{ name }}/${{ python_name }}-${{ version }}.tar.gz
+  sha256: b00f91e19863741ce137a504eff3082c0b0effd84777444919bd83357530867f
+
+build:
+  number: 0
+  script: build.sh
+  python:
+    version_independent: true
+
+requirements:
+  build:
+    - ${{ compiler('c') }}
+    - ${{ compiler('rust') }}
+    - cargo-bundle-licenses
+  host:
+    - python      ${{ python_min }}.*
+    - python-abi3 ${{ python_min }}.*  # (1)!
+    - maturin >=1.2.2,<2
+    - pip
+    - if: unix
+      then:
+        - openssl
+  run:
+    - python >=${{ python_min }}
+
+tests:
+  - python:
+      imports:
+        - rattler
+      python_version: ${{ python_min }}.*  # (2)!
+  # You could run `abi3audit` here, but it is not necessary
+  # - script:
+  #     - abi3audit ${{ SP_DIR }}/spam.abi3.so -s -v --assume-minimum-abi3 ${{ python_min }}
+  #   requirements:
+  #     run:
+  #       - abi3audit
+
+about:
+  homepage: https://github.com/conda/rattler
+  license: BSD-3-Clause
+  license_file:
+    - LICENSE
+    - py-rattler/THIRDPARTY.yml
+  summary: A blazing fast library to work with the conda ecosystem
+  description: |
+    Rattler is a library that provides common functionality used within the conda
+    ecosystem. The goal of the library is to enable programs and other libraries to
+    easily interact with the conda ecosystem without being dependent on Python. Its
+    primary use case is as a library that you can use to provide conda related
+    workflows in your own tools.
+  repository: https://github.com/conda/rattler
