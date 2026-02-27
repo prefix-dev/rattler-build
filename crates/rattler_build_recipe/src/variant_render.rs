@@ -1034,6 +1034,22 @@ fn source_list_has_attestation(
     })
 }
 
+/// Check if a build section has signing configuration.
+fn build_has_signing(build: &stage0::Build) -> bool {
+    build.signing.macos.is_some() || build.signing.windows.is_some()
+}
+
+/// Check if a recipe contains any code signing configuration.
+fn recipe_has_signing(recipe: &Stage0Recipe) -> bool {
+    match recipe {
+        Stage0Recipe::SingleOutput(r) => build_has_signing(&r.build),
+        Stage0Recipe::MultiOutput(r) => r.outputs.iter().any(|output| match output {
+            stage0::Output::Staging(_) => false,
+            stage0::Output::Package(p) => build_has_signing(&p.build),
+        }),
+    }
+}
+
 /// Check if a recipe contains any source with attestation config.
 fn recipe_has_attestation(recipe: &Stage0Recipe) -> bool {
     match recipe {
@@ -1066,6 +1082,13 @@ pub fn render_recipe_with_variant_config(
     variant_config: &VariantConfig,
     config: RenderConfig,
 ) -> Result<Vec<RenderedVariant>, RenderError> {
+    // Check if recipe has code signing config - requires experimental flag
+    if !config.experimental && recipe_has_signing(stage0_recipe) {
+        return Err(RenderError::ExperimentalRequired {
+            message: "code signing is an experimental feature: provide the `--experimental` flag to enable this feature".to_string(),
+        });
+    }
+
     // Check if any source has attestation config - requires experimental flag
     if !config.experimental && recipe_has_attestation(stage0_recipe) {
         return Err(RenderError::ExperimentalRequired {
