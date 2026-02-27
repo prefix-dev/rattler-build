@@ -1017,6 +1017,9 @@ tests:
 
 ## Outputs section
 
+!!! tip
+    For a complete guide including staging outputs and examples, see [Multi-Output Recipes](multi_output.md).
+
 Explicitly specifies packaging steps. This section supports multiple outputs, as
 well as different package output types. The format is a list of mappings.
 
