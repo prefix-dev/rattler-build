@@ -198,7 +198,7 @@ html, body {
 }
 
 .load-pinning-btn {
-  margin-left: 4px;
+  margin-left: 8px;
   background: var(--bg-editor);
   color: var(--text-muted);
   border: 1px solid var(--border);
@@ -349,6 +349,11 @@ html, body {
   flex: 0 0 180px;
   display: flex;
   flex-direction: column;
+  min-height: 0;
+}
+
+.variables-panel .editor-container textarea {
+  field-sizing: fixed;
 }
 
 /* Used variables hint */

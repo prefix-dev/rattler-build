@@ -102,10 +102,7 @@ const loadPinningBtn = document.getElementById('load-pinning-btn');
 // ===== Editor helpers =====
 
 function highlightEditor(textarea, pre) {
-  // highlight_source_yaml returns pre-escaped HTML from the WASM module.
-  // Append '\n' because arborium trims trailing newlines, but the textarea
-  // keeps them — without this the <pre> content is shorter.
-  pre.innerHTML = highlight_source_yaml(textarea.value) + '\n';
+  pre.innerHTML = highlight_source_yaml(textarea.value);
 }
 
 // Fallback auto-resize for browsers without CSS field-sizing: content.
@@ -354,7 +351,7 @@ loadPinningBtn.addEventListener('click', async () => {
     alert(`Failed to load pinning: ${e.message}`);
   } finally {
     loadPinningBtn.disabled = false;
-    loadPinningBtn.textContent = 'conda-forge';
+    loadPinningBtn.textContent = 'insert conda-forge pinning';
   }
 });
 
