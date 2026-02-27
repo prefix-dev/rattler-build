@@ -2652,6 +2652,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#migrate-recipe" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        migrate-recipe
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2888,6 +2899,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#migrate-recipe" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        migrate-recipe
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2935,6 +2957,7 @@
 <li><code>debug</code> — Debug a recipe build</li>
 <li><code>package</code> — Package-related subcommands</li>
 <li><code>bump-recipe</code> — Bump a recipe to a new version</li>
+<li><code>migrate-recipe</code> — Migrate a recipe from the deprecated <code>cache:</code> format to <code>staging:</code> outputs</li>
 </ul>
 <h5 id="options"><strong>Options:</strong><a class="headerlink" href="#options" title="Permanent link">#</a></h5>
 <ul>
@@ -4286,6 +4309,23 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <li>
 <p><code>--keep-build-number</code></p>
 <p>Keep the current build number instead of resetting it to 0</p>
+</li>
+</ul>
+<h3 id="migrate-recipe"><code>migrate-recipe</code><a class="headerlink" href="#migrate-recipe" title="Permanent link">#</a></h3>
+<p>Migrate a recipe from the deprecated <code>cache:</code> format to <code>staging:</code> outputs</p>
+<p><strong>Usage:</strong> <code>rattler-build migrate-recipe [OPTIONS]</code></p>
+<h5 id="options_27"><strong>Options:</strong><a class="headerlink" href="#options_27" title="Permanent link">#</a></h5>
+<ul>
+<li>
+<p><code>-r</code>, <code>--recipe &lt;RECIPE&gt;</code></p>
+<p>Path to the recipe file or directory containing recipe.yaml. Defaults to current directory</p>
+<ul>
+<li>Default value: <code>.</code></li>
+</ul>
+</li>
+<li>
+<p><code>--dry-run</code></p>
+<p>Perform a dry-run: show the migrated recipe without writing to the file</p>
 </li>
 </ul>
 <hr/>
