@@ -212,7 +212,7 @@ function update() {
     const usedResult = JSON.parse(usedJson);
     if (usedResult.ok && usedResult.result.length > 0) {
       usedVarsEl.innerHTML = 'Used: ' + usedResult.result
-        .map(v => `<span>${escapeHtml(v)}</span>`)
+        .map(v => html`<span>${v}</span>`)
         .join(', ');
     } else {
       usedVarsEl.textContent = '';
@@ -235,85 +235,70 @@ function renderVariantsOutput(data) {
     return;
   }
 
-  let html = '<div class="variants-view">';
-
-  // Summary cards
-  html += '<div class="variants-grid">';
-  for (const s of summary) {
-    const skippedClass = s.skipped ? ' variant-card-skipped' : '';
-    html += `<div class="variant-card${skippedClass}">`;
-    html += `<div class="variant-card-header">`;
-    html += `<span class="variant-pkg-name">${escapeHtml(s.name)}</span>`;
-    html += `<span class="variant-pkg-version">${escapeHtml(s.version)}</span>`;
-    if (s.build_string) {
-      html += `<span class="variant-build-string">${escapeHtml(s.build_string)}</span>`;
-    }
-    if (s.skipped) {
-      html += `<span class="variant-badge variant-badge-skip">skipped</span>`;
-    }
-    if (s.noarch) {
-      html += `<span class="variant-badge variant-badge-noarch">${escapeHtml(s.noarch)}</span>`;
-    }
-    html += `</div>`;
-
-    // Context table
-    const contextEntries = s.context ? Object.entries(s.context) : [];
-    if (contextEntries.length > 0) {
-      html += `<table class="context-table">`;
-      html += `<thead><tr><th colspan="2">context</th></tr></thead><tbody>`;
-      for (const [k, v] of contextEntries) {
-        const display = typeof v === 'string' ? v : JSON.stringify(v);
-        html += `<tr><td class="context-key">${escapeHtml(k)}</td><td class="context-value">${escapeHtml(display)}</td></tr>`;
-      }
-      html += `</tbody></table>`;
-    }
-
-    // Variant keys
-    if (s.variant.length > 0) {
-      html += `<div class="variant-keys">`;
-      for (const [k, v] of s.variant) {
-        html += `<span class="variant-key-pill"><span class="variant-key-name">${escapeHtml(k)}</span><span class="variant-key-value">${escapeHtml(v)}</span></span>`;
-      }
-      html += `</div>`;
-    }
-
-    // Dependencies summary
-    const hasDeps = s.build_deps.length > 0 || s.host_deps.length > 0 || s.run_deps.length > 0;
-    if (hasDeps) {
-      html += `<div class="variant-deps">`;
-      if (s.build_deps.length > 0) {
-        html += `<div class="variant-dep-section"><span class="variant-dep-label">build:</span> ${s.build_deps.map(d => `<span class="variant-dep">${escapeHtml(d)}</span>`).join(' ')}</div>`;
-      }
-      if (s.host_deps.length > 0) {
-        html += `<div class="variant-dep-section"><span class="variant-dep-label">host:</span> ${s.host_deps.map(d => `<span class="variant-dep">${escapeHtml(d)}</span>`).join(' ')}</div>`;
-      }
-      if (s.run_deps.length > 0) {
-        html += `<div class="variant-dep-section"><span class="variant-dep-label">run:</span> ${s.run_deps.map(d => `<span class="variant-dep">${escapeHtml(d)}</span>`).join(' ')}</div>`;
-      }
-      html += `</div>`;
-    }
-
-    html += `</div>`;
+  function renderDepSection(label, deps) {
+    if (deps.length === 0) return '';
+    const pills = deps.map(d => html`<span class="variant-dep">${d}</span>`).join(' ');
+    return html`<div class="variant-dep-section"><span class="variant-dep-label">${label}:</span> ${safe(pills)}</div>`;
   }
-  html += '</div>';
 
-  // Collapsible full YAML
-  html += `<details class="variants-yaml-details">`;
-  html += `<summary>Full YAML output (${summary.length} variant${summary.length !== 1 ? 's' : ''})</summary>`;
-  html += `<pre class="output-yaml">${data.variants_html}</pre>`;
-  html += `</details>`;
+  function renderCard(s) {
+    const skippedClass = s.skipped ? ' variant-card-skipped' : '';
+    const buildStr = s.build_string ? html`<span class="variant-build-string">${s.build_string}</span>` : '';
+    const skippedBadge = s.skipped ? '<span class="variant-badge variant-badge-skip">skipped</span>' : '';
+    const noarchBadge = s.noarch ? html`<span class="variant-badge variant-badge-noarch">${s.noarch}</span>` : '';
 
-  html += '</div>';
-  outputContainer.innerHTML = html;
+    const contextEntries = s.context ? Object.entries(s.context) : [];
+    const contextTable = contextEntries.length === 0 ? '' :
+      '<table class="context-table"><thead><tr><th colspan="2">context</th></tr></thead><tbody>' +
+      contextEntries.map(([k, v]) => {
+        const display = typeof v === 'string' ? v : JSON.stringify(v);
+        return html`<tr><td class="context-key">${k}</td><td class="context-value">${display}</td></tr>`;
+      }).join('') +
+      '</tbody></table>';
+
+    const variantKeys = s.variant.length === 0 ? '' :
+      '<div class="variant-keys">' +
+      s.variant.map(([k, v]) =>
+        html`<span class="variant-key-pill"><span class="variant-key-name">${k}</span><span class="variant-key-value">${v}</span></span>`
+      ).join('') +
+      '</div>';
+
+    const hasDeps = s.build_deps.length > 0 || s.host_deps.length > 0 || s.run_deps.length > 0;
+    const depsSection = !hasDeps ? '' :
+      '<div class="variant-deps">' +
+      renderDepSection('build', s.build_deps) +
+      renderDepSection('host', s.host_deps) +
+      renderDepSection('run', s.run_deps) +
+      '</div>';
+
+    return html`<div class="variant-card${safe(skippedClass)}">
+      <div class="variant-card-header">
+        <span class="variant-pkg-name">${s.name}</span>
+        <span class="variant-pkg-version">${s.version}</span>
+        ${safe(buildStr)}${safe(skippedBadge)}${safe(noarchBadge)}
+      </div>
+      ${safe(contextTable)}${safe(variantKeys)}${safe(depsSection)}
+    </div>`;
+  }
+
+  const cards = summary.map(renderCard).join('');
+  const count = summary.length;
+  const plural = count !== 1 ? 's' : '';
+
+  outputContainer.innerHTML = html`<div class="variants-view">
+    <div class="variants-grid">${safe(cards)}</div>
+    <details class="variants-yaml-details">
+      <summary>Full YAML output (${safe(String(count))} variant${safe(plural)})</summary>
+      <pre class="output-yaml">${safe(data.variants_html)}</pre>
+    </details>
+  </div>`;
 }
 
 function renderError(error) {
-  let html = `<div class="output-error">${escapeHtml(error.message)}`;
-  if (error.line != null) {
-    html += `<div class="error-location">at line ${error.line}, column ${error.column || 0}</div>`;
-  }
-  html += '</div>';
-  outputContainer.innerHTML = html;
+  const location = error.line != null
+    ? html`<div class="error-location">at line ${safe(String(error.line))}, column ${safe(String(error.column || 0))}</div>`
+    : '';
+  outputContainer.innerHTML = html`<div class="output-error">${error.message}${safe(location)}</div>`;
 }
 
 function escapeHtml(str) {
@@ -322,6 +307,25 @@ function escapeHtml(str) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+// Marker for pre-escaped / trusted HTML that should not be double-escaped.
+class SafeHTML {
+  constructor(value) { this.value = value; }
+}
+
+// Wrap a string so `html` passes it through without escaping.
+function safe(value) { return new SafeHTML(value); }
+
+// Tagged template literal that auto-escapes interpolated values.
+// Use safe() to inject trusted HTML without escaping.
+function html(strings, ...values) {
+  return strings.reduce((result, str, i) => {
+    if (i >= values.length) return result + str;
+    const val = values[i];
+    const escaped = val instanceof SafeHTML ? val.value : escapeHtml(String(val));
+    return result + str + escaped;
+  }, '');
 }
 
 // Draggable horizontal divider
@@ -413,7 +417,7 @@ async function main() {
     // Initial render
     update();
   } catch (e) {
-    outputContainer.innerHTML = `<div class="output-error">Failed to load WASM module: ${escapeHtml(e.toString())}</div>`;
+    outputContainer.innerHTML = html`<div class="output-error">Failed to load WASM module: ${e.toString()}</div>`;
   }
 }
 
