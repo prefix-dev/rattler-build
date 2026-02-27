@@ -1,3 +1,35 @@
+## [0.58.2] - 2026-02-27
+
+### ✨ Highlights
+
+- New WASM playground at [playground.rattler.build](https://playground.rattler.build)
+- New `migrate-recipe` command for cache-to-staging migration
+
+### 🚀 Features
+
+- Add `migrate-recipe` command for cache-to-staging migration by @Hofer-Julian in [#2223](https://github.com/prefix-dev/rattler-build/pull/2223)
+- WASM playground by @wolfv in [#2218](https://github.com/prefix-dev/rattler-build/pull/2218)
+
+### 🐛 Bug Fixes
+
+- Fix platform conditionals for emscripten and improve zip_keys validation by @wolfv in [#2224](https://github.com/prefix-dev/rattler-build/pull/2224)
+- Abi3 has to ignore run exports from Python by @wolfv in [#2229](https://github.com/prefix-dev/rattler-build/pull/2229)
+
+### 📚 Documentation
+
+- Add missing docs for staging output by @Hofer-Julian in [#2225](https://github.com/prefix-dev/rattler-build/pull/2225)
+- Add comprehensive multi-output recipe documentation by @mohitdebian in [#2200](https://github.com/prefix-dev/rattler-build/pull/2200)
+- Extract recipe YAML blocks into standalone snippet files by @Hofer-Julian in [#2226](https://github.com/prefix-dev/rattler-build/pull/2226)
+- Update playground URL to playground.rattler.build by @Hofer-Julian in [#2228](https://github.com/prefix-dev/rattler-build/pull/2228)
+
+### 👋 New Contributors
+
+- @mohitdebian made their first contribution in [#2200](https://github.com/prefix-dev/rattler-build/pull/2200)
+
+[Full commit history](https://github.com/prefix-dev/rattler-build/compare/v0.58.1..v0.58.2)
+
+---
+
 ## [unreleased]
 
 ### 🚀 Features
