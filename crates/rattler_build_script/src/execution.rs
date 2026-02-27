@@ -162,15 +162,6 @@ impl Script {
     where
         F: Fn(&str) -> Result<String, String>,
     {
-        // Determine the valid script extensions based on the available interpreters.
-        let mut valid_script_extensions = Vec::new();
-        if cfg!(windows) {
-            valid_script_extensions.push("bat");
-            valid_script_extensions.push("ps1");
-        } else {
-            valid_script_extensions.push("sh");
-        }
-
         let env_vars = env_vars
             .into_iter()
             .filter_map(|(k, v)| v.map(|v| (k, v)))
@@ -178,7 +169,7 @@ impl Script {
             .collect::<IndexMap<String, String>>();
 
         let contents =
-            self.resolve_content(recipe_dir, jinja_renderer, &valid_script_extensions)?;
+            self.resolve_content(recipe_dir, jinja_renderer, crate::platform_script_extensions())?;
 
         let secrets = self
             .secrets()
@@ -781,5 +772,45 @@ mod tests {
 
         let resolved_missing = ResolvedScriptContents::Missing;
         assert_eq!(resolved_missing.infer_interpreter(), None);
+    }
+
+    /// Regression test for <https://github.com/prefix-dev/rattler-build/issues/2199>
+    ///
+    /// Extension order in `resolve_content` determines which file is picked
+    /// when both `.sh` and `.bat` exist. `platform_script_extensions()` must
+    /// select the platform-appropriate one.
+    #[test]
+    fn test_script_extension_resolution_respects_order() {
+        use crate::script::{Script, ScriptContent};
+
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("test-script.sh"), "#!/bin/bash\necho hello").unwrap();
+        std::fs::write(dir.path().join("test-script.bat"), "@echo off\necho hello").unwrap();
+
+        let resolve = |content: ScriptContent, exts: &[&str]| -> PathBuf {
+            let script = Script { content, ..Script::default() };
+            match script
+                .resolve_content(dir.path(), None::<fn(&str) -> Result<String, String>>, exts)
+                .unwrap()
+            {
+                ResolvedScriptContents::Path(path, _) => path,
+                other => panic!("Expected Path variant, got {:?}", other),
+            }
+        };
+
+        // Extension list order controls which file wins
+        let path_content = || ScriptContent::Path(PathBuf::from("test-script"));
+        assert_eq!(resolve(path_content(), &["sh", "bat"]).extension().unwrap(), "sh");
+        assert_eq!(resolve(path_content(), &["bat", "sh"]).extension().unwrap(), "bat");
+
+        // CommandOrPath variant behaves the same
+        let cop_content = || ScriptContent::CommandOrPath("test-script".into());
+        assert_eq!(resolve(cop_content(), &["sh"]).extension().unwrap(), "sh");
+        assert_eq!(resolve(cop_content(), &["bat"]).extension().unwrap(), "bat");
+
+        // platform_script_extensions() picks the right one for the current platform
+        let ext = resolve(path_content(), crate::platform_script_extensions())
+            .extension().unwrap().to_owned();
+        assert_eq!(ext, if cfg!(windows) { "bat" } else { "sh" });
     }
 }
