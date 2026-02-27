@@ -349,7 +349,7 @@ html, body {
 
 .variant-card {
   background: var(--bg-panel);
-  border: 1px solid var(--border);
+  border: 1px solid var(--divider);
   border-radius: 8px;
   padding: 10px 14px;
   transition: border-color 0.15s;
