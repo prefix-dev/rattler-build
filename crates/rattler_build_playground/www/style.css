@@ -102,7 +102,7 @@ html, body {
   font-family: var(--font-sans);
   border-radius: 4px;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: color 0.15s, background-color 0.15s;
 }
 
 .tab-btn:hover {
@@ -130,16 +130,16 @@ html, body {
   min-width: 0;
 }
 
-.panel-left {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-
+.panel-left,
 .panel-right {
   flex: 1;
+}
+
+.recipe-pane {
+  flex: 1;
   display: flex;
   flex-direction: column;
+  min-height: 0;
 }
 
 .panel-header {
@@ -177,7 +177,7 @@ html, body {
   cursor: pointer;
   text-transform: none;
   letter-spacing: normal;
-  transition: all 0.15s;
+  transition: color 0.15s, border-color 0.15s;
 }
 
 .load-pinning-btn:hover {
@@ -216,7 +216,8 @@ html, body {
   color: var(--text-primary);
 }
 
-.editor-highlight code {
+.editor-highlight code,
+.output-yaml code {
   background: transparent;
   font-family: inherit;
 }
@@ -281,11 +282,6 @@ html, body {
   white-space: pre-wrap;
   word-break: break-word;
   color: var(--text-primary);
-}
-
-.output-yaml code {
-  background: transparent;
-  font-family: inherit;
 }
 
 .output-error {
