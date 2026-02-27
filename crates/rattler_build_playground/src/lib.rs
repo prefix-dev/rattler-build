@@ -236,6 +236,7 @@ pub fn render_variants(
     yaml_source: &str,
     variant_config_yaml: &str,
     target_platform: &str,
+    variant_format: &str,
 ) -> String {
     // Parse the recipe to Stage 0
     let stage0_recipe = match stage0::parse_recipe_or_multi_from_source(yaml_source) {
@@ -246,8 +247,6 @@ pub fn render_variants(
     // Parse platform
     let platform = Platform::from_str(target_platform).unwrap_or(Platform::Linux64);
 
-    // Parse variant config — try conda_build_config format first (handles # [selector] syntax),
-    // then fall back to the modern variants.yaml format
     let jinja_config = JinjaConfig {
         target_platform: platform,
         build_platform: platform,
@@ -257,12 +256,16 @@ pub fn render_variants(
         ..Default::default()
     };
 
-    let variant_config = match parse_conda_build_config(variant_config_yaml, &jinja_config) {
-        Ok(vc) => vc,
-        Err(_) => match VariantConfig::from_yaml_str(variant_config_yaml) {
+    let variant_config = if variant_format == "conda_build_config" {
+        match parse_conda_build_config(variant_config_yaml, &jinja_config) {
+            Ok(vc) => vc,
+            Err(e) => return error_json(&format!("Invalid conda_build_config: {e}"), None, None),
+        }
+    } else {
+        match VariantConfig::from_yaml_str(variant_config_yaml) {
             Ok(vc) => vc,
             Err(e) => return error_json(&format!("Invalid variant config: {e}"), None, None),
-        },
+        }
     };
 
     let render_config = RenderConfig::new()

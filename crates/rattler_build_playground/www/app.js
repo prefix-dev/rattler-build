@@ -83,6 +83,7 @@ const CONDA_FORGE_PINNING_URL = 'https://raw.githubusercontent.com/conda-forge/c
 
 let wasmReady = false;
 let currentMode = 'variants';
+let variantFormat = 'variants';
 let debounceTimer = null;
 let pinningCache = null;
 
@@ -219,7 +220,7 @@ function update() {
       const varsJson = first_variant_values(variantYaml);
       resultJson = evaluate_recipe(yaml, varsJson, platform);
     } else if (currentMode === 'variants') {
-      resultJson = render_variants(yaml, variantYaml, platform);
+      resultJson = render_variants(yaml, variantYaml, platform, variantFormat);
     } else {
       throw new Error(`Unknown output mode: ${currentMode}`);
     }
@@ -288,6 +289,26 @@ if (savedMode) {
   });
 }
 
+// Variant format toggle
+document.querySelectorAll('.variant-format-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.variant-format-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    variantFormat = btn.dataset.format;
+    localStorage.setItem('playground-variant-format', variantFormat);
+    update();
+  });
+});
+
+// Restore variant format
+const savedFormat = localStorage.getItem('playground-variant-format');
+if (savedFormat) {
+  variantFormat = savedFormat;
+  document.querySelectorAll('.variant-format-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.format === variantFormat);
+  });
+}
+
 // Debounced update on input
 recipeEditor.addEventListener('input', () => {
   localStorage.setItem('playground-recipe', recipeEditor.value);
@@ -320,6 +341,12 @@ loadPinningBtn.addEventListener('click', async () => {
     }
     variantsEditor.value = pinningCache;
     localStorage.setItem('playground-variants', pinningCache);
+    // conda-forge pinning uses conda_build_config format
+    variantFormat = 'conda_build_config';
+    localStorage.setItem('playground-variant-format', variantFormat);
+    document.querySelectorAll('.variant-format-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.format === variantFormat);
+    });
     if (wasmReady) highlightEditor(variantsEditor, variantsHighlight);
     autoResize(variantsEditor);
     scheduleUpdate();

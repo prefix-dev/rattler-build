@@ -165,8 +165,40 @@ html, body {
   font-size: 11px;
 }
 
-.load-pinning-btn {
+.variant-format-toggle {
+  display: flex;
+  gap: 1px;
   margin-left: auto;
+  background: var(--bg-editor);
+  border-radius: 3px;
+  padding: 1px;
+}
+
+.variant-format-btn {
+  background: transparent;
+  color: var(--text-muted);
+  border: none;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  border-radius: 2px;
+  cursor: pointer;
+  text-transform: none;
+  letter-spacing: normal;
+  transition: color 0.15s, background-color 0.15s;
+}
+
+.variant-format-btn:hover {
+  color: var(--text-secondary);
+}
+
+.variant-format-btn.active {
+  background: var(--accent);
+  color: var(--bg-primary);
+}
+
+.load-pinning-btn {
+  margin-left: 4px;
   background: var(--bg-editor);
   color: var(--text-muted);
   border: 1px solid var(--border);
