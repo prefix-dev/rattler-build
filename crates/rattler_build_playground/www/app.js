@@ -1,5 +1,37 @@
 import wasmInit, { parse_recipe, evaluate_recipe, get_used_variables, get_platforms, render_variants, get_theme_css, highlight_source_yaml, first_variant_values } from './rattler_build_playground.js';
 
+// ===== HTML utilities =====
+
+function escapeHtml(str) {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// Marker for pre-escaped / trusted HTML that should not be double-escaped.
+class SafeHTML {
+  constructor(value) { this.value = value; }
+}
+
+// Wrap a string so `html` passes it through without escaping.
+function safe(value) { return new SafeHTML(value); }
+
+// Tagged template literal that auto-escapes interpolated values.
+// Use safe() to inject trusted HTML without escaping.
+function html(strings, ...values) {
+  return strings.reduce((result, str, i) => {
+    if (i >= values.length) return result + str;
+    const val = values[i];
+    const escaped = val instanceof SafeHTML ? val.value : escapeHtml(String(val));
+    return result + str + escaped;
+  }, '');
+}
+
+// ===== Constants =====
+
 const DEFAULT_RECIPE = `context:
   name: flask
   version: "3.0.0"
@@ -46,12 +78,17 @@ about:
 
 const DEFAULT_VARIANTS = ``;
 
-// State
-let wasm = null;
+const CONDA_FORGE_PINNING_URL = 'https://raw.githubusercontent.com/conda-forge/conda-forge-pinning-feedstock/main/recipe/conda_build_config.yaml';
+
+// ===== State =====
+
+let wasmReady = false;
 let currentMode = 'variants';
 let debounceTimer = null;
+let pinningCache = null;
 
-// DOM elements
+// ===== DOM elements =====
+
 const recipeEditor = document.getElementById('recipe-editor');
 const variantsEditor = document.getElementById('variants-editor');
 const recipeHighlight = document.getElementById('recipe-highlight');
@@ -60,9 +97,12 @@ const outputContainer = document.getElementById('output-container');
 const outputBadge = document.getElementById('output-badge');
 const platformSelect = document.getElementById('platform-select');
 const usedVarsEl = document.getElementById('used-vars');
+const loadPinningBtn = document.getElementById('load-pinning-btn');
 
-// Editor syntax highlighting
+// ===== Editor helpers =====
+
 function highlightEditor(textarea, pre) {
+  // highlight_source_yaml returns pre-escaped HTML from the WASM module
   pre.innerHTML = highlight_source_yaml(textarea.value);
 }
 
@@ -71,91 +111,87 @@ function syncScroll(textarea, pre) {
   pre.scrollLeft = textarea.scrollLeft;
 }
 
-// Load saved state or defaults
-recipeEditor.value = localStorage.getItem('playground-recipe') || DEFAULT_RECIPE;
-variantsEditor.value = localStorage.getItem('playground-variants') || DEFAULT_VARIANTS;
+// ===== Rendering =====
 
-// Tab switching
-document.querySelectorAll('.tab-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    currentMode = btn.dataset.mode;
-    localStorage.setItem('playground-mode', currentMode);
-    update();
-  });
-});
-
-// Restore active mode
-const savedMode = localStorage.getItem('playground-mode');
-if (savedMode) {
-  currentMode = savedMode;
-  document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.mode === currentMode);
-  });
+function renderOutput(highlightedHtml) {
+  outputContainer.innerHTML = html`<pre class="output-yaml">${safe(highlightedHtml)}</pre>`;
 }
 
-// Debounced update on input
-recipeEditor.addEventListener('input', () => {
-  localStorage.setItem('playground-recipe', recipeEditor.value);
-  if (wasm) highlightEditor(recipeEditor, recipeHighlight);
-  scheduleUpdate();
-});
+function renderDepSection(label, deps) {
+  if (deps.length === 0) return '';
+  const pills = deps.map(d => html`<span class="variant-dep">${d}</span>`).join(' ');
+  return html`<div class="variant-dep-section"><span class="variant-dep-label">${label}:</span> ${safe(pills)}</div>`;
+}
 
-variantsEditor.addEventListener('input', () => {
-  localStorage.setItem('playground-variants', variantsEditor.value);
-  if (wasm) highlightEditor(variantsEditor, variantsHighlight);
-  scheduleUpdate();
-});
+function renderCard(s) {
+  const skippedClass = s.skipped ? ' variant-card-skipped' : '';
+  const buildStr = s.build_string ? html`<span class="variant-build-string">${s.build_string}</span>` : '';
+  const skippedBadge = s.skipped ? html`<span class="variant-badge variant-badge-skip">skipped</span>` : '';
+  const noarchBadge = s.noarch ? html`<span class="variant-badge variant-badge-noarch">${s.noarch}</span>` : '';
 
-// Sync scroll between textarea and highlight overlay
-recipeEditor.addEventListener('scroll', () => syncScroll(recipeEditor, recipeHighlight));
-variantsEditor.addEventListener('scroll', () => syncScroll(variantsEditor, variantsHighlight));
+  const contextEntries = s.context ? Object.entries(s.context) : [];
+  const contextTable = contextEntries.length === 0 ? '' :
+    html`<table class="context-table"><thead><tr><th colspan="2">context</th></tr></thead><tbody>${safe(
+      contextEntries.map(([k, v]) => {
+        const display = typeof v === 'string' ? v : JSON.stringify(v);
+        return html`<tr><td class="context-key">${k}</td><td class="context-value">${display}</td></tr>`;
+      }).join('')
+    )}</tbody></table>`;
 
-platformSelect.addEventListener('change', () => {
-  localStorage.setItem('playground-platform', platformSelect.value);
-  update();
-});
+  const variantKeys = s.variant.length === 0 ? '' :
+    html`<div class="variant-keys">${safe(
+      s.variant.map(([k, v]) =>
+        html`<span class="variant-key-pill"><span class="variant-key-name">${k}</span><span class="variant-key-value">${v}</span></span>`
+      ).join('')
+    )}</div>`;
 
-// Load conda-forge pinning
-const CONDA_FORGE_PINNING_URL = 'https://raw.githubusercontent.com/conda-forge/conda-forge-pinning-feedstock/main/recipe/conda_build_config.yaml';
-const loadPinningBtn = document.getElementById('load-pinning-btn');
-let pinningCache = null;
+  const hasDeps = s.build_deps.length > 0 || s.host_deps.length > 0 || s.run_deps.length > 0;
+  const depsSection = !hasDeps ? '' :
+    html`<div class="variant-deps">${safe(
+      renderDepSection('build', s.build_deps) +
+      renderDepSection('host', s.host_deps) +
+      renderDepSection('run', s.run_deps)
+    )}</div>`;
 
-loadPinningBtn.addEventListener('click', async () => {
-  loadPinningBtn.disabled = true;
-  loadPinningBtn.textContent = 'loading...';
-  try {
-    if (!pinningCache) {
-      const resp = await fetch(CONDA_FORGE_PINNING_URL);
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      pinningCache = await resp.text();
-    }
-    variantsEditor.value = pinningCache;
-    localStorage.setItem('playground-variants', pinningCache);
-    if (wasm) highlightEditor(variantsEditor, variantsHighlight);
-    scheduleUpdate();
-  } catch (e) {
-    alert(`Failed to load pinning: ${e.message}`);
-  } finally {
-    loadPinningBtn.disabled = false;
-    loadPinningBtn.textContent = 'conda-forge';
+  return html`<div class="variant-card${safe(skippedClass)}">
+    <div class="variant-card-header">
+      <span class="variant-pkg-name">${s.name}</span>
+      <span class="variant-pkg-version">${s.version}</span>
+      ${safe(buildStr)}${safe(skippedBadge)}${safe(noarchBadge)}
+    </div>
+    ${safe(contextTable)}${safe(variantKeys)}${safe(depsSection)}
+  </div>`;
+}
+
+function renderVariantsOutput(data) {
+  const summary = data.summary;
+
+  if (!summary || summary.length === 0) {
+    outputContainer.innerHTML = html`<div class="output-placeholder">No outputs produced (recipe may be skipped for this platform)</div>`;
+    return;
   }
-});
 
-// Handle tab key in editors
-[recipeEditor, variantsEditor].forEach(editor => {
-  editor.addEventListener('keydown', (e) => {
-    if (e.key === 'Tab') {
-      e.preventDefault();
-      const start = editor.selectionStart;
-      const end = editor.selectionEnd;
-      editor.value = editor.value.substring(0, start) + '  ' + editor.value.substring(end);
-      editor.selectionStart = editor.selectionEnd = start + 2;
-      editor.dispatchEvent(new Event('input'));
-    }
-  });
-});
+  const cards = summary.map(renderCard).join('');
+  const count = summary.length;
+  const plural = count !== 1 ? 's' : '';
+
+  outputContainer.innerHTML = html`<div class="variants-view">
+    <div class="variants-grid">${safe(cards)}</div>
+    <details class="variants-yaml-details">
+      <summary>Full YAML output (${count} variant${plural})</summary>
+      <pre class="output-yaml">${safe(data.variants_html)}</pre>
+    </details>
+  </div>`;
+}
+
+function renderError(error) {
+  const location = error.line != null
+    ? html`<div class="error-location">at line ${error.line}, column ${error.column || 0}</div>`
+    : '';
+  outputContainer.innerHTML = html`<div class="output-error">${error.message}${safe(location)}</div>`;
+}
+
+// ===== Core update loop =====
 
 function scheduleUpdate() {
   clearTimeout(debounceTimer);
@@ -163,7 +199,7 @@ function scheduleUpdate() {
 }
 
 function update() {
-  if (!wasm) return;
+  if (!wasmReady) return;
 
   const yaml = recipeEditor.value;
   const variantYaml = variantsEditor.value || '{}';
@@ -175,13 +211,14 @@ function update() {
     if (currentMode === 'stage0') {
       resultJson = parse_recipe(yaml);
     } else if (currentMode === 'stage1') {
-      // For stage1, extract the first value of each variant key
       const varsJson = first_variant_values(variantYaml);
       resultJson = evaluate_recipe(yaml, varsJson, platform);
     } else if (currentMode === 'vars') {
       resultJson = get_used_variables(yaml);
     } else if (currentMode === 'variants') {
       resultJson = render_variants(yaml, variantYaml, platform);
+    } else {
+      throw new Error(`Unknown output mode: ${currentMode}`);
     }
 
     const elapsed = (performance.now() - start).toFixed(1);
@@ -211,9 +248,9 @@ function update() {
     const usedJson = get_used_variables(yaml);
     const usedResult = JSON.parse(usedJson);
     if (usedResult.ok && usedResult.result.length > 0) {
-      usedVarsEl.innerHTML = 'Used: ' + usedResult.result
-        .map(v => html`<span>${v}</span>`)
-        .join(', ');
+      usedVarsEl.innerHTML = html`Used: ${safe(
+        usedResult.result.map(v => html`<span>${v}</span>`).join(', ')
+      )}`;
     } else {
       usedVarsEl.textContent = '';
     }
@@ -222,118 +259,100 @@ function update() {
   }
 }
 
+// ===== Event listeners =====
 
-function renderOutput(html) {
-  outputContainer.innerHTML = `<pre class="output-yaml">${html}</pre>`;
+// Load saved state or defaults
+recipeEditor.value = localStorage.getItem('playground-recipe') || DEFAULT_RECIPE;
+variantsEditor.value = localStorage.getItem('playground-variants') || DEFAULT_VARIANTS;
+
+// Tab switching
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentMode = btn.dataset.mode;
+    localStorage.setItem('playground-mode', currentMode);
+    update();
+  });
+});
+
+// Restore active mode
+const savedMode = localStorage.getItem('playground-mode');
+if (savedMode) {
+  currentMode = savedMode;
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.mode === currentMode);
+  });
 }
 
-function renderVariantsOutput(data) {
-  const summary = data.summary;
+// Debounced update on input
+recipeEditor.addEventListener('input', () => {
+  localStorage.setItem('playground-recipe', recipeEditor.value);
+  if (wasmReady) highlightEditor(recipeEditor, recipeHighlight);
+  scheduleUpdate();
+});
 
-  if (!summary || summary.length === 0) {
-    outputContainer.innerHTML = '<div class="output-placeholder">No outputs produced (recipe may be skipped for this platform)</div>';
-    return;
+variantsEditor.addEventListener('input', () => {
+  localStorage.setItem('playground-variants', variantsEditor.value);
+  if (wasmReady) highlightEditor(variantsEditor, variantsHighlight);
+  scheduleUpdate();
+});
+
+// Sync scroll between textarea and highlight overlay
+recipeEditor.addEventListener('scroll', () => syncScroll(recipeEditor, recipeHighlight));
+variantsEditor.addEventListener('scroll', () => syncScroll(variantsEditor, variantsHighlight));
+
+platformSelect.addEventListener('change', () => {
+  localStorage.setItem('playground-platform', platformSelect.value);
+  update();
+});
+
+// Load conda-forge pinning
+loadPinningBtn.addEventListener('click', async () => {
+  loadPinningBtn.disabled = true;
+  loadPinningBtn.textContent = 'loading...';
+  try {
+    if (!pinningCache) {
+      const resp = await fetch(CONDA_FORGE_PINNING_URL);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      pinningCache = await resp.text();
+    }
+    variantsEditor.value = pinningCache;
+    localStorage.setItem('playground-variants', pinningCache);
+    if (wasmReady) highlightEditor(variantsEditor, variantsHighlight);
+    scheduleUpdate();
+  } catch (e) {
+    alert(`Failed to load pinning: ${e.message}`);
+  } finally {
+    loadPinningBtn.disabled = false;
+    loadPinningBtn.textContent = 'conda-forge';
   }
+});
 
-  function renderDepSection(label, deps) {
-    if (deps.length === 0) return '';
-    const pills = deps.map(d => html`<span class="variant-dep">${d}</span>`).join(' ');
-    return html`<div class="variant-dep-section"><span class="variant-dep-label">${label}:</span> ${safe(pills)}</div>`;
-  }
+// Handle tab key in editors
+[recipeEditor, variantsEditor].forEach(editor => {
+  editor.addEventListener('keydown', (e) => {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const start = editor.selectionStart;
+      const end = editor.selectionEnd;
+      editor.value = editor.value.substring(0, start) + '  ' + editor.value.substring(end);
+      editor.selectionStart = editor.selectionEnd = start + 2;
+      editor.dispatchEvent(new Event('input'));
+    }
+  });
+});
 
-  function renderCard(s) {
-    const skippedClass = s.skipped ? ' variant-card-skipped' : '';
-    const buildStr = s.build_string ? html`<span class="variant-build-string">${s.build_string}</span>` : '';
-    const skippedBadge = s.skipped ? '<span class="variant-badge variant-badge-skip">skipped</span>' : '';
-    const noarchBadge = s.noarch ? html`<span class="variant-badge variant-badge-noarch">${s.noarch}</span>` : '';
+// ===== Draggable dividers =====
 
-    const contextEntries = s.context ? Object.entries(s.context) : [];
-    const contextTable = contextEntries.length === 0 ? '' :
-      '<table class="context-table"><thead><tr><th colspan="2">context</th></tr></thead><tbody>' +
-      contextEntries.map(([k, v]) => {
-        const display = typeof v === 'string' ? v : JSON.stringify(v);
-        return html`<tr><td class="context-key">${k}</td><td class="context-value">${display}</td></tr>`;
-      }).join('') +
-      '</tbody></table>';
+const MOBILE_BREAKPOINT = 768;
 
-    const variantKeys = s.variant.length === 0 ? '' :
-      '<div class="variant-keys">' +
-      s.variant.map(([k, v]) =>
-        html`<span class="variant-key-pill"><span class="variant-key-name">${k}</span><span class="variant-key-value">${v}</span></span>`
-      ).join('') +
-      '</div>';
-
-    const hasDeps = s.build_deps.length > 0 || s.host_deps.length > 0 || s.run_deps.length > 0;
-    const depsSection = !hasDeps ? '' :
-      '<div class="variant-deps">' +
-      renderDepSection('build', s.build_deps) +
-      renderDepSection('host', s.host_deps) +
-      renderDepSection('run', s.run_deps) +
-      '</div>';
-
-    return html`<div class="variant-card${safe(skippedClass)}">
-      <div class="variant-card-header">
-        <span class="variant-pkg-name">${s.name}</span>
-        <span class="variant-pkg-version">${s.version}</span>
-        ${safe(buildStr)}${safe(skippedBadge)}${safe(noarchBadge)}
-      </div>
-      ${safe(contextTable)}${safe(variantKeys)}${safe(depsSection)}
-    </div>`;
-  }
-
-  const cards = summary.map(renderCard).join('');
-  const count = summary.length;
-  const plural = count !== 1 ? 's' : '';
-
-  outputContainer.innerHTML = html`<div class="variants-view">
-    <div class="variants-grid">${safe(cards)}</div>
-    <details class="variants-yaml-details">
-      <summary>Full YAML output (${safe(String(count))} variant${safe(plural)})</summary>
-      <pre class="output-yaml">${safe(data.variants_html)}</pre>
-    </details>
-  </div>`;
-}
-
-function renderError(error) {
-  const location = error.line != null
-    ? html`<div class="error-location">at line ${safe(String(error.line))}, column ${safe(String(error.column || 0))}</div>`
-    : '';
-  outputContainer.innerHTML = html`<div class="output-error">${error.message}${safe(location)}</div>`;
-}
-
-function escapeHtml(str) {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
-// Marker for pre-escaped / trusted HTML that should not be double-escaped.
-class SafeHTML {
-  constructor(value) { this.value = value; }
-}
-
-// Wrap a string so `html` passes it through without escaping.
-function safe(value) { return new SafeHTML(value); }
-
-// Tagged template literal that auto-escapes interpolated values.
-// Use safe() to inject trusted HTML without escaping.
-function html(strings, ...values) {
-  return strings.reduce((result, str, i) => {
-    if (i >= values.length) return result + str;
-    const val = values[i];
-    const escaped = val instanceof SafeHTML ? val.value : escapeHtml(String(val));
-    return result + str + escaped;
-  }, '');
-}
-
-// Draggable horizontal divider
 const dividerH = document.getElementById('divider-h');
 const panelLeft = document.getElementById('panel-left');
 const panelRight = document.getElementById('panel-right');
 
 dividerH.addEventListener('mousedown', (e) => {
+  if (window.innerWidth <= MOBILE_BREAKPOINT) return;
   e.preventDefault();
   dividerH.classList.add('active');
   const startX = e.clientX;
@@ -358,7 +377,6 @@ dividerH.addEventListener('mousedown', (e) => {
   document.addEventListener('mouseup', onUp);
 });
 
-// Draggable vertical divider
 const dividerV = document.getElementById('divider-v');
 
 dividerV.addEventListener('mousedown', (e) => {
@@ -389,10 +407,12 @@ dividerV.addEventListener('mousedown', (e) => {
   document.addEventListener('mouseup', onUp);
 });
 
-// Initialize WASM
+// ===== Initialize WASM =====
+
 async function main() {
   try {
-    wasm = await wasmInit();
+    await wasmInit();
+    wasmReady = true;
 
     // Inject arborium syntax-highlighting theme CSS
     const style = document.createElement('style');
