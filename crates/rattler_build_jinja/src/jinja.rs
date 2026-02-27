@@ -221,10 +221,10 @@ impl Jinja {
             // Add platform family selectors (e.g., "linux", "osx", "win", "emscripten", "wasi")
             // derived from platform names by extracting the part before the architecture suffix.
             // This automatically supports new platforms added to rattler_conda_types.
-            if let Some(family) = platform.only_platform() {
-                if seen_families.insert(family.to_string()) {
-                    context.insert(family.to_string(), Value::from(Some(family) == host_family));
-                }
+            if let Some(family) = platform.only_platform()
+                && seen_families.insert(family.to_string())
+            {
+                context.insert(family.to_string(), Value::from(Some(family) == host_family));
             }
         }
 
