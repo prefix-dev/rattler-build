@@ -1040,8 +1040,7 @@ pub(crate) async fn resolve_dependencies(
     };
 
     // And filter the run exports
-    let host_run_exports =
-        filter_run_exports(&ignore_run_exports, &host_run_exports, "host")?;
+    let host_run_exports = filter_run_exports(&ignore_run_exports, &host_run_exports, "host")?;
 
     // add the host run exports to the run dependencies
     if output.target_platform() == &Platform::NoArch {
