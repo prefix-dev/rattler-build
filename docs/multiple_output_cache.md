@@ -81,13 +81,209 @@ inherit:
   run_exports: false  # Disable inheriting run exports
 ```
 
-If the staging output has an "ignore run exports" section, those filters are applied at the staging level. If an inheriting output ignores any run exports, then we also ignore the run-exports if they would come from the staging.
+If the staging output has an `ignore_run_exports` section, those filters are
+applied at the staging level before run exports reach any inheriting package.
+If an inheriting output also ignores run exports, those filters are applied
+additionally.
+
+You can filter run exports at the staging level using `from_package` or
+`by_name`:
+
+```yaml
+outputs:
+  - staging:
+      name: build-stage
+    requirements:
+      host:
+        - some-dep
+      ignore_run_exports:
+        from_package:
+          - some-dep       # ignore run exports originating from some-dep
+        # alternatively:
+        # by_name:
+        #   - some-dep     # ignore run exports matching the name "some-dep"
+
+  - package:
+      name: mypkg
+    inherit: build-stage
+```
 
 ### Source code with staging
 
 The top-level `source` section provides source code that is available to both the staging output and all package outputs. For every output, the (dirty) source is restored from the staging directory. Outputs can layer additional files on top of the staging source.
 
 If you already ran `cmake` in the staging output, you can continue from where the build left off in subsequent outputs. This is useful when you want to e.g. build additional components (such as Python bindings) on top of the already-built library.
+
+### Work directory caching
+
+The staging cache preserves not just prefix files but also the **entire work
+directory** from the staging build. When a package output inherits from staging,
+both the prefix and the work directory are restored. This means that build
+artifacts like compiled object files, CMake build directories, and generated
+configuration files are available to the inheriting package's build script.
+
+For example, if your staging output runs `cmake` and `make`, an inheriting
+package can `cd build && make install` additional targets without recompiling
+from scratch.
+
+### Top-level inheritance
+
+In recipes that have both a top-level `build:` section and staging outputs,
+package outputs can choose where to inherit from. By default, listing
+`inherit: cache-name` inherits from a staging cache. To inherit from the
+top-level build instead, use `inherit: null`:
+
+```yaml
+build:
+  script:
+    - if: unix
+      then: |
+        mkdir -p $PREFIX/share
+        echo "data" > $PREFIX/share/data.txt
+
+outputs:
+  - staging:
+      name: compile-stage
+    build:
+      script:
+        - if: unix
+          then: |
+            mkdir -p $PREFIX/lib
+            echo "compiled.so" > $PREFIX/lib/compiled.so
+
+  # Inherits compiled library from staging
+  - package:
+      name: compiled-pkg
+    inherit: compile-stage
+    build:
+      files:
+        - lib/**
+
+  # Inherits data files from the top-level build
+  - package:
+      name: data-pkg
+    inherit: null
+    build:
+      files:
+        - share/**
+```
+
+### Multiple staging caches
+
+A recipe can define multiple independent staging outputs. Each staging output is
+built and cached separately, and different package outputs can inherit from
+different staging caches:
+
+```yaml
+outputs:
+  # First staging output - builds core C library
+  - staging:
+      name: core-build
+    requirements:
+      build:
+        - ${{ compiler('c') }}
+        - cmake
+      host:
+        - zlib
+    build:
+      script:
+        - cmake -B build && cmake --build build --target install
+
+  # Second staging output - builds Python bindings
+  - staging:
+      name: python-build
+    requirements:
+      build:
+        - python
+        - setuptools
+      host:
+        - python
+    build:
+      script:
+        - python -m pip install . --prefix=$PREFIX
+
+  # Inherits from core-build
+  - package:
+      name: libcore
+    inherit: core-build
+    build:
+      files:
+        - lib/**
+
+  # Inherits from core-build (different file selection)
+  - package:
+      name: core-headers
+    inherit: core-build
+    build:
+      files:
+        - include/**
+
+  # Inherits from python-build
+  - package:
+      name: python-mycore
+    inherit: python-build
+    requirements:
+      run:
+        - python
+```
+
+
+### Variants and staging
+
+Staging caches interact with [variant configuration](variants.md). The cache
+key includes only the variant variables that are referenced in the staging
+output's requirements. This means:
+
+- Different variants produce different staging caches
+- The staging build is only rerun when its relevant variant keys change
+- Inheriting packages can add their own variant dimensions (e.g. a `python`
+  version) on top of the staging cache
+
+For example, if a staging output depends on `libfoo` and `libfoo` has variants
+`[1.0, 2.0]`, the staging build runs once per `libfoo` variant. An inheriting
+package that additionally depends on `python` expands the matrix further (one
+package per `libfoo` × `python` combination), but the staging cache is reused
+across `python` variants.
+
+### How caching works
+
+The staging cache is keyed by a SHA256 hash over:
+
+- The staging output's resolved requirements (build and host dependencies)
+- Relevant variant variables (only those referenced in the staging requirements)
+- `host_platform` and `build_platform` (always included)
+
+Staging caches are stored under `output/build_cache/staging_<hash>/`. Each
+cache directory contains:
+
+```txt
+output/build_cache/staging_<sha256>/
+├─ metadata.json    # Cache metadata (deps, sources, file lists, variant)
+├─ prefix/          # Cached prefix files (only files added by the build script)
+└─ work_dir/        # Cached work directory
+```
+
+On a **cache hit**, the staging build script is skipped entirely — the cached
+prefix and work directory files are restored directly. On a **cache miss**, the
+full build runs and the results are cached for future use.
+
+To force a staging cache rebuild, delete the corresponding directory under
+`output/build_cache/`.
+
+### Symlink handling
+
+Symlinks created during the staging build are preserved in the cache. Both
+relative and absolute symlinks are cached and restored correctly, including
+broken symlinks (symlinks whose target does not exist). On Unix systems,
+symbolic links are used; on Windows, junction points are created where
+applicable.
+
+### File capture
+
+Only files **added** by the build script are cached — files that were already
+present in the host environment from dependencies are excluded. This means the
+staging cache contains exactly the files that the build script installed into
+`$PREFIX`, not the entire environment.
 
 
 ## C++ Example that builds Python bindings on top of a library

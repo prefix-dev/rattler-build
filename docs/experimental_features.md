@@ -9,6 +9,43 @@ Currently only the `build` and `rebuild` commands support the following experime
 To enable them, use the `--experimental` flag with the command.
 Or, use the environment variable, `RATTLER_BUILD_EXPERIMENTAL=true`.
 
+## Staging outputs
+
+Staging outputs allow you to build code once and cache the results, then have
+multiple package outputs inherit those cached files. This is useful for
+splitting a single build into multiple packages (e.g. a runtime library and
+development headers) without rebuilding.
+
+```yaml
+outputs:
+  - staging:
+      name: mylib-build
+    requirements:
+      build:
+        - ${{ compiler('c') }}
+    build:
+      script:
+        - cmake -B build && cmake --build build --target install
+
+  - package:
+      name: mylib
+    inherit: mylib-build
+    build:
+      files:
+        - lib/**
+
+  - package:
+      name: mylib-dev
+    inherit: mylib-build
+    build:
+      files:
+        - include/**
+```
+
+See the [staging outputs guide](multiple_output_cache.md) for full
+documentation, and the [recipe reference](reference/recipe_file.md#staging-outputs)
+for the complete YAML schema.
+
 ## Sigstore source attestation
 
 The `attestation` field on URL sources allows verifying that downloaded source archives were produced by a trusted publisher using [Sigstore](https://sigstore.dev) attestations. This is supported for PyPI packages (where the bundle URL is automatically derived) and GitHub releases (where you specify the `bundle_url` manually).

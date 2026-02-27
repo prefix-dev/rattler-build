@@ -213,7 +213,11 @@ output/
 │       └─ host_env_placehold_.../  # Host environment (runtime dependencies)
 │       └─ build_env/               # Build environment (build-time dependencies)
 └─ src_cache/                       # Downloaded and extracted sources
-└─ build_cache/                     # Staging cache - experimental feature
+└─ build_cache/                     # Staging cache (experimental)
+│   └─ staging_<sha256>/            # Per-staging-output cache
+│       └─ metadata.json            # Cache metadata (deps, sources, variant)
+│       └─ prefix/                  # Cached prefix files from staging build
+│       └─ work_dir/                # Cached work directory from staging build
 └─ <platform>/                      # Built packages
 ```
 
