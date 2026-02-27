@@ -470,14 +470,20 @@ fn default_compiler(platform: Platform, language: &str) -> Option<Variable> {
     Some(
         match language {
             // Platform agnostic compilers
-            "fortran" => "gfortran",
+            "fortran" => {
+                if platform.is_windows() {
+                    "flang"
+                } else {
+                    "gfortran"
+                }
+            }
             lang if !["c", "cxx"].contains(&lang) => lang,
             // Platform specific compilers
             _ => {
                 if platform.is_windows() {
                     match language {
-                        "c" => "vs2017",
-                        "cxx" => "vs2017",
+                        "c" => "vs2022",
+                        "cxx" => "vs2022",
                         _ => unreachable!(),
                     }
                 } else if platform.is_osx() {
@@ -2068,16 +2074,20 @@ mod tests {
 
         let platform = Platform::Win64;
         assert_eq!(
-            "vs2017",
+            "vs2022",
             default_compiler(platform, "cxx").unwrap().to_string()
         );
         assert_eq!(
-            "vs2017",
+            "vs2022",
             default_compiler(platform, "c").unwrap().to_string()
         );
         assert_eq!(
             "cuda",
             default_compiler(platform, "cuda").unwrap().to_string()
+        );
+        assert_eq!(
+            "flang",
+            default_compiler(platform, "fortran").unwrap().to_string()
         );
     }
 }
