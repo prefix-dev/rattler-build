@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "py-rattler-build"
-version = "0.58.1"
+version = "0.58.2"
 requires-python = ">=3.10"
 description = "The fastest way to build conda packages programatically"
 readme = "README.md"
