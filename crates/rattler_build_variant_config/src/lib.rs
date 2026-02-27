@@ -120,7 +120,9 @@ pub mod yaml_parser;
 
 // Re-export main types
 pub use combination::compute_combinations;
+#[cfg(not(target_arch = "wasm32"))]
 pub use conda_build_config::load_conda_build_config;
+pub use conda_build_config::parse_conda_build_config;
 pub use config::VariantConfig;
 pub use error::{VariantConfigError, VariantError, VariantExpandError};
 

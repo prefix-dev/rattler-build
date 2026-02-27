@@ -27,6 +27,7 @@ members = [
   "crates/rattler_build_allocator",
   "crates/rattler_build_package",
 ]
+exclude = ["crates/rattler_build_playground"]
 
 [workspace.package]
 authors = ["rattler-build contributors <hi@prefix.dev>"]
@@ -118,7 +119,7 @@ memmap2 = "0.9.10"
 rayon = "1.11.0"
 serial_test = "3.4.0"
 rattler_build_networking = { path = "crates/rattler_build_networking" }
-rattler_build_script = { path = "crates/rattler_build_script" }
+rattler_build_script = { path = "crates/rattler_build_script", default-features = false }
 rattler_build_variant_config = { path = "crates/rattler_build_variant_config" }
 rattler_build_yaml_parser = { path = "crates/rattler_build_yaml_parser" }
 rattler_git = { path = "crates/rattler_git" }
@@ -316,7 +317,7 @@ rattler_build_recipe = { workspace = true, features = ["variant-config"] }
 rattler_git = { workspace = true }
 rattler_build_networking = { workspace = true, features = ["middleware"] }
 rattler_build_source_cache = { path = "crates/rattler_build_source_cache", default-features = false }
-rattler_build_script = { workspace = true }
+rattler_build_script = { workspace = true, features = ["execution"] }
 rattler_build_allocator = { path = "crates/rattler_build_allocator", optional = true }
 
 [target.'cfg(not(target_os = "windows"))'.dependencies]

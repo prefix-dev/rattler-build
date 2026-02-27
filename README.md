@@ -107,6 +107,10 @@ package as output. The `test` subcommand can be used to test existing packages
 
 There is also a [terminal user interface (TUI)](https://prefix-dev.github.io/rattler-build/latest/tui/) that can help with building multiple packages and easily viewing logs.
 
+### Playground
+
+Want to try `rattler-build` recipes without installing anything? The [online playground](https://wasm-support.rattler-build-playground.pages.dev/) lets you edit recipes, tweak variant configurations, and see evaluated output — all in the browser.
+
 ### The recipe format
 
 > **Note** You can find all examples below in the [`examples`](https://github.com/prefix-dev/rattler-build/tree/main/examples)

@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>rattler-build Recipe Playground</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <div class="toolbar">
+      <h1>rattler-build playground</h1>
+      <div class="toolbar-controls">
+        <label for="platform-select">Platform:</label>
+        <select id="platform-select"></select>
+
+        <div class="tab-group">
+          <button class="tab-btn active" data-mode="variants">Variants</button>
+          <button class="tab-btn" data-mode="stage1">Evaluated</button>
+          <button class="tab-btn" data-mode="stage0">Parsed</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="main">
+      <div class="panel panel-left" id="panel-left">
+        <div class="recipe-pane">
+          <div class="panel-header">
+            Recipe YAML
+          </div>
+          <div class="editor-container">
+            <pre class="editor-highlight" id="recipe-highlight"></pre>
+            <textarea id="recipe-editor" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off"></textarea>
+          </div>
+        </div>
+        <div class="divider-v" id="divider-v"></div>
+        <div class="variables-panel">
+          <div class="panel-header">
+            Variant Config
+            <button class="load-pinning-btn" id="load-pinning-btn" title="Insert conda-forge pinning into the editor">insert conda-forge pinning</button>
+            <div class="variant-format-toggle" id="variant-format-toggle">
+              <button class="variant-format-btn active" data-format="variants">variants.yaml</button>
+              <button class="variant-format-btn" data-format="conda_build_config">conda_build_config</button>
+            </div>
+          </div>
+          <div class="editor-container">
+            <pre class="editor-highlight" id="variants-highlight"></pre>
+            <textarea id="variants-editor" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" placeholder="python:
+  - &quot;3.11&quot;
+  - &quot;3.12&quot;"></textarea>
+          </div>
+          <div class="used-vars" id="used-vars"></div>
+        </div>
+      </div>
+
+      <div class="divider-h" id="divider-h"></div>
+
+      <div class="panel panel-right" id="panel-right">
+        <div class="panel-header">
+          Output
+          <span class="badge" id="output-badge"></span>
+        </div>
+        <div class="output-container" id="output-container">
+          <div class="output-placeholder">Loading WASM module...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

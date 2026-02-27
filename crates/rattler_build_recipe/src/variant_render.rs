@@ -9,7 +9,9 @@
 //! - Stage 1: Add variants from dependencies and compute lazy hashes
 
 use std::collections::{BTreeMap, HashSet};
-use std::path::{Path, PathBuf};
+#[cfg(not(target_arch = "wasm32"))]
+use std::path::Path;
+use std::path::PathBuf;
 
 use indexmap::IndexMap;
 use miette::Diagnostic;
@@ -973,6 +975,7 @@ fn create_jinja_config(
 /// # Ok(())
 /// # }
 /// ```
+#[cfg(not(target_arch = "wasm32"))]
 pub fn render_recipe_with_variants(
     recipe_path: &Path,
     variant_files: &[impl AsRef<Path>],

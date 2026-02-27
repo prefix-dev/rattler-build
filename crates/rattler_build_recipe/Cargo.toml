@@ -8,13 +8,14 @@ repository.workspace = true
 description = "Recipe generation for PyPI, CRAN, CPAN, and LuaRocks packages"
 
 [features]
-default = ["variant-config"]
+default = ["variant-config", "script-execution"]
 variant-config = ["dep:rattler_build_variant_config", "dep:petgraph"]
+script-execution = ["rattler_build_script/execution"]
 
 [dependencies]
 rattler_build_types = { workspace = true }
 rattler_build_jinja = { workspace = true }
-rattler_build_script = { workspace = true }
+rattler_build_script = { workspace = true, default-features = false }
 rattler_build_variant_config = { workspace = true, optional = true }
 rattler_build_yaml_parser = { workspace = true }
 

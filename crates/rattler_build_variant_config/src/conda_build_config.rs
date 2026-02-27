@@ -5,9 +5,23 @@
 
 use minijinja::Value;
 use rattler_build_jinja::{Jinja, JinjaConfig};
+#[cfg(not(target_arch = "wasm32"))]
 use std::path::Path;
 
 use crate::{config::VariantConfig, error::VariantConfigError};
+
+/// Look up an environment variable by name, returning `None` on WASM.
+fn lookup_env_var(name: &str) -> Option<String> {
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        std::env::var(name).ok()
+    }
+    #[cfg(target_arch = "wasm32")]
+    {
+        let _ = name;
+        None
+    }
+}
 
 #[derive(Debug)]
 struct ParsedLine<'a> {
@@ -59,7 +73,7 @@ fn conda_build_config_jinja(jinja_config: &JinjaConfig) -> Jinja {
     jinja.env_mut().add_function(
         "environ_get",
         move |name: String, default: Option<String>| {
-            let value = std::env::var(name).unwrap_or_else(|_| default.unwrap_or_default());
+            let value = lookup_env_var(&name).unwrap_or_else(|| default.unwrap_or_default());
             Ok(Value::from(value))
         },
     );
@@ -67,32 +81,21 @@ fn conda_build_config_jinja(jinja_config: &JinjaConfig) -> Jinja {
     jinja
 }
 
-/// Load a `conda_build_config.yaml` file with selector support
+/// Parse a `conda_build_config.yaml` string with selector support
 ///
-/// The parser supports:
+/// This is the string-based version of [`load_conda_build_config`] that works on
+/// in-memory strings instead of files. It supports the same selector syntax:
 /// - Conditional lines using `# [selector]` syntax
 /// - `os.environ.get(...)` for environment variables
 /// - Platform selectors (unix, linux, osx, win)
-///
-/// # Example
-///
-/// ```yaml
-/// python:
-///   - 3.9
-///   - 3.10  # [unix]
-///   - 3.11  # [osx]
-/// ```
-pub fn load_conda_build_config(
-    path: &Path,
+pub fn parse_conda_build_config(
+    input: &str,
     config: &JinjaConfig,
 ) -> Result<VariantConfig, VariantConfigError> {
-    let mut input = fs_err::read_to_string(path)
-        .map_err(|e| VariantConfigError::IoError(path.to_path_buf(), e))?;
-
     let jinja = conda_build_config_jinja(config);
 
     // Replace Python-style calls with Jinja-compatible ones
-    input = input.replace("os.environ.get", "environ_get");
+    let mut input = input.replace("os.environ.get", "environ_get");
     input = input.replace(".startswith", " is startingwith");
 
     // Process lines with selectors
@@ -125,13 +128,7 @@ pub fn load_conda_build_config(
 
     // Parse as YAML and filter null values
     let value: serde_yaml::Value =
-        serde_yaml::from_str(&out).map_err(|e| VariantConfigError::ParseError {
-            path: path.to_path_buf(),
-            source: rattler_build_yaml_parser::ParseError::generic(
-                e.to_string(),
-                marked_yaml::Span::new_blank(),
-            ),
-        })?;
+        serde_yaml::from_str(&out).map_err(|e| VariantConfigError::InvalidConfig(e.to_string()))?;
 
     if value.is_null() {
         return Ok(VariantConfig::default());
@@ -142,33 +139,52 @@ pub fn load_conda_build_config(
         .as_mapping()
         .ok_or_else(|| {
             VariantConfigError::InvalidConfig(
-                "Expected conda_build_config.yaml to be a mapping".to_string()
+                "Expected conda_build_config.yaml to be a mapping".to_string(),
             )
         })?
         .clone()
         .into_iter()
         .filter(|(k, v)| {
             // Emit warning for pin_run_as_build
-            if let Some(key_str) = k.as_str() && key_str == "pin_run_as_build" {
-                    tracing::warn!("Found 'pin_run_as_build' in conda_build_config.yaml - this is currently not supported and will be ignored");
-                    return false;
+            if let Some(key_str) = k.as_str()
+                && key_str == "pin_run_as_build"
+            {
+                tracing::warn!("Found 'pin_run_as_build' in conda_build_config.yaml - this is currently not supported and will be ignored");
+                return false;
             }
             !v.is_null()
         })
         .collect::<serde_yaml::Mapping>();
 
-    let config: VariantConfig =
-        serde_yaml::from_value(serde_yaml::Value::Mapping(value)).map_err(|e| {
-            VariantConfigError::ParseError {
-                path: path.to_path_buf(),
-                source: rattler_build_yaml_parser::ParseError::generic(
-                    e.to_string(),
-                    marked_yaml::Span::new_blank(),
-                ),
-            }
-        })?;
+    let config: VariantConfig = serde_yaml::from_value(serde_yaml::Value::Mapping(value))
+        .map_err(|e| VariantConfigError::InvalidConfig(e.to_string()))?;
 
     Ok(config)
+}
+
+/// Load a `conda_build_config.yaml` file with selector support
+///
+/// The parser supports:
+/// - Conditional lines using `# [selector]` syntax
+/// - `os.environ.get(...)` for environment variables
+/// - Platform selectors (unix, linux, osx, win)
+///
+/// # Example
+///
+/// ```yaml
+/// python:
+///   - 3.9
+///   - 3.10  # [unix]
+///   - 3.11  # [osx]
+/// ```
+#[cfg(not(target_arch = "wasm32"))]
+pub fn load_conda_build_config(
+    path: &Path,
+    config: &JinjaConfig,
+) -> Result<VariantConfig, VariantConfigError> {
+    let input = fs_err::read_to_string(path)
+        .map_err(|e| VariantConfigError::IoError(path.to_path_buf(), e))?;
+    parse_conda_build_config(&input, config)
 }
 
 #[cfg(test)]

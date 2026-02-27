@@ -1,4 +1,5 @@
 //! Module for types and functions related to minijinja setup for recipes.
+#[cfg(not(target_arch = "wasm32"))]
 use fs_err as fs;
 use indexmap::IndexMap;
 use minijinja::{
@@ -7,6 +8,7 @@ use minijinja::{
     value::{Kwargs, Object},
 };
 use rattler_build_types::{NormalizedKey, Pin, PinArgs};
+#[cfg(not(target_arch = "wasm32"))]
 use std::io::Read;
 use std::sync::{Arc, Mutex};
 use std::{
@@ -648,6 +650,134 @@ lazy_static::lazy_static! {
         .unwrap();
 }
 
+/// Check if the experimental feature is enabled (used by IO function stubs).
+fn check_experimental(experimental: bool) -> Result<(), minijinja::Error> {
+    if !experimental {
+        return Err(minijinja::Error::new(
+            minijinja::ErrorKind::InvalidOperation,
+            "Experimental feature: provide the `--experimental` flag to enable this feature",
+        ));
+    }
+    Ok(())
+}
+
+/// Register platform-specific IO functions (load_from_file, git) into the Jinja environment.
+///
+/// On native targets this registers the real implementations; on WASM it registers
+/// stubs that return clear error messages.
+#[cfg(not(target_arch = "wasm32"))]
+fn register_io_functions(env: &mut Environment, experimental: bool, recipe_path: Option<PathBuf>) {
+    #[derive(Debug, PartialEq, Eq, Clone, Copy)]
+    enum FileFormat {
+        Yaml,
+        Json,
+        Toml,
+        Unknown,
+    }
+
+    fn get_file_format(file_path: &std::path::Path) -> FileFormat {
+        file_path
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .map(|ext| match ext.to_lowercase().as_str() {
+                "yaml" | "yml" => FileFormat::Yaml,
+                "json" => FileFormat::Json,
+                "toml" => FileFormat::Toml,
+                _ => FileFormat::Unknown,
+            })
+            .unwrap_or(FileFormat::Unknown)
+    }
+
+    fn handle_file_error(e: std::io::Error, file_path: &std::path::Path) -> minijinja::Error {
+        minijinja::Error::new(
+            minijinja::ErrorKind::UndefinedError,
+            format!("Failed to open file '{}': {}", file_path.display(), e),
+        )
+    }
+
+    fn handle_read_error(e: std::io::Error, file_path: &std::path::Path) -> minijinja::Error {
+        minijinja::Error::new(
+            minijinja::ErrorKind::UndefinedError,
+            format!("Failed to read file '{}': {}", file_path.display(), e),
+        )
+    }
+
+    fn handle_deserialize_error(e: impl std::fmt::Display) -> minijinja::Error {
+        minijinja::Error::new(minijinja::ErrorKind::CannotDeserialize, e.to_string())
+    }
+
+    fn read_and_parse_file(
+        file_path: &std::path::Path,
+    ) -> Result<minijinja::Value, minijinja::Error> {
+        let file = fs::File::open(file_path).map_err(|e| handle_file_error(e, file_path))?;
+        let mut reader = std::io::BufReader::new(file);
+
+        match get_file_format(file_path) {
+            FileFormat::Yaml => serde_yaml::from_reader(reader).map_err(handle_deserialize_error),
+            FileFormat::Json => serde_json::from_reader(reader).map_err(handle_deserialize_error),
+            FileFormat::Toml => {
+                let mut content = String::new();
+                reader
+                    .read_to_string(&mut content)
+                    .map_err(|e| handle_read_error(e, file_path))?;
+                toml::from_str(&content).map_err(handle_deserialize_error)
+            }
+            FileFormat::Unknown => {
+                let mut content = String::new();
+                reader
+                    .read_to_string(&mut content)
+                    .map_err(|e| handle_read_error(e, file_path))?;
+                Ok(Value::from(content))
+            }
+        }
+    }
+
+    let recipe_dir = recipe_path
+        .as_ref()
+        .and_then(|p| p.parent().map(|p| p.to_path_buf()));
+
+    env.add_function("load_from_file", move |path: String| {
+        check_experimental(experimental)?;
+
+        if let Some(recipe_path) = recipe_path.as_ref()
+            && let Some(parent) = recipe_path.parent()
+        {
+            let relative_path = parent.join(&path);
+            if let Ok(value) = read_and_parse_file(&relative_path) {
+                return Ok(value);
+            }
+        }
+
+        let file_path = std::path::Path::new(&path);
+        read_and_parse_file(file_path)
+    });
+
+    env.add_global(
+        "git",
+        Value::from_object(crate::git::Git {
+            experimental,
+            recipe_dir,
+        }),
+    );
+}
+
+/// WASM stub: registers error-returning stubs for IO functions.
+#[cfg(target_arch = "wasm32")]
+fn register_io_functions(env: &mut Environment, experimental: bool, _recipe_path: Option<PathBuf>) {
+    env.add_function(
+        "load_from_file",
+        move |_path: String| -> Result<Value, minijinja::Error> {
+            check_experimental(experimental)?;
+            Err(minijinja::Error::new(
+                minijinja::ErrorKind::InvalidOperation,
+                "load_from_file is not available in WASM",
+            ))
+        },
+    );
+
+    env.add_global("git", Value::from_object(crate::git::Git { experimental }));
+}
+
 fn set_jinja(
     config: &JinjaConfig,
     accessed_variables: Arc<Mutex<HashSet<String>>>,
@@ -816,117 +946,10 @@ fn set_jinja(
         Ok(parse_platform(platform)?.is_unix())
     });
 
-    #[derive(Debug, PartialEq, Eq, Clone, Copy)]
-    enum FileFormat {
-        Yaml,
-        Json,
-        Toml,
-        Unknown,
-    }
-
-    // Helper function to determine the file format based on the file extension
-    fn get_file_format(file_path: &std::path::Path) -> FileFormat {
-        file_path
-            .extension()
-            .and_then(|ext| ext.to_str())
-            .map(|ext| match ext.to_lowercase().as_str() {
-                "yaml" | "yml" => FileFormat::Yaml,
-                "json" => FileFormat::Json,
-                "toml" => FileFormat::Toml,
-                _ => FileFormat::Unknown,
-            })
-            .unwrap_or(FileFormat::Unknown)
-    }
-
-    // Helper function to handle file errors
-    fn handle_file_error(e: std::io::Error, file_path: &std::path::Path) -> minijinja::Error {
-        minijinja::Error::new(
-            minijinja::ErrorKind::UndefinedError,
-            format!("Failed to open file '{}': {}", file_path.display(), e),
-        )
-    }
-
-    // Helper function to handle file reading errors
-    fn handle_read_error(e: std::io::Error, file_path: &std::path::Path) -> minijinja::Error {
-        minijinja::Error::new(
-            minijinja::ErrorKind::UndefinedError,
-            format!("Failed to read file '{}': {}", file_path.display(), e),
-        )
-    }
-
-    // Helper function to handle deserialization errors
-    fn handle_deserialize_error(e: impl std::fmt::Display) -> minijinja::Error {
-        minijinja::Error::new(minijinja::ErrorKind::CannotDeserialize, e.to_string())
-    }
-
-    // Read and parse the file based on its format
-    fn read_and_parse_file(
-        file_path: &std::path::Path,
-    ) -> Result<minijinja::Value, minijinja::Error> {
-        let file = fs::File::open(file_path).map_err(|e| handle_file_error(e, file_path))?;
-        let mut reader = std::io::BufReader::new(file);
-
-        match get_file_format(file_path) {
-            FileFormat::Yaml => serde_yaml::from_reader(reader).map_err(handle_deserialize_error),
-            FileFormat::Json => serde_json::from_reader(reader).map_err(handle_deserialize_error),
-            FileFormat::Toml => {
-                let mut content = String::new();
-                reader
-                    .read_to_string(&mut content)
-                    .map_err(|e| handle_read_error(e, file_path))?;
-                toml::from_str(&content).map_err(handle_deserialize_error)
-            }
-            FileFormat::Unknown => {
-                let mut content = String::new();
-                reader
-                    .read_to_string(&mut content)
-                    .map_err(|e| handle_read_error(e, file_path))?;
-                Ok(Value::from(content))
-            }
-        }
-    }
-    // Check if the experimental feature is enabled
-    fn check_experimental(experimental: bool) -> Result<(), minijinja::Error> {
-        if !experimental {
-            return Err(minijinja::Error::new(
-                minijinja::ErrorKind::InvalidOperation,
-                "Experimental feature: provide the `--experimental` flag to enable this feature",
-            ));
-        }
-        Ok(())
-    }
-
-    let recipe_dir = recipe_path
-        .as_ref()
-        .and_then(|p| p.parent().map(|p| p.to_path_buf()));
-
-    env.add_function("load_from_file", move |path: String| {
-        check_experimental(experimental)?;
-
-        if let Some(recipe_path) = recipe_path.as_ref()
-            && let Some(parent) = recipe_path.parent()
-        {
-            let relative_path = parent.join(&path);
-            if let Ok(value) = read_and_parse_file(&relative_path) {
-                return Ok(value);
-            }
-        }
-
-        let file_path = std::path::Path::new(&path);
-        read_and_parse_file(file_path)
-    });
+    register_io_functions(&mut env, experimental, recipe_path);
 
     // Add env object
     env.add_global("env", Value::from_object(crate::env::Env));
-
-    // Add git object (experimental)
-    env.add_global(
-        "git",
-        Value::from_object(crate::git::Git {
-            experimental,
-            recipe_dir,
-        }),
-    );
 
     env
 }

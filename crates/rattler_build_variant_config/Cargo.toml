@@ -36,6 +36,8 @@ miette = { workspace = true }
 
 # Utilities
 tracing = { workspace = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 fs-err = { workspace = true }
 regex = { workspace = true }
 

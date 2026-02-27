@@ -5,6 +5,19 @@ use minijinja::{
     value::{Kwargs, Object, from_args},
 };
 
+/// Look up an environment variable by name, returning `None` on WASM.
+fn lookup_env_var(name: &str) -> Option<String> {
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        std::env::var(name).ok()
+    }
+    #[cfg(target_arch = "wasm32")]
+    {
+        let _ = name;
+        None
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct Env;
 impl std::fmt::Display for Env {
@@ -18,20 +31,17 @@ impl Env {
         let default_value = kwargs.get::<String>("default").ok();
         kwargs.assert_all_used()?;
 
-        match std::env::var(env_var) {
-            Ok(r) => Ok(Value::from(r)),
-            Err(_) => match default_value {
-                Some(default_value) => Ok(Value::from(default_value)),
-                None => Err(minijinja::Error::new(
-                    minijinja::ErrorKind::InvalidOperation,
-                    format!("Environment variable {env_var} not found"),
-                )),
-            },
+        match lookup_env_var(env_var).or(default_value) {
+            Some(value) => Ok(Value::from(value)),
+            None => Err(minijinja::Error::new(
+                minijinja::ErrorKind::InvalidOperation,
+                format!("Environment variable {env_var} not found"),
+            )),
         }
     }
 
     fn exists(&self, env_var: &str) -> Result<Value, minijinja::Error> {
-        Ok(Value::from(std::env::var(env_var).is_ok()))
+        Ok(Value::from(lookup_env_var(env_var).is_some()))
     }
 }
 
