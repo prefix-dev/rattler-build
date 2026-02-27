@@ -1103,6 +1103,11 @@ impl Output {
 
     /// Install the environments of the outputs. Assumes that the dependencies
     /// for the environment have already been resolved.
+    ///
+    /// When this output inherits from a staging cache, the cache's host
+    /// dependencies are merged into the host environment so that their
+    /// shared libraries and `conda-meta` records are present during
+    /// post-processing (linking checks, relinking, etc.).
     pub async fn install_environments(
         &self,
         tool_configuration: &Configuration,

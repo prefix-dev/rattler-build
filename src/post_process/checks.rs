@@ -6,7 +6,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::post_process::{package_nature::PackageNature, relink};
+use crate::post_process::{
+    package_nature::{CaseInsensitivePathBuf, PackageNature},
+    relink,
+};
 use crate::{
     metadata::Output,
     post_process::{package_nature::PrefixInfo, relink::RelinkError},
@@ -528,7 +531,15 @@ pub fn perform_linking_checks(
     let dynamic_linking = &output.recipe.build().dynamic_linking;
     let system_libs = find_system_libs(output)?;
 
-    let prefix_info = PrefixInfo::from_prefix(output.prefix())?;
+    let mut prefix_info = PrefixInfo::from_prefix(output.prefix())?;
+
+    // Merge cached prefix info from the staging cache (if any).
+    // The staging cache's host packages may not be physically installed in
+    // the prefix, but we need their path-to-package and nature mappings
+    // for linking checks to attribute shared libraries correctly.
+    if let Some(cached) = &output.cached_prefix_info {
+        prefix_info.merge_cached(cached);
+    }
 
     let host_dso_packages = host_run_export_dso_packages(output, &prefix_info.package_to_nature);
     tracing::trace!("Host run_export DSO packages: {host_dso_packages:#?}",);
@@ -576,18 +587,54 @@ pub fn perform_linking_checks(
                             continue;
                         }
 
-                        let lib = resolved.as_ref().unwrap_or(lib);
-                        if let Ok(libpath) = lib.strip_prefix(host_prefix)
-                            && let Some(package) = prefix_info
-                                .path_to_package
-                                .get(&libpath.to_path_buf().into())
-                            && let Some(nature) = prefix_info.package_to_nature.get(package)
-                        {
-                            // Accept any package that provides shared objects (DSO libraries,
-                            // interpreters like python providing python3XX.dll, plugin libraries, etc.)
-                            if nature.provides_shared_objects() {
-                                file_dsos.push((libpath.to_path_buf(), package.clone()));
+                        let effective_lib = resolved.as_ref().unwrap_or(lib);
+
+                        // Try to attribute the library to a host package.
+                        // First attempt: resolved path stripped of host prefix.
+                        let attributed =
+                            if let Ok(libpath) = effective_lib.strip_prefix(host_prefix) {
+                                let key: CaseInsensitivePathBuf = libpath.to_path_buf().into();
+                                if let Some(package) = prefix_info.path_to_package.get(&key)
+                                    && let Some(nature) = prefix_info.package_to_nature.get(package)
+                                    && nature.provides_shared_objects()
+                                {
+                                    Some((libpath.to_path_buf(), package.clone()))
+                                } else {
+                                    None
+                                }
+                            } else {
+                                None
+                            };
+
+                        // Second attempt: for unresolved @rpath/@loader_path libraries
+                        // (host dep files may not be on disk due to staging cache
+                        // optimization), resolve virtually against path_to_package.
+                        let attributed = attributed.or_else(|| {
+                            if resolved.is_some() {
+                                return None;
                             }
+                            let rel = lib
+                                .strip_prefix("@rpath")
+                                .or_else(|_| lib.strip_prefix("@loader_path"))
+                                .ok()?;
+                            // Try common library directories
+                            for dir in &["lib", "bin", "Library/bin"] {
+                                let candidate: CaseInsensitivePathBuf =
+                                    Path::new(dir).join(rel).into();
+                                if let Some(package) = prefix_info.path_to_package.get(&candidate)
+                                    && let Some(nature) = prefix_info.package_to_nature.get(package)
+                                    && nature.provides_shared_objects()
+                                {
+                                    // Use the unresolved path as key so it matches
+                                    // the entry in shared_libraries downstream
+                                    return Some((lib.to_path_buf(), package.clone()));
+                                }
+                            }
+                            None
+                        });
+
+                        if let Some((libpath, package)) = attributed {
+                            file_dsos.push((libpath, package));
                         }
                     }
 
@@ -669,6 +716,23 @@ pub fn perform_linking_checks(
                 continue;
             }
 
+            // Check if the library is a build artifact from the staging cache
+            // (i.e. it will be packaged by a sibling output).
+            if let Some(cached) = &output.cached_prefix_info {
+                let lib_str = lib.to_string_lossy();
+                if cached
+                    .staging_prefix_files
+                    .iter()
+                    .any(|f| f == lib_str.as_ref() || Path::new(f) == lib)
+                {
+                    link_info.linked_packages.push(LinkedPackage {
+                        name: lib.to_path_buf(),
+                        link_origin: LinkOrigin::PackageItself,
+                    });
+                    continue;
+                }
+            }
+
             // Check if we allow overlinking.
             if dynamic_linking.missing_dso_allowlist.is_match(lib) {
                 tracing::info!(
@@ -712,6 +776,16 @@ pub fn perform_linking_checks(
     // If there are any host packages with DSOs that we didn't link against,
     // it is "overdepending".
     for host_package in host_dso_packages.iter() {
+        // Skip overdepending check for packages inherited from the staging cache.
+        // These are transitive dependencies needed by the staging cache's build
+        // artifacts (sibling outputs) and are expected to not be directly linked
+        // by this output's files.
+        if let Some(cached) = &output.cached_prefix_info {
+            if cached.package_to_nature.contains_key(host_package) {
+                continue;
+            }
+        }
+
         if !package_files
             .iter()
             .map(|package| {

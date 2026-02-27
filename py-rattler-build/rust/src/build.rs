@@ -225,6 +225,7 @@ pub fn build_rendered_variant_py(
         finalized_sources: None,
         finalized_cache_dependencies: None,
         finalized_cache_sources: None,
+        cached_prefix_info: None,
         build_summary: Arc::new(Mutex::new(BuildSummary::default())),
         system_tools: SystemTools::default(),
         extra_meta: None,
