@@ -9,6 +9,8 @@ is a standard "conda" package that can be installed using [`pixi`](https://pixi.
 
 You can use `rattler-build` to publish packages to prefix.dev, anaconda.org, JFrog Artifactory, S3 buckets, or Quetz Servers.
 
+**Try it out!** You can experiment with rattler-build directly in your browser using our [online playground](https://playground.rattler.build/).
+
 ![](https://user-images.githubusercontent.com/885054/244683824-fd1b3896-84c7-498c-b406-40ab2a9e450c.svg)
 
 ## Installation

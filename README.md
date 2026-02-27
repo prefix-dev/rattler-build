@@ -109,7 +109,7 @@ There is also a [terminal user interface (TUI)](https://prefix-dev.github.io/rat
 
 ### Playground
 
-Want to try `rattler-build` recipes without installing anything? The [online playground](https://wasm-support.rattler-build-playground.pages.dev/) lets you edit recipes, tweak variant configurations, and see evaluated output — all in the browser.
+Want to try `rattler-build` recipes without installing anything? The [online playground](https://playground.rattler.build/) lets you edit recipes, tweak variant configurations, and see evaluated output — all in the browser.
 
 ### The recipe format
 
