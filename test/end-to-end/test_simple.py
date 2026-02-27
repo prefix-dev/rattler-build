@@ -1716,6 +1716,20 @@ def test_abi3(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     assert index["subdir"] == host_subdir()
     assert index["platform"] == host_subdir().split("-")[0]
 
+    # CEP-20: abi3 packages should NOT have python_abi in their run
+    # dependencies (python's run exports should be ignored), but SHOULD have
+    # cpython and _python_abi3_support from python-abi3's run exports.
+    dep_names = [d.split(" ")[0] for d in index.get("depends", [])]
+    assert "python_abi" not in dep_names, (
+        "python_abi should not be in abi3 package dependencies"
+    )
+    assert "cpython" in dep_names, (
+        "cpython (from python-abi3 run_exports) should be in abi3 package dependencies"
+    )
+    assert "_python_abi3_support" in dep_names, (
+        "_python_abi3_support (from python-abi3 run_exports) should be in abi3 package dependencies"
+    )
+
 
 @pytest.mark.skipif(
     os.name == "nt" or platform.system() == "Darwin",
