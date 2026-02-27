@@ -33,50 +33,49 @@ function html(strings, ...values) {
 // ===== Constants =====
 
 const DEFAULT_RECIPE = `context:
-  name: flask
-  version: "3.0.0"
+  name: numpy
+  version: "2.2.3"
 
 package:
   name: \${{ name }}
   version: \${{ version }}
 
 source:
-  url: https://pypi.io/packages/source/\${{ name[0] }}/\${{ name }}/flask-\${{ version }}.tar.gz
-  sha256: cfadcdb638b609361d29ec22360d6070a77d7463dcb3ab08d2c2f2f168845f58
+  url: https://pypi.io/packages/source/\${{ name[0] }}/\${{ name }}/numpy-\${{ version }}.tar.gz
+  sha256: dbdc15f0c81611925f382dfa97b3bd0bc2c1ce19d4fe50482cb0ddc12ba30020
 
 build:
   number: 0
   script:
     - python -m pip install . -vv
-  python:
-    entry_points:
-      - flask = flask.cli:main
 
 requirements:
   host:
     - python
-    - flit-core <4
     - pip
+    - cython
+    - numpy-base
   run:
     - python
-    - werkzeug >=3.0.0
-    - jinja2 >=3.1.2
-    - click >=8.1.3
-    - blinker >=1.6.2
+    - numpy-base
 
 tests:
   - python:
       imports:
-        - flask
-        - flask.json
+        - numpy
+        - numpy.linalg
 
 about:
-  homepage: https://palletsprojects.com/p/flask
+  homepage: https://numpy.org/
   license: BSD-3-Clause
-  summary: A simple framework for building complex web applications.
+  summary: The fundamental package for scientific computing with Python.
 `;
 
-const DEFAULT_VARIANTS = ``;
+const DEFAULT_VARIANTS = `python:
+  - "3.11"
+  - "3.12"
+  - "3.13"
+`;
 
 const CONDA_FORGE_PINNING_URL = 'https://raw.githubusercontent.com/conda-forge/conda-forge-pinning-feedstock/main/recipe/conda_build_config.yaml';
 
@@ -219,8 +218,6 @@ function update() {
     } else if (currentMode === 'stage1') {
       const varsJson = first_variant_values(variantYaml);
       resultJson = evaluate_recipe(yaml, varsJson, platform);
-    } else if (currentMode === 'vars') {
-      resultJson = get_used_variables(yaml);
     } else if (currentMode === 'variants') {
       resultJson = render_variants(yaml, variantYaml, platform);
     } else {

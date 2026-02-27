@@ -666,11 +666,7 @@ fn check_experimental(experimental: bool) -> Result<(), minijinja::Error> {
 /// On native targets this registers the real implementations; on WASM it registers
 /// stubs that return clear error messages.
 #[cfg(not(target_arch = "wasm32"))]
-fn register_io_functions(
-    env: &mut Environment,
-    experimental: bool,
-    recipe_path: Option<PathBuf>,
-) {
+fn register_io_functions(env: &mut Environment, experimental: bool, recipe_path: Option<PathBuf>) {
     #[derive(Debug, PartialEq, Eq, Clone, Copy)]
     enum FileFormat {
         Yaml,
@@ -767,11 +763,7 @@ fn register_io_functions(
 
 /// WASM stub: registers error-returning stubs for IO functions.
 #[cfg(target_arch = "wasm32")]
-fn register_io_functions(
-    env: &mut Environment,
-    experimental: bool,
-    _recipe_path: Option<PathBuf>,
-) {
+fn register_io_functions(env: &mut Environment, experimental: bool, _recipe_path: Option<PathBuf>) {
     env.add_function(
         "load_from_file",
         move |_path: String| -> Result<Value, minijinja::Error> {
@@ -783,10 +775,7 @@ fn register_io_functions(
         },
     );
 
-    env.add_global(
-        "git",
-        Value::from_object(crate::git::Git { experimental }),
-    );
+    env.add_global("git", Value::from_object(crate::git::Git { experimental }));
 }
 
 fn set_jinja(
