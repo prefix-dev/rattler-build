@@ -162,6 +162,29 @@ impl Git {
             .to_string();
         Ok(Value::from(result))
     }
+
+    fn dispatch(&self, name: &str, args: &[Value]) -> Result<Value, minijinja::Error> {
+        let (src,) = from_args(args)?;
+        match name {
+            "head_rev" => self.head_rev(src),
+            "latest_tag_rev" => self.latest_tag_rev(src),
+            "latest_tag" => self.latest_tag(src),
+            name => Err(minijinja::Error::new(
+                minijinja::ErrorKind::UnknownMethod,
+                format!("object has no method named {name}"),
+            )),
+        }
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+impl Git {
+    fn dispatch(&self, _name: &str, _args: &[Value]) -> Result<Value, minijinja::Error> {
+        Err(minijinja::Error::new(
+            minijinja::ErrorKind::InvalidOperation,
+            "Git operations are not available in WASM",
+        ))
+    }
 }
 
 impl Object for Git {
@@ -178,27 +201,6 @@ impl Object for Git {
             ));
         }
 
-        #[cfg(not(target_arch = "wasm32"))]
-        {
-            let (src,) = from_args(args)?;
-            match name {
-                "head_rev" => self.head_rev(src),
-                "latest_tag_rev" => self.latest_tag_rev(src),
-                "latest_tag" => self.latest_tag(src),
-                name => Err(minijinja::Error::new(
-                    minijinja::ErrorKind::UnknownMethod,
-                    format!("object has no method named {name}"),
-                )),
-            }
-        }
-
-        #[cfg(target_arch = "wasm32")]
-        {
-            let _ = (name, args);
-            Err(minijinja::Error::new(
-                minijinja::ErrorKind::InvalidOperation,
-                "Git operations are not available in WASM",
-            ))
-        }
+        self.dispatch(name, args)
     }
 }

@@ -10,6 +10,19 @@ use std::path::Path;
 
 use crate::{config::VariantConfig, error::VariantConfigError};
 
+/// Look up an environment variable by name, returning `None` on WASM.
+fn lookup_env_var(name: &str) -> Option<String> {
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        std::env::var(name).ok()
+    }
+    #[cfg(target_arch = "wasm32")]
+    {
+        let _ = name;
+        None
+    }
+}
+
 #[derive(Debug)]
 struct ParsedLine<'a> {
     content: &'a str,
@@ -60,13 +73,7 @@ fn conda_build_config_jinja(jinja_config: &JinjaConfig) -> Jinja {
     jinja.env_mut().add_function(
         "environ_get",
         move |name: String, default: Option<String>| {
-            #[cfg(not(target_arch = "wasm32"))]
-            let value = std::env::var(name).unwrap_or_else(|_| default.unwrap_or_default());
-            #[cfg(target_arch = "wasm32")]
-            let value = {
-                let _ = name;
-                default.unwrap_or_default()
-            };
+            let value = lookup_env_var(&name).unwrap_or_else(|| default.unwrap_or_default());
             Ok(Value::from(value))
         },
     );
@@ -74,25 +81,13 @@ fn conda_build_config_jinja(jinja_config: &JinjaConfig) -> Jinja {
     jinja
 }
 
-/// Load a `conda_build_config.yaml` file with selector support
-///
-/// The parser supports:
-/// - Conditional lines using `# [selector]` syntax
-/// - `os.environ.get(...)` for environment variables
-/// - Platform selectors (unix, linux, osx, win)
-///
-/// # Example
-///
-/// ```yaml
-/// python:
-///   - 3.9
-///   - 3.10  # [unix]
-///   - 3.11  # [osx]
-/// ```
 /// Parse a `conda_build_config.yaml` string with selector support
 ///
 /// This is the string-based version of [`load_conda_build_config`] that works on
-/// in-memory strings instead of files. It supports the same selector syntax.
+/// in-memory strings instead of files. It supports the same selector syntax:
+/// - Conditional lines using `# [selector]` syntax
+/// - `os.environ.get(...)` for environment variables
+/// - Platform selectors (unix, linux, osx, win)
 pub fn parse_conda_build_config(
     input: &str,
     config: &JinjaConfig,
