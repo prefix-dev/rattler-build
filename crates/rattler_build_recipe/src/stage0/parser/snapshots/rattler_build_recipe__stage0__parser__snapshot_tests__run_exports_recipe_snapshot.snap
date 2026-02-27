@@ -71,6 +71,7 @@ about:
   description: null
   documentation: null
   repository: null
+app: {}
 extra:
   recipe-maintainers:
   - maintainer

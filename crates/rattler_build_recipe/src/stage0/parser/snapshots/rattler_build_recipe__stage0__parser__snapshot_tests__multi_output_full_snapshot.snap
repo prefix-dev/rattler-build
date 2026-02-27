@@ -54,6 +54,7 @@ about:
   description: null
   documentation: null
   repository: null
+app: {}
 extra:
   recipe-maintainers:
   - alice
@@ -142,6 +143,7 @@ outputs:
     description: null
     documentation: null
     repository: null
+  app: {}
   tests:
   - script:
       content:
@@ -197,6 +199,7 @@ outputs:
       It allows you to use complex project functionality from Python.
     documentation: null
     repository: null
+  app: {}
   tests:
   - python:
       imports:
@@ -250,3 +253,4 @@ outputs:
     description: null
     documentation: null
     repository: null
+  app: {}

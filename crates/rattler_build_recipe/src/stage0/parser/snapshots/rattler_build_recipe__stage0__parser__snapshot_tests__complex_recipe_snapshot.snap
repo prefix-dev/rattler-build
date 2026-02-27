@@ -92,6 +92,7 @@ about:
     templates and other formatting.
   documentation: https://${{ name }}.readthedocs.io
   repository: https://github.com/${{ org }}/${{ name }}
+app: {}
 extra:
   recipe-maintainers:
   - someone

@@ -10,5 +10,5 @@ expression: error_with_source
    ·        ╰── invalid value for 'recipe': unknown top-level field 'unknown_section'
  9 │   some_field: some_value
    ╰────
-  help: valid top-level fields are: package, build, about, requirements,
+  help: valid top-level fields are: package, build, about, app, requirements,
         extra, source, tests, schema_version, context
