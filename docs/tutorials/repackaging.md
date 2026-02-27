@@ -15,12 +15,12 @@ package:
   version: 25.5.2
 
 source:
-  - if: target_platform == "linux-64"
+  - if: host_platform == "linux-64"
     then:
       url: https://github.com/linkerd/linkerd2/releases/download/edge-25.5.2/linkerd2-cli-edge-25.5.2-linux-amd64
       sha256: 55e7721ab0eb48217f239628b55517b7d663a962df18cdab180e5d42e45f83cb
       file_name: linkerd
-  - if: target_platform == "osx-arm64"
+  - if: host_platform == "osx-arm64"
     then:
       url: https://github.com/linkerd/linkerd2/releases/download/edge-25.5.2/linkerd2-cli-edge-25.5.2-darwin-arm64
       sha256: 405ddf3af0089bfece93d811c9bfb9f63e3a000e3f423163fc56690ef4d427cf
@@ -59,10 +59,10 @@ about:
 
 !!! note
 
-    To repackage the `linkerd` package on `osx-arm64` for `linux-64`, you can pass the `--target-platform` argument to `rattler-build`:
+    To repackage the `linkerd` package on `osx-arm64` for `linux-64`, you can pass the `--host-platform` argument to `rattler-build`:
 
     ```bash
-    rattler-build build --target-platform linux-64 linkerd
+    rattler-build build --host-platform linux-64 linkerd
     ```
 
 ## Adding system requirements
