@@ -36,7 +36,9 @@ clang = ">=21.1.8,<23"
 
 [feature.playground.tasks]
 playground-build = { cmd = "python scripts/build_playground.py", description = "Build the WASM playground" }
-playground-serve = { cmd = "python -m http.server 8080 --directory deploy", depends-on = ["playground-build"], description = "Build and serve the playground locally" }
+playground-serve = { cmd = "python -m http.server 8080 --directory deploy", depends-on = [
+  "playground-build",
+], description = "Build and serve the playground locally" }
 
 [feature.docs.tasks]
 download-font = "bash docs/layouts/download-font-to-cache.sh"
