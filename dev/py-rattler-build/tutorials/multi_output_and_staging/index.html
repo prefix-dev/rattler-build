@@ -21,7 +21,7 @@
       
       
       <link rel="icon" href="../../../assets/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.0">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.2">
     
     
       
@@ -29,7 +29,7 @@
       
     
     
-      <link rel="stylesheet" href="../../../assets/stylesheets/main.618322db.min.css">
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
       
         
         <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -2841,7 +2841,7 @@ Package: myproject-tools 2.0.0
 </span></code></pre></div>
 <div class="language-text highlight"><pre><span></span><code>Building Example 1 packages...
 ============================================================
-Recipe path: /tmp/rattler_build__bsxzbc2/recipe.yaml
+Recipe path: /tmp/rattler_build_rfwrn8tg/recipe.yaml
 
 Building variant 1/2
   Package: myproject-lib
@@ -2849,8 +2849,8 @@ Building variant 1/2
   Build string: hb0f4dca_0
 
 
-  Build complete in 1.54s!
-  Package: /tmp/rattler_build__bsxzbc2/output/linux-64/myproject-lib-2.0.0-hb0f4dca_0.conda
+  Build complete in 1.60s!
+  Package: /tmp/rattler_build_rfwrn8tg/output/linux-64/myproject-lib-2.0.0-hb0f4dca_0.conda
   Variant: {&#39;target_platform&#39;: &#39;linux-64&#39;}
   Build log: 54 messages captured
 
@@ -2861,14 +2861,14 @@ Building variant 2/2
 
 
   Build complete in 1.51s!
-  Package: /tmp/rattler_build__bsxzbc2/output/linux-64/myproject-tools-2.0.0-hb0f4dca_0.conda
+  Package: /tmp/rattler_build_rfwrn8tg/output/linux-64/myproject-tools-2.0.0-hb0f4dca_0.conda
   Variant: {&#39;target_platform&#39;: &#39;linux-64&#39;}
   Build log: 55 messages captured
 
 ============================================================
 Example 1 builds completed successfully!
 
-Built packages are available in: /tmp/rattler_build__bsxzbc2/output
+Built packages are available in: /tmp/rattler_build_rfwrn8tg/output
 </code></pre></div>
 <h2 id="example-2-staging-outputs-shared-build-artifacts">Example 2: Staging Outputs - Shared Build Artifacts<a class="headerlink" href="#example-2-staging-outputs-shared-build-artifacts" title="Permanent link">#</a></h2>
 <p>Staging is different from regular dependencies (Example 1). A staging output runs its build script once, then <strong>copies its files directly into each inheriting package's prefix</strong>. Since these are "new" files in the prefix, they will be included in the final package.</p>
@@ -3045,15 +3045,17 @@ compiled-project-cli 1.5.0
 </span></code></pre></div>
 <div class="language-text highlight"><pre><span></span><code>Building Example 2 packages (with staging)...
 ============================================================
-Recipe path: /tmp/rattler_build__f6xixph/recipe.yaml
+Recipe path: /tmp/rattler_build_779hq4d7/recipe.yaml
 
 Building variant 1/2
   Package: compiled-project-python
   Version: 1.5.0
   Build string: hb0f4dca_0
   Staging caches: [&#39;shared-build&#39;]
-  Build complete in 1.57s!
-  Package: /tmp/rattler_build__f6xixph/output/linux-64/compiled-project-python-1.5.0-hb0f4dca_0.conda
+
+
+  Build complete in 1.65s!
+  Package: /tmp/rattler_build_779hq4d7/output/linux-64/compiled-project-python-1.5.0-hb0f4dca_0.conda
   Variant: {&#39;target_platform&#39;: &#39;linux-64&#39;}
   Build log: 71 messages captured
 
@@ -3064,15 +3066,15 @@ Building variant 2/2
   Staging caches: [&#39;shared-build&#39;]
 
 
-  Build complete in 1.58s!
-  Package: /tmp/rattler_build__f6xixph/output/linux-64/compiled-project-cli-1.5.0-hb0f4dca_0.conda
+  Build complete in 1.65s!
+  Package: /tmp/rattler_build_779hq4d7/output/linux-64/compiled-project-cli-1.5.0-hb0f4dca_0.conda
   Variant: {&#39;target_platform&#39;: &#39;linux-64&#39;}
   Build log: 66 messages captured
 
 ============================================================
 Example 2 builds completed successfully!
 
-Built packages are available in: /tmp/rattler_build__f6xixph/output
+Built packages are available in: /tmp/rattler_build_779hq4d7/output
 </code></pre></div>
 <h2 id="summary">Summary<a class="headerlink" href="#summary" title="Permanent link">#</a></h2>
 <p>In this tutorial, you learned about multi-output recipes and staging:</p>
@@ -3279,10 +3281,10 @@ Built packages are available in: /tmp/rattler_build__f6xixph/output
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["content.tabs.link", "content.code.copy", "content.action.edit", "content.code.annotate", "navigation.instant", "navigation.instant.progress", "navigation.tracking", "navigation.indexes", "navigation.top", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["content.tabs.link", "content.code.copy", "content.action.edit", "content.code.annotate", "navigation.instant", "navigation.instant.progress", "navigation.tracking", "navigation.indexes", "navigation.top", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
-      <script src="../../../assets/javascripts/bundle.e71a0d61.min.js"></script>
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
     
   </body>
