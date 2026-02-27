@@ -92,6 +92,9 @@ pub enum SubCommands {
     /// It can either use a specified version or auto-detect the latest version
     /// from supported providers (GitHub, PyPI, crates.io).
     BumpRecipe(BumpRecipeOpts),
+
+    /// Migrate a recipe from the deprecated `cache:` format to `staging:` outputs
+    MigrateRecipe(MigrateRecipeOpts),
 }
 
 /// Arguments for the `debug` command.
@@ -1393,4 +1396,17 @@ pub struct BumpRecipeOpts {
     /// Keep the current build number instead of resetting it to 0.
     #[arg(long, default_value = "false")]
     pub keep_build_number: bool,
+}
+
+/// Options for the `migrate-recipe` subcommand.
+#[derive(Parser)]
+pub struct MigrateRecipeOpts {
+    /// Path to the recipe file or directory containing recipe.yaml. Defaults to
+    /// current directory.
+    #[arg(short, long, default_value = ".")]
+    pub recipe: PathBuf,
+
+    /// Perform a dry-run: show the migrated recipe without writing to the file.
+    #[arg(long, default_value = "false")]
+    pub dry_run: bool,
 }

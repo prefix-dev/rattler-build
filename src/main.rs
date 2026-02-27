@@ -18,10 +18,10 @@ use miette::IntoDiagnostic;
 use rattler_build::{
     build_recipes, bump_recipe,
     console_utils::init_logging,
-    debug_recipe, extract_package, get_recipe_path,
+    debug_recipe, extract_package, get_recipe_path, migrate_recipe,
     opt::{
-        App, BuildData, BumpRecipeOpts, DebugData, DebugSubCommands, PackageCommands, PublishData,
-        RebuildData, ShellCompletion, SubCommands, TestData,
+        App, BuildData, BumpRecipeOpts, DebugData, DebugSubCommands, MigrateRecipeOpts,
+        PackageCommands, PublishData, RebuildData, ShellCompletion, SubCommands, TestData,
     },
     publish_packages, rebuild, run_test, show_package_info,
     tool_configuration::APP_USER_AGENT,
@@ -81,6 +81,29 @@ async fn run_bump_recipe(opts: BumpRecipeOpts) -> miette::Result<()> {
             Err(e) => {
                 return Err(miette::miette!("Failed to bump recipe: {}", e));
             }
+        }
+    }
+
+    Ok(())
+}
+
+/// Run the migrate-recipe command
+fn run_migrate_recipe(opts: MigrateRecipeOpts) -> miette::Result<()> {
+    let recipe_path = get_recipe_path(&opts.recipe)?;
+
+    match migrate_recipe::migrate_recipe(&recipe_path, opts.dry_run) {
+        Ok(_) => {
+            if !opts.dry_run {
+                tracing::info!("Recipe migrated successfully: {}", recipe_path.display());
+            }
+        }
+        Err(migrate_recipe::MigrateRecipeError::NoCacheKey) => {
+            tracing::info!(
+                "Recipe does not use the deprecated 'cache:' format — no migration needed"
+            );
+        }
+        Err(e) => {
+            return Err(miette::miette!("Failed to migrate recipe: {}", e));
         }
     }
 
@@ -251,6 +274,7 @@ async fn async_main() -> miette::Result<()> {
             PackageCommands::Extract(opts) => extract_package(opts).await,
         },
         Some(SubCommands::BumpRecipe(opts)) => run_bump_recipe(opts).await,
+        Some(SubCommands::MigrateRecipe(opts)) => run_migrate_recipe(opts),
         None => {
             _ = App::command().print_long_help();
             Ok(())
