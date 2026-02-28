@@ -39,7 +39,8 @@ impl TryConvertNode<Script> for RenderedNode {
             RenderedNode::Mapping(map) => map.try_convert(name),
             RenderedNode::Null(_) => Err(vec![_partialerror!(
                 *self.span(),
-                ErrorKind::MissingField(Cow::Owned(name.to_owned()))
+                ErrorKind::MissingField(Cow::Owned(name.to_owned())),
+                label = format!("required field `{}` is missing", name)
             )]),
         }
     }
