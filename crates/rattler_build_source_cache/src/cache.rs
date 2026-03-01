@@ -18,6 +18,7 @@ use rattler_git::resolver::GitResolver;
 ///
 /// Detects URLs from `pypi.io` and `files.pythonhosted.org` and constructs
 /// the corresponding `https://pypi.org/integrity/{project}/{version}/{filename}/provenance` URL.
+#[cfg_attr(not(feature = "sigstore"), allow(dead_code))]
 fn derive_pypi_provenance_url(source_url: &url::Url) -> Option<url::Url> {
     let host = source_url.host_str()?;
     if host != "pypi.io" && host != "files.pythonhosted.org" {
@@ -53,134 +54,146 @@ fn derive_pypi_provenance_url(source_url: &url::Url) -> Option<url::Url> {
     url::Url::parse(&provenance_url).ok()
 }
 
-/// Result of parsing an attestation response.
-struct ParsedAttestations {
-    bundles: Vec<sigstore_types::Bundle>,
-    /// Whether these bundles were converted from PyPI PEP 740 provenance format.
-    /// PyPI-converted bundles lack canonicalized rekor bodies so transparency log
-    /// verification must be skipped.
-    from_pypi: bool,
-}
+#[cfg(feature = "sigstore")]
+mod sigstore_verify_impl {
+    use crate::error::CacheError;
 
-/// Parse an attestation response into one or more sigstore bundles.
-///
-/// Handles two formats:
-/// 1. **Standard sigstore bundle** (`.sigstore.json`): has a `mediaType` field,
-///    parsed directly via `Bundle::from_json`.
-/// 2. **PyPI PEP 740 provenance response**: has an `attestation_bundles` array,
-///    each containing `attestations` that are converted to sigstore bundles.
-fn parse_attestation_response(json_str: &str) -> Result<ParsedAttestations, CacheError> {
-    let value: serde_json::Value = serde_json::from_str(json_str)
-        .map_err(|e| CacheError::InvalidAttestationBundle(format!("Invalid JSON: {}", e)))?;
-
-    // If it has a "mediaType" field, it's a standard sigstore bundle
-    if value.get("mediaType").is_some() {
-        let bundle = sigstore_types::Bundle::from_json(json_str).map_err(|e| {
-            CacheError::InvalidAttestationBundle(format!("Failed to parse sigstore bundle: {}", e))
-        })?;
-        return Ok(ParsedAttestations {
-            bundles: vec![bundle],
-            from_pypi: false,
-        });
+    /// Result of parsing an attestation response.
+    pub(crate) struct ParsedAttestations {
+        pub(crate) bundles: Vec<sigstore_types::Bundle>,
+        /// Whether these bundles were converted from PyPI PEP 740 provenance format.
+        /// PyPI-converted bundles lack canonicalized rekor bodies so transparency log
+        /// verification must be skipped.
+        pub(crate) from_pypi: bool,
     }
 
-    // Otherwise, try to parse as a PyPI provenance response
-    if let Some(attestation_bundles) = value.get("attestation_bundles").and_then(|v| v.as_array()) {
-        let mut bundles = Vec::new();
-        for ab in attestation_bundles {
-            if let Some(attestations) = ab.get("attestations").and_then(|v| v.as_array()) {
-                for attestation in attestations {
-                    let bundle = convert_pypi_attestation_to_bundle(attestation)?;
-                    bundles.push(bundle);
+    /// Parse an attestation response into one or more sigstore bundles.
+    ///
+    /// Handles two formats:
+    /// 1. **Standard sigstore bundle** (`.sigstore.json`): has a `mediaType` field,
+    ///    parsed directly via `Bundle::from_json`.
+    /// 2. **PyPI PEP 740 provenance response**: has an `attestation_bundles` array,
+    ///    each containing `attestations` that are converted to sigstore bundles.
+    pub(crate) fn parse_attestation_response(
+        json_str: &str,
+    ) -> Result<ParsedAttestations, CacheError> {
+        let value: serde_json::Value = serde_json::from_str(json_str)
+            .map_err(|e| CacheError::InvalidAttestationBundle(format!("Invalid JSON: {}", e)))?;
+
+        // If it has a "mediaType" field, it's a standard sigstore bundle
+        if value.get("mediaType").is_some() {
+            let bundle = sigstore_types::Bundle::from_json(json_str).map_err(|e| {
+                CacheError::InvalidAttestationBundle(format!(
+                    "Failed to parse sigstore bundle: {}",
+                    e
+                ))
+            })?;
+            return Ok(ParsedAttestations {
+                bundles: vec![bundle],
+                from_pypi: false,
+            });
+        }
+
+        // Otherwise, try to parse as a PyPI provenance response
+        if let Some(attestation_bundles) =
+            value.get("attestation_bundles").and_then(|v| v.as_array())
+        {
+            let mut bundles = Vec::new();
+            for ab in attestation_bundles {
+                if let Some(attestations) = ab.get("attestations").and_then(|v| v.as_array()) {
+                    for attestation in attestations {
+                        let bundle = convert_pypi_attestation_to_bundle(attestation)?;
+                        bundles.push(bundle);
+                    }
                 }
             }
+            if bundles.is_empty() {
+                return Err(CacheError::InvalidAttestationBundle(
+                    "PyPI provenance response contains no attestations".to_string(),
+                ));
+            }
+            return Ok(ParsedAttestations {
+                bundles,
+                from_pypi: true,
+            });
         }
-        if bundles.is_empty() {
-            return Err(CacheError::InvalidAttestationBundle(
-                "PyPI provenance response contains no attestations".to_string(),
-            ));
-        }
-        return Ok(ParsedAttestations {
-            bundles,
-            from_pypi: true,
-        });
+
+        Err(CacheError::InvalidAttestationBundle(
+            "Unrecognized attestation format: expected sigstore bundle or PyPI provenance response"
+                .to_string(),
+        ))
     }
 
-    Err(CacheError::InvalidAttestationBundle(
-        "Unrecognized attestation format: expected sigstore bundle or PyPI provenance response"
-            .to_string(),
-    ))
-}
+    /// Convert a PyPI PEP 740 attestation object to a sigstore v0.3 bundle.
+    ///
+    /// PyPI attestation format:
+    /// ```json
+    /// {
+    ///   "version": 1,
+    ///   "verification_material": {
+    ///     "certificate": "<base64(DER)>",
+    ///     "transparency_entries": [{ ... }]
+    ///   },
+    ///   "envelope": {
+    ///     "statement": "<base64(in-toto JSON)>",
+    ///     "signature": "<base64(sig)>"
+    ///   }
+    /// }
+    /// ```
+    fn convert_pypi_attestation_to_bundle(
+        attestation: &serde_json::Value,
+    ) -> Result<sigstore_types::Bundle, CacheError> {
+        let err = |msg: &str| CacheError::InvalidAttestationBundle(msg.to_string());
 
-/// Convert a PyPI PEP 740 attestation object to a sigstore v0.3 bundle.
-///
-/// PyPI attestation format:
-/// ```json
-/// {
-///   "version": 1,
-///   "verification_material": {
-///     "certificate": "<base64(DER)>",
-///     "transparency_entries": [{ ... }]
-///   },
-///   "envelope": {
-///     "statement": "<base64(in-toto JSON)>",
-///     "signature": "<base64(sig)>"
-///   }
-/// }
-/// ```
-fn convert_pypi_attestation_to_bundle(
-    attestation: &serde_json::Value,
-) -> Result<sigstore_types::Bundle, CacheError> {
-    let err = |msg: &str| CacheError::InvalidAttestationBundle(msg.to_string());
+        let envelope = attestation
+            .get("envelope")
+            .ok_or_else(|| err("missing 'envelope'"))?;
+        let verification_material = attestation
+            .get("verification_material")
+            .ok_or_else(|| err("missing 'verification_material'"))?;
 
-    let envelope = attestation
-        .get("envelope")
-        .ok_or_else(|| err("missing 'envelope'"))?;
-    let verification_material = attestation
-        .get("verification_material")
-        .ok_or_else(|| err("missing 'verification_material'"))?;
+        let statement = envelope
+            .get("statement")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| err("missing 'envelope.statement'"))?;
+        let signature = envelope
+            .get("signature")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| err("missing 'envelope.signature'"))?;
+        let certificate = verification_material
+            .get("certificate")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| err("missing 'verification_material.certificate'"))?;
 
-    let statement = envelope
-        .get("statement")
-        .and_then(|v| v.as_str())
-        .ok_or_else(|| err("missing 'envelope.statement'"))?;
-    let signature = envelope
-        .get("signature")
-        .and_then(|v| v.as_str())
-        .ok_or_else(|| err("missing 'envelope.signature'"))?;
-    let certificate = verification_material
-        .get("certificate")
-        .and_then(|v| v.as_str())
-        .ok_or_else(|| err("missing 'verification_material.certificate'"))?;
+        // PyPI transparency_entries already use the sigstore bundle v0.3 JSON format
+        // (camelCase field names, same structure), so pass them through directly.
+        let tlog_entries: Vec<serde_json::Value> = verification_material
+            .get("transparency_entries")
+            .and_then(|v| v.as_array())
+            .cloned()
+            .unwrap_or_default();
 
-    // PyPI transparency_entries already use the sigstore bundle v0.3 JSON format
-    // (camelCase field names, same structure), so pass them through directly.
-    let tlog_entries: Vec<serde_json::Value> = verification_material
-        .get("transparency_entries")
-        .and_then(|v| v.as_array())
-        .cloned()
-        .unwrap_or_default();
+        // Construct a sigstore v0.3 bundle JSON
+        let bundle_json = serde_json::json!({
+            "mediaType": "application/vnd.dev.sigstore.bundle.v0.3+json",
+            "verificationMaterial": {
+                "certificate": { "rawBytes": certificate },
+                "tlogEntries": tlog_entries,
+                "timestampVerificationData": {}
+            },
+            "dsseEnvelope": {
+                "payload": statement,
+                "payloadType": "application/vnd.in-toto+json",
+                "signatures": [{ "sig": signature }]
+            }
+        });
 
-    // Construct a sigstore v0.3 bundle JSON
-    let bundle_json = serde_json::json!({
-        "mediaType": "application/vnd.dev.sigstore.bundle.v0.3+json",
-        "verificationMaterial": {
-            "certificate": { "rawBytes": certificate },
-            "tlogEntries": tlog_entries,
-            "timestampVerificationData": {}
-        },
-        "dsseEnvelope": {
-            "payload": statement,
-            "payloadType": "application/vnd.in-toto+json",
-            "signatures": [{ "sig": signature }]
-        }
-    });
+        let bundle_str = serde_json::to_string(&bundle_json)
+            .map_err(|e| err(&format!("Failed to serialize bundle: {}", e)))?;
 
-    let bundle_str = serde_json::to_string(&bundle_json)
-        .map_err(|e| err(&format!("Failed to serialize bundle: {}", e)))?;
-
-    sigstore_types::Bundle::from_json(&bundle_str)
-        .map_err(|e| err(&format!("Failed to parse converted bundle: {}", e)))
+        sigstore_types::Bundle::from_json(&bundle_str)
+            .map_err(|e| err(&format!("Failed to parse converted bundle: {}", e)))
+    }
 }
 
 /// Result of fetching a source from the cache
@@ -773,6 +786,7 @@ impl SourceCache {
     /// Identity matching uses **prefix** semantics: the expected identity (e.g.
     /// `https://github.com/pallets/flask`) must be a prefix of the actual certificate
     /// identity (e.g. `https://github.com/pallets/flask/.github/workflows/release.yml@refs/tags/3.1.1`).
+    #[cfg(feature = "sigstore")]
     async fn verify_attestation(
         &self,
         file_path: &Path,
@@ -808,7 +822,7 @@ impl SourceCache {
         let artifact_bytes = fs_err::tokio::read(file_path).await?;
 
         // Parse the response: could be a plain sigstore bundle or a PyPI provenance response
-        let parsed = parse_attestation_response(&response_json)?;
+        let parsed = sigstore_verify_impl::parse_attestation_response(&response_json)?;
 
         // For each required identity check, find a matching bundle and verify it
         for check in &attestation_config.identity_checks {
@@ -882,10 +896,28 @@ impl SourceCache {
         Ok(())
     }
 
+    /// Fallback when the `sigstore` feature is disabled: log a prominent warning
+    /// and skip attestation verification entirely.
+    #[cfg(not(feature = "sigstore"))]
+    async fn verify_attestation(
+        &self,
+        _file_path: &Path,
+        source_url: &url::Url,
+        _attestation_config: &AttestationVerification,
+    ) -> Result<(), CacheError> {
+        tracing::warn!("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+        tracing::warn!("!!! WARNING: Sigstore verification is DISABLED at compile time !!!");
+        tracing::warn!("!!! Attestation for {} will NOT be verified !!!", source_url);
+        tracing::warn!("!!! Build rattler-build with the 'sigstore' feature to enable  !!!");
+        tracing::warn!("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+        Ok(())
+    }
+
     /// Download an attestation bundle from a URL.
     ///
     /// Returns the raw response body — can be a standard sigstore bundle
     /// or a PyPI PEP 740 provenance response.
+    #[cfg(feature = "sigstore")]
     async fn download_attestation_bundle(&self, url: &url::Url) -> Result<String, CacheError> {
         let response = self
             .client
@@ -1191,8 +1223,10 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "sigstore")]
     #[test]
     fn test_parse_attestation_response_sigstore_bundle() {
+        use super::sigstore_verify_impl::parse_attestation_response;
         // A sigstore bundle has a "mediaType" field
         let json = r#"{
             "mediaType": "application/vnd.dev.sigstore.bundle.v0.3+json",
@@ -1212,8 +1246,10 @@ mod tests {
         assert!(!parsed.from_pypi);
     }
 
+    #[cfg(feature = "sigstore")]
     #[test]
     fn test_parse_attestation_response_pypi_provenance() {
+        use super::sigstore_verify_impl::parse_attestation_response;
         // A PyPI provenance response has "attestation_bundles"
         let json = r#"{
             "version": 1,
@@ -1241,8 +1277,10 @@ mod tests {
         assert!(parsed.from_pypi);
     }
 
+    #[cfg(feature = "sigstore")]
     #[test]
     fn test_parse_attestation_response_unrecognized_format() {
+        use super::sigstore_verify_impl::parse_attestation_response;
         let json = r#"{ "foo": "bar" }"#;
         assert!(parse_attestation_response(json).is_err());
     }
