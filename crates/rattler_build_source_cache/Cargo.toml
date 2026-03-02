@@ -9,7 +9,11 @@ description = "Source cache management for rattler-build"
 
 [features]
 default = ["rustls-tls", "sigstore"]
-sigstore = ["dep:sigstore-verify", "dep:sigstore-trust-root", "dep:sigstore-types"]
+sigstore = [
+  "dep:sigstore-verify",
+  "dep:sigstore-trust-root",
+  "dep:sigstore-types",
+]
 native-tls = [
   "rattler_build_networking/native-tls",
   "sigstore-verify?/native-tls",
@@ -54,9 +58,9 @@ tempfile = { workspace = true }
 dunce = { workspace = true }
 rattler_git = { workspace = true }
 hex = { workspace = true }
-sigstore-verify = { workspace = true, optional = true }
-sigstore-trust-root = { workspace = true, optional = true }
-sigstore-types = { workspace = true, optional = true }
+sigstore-verify = { version = "0.6.3", default-features = false, optional = true }
+sigstore-trust-root = { version = "0.6.3", default-features = false, optional = true }
+sigstore-types = { version = "0.6.3", optional = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["rt", "macros", "test-util"] }

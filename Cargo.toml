@@ -108,9 +108,6 @@ rstest = "0.26.1"
 petgraph = { version = "0.8.3", default-features = false }
 sha1 = { version = "0.10.6" }
 lzma-rust2 = { version = "0.15", features = ["xz"] }
-sigstore-verify = { version = "0.6.3", default-features = false }
-sigstore-trust-root = { version = "0.6.3", default-features = false }
-sigstore-types = { version = "0.6.3" }
 
 anyhow = "1.0.102"
 content_inspector = "0.2.4"
@@ -175,7 +172,10 @@ s3 = [
   'rattler_build_networking/s3',
   'dep:rattler_s3',
 ]
-sigstore = ['rattler_upload/sigstore-sign', 'rattler_build_source_cache/sigstore']
+sigstore = [
+  'rattler_upload/sigstore-sign',
+  'rattler_build_source_cache/sigstore',
+]
 recipe-generation = ["rattler_build_recipe_generator"]
 # This feature needs to add a dependency on
 # clap-markdown = { git = "https://github.com/ruben-arts/clap-markdown", branch = "main" }
