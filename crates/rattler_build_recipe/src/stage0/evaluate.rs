@@ -21,6 +21,7 @@
 
 use std::{
     collections::{BTreeMap, HashSet},
+    ops::Not,
     path::PathBuf,
     str::FromStr,
 };
@@ -92,7 +93,10 @@ use crate::{
         },
     },
 };
-use rattler_build_jinja::Variable;
+use rattler_build_jinja::{
+    Variable, extract_default_guarded_variables_from_expression,
+    extract_default_guarded_variables_from_template,
+};
 
 /// Variables that are always included in variant combinations
 pub const ALWAYS_INCLUDED_VARS: &[&str] =
@@ -212,9 +216,12 @@ fn render_template_to_variable(
 
         // Check for undefined variables and error out (even if rendering succeeded)
         // Only error if we're not in Lenient mode
+        // Exclude variables guarded by the `default` filter — they are intentionally undefined
+        let default_guarded = extract_default_guarded_variables_from_template(template);
         let undefined_vars: Vec<String> = jinja
             .undefined_variables_excluding_functions()
             .into_iter()
+            .filter(|v| default_guarded.contains(v).not())
             .collect();
         if !undefined_vars.is_empty()
             && !matches!(
@@ -264,9 +271,13 @@ fn render_template_to_variable(
     // Check for undefined variables and error out (even if evaluation succeeded)
     // This catches cases like "${{ 'foo' if undefined_var else 'bar' }}" in SemiStrict mode
     // Only error if we're not in Lenient mode
+    // Exclude variables guarded by the `default` filter — they are intentionally undefined
+    let expression = trimmed[3..trimmed.len() - 2].trim();
+    let default_guarded = extract_default_guarded_variables_from_expression(expression);
     let undefined_vars: Vec<String> = jinja
         .undefined_variables_excluding_functions()
         .into_iter()
+        .filter(|v| default_guarded.contains(v).not())
         .collect();
     if !undefined_vars.is_empty()
         && !matches!(
@@ -416,9 +427,12 @@ fn render_template(
             // Check for undefined variables and error out (even if rendering succeeded)
             // This catches cases like "${{ 'foo' if undefined_var else 'bar' }}" in SemiStrict mode
             // Only error if we're not in Lenient mode
+            // Exclude variables guarded by the `default` filter — they are intentionally undefined
+            let default_guarded = extract_default_guarded_variables_from_template(template);
             let undefined_vars: Vec<String> = jinja
                 .undefined_variables_excluding_functions()
                 .into_iter()
+                .filter(|v| default_guarded.contains(v).not())
                 .collect();
             if !undefined_vars.is_empty()
                 && !matches!(
@@ -527,7 +541,13 @@ fn evaluate_condition(
     }
 
     // But only error on actual undefined variables (not function names)
-    let undefined_vars = jinja.undefined_variables_excluding_functions();
+    // Exclude variables guarded by the `default` filter — they are intentionally undefined
+    let default_guarded = extract_default_guarded_variables_from_expression(expr.source());
+    let undefined_vars: Vec<String> = jinja
+        .undefined_variables_excluding_functions()
+        .into_iter()
+        .filter(|v| default_guarded.contains(v).not())
+        .collect();
     if !undefined_vars.is_empty() {
         return Err(
             ParseError::jinja_error(
@@ -3468,8 +3488,9 @@ mod tests {
     use rattler_build_jinja::{JinjaConfig, Variable};
 
     use super::*;
-    use crate::stage0::types::{
-        Conditional, ConditionalList, Item, JinjaTemplate, NestedItemList, Value,
+    use crate::stage0::{
+        self,
+        types::{Conditional, ConditionalList, Item, JinjaTemplate, NestedItemList, Value},
     };
 
     #[test]
@@ -3772,7 +3793,7 @@ requirements:
         let parsed = parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
 
         match parsed {
-            crate::stage0::Recipe::SingleOutput(recipe) => {
+            stage0::Recipe::SingleOutput(recipe) => {
                 let ctx = EvaluationContext::new();
                 let result = recipe.evaluate(&ctx);
 
@@ -3812,7 +3833,7 @@ package:
         let parsed = parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
 
         match parsed {
-            crate::stage0::Recipe::SingleOutput(recipe) => {
+            stage0::Recipe::SingleOutput(recipe) => {
                 let ctx = EvaluationContext::new();
                 let result = recipe.evaluate(&ctx);
 
@@ -3852,7 +3873,7 @@ package:
         let parsed = parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
 
         match parsed {
-            crate::stage0::Recipe::SingleOutput(recipe) => {
+            stage0::Recipe::SingleOutput(recipe) => {
                 let ctx = EvaluationContext::new();
                 let result = recipe.evaluate(&ctx);
 
@@ -3929,7 +3950,7 @@ outputs:
         let parsed = parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
 
         match parsed {
-            crate::stage0::Recipe::MultiOutput(multi) => {
+            stage0::Recipe::MultiOutput(multi) => {
                 let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
 
                 let recipes = multi.evaluate(&ctx).unwrap();
@@ -3992,7 +4013,7 @@ outputs:
         let parsed = parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
 
         match parsed {
-            crate::stage0::Recipe::MultiOutput(multi) => {
+            stage0::Recipe::MultiOutput(multi) => {
                 let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
 
                 let recipes = multi.evaluate(&ctx).unwrap();
@@ -4044,7 +4065,7 @@ outputs:
         let parsed = parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
 
         match parsed {
-            crate::stage0::Recipe::MultiOutput(multi) => {
+            stage0::Recipe::MultiOutput(multi) => {
                 let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
 
                 let recipes = multi.evaluate(&ctx).unwrap();
@@ -4121,7 +4142,7 @@ outputs:
         let parsed = parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
 
         match parsed {
-            crate::stage0::Recipe::MultiOutput(multi) => {
+            stage0::Recipe::MultiOutput(multi) => {
                 let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
 
                 let recipes = multi.evaluate(&ctx).unwrap();
@@ -4183,7 +4204,7 @@ outputs:
         let parsed = parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
 
         match parsed {
-            crate::stage0::Recipe::MultiOutput(multi) => {
+            stage0::Recipe::MultiOutput(multi) => {
                 let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
 
                 let recipes = multi.evaluate(&ctx).unwrap();
@@ -4267,7 +4288,7 @@ outputs:
         let parsed = parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
 
         match parsed {
-            crate::stage0::Recipe::MultiOutput(multi) => {
+            stage0::Recipe::MultiOutput(multi) => {
                 let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
 
                 let recipes = multi.evaluate(&ctx).unwrap();
@@ -4362,7 +4383,7 @@ outputs:
         let parsed = parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
 
         match parsed {
-            crate::stage0::Recipe::MultiOutput(multi) => {
+            stage0::Recipe::MultiOutput(multi) => {
                 let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
 
                 let recipes = multi.evaluate(&ctx).unwrap();
@@ -4419,7 +4440,7 @@ outputs:
         let parsed = parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
 
         match parsed {
-            crate::stage0::Recipe::MultiOutput(multi) => {
+            stage0::Recipe::MultiOutput(multi) => {
                 let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
 
                 let recipes = multi.evaluate(&ctx).unwrap();
@@ -4518,7 +4539,7 @@ outputs:
         let parsed = parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
 
         match parsed {
-            crate::stage0::Recipe::MultiOutput(multi) => {
+            stage0::Recipe::MultiOutput(multi) => {
                 let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
 
                 let recipes = multi.evaluate(&ctx).unwrap();
@@ -4895,7 +4916,7 @@ outputs:
         let parsed = parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
 
         match parsed {
-            crate::stage0::Recipe::MultiOutput(multi) => {
+            stage0::Recipe::MultiOutput(multi) => {
                 // Test on Windows - the output should be skipped and not fail
                 let jinja_config = JinjaConfig {
                     target_platform: rattler_conda_types::Platform::Win64,
@@ -4962,7 +4983,7 @@ outputs:
         let parsed = parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
 
         match parsed {
-            crate::stage0::Recipe::MultiOutput(multi) => {
+            stage0::Recipe::MultiOutput(multi) => {
                 // Test on Linux - the output should NOT be skipped and requirements should be evaluated
                 let mut variant = std::collections::BTreeMap::new();
                 variant.insert("c_stdlib".into(), Variable::from_string("sysroot"));
@@ -5119,5 +5140,119 @@ build:
             !is_skipped(&skip_conditions_false, &ctx),
             "is_skipped should return false for skip condition 'false'"
         );
+    }
+
+    #[test]
+    fn test_default_filter_with_undefined_variable() {
+        // Reproducer for https://github.com/prefix-dev/rattler-build/issues/2232
+        // `cxx_compiler_version | default(cxx_compiler | replace("vs", ""))` should succeed
+        // even though `cxx_compiler_version` is undefined, because it's handled by `default`.
+        let mut ctx = EvaluationContext::new();
+        ctx.insert("cxx_compiler".to_string(), Variable::from_string("vs2022"));
+
+        let result = render_template_to_variable(
+            r#"${{ cxx_compiler_version | default(cxx_compiler | replace("vs", "")) }}"#,
+            &ctx,
+            None,
+        );
+
+        assert!(result.is_ok(), "Expected Ok but got: {:?}", result.err());
+        assert_eq!(result.unwrap().as_ref().to_string(), "2022");
+    }
+
+    #[test]
+    fn test_default_filter_preserves_undefined_error_for_unguarded_vars() {
+        // `foo | default(bar)` should error because `bar` (the fallback) is itself
+        // undefined and not guarded by `default`.
+        let ctx = EvaluationContext::new();
+
+        let result = render_template_to_variable(r#"${{ foo | default(bar) }}"#, &ctx, None);
+
+        assert!(
+            result.is_err(),
+            "Expected Err because `bar` is undefined and unguarded"
+        );
+    }
+
+    #[test]
+    fn test_default_filter_nested() {
+        // `foo | default(bar | default("fallback"))` should succeed because both
+        // `foo` and `bar` are guarded by `default`.
+        let ctx = EvaluationContext::new();
+
+        let result = render_template_to_variable(
+            r#"${{ foo | default(bar | default("fallback")) }}"#,
+            &ctx,
+            None,
+        );
+
+        assert!(
+            result.is_ok(),
+            "Expected Ok but got: {}",
+            result.err().unwrap()
+        );
+        assert_eq!(result.unwrap().as_ref().to_string(), "fallback");
+    }
+
+    #[test]
+    fn test_default_filter_in_template_context() {
+        // Test the default filter in a multi-expression template context
+        let mut ctx = EvaluationContext::new();
+        ctx.insert("name".to_string(), Variable::from_string("pkg"));
+
+        let result = render_template(
+            r#"${{ name }}-${{ version | default("0.0.0") }}"#,
+            &ctx,
+            None,
+        );
+
+        assert!(
+            result.is_ok(),
+            "Expected Ok but got: {}",
+            result.err().unwrap()
+        );
+        assert_eq!(result.unwrap(), "pkg-0.0.0");
+    }
+
+    #[test]
+    fn test_default_filter_end_to_end_recipe() {
+        // End-to-end test for https://github.com/prefix-dev/rattler-build/issues/2232
+        // Simulates a real-world recipe where cxx_compiler_version is not set in
+        // the variant but derived from cxx_compiler via the `default` filter.
+        let recipe_yaml = r#"schema_version: 1
+
+context:
+  cxx_compiler: vs2022
+  cxx_compiler_version: ${{ cxx_compiler_version | default(cxx_compiler | replace("vs", "")) }}
+
+package:
+  name: test-default-filter
+  version: ${{ cxx_compiler_version }}
+"#;
+
+        let parsed = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+
+        match parsed {
+            stage0::Recipe::SingleOutput(recipe) => {
+                let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Win64);
+                let result = recipe.evaluate(&ctx);
+
+                assert!(
+                    result.is_ok(),
+                    "Expected Ok but got: {}",
+                    result.err().unwrap()
+                );
+                let evaluated = result.unwrap();
+
+                let context = &evaluated.context;
+                assert_eq!(
+                    context.get("cxx_compiler_version").map(|v| v.to_string()),
+                    Some("2022".to_string()),
+                    "cxx_compiler_version should be derived from cxx_compiler via default filter"
+                );
+                assert_eq!(evaluated.package.version.to_string(), "2022");
+            }
+            _ => panic!("Expected single recipe"),
+        }
     }
 }
