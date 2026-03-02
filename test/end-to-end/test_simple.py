@@ -132,7 +132,7 @@ def test_python_noarch(rattler_build: RattlerBuild, recipes: Path, tmp_path: Pat
     output = rattler_build.build(recipes / "toml", tmp_path)
 
     # Check that the run export form Python is actually added
-    assert(output.contains("(RE of [host: python])"))
+    assert("(RE of [host: python])" in output)
 
     pkg = get_extracted_package(tmp_path, "toml")
 
