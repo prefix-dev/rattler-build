@@ -1029,7 +1029,7 @@ pub(crate) async fn resolve_dependencies(
     // `python` itself (e.g. `python_abi`) since these packages are
     // Python-version independent. Run exports from `python-abi3` (e.g.
     // `cpython >=3.X`) are still kept. See CEP-20.
-    let ignore_run_exports = if output.is_python_version_independent() {
+    let ignore_run_exports = if output.recipe.build.python.version_independent {
         let mut ignore = requirements.ignore_run_exports.clone();
         let python: PackageName = "python".parse().expect("valid package name");
         ignore.from_package.push(python.clone());
