@@ -262,7 +262,7 @@ You can also check for the existence of an environment variable:
 ## Tests
 
 You can write tests using minijinja to check whether objects have certain properties.
-The syntax for a filter is `{{ variable is test_name }}`.
+The syntax for a test is `${{ variable is test_name }}`.
 
 - `undefined`: Check whether a variable is undefined.
 - `defined`: Check whether a variable is defined.
@@ -278,39 +278,39 @@ The syntax for a filter is `{{ variable is test_name }}`.
 - `string`: Check whether a variable is a string.
 - `sequence`: Check whether a variable is a sequence.
 - `boolean`: Check whether a variable is a boolean.
-- `startingwith`: Check whether a variable is starting with another string: `{{ python is startingwith('3.12') }}`
-- `endingwith`: Check whether a variable is starting with another string: `{{ python is endingwith('.*') }}`
+- `startingwith`: Check whether a variable is starting with another string: `${{ python is startingwith('3.12') }}`
+- `endingwith`: Check whether a variable is starting with another string: `${{ python is endingwith('.*') }}`
 
 ## Filters
 
 A feature of `jinja` is called "filters". Filters are functions that can be
 applied to variables in a template expression.
 
-The syntax for a filter is `{{ variable | filter_name }}`. A filter can also
+The syntax for a filter is `${{ variable | filter_name }}`. A filter can also
 take arguments, such as `... | replace('foo', 'bar')`.
 
 The following Jinja filters are available, taken from the upstream `minijinja`
 library:
 
-- `replace`: replace a string with another string (e.g. `"{{ 'foo' | replace('oo', 'aa') }}"` will return `"faa"`)
-- `lower`: convert a string to lowercase (e.g. `"{{ 'FOO' | lower }}"` will return `"foo"`)
-- `upper`: convert a string to uppercase (e.g. `"{{ 'foo' | upper }}"` will
-return `"FOO"`) - `int`: convert a string to an integer (e.g. `"{{ '42' | int }}"` will return `42`)
-- `abs`: return the absolute value of a number (e.g. `"{{ -42 | abs }}"` will return `42`)
-- `bool`: convert a value to a boolean (e.g. `"{{ 'foo' | bool }}"` will return `true`)
-- `default`: return a default value if the value is falsy (e.g. `"{{ '' | default('foo') }}"` will return `"foo"`)
-- `first`: return the first element of a list (e.g. `"{{ [1, 2, 3] | first }}"`
-will return `1`) - `last`: return the last element of a list (e.g. `"{{ [1, 2, 3] | last }}"` will return `3`)
-- `length`: return the length of a list (e.g. `"{{ [1, 2, 3] | length }}"` will return `3`)
-- `list`: convert a string to a list (e.g. `"{{ 'foo' | list }}"` will return `['f', 'o', 'o']`)
-- `join`: join a list with a separator (e.g. `"{{ [1, 2, 3] | join('.') }}"` will return `"1.2.3"`)
-- `min`: return the minimum value of a list (e.g. `"{{ [1, 2, 3] | min }}"` will return `1`)
-- `max`: return the maximum value of a list (e.g. `"{{ [1, 2, 3] | max }}"` will return `3`)
-- `reverse`: reverse a list (e.g. `"{{ [1, 2, 3] | reverse }}"` will return `[3, 2, 1]`)
-- `sort`: sort a list (e.g. `"{{ [3, 1, 2] | sort }}"` will return `[1, 2, 3]`)
-- `trim`: remove leading and trailing whitespace from a string (e.g. `"{{ ' foo ' | trim }}"` will return `"foo"`)
-- `unique`: remove duplicates from a list (e.g. `"{{ [1, 2, 1, 3] | unique }}"` will return `[1, 2, 3]`)
-- `split`: split a string into a list (e.g. `"{{ '1.2.3' | split('.') | list }}"` will return `['1', '2', '3']`). By default, splits on whitespace.
+- `replace`: replace a string with another string (e.g. `"${{ 'foo' | replace('oo', 'aa') }}"` will return `"faa"`)
+- `lower`: convert a string to lowercase (e.g. `"${{ 'FOO' | lower }}"` will return `"foo"`)
+- `upper`: convert a string to uppercase (e.g. `"${{ 'foo' | upper }}"` will return `"FOO"`)
+- `int`: convert a string to an integer (e.g. `"${{ '42' | int }}"` will return `42`)
+- `abs`: return the absolute value of a number (e.g. `"${{ -42 | abs }}"` will return `42`)
+- `bool`: convert a value to a boolean (e.g. `"${{ 'foo' | bool }}"` will return `true`)
+- `default`: return a default value if the value is falsy (e.g. `"${{ '' | default('foo') }}"` will return `"foo"`)
+- `first`: return the first element of a list (e.g. `"${{ [1, 2, 3] | first }}"` will return `1`)
+- `last`: return the last element of a list (e.g. `"${{ [1, 2, 3] | last }}"` will return `3`)
+- `length`: return the length of a list (e.g. `"${{ [1, 2, 3] | length }}"` will return `3`)
+- `list`: convert a string to a list (e.g. `"${{ 'foo' | list }}"` will return `['f', 'o', 'o']`)
+- `join`: join a list with a separator (e.g. `"${{ [1, 2, 3] | join('.') }}"` will return `"1.2.3"`)
+- `min`: return the minimum value of a list (e.g. `"${{ [1, 2, 3] | min }}"` will return `1`)
+- `max`: return the maximum value of a list (e.g. `"${{ [1, 2, 3] | max }}"` will return `3`)
+- `reverse`: reverse a list (e.g. `"${{ [1, 2, 3] | reverse }}"` will return `[3, 2, 1]`)
+- `sort`: sort a list (e.g. `"${{ [3, 1, 2] | sort }}"` will return `[1, 2, 3]`)
+- `trim`: remove leading and trailing whitespace from a string (e.g. `"${{ ' foo ' | trim }}"` will return `"foo"`)
+- `unique`: remove duplicates from a list (e.g. `"${{ [1, 2, 1, 3] | unique }}"` will return `[1, 2, 3]`)
+- `split`: split a string into a list (e.g. `"${{ '1.2.3' | split('.') | list }}"` will return `['1', '2', '3']`). By default, splits on whitespace.
 
 ??? "Removed filters"
 
