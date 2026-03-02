@@ -1430,7 +1430,7 @@ def test_cache_runexports(
 def test_extra_meta_is_recorded_into_about_json(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
 ):
-    output = rattler_build.build(
+    rattler_build.build(
         recipes / "toml",
         tmp_path,
         extra_meta={"flow_run_id": "some_id", "sha": "24ee3"},
