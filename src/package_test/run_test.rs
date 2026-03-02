@@ -34,6 +34,8 @@ use std::{
 use tempfile::TempDir;
 use walkdir::WalkDir;
 
+use rattler::package_cache::PackageCache;
+
 use crate::{
     env_vars,
     metadata::{Debug, PlatformWithVirtualPackages},
@@ -419,13 +421,16 @@ pub async fn run_test(
     let pkg = CondaArchiveIdentifier::try_from_path(package_file)
         .ok_or_else(|| TestError::TestFailed("could not get archive identifier".to_string()))?;
 
-    // Extract the package to a temporary directory (not the global package cache)
-    // to read test metadata. Using the global cache caused conflicts with the
-    // Installer's own cache management, leading to linking failures for noarch
-    // Python packages.
-    let package_extract_dir = tempfile::tempdir()?;
-    let package_folder = package_extract_dir.path().join(format!(
-        "{}-{}-{}",
+    // Create a temporary package cache for test environments.
+    // This avoids conflicts with the global package cache that caused
+    // linking failures for noarch Python packages (issue #2236).
+    let temp_cache_dir = tempfile::tempdir()?;
+    let temp_package_cache = PackageCache::new(temp_cache_dir.path().to_path_buf());
+
+    // Extract to a subdirectory of the temp cache for reading test metadata.
+    // The Installer will handle its own extraction into the temp PackageCache.
+    let package_folder = temp_cache_dir.path().join(format!(
+        "metadata-{}-{}-{}",
         pkg.identifier.name, pkg.identifier.version, pkg.identifier.build_string
     ));
 
@@ -447,6 +452,10 @@ pub async fn run_test(
         target_platform: Some(target_platform),
         host_platform: Some(host_platform.clone()),
         channels,
+        tool_configuration: tool_configuration::Configuration {
+            package_cache: temp_package_cache,
+            ..config.tool_configuration.clone()
+        },
         ..config.clone()
     };
 
