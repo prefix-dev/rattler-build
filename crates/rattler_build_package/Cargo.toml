@@ -51,3 +51,4 @@ url = { workspace = true }
 [dev-dependencies]
 insta = { workspace = true }
 rstest = { workspace = true }
+rattler_package_streaming = { workspace = true }
