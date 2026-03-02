@@ -222,9 +222,13 @@ impl BaseClientBuilder {
             let has_middleware = self.auth_storage.is_some()
                 || {
                     #[cfg(feature = "s3")]
-                    { self.s3_config.is_some() }
+                    {
+                        self.s3_config.is_some()
+                    }
                     #[cfg(not(feature = "s3"))]
-                    { false }
+                    {
+                        false
+                    }
                 }
                 || self.mirror_config.is_some();
             if has_middleware {
@@ -247,11 +251,9 @@ impl BaseClientBuilder {
 
     #[cfg(feature = "middleware")]
     fn build_with_middleware(self) -> BaseClient {
-        use rattler_networking::{
-            AuthenticationMiddleware, mirror_middleware::MirrorMiddleware,
-        };
         #[cfg(feature = "s3")]
         use rattler_networking::s3_middleware::S3Middleware;
+        use rattler_networking::{AuthenticationMiddleware, mirror_middleware::MirrorMiddleware};
         use std::sync::Arc;
 
         let user_agent = self

@@ -907,7 +907,10 @@ impl SourceCache {
     ) -> Result<(), CacheError> {
         tracing::warn!("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
         tracing::warn!("!!! WARNING: Sigstore verification is DISABLED at compile time !!!");
-        tracing::warn!("!!! Attestation for {} will NOT be verified !!!", source_url);
+        tracing::warn!(
+            "!!! Attestation for {} will NOT be verified !!!",
+            source_url
+        );
         tracing::warn!("!!! Build rattler-build with the 'sigstore' feature to enable  !!!");
         tracing::warn!("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
         Ok(())
