@@ -3,10 +3,12 @@
 //! This module provides functionality to parse Jinja templates and expressions,
 //! traverse their AST, and extract all variable names used in them.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashSet};
 use std::fmt::Display;
 
-use minijinja::machinery::ast::Expr;
+use minijinja::machinery::WhitespaceConfig;
+use minijinja::machinery::ast::{CallArg, Expr, Stmt};
+use minijinja::machinery::parse_expr;
 use serde::{Deserialize, Serialize};
 
 /// A validated Jinja2 template with pre-computed variable dependencies
@@ -440,6 +442,226 @@ fn collect_variables_from_expr(
     }
 }
 
+/// Extract the root variable name from an expression by following filter chains.
+///
+/// For `foo | replace("a", "b") | lower`, this returns `Some("foo")`.
+/// For non-variable expressions (e.g., string literals), returns `None`.
+fn extract_root_variable(expr: &Expr) -> Option<String> {
+    match expr {
+        Expr::Var(var) => Some(var.id.to_string()),
+        Expr::Filter(filter) => filter.expr.as_ref().and_then(extract_root_variable),
+        _ => None,
+    }
+}
+
+/// Collect both guarded and unguarded variable names from an expression in a single pass.
+///
+/// A variable is "guarded" if it is the root input to a `default`/`d` filter.
+/// A variable is "unguarded" if it appears anywhere outside such a guarded position.
+fn collect_default_guard_info_from_expr(
+    expr: &Expr,
+    guarded: &mut HashSet<String>,
+    unguarded: &mut HashSet<String>,
+) {
+    let recurse = collect_default_guard_info_from_expr;
+    match expr {
+        Expr::Filter(filter) if filter.name == "default" || filter.name == "d" => {
+            // The primary expression is guarded by `default`
+            if let Some(inner) = &filter.expr
+                && let Some(root_var) = extract_root_variable(inner)
+            {
+                guarded.insert(root_var);
+            }
+            // Recurse into filter args — nested defaults make their inputs guarded too,
+            // while non-default args contain unguarded variables
+            for arg in &filter.args {
+                if let CallArg::Pos(arg_expr) = arg {
+                    recurse(arg_expr, guarded, unguarded);
+                }
+            }
+        }
+        Expr::Var(var) => {
+            unguarded.insert(var.id.to_string());
+        }
+        Expr::Filter(filter) => {
+            if let Some(inner) = &filter.expr {
+                recurse(inner, guarded, unguarded);
+            }
+            for arg in &filter.args {
+                if let CallArg::Pos(arg_expr) = arg {
+                    recurse(arg_expr, guarded, unguarded);
+                }
+            }
+        }
+        Expr::BinOp(binop) => {
+            recurse(&binop.left, guarded, unguarded);
+            recurse(&binop.right, guarded, unguarded);
+        }
+        Expr::UnaryOp(unary) => {
+            recurse(&unary.expr, guarded, unguarded);
+        }
+        Expr::IfExpr(if_expr) => {
+            recurse(&if_expr.test_expr, guarded, unguarded);
+            recurse(&if_expr.true_expr, guarded, unguarded);
+            if let Some(false_expr) = &if_expr.false_expr {
+                recurse(false_expr, guarded, unguarded);
+            }
+        }
+        Expr::Call(call) => {
+            recurse(&call.expr, guarded, unguarded);
+            for arg in &call.args {
+                if let CallArg::Pos(arg_expr) = arg {
+                    recurse(arg_expr, guarded, unguarded);
+                }
+            }
+        }
+        Expr::Test(test) => {
+            recurse(&test.expr, guarded, unguarded);
+            for arg in &test.args {
+                if let CallArg::Pos(arg_expr) = arg {
+                    recurse(arg_expr, guarded, unguarded);
+                }
+            }
+        }
+        Expr::List(list) => {
+            for item in &list.items {
+                recurse(item, guarded, unguarded);
+            }
+        }
+        Expr::GetAttr(get_attr) => {
+            recurse(&get_attr.expr, guarded, unguarded);
+        }
+        Expr::GetItem(get_item) => {
+            recurse(&get_item.expr, guarded, unguarded);
+            recurse(&get_item.subscript_expr, guarded, unguarded);
+        }
+        Expr::Slice(slice) => {
+            recurse(&slice.expr, guarded, unguarded);
+            if let Some(start) = &slice.start {
+                recurse(start, guarded, unguarded);
+            }
+            if let Some(stop) = &slice.stop {
+                recurse(stop, guarded, unguarded);
+            }
+            if let Some(step) = &slice.step {
+                recurse(step, guarded, unguarded);
+            }
+        }
+        Expr::Map(map) => {
+            for key in &map.keys {
+                recurse(key, guarded, unguarded);
+            }
+        }
+        Expr::Const(_) => {}
+    }
+}
+
+/// Collect both guarded and unguarded variable names from a statement AST in a single pass.
+fn collect_default_guard_info_from_ast(
+    node: &Stmt,
+    guarded: &mut HashSet<String>,
+    unguarded: &mut HashSet<String>,
+) {
+    let recurse_expr = collect_default_guard_info_from_expr;
+    let recurse_ast = collect_default_guard_info_from_ast;
+    match node {
+        Stmt::Template(template) => {
+            for child in &template.children {
+                recurse_ast(child, guarded, unguarded);
+            }
+        }
+        Stmt::EmitExpr(emit) => {
+            recurse_expr(&emit.expr, guarded, unguarded);
+        }
+        Stmt::ForLoop(for_loop) => {
+            recurse_expr(&for_loop.iter, guarded, unguarded);
+            for child in &for_loop.body {
+                recurse_ast(child, guarded, unguarded);
+            }
+            for child in &for_loop.else_body {
+                recurse_ast(child, guarded, unguarded);
+            }
+        }
+        Stmt::IfCond(if_cond) => {
+            recurse_expr(&if_cond.expr, guarded, unguarded);
+            for child in &if_cond.true_body {
+                recurse_ast(child, guarded, unguarded);
+            }
+            for child in &if_cond.false_body {
+                recurse_ast(child, guarded, unguarded);
+            }
+        }
+        Stmt::WithBlock(with_block) => {
+            for (_target, expr) in &with_block.assignments {
+                recurse_expr(expr, guarded, unguarded);
+            }
+            for child in &with_block.body {
+                recurse_ast(child, guarded, unguarded);
+            }
+        }
+        Stmt::Set(set) => {
+            recurse_expr(&set.expr, guarded, unguarded);
+        }
+        Stmt::AutoEscape(auto_escape) => {
+            recurse_expr(&auto_escape.enabled, guarded, unguarded);
+            for child in &auto_escape.body {
+                recurse_ast(child, guarded, unguarded);
+            }
+        }
+        Stmt::FilterBlock(filter_block) => {
+            recurse_expr(&filter_block.filter, guarded, unguarded);
+            for child in &filter_block.body {
+                recurse_ast(child, guarded, unguarded);
+            }
+        }
+        Stmt::Block(block) => {
+            for child in &block.body {
+                recurse_ast(child, guarded, unguarded);
+            }
+        }
+        Stmt::Do(do_stmt) => {
+            recurse_expr(&do_stmt.call.expr, guarded, unguarded);
+        }
+        _ => {}
+    }
+}
+
+/// Extract variable names that are *exclusively* guarded by a `default` (or `d`) filter
+/// from a Jinja expression (without `${{ }}` delimiters).
+///
+/// A variable is only considered exclusively guarded if it appears as an input to a
+/// `default`/`d` filter AND does not also appear in any unguarded position.
+/// For example, in `bar | default + bar`, `bar` is NOT exclusively guarded because
+/// it also appears unguarded on the right side of `+`.
+pub fn extract_default_guarded_variables_from_expression(expr: &str) -> HashSet<String> {
+    let mut guarded = HashSet::new();
+    let mut unguarded = HashSet::new();
+    if let Ok(ast) = parse_expr(expr) {
+        collect_default_guard_info_from_expr(&ast, &mut guarded, &mut unguarded);
+    }
+    // Only exclude variables that appear exclusively in guarded positions
+    &guarded - &unguarded
+}
+
+/// Extract variable names that are *exclusively* guarded by a `default` (or `d`) filter
+/// from a Jinja template string (with `${{ }}` delimiters).
+///
+/// A variable is only considered exclusively guarded if it appears as an input to a
+/// `default`/`d` filter AND does not also appear in any unguarded position.
+pub fn extract_default_guarded_variables_from_template(template: &str) -> HashSet<String> {
+    let mut guarded = HashSet::new();
+    let mut unguarded = HashSet::new();
+    if let Ok(ast) = minijinja::machinery::parse(
+        template,
+        "template",
+        Default::default(),
+        WhitespaceConfig::default(),
+    ) {
+        collect_default_guard_info_from_ast(&ast, &mut guarded, &mut unguarded);
+    }
+    &guarded - &unguarded
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -545,5 +767,77 @@ mod tests {
         let mut vars = template.used_variables().to_vec();
         vars.sort();
         assert_eq!(vars, vec!["a", "b", "c"]);
+    }
+
+    #[test]
+    fn test_extract_default_guarded_simple() {
+        // `foo | default("fallback")` — `foo` is guarded
+        let guarded =
+            extract_default_guarded_variables_from_expression(r#"foo | default("fallback")"#);
+        assert_eq!(guarded, HashSet::from(["foo".to_string()]));
+    }
+
+    #[test]
+    fn test_extract_default_guarded_with_d_alias() {
+        // `foo | d("fallback")` — `d` is an alias for `default`
+        let guarded = extract_default_guarded_variables_from_expression(r#"foo | d("fallback")"#);
+        assert_eq!(guarded, HashSet::from(["foo".to_string()]));
+    }
+
+    #[test]
+    fn test_extract_default_guarded_with_filter_chain() {
+        // `foo | replace("a", "b") | default("fallback")` — `foo` is the root variable
+        let guarded = extract_default_guarded_variables_from_expression(
+            r#"foo | replace("a", "b") | default("fallback")"#,
+        );
+        assert_eq!(guarded, HashSet::from(["foo".to_string()]));
+    }
+
+    #[test]
+    fn test_extract_default_guarded_nested() {
+        // `foo | default(bar | default("fallback"))` — both `foo` and `bar` are guarded
+        let guarded = extract_default_guarded_variables_from_expression(
+            r#"foo | default(bar | default("fallback"))"#,
+        );
+        assert_eq!(
+            guarded,
+            HashSet::from(["foo".to_string(), "bar".to_string()])
+        );
+    }
+
+    #[test]
+    fn test_extract_default_guarded_complex_fallback() {
+        // `cxx_compiler_version | default(cxx_compiler | replace("vs", ""))`
+        // — `cxx_compiler_version` is guarded, `cxx_compiler` is NOT (it's used in the fallback)
+        let guarded = extract_default_guarded_variables_from_expression(
+            r#"cxx_compiler_version | default(cxx_compiler | replace("vs", ""))"#,
+        );
+        assert_eq!(guarded, HashSet::from(["cxx_compiler_version".to_string()]));
+    }
+
+    #[test]
+    fn test_extract_default_guarded_no_default() {
+        // No `default` filter — nothing is guarded
+        let guarded = extract_default_guarded_variables_from_expression("foo | lower | upper");
+        assert!(guarded.is_empty());
+    }
+
+    #[test]
+    fn test_extract_default_guarded_var_also_used_unguarded() {
+        // `bar | default("x") + bar` — `bar` is guarded on the left but also used
+        // unguarded on the right, so it should NOT be exclusively guarded
+        let guarded =
+            extract_default_guarded_variables_from_expression(r#"bar | default("x") + bar"#);
+        assert!(
+            guarded.is_empty(),
+            "bar appears in both guarded and unguarded positions, so it should not be excluded"
+        );
+    }
+
+    #[test]
+    fn test_extract_default_guarded_from_template() {
+        let guarded =
+            extract_default_guarded_variables_from_template(r#"${{ foo | default("bar") }}"#);
+        assert_eq!(guarded, HashSet::from(["foo".to_string()]));
     }
 }
