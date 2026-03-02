@@ -110,7 +110,7 @@ jobs:
           S3_SECRET_ACCESS_KEY: ${{ secrets.S3_UPLOAD_ACCESS_KEY_SECRET }}
       - name: Upload binary artifact
         if: always()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v4
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v4
         with:
           name: rattler-build-${{ matrix.os }}
           path: target-pixi/release/rattler-build${{ runner.os == 'Windows' && '.exe' || '' }}
@@ -196,7 +196,7 @@ jobs:
           fi
 
       - name: Install Rust toolchain
-        uses: actions-rust-lang/setup-rust-toolchain@1780873c7b576612439a134613cc4cc74ce5538c # v1
+        uses: actions-rust-lang/setup-rust-toolchain@a0b538fa0b742a6aa35d6e2c169b4bd06d225a98 # v1
         with:
           toolchain: "1.93.1"
           target: ${{ matrix.target }}
@@ -211,7 +211,7 @@ jobs:
 
       - name: Install cross
         if: matrix.use-cross
-        uses: taiki-e/install-action@cfdb446e391c69574ebc316dfb7d7849ec12b940 # v2
+        uses: taiki-e/install-action@d6e286fa45544157a02d45a43742857ebbc25d12 # v2
         with:
           tool: cross
 
@@ -293,7 +293,7 @@ jobs:
           echo "binary-path=binaries/rattler-build-${{ matrix.target }}${{ contains(matrix.target, 'pc-windows') && '.exe' || '' }}" >> $GITHUB_OUTPUT
 
       - name: Upload artifact
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v4
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v4
         with:
           name: ${{ steps.package.outputs.pkg-name }}
           path: ${{ steps.package.outputs.pkg-path }}
@@ -349,7 +349,7 @@ jobs:
           submodules: recursive
 
       - name: Download rattler-build artifact
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v4
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v4
         with:
           name: rattler-build-x86_64-unknown-linux-musl.tar.gz
           path: ./
