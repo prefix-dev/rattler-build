@@ -45,7 +45,6 @@ use crate::{
     tool_configuration,
 };
 
-
 #[allow(missing_docs)]
 #[derive(thiserror::Error, Debug)]
 pub enum TestError {
@@ -437,12 +436,13 @@ pub async fn run_test(
         ValidationMode::default(),
     );
 
-    // Extract to a subdirectory of the temp cache for reading test metadata.
-    // The Installer will handle its own extraction into the temp PackageCache.
-    let package_folder = temp_cache_dir.path().join(format!(
-        "metadata-{}-{}-{}",
-        pkg.identifier.name, pkg.identifier.version, pkg.identifier.build_string
-    ));
+    // Use the package cache to extract the package for reading test metadata.
+    // This avoids manual extraction and reuses the cache properly.
+    let cache_metadata = temp_package_cache
+        .get_or_fetch_from_path(package_file, None)
+        .await
+        .map_err(|e| TestError::TestFailed(format!("failed to cache package: {e}")))?;
+    let package_folder = cache_metadata.path().to_path_buf();
 
     let mut channels = config.channels.clone();
     channels.insert(0, Channel::from_directory(tmp_repo.path()).base_url);
@@ -470,11 +470,6 @@ pub async fn run_test(
     };
 
     tracing::info!("Collecting tests from '{}'", package_folder.display());
-
-    rattler_package_streaming::fs::extract(package_file, &package_folder).map_err(|e| {
-        tracing::error!("Failed to extract package: {:?}", e);
-        TestError::TestFailed(format!("failed to extract package: {:?}", e))
-    })?;
 
     let index_json = IndexJson::from_package_directory(&package_folder)?;
     let env = env_vars_from_package(&index_json);

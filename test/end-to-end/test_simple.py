@@ -129,7 +129,11 @@ def check_info(folder: Path, expected: Path):
 
 
 def test_python_noarch(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
-    rattler_build.build(recipes / "toml", tmp_path)
+    output = rattler_build.build(recipes / "toml", tmp_path)
+
+    # Check that the run export form Python is actually added
+    assert(output.contains("(RE of [host: python])"))
+
     pkg = get_extracted_package(tmp_path, "toml")
 
     assert (pkg / "info/licenses/LICENSE").exists()
@@ -138,6 +142,11 @@ def test_python_noarch(rattler_build: RattlerBuild, recipes: Path, tmp_path: Pat
     assert installer.read_text().strip() == "conda"
 
     check_info(pkg, expected=recipes / "toml" / "expected")
+
+    # load index.json and make sure that `python` is in `depends`
+    index_json = json.loads((pkg / "info/index.json").read_text())
+    assert "depends" in index_json
+    assert "python" in index_json["depends"]
 
 
 def test_render_only_with_solve_does_not_download_packages(
@@ -1422,11 +1431,12 @@ def test_cache_runexports(
 def test_extra_meta_is_recorded_into_about_json(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
 ):
-    rattler_build.build(
+    output = rattler_build.build(
         recipes / "toml",
         tmp_path,
         extra_meta={"flow_run_id": "some_id", "sha": "24ee3"},
     )
+
     pkg = get_extracted_package(tmp_path, "toml")
 
     about_json = json.loads((pkg / "info/about.json").read_text())
