@@ -129,7 +129,7 @@ def check_info(folder: Path, expected: Path):
 
 
 def test_python_noarch(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
-    output = rattler_build.build(recipes / "toml", tmp_path)
+    rattler_build.build(recipes / "toml", tmp_path)
     pkg = get_extracted_package(tmp_path, "toml")
 
     assert (pkg / "info/licenses/LICENSE").exists()
