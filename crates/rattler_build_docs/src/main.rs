@@ -71,10 +71,10 @@ fn subcommand_to_md(parents: &[String], command: &Command) -> String {
     writeln!(buffer, "# {}", name_parts.join("")).unwrap();
 
     // About
-    if command.get_name() != "rattler-build" {
-        if let Some(about) = command.get_about() {
-            writeln!(buffer, "\n{about}").unwrap();
-        }
+    if command.get_name() != "rattler-build"
+        && let Some(about) = command.get_about()
+    {
+        writeln!(buffer, "\n{about}").unwrap();
     }
 
     // Usage
@@ -320,10 +320,10 @@ fn arguments(options: &[&clap::Arg], parents: &[String]) -> String {
         }
 
         // Handle aliases, env, defaults, and options
-        if let Some(aliases) = opt.get_visible_aliases() {
-            if !aliases.is_empty() {
-                writeln!(buffer, "<br>**aliases**: {}", aliases.join(", ")).unwrap();
-            }
+        if let Some(aliases) = opt.get_visible_aliases()
+            && !aliases.is_empty()
+        {
+            writeln!(buffer, "<br>**aliases**: {}", aliases.join(", ")).unwrap();
         }
         if let Some(env) = opt.get_env() {
             writeln!(buffer, "<br>**env**: `{}`", env.to_string_lossy()).unwrap();
