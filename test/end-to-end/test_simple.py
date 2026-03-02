@@ -139,6 +139,14 @@ def test_python_noarch(rattler_build: RattlerBuild, recipes: Path, tmp_path: Pat
 
     check_info(pkg, expected=recipes / "toml" / "expected")
 
+    # load index.json and make sure that `python` is in `depends`
+    index_json = json.loads((pkg / "info/index.json").read_text())
+    assert "depends" in index_json
+    # check that python is in there from `run_exports`
+    assert "python" in index_json["depends"]
+    # check that the direct python requirement is _also_ there
+    assert "python >=3.11" in index_json["depends"]
+
 
 def test_render_only_with_solve_does_not_download_packages(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
@@ -1427,6 +1435,7 @@ def test_extra_meta_is_recorded_into_about_json(
         tmp_path,
         extra_meta={"flow_run_id": "some_id", "sha": "24ee3"},
     )
+
     pkg = get_extracted_package(tmp_path, "toml")
 
     about_json = json.loads((pkg / "info/about.json").read_text())

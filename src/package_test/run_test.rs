@@ -7,7 +7,6 @@
 //! * `imports` - import a list of modules and check if they can be imported
 //! * `files` - check if a list of files exist
 use fs_err as fs;
-use rattler::package_cache::CacheKey;
 use rattler_build_recipe::stage1::{
     TestType,
     tests::{CommandsTest, DownstreamTest, PerlTest, PythonTest, PythonVersion, RTest, RubyTest},
@@ -26,8 +25,6 @@ use rattler_shell::{
 };
 use rattler_solve::{ChannelPriority, SolveStrategy};
 use std::fmt::Write;
-use std::fs::{File, OpenOptions};
-use std::io;
 use std::{
     collections::HashMap,
     io::Write as _,
@@ -37,6 +34,9 @@ use std::{
 use tempfile::TempDir;
 use walkdir::WalkDir;
 
+use rattler::package_cache::PackageCache;
+use rattler_cache::validation::ValidationMode;
+
 use crate::{
     env_vars,
     metadata::{Debug, PlatformWithVirtualPackages},
@@ -44,42 +44,6 @@ use crate::{
     source::copy_dir::CopyDir,
     tool_configuration,
 };
-
-/// A simple file-based lock for package cache operations
-/// TODO: remove once we use temporary package caches for testing
-struct PackageCacheLock {
-    file: File,
-}
-
-impl PackageCacheLock {
-    /// Create a new lock on the given path
-    fn new(path: &Path) -> io::Result<Self> {
-        // Create parent directory if it doesn't exist
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)?;
-        }
-
-        // Open or create the lock file
-        let lock_file_path = path.with_extension("lock");
-        let file = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .truncate(false)
-            .open(&lock_file_path)?;
-
-        // Acquire exclusive lock
-        rattler_prefix_guard::lock_exclusive(&file)?;
-
-        Ok(Self { file })
-    }
-}
-
-impl Drop for PackageCacheLock {
-    fn drop(&mut self) {
-        let _ = rattler_prefix_guard::unlock(&self.file);
-    }
-}
 
 #[allow(missing_docs)]
 #[derive(thiserror::Error, Debug)]
@@ -454,28 +418,31 @@ pub async fn run_test(
         .await
         .map_err(|e| TestError::TestFailed(e.to_string()))?;
 
-    let cache_dir =
-        rattler::default_cache_dir().map_err(|e| TestError::TestFailed(e.to_string()))?;
-
     let pkg = CondaArchiveIdentifier::try_from_path(package_file)
         .ok_or_else(|| TestError::TestFailed("could not get archive identifier".to_string()))?;
 
-    // if the package is already in the cache, remove it.
-    // TODO make this based on SHA256 instead!
-    let cache_key = CacheKey::from(pkg.clone());
-    let package_folder = cache_dir.join("pkgs").join(cache_key.to_string());
+    // Create a layered package cache for test environments:
+    // - Layer 1 (temp dir): writable target for newly downloaded packages
+    // - Layer 2 (global cache): read-only fallback for already-cached packages
+    // This avoids cache key conflicts with the global package cache while
+    // still reusing packages that have already been downloaded (issue #2236).
+    let temp_cache_dir = tempfile::tempdir()?;
+    let global_cache_dir = rattler_cache::default_cache_dir()
+        .map_err(|e| TestError::TestFailed(format!("failed to determine cache directory: {e}")))?
+        .join(rattler_cache::PACKAGE_CACHE_DIR);
+    let temp_package_cache = PackageCache::new_layered(
+        [temp_cache_dir.path().to_path_buf(), global_cache_dir],
+        false,
+        ValidationMode::default(),
+    );
 
-    // Acquire a lock on the package cache directory to prevent race conditions
-    // when multiple tests run in parallel and try to remove/extract the same package
-    let _lock = PackageCacheLock::new(&package_folder)?;
-
-    if package_folder.exists() {
-        tracing::info!(
-            "Removing previously cached package '{}'",
-            package_folder.display()
-        );
-        fs::remove_dir_all(&package_folder)?;
-    }
+    // Use the package cache to extract the package for reading test metadata.
+    // This avoids manual extraction and reuses the cache properly.
+    let cache_metadata = temp_package_cache
+        .get_or_fetch_from_path(package_file, None)
+        .await
+        .map_err(|e| TestError::TestFailed(format!("failed to cache package: {e}")))?;
+    let package_folder = cache_metadata.path().to_path_buf();
 
     let mut channels = config.channels.clone();
     channels.insert(0, Channel::from_directory(tmp_repo.path()).base_url);
@@ -495,15 +462,14 @@ pub async fn run_test(
         target_platform: Some(target_platform),
         host_platform: Some(host_platform.clone()),
         channels,
+        tool_configuration: tool_configuration::Configuration {
+            package_cache: temp_package_cache,
+            ..config.tool_configuration.clone()
+        },
         ..config.clone()
     };
 
     tracing::info!("Collecting tests from '{}'", package_folder.display());
-
-    rattler_package_streaming::fs::extract(package_file, &package_folder).map_err(|e| {
-        tracing::error!("Failed to extract package: {:?}", e);
-        TestError::TestFailed(format!("failed to extract package: {:?}", e))
-    })?;
 
     let index_json = IndexJson::from_package_directory(&package_folder)?;
     let env = env_vars_from_package(&index_json);
@@ -554,7 +520,7 @@ pub async fn run_test(
             config.exclude_newer,
         )
         .await
-        .map_err(|e| TestError::TestEnvironmentSetup(e.to_string()))?;
+        .map_err(|e| TestError::TestEnvironmentSetup(format!("{e:?}")))?;
 
         // These are the legacy tests
         let (test_folder, tests) = legacy_tests_from_folder(&package_folder).await?;
@@ -754,7 +720,7 @@ async fn run_python_test_inner(
         config.exclude_newer,
     )
     .await
-    .map_err(|e| TestError::TestEnvironmentSetup(e.to_string()))?;
+    .map_err(|e| TestError::TestEnvironmentSetup(format!("{e:?}")))?;
 
     let mut imports = String::new();
     for import in &python_test.imports {
@@ -857,7 +823,7 @@ async fn run_perl_test(
         config.exclude_newer,
     )
     .await
-    .map_err(|e| TestError::TestEnvironmentSetup(e.to_string()))?;
+    .map_err(|e| TestError::TestEnvironmentSetup(format!("{e:?}")))?;
 
     let mut imports = String::new();
     tracing::info!("Testing perl imports:\n");
@@ -930,7 +896,7 @@ async fn run_commands_test(
             config.exclude_newer,
         )
         .await
-        .map_err(|e| TestError::TestEnvironmentSetup(e.to_string()))?;
+        .map_err(|e| TestError::TestEnvironmentSetup(format!("{e:?}")))?;
         Some(build_prefix)
     } else {
         None
@@ -967,7 +933,7 @@ async fn run_commands_test(
         config.exclude_newer,
     )
     .await
-    .map_err(|e| TestError::TestEnvironmentSetup(e.to_string()))?;
+    .map_err(|e| TestError::TestEnvironmentSetup(format!("{e:?}")))?;
 
     let platform = Platform::current();
     let mut env_vars = env_vars::os_vars(&run_prefix, &platform);
@@ -1156,7 +1122,7 @@ async fn run_r_test(
         config.exclude_newer,
     )
     .await
-    .map_err(|e| TestError::TestEnvironmentSetup(e.to_string()))?;
+    .map_err(|e| TestError::TestEnvironmentSetup(format!("{e:?}")))?;
 
     let mut libraries = String::new();
     tracing::info!("Testing R libraries:\n");
@@ -1234,7 +1200,7 @@ async fn run_ruby_test(
         config.exclude_newer,
     )
     .await
-    .map_err(|e| TestError::TestEnvironmentSetup(e.to_string()))?;
+    .map_err(|e| TestError::TestEnvironmentSetup(format!("{e:?}")))?;
 
     let mut requires = String::new();
     tracing::info!("Testing Ruby requires:\n");
