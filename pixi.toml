@@ -29,11 +29,12 @@ update-snapshots = "pytest test/end-to-end --snapshot-update"
 check-native-tls = "python scripts/check-native-tls.py"
 # Playground tasks are in the "playground" environment/feature (see below)
 
-# Expects `rustup` and `wasm-pack` to be installed on the host system
+# Expects `rustup` with target `wasm32-unknown-unknown` to be installed on the host system
 [feature.playground.dependencies]
 python = ">=3.12,<4"
 clang = ">=21.1.8,<23"
 livereload = ">=2.7,<3"
+wasm-pack = ">=0.14.0,<0.15"
 
 [feature.playground.tasks]
 playground-build = { cmd = "python scripts/build_playground.py", description = "Build the WASM playground", inputs = [
