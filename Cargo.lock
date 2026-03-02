@@ -4904,6 +4904,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "rattler_build_docs"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "fs-err",
+ "itertools 0.14.0",
+ "rattler-build",
+ "rattler_conda_types",
+]
+
+[[package]]
 name = "rattler_build_jinja"
 version = "0.1.0"
 dependencies = [

@@ -26,6 +26,7 @@ members = [
   "crates/rattler_build_yaml_parser",
   "crates/rattler_build_allocator",
   "crates/rattler_build_package",
+  "crates/rattler_build_docs",
 ]
 exclude = ["crates/rattler_build_playground"]
 
@@ -176,10 +177,6 @@ s3 = [
 ]
 sigstore = ['rattler_upload/sigstore-sign']
 recipe-generation = ["rattler_build_recipe_generator"]
-# This feature needs to add a dependency on
-# clap-markdown = { git = "https://github.com/ruben-arts/clap-markdown", branch = "main" }
-# but in order to be able to publish to crates we remove this feature
-generate-cli-docs = []
 patch-test-extra = []
 
 [[bin]]

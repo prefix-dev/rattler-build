@@ -73,13 +73,7 @@ pub enum SubCommands {
     /// Handle authentication to external channels
     Auth(rattler::cli::auth::Args),
 
-    /// Debug a recipe build.
-    ///
-    /// Subcommands:
-    ///   setup     - Set up a debug environment from a recipe
-    ///   shell     - Open an interactive debug shell
-    ///   host-add  - Install additional packages into the host prefix
-    ///   build-add - Install additional packages into the build prefix
+    /// Debug a recipe build
     Debug(DebugArgs),
 
     /// Package-related subcommands
