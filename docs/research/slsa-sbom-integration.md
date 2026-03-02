@@ -87,7 +87,7 @@ is natural alignment here.
 ### CycloneDX (CDX)
 
 - **Maintained by**: OWASP Foundation
-- **Latest version**: 1.6.1
+- **Latest version**: 1.7 (October 2025; became ECMA-424 at 1.6)
 - **Formats**: JSON, XML, Protocol Buffers
 - **Primary focus**: Security and vulnerability management
 - **Key strengths**:
@@ -103,6 +103,7 @@ is natural alignment here.
 |---|---|---|
 | License compliance (enterprise) | Excellent | Good |
 | Security/vulnerability focus | Good (3.0) | Excellent |
+| Provenance citations | No | Yes (1.7 Citations) |
 | Build process capture | Partial (3.0 Build profile) | Excellent (Formulation) |
 | ISO standard | Yes | No |
 | Already aligned (SPDX licenses) | Yes | N/A |
@@ -164,7 +165,7 @@ framework for ensuring the integrity of software artifacts throughout the supply
 chain. It focuses primarily on **build provenance** — proving that an artifact
 was built from specific sources by a specific builder.
 
-### SLSA Build Track Levels (v1.0 / v1.1)
+### SLSA Build Track Levels (v1.0 / v1.1 / v1.2)
 
 | Level | Name | What it means |
 |-------|------|---------------|
@@ -172,6 +173,25 @@ was built from specific sources by a specific builder.
 | **L1** | Provenance Exists | Build process documented; provenance exists (can be unsigned) |
 | **L2** | Hosted Build + Signed Provenance | Built on a hosted platform; provenance is signed and tamper-evident |
 | **L3** | Hardened Build Platform | Build platform provides isolation between builds; signing keys are separate from build steps |
+
+### SLSA Source Track (NEW in v1.2, November 2025)
+
+SLSA v1.2 introduced a **Source Track**, covering threats from authoring,
+reviewing, and managing source code:
+
+| Level | Name | What it means |
+|-------|------|---------------|
+| **Source L1** | Version controlled | Source is in a version control system |
+| **Source L2** | History and provenance | Branch protection, verified commits |
+| **Source L3** | Continuous enforcement | Technical controls continuously enforced |
+
+### Version timeline
+
+- **v1.0** (2023): Build Track only
+- **v1.1** (April 2025): Backwards-compatible clarifications, VSA verifier
+  metadata
+- **v1.2** (November 2025): Source Track introduction, backwards-compatible with
+  v1.1
 
 ### Where rattler-build stands today
 
@@ -309,6 +329,14 @@ attestations, and rattler-build can hook into it.
    - Stores the attestation in the GitHub Attestation API
    - For public repos: also logs to Sigstore's public transparency log
    - For private repos (Enterprise Cloud): uses GitHub's own Sigstore instance
+   - Note: `actions/attest-build-provenance` (v4+) is now just a wrapper
+     around `actions/attest`
+
+1. **`actions/attest-sbom`** — Dedicated action for SBOM attestations
+   - Accepts an external SPDX or CycloneDX JSON file
+   - Creates a signed in-toto attestation with the SBOM as predicate
+   - This is the key integration point: rattler-build generates the SBOM,
+     `actions/attest-sbom` signs and stores it
 
 2. **SLSA Build Levels achievable on GitHub Actions**:
    - **L2**: Use `actions/attest` directly in your build job ← rattler-build can
