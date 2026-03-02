@@ -199,6 +199,7 @@ impl Tests {
         let platform = Platform::current();
         let mut env_vars = env_vars::os_vars(environment, &platform);
         env_vars.retain(|key, _| key != ShellEnum::default().path_var(&platform));
+        env_vars.extend(env_vars::python_vars_from_prefix(environment, platform));
         env_vars.extend(pkg_vars.iter().map(|(k, v)| (k.clone(), Some(v.clone()))));
         env_vars.insert(
             "PREFIX".to_string(),
@@ -972,6 +973,7 @@ async fn run_commands_test(
     let platform = Platform::current();
     let mut env_vars = env_vars::os_vars(&run_prefix, &platform);
     env_vars.retain(|key, _| key != ShellEnum::default().path_var(&platform));
+    env_vars.extend(env_vars::python_vars_from_prefix(&run_prefix, platform));
     env_vars.extend(pkg_vars.iter().map(|(k, v)| (k.clone(), Some(v.clone()))));
     env_vars.insert(
         "PREFIX".to_string(),

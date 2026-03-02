@@ -28,6 +28,79 @@ fn get_sitepackages_dir(prefix: &Path, platform: Platform, py_ver: &str) -> Path
     get_stdlib_dir(prefix, platform, py_ver).join("site-packages")
 }
 
+/// Discover the Python version by inspecting the host prefix filesystem.
+///
+/// On Unix, looks for `lib/pythonX.Y/` directories containing `site-packages`.
+/// On Windows, looks for `pythonX.Y.dll` or `include/pythonX.Y/` to determine the version.
+fn discover_python_version(prefix: &Path, platform: Platform) -> Option<String> {
+    if platform.is_windows() {
+        // On Windows, look for include/pythonX.Y/ directory
+        let include_dir = prefix.join("include");
+        if let Ok(entries) = fs_err::read_dir(&include_dir) {
+            for entry in entries.flatten() {
+                let name = entry.file_name();
+                let name_str = name.to_string_lossy();
+                if let Some(py_ver) = name_str.strip_prefix("python")
+                    && py_ver.contains('.')
+                    && entry.path().is_dir()
+                {
+                    return Some(py_ver.to_string());
+                }
+            }
+        }
+    } else {
+        // On Unix, look for lib/pythonX.Y/ directories with site-packages
+        let lib_dir = prefix.join("lib");
+        if let Ok(entries) = fs_err::read_dir(&lib_dir) {
+            for entry in entries.flatten() {
+                let name = entry.file_name();
+                let name_str = name.to_string_lossy();
+                if let Some(py_ver) = name_str.strip_prefix("python")
+                    && py_ver.contains('.')
+                    && entry.path().is_dir()
+                    && entry.path().join("site-packages").is_dir()
+                {
+                    return Some(py_ver.to_string());
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Discover Python environment variables by inspecting the prefix filesystem.
+///
+/// This is useful for test environments where we don't have an `Output` but need
+/// Python-related env vars like `SP_DIR`, `PY_VER`, `STDLIB_DIR`, and `PYTHON`.
+pub fn python_vars_from_prefix(
+    prefix: &Path,
+    platform: Platform,
+) -> HashMap<String, Option<String>> {
+    let mut result = HashMap::new();
+
+    if platform.is_windows() {
+        let python = prefix.join("python.exe");
+        insert!(result, "PYTHON", python.to_string_lossy());
+    } else {
+        let python = prefix.join("bin/python");
+        insert!(result, "PYTHON", python.to_string_lossy());
+    }
+
+    if let Some(py_ver) = discover_python_version(prefix, platform) {
+        let py_ver_parts: Vec<_> = py_ver.split('.').take(2).collect();
+        let py_ver_str = py_ver_parts.join(".");
+        let stdlib_dir = get_stdlib_dir(prefix, platform, &py_ver_str);
+        let site_packages_dir = get_sitepackages_dir(prefix, platform, &py_ver_str);
+        let py3k = if py_ver_parts[0] == "3" { "1" } else { "0" };
+        insert!(result, "PY3K", py3k);
+        insert!(result, "PY_VER", py_ver_str);
+        insert!(result, "STDLIB_DIR", stdlib_dir.to_string_lossy());
+        insert!(result, "SP_DIR", site_packages_dir.to_string_lossy());
+    }
+
+    result
+}
+
 /// Returns a map of environment variables for Python that are used in the build process.
 ///
 /// Variables:
@@ -55,10 +128,18 @@ pub fn python_vars(output: &Output) -> HashMap<String, Option<String>> {
         .get(&"python".into())
         .map(|s| s.to_string());
     if python_version.is_none()
-        && let Some((record, requested)) = output.find_resolved_package("python")
-        && requested
+        && let Some((record, _)) = output.find_resolved_package("python")
     {
+        // Use the resolved python version even if it's a transitive dependency
+        // (e.g. pulled in by pip in noarch python packages)
         python_version = Some(record.package_record.version.to_string());
+    }
+
+    // If still not found, try to discover Python from the host prefix filesystem.
+    // This handles cases where Python is installed but not in the resolved dependencies
+    // (e.g. noarch python packages where python is only a run dependency).
+    if python_version.is_none() {
+        python_version = discover_python_version(output.prefix(), output.host_platform().platform);
     }
 
     if let Some(py_ver) = python_version {
