@@ -3157,7 +3157,7 @@ error is thrown).</p>
 </ul>
 <h2 id="tests">Tests<a class="headerlink" href="#tests" title="Permanent link">#</a></h2>
 <p>You can write tests using minijinja to check whether objects have certain properties.
-The syntax for a filter is <code>{{ variable is test_name }}</code>.</p>
+The syntax for a test is <code>${{ variable is test_name }}</code>.</p>
 <ul>
 <li><code>undefined</code>: Check whether a variable is undefined.</li>
 <li><code>defined</code>: Check whether a variable is defined.</li>
@@ -3173,36 +3173,36 @@ The syntax for a filter is <code>{{ variable is test_name }}</code>.</p>
 <li><code>string</code>: Check whether a variable is a string.</li>
 <li><code>sequence</code>: Check whether a variable is a sequence.</li>
 <li><code>boolean</code>: Check whether a variable is a boolean.</li>
-<li><code>startingwith</code>: Check whether a variable is starting with another string: <code>{{ python is startingwith('3.12') }}</code></li>
-<li><code>endingwith</code>: Check whether a variable is starting with another string: <code>{{ python is endingwith('.*') }}</code></li>
+<li><code>startingwith</code>: Check whether a variable is starting with another string: <code>${{ python is startingwith('3.12') }}</code></li>
+<li><code>endingwith</code>: Check whether a variable is starting with another string: <code>${{ python is endingwith('.*') }}</code></li>
 </ul>
 <h2 id="filters">Filters<a class="headerlink" href="#filters" title="Permanent link">#</a></h2>
 <p>A feature of <code>jinja</code> is called "filters". Filters are functions that can be
 applied to variables in a template expression.</p>
-<p>The syntax for a filter is <code>{{ variable | filter_name }}</code>. A filter can also
+<p>The syntax for a filter is <code>${{ variable | filter_name }}</code>. A filter can also
 take arguments, such as <code>... | replace('foo', 'bar')</code>.</p>
 <p>The following Jinja filters are available, taken from the upstream <code>minijinja</code>
 library:</p>
 <ul>
-<li><code>replace</code>: replace a string with another string (e.g. <code>"{{ 'foo' | replace('oo', 'aa') }}"</code> will return <code>"faa"</code>)</li>
-<li><code>lower</code>: convert a string to lowercase (e.g. <code>"{{ 'FOO' | lower }}"</code> will return <code>"foo"</code>)</li>
-<li><code>upper</code>: convert a string to uppercase (e.g. <code>"{{ 'foo' | upper }}"</code> will
-return <code>"FOO"</code>) - <code>int</code>: convert a string to an integer (e.g. <code>"{{ '42' | int }}"</code> will return <code>42</code>)</li>
-<li><code>abs</code>: return the absolute value of a number (e.g. <code>"{{ -42 | abs }}"</code> will return <code>42</code>)</li>
-<li><code>bool</code>: convert a value to a boolean (e.g. <code>"{{ 'foo' | bool }}"</code> will return <code>true</code>)</li>
-<li><code>default</code>: return a default value if the value is falsy (e.g. <code>"{{ '' | default('foo') }}"</code> will return <code>"foo"</code>)</li>
-<li><code>first</code>: return the first element of a list (e.g. <code>"{{ [1, 2, 3] | first }}"</code>
-will return <code>1</code>) - <code>last</code>: return the last element of a list (e.g. <code>"{{ [1, 2, 3] | last }}"</code> will return <code>3</code>)</li>
-<li><code>length</code>: return the length of a list (e.g. <code>"{{ [1, 2, 3] | length }}"</code> will return <code>3</code>)</li>
-<li><code>list</code>: convert a string to a list (e.g. <code>"{{ 'foo' | list }}"</code> will return <code>['f', 'o', 'o']</code>)</li>
-<li><code>join</code>: join a list with a separator (e.g. <code>"{{ [1, 2, 3] | join('.') }}"</code> will return <code>"1.2.3"</code>)</li>
-<li><code>min</code>: return the minimum value of a list (e.g. <code>"{{ [1, 2, 3] | min }}"</code> will return <code>1</code>)</li>
-<li><code>max</code>: return the maximum value of a list (e.g. <code>"{{ [1, 2, 3] | max }}"</code> will return <code>3</code>)</li>
-<li><code>reverse</code>: reverse a list (e.g. <code>"{{ [1, 2, 3] | reverse }}"</code> will return <code>[3, 2, 1]</code>)</li>
-<li><code>sort</code>: sort a list (e.g. <code>"{{ [3, 1, 2] | sort }}"</code> will return <code>[1, 2, 3]</code>)</li>
-<li><code>trim</code>: remove leading and trailing whitespace from a string (e.g. <code>"{{ ' foo ' | trim }}"</code> will return <code>"foo"</code>)</li>
-<li><code>unique</code>: remove duplicates from a list (e.g. <code>"{{ [1, 2, 1, 3] | unique }}"</code> will return <code>[1, 2, 3]</code>)</li>
-<li><code>split</code>: split a string into a list (e.g. <code>"{{ '1.2.3' | split('.') | list }}"</code> will return <code>['1', '2', '3']</code>). By default, splits on whitespace.</li>
+<li><code>replace</code>: replace a string with another string (e.g. <code>"${{ 'foo' | replace('oo', 'aa') }}"</code> will return <code>"faa"</code>)</li>
+<li><code>lower</code>: convert a string to lowercase (e.g. <code>"${{ 'FOO' | lower }}"</code> will return <code>"foo"</code>)</li>
+<li><code>upper</code>: convert a string to uppercase (e.g. <code>"${{ 'foo' | upper }}"</code> will return <code>"FOO"</code>)</li>
+<li><code>int</code>: convert a string to an integer (e.g. <code>"${{ '42' | int }}"</code> will return <code>42</code>)</li>
+<li><code>abs</code>: return the absolute value of a number (e.g. <code>"${{ -42 | abs }}"</code> will return <code>42</code>)</li>
+<li><code>bool</code>: convert a value to a boolean (e.g. <code>"${{ 'foo' | bool }}"</code> will return <code>true</code>)</li>
+<li><code>default</code>: return a default value if the value is falsy (e.g. <code>"${{ '' | default('foo') }}"</code> will return <code>"foo"</code>)</li>
+<li><code>first</code>: return the first element of a list (e.g. <code>"${{ [1, 2, 3] | first }}"</code> will return <code>1</code>)</li>
+<li><code>last</code>: return the last element of a list (e.g. <code>"${{ [1, 2, 3] | last }}"</code> will return <code>3</code>)</li>
+<li><code>length</code>: return the length of a list (e.g. <code>"${{ [1, 2, 3] | length }}"</code> will return <code>3</code>)</li>
+<li><code>list</code>: convert a string to a list (e.g. <code>"${{ 'foo' | list }}"</code> will return <code>['f', 'o', 'o']</code>)</li>
+<li><code>join</code>: join a list with a separator (e.g. <code>"${{ [1, 2, 3] | join('.') }}"</code> will return <code>"1.2.3"</code>)</li>
+<li><code>min</code>: return the minimum value of a list (e.g. <code>"${{ [1, 2, 3] | min }}"</code> will return <code>1</code>)</li>
+<li><code>max</code>: return the maximum value of a list (e.g. <code>"${{ [1, 2, 3] | max }}"</code> will return <code>3</code>)</li>
+<li><code>reverse</code>: reverse a list (e.g. <code>"${{ [1, 2, 3] | reverse }}"</code> will return <code>[3, 2, 1]</code>)</li>
+<li><code>sort</code>: sort a list (e.g. <code>"${{ [3, 1, 2] | sort }}"</code> will return <code>[1, 2, 3]</code>)</li>
+<li><code>trim</code>: remove leading and trailing whitespace from a string (e.g. <code>"${{ ' foo ' | trim }}"</code> will return <code>"foo"</code>)</li>
+<li><code>unique</code>: remove duplicates from a list (e.g. <code>"${{ [1, 2, 1, 3] | unique }}"</code> will return <code>[1, 2, 3]</code>)</li>
+<li><code>split</code>: split a string into a list (e.g. <code>"${{ '1.2.3' | split('.') | list }}"</code> will return <code>['1', '2', '3']</code>). By default, splits on whitespace.</li>
 </ul>
 <details>
 <summary>Removed filters</summary>
