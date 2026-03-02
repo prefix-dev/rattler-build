@@ -130,10 +130,6 @@ def check_info(folder: Path, expected: Path):
 
 def test_python_noarch(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     output = rattler_build.build(recipes / "toml", tmp_path)
-
-    # Check that the run export form Python is actually added
-    assert("(RE of [host: python])" in output)
-
     pkg = get_extracted_package(tmp_path, "toml")
 
     assert (pkg / "info/licenses/LICENSE").exists()
@@ -146,7 +142,10 @@ def test_python_noarch(rattler_build: RattlerBuild, recipes: Path, tmp_path: Pat
     # load index.json and make sure that `python` is in `depends`
     index_json = json.loads((pkg / "info/index.json").read_text())
     assert "depends" in index_json
+    # check that python is in there from `run_exports`
     assert "python" in index_json["depends"]
+    # check that the direct python requirement is _also_ there
+    assert "python >=3.11" in index_json["depends"]
 
 
 def test_render_only_with_solve_does_not_download_packages(
