@@ -168,7 +168,7 @@ nav:
   - References:
       - Recipe file: reference/recipe_file.md
       - Multi-Output Recipes: reference/multi_output.md
-      - CLI: reference/cli.md
+      - CLI: reference/cli/rattler-build.md
       - Jinja: reference/jinja.md
       - Rattler Index: rattler_index.md
 
