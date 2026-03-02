@@ -138,7 +138,7 @@ pub struct BaseClientBuilder {
     insecure_hosts: Option<Vec<String>>,
     #[cfg(feature = "middleware")]
     auth_storage: Option<rattler_networking::AuthenticationStorage>,
-    #[cfg(feature = "middleware")]
+    #[cfg(all(feature = "middleware", feature = "s3"))]
     s3_config:
         Option<std::collections::HashMap<String, rattler_networking::s3_middleware::S3Config>>,
     #[cfg(feature = "middleware")]
@@ -155,7 +155,7 @@ impl Default for BaseClientBuilder {
             insecure_hosts: None,
             #[cfg(feature = "middleware")]
             auth_storage: None,
-            #[cfg(feature = "middleware")]
+            #[cfg(all(feature = "middleware", feature = "s3"))]
             s3_config: None,
             #[cfg(feature = "middleware")]
             mirror_config: None,
@@ -193,7 +193,7 @@ impl BaseClientBuilder {
     }
 
     /// Set S3 s3 configuration
-    #[cfg(feature = "middleware")]
+    #[cfg(all(feature = "middleware", feature = "s3"))]
     pub fn with_s3(
         mut self,
         s3_config: std::collections::HashMap<String, rattler_networking::s3_middleware::S3Config>,
@@ -220,7 +220,16 @@ impl BaseClientBuilder {
         #[cfg(feature = "middleware")]
         {
             let has_middleware = self.auth_storage.is_some()
-                || self.s3_config.is_some()
+                || {
+                    #[cfg(feature = "s3")]
+                    {
+                        self.s3_config.is_some()
+                    }
+                    #[cfg(not(feature = "s3"))]
+                    {
+                        false
+                    }
+                }
                 || self.mirror_config.is_some();
             if has_middleware {
                 return self.build_with_middleware();
@@ -242,10 +251,9 @@ impl BaseClientBuilder {
 
     #[cfg(feature = "middleware")]
     fn build_with_middleware(self) -> BaseClient {
-        use rattler_networking::{
-            AuthenticationMiddleware, mirror_middleware::MirrorMiddleware,
-            s3_middleware::S3Middleware,
-        };
+        #[cfg(feature = "s3")]
+        use rattler_networking::s3_middleware::S3Middleware;
+        use rattler_networking::{AuthenticationMiddleware, mirror_middleware::MirrorMiddleware};
         use std::sync::Arc;
 
         let user_agent = self
@@ -273,6 +281,7 @@ impl BaseClientBuilder {
         let mirror_mw = self
             .mirror_config
             .map(|cfg| Arc::new(MirrorMiddleware::from_map(cfg)));
+        #[cfg(feature = "s3")]
         let s3_mw = self
             .s3_config
             .map(|cfg| Arc::new(S3Middleware::new(cfg, auth_storage.clone())));
@@ -292,6 +301,7 @@ impl BaseClientBuilder {
         if let Some(mw) = &mirror_mw {
             client_builder = client_builder.with_arc(mw.clone());
         }
+        #[cfg(feature = "s3")]
         if let Some(mw) = &s3_mw {
             client_builder = client_builder.with_arc(mw.clone());
         }
@@ -311,6 +321,7 @@ impl BaseClientBuilder {
         if let Some(mw) = &mirror_mw {
             dangerous_client_builder = dangerous_client_builder.with_arc(mw.clone());
         }
+        #[cfg(feature = "s3")]
         if let Some(mw) = &s3_mw {
             dangerous_client_builder = dangerous_client_builder.with_arc(mw.clone());
         }
