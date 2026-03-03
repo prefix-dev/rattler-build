@@ -22,7 +22,6 @@ test-all = { depends-on = ["test-slow", "test-end-to-end"] }
 install-as = { cmd = "python scripts/install.py", depends-on = [
   "build-release",
 ], description = "Install release build to a custom location" }
-test-ci = "cargo test --release -p rust-tests"
 generate-cli-docs = "cargo run --manifest-path crates/rattler_build_docs/Cargo.toml"
 generate-test-data = "cargo r --release --bin patch-apply-gen-test-data"
 update-snapshots = "pytest test/end-to-end --snapshot-update"
