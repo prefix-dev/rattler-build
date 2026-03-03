@@ -613,6 +613,7 @@ pub async fn get_build_output(
             finalized_sources: None,
             finalized_cache_dependencies: None,
             finalized_cache_sources: None,
+            cached_prefix_info: None,
             system_tools: SystemTools::new(),
             build_summary: Arc::new(Mutex::new(BuildSummary::default())),
             extra_meta: Some(

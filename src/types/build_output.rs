@@ -20,6 +20,7 @@ use std::{
 
 use crate::{
     console_utils::github_integration_enabled,
+    post_process::package_nature::CachedPrefixInfo,
     render::resolved_dependencies::FinalizedDependencies,
     system_tools::SystemTools,
     types::{BuildConfiguration, BuildSummary, PlatformWithVirtualPackages},
@@ -49,6 +50,13 @@ pub struct BuildOutput {
     /// The finalized sources from the cache (if there is a cache instruction)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub finalized_cache_sources: Option<Vec<Source>>,
+
+    /// Cached prefix info from the staging cache's host environment.
+    /// Used by linking checks to attribute shared libraries to packages
+    /// that were installed during the staging cache build but are not
+    /// physically present in the current host prefix.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cached_prefix_info: Option<CachedPrefixInfo>,
 
     /// Summary of the build
     #[serde(skip)]

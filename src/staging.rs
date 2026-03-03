@@ -23,6 +23,7 @@ use crate::{
     env_vars,
     metadata::{Output, build_reindexed_channels},
     packaging::Files,
+    post_process::package_nature::{CachedPrefixInfo, PrefixInfo},
     render::resolved_dependencies::{
         FinalizedDependencies, RunExportsDownload, install_environments, resolve_dependencies,
     },
@@ -72,6 +73,13 @@ pub struct StagingCacheMetadata {
 
     /// The variant configuration that was used
     pub variant: BTreeMap<NormalizedKey, Variable>,
+
+    /// Cached prefix info (path-to-package and package nature mappings)
+    /// from the host environment at staging cache build time.
+    /// This allows linking checks to attribute shared libraries to their
+    /// providing packages without needing the conda-meta records installed.
+    #[serde(default)]
+    pub cached_prefix_info: CachedPrefixInfo,
 }
 
 impl Output {
@@ -142,7 +150,7 @@ impl Output {
     /// 2. If yes, restore the cached files to the prefix
     /// 3. If no, build the staging cache and save it
     ///
-    /// Returns the finalized dependencies and sources from the staging cache
+    /// Returns the finalized dependencies, sources, and cached prefix info
     pub async fn build_or_restore_staging_cache(
         &self,
         staging: &StagingCache,
@@ -151,6 +159,7 @@ impl Output {
         (
             FinalizedDependencies,
             Vec<rattler_build_recipe::stage1::Source>,
+            CachedPrefixInfo,
         ),
         miette::Error,
     > {
@@ -217,6 +226,7 @@ impl Output {
         (
             FinalizedDependencies,
             Vec<rattler_build_recipe::stage1::Source>,
+            CachedPrefixInfo,
         ),
         miette::Error,
     > {
@@ -368,6 +378,12 @@ impl Output {
         .run()
         .into_diagnostic()?;
 
+        // Capture prefix info (path-to-package and package nature mappings)
+        // from the host environment while conda-meta records are still present.
+        // This data is needed by linking checks in inheriting outputs.
+        let prefix_info = PrefixInfo::from_prefix(self.prefix()).into_diagnostic()?;
+        let cached_prefix_info = CachedPrefixInfo::from_prefix_info(&prefix_info, &copied_files);
+
         // Save metadata
         let metadata = StagingCacheMetadata {
             name: staging.name.clone(),
@@ -377,6 +393,7 @@ impl Output {
             work_dir_files: copied_work_dir.copied_paths().to_vec(),
             prefix: self.prefix().to_path_buf(),
             variant: staging.used_variant.clone(),
+            cached_prefix_info,
         };
 
         let metadata_json = serde_json::to_string_pretty(&metadata).into_diagnostic()?;
@@ -388,7 +405,11 @@ impl Output {
             metadata.work_dir_files.len()
         );
 
-        Ok((finalized_dependencies, finalized_sources))
+        Ok((
+            finalized_dependencies,
+            finalized_sources,
+            metadata.cached_prefix_info,
+        ))
     }
 
     /// Restore a staging cache from disk
@@ -400,6 +421,7 @@ impl Output {
         (
             FinalizedDependencies,
             Vec<rattler_build_recipe::stage1::Source>,
+            CachedPrefixInfo,
         ),
         miette::Error,
     > {
@@ -439,7 +461,11 @@ impl Output {
             metadata.name
         );
 
-        Ok((metadata.finalized_dependencies, metadata.finalized_sources))
+        Ok((
+            metadata.finalized_dependencies,
+            metadata.finalized_sources,
+            metadata.cached_prefix_info,
+        ))
     }
 
     /// Process all staging caches for this output
@@ -454,6 +480,7 @@ impl Output {
         Option<(
             FinalizedDependencies,
             Vec<rattler_build_recipe::stage1::Source>,
+            CachedPrefixInfo,
         )>,
         miette::Error,
     > {
@@ -470,7 +497,7 @@ impl Output {
                 "Building or restoring staging cache: {}",
                 staging_cache.name
             );
-            let (_deps, _sources) = self
+            let (_deps, _sources, _prefix_info) = self
                 .build_or_restore_staging_cache(staging_cache, tool_configuration)
                 .await?;
         }
@@ -491,11 +518,11 @@ impl Output {
                 })?;
 
             // Get or build the cache
-            let (deps, sources) = self
+            let (deps, sources, cached_prefix_info) = self
                 .build_or_restore_staging_cache(staging, tool_configuration)
                 .await?;
 
-            Ok(Some((deps, sources)))
+            Ok(Some((deps, sources, cached_prefix_info)))
         } else {
             Ok(None)
         }
