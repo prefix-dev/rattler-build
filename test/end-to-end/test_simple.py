@@ -198,7 +198,12 @@ def test_abi3_cross_compile_ignores_python_run_exports(
         tmp_path,
         with_solve=True,
         custom_channels=["conda-forge"],
-        extra_args=["--build-platform", "linux-64", "--target-platform", "linux-ppc64le"],
+        extra_args=[
+            "--build-platform",
+            "linux-64",
+            "--target-platform",
+            "linux-ppc64le",
+        ],
         raw=True,
         env=env,
     )
@@ -208,7 +213,9 @@ def test_abi3_cross_compile_ignores_python_run_exports(
     outputs = json.loads(result.stdout or "[]")
     assert len(outputs) >= 1, "expected at least one output"
 
-    run_deps = outputs[0].get("finalized_dependencies", {}).get("run", {}).get("depends", [])
+    run_deps = (
+        outputs[0].get("finalized_dependencies", {}).get("run", {}).get("depends", [])
+    )
 
     # Collect all run-export entries (they have a "run_export" key in the JSON)
     run_export_deps = [dep for dep in run_deps if "run_export" in dep]
@@ -216,7 +223,8 @@ def test_abi3_cross_compile_ignores_python_run_exports(
     # cross-python_linux-ppc64le exports a python version pin to run deps; for abi3
     # packages this must be suppressed
     cross_python_exports = [
-        dep for dep in run_export_deps
+        dep
+        for dep in run_export_deps
         if dep.get("run_export", "").startswith("cross-python")
     ]
     assert not cross_python_exports, (
@@ -226,7 +234,8 @@ def test_abi3_cross_compile_ignores_python_run_exports(
 
     # python in host exports python_abi; likewise must be suppressed for abi3
     python_abi_exports = [
-        dep for dep in run_export_deps
+        dep
+        for dep in run_export_deps
         if dep.get("run_export") == "python" and "python_abi" in dep.get("spec", "")
     ]
     assert not python_abi_exports, (
