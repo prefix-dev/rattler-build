@@ -8,6 +8,8 @@ pub mod cache;
 pub mod error;
 pub mod index;
 pub mod lock;
+#[cfg(feature = "sigstore")]
+mod sigstore;
 pub mod source;
 
 pub use builder::SourceCacheBuilder;

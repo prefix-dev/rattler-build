@@ -10,6 +10,7 @@ description = "Networking utilities for rattler-build"
 [features]
 default = []
 middleware = ["rattler_networking"]
+s3 = ["rattler_networking?/s3"]
 native-tls = ["reqwest/native-tls", "rattler_networking?/native-tls"]
 rustls-tls = [
   "reqwest/rustls-tls",

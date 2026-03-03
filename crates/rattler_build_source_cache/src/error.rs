@@ -69,6 +69,7 @@ pub enum CacheError {
     #[error("Invalid attestation bundle: {0}")]
     InvalidAttestationBundle(String),
 
+    #[cfg(feature = "sigstore")]
     #[error("Failed to initialize sigstore trust root: {0}")]
     SigstoreTrustRoot(String),
 

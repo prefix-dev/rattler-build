@@ -174,14 +174,14 @@ pub fn reqwest_client_from_auth_storage(
 ) -> Result<rattler_build_networking::BaseClient, AuthenticationStorageError> {
     let auth_storage = get_auth_store(auth_file)?;
 
-    Ok(rattler_build_networking::BaseClient::builder()
+    let builder = rattler_build_networking::BaseClient::builder()
         .user_agent(APP_USER_AGENT)
         .timeout(5 * 60)
         .insecure_hosts(allow_insecure_host.unwrap_or_default())
-        .with_authentication(auth_storage)
-        .with_s3(s3_middleware_config)
-        .with_mirrors(mirror_middleware_config)
-        .build())
+        .with_authentication(auth_storage);
+    #[cfg(feature = "s3")]
+    let builder = builder.with_s3(s3_middleware_config);
+    Ok(builder.with_mirrors(mirror_middleware_config).build())
 }
 
 /// A builder for a [`Configuration`].
