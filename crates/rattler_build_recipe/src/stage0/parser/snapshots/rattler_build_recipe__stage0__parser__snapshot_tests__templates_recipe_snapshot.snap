@@ -55,6 +55,7 @@ about:
   description: A templated package for ${{ platform }}
   documentation: null
   repository: null
+app: {}
 extra:
   recipe-maintainers:
   - foobar
