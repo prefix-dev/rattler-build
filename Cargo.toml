@@ -171,6 +171,7 @@ tui = [
 ]
 s3 = [
   'rattler_networking/s3',
+  'rattler_build_networking/s3',
   'rattler_upload/s3',
   'rattler_index/s3',
   'dep:rattler_s3',

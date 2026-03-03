@@ -68,6 +68,7 @@ impl BaseClient {
         ))
         .build();
 
+        #[cfg(any(feature = "native-tls", feature = "rustls-tls"))]
         let dangerous_client = reqwest_middleware::ClientBuilder::new(
             reqwest::Client::builder()
                 .no_gzip()
@@ -83,6 +84,10 @@ impl BaseClient {
             ExponentialBackoff::builder().build_with_max_retries(3),
         ))
         .build();
+
+        // Without a TLS backend, cert bypass is not available — use the standard client.
+        #[cfg(not(any(feature = "native-tls", feature = "rustls-tls")))]
+        let dangerous_client = client.clone();
 
         Self {
             client,
@@ -138,7 +143,7 @@ pub struct BaseClientBuilder {
     insecure_hosts: Option<Vec<String>>,
     #[cfg(feature = "middleware")]
     auth_storage: Option<rattler_networking::AuthenticationStorage>,
-    #[cfg(feature = "middleware")]
+    #[cfg(feature = "s3")]
     s3_config:
         Option<std::collections::HashMap<String, rattler_networking::s3_middleware::S3Config>>,
     #[cfg(feature = "middleware")]
@@ -155,7 +160,7 @@ impl Default for BaseClientBuilder {
             insecure_hosts: None,
             #[cfg(feature = "middleware")]
             auth_storage: None,
-            #[cfg(feature = "middleware")]
+            #[cfg(feature = "s3")]
             s3_config: None,
             #[cfg(feature = "middleware")]
             mirror_config: None,
@@ -193,7 +198,7 @@ impl BaseClientBuilder {
     }
 
     /// Set S3 s3 configuration
-    #[cfg(feature = "middleware")]
+    #[cfg(feature = "s3")]
     pub fn with_s3(
         mut self,
         s3_config: std::collections::HashMap<String, rattler_networking::s3_middleware::S3Config>,
@@ -219,9 +224,12 @@ impl BaseClientBuilder {
     pub fn build(self) -> BaseClient {
         #[cfg(feature = "middleware")]
         {
-            let has_middleware = self.auth_storage.is_some()
-                || self.s3_config.is_some()
-                || self.mirror_config.is_some();
+            #[allow(unused_mut)]
+            let mut has_middleware = self.auth_storage.is_some() || self.mirror_config.is_some();
+            #[cfg(feature = "s3")]
+            {
+                has_middleware = has_middleware || self.s3_config.is_some();
+            }
             if has_middleware {
                 return self.build_with_middleware();
             }
@@ -242,10 +250,7 @@ impl BaseClientBuilder {
 
     #[cfg(feature = "middleware")]
     fn build_with_middleware(self) -> BaseClient {
-        use rattler_networking::{
-            AuthenticationMiddleware, mirror_middleware::MirrorMiddleware,
-            s3_middleware::S3Middleware,
-        };
+        use rattler_networking::{AuthenticationMiddleware, mirror_middleware::MirrorMiddleware};
         use std::sync::Arc;
 
         let user_agent = self
@@ -273,9 +278,6 @@ impl BaseClientBuilder {
         let mirror_mw = self
             .mirror_config
             .map(|cfg| Arc::new(MirrorMiddleware::from_map(cfg)));
-        let s3_mw = self
-            .s3_config
-            .map(|cfg| Arc::new(S3Middleware::new(cfg, auth_storage.clone())));
         let auth_mw = Arc::new(AuthenticationMiddleware::from_auth_storage(
             auth_storage.clone(),
         ));
@@ -290,39 +292,60 @@ impl BaseClientBuilder {
                 .expect("failed to create client"),
         );
         if let Some(mw) = &mirror_mw {
-            client_builder = client_builder.with_arc(mw.clone());
+            client_builder = client_builder.with_arc(Arc::clone(mw) as _);
         }
-        if let Some(mw) = &s3_mw {
-            client_builder = client_builder.with_arc(mw.clone());
+        #[cfg(feature = "s3")]
+        {
+            use rattler_networking::s3_middleware::S3Middleware;
+            let s3_mw = self
+                .s3_config
+                .map(|cfg| Arc::new(S3Middleware::new(cfg, auth_storage.clone())));
+            if let Some(mw) = &s3_mw {
+                client_builder = client_builder.with_arc(Arc::clone(mw) as _);
+            }
+            client_builder = client_builder.with_arc(auth_mw.clone());
+            client_builder = client_builder.with_arc(retry_mw.clone());
+            let client = client_builder.build();
+
+            // Build dangerous client (insecure)
+            let mut dangerous_client_builder = reqwest_middleware::ClientBuilder::new(
+                common_settings(reqwest::Client::builder())
+                    .danger_accept_invalid_certs(true)
+                    .build()
+                    .expect("failed to create dangerous client"),
+            );
+            if let Some(mw) = &mirror_mw {
+                dangerous_client_builder = dangerous_client_builder.with_arc(Arc::clone(mw) as _);
+            }
+            if let Some(mw) = &s3_mw {
+                dangerous_client_builder = dangerous_client_builder.with_arc(Arc::clone(mw) as _);
+            }
+            dangerous_client_builder = dangerous_client_builder.with_arc(auth_mw);
+            dangerous_client_builder = dangerous_client_builder.with_arc(retry_mw);
+            let dangerous_client = dangerous_client_builder.build();
+
+            BaseClient {
+                client,
+                dangerous_client,
+                allow_insecure_host: insecure_hosts,
+            }
         }
-        client_builder = client_builder.with_arc(auth_mw.clone());
-        client_builder = client_builder.with_arc(retry_mw.clone());
-        let client = client_builder.build();
 
-        // Build dangerous client (insecure)
-        let mut dangerous_client_builder = reqwest_middleware::ClientBuilder::new(
-            common_settings(reqwest::Client::builder())
-                .danger_accept_invalid_certs(true)
-                .build()
-                .expect("failed to create dangerous client"),
-        );
+        #[cfg(not(feature = "s3"))]
+        {
+            client_builder = client_builder.with_arc(auth_mw.clone());
+            client_builder = client_builder.with_arc(retry_mw.clone());
+            let client = client_builder.build();
 
-        // Apply the exact same middleware chain and order to the dangerous client.
-        if let Some(mw) = &mirror_mw {
-            dangerous_client_builder = dangerous_client_builder.with_arc(mw.clone());
-        }
-        if let Some(mw) = &s3_mw {
-            dangerous_client_builder = dangerous_client_builder.with_arc(mw.clone());
-        }
-        dangerous_client_builder = dangerous_client_builder.with_arc(auth_mw);
-        dangerous_client_builder = dangerous_client_builder.with_arc(retry_mw);
+            // Build dangerous client (insecure) — no TLS features means no cert bypass support,
+            // so fall back to the same client.
+            let dangerous_client = client.clone();
 
-        let dangerous_client = dangerous_client_builder.build();
-
-        BaseClient {
-            client,
-            dangerous_client,
-            allow_insecure_host: insecure_hosts,
+            BaseClient {
+                client,
+                dangerous_client,
+                allow_insecure_host: insecure_hosts,
+            }
         }
     }
 }
