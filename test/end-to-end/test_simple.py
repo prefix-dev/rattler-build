@@ -148,7 +148,7 @@ def test_python_noarch(rattler_build: RattlerBuild, recipes: Path, tmp_path: Pat
     assert "python >=3.11" in index_json["depends"]
 
 
-def test_render_only_with_solve_does_not_download_packages(
+def test_render_only_with_solve_does_not_install_packages(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
     result = rattler_build.render(
@@ -162,8 +162,7 @@ def test_render_only_with_solve_does_not_download_packages(
     assert result.returncode == 0
     combined = (result.stdout or "") + "\n" + (result.stderr or "")
 
-    # Verify we did not trigger steps that download packages
-    assert "Collecting run exports" not in combined
+    # Verify we did not install environments (run exports collection is allowed)
     assert "Installing host environment" not in combined
     assert "Installing build environment" not in combined
 
@@ -179,6 +178,67 @@ def test_render_only_with_solve_does_not_download_packages(
         if isinstance(build, dict):
             resolved_len = len(build.get("resolved", []))
     assert resolved_len >= 1
+
+
+def test_abi3_cross_compile_ignores_python_run_exports(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Test that abi3 (version_independent) packages don't inherit python version
+    run exports from cross-python in the build environment.
+
+    When cross-compiling, cross-python_<target> in the build env and python in the
+    host env both have run exports that pin a specific Python version (e.g.
+    "python 3.10.* *_cpython" and "python_abi 3.10.* *_cp310"). For abi3 packages
+    these must be ignored since the package is Python-version independent.
+    """
+    env = {**os.environ, "CONDA_OVERRIDE_GLIBC": "2.38"}
+
+    result = rattler_build.render(
+        recipes / "abi3-cross-compile",
+        tmp_path,
+        with_solve=True,
+        custom_channels=["conda-forge"],
+        extra_args=["--build-platform", "linux-64", "--target-platform", "linux-ppc64le"],
+        raw=True,
+        env=env,
+    )
+
+    assert result.returncode == 0, f"render failed:\n{result.stderr}"
+
+    outputs = json.loads(result.stdout or "[]")
+    assert len(outputs) >= 1, "expected at least one output"
+
+    run_deps = outputs[0].get("finalized_dependencies", {}).get("run", {}).get("depends", [])
+
+    # Collect all run-export entries (they have a "run_export" key in the JSON)
+    run_export_deps = [dep for dep in run_deps if "run_export" in dep]
+
+    # cross-python_linux-ppc64le exports a python version pin to run deps; for abi3
+    # packages this must be suppressed
+    cross_python_exports = [
+        dep for dep in run_export_deps
+        if dep.get("run_export", "").startswith("cross-python")
+    ]
+    assert not cross_python_exports, (
+        f"abi3 package should not inherit python run exports from cross-python, "
+        f"got: {cross_python_exports}"
+    )
+
+    # python in host exports python_abi; likewise must be suppressed for abi3
+    python_abi_exports = [
+        dep for dep in run_export_deps
+        if dep.get("run_export") == "python" and "python_abi" in dep.get("spec", "")
+    ]
+    assert not python_abi_exports, (
+        f"abi3 package should not inherit python_abi run exports, "
+        f"got: {python_abi_exports}"
+    )
+
+    # The explicit "run: - python" dep must still be present
+    run_specs = [dep.get("spec", dep.get("source", "")) for dep in run_deps]
+    assert any("python" in s for s in run_specs), (
+        f"explicit python run dep should still be present, got: {run_specs}"
+    )
 
 
 def test_render_only_ignores_nonexistent_output_dir(

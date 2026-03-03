@@ -1,0 +1,23 @@
+package:
+  name: abi3-cross-compile-test
+  version: 0.1.0
+
+build:
+  number: 0
+  python:
+    version_independent: true
+  script: echo "hello"
+
+requirements:
+  build:
+    - if: host_platform != build_platform
+      then: cross-python_${{ host_platform }}
+  host:
+    - python
+    - pip
+  run:
+    - python
+
+about:
+  summary: Minimal abi3 recipe for cross-compile run-export testing
+  license: MIT
