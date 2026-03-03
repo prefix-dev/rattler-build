@@ -1402,7 +1402,7 @@ pub async fn build_recipes(
             for output in outputs {
                 updated_outputs.push(
                     output
-                        .resolve_dependencies(&tool_config, RunExportsDownload::SkipDownload)
+                        .resolve_dependencies(&tool_config, RunExportsDownload::DownloadMissing)
                         .await
                         .into_diagnostic()?,
                 );
@@ -1620,7 +1620,7 @@ pub async fn publish_packages(
                 for output in outputs {
                     updated_outputs.push(
                         output
-                            .resolve_dependencies(&tool_config, RunExportsDownload::SkipDownload)
+                            .resolve_dependencies(&tool_config, RunExportsDownload::DownloadMissing)
                             .await
                             .into_diagnostic()?,
                     );
