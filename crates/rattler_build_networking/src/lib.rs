@@ -68,13 +68,15 @@ impl BaseClient {
         ))
         .build();
 
+        let dangerous_client_inner = reqwest::Client::builder()
+            .no_gzip()
+            .pool_max_idle_per_host(20)
+            .user_agent(&user_agent)
+            .read_timeout(std::time::Duration::from_secs(timeout_secs));
+        #[cfg(any(feature = "native-tls", feature = "rustls-tls"))]
+        let dangerous_client_inner = dangerous_client_inner.danger_accept_invalid_certs(true);
         let dangerous_client = reqwest_middleware::ClientBuilder::new(
-            reqwest::Client::builder()
-                .no_gzip()
-                .pool_max_idle_per_host(20)
-                .user_agent(&user_agent)
-                .read_timeout(std::time::Duration::from_secs(timeout_secs))
-                .danger_accept_invalid_certs(true)
+            dangerous_client_inner
                 .referer(false)
                 .build()
                 .expect("failed to create dangerous client"),
@@ -310,9 +312,11 @@ impl BaseClientBuilder {
         let client = client_builder.build();
 
         // Build dangerous client (insecure)
+        let dangerous_inner = common_settings(reqwest::Client::builder());
+        #[cfg(any(feature = "native-tls", feature = "rustls-tls"))]
+        let dangerous_inner = dangerous_inner.danger_accept_invalid_certs(true);
         let mut dangerous_client_builder = reqwest_middleware::ClientBuilder::new(
-            common_settings(reqwest::Client::builder())
-                .danger_accept_invalid_certs(true)
+            dangerous_inner
                 .build()
                 .expect("failed to create dangerous client"),
         );
