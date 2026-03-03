@@ -1,8 +1,6 @@
 on:
   push:
     branches: [main]
-    tags:
-      - "v*.*.*"
   pull_request:
     paths:
       - ".github/workflows/rust.yml"
@@ -18,11 +16,16 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 env:
   RUST_LOG: info
   RUST_BACKTRACE: 1
   RUSTFLAGS: "-D warnings"
   CARGO_TERM_COLOR: always
+  SCCACHE_GHA_ENABLED: "true"
+  ACTIONS_CACHE_SERVICE_V2: on
 
 jobs:
   # Run Rust unit/integration tests (debug mode)
@@ -34,27 +37,25 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           submodules: recursive
-      - uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # master
+          persist-credentials: false
+      - uses: prefix-dev/setup-pixi@a0af7a228712d6121d37aba47adf55c1332c9c2e # v0.9.4
         with:
-          toolchain: "1.93.1"
-          components: clippy,rustfmt
-      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
+          cache: true
+          cache-write: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+      - name: Configure sccache
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         with:
-          shared-key: test-${{ matrix.os }}
-          # Only save cache on main to avoid thrashing
-          save-if: ${{ github.ref == 'refs/heads/main' }}
+          script: |
+            core.exportVariable('ACTIONS_RESULTS_URL', process.env.ACTIONS_RESULTS_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
       # https://github.com/actions/runner-images/issues/5459#issuecomment-1532856844
       - name: Set up GNU patch on Windows
         # Needed to use GNU patch instead of Strawberry Perl patch
         if: ${{ contains(github.event.pull_request.labels.*.name, 'need-patch-apply-tests') && matrix.os == 'windows-latest' }}
         run: Add-Content $env:GITHUB_PATH "C:\Program Files\Git\usr\bin"
-      - uses: prefix-dev/setup-pixi@v0.9.4
-        if: ${{ matrix.os == 'macos-latest' }}
-        with:
-          cache: true
       - name: Set up GNU patch on MacOS
         # Needed to use GNU patch instead of whatever is builtin on macos (1 test fails)
         if: ${{ contains(github.event.pull_request.labels.*.name, 'need-patch-apply-tests') && matrix.os == 'macos-latest' }}
@@ -63,17 +64,56 @@ jobs:
         if: ${{ matrix.os == 'macos-latest' }}
         run: pixi global install patchelf
       - name: Run tests
-        run: cargo test --workspace --all-targets --features=tui,recipe-generation --verbose -- --nocapture
+        run: pixi run cargo test --workspace --all-targets --features=tui,recipe-generation --verbose -- --nocapture
       - name: Run patch apply tests
         # https://github.com/orgs/community/discussions/26261#discussioncomment-3251039
         if: ${{ contains(github.event.pull_request.labels.*.name, 'need-patch-apply-tests') }}
         run: |
           patch --version
-          cargo test --features=tui,recipe-generation,patch-test-extra -- --nocapture --ignored
+          pixi run cargo test --features=tui,recipe-generation,patch-test-extra -- --nocapture --ignored
+      - name: Show sccache stats
+        if: always()
+        run: pixi run sccache --show-stats
 
-  # Build release binary and run end-to-end tests (pipelined per OS)
-  build-and-test:
-    name: Build & E2E (${{ matrix.os }})
+  # Build release binary (one per OS)
+  build:
+    name: Build (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: prefix-dev/setup-pixi@a0af7a228712d6121d37aba47adf55c1332c9c2e # v0.9.4
+        with:
+          cache: true
+          cache-write: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+      - name: Configure sccache
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        with:
+          script: |
+            core.exportVariable('ACTIONS_RESULTS_URL', process.env.ACTIONS_RESULTS_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+      - name: Build release binary
+        run: pixi run build-release
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: rattler-build-${{ matrix.os }}
+          path: target-pixi/release/rattler-build${{ runner.os == 'Windows' && '.exe' || '' }}
+          retention-days: 7
+      - name: Show sccache stats
+        if: always()
+        run: pixi run sccache --show-stats
+
+  # Run end-to-end tests using the pre-built binary
+  e2e-test:
+    name: End-to-end (${{ matrix.os }})
+    needs: build
     strategy:
       fail-fast: false
       matrix:
@@ -82,299 +122,61 @@ jobs:
     env:
       RATTLER_BUILD_ENABLE_GITHUB_INTEGRATION: "true"
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           submodules: recursive
-      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
-        with:
-          # Use target-pixi to match pixi's CARGO_TARGET_DIR
-          workspaces: ". -> target-pixi"
-          shared-key: release-${{ matrix.os }}
-          # Only save cache on main to avoid thrashing
-          save-if: ${{ github.ref == 'refs/heads/main' }}
-      - uses: prefix-dev/setup-pixi@v0.9.4
+          persist-credentials: false
+      - uses: prefix-dev/setup-pixi@a0af7a228712d6121d37aba47adf55c1332c9c2e # v0.9.4
         with:
           cache: true
-      - name: Build release binary
-        run: pixi run build-release
+          cache-write: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+      - name: Download rattler-build binary
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
+        with:
+          name: rattler-build-${{ matrix.os }}
+          path: target-pixi/release/
+      - name: Prepare binary
+        if: runner.os != 'Windows'
+        run: chmod +x target-pixi/release/rattler-build
       - name: Run end-to-end tests
-        run: pixi run pytest test/end-to-end --snapshot-warn-unused --snapshot-details --numprocesses=auto --durations=0 -v
+        run: pixi run test-end-to-end-ci
         env:
           PREFIX_DEV_READ_ONLY_TOKEN: ${{ secrets.PREFIX_DEV_READ_ONLY_TOKEN }}
           ANACONDA_ORG_TEST_TOKEN: ${{ secrets.ANACONDA_ORG_TEST_TOKEN }}
           S3_ACCESS_KEY_ID: ${{ secrets.S3_UPLOAD_ACCESS_KEY_ID }}
           S3_SECRET_ACCESS_KEY: ${{ secrets.S3_UPLOAD_ACCESS_KEY_SECRET }}
-      - name: Upload binary artifact
-        if: always()
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v4
-        with:
-          name: rattler-build-${{ matrix.os }}
-          path: target-pixi/release/rattler-build${{ runner.os == 'Windows' && '.exe' || '' }}
-          retention-days: 7
-
-  # Cross-platform release builds (only on main/tags/labeled PRs)
-  build:
-    name: Build ${{ matrix.target }}
-    runs-on: ${{ matrix.os }}
-    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') || contains(github.event.pull_request.labels.*.name, 'ci:full-build') || contains(github.event.pull_request.labels.*.name, 'needs-rebuild-tests')
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - target: x86_64-unknown-linux-musl
-            os: ubuntu-22.04
-          - target: aarch64-unknown-linux-musl
-            os: ubuntu-22.04
-            use-cross: true
-          # - target: powerpc64le-unknown-linux-musl
-          #   os: ubuntu-22.04
-          #   use-cross: true
-          - target: powerpc64le-unknown-linux-gnu
-            os: ubuntu-22.04
-            use-cross: true
-          - target: x86_64-apple-darwin
-            os: macos-latest
-          - target: aarch64-apple-darwin
-            os: macos-latest
-          - target: x86_64-pc-windows-gnu
-            os: windows-2022
-          - target: x86_64-pc-windows-msvc
-            os: windows-2022
-          - target: aarch64-pc-windows-msvc
-            os: windows-11-arm
-    env:
-      # These are some environment variables that configure the build so that the binary size is reduced.
-      # Inspiration was taken from this blog: https://arusahni.net/blog/2020/03/optimizing-rust-binary-size.html
-      # They're only enable it on main and releases.
-      #
-      # Enable Link Time Optimization (LTO) for our release builds. This increases link time but drastically reduces
-      # binary size.
-      CARGO_PROFILE_RELEASE_LTO: ${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && 'true' || 'false' }}
-
-      # Use a single code gen unit, this effectively disables parallel linking but ensures that everything is linked
-      # together in a single unit which reduces the file-size at the cost of link time.
-      # Default for a release build is 16
-      CARGO_PROFILE_RELEASE_CODEGEN_UNITS: ${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && 1 || 16 }}
-
-      # Strip the binaries. This reduces the filesize of the final release.
-      CARGO_PROFILE_RELEASE_STRIP: ${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && 'symbols' || 'false' }}
-
-      # Optimize the binary for size. This reduces the filesize at the cost of a slower binary.
-      CARGO_PROFILE_OPT_LEVEL: ${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && 's' || '0' }}
-
-      # Sets the default features which are always used also when `--no-default` is used.
-      # Enable the `performance` feature for release builds to use optimized memory allocators.
-      # Include `s3` for S3 upload support in release builds.
-      # Include `sigstore` for sigstore signing support in release builds.
-      REQUIRED_FEATURES: ${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && 'recipe-generation,performance,s3,sigstore' || 'recipe-generation,s3,sigstore' }}
-
-    steps:
-      - name: Checkout source code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
-        with:
-          submodules: recursive
-
-      - name: Extract version
-        shell: bash
-        id: metadata
-        run: | # also call this step outside of $(...) to make sure the status code is propagated
-          ${{ startsWith(matrix.os, 'windows') && 'choco install yq' || '' }}
-          yq '.package.version' Cargo.toml
-          echo "project-version=$(yq '.package.version' Cargo.toml)" >> $GITHUB_OUTPUT
-
-      - name: Assert version in release
-        if: startsWith(github.ref, 'refs/tags/v')
-        shell: bash
-        run: |
-          if [[ "v${{ steps.metadata.outputs.project-version }}" != "${{ github.ref_name }}" ]]; then
-            echo ::error file=Cargo.toml::"Version mismatch: Cargo.toml: v${{ steps.metadata.outputs.project-version }} != ${{ github.ref_name }}"
-            exit 1
-          fi
-
-      - name: Install Rust toolchain
-        uses: actions-rust-lang/setup-rust-toolchain@a0b538fa0b742a6aa35d6e2c169b4bd06d225a98 # v1
-        with:
-          toolchain: "1.93.1"
-          target: ${{ matrix.target }}
-
-      - name: Install musl-gcc
-        if: matrix.target == 'x86_64-unknown-linux-musl'
-        run: sudo apt install musl-tools
-
-      - name: Install gnu-openssl
-        if: matrix.target == 'powerpc64le-unknown-linux-gnu'
-        run: sudo apt install libssl-dev
-
-      - name: Install cross
-        if: matrix.use-cross
-        uses: taiki-e/install-action@a37010ded18ff788be4440302bd6830b1ae50d8b # v2
-        with:
-          tool: cross
-
-      - name: Show version information (Rust, cargo, GCC)
-        run: |
-          gcc --version || true
-          rustup -V
-          rustup toolchain list
-          rustup default
-          cargo -V
-          rustc -V
-
-      - name: Set build options
-        id: options
-        shell: bash
-        run: |
-          unset CARGO_BUILD_OPTIONS
-          case ${{ matrix.target }} in
-            *-musl) CARGO_BUILD_OPTIONS="--no-default-features --features rustls-tls"  ;;
-            *) CARGO_BUILD_OPTIONS=""  ;;
-          esac
-          echo "cargo-build-options=${CARGO_BUILD_OPTIONS}" >> "$GITHUB_OUTPUT"
-
-          # test only library unit tests and binary for arm-type targets
-          unset CARGO_TEST_OPTIONS
-          case ${{ matrix.target }} in
-            arm-* | aarch64-*) CARGO_TEST_OPTIONS="--lib --bin rattler-build" ;;
-          esac
-          echo "cargo-test-options=${CARGO_TEST_OPTIONS}" >> $GITHUB_OUTPUT
-
-      - name: Build
-        run: >-
-          ${{ matrix.use-cross && 'cross' || 'cargo' }}
-          build
-          --locked
-          --release
-          --features ${{ env.REQUIRED_FEATURES }}
-          --target=${{ matrix.target }}
-          ${{ steps.options.outputs.cargo-build-options }}
-
-      - name: Run tests
-        shell: bash
-        if: matrix.target != 'aarch64-apple-darwin'
-        run: >-
-          ${{ matrix.use-cross && 'cross' || 'cargo' }}
-          test
-          --release
-          --locked
-          --features ${{ env.REQUIRED_FEATURES }}
-          --target=${{ matrix.target }}
-          ${{ steps.options.outputs.cargo-build-options }}
-          ${{ steps.options.outputs.cargo-test-options }}
-
-      - name: Create tarball
-        id: package
-        shell: bash
-        run: |
-          PKG_BASENAME=rattler-build-${{ matrix.target }}
-          PKG_NAME=${PKG_BASENAME}${{ contains(matrix.target, 'pc-windows') && '.zip' || '.tar.gz' }}
-
-          ARCHIVE_DIR="pkg/${PKG_BASENAME}"
-          mkdir -p "${ARCHIVE_DIR}"
-
-          cp "target/${{ matrix.target }}/release/rattler-build${{ contains(matrix.target, 'pc-windows') && '.exe' || '' }}" "$ARCHIVE_DIR"
-          cp README.md LICENSE "$ARCHIVE_DIR"
-
-          pushd pkg >/dev/null
-          case ${{ matrix.target }} in
-            *-pc-windows-*) 7z -y a "${PKG_NAME}" "${PKG_BASENAME}"/* | tail -2 ;;
-            *) tar czf "${PKG_NAME}" "${PKG_BASENAME}"/* ;;
-          esac;
-          popd >/dev/null
-
-          echo "pkg-name=${PKG_NAME}" >> $GITHUB_OUTPUT
-          echo pkg-path="${ARCHIVE_DIR}${{ contains(matrix.target, 'pc-windows') && '.zip' || '.tar.gz' }}" >> $GITHUB_OUTPUT
-
-          mkdir -p binaries
-          cp "target/${{ matrix.target }}/release/rattler-build${{ contains(matrix.target, 'pc-windows') && '.exe' || '' }}" "binaries/rattler-build-${{ matrix.target }}${{ contains(matrix.target, 'pc-windows') && '.exe' || '' }}"
-          echo "binary-path=binaries/rattler-build-${{ matrix.target }}${{ contains(matrix.target, 'pc-windows') && '.exe' || '' }}" >> $GITHUB_OUTPUT
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v4
-        with:
-          name: ${{ steps.package.outputs.pkg-name }}
-          path: ${{ steps.package.outputs.pkg-path }}
-
-      - name: Publish archives and packages
-        uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2
-        if: startsWith(github.ref, 'refs/tags/v')
-        with:
-          draft: true
-          files: |
-            ${{ steps.package.outputs.pkg-path }}
-            ${{ steps.package.outputs.binary-path }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Create issue on failure
-        if: startsWith(github.ref, 'refs/tags/v') && failure()
-        uses: dacbd/create-issue-action@cdb57ab6ff8862aa09fee2be6ba77a59581921c2 # cdb57ab6ff8862aa09fee2be6ba77a59581921c2
-        with:
-          token: ${{ github.token }}
-          title: GitHub release failed
-          body: |
-            Creating a release failed. Please check the logs for more information.
-            [Failed Run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
-
-  build-post:
-    name: Post-process
-    needs: build
-    if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
-        with:
-          submodules: recursive
-      - name: Set as latest release
-        if: startsWith(github.ref, 'refs/tags/v')
-        run: |
-          gh release edit "${{ github.ref_name }}" --draft=false
-          gh release edit "${{ github.ref_name }}" --latest
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   rebuild-test:
     name: Rebuild Test
     needs: build
     if: contains(github.event.pull_request.labels.*.name, 'needs-rebuild-tests')
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout source code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           submodules: recursive
-
+          persist-credentials: false
       - name: Download rattler-build artifact
-        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v4
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
         with:
-          name: rattler-build-x86_64-unknown-linux-musl.tar.gz
+          name: rattler-build-ubuntu-latest
           path: ./
-
-      - name: Extract rattler-build binary
-        run: |
-          tar -xzf rattler-build-x86_64-unknown-linux-musl.tar.gz
-          chmod +x rattler-build-x86_64-unknown-linux-musl/rattler-build
-          mv rattler-build-x86_64-unknown-linux-musl/rattler-build ./rattler-build
-
-      - name: Create output directory
-        run: mkdir -p output
-
+      - name: Prepare binary
+        run: chmod +x rattler-build
       - name: Build rich package
         run: |
+          mkdir -p output
           ./rattler-build build --recipe ./examples/rich
           echo "Built packages:"
           ls -la ./output/noarch/
-
       - name: Rebuild rich package
         run: |
-          # Find the built package (should be something like rich-*.conda)
           PACKAGE=$(find ./output/noarch/rich-*.conda | head -n1)
           echo "Rebuilding package: $PACKAGE"
           ./rattler-build rebuild --package-file "$PACKAGE"
           echo "Rebuild completed successfully"
-
       - name: Compare original and rebuilt packages
         run: |
           echo "Contents after rebuild:"
           ls -la ./output/noarch/
-          # The rebuild command should produce a new package with similar structure

@@ -20,3 +20,4 @@ BA = "BA"
 
 [default.extend-words]
 placehold = "placehold"
+intoto = "intoto"
