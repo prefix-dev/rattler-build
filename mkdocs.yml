@@ -120,6 +120,7 @@ nav:
       - Variants: variants.md
       - Configuration: config.md
       - Compilers and cross compilation: compilers.md
+      - Code signing: code_signing.md
       - Experimental features: experimental_features.md
       - Multiple output cache: multiple_output_cache.md
       - Sandbox: sandbox.md

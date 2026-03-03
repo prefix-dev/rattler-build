@@ -355,6 +355,143 @@ pub struct Build {
     /// Post-processing operations
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub post_process: Vec<PostProcess>,
+
+    /// Code signing configuration (not serialized into rendered recipe output)
+    #[serde(default, skip_serializing)]
+    pub signing: Signing,
+}
+
+/// Code signing configuration for native binaries (evaluated)
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct Signing {
+    /// macOS code signing configuration
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub macos: Option<MacOsSigning>,
+    /// Windows code signing configuration
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub windows: Option<WindowsSigning>,
+}
+
+impl Signing {
+    /// Check if this is the default (no signing) configuration
+    pub fn is_default(&self) -> bool {
+        self.macos.is_none() && self.windows.is_none()
+    }
+}
+
+/// macOS code signing configuration using `codesign` (evaluated)
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MacOsSigning {
+    /// Signing identity (e.g., "Developer ID Application: Company (TEAMID)")
+    /// Use "-" for ad-hoc signing
+    pub identity: String,
+    /// Path to the keychain containing the signing certificate
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub keychain: Option<String>,
+    /// Entitlements plist file path
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub entitlements: Option<String>,
+    /// Additional codesign options (e.g., "runtime" for hardened runtime)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub options: Vec<String>,
+}
+
+/// Windows code signing configuration (evaluated).
+///
+/// Exactly one signing method must be configured:
+/// - **Local certificate** (`signtool`): Configure the `signtool` sub-object.
+/// - **Azure Trusted Signing**: Configure the `azure_trusted_signing` sub-object.
+///
+/// Shared settings (`timestamp_url`, `digest_algorithm`) live at the top level.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct WindowsSigning {
+    /// Local certificate signing via `signtool`
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub signtool: Option<SigntoolConfig>,
+    /// Azure Trusted Signing configuration
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub azure_trusted_signing: Option<AzureTrustedSigningConfig>,
+
+    // --- Shared settings ---
+    /// RFC 3161 timestamp server URL
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timestamp_url: Option<String>,
+    /// Digest algorithm (default: sha256)
+    #[serde(default = "default_digest_algorithm")]
+    pub digest_algorithm: String,
+}
+
+/// Local certificate signing configuration for `signtool` (evaluated)
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SigntoolConfig {
+    /// Path to the certificate file (.pfx / .p12)
+    pub certificate_file: String,
+    /// Name of the environment variable containing the certificate password.
+    /// The password is read from this env var at build time to avoid leaking
+    /// secrets into the rendered recipe.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub certificate_password_env: Option<String>,
+}
+
+/// Azure Trusted Signing configuration (evaluated)
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AzureTrustedSigningConfig {
+    /// Azure Trusted Signing endpoint URL
+    pub endpoint: String,
+    /// Azure Trusted Signing account name
+    pub account_name: String,
+    /// Azure Trusted Signing certificate profile name
+    pub certificate_profile: String,
+}
+
+/// The Windows signing method as determined from the configuration.
+#[derive(Debug, Clone, PartialEq)]
+pub enum WindowsSigningMethod<'a> {
+    /// Local certificate signing via signtool
+    Signtool {
+        /// Path to the .pfx/.p12 certificate
+        certificate_file: &'a str,
+        /// Name of the env var containing the certificate password
+        certificate_password_env: Option<&'a str>,
+    },
+    /// Azure Trusted Signing
+    AzureTrustedSigning {
+        /// Azure signing endpoint URL
+        endpoint: &'a str,
+        /// Azure signing account name
+        account_name: &'a str,
+        /// Azure certificate profile name
+        certificate_profile: &'a str,
+    },
+}
+
+impl WindowsSigning {
+    /// Determine which signing method is configured.
+    ///
+    /// Returns an error message if neither or both methods are configured.
+    pub fn method(&self) -> Result<WindowsSigningMethod<'_>, &'static str> {
+        match (&self.signtool, &self.azure_trusted_signing) {
+            (Some(_), Some(_)) => Err(
+                "Both 'signtool' and 'azure_trusted_signing' are configured. \
+                 Please use only one signing method.",
+            ),
+            (None, None) => Err("No Windows signing method configured. \
+                 Set either 'signtool' or 'azure_trusted_signing'."),
+            (Some(st), None) => Ok(WindowsSigningMethod::Signtool {
+                certificate_file: &st.certificate_file,
+                certificate_password_env: st.certificate_password_env.as_deref(),
+            }),
+            (None, Some(az)) => Ok(WindowsSigningMethod::AzureTrustedSigning {
+                endpoint: &az.endpoint,
+                account_name: &az.account_name,
+                certificate_profile: &az.certificate_profile,
+            }),
+        }
+    }
+}
+
+fn default_digest_algorithm() -> String {
+    "sha256".to_string()
 }
 
 /// Dynamic linking configuration
@@ -527,6 +664,7 @@ impl Build {
             && self.prefix_detection.ignore.is_none()
             && !self.prefix_detection.ignore_binary_files
             && self.post_process.is_empty()
+            && self.signing.is_default()
     }
 }
 

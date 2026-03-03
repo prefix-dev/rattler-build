@@ -5,8 +5,9 @@ use rattler_conda_types::NoArchType;
 use crate::stage0::{
     Conditional, ConditionalList, Item, JinjaExpression, NestedItemList,
     build::{
-        BinaryRelocation, Build, DynamicLinking, ForceFileType, PostProcess, PrefixDetection,
-        PrefixIgnore, PythonBuild, VariantKeyUsage,
+        AzureTrustedSigningConfig, BinaryRelocation, Build, DynamicLinking, ForceFileType,
+        MacOsSigning, PostProcess, PrefixDetection, PrefixIgnore, PythonBuild, Signing,
+        SigntoolConfig, VariantKeyUsage, WindowsSigning,
     },
     parser::helpers::get_span,
     types::{IncludeExclude, Value},
@@ -453,10 +454,13 @@ fn parse_build_from_mapping(mapping: &MarkedMappingNode) -> Result<Build, ParseE
             "post_process" => {
                 build.post_process = parse_post_process_list(value_node)?;
             }
+            "signing" => {
+                build.signing = parse_signing(value_node)?;
+            }
             _ => {
                 return Err(
                     ParseError::invalid_value("build", format!("unknown field '{}'", key), *key_node.span())
-                        .with_suggestion("Valid fields are: number, string, script, noarch, python, skip, always_copy_files, always_include_files, merge_build_and_host_envs, files, dynamic_linking, variant, prefix_detection, post_process")
+                        .with_suggestion("Valid fields are: number, string, script, noarch, python, skip, always_copy_files, always_include_files, merge_build_and_host_envs, files, dynamic_linking, variant, prefix_detection, post_process, signing")
                 );
             }
         }
@@ -823,6 +827,262 @@ fn parse_post_process_list_as_values(
     }
 }
 
+fn parse_signing(node: &Node) -> Result<Signing, ParseError> {
+    let mapping = node.as_mapping().ok_or_else(|| {
+        ParseError::expected_type("mapping", "non-mapping", get_span(node))
+            .with_message("Expected 'signing' to be a mapping")
+    })?;
+
+    let mut signing = Signing::default();
+
+    for (key_node, value_node) in mapping.iter() {
+        let key = key_node.as_str();
+
+        match key {
+            "macos" => {
+                signing.macos = Some(parse_macos_signing(value_node)?);
+            }
+            "windows" => {
+                signing.windows = Some(parse_windows_signing(value_node)?);
+            }
+            _ => {
+                return Err(ParseError::invalid_value(
+                    "signing",
+                    format!("unknown field '{}'", key),
+                    *key_node.span(),
+                )
+                .with_suggestion("Valid fields are: macos, windows"));
+            }
+        }
+    }
+
+    Ok(signing)
+}
+
+fn parse_macos_signing(node: &Node) -> Result<MacOsSigning, ParseError> {
+    let mapping = node.as_mapping().ok_or_else(|| {
+        ParseError::expected_type("mapping", "non-mapping", get_span(node))
+            .with_message("Expected 'signing.macos' to be a mapping")
+    })?;
+
+    let mut identity = None;
+    let mut keychain = None;
+    let mut entitlements = None;
+    let mut options = ConditionalList::default();
+
+    for (key_node, value_node) in mapping.iter() {
+        let key = key_node.as_str();
+
+        match key {
+            "identity" => {
+                identity = Some(parse_field!("signing.macos.identity", value_node));
+            }
+            "keychain" => {
+                keychain = Some(parse_field!("signing.macos.keychain", value_node));
+            }
+            "entitlements" => {
+                entitlements = Some(parse_field!("signing.macos.entitlements", value_node));
+            }
+            "options" => {
+                options = parse_conditional_list(value_node)?;
+            }
+            _ => {
+                return Err(ParseError::invalid_value(
+                    "signing.macos",
+                    format!("unknown field '{}'", key),
+                    *key_node.span(),
+                )
+                .with_suggestion("Valid fields are: identity, keychain, entitlements, options"));
+            }
+        }
+    }
+
+    let identity = identity.ok_or_else(|| ParseError::missing_field("identity", get_span(node)))?;
+
+    Ok(MacOsSigning {
+        identity,
+        keychain,
+        entitlements,
+        options,
+    })
+}
+
+fn parse_windows_signing(node: &Node) -> Result<WindowsSigning, ParseError> {
+    let mapping = node.as_mapping().ok_or_else(|| {
+        ParseError::expected_type("mapping", "non-mapping", get_span(node))
+            .with_message("Expected 'signing.windows' to be a mapping")
+    })?;
+
+    let mut signtool = None;
+    let mut azure_trusted_signing = None;
+    let mut timestamp_url = None;
+    let mut digest_algorithm = None;
+
+    for (key_node, value_node) in mapping.iter() {
+        let key = key_node.as_str();
+
+        match key {
+            "signtool" => {
+                signtool = Some(parse_signtool_config(value_node)?);
+            }
+            "azure_trusted_signing" => {
+                azure_trusted_signing = Some(parse_azure_trusted_signing_config(value_node)?);
+            }
+            "timestamp_url" => {
+                timestamp_url = Some(parse_field!("signing.windows.timestamp_url", value_node));
+            }
+            "digest_algorithm" => {
+                digest_algorithm =
+                    Some(parse_field!("signing.windows.digest_algorithm", value_node));
+            }
+            _ => {
+                return Err(ParseError::invalid_value(
+                    "signing.windows",
+                    format!("unknown field '{}'", key),
+                    *key_node.span(),
+                )
+                .with_suggestion(
+                    "Valid fields are: signtool, azure_trusted_signing, \
+                     timestamp_url, digest_algorithm",
+                ));
+            }
+        }
+    }
+
+    // Validate: exactly one signing method must be specified
+    if signtool.is_none() && azure_trusted_signing.is_none() {
+        return Err(
+            ParseError::missing_field("signtool or azure_trusted_signing", get_span(node))
+                .with_message(
+                    "Windows signing requires either 'signtool' (for local certificate) or \
+                     'azure_trusted_signing' (for Azure Trusted Signing)",
+                ),
+        );
+    }
+
+    if signtool.is_some() && azure_trusted_signing.is_some() {
+        return Err(ParseError::invalid_value(
+            "signing.windows",
+            "both 'signtool' and 'azure_trusted_signing' are set; use only one",
+            get_span(node),
+        )
+        .with_message(
+            "Windows signing supports only one method at a time. \
+             Use either 'signtool' or 'azure_trusted_signing', not both.",
+        ));
+    }
+
+    Ok(WindowsSigning {
+        signtool,
+        azure_trusted_signing,
+        timestamp_url,
+        digest_algorithm,
+    })
+}
+
+fn parse_signtool_config(node: &Node) -> Result<SigntoolConfig, ParseError> {
+    let mapping = node.as_mapping().ok_or_else(|| {
+        ParseError::expected_type("mapping", "non-mapping", get_span(node))
+            .with_message("Expected 'signing.windows.signtool' to be a mapping")
+    })?;
+
+    let mut certificate_file = None;
+    let mut certificate_password_env = None;
+
+    for (key_node, value_node) in mapping.iter() {
+        let key = key_node.as_str();
+
+        match key {
+            "certificate_file" => {
+                certificate_file = Some(parse_field!(
+                    "signing.windows.signtool.certificate_file",
+                    value_node
+                ));
+            }
+            "certificate_password_env" => {
+                certificate_password_env = Some(parse_field!(
+                    "signing.windows.signtool.certificate_password_env",
+                    value_node
+                ));
+            }
+            _ => {
+                return Err(ParseError::invalid_value(
+                    "signing.windows.signtool",
+                    format!("unknown field '{}'", key),
+                    *key_node.span(),
+                )
+                .with_suggestion("Valid fields are: certificate_file, certificate_password_env"));
+            }
+        }
+    }
+
+    let certificate_file = certificate_file
+        .ok_or_else(|| ParseError::missing_field("certificate_file", get_span(node)))?;
+
+    Ok(SigntoolConfig {
+        certificate_file,
+        certificate_password_env,
+    })
+}
+
+fn parse_azure_trusted_signing_config(
+    node: &Node,
+) -> Result<AzureTrustedSigningConfig, ParseError> {
+    let mapping = node.as_mapping().ok_or_else(|| {
+        ParseError::expected_type("mapping", "non-mapping", get_span(node))
+            .with_message("Expected 'signing.windows.azure_trusted_signing' to be a mapping")
+    })?;
+
+    let mut endpoint = None;
+    let mut account_name = None;
+    let mut certificate_profile = None;
+
+    for (key_node, value_node) in mapping.iter() {
+        let key = key_node.as_str();
+
+        match key {
+            "endpoint" => {
+                endpoint = Some(parse_field!(
+                    "signing.windows.azure_trusted_signing.endpoint",
+                    value_node
+                ));
+            }
+            "account_name" => {
+                account_name = Some(parse_field!(
+                    "signing.windows.azure_trusted_signing.account_name",
+                    value_node
+                ));
+            }
+            "certificate_profile" => {
+                certificate_profile = Some(parse_field!(
+                    "signing.windows.azure_trusted_signing.certificate_profile",
+                    value_node
+                ));
+            }
+            _ => {
+                return Err(ParseError::invalid_value(
+                    "signing.windows.azure_trusted_signing",
+                    format!("unknown field '{}'", key),
+                    *key_node.span(),
+                )
+                .with_suggestion("Valid fields are: endpoint, account_name, certificate_profile"));
+            }
+        }
+    }
+
+    let endpoint = endpoint.ok_or_else(|| ParseError::missing_field("endpoint", get_span(node)))?;
+    let account_name =
+        account_name.ok_or_else(|| ParseError::missing_field("account_name", get_span(node)))?;
+    let certificate_profile = certificate_profile
+        .ok_or_else(|| ParseError::missing_field("certificate_profile", get_span(node)))?;
+
+    Ok(AzureTrustedSigningConfig {
+        endpoint,
+        account_name,
+        certificate_profile,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -953,5 +1213,203 @@ post_process:
         } else {
             panic!("Expected conditional item");
         }
+    }
+
+    #[test]
+    fn test_parse_signing_macos() {
+        let yaml = r#"
+signing:
+  macos:
+    identity: "Developer ID Application: Test (ABC123)"
+    keychain: "/path/to/keychain.keychain-db"
+    entitlements: "entitlements.plist"
+    options:
+      - runtime
+"#;
+        let node = marked_yaml::parse_yaml(0, yaml).unwrap();
+        let build = parse_build(&node).unwrap();
+        let signing = &build.signing;
+        assert!(signing.macos.is_some());
+        assert!(signing.windows.is_none());
+
+        let macos = signing.macos.as_ref().unwrap();
+        assert_eq!(
+            macos.identity.as_concrete().unwrap(),
+            "Developer ID Application: Test (ABC123)"
+        );
+        assert_eq!(
+            macos.keychain.as_ref().unwrap().as_concrete().unwrap(),
+            "/path/to/keychain.keychain-db"
+        );
+        assert_eq!(
+            macos.entitlements.as_ref().unwrap().as_concrete().unwrap(),
+            "entitlements.plist"
+        );
+        assert_eq!(macos.options.len(), 1);
+    }
+
+    #[test]
+    fn test_parse_signing_windows_signtool() {
+        let yaml = r#"
+signing:
+  windows:
+    signtool:
+      certificate_file: "/path/to/cert.pfx"
+      certificate_password_env: "CERT_PASSWORD"
+    timestamp_url: "http://timestamp.digicert.com"
+    digest_algorithm: "sha256"
+"#;
+        let node = marked_yaml::parse_yaml(0, yaml).unwrap();
+        let build = parse_build(&node).unwrap();
+        let signing = &build.signing;
+        assert!(signing.macos.is_none());
+        assert!(signing.windows.is_some());
+
+        let windows = signing.windows.as_ref().unwrap();
+        let signtool = windows.signtool.as_ref().unwrap();
+        assert!(windows.azure_trusted_signing.is_none());
+        assert_eq!(
+            signtool.certificate_file.as_concrete().unwrap(),
+            "/path/to/cert.pfx"
+        );
+        assert_eq!(
+            signtool
+                .certificate_password_env
+                .as_ref()
+                .unwrap()
+                .as_concrete()
+                .unwrap(),
+            "CERT_PASSWORD"
+        );
+        assert_eq!(
+            windows
+                .timestamp_url
+                .as_ref()
+                .unwrap()
+                .as_concrete()
+                .unwrap(),
+            "http://timestamp.digicert.com"
+        );
+    }
+
+    #[test]
+    fn test_parse_signing_windows_azure() {
+        let yaml = r#"
+signing:
+  windows:
+    azure_trusted_signing:
+      endpoint: "https://wus2.codesigning.azure.net"
+      account_name: "my-signing-account"
+      certificate_profile: "my-profile"
+    timestamp_url: "http://timestamp.acs.microsoft.com"
+    digest_algorithm: "sha256"
+"#;
+        let node = marked_yaml::parse_yaml(0, yaml).unwrap();
+        let build = parse_build(&node).unwrap();
+        let signing = &build.signing;
+        assert!(signing.windows.is_some());
+
+        let windows = signing.windows.as_ref().unwrap();
+        assert!(windows.signtool.is_none());
+        let azure = windows.azure_trusted_signing.as_ref().unwrap();
+        assert_eq!(
+            azure.endpoint.as_concrete().unwrap(),
+            "https://wus2.codesigning.azure.net"
+        );
+        assert_eq!(
+            azure.account_name.as_concrete().unwrap(),
+            "my-signing-account"
+        );
+        assert_eq!(
+            azure.certificate_profile.as_concrete().unwrap(),
+            "my-profile"
+        );
+    }
+
+    #[test]
+    fn test_parse_signing_both_platforms() {
+        let yaml = r#"
+signing:
+  macos:
+    identity: "-"
+  windows:
+    azure_trusted_signing:
+      endpoint: "https://endpoint"
+      account_name: "account"
+      certificate_profile: "profile"
+"#;
+        let node = marked_yaml::parse_yaml(0, yaml).unwrap();
+        let build = parse_build(&node).unwrap();
+        assert!(build.signing.macos.is_some());
+        assert!(build.signing.windows.is_some());
+    }
+
+    #[test]
+    fn test_parse_signing_missing_identity() {
+        let yaml = r#"
+signing:
+  macos:
+    keychain: "/path/to/keychain"
+"#;
+        let node = marked_yaml::parse_yaml(0, yaml).unwrap();
+        let result = parse_build(&node);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_signing_missing_any_method() {
+        let yaml = r#"
+signing:
+  windows:
+    timestamp_url: "http://example.com"
+"#;
+        let node = marked_yaml::parse_yaml(0, yaml).unwrap();
+        let result = parse_build(&node);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_signing_both_methods_errors() {
+        let yaml = r#"
+signing:
+  windows:
+    signtool:
+      certificate_file: "cert.pfx"
+    azure_trusted_signing:
+      endpoint: "https://endpoint"
+      account_name: "account"
+      certificate_profile: "profile"
+"#;
+        let node = marked_yaml::parse_yaml(0, yaml).unwrap();
+        let result = parse_build(&node);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_signing_unknown_field() {
+        let yaml = r#"
+signing:
+  linux:
+    key: "something"
+"#;
+        let node = marked_yaml::parse_yaml(0, yaml).unwrap();
+        let result = parse_build(&node);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(matches!(err, ParseError::InvalidValue { .. }));
+    }
+
+    #[test]
+    fn test_parse_signing_with_jinja_template() {
+        let yaml = r#"
+signing:
+  macos:
+    identity: "${{ SIGNING_IDENTITY }}"
+"#;
+        let node = marked_yaml::parse_yaml(0, yaml).unwrap();
+        let build = parse_build(&node).unwrap();
+        let macos = build.signing.macos.as_ref().unwrap();
+        // Should be a template, not a concrete value
+        assert!(macos.identity.as_concrete().is_none());
     }
 }

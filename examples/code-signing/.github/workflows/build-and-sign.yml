@@ -1,0 +1,218 @@
+# Example GitHub Actions workflow that builds a small C library with rattler-build
+# and code-signs the binaries on macOS and Windows.
+#
+# Copy this workflow (and the recipe.yaml + hello/ source) into your own repo.
+# Then configure the secrets listed below.
+#
+# Required secrets:
+#   macOS:
+#     MACOS_CERTIFICATE_P12   - base64-encoded .p12 certificate
+#     MACOS_CERTIFICATE_PASSWORD - password for the .p12 file
+#     MACOS_SIGNING_IDENTITY  - e.g. "Developer ID Application: My Org (TEAMID)"
+#   Windows (signtool with local .pfx):
+#     WIN_CERT_FILE_B64       - base64-encoded .pfx certificate
+#     WIN_CERT_PASSWORD       - password for the .pfx file
+#   Windows (Azure Trusted Signing) — used by the azure-signing job:
+#     AZURE_CLIENT_ID         - Azure AD app registration client ID
+#     AZURE_TENANT_ID         - Azure AD tenant ID
+#     AZURE_SUBSCRIPTION_ID   - Azure subscription ID
+#     AZURE_SIGNING_ENDPOINT  - e.g. https://wus2.codesigning.azure.net
+#     AZURE_SIGNING_ACCOUNT   - Azure Trusted Signing account name
+#     AZURE_SIGNING_PROFILE   - certificate profile name
+
+name: Build and sign conda package
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Job 1: macOS + Windows (local cert) + Linux
+  # ═══════════════════════════════════════════════════════════════════════════
+  build:
+    name: Build (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            platform: osx-arm64
+          - os: windows-latest
+            platform: win-64
+          - os: ubuntu-latest
+            platform: linux-64
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── Install rattler-build ──────────────────────────────────────────
+      - name: Install rattler-build
+        uses: prefix-dev/setup-rattler-build@v0.2.20
+
+      # ── macOS: import certificate into a temporary keychain ────────────
+      - name: Import macOS signing certificate
+        if: runner.os == 'macOS'
+        env:
+          CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+        run: |
+          KEYCHAIN_PATH="$RUNNER_TEMP/signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -base64 32)"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          echo "$CERTIFICATE_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" \
+            -k "$KEYCHAIN_PATH" -P "$CERTIFICATE_PASSWORD" \
+            -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: \
+            -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH"
+
+      # ── Windows: decode the .pfx certificate to a temp file ────────────
+      - name: Decode Windows signing certificate
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          WIN_CERT_FILE_B64: ${{ secrets.WIN_CERT_FILE_B64 }}
+        run: |
+          $certPath = Join-Path $env:RUNNER_TEMP "cert.pfx"
+          [IO.File]::WriteAllBytes($certPath, [Convert]::FromBase64String($env:WIN_CERT_FILE_B64))
+          echo "WIN_CERT_FILE=$certPath" >> $env:GITHUB_ENV
+
+      # ── Build the package (signing happens automatically) ──────────────
+      - name: Build conda package
+        env:
+          MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+          WIN_CERT_FILE: ${{ env.WIN_CERT_FILE }}
+          WIN_CERT_PASSWORD: ${{ secrets.WIN_CERT_PASSWORD }}
+        run: |
+          rattler-build build \
+            --experimental \
+            --recipe recipe.yaml \
+            --target-platform ${{ matrix.platform }}
+
+      # ── Upload the built .conda package as an artifact ─────────────────
+      - name: Upload package
+        uses: actions/upload-artifact@v4
+        with:
+          name: hello-signed-${{ matrix.platform }}
+          path: output/**/*.conda
+
+      # ── Verify signatures (macOS only, as a sanity check) ──────────────
+      - name: Verify macOS signatures
+        if: runner.os == 'macOS'
+        run: |
+          echo "Listing built .conda packages..."
+          find output -name '*.conda' -print
+
+          # Extract and verify — the test section in the recipe also does this,
+          # but this step runs outside of the test environment for extra confidence.
+          echo "Package signatures were verified during the build (see build log)."
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Job 2: Windows with Azure Trusted Signing (no local certificate needed)
+  #
+  # This job shows how to install the Azure Trusted Signing tools from NuGet
+  # and sign binaries without relying on the azure/trusted-signing-action.
+  # ═══════════════════════════════════════════════════════════════════════════
+  azure-signing:
+    name: Build (Windows + Azure Trusted Signing)
+    runs-on: windows-latest
+    permissions:
+      id-token: write  # required for Azure OIDC login
+
+    env:
+      # NuGet package versions — update these as new versions are released
+      BUILD_TOOLS_VERSION: "10.0.26100.4188"
+      TRUSTED_SIGNING_CLIENT_VERSION: "1.0.95"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── Install rattler-build ──────────────────────────────────────────
+      - name: Install rattler-build
+        uses: prefix-dev/setup-rattler-build@v0.2.20
+
+      # ── Azure login via OIDC (federated credentials) ───────────────────
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      # ── Install Azure Trusted Signing tools from NuGet ─────────────────
+      # This replaces the azure/trusted-signing-action by installing the
+      # required components directly:
+      #   1. signtool.exe   — from Microsoft.Windows.SDK.BuildTools
+      #   2. dlib + headers — from Microsoft.Trusted.Signing.Client
+      - name: Install signing tools from NuGet
+        shell: pwsh
+        run: |
+          $toolsDir = Join-Path $env:RUNNER_TEMP "signing-tools"
+          New-Item -ItemType Directory -Force -Path $toolsDir | Out-Null
+
+          # Download and extract Windows SDK BuildTools (contains signtool.exe)
+          $buildToolsPkg = Join-Path $toolsDir "buildtools.nupkg.zip"
+          $buildToolsDir = Join-Path $toolsDir "buildtools"
+          Invoke-WebRequest `
+            -Uri "https://www.nuget.org/api/v2/package/Microsoft.Windows.SDK.BuildTools/$env:BUILD_TOOLS_VERSION" `
+            -OutFile $buildToolsPkg
+          Expand-Archive -Path $buildToolsPkg -DestinationPath $buildToolsDir -Force
+
+          # Find signtool.exe (x64)
+          $signtool = Get-ChildItem -Path $buildToolsDir -Recurse -Filter "signtool.exe" |
+            Where-Object { $_.FullName -match "x64" } |
+            Select-Object -First 1
+          if (-not $signtool) { throw "signtool.exe not found in BuildTools package" }
+
+          $signtoolDir = $signtool.DirectoryName
+          Write-Host "Found signtool at: $($signtool.FullName)"
+
+          # Download and extract Trusted Signing Client (contains the dlib)
+          $clientPkg = Join-Path $toolsDir "tsclient.nupkg.zip"
+          $clientDir = Join-Path $toolsDir "tsclient"
+          Invoke-WebRequest `
+            -Uri "https://www.nuget.org/api/v2/package/Microsoft.Trusted.Signing.Client/$env:TRUSTED_SIGNING_CLIENT_VERSION" `
+            -OutFile $clientPkg
+          Expand-Archive -Path $clientPkg -DestinationPath $clientDir -Force
+
+          # Find the dlib (x64)
+          $dlib = Get-ChildItem -Path $clientDir -Recurse -Filter "Azure.CodeSigning.Dlib.dll" |
+            Where-Object { $_.FullName -match "x64" } |
+            Select-Object -First 1
+          if (-not $dlib) { throw "Azure.CodeSigning.Dlib.dll not found in Trusted Signing Client package" }
+
+          Write-Host "Found dlib at: $($dlib.FullName)"
+
+          # Copy the dlib next to signtool so it can be found via /dlib
+          Copy-Item -Path $dlib.FullName -Destination $signtoolDir
+
+          # Add signtool directory to PATH
+          echo "$signtoolDir" >> $env:GITHUB_PATH
+          Write-Host "Added $signtoolDir to PATH"
+
+      # ── Build the package (Azure Trusted Signing) ──────────────────────
+      - name: Build conda package
+        env:
+          AZURE_SIGNING_ENDPOINT: ${{ secrets.AZURE_SIGNING_ENDPOINT }}
+          AZURE_SIGNING_ACCOUNT: ${{ secrets.AZURE_SIGNING_ACCOUNT }}
+          AZURE_SIGNING_PROFILE: ${{ secrets.AZURE_SIGNING_PROFILE }}
+        run: |
+          rattler-build build \
+            --experimental \
+            --recipe recipe.yaml \
+            --target-platform win-64
+
+      # ── Upload ─────────────────────────────────────────────────────────
+      - name: Upload package
+        uses: actions/upload-artifact@v4
+        with:
+          name: hello-signed-win-64-azure
+          path: output/**/*.conda

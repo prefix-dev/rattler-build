@@ -1,0 +1,55 @@
+schema_version: 1
+
+context:
+  version: "0.1.0"
+
+package:
+  name: hello-signed
+  version: ${{ version }}
+
+source:
+  path: ./hello
+
+build:
+  script:
+    - if: win
+      then:
+        - cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release %CMAKE_ARGS%
+    - if: unix
+      then:
+        - cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release ${CMAKE_ARGS}
+    - cmake --build build --config Release
+    - cmake --install build
+
+  # Code signing: rattler-build signs all detected binaries after relinking,
+  # right before the package archive is created.
+  signing:
+    macos:
+      identity: "${{ env.MACOS_SIGNING_IDENTITY }}"
+      options:
+        - runtime
+    windows:
+      signtool:
+        certificate_file: "${{ env.WIN_CERT_FILE }}"
+        certificate_password_env: WIN_CERT_PASSWORD
+      timestamp_url: "http://timestamp.digicert.com"
+      digest_algorithm: sha256
+
+requirements:
+  build:
+    - ${{ compiler('c') }}
+    - ninja
+    - cmake
+
+tests:
+  - script:
+      - if: unix
+        then:
+          - hello
+      - if: osx
+        then:
+          - codesign --verify --deep --strict $PREFIX/bin/hello
+          - codesign --verify --deep --strict $PREFIX/lib/libgreet.dylib
+      - if: win
+        then:
+          - hello

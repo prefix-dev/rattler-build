@@ -79,6 +79,10 @@ pub struct Build {
     /// Post-processing operations
     #[serde(default)]
     pub post_process: ConditionalList<PostProcess>,
+
+    /// Code signing configuration
+    #[serde(default)]
+    pub signing: Signing,
 }
 
 impl Default for Build {
@@ -98,6 +102,7 @@ impl Default for Build {
             variant: VariantKeyUsage::default(),
             prefix_detection: PrefixDetection::default(),
             post_process: ConditionalList::default(),
+            signing: Signing::default(),
         }
     }
 }
@@ -189,6 +194,84 @@ pub struct PrefixDetection {
     pub ignore_binary_files: Value<bool>,
 }
 
+/// Code signing configuration for native binaries
+#[derive(Debug, Serialize, Deserialize, Default, Clone, PartialEq)]
+pub struct Signing {
+    /// macOS code signing configuration
+    #[serde(default)]
+    pub macos: Option<MacOsSigning>,
+    /// Windows code signing configuration
+    #[serde(default)]
+    pub windows: Option<WindowsSigning>,
+}
+
+/// macOS code signing configuration using `codesign`
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct MacOsSigning {
+    /// Signing identity (e.g., "Developer ID Application: Company (TEAMID)")
+    /// Use "-" for ad-hoc signing
+    pub identity: Value<String>,
+    /// Path to the keychain containing the signing certificate
+    #[serde(default)]
+    pub keychain: Option<Value<String>>,
+    /// Entitlements plist file path
+    #[serde(default)]
+    pub entitlements: Option<Value<String>>,
+    /// Additional codesign options (e.g., "runtime" for hardened runtime)
+    #[serde(default)]
+    pub options: ConditionalList<String>,
+}
+
+/// Windows code signing configuration.
+///
+/// Supports two signing methods (exactly one must be configured):
+/// 1. **Local certificate** (`signtool`): Configure the `signtool` sub-object.
+/// 2. **Azure Trusted Signing**: Configure the `azure_trusted_signing` sub-object.
+///
+/// Shared settings (`timestamp_url`, `digest_algorithm`) live at the top level.
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct WindowsSigning {
+    /// Local certificate signing via `signtool`
+    #[serde(default)]
+    pub signtool: Option<SigntoolConfig>,
+    /// Azure Trusted Signing configuration
+    #[serde(default)]
+    pub azure_trusted_signing: Option<AzureTrustedSigningConfig>,
+
+    // --- Shared settings ---
+    /// RFC 3161 timestamp server URL
+    #[serde(default)]
+    pub timestamp_url: Option<Value<String>>,
+    /// Digest algorithm (default: sha256)
+    #[serde(default)]
+    pub digest_algorithm: Option<Value<String>>,
+}
+
+/// Local certificate signing configuration for `signtool`
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct SigntoolConfig {
+    /// Path to the certificate file (.pfx / .p12)
+    pub certificate_file: Value<String>,
+    /// Name of the environment variable containing the certificate password.
+    /// The password is read from this env var at build time to avoid leaking
+    /// secrets into the rendered recipe.
+    #[serde(default)]
+    pub certificate_password_env: Option<Value<String>>,
+}
+
+/// Azure Trusted Signing configuration
+///
+/// Requires `az login` (OIDC) for authentication.
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct AzureTrustedSigningConfig {
+    /// Azure Trusted Signing endpoint URL
+    pub endpoint: Value<String>,
+    /// Azure Trusted Signing account name
+    pub account_name: Value<String>,
+    /// Azure Trusted Signing certificate profile name
+    pub certificate_profile: Value<String>,
+}
+
 /// Post-processing operations using regex replacements
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct PostProcess {
@@ -277,6 +360,7 @@ impl Build {
             variant,
             prefix_detection,
             post_process,
+            signing,
         } = self;
 
         let mut vars = Vec::new();
@@ -410,6 +494,37 @@ impl Build {
         // Post-process (handle conditional items)
         vars.extend(post_process.used_variables());
         collect_post_process_vars(post_process.iter(), &mut vars);
+
+        // Signing
+        if let Some(macos) = &signing.macos {
+            vars.extend(macos.identity.used_variables());
+            if let Some(keychain) = &macos.keychain {
+                vars.extend(keychain.used_variables());
+            }
+            if let Some(entitlements) = &macos.entitlements {
+                vars.extend(entitlements.used_variables());
+            }
+            vars.extend(macos.options.used_variables());
+        }
+        if let Some(windows) = &signing.windows {
+            if let Some(signtool) = &windows.signtool {
+                vars.extend(signtool.certificate_file.used_variables());
+                if let Some(password) = &signtool.certificate_password_env {
+                    vars.extend(password.used_variables());
+                }
+            }
+            if let Some(azure) = &windows.azure_trusted_signing {
+                vars.extend(azure.endpoint.used_variables());
+                vars.extend(azure.account_name.used_variables());
+                vars.extend(azure.certificate_profile.used_variables());
+            }
+            if let Some(timestamp_url) = &windows.timestamp_url {
+                vars.extend(timestamp_url.used_variables());
+            }
+            if let Some(digest_algorithm) = &windows.digest_algorithm {
+                vars.extend(digest_algorithm.used_variables());
+            }
+        }
 
         vars.sort();
         vars.dedup();

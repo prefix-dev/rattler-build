@@ -38,6 +38,9 @@ build:
     ignore: false
     ignore_binary_files: false
   post_process: []
+  signing:
+    macos: null
+    windows: null
 requirements:
   build:
   - ${{ compiler("c") }}
