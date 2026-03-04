@@ -1,6 +1,5 @@
 """Tests for VariantConfig Python bindings."""
 
-import tempfile
 from pathlib import Path
 
 from rattler_build import PlatformConfig, VariantConfig
@@ -78,7 +77,7 @@ numpy:
     assert len(python_values) == 3
 
 
-def test_variant_config_from_file() -> None:
+def test_variant_config_from_file(tmp_path: Path) -> None:
     """Test loading VariantConfig from a file."""
     yaml_content = """
 python:
@@ -88,20 +87,14 @@ rust:
   - "1.70"
 """
 
-    # Create a temporary file
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
-        f.write(yaml_content)
-        temp_path = Path(f.name)
+    temp_path = tmp_path / "variant.yaml"
+    temp_path.write_text(yaml_content)
 
-    try:
-        config = VariantConfig.from_file(temp_path)
+    config = VariantConfig.from_file(temp_path)
 
-        keys = config.keys()
-        assert "python" in keys
-        assert "rust" in keys
-    finally:
-        # Clean up
-        temp_path.unlink()
+    keys = config.keys()
+    assert "python" in keys
+    assert "rust" in keys
 
 
 def test_variant_config_with_different_types() -> None:
@@ -198,7 +191,7 @@ zip_keys:
     assert len(combinations) == 2  # Not 4
 
 
-def test_variant_config_from_file_with_context() -> None:
+def test_variant_config_from_file_with_context(tmp_path: Path) -> None:
     """Test loading VariantConfig with JinjaConfig context."""
     from rattler_build import JinjaConfig
 
@@ -210,36 +203,30 @@ c_compiler:
     then: msvc
 """
 
-    # Create a temporary file
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
-        f.write(yaml_content)
-        temp_path = Path(f.name)
+    temp_path = tmp_path / "variant.yaml"
+    temp_path.write_text(yaml_content)
 
-    try:
-        # Load with Linux context
-        platform_config = PlatformConfig(target_platform="linux-64")
+    # Load with Linux context
+    platform_config = PlatformConfig(target_platform="linux-64")
 
-        jinja_config_linux = JinjaConfig(platform=platform_config)
-        config_linux = VariantConfig.from_file_with_context(temp_path, jinja_config_linux)
+    jinja_config_linux = JinjaConfig(platform=platform_config)
+    config_linux = VariantConfig.from_file_with_context(temp_path, jinja_config_linux)
 
-        values_linux = config_linux.get_values("c_compiler")
-        assert values_linux is not None
-        assert "gcc" in values_linux
-        assert "msvc" not in values_linux
+    values_linux = config_linux.get_values("c_compiler")
+    assert values_linux is not None
+    assert "gcc" in values_linux
+    assert "msvc" not in values_linux
 
-        # Load with Windows context
-        platform_config = PlatformConfig(target_platform="win-64")
+    # Load with Windows context
+    platform_config = PlatformConfig(target_platform="win-64")
 
-        jinja_config_win = JinjaConfig(platform=platform_config)
-        config_win = VariantConfig.from_file_with_context(temp_path, jinja_config_win)
+    jinja_config_win = JinjaConfig(platform=platform_config)
+    config_win = VariantConfig.from_file_with_context(temp_path, jinja_config_win)
 
-        values_win = config_win.get_values("c_compiler")
-        assert values_win is not None
-        assert "msvc" in values_win
-        assert "gcc" not in values_win
-    finally:
-        # Clean up
-        temp_path.unlink()
+    values_win = config_win.get_values("c_compiler")
+    assert values_win is not None
+    assert "msvc" in values_win
+    assert "gcc" not in values_win
 
 
 def test_variant_config_from_yaml_with_context() -> None:
@@ -274,7 +261,7 @@ cxx_compiler:
     assert "gxx" in cxx_values
 
 
-def test_variant_config_from_conda_build_config() -> None:
+def test_variant_config_from_conda_build_config(tmp_path: Path) -> None:
     """Test loading conda_build_config.yaml format with selectors."""
     from rattler_build import JinjaConfig
 
@@ -289,59 +276,53 @@ c_compiler:
   - vs2019    # [win]
 """
 
-    # Create a temporary file
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
-        f.write(yaml_content)
-        temp_path = Path(f.name)
+    temp_path = tmp_path / "variant.yaml"
+    temp_path.write_text(yaml_content)
 
-    try:
-        # Load with Linux context
-        platform_config = PlatformConfig(target_platform="linux-64")
+    # Load with Linux context
+    platform_config = PlatformConfig(target_platform="linux-64")
 
-        jinja_config_linux = JinjaConfig(platform=platform_config)
-        config_linux = VariantConfig.from_conda_build_config(temp_path, jinja_config_linux)
+    jinja_config_linux = JinjaConfig(platform=platform_config)
+    config_linux = VariantConfig.from_conda_build_config(temp_path, jinja_config_linux)
 
-        python_values = config_linux.get_values("python")
-        assert python_values is not None
-        assert len(python_values) == 2  # 3.9 and 3.10 (unix selector)
+    python_values = config_linux.get_values("python")
+    assert python_values is not None
+    assert len(python_values) == 2  # 3.9 and 3.10 (unix selector)
 
-        c_compiler_values = config_linux.get_values("c_compiler")
-        assert c_compiler_values is not None
-        assert "gcc" in c_compiler_values
-        assert "clang" not in c_compiler_values
-        assert "vs2019" not in c_compiler_values
+    c_compiler_values = config_linux.get_values("c_compiler")
+    assert c_compiler_values is not None
+    assert "gcc" in c_compiler_values
+    assert "clang" not in c_compiler_values
+    assert "vs2019" not in c_compiler_values
 
-        # Load with macOS context
-        platform_config = PlatformConfig(target_platform="osx-64")
+    # Load with macOS context
+    platform_config = PlatformConfig(target_platform="osx-64")
 
-        jinja_config_osx = JinjaConfig(platform=platform_config)
-        config_osx = VariantConfig.from_conda_build_config(temp_path, jinja_config_osx)
+    jinja_config_osx = JinjaConfig(platform=platform_config)
+    config_osx = VariantConfig.from_conda_build_config(temp_path, jinja_config_osx)
 
-        python_values_osx = config_osx.get_values("python")
-        assert python_values_osx is not None
-        assert len(python_values_osx) == 3  # 3.9, 3.10 (unix), and 3.11 (osx)
+    python_values_osx = config_osx.get_values("python")
+    assert python_values_osx is not None
+    assert len(python_values_osx) == 3  # 3.9, 3.10 (unix), and 3.11 (osx)
 
-        c_compiler_values_osx = config_osx.get_values("c_compiler")
-        assert c_compiler_values_osx is not None
-        assert "clang" in c_compiler_values_osx
-        assert "gcc" not in c_compiler_values_osx
+    c_compiler_values_osx = config_osx.get_values("c_compiler")
+    assert c_compiler_values_osx is not None
+    assert "clang" in c_compiler_values_osx
+    assert "gcc" not in c_compiler_values_osx
 
-        # Load with Windows context
-        platform_config = PlatformConfig(target_platform="win-64")
+    # Load with Windows context
+    platform_config = PlatformConfig(target_platform="win-64")
 
-        jinja_config_win = JinjaConfig(platform=platform_config)
-        config_win = VariantConfig.from_conda_build_config(temp_path, jinja_config_win)
+    jinja_config_win = JinjaConfig(platform=platform_config)
+    config_win = VariantConfig.from_conda_build_config(temp_path, jinja_config_win)
 
-        python_values_win = config_win.get_values("python")
-        assert python_values_win is not None
-        assert len(python_values_win) == 1  # Only 3.9 (no unix/osx selectors match)
+    python_values_win = config_win.get_values("python")
+    assert python_values_win is not None
+    assert len(python_values_win) == 1  # Only 3.9 (no unix/osx selectors match)
 
-        c_compiler_values_win = config_win.get_values("c_compiler")
-        assert c_compiler_values_win is not None
-        assert "vs2019" in c_compiler_values_win
-    finally:
-        # Clean up
-        temp_path.unlink()
+    c_compiler_values_win = config_win.get_values("c_compiler")
+    assert c_compiler_values_win is not None
+    assert "vs2019" in c_compiler_values_win
 
 
 def test_variant_config_multiple_zip_key_groups() -> None:

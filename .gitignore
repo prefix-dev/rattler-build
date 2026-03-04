@@ -25,3 +25,6 @@ target-pixi
 
 # generated tutorial markdown (from notebooks)
 docs/py-rattler-build/tutorials/
+
+# pytest temp directories
+pytest-temp

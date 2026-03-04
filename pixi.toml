@@ -99,6 +99,8 @@ syrupy = "4.6.*"
 boto3 = "*"
 
 
+
+
 [feature.lint.dependencies]
 actionlint = ">=1.7.4,<2"
 cargo-deny = ">=0.18.3,<0.19"
@@ -157,23 +159,28 @@ RUSTC_WRAPPER = "sccache"
 build-package = "python scripts/build_package.py"
 upload-package = "python scripts/upload_package.py"
 
-
-[target.linux-64.dependencies]
+[target.linux.dependencies]
 clang = ">=18.1.8,<19.0"
 mold = ">=2.33.0,<3.0"
 patchelf = ">=0.17.2,<0.18"
+powershell = ">=7.5.4,<8"
 
 [target.osx-64.dependencies]
 patchelf = ">=0.18.0,<0.19"
 
 [target.osx-arm64.dependencies]
 patchelf = ">=0.18.0,<0.19"
+powershell = ">=7.5.4,<8"
 
-[target.linux-64.activation]
+[target.win.dependencies]
+powershell = ">=7.5.4,<8"
+
+[target.linux.activation]
 scripts = ["scripts/activate.sh"]
-[target.osx-arm64.activation]
+
+[target.osx.activation]
 scripts = ["scripts/activate.sh"]
-[target.win-64.activation]
+[target.win.activation]
 scripts = ["scripts/activate.bat"]
 
 [feature.docs.dependencies]

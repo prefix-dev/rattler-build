@@ -2769,10 +2769,12 @@ about:
     shutil.rmtree(git_dir)
 
     # Verify the cache is now corrupted (git commands should fail)
+    # Set GIT_CEILING_DIRECTORIES so git doesn't walk up into the project repo
     result = subprocess.run(
         ["git", "rev-parse", "--git-dir"],
         cwd=cached_repo,
         capture_output=True,
+        env={**os.environ, "GIT_CEILING_DIRECTORIES": str(cached_repo.parent)},
     )
     assert result.returncode != 0, "Git command should fail on corrupted cache"
 
