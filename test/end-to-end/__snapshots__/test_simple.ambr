@@ -1,4 +1,12 @@
 # serializer version: 1
+# name: test_r_interpreter
+  '''
+  - r:
+      libraries:
+      - ggplot2
+  
+  '''
+# ---
 # name: test_noarch_flask
   '''
   - python:
