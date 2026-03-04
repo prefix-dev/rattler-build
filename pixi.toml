@@ -161,17 +161,12 @@ upload-package = "python scripts/upload_package.py"
 clang = ">=18.1.8,<19.0"
 mold = ">=2.33.0,<3.0"
 patchelf = ">=0.17.2,<0.18"
-powershell = ">=7.5.4,<8"
 
 [target.osx-64.dependencies]
 patchelf = ">=0.18.0,<0.19"
 
 [target.osx-arm64.dependencies]
 patchelf = ">=0.18.0,<0.19"
-powershell = ">=7.5.4,<8"
-
-[target.win.dependencies]
-powershell = ">=7.5.4,<8"
 
 [target.linux.activation]
 scripts = ["scripts/activate.sh"]

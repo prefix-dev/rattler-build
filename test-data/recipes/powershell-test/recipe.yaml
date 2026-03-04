@@ -27,7 +27,7 @@ build:
       Write-Output 'PowerShell test completed successfully'
 
 requirements:
-  host:
+  build:
     - powershell
 
 tests:
