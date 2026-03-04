@@ -43,6 +43,26 @@ def test_source_files_copied_to_test(
     ).exists()
 
 
+@pytest.mark.skipif(os.name == "nt", reason="recipe uses build.sh (unix only)")
+def test_conditional_script_empty(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot
+):
+    """Test that a conditional test script evaluating to empty does not fall back to build.sh."""
+    rattler_build.build(
+        recipes / "test-conditional-script-empty",
+        tmp_path,
+        extra_args=["--test=skip"],
+    )
+    pkg = get_extracted_package(tmp_path, "test-conditional-script-empty")
+
+    assert (pkg / "info" / "tests" / "tests.yaml").exists()
+    content = (pkg / "info" / "tests" / "tests.yaml").read_text()
+
+    # The test script must not contain the build script content
+    assert "Hello" not in content
+    assert snapshot == content
+
+
 @pytest.mark.skipif(
     os.name != "nt", reason="recipe does not support execution on windows"
 )

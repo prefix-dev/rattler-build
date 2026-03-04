@@ -1283,7 +1283,7 @@ pub fn evaluate_script(
             !env.is_empty() || interpreter.is_some() || cwd.is_some() || !secrets.is_empty();
 
         let content = if commands.is_empty() {
-            ScriptContentOutput::Default
+            ScriptContentOutput::Commands(Vec::new())
         } else if commands.len() == 1 && !has_additional_options && !script.content_explicit {
             // Single command with no additional options and NOT explicitly using content: field
             // This serializes as a simple string: `script: "cmd"`
@@ -5254,5 +5254,38 @@ package:
             }
             _ => panic!("Expected single recipe"),
         }
+    }
+
+    #[test]
+    fn test_evaluate_script_empty_conditional_returns_commands_not_default() {
+        use rattler_build_script::ScriptContent;
+
+        // Create a Script with a conditional content list where the condition is false
+        // and has no else branch — this should produce Commands([]), NOT Default
+        let script = crate::stage0::types::Script {
+            content: Some(ConditionalList::new(vec![Item::Conditional(Conditional {
+                condition: JinjaExpression::new("win".to_string()).unwrap(),
+                then: NestedItemList::new(vec![Item::Value(Value::new_concrete(
+                    "echo hello".to_string(),
+                    None,
+                ))]),
+                else_value: None,
+                condition_span: None,
+            })])),
+            ..Default::default()
+        };
+
+        // Context where `win` is false — so the conditional produces no commands
+        let mut ctx = EvaluationContext::new();
+        ctx.insert("win".to_string(), Variable::from(false));
+
+        let result = evaluate_script(&script, &ctx).unwrap();
+
+        // The script content should be Commands([]), not Default
+        assert_eq!(result.content, ScriptContent::Commands(vec![]));
+        assert!(
+            !result.content.is_default(),
+            "Empty conditional script must not fall back to Default (which discovers build.sh)"
+        );
     }
 }

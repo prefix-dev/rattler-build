@@ -1,4 +1,11 @@
 # serializer version: 1
+# name: test_conditional_script_empty
+  '''
+  - script:
+      content: ''
+  
+  '''
+# ---
 # name: test_perl_tests
   '''
   - perl:
