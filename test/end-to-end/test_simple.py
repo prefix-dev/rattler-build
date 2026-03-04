@@ -3006,3 +3006,259 @@ build:
         f"LFS file should contain actual content, got: {resolved!r}"
     )
     assert (pkg / "README.md").read_text() == "hello"
+
+
+def test_git_source(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(recipes / "llamacpp", tmp_path)
+    pkg = get_extracted_package(tmp_path, "llama.cpp")
+    license_file = pkg / "info/licenses/LICENSE"
+    assert license_file.exists()
+    assert " Georgi " in license_file.read_text()
+
+
+def test_package_content_test_execution(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    rattler_build.build(
+        recipes / "package-content-tests/recipe-test-succeed.yaml", tmp_path
+    )
+
+    with pytest.raises(CalledProcessError):
+        rattler_build.build(
+            recipes / "package-content-tests/recipe-test-fail.yaml",
+            tmp_path / "fail",
+        )
+
+
+def test_test_execution(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(recipes / "test-execution/recipe-test-succeed.yaml", tmp_path)
+
+    with pytest.raises(CalledProcessError):
+        rattler_build.build(
+            recipes / "test-execution/recipe-test-fail.yaml", tmp_path / "fail"
+        )
+
+
+@pytest.mark.skipif(os.name == "nt", reason="Unix-only test")
+def test_files_copy(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(recipes / "test-sources", tmp_path)
+
+
+def test_tar_source(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(recipes / "tar-source", tmp_path)
+
+
+def test_zip_source(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(recipes / "zip-source", tmp_path)
+
+
+def test_7z_source(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(recipes / "7z-source", tmp_path)
+
+
+def test_dry_run_cf_upload(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    variant_config = recipes / "polarify" / "linux_64_.yaml"
+    rattler_build.build(recipes / "polarify", tmp_path, variant_config=variant_config)
+
+    pkg_path = get_package(tmp_path, "polarify")
+    output = rattler_build(
+        "upload",
+        "-vvv",
+        "conda-forge",
+        "--feedstock",
+        "polarify",
+        "--feedstock-token",
+        "fake-feedstock-token",
+        "--staging-token",
+        "fake-staging-token",
+        "--dry-run",
+        str(pkg_path),
+        stderr=STDOUT,
+    )
+    assert "Done uploading packages to conda-forge" in output
+
+
+def test_correct_sha256(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(recipes / "correct-sha", tmp_path)
+
+
+@pytest.mark.skipif(os.name == "nt", reason="Unix-only test")
+def test_rpath(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(
+        recipes / "rpath", tmp_path, extra_args=["--target-platform", "linux-64"]
+    )
+
+
+@pytest.mark.skipif(platform.system() != "Linux", reason="Linux-only test")
+def test_overlinking_check(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    args = rattler_build.build_args(
+        recipes / "overlinking",
+        tmp_path,
+        extra_args=["--target-platform", "linux-64"],
+    )
+    try:
+        rattler_build(*args, stderr=STDOUT)
+        pytest.fail("Expected build to fail with overlinking error")
+    except CalledProcessError as e:
+        assert "linking check error: Overlinking against" in e.output
+
+
+@pytest.mark.skipif(platform.system() != "Linux", reason="Linux-only test")
+def test_overdepending_check(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    args = rattler_build.build_args(
+        recipes / "overdepending",
+        tmp_path,
+        extra_args=["--target-platform", "linux-64"],
+    )
+    try:
+        rattler_build(*args, stderr=STDOUT)
+        pytest.fail("Expected build to fail with overdepending error")
+    except CalledProcessError as e:
+        assert "linking check error: Overdepending against" in e.output
+
+
+@pytest.mark.skipif(platform.system() != "Linux", reason="Linux-only test")
+def test_overlinking_host_not_run(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Regression test for https://github.com/prefix-dev/rattler-build/issues/2192
+
+    When a library (zlib) is in host but NOT in run requirements (because
+    ignore_run_exports suppresses the automatic addition), the overlinking check
+    should detect this and fail the build.
+    """
+    args = rattler_build.build_args(
+        recipes / "overlinking_host_not_run",
+        tmp_path,
+        extra_args=["--target-platform", "linux-64"],
+    )
+    try:
+        rattler_build(*args, stderr=STDOUT)
+        pytest.fail("Expected build to fail with overlinking error")
+    except CalledProcessError as e:
+        assert "linking check error: Overlinking against" in e.output
+
+
+@pytest.mark.skipif(platform.system() != "Linux", reason="Linux-only test")
+def test_allow_missing_dso(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    args = rattler_build.build_args(
+        recipes / "allow_missing_dso",
+        tmp_path,
+        extra_args=["--target-platform", "linux-64"],
+    )
+    output = rattler_build(*args, stderr=STDOUT)
+    assert "it is included in the allow list. Skipping..." in output
+
+
+@pytest.mark.skipif(
+    platform.system() not in ("Darwin", "Linux"),
+    reason="Cross-platform render test (non-Windows)",
+)
+def test_render_only_cross_platform(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Test that --render-only with cross-platform target doesn't install packages."""
+    rattler_build.render(
+        recipes / "flask",
+        tmp_path,
+        extra_args=["--target-platform", "win-64"],
+    )
+
+
+def test_script_content_scalar_with_jinja(rattler_build: RattlerBuild, tmp_path: Path):
+    recipe_dir = tmp_path / "recipe"
+    recipe_dir.mkdir()
+    (recipe_dir / "recipe.yaml").write_text(
+        """\
+package:
+  name: hellopackage
+  version: 1.0.0
+build:
+  script:
+    content: ${{ PYTHON }} --help
+requirements:
+  host:
+    - python
+"""
+    )
+    rattler_build.build(recipe_dir, tmp_path / "output")
+
+
+def test_script_content_sequence_with_jinja(
+    rattler_build: RattlerBuild, tmp_path: Path
+):
+    recipe_dir = tmp_path / "recipe"
+    recipe_dir.mkdir()
+    (recipe_dir / "recipe.yaml").write_text(
+        """\
+package:
+  name: hellopackage
+  version: 1.0.0
+build:
+  script:
+    content:
+      - ${{ PYTHON }} --help
+requirements:
+  host:
+    - python
+"""
+    )
+    rattler_build.build(recipe_dir, tmp_path / "output")
+
+
+@pytest.mark.skipif(os.name == "nt", reason="Uses Unix /tmp paths")
+def test_absolute_path_license_without_flag(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    args = rattler_build.build_args(recipes / "absolute_path_license", tmp_path)
+    try:
+        rattler_build(*args, stderr=STDOUT)
+        pytest.fail("Expected build to fail with absolute license path error")
+    except CalledProcessError as e:
+        assert "Absolute paths in license_file are not allowed" in e.output
+        assert "allow-absolute" in e.output
+
+
+@pytest.mark.skipif(os.name == "nt", reason="Uses Unix /tmp paths")
+def test_absolute_path_license_with_flag(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    rattler_build.build(
+        recipes / "absolute_path_license",
+        tmp_path,
+        extra_args=["--allow-absolute-license-paths"],
+    )
+    pkg = get_extracted_package(tmp_path, "absolute-path-license")
+    assert (pkg / "info/licenses/LICENSE").exists()
+    assert (pkg / "info/licenses/external_license.txt").exists()
+
+
+def test_sourceforge_redirects(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    rattler_build.build(recipes / "sourceforge-redirects", tmp_path)
+
+
+def test_target_platform_in_variant_config_warning(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    variant_config = (
+        Path(__file__).parent.parent.parent
+        / "test-data"
+        / "variant_files"
+        / "variant_with_target_platform.yaml"
+    )
+    result = rattler_build.render(
+        recipes / "binary_prefix_test",
+        tmp_path,
+        variant_config=variant_config,
+        raw=True,
+    )
+    combined = (result.stdout or "") + "\n" + (result.stderr or "")
+    assert (
+        "Setting 'target_platform' in a variant config file is not supported"
+        in combined
+    )
+    assert "Please use the '--target-platform' command-line flag" in combined
