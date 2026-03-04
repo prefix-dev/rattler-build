@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use rattler_conda_types::Platform;
@@ -21,11 +21,11 @@ foreach ($envVar in Get-ChildItem Env:) {
 
 "#;
 
-/// Check if pwsh (PowerShell 7+) is available and determine its version.
-/// Returns (shell_command, is_new_enough).
-fn detect_powershell() -> (&'static str, bool) {
-    let result: Option<bool> = which::which("pwsh").ok().and_then(|_| {
-        let out = String::from_utf8(Command::new("pwsh").arg("-v").output().ok()?.stdout).ok()?;
+/// Check if the given pwsh binary is PowerShell 7.4+.
+fn is_pwsh_new_enough(pwsh_path: &Path) -> bool {
+    let result: Option<bool> = (|| {
+        let out =
+            String::from_utf8(Command::new(pwsh_path).arg("-v").output().ok()?.stdout).ok()?;
         let ver = out
             .trim()
             .split(' ')
@@ -39,19 +39,32 @@ fn detect_powershell() -> (&'static str, bool) {
         let major = ver[0].parse::<i32>().ok()?;
         let minor = ver[1].parse::<i32>().ok()?;
         Some(major > 7 || (major == 7 && minor >= 4))
-    });
+    })();
 
-    match result {
-        Some(new_enough) => ("pwsh", new_enough),
-        None => ("powershell", false),
-    }
+    result.unwrap_or(false)
 }
 
 // PowerShell interpreter: writes a .ps1 script then delegates to cmd.exe (Windows) or bash (Unix)
 // to run it via the pwsh/powershell command.
 impl Interpreter for PowerShellInterpreter {
     async fn run(&self, args: ExecutionArgs) -> Result<(), InterpreterError> {
-        let (shell_cmd, new_enough) = detect_powershell();
+        // Try to find pwsh in the build prefix or system PATH for version checking.
+        // The actual command used in the script may rely on the activation script
+        // (build_env.sh) to put pwsh on PATH at runtime.
+        let pwsh_path =
+            find_interpreter("pwsh", args.build_prefix.as_ref(), &args.execution_platform)
+                .ok()
+                .flatten();
+
+        let (shell_cmd, new_enough) = match &pwsh_path {
+            Some(path) => {
+                let new_enough = is_pwsh_new_enough(path);
+                (path.to_string_lossy().into_owned(), new_enough)
+            }
+            // Fall back to "pwsh" by name — the conda `powershell` package provides the
+            // `pwsh` binary, and the activation scripts will put it on PATH.
+            None => ("pwsh".to_owned(), false),
+        };
 
         if !new_enough {
             tracing::warn!(
@@ -64,10 +77,17 @@ impl Interpreter for PowerShellInterpreter {
         let contents = POWERSHELL_PREAMBLE.to_owned() + args.script.script();
         tokio::fs::write(&ps1_script, contents).await?;
 
+        // Quote the shell command if it contains spaces (e.g. "C:\Program Files\...")
+        let quoted_shell_cmd = if shell_cmd.contains(' ') {
+            format!("\"{}\"", shell_cmd)
+        } else {
+            shell_cmd
+        };
+
         let args = ExecutionArgs {
             script: crate::execution::ResolvedScriptContents::Inline(format!(
                 "{} -NoLogo -NoProfile {:?}",
-                shell_cmd, ps1_script
+                quoted_shell_cmd, ps1_script
             )),
             ..args
         };

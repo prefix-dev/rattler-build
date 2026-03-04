@@ -97,7 +97,6 @@ environments:
       - conda: https://prefix.dev/conda-forge/linux-64/perl-5.32.1-7_hd590300_perl5.conda
       - conda: https://prefix.dev/conda-forge/linux-64/pkg-config-0.29.2-h4bc722e_1009.conda
       - conda: https://prefix.dev/conda-forge/noarch/pluggy-1.6.0-pyhf9edf01_1.conda
-      - conda: https://prefix.dev/conda-forge/linux-64/powershell-7.5.4-hfc2019e_1.conda
       - conda: https://prefix.dev/conda-forge/noarch/pycparser-2.22-pyh29332c3_1.conda
       - conda: https://prefix.dev/conda-forge/noarch/pysocks-1.7.1-pyha55dd90_7.conda
       - conda: https://prefix.dev/conda-forge/noarch/pytest-7.4.2-pyhd8ed1ab_0.conda
@@ -355,7 +354,6 @@ environments:
       - conda: https://prefix.dev/conda-forge/osx-arm64/perl-5.32.1-7_h4614cfb_perl5.conda
       - conda: https://prefix.dev/conda-forge/osx-arm64/pkg-config-0.29.2-hde07d2e_1009.conda
       - conda: https://prefix.dev/conda-forge/noarch/pluggy-1.6.0-pyhf9edf01_1.conda
-      - conda: https://prefix.dev/conda-forge/osx-arm64/powershell-7.5.4-h820172f_1.conda
       - conda: https://prefix.dev/conda-forge/noarch/pycparser-2.22-pyh29332c3_1.conda
       - conda: https://prefix.dev/conda-forge/noarch/pysocks-1.7.1-pyha55dd90_7.conda
       - conda: https://prefix.dev/conda-forge/noarch/pytest-7.4.2-pyhd8ed1ab_0.conda
@@ -463,7 +461,6 @@ environments:
       - conda: https://prefix.dev/conda-forge/win-64/perl-5.32.1.1-7_h57928b3_strawberry.conda
       - conda: https://prefix.dev/conda-forge/win-64/pkg-config-0.29.2-h88c491f_1009.conda
       - conda: https://prefix.dev/conda-forge/noarch/pluggy-1.6.0-pyhf9edf01_1.conda
-      - conda: https://prefix.dev/conda-forge/win-64/powershell-7.5.4-h11686cb_1.conda
       - conda: https://prefix.dev/conda-forge/noarch/pycparser-2.22-pyh29332c3_1.conda
       - conda: https://prefix.dev/conda-forge/noarch/pysocks-1.7.1-pyh09c184e_7.conda
       - conda: https://prefix.dev/conda-forge/noarch/pytest-7.4.2-pyhd8ed1ab_0.conda
@@ -1276,7 +1273,6 @@ environments:
       - conda: https://prefix.dev/conda-forge/linux-64/pkg-config-0.29.2-h4bc722e_1009.conda
       - conda: https://prefix.dev/conda-forge/noarch/platformdirs-4.9.2-pyhcf101f3_0.conda
       - conda: https://prefix.dev/conda-forge/noarch/pluggy-1.6.0-pyhf9edf01_1.conda
-      - conda: https://prefix.dev/conda-forge/linux-64/powershell-7.5.4-hfc2019e_1.conda
       - conda: https://prefix.dev/conda-forge/linux-64/prettier-3.8.1-h7e4c9f4_0.conda
       - conda: https://prefix.dev/conda-forge/noarch/pycparser-2.22-pyh29332c3_1.conda
       - conda: https://prefix.dev/conda-forge/noarch/pysocks-1.7.1-pyha55dd90_7.conda
@@ -1562,7 +1558,6 @@ environments:
       - conda: https://prefix.dev/conda-forge/osx-arm64/pkg-config-0.29.2-hde07d2e_1009.conda
       - conda: https://prefix.dev/conda-forge/noarch/platformdirs-4.9.2-pyhcf101f3_0.conda
       - conda: https://prefix.dev/conda-forge/noarch/pluggy-1.6.0-pyhf9edf01_1.conda
-      - conda: https://prefix.dev/conda-forge/osx-arm64/powershell-7.5.4-h820172f_1.conda
       - conda: https://prefix.dev/conda-forge/osx-arm64/prettier-3.8.1-h9907cc9_0.conda
       - conda: https://prefix.dev/conda-forge/noarch/pycparser-2.22-pyh29332c3_1.conda
       - conda: https://prefix.dev/conda-forge/noarch/pysocks-1.7.1-pyha55dd90_7.conda
@@ -1681,7 +1676,6 @@ environments:
       - conda: https://prefix.dev/conda-forge/win-64/pkg-config-0.29.2-h88c491f_1009.conda
       - conda: https://prefix.dev/conda-forge/noarch/platformdirs-4.9.2-pyhcf101f3_0.conda
       - conda: https://prefix.dev/conda-forge/noarch/pluggy-1.6.0-pyhf9edf01_1.conda
-      - conda: https://prefix.dev/conda-forge/win-64/powershell-7.5.4-h11686cb_1.conda
       - conda: https://prefix.dev/conda-forge/win-64/prettier-3.8.1-hc95d2ff_0.conda
       - conda: https://prefix.dev/conda-forge/noarch/pycparser-2.22-pyh29332c3_1.conda
       - conda: https://prefix.dev/conda-forge/noarch/pysocks-1.7.1-pyh09c184e_7.conda
@@ -8031,29 +8025,6 @@ packages:
   license_family: MIT
   size: 25877
   timestamp: 1764896838868
-- conda: https://prefix.dev/conda-forge/linux-64/powershell-7.5.4-hfc2019e_1.conda
-  sha256: e0309a3dedf73cfee30340e3ad871b1568a65d58e1d204738bece0166676922e
-  md5: 939dabe1089a3bc6fb55dfa7bcf0c21a
-  depends:
-  - icu
-  license: MIT
-  license_family: MIT
-  size: 66820802
-  timestamp: 1767216494328
-- conda: https://prefix.dev/conda-forge/osx-arm64/powershell-7.5.4-h820172f_1.conda
-  sha256: b31435953ba749fab68e5dfdb7ff76dc8df0461bbc78f2790917537f85fecc1c
-  md5: 1a2bfc512d3028ba893689899c38838e
-  license: MIT
-  license_family: MIT
-  size: 61950482
-  timestamp: 1767216637975
-- conda: https://prefix.dev/conda-forge/win-64/powershell-7.5.4-h11686cb_1.conda
-  sha256: 96eeaa407dbf1d56cbfa479974d5d27083c31a69f31023895f857ea340e08395
-  md5: d81b4702acddabe4d1ca0ac41e11fa92
-  license: MIT
-  license_family: MIT
-  size: 98686353
-  timestamp: 1767216571146
 - conda: https://prefix.dev/conda-forge/linux-64/prettier-3.8.1-h7e4c9f4_0.conda
   sha256: 11889a9e414f7c35dc0de59ce195b9b73e65881d5d3bbe7e2e14a59fe47d702e
   md5: 206c0500b835e80dfee8e3ad2e5776ce
