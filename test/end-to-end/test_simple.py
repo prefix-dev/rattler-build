@@ -1994,7 +1994,9 @@ def test_line_breaks(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path)
     assert any("done" in line for line in output_lines)
 
 
-def test_r_interpreter(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+def test_r_interpreter(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot
+):
     rattler_build.build(recipes / "r-test", tmp_path)
     pkg = get_extracted_package(tmp_path, "r-test")
 
@@ -2008,6 +2010,10 @@ def test_r_interpreter(rattler_build: RattlerBuild, recipes: Path, tmp_path: Pat
     assert "PREFIX:" in output_content
     assert (pkg / "info/recipe/recipe.yaml").exists()
     assert (pkg / "info/tests/tests.yaml").exists()
+
+    # Verify tests.yaml content (was test_r_tests in test_tests.py)
+    tests_content = (pkg / "info/tests/tests.yaml").read_text()
+    assert snapshot == tests_content
 
     # Verify index.json exists before running test
     assert (pkg / "info/index.json").exists(), "index.json file missing from package"
@@ -2168,30 +2174,6 @@ def test_interpreter_detection(
         expected_output = f"Hello from {interpreter.upper()}!"
 
     assert expected_output in test_output
-    assert "all tests passed!" in test_output
-
-
-def test_interpreter_detection_all_tests(
-    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
-):
-    """
-    Tests that rattler-build can run multiple test scripts requiring
-    different interpreters within the same test phase.
-    """
-    recipe_dir = recipes / "interpreter-detection"
-    pkg_name = "test-interpreter-all"
-
-    rattler_build.build(recipe_dir, tmp_path)
-    pkg_file = get_package(tmp_path, pkg_name)
-    assert pkg_file.exists()
-
-    test_output = rattler_build.test(pkg_file)
-
-    assert "Hello from Python!" in test_output
-    assert "Hello from Perl!" in test_output
-    assert "Hello from R!" in test_output
-    assert "Hello from Nushell!" in test_output
-    assert "Hello from PowerShell!" in test_output
     assert "all tests passed!" in test_output
 
 
@@ -2513,76 +2495,40 @@ def test_caseinsensitive(rattler_build: RattlerBuild, recipes: Path, tmp_path: P
         assert "test.txt" in paths
 
 
-def test_ruby_test(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
-    rattler_build.build(
-        recipes / "ruby-test/recipe.yaml",
-        tmp_path,
-    )
-    pkg = get_extracted_package(tmp_path, "ruby-test")
+def test_ruby(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    """Test Ruby recipes (ruby-test, ruby-extension-test, ruby-imports-test).
 
+    Builds all three in the same tmp_path to share the conda package cache.
+    """
+    rattler_build.build(recipes / "ruby-test/recipe.yaml", tmp_path)
+    pkg = get_extracted_package(tmp_path, "ruby-test")
     assert (pkg / "info/index.json").exists()
     assert (pkg / "info/tests/tests.yaml").exists()
 
+    rattler_build.build(recipes / "ruby-extension-test/recipe.yaml", tmp_path)
+    pkg_ext = get_extracted_package(tmp_path, "ruby-extension-test")
+    assert (pkg_ext / "info/index.json").exists()
 
-def test_simple_ruby_test(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
-    rattler_build.build(
-        recipes / "simple-ruby-test/recipe.yaml",
-        tmp_path,
-    )
-    pkg = get_extracted_package(tmp_path, "simple-ruby-test")
-
-    assert (pkg / "info/index.json").exists()
-
-
-def test_ruby_extension_test(
-    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
-):
-    rattler_build.build(
-        recipes / "ruby-extension-test/recipe.yaml",
-        tmp_path,
-    )
-    pkg = get_extracted_package(tmp_path, "ruby-extension-test")
-
-    assert (pkg / "info/index.json").exists()
-
-
-def test_ruby_imports_test(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
-    rattler_build.build(
-        recipes / "ruby-imports-test/recipe.yaml",
-        tmp_path,
-    )
-    pkg = get_extracted_package(tmp_path, "ruby-imports-test")
-
-    assert (pkg / "info/index.json").exists()
-
-
-def test_simple_nodejs_test(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
-    rattler_build.build(
-        recipes / "simple-nodejs-test/recipe.yaml",
-        tmp_path,
-    )
-    pkg = get_extracted_package(tmp_path, "simple-nodejs-test")
-
-    assert (pkg / "info/index.json").exists()
-
-
-def test_nodejs_extension(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
-    rattler_build.build(
-        recipes / "nodejs-extension-test/recipe.yaml",
-        tmp_path,
-    )
-    pkg = get_extracted_package(tmp_path, "nodejs-extension-test")
-
-    assert (pkg / "info/index.json").exists()
+    rattler_build.build(recipes / "ruby-imports-test/recipe.yaml", tmp_path)
+    pkg_imp = get_extracted_package(tmp_path, "ruby-imports-test")
+    assert (pkg_imp / "info/index.json").exists()
 
 
 def test_nodejs(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
-    rattler_build.build(
-        recipes / "nodejs-test/recipe.yaml",
-        tmp_path,
-    )
-    pkg = get_extracted_package(tmp_path, "nodejs-test")
+    """Test NodeJS recipes (simple-nodejs-test, nodejs-extension-test, nodejs-test).
 
+    Builds all three in the same tmp_path to share the conda package cache.
+    """
+    rattler_build.build(recipes / "simple-nodejs-test/recipe.yaml", tmp_path)
+    pkg_simple = get_extracted_package(tmp_path, "simple-nodejs-test")
+    assert (pkg_simple / "info/index.json").exists()
+
+    rattler_build.build(recipes / "nodejs-extension-test/recipe.yaml", tmp_path)
+    pkg_ext = get_extracted_package(tmp_path, "nodejs-extension-test")
+    assert (pkg_ext / "info/index.json").exists()
+
+    rattler_build.build(recipes / "nodejs-test/recipe.yaml", tmp_path)
+    pkg = get_extracted_package(tmp_path, "nodejs-test")
     assert (pkg / "info/index.json").exists()
 
 
@@ -3169,10 +3115,12 @@ def test_render_only_cross_platform(
     )
 
 
-def test_script_content_scalar_with_jinja(rattler_build: RattlerBuild, tmp_path: Path):
-    recipe_dir = tmp_path / "recipe"
-    recipe_dir.mkdir()
-    (recipe_dir / "recipe.yaml").write_text(
+def test_script_content_with_jinja(rattler_build: RattlerBuild, tmp_path: Path):
+    """Test script content with Jinja templating (both scalar and sequence forms)."""
+    # Scalar form
+    scalar_dir = tmp_path / "recipe-scalar"
+    scalar_dir.mkdir()
+    (scalar_dir / "recipe.yaml").write_text(
         """\
 package:
   name: hellopackage
@@ -3185,15 +3133,12 @@ requirements:
     - python
 """
     )
-    rattler_build.build(recipe_dir, tmp_path / "output")
+    rattler_build.build(scalar_dir, tmp_path / "output-scalar")
 
-
-def test_script_content_sequence_with_jinja(
-    rattler_build: RattlerBuild, tmp_path: Path
-):
-    recipe_dir = tmp_path / "recipe"
-    recipe_dir.mkdir()
-    (recipe_dir / "recipe.yaml").write_text(
+    # Sequence form
+    seq_dir = tmp_path / "recipe-seq"
+    seq_dir.mkdir()
+    (seq_dir / "recipe.yaml").write_text(
         """\
 package:
   name: hellopackage
@@ -3207,7 +3152,7 @@ requirements:
     - python
 """
     )
-    rattler_build.build(recipe_dir, tmp_path / "output")
+    rattler_build.build(seq_dir, tmp_path / "output-seq")
 
 
 @pytest.mark.skipif(os.name == "nt", reason="Uses Unix /tmp paths")

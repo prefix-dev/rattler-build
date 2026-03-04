@@ -7,6 +7,7 @@ from pathlib import Path
 from subprocess import CalledProcessError
 
 import pytest
+import yaml
 from helpers import (
     RattlerBuild,
     get_extracted_package,
@@ -151,6 +152,10 @@ def test_staging_with_deps(rattler_build: RattlerBuild, recipes: Path, tmp_path:
     assert (pkg1 / "info/index.json").exists()
     assert (pkg2 / "info/index.json").exists()
 
+    # -- Build number propagation (was test_staging_build_number_propagation) --
+    index = json.loads((pkg1 / "info/index.json").read_text())
+    assert index["build_number"] == 0
+
 
 def test_staging_run_exports(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
@@ -250,7 +255,11 @@ def test_staging_with_variants(
 def test_multiple_staging_caches(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
-    """Test multiple independent staging outputs in one recipe."""
+    """Test multiple independent staging outputs in one recipe.
+
+    Also verifies metadata preservation, file selection, source handling,
+    and about propagation (previously separate tests).
+    """
     rattler_build.build(
         recipes / "staging/multiple-staging-caches.yaml",
         tmp_path,
@@ -280,6 +289,41 @@ def test_multiple_staging_caches(
         assert not (pkg_dev / "lib/libcore.dll").exists()
     else:
         assert not (pkg_dev / "lib/libcore.so").exists()
+
+    # -- Metadata preservation (was test_staging_metadata_preserved) --
+    assert (pkg_core / "info/recipe/rendered_recipe.yaml").exists()
+
+    rendered = yaml.safe_load(
+        (pkg_core / "info/recipe/rendered_recipe.yaml").read_text()
+    )
+    recipe = rendered["recipe"]
+    assert "staging_caches" in recipe
+    assert len(recipe["staging_caches"]) >= 1
+    assert "inherits_from" in recipe
+    assert recipe["inherits_from"]["cache_name"] == "core-build"
+
+    # -- File selection (was test_staging_files_selection) --
+    paths_core = json.loads((pkg_core / "info/paths.json").read_text())
+    core_files = [p["_path"] for p in paths_core["paths"]]
+    if platform.system() == "Windows":
+        assert any("lib/libcore.dll" in f for f in core_files)
+    else:
+        assert any("lib/libcore.so" in f for f in core_files)
+    assert any("include/core.h" in f for f in core_files)
+
+    paths_dev = json.loads((pkg_dev / "info/paths.json").read_text())
+    dev_files = [p["_path"] for p in paths_dev["paths"]]
+    assert not any("lib/" in f for f in dev_files)
+    assert any("include/" in f for f in dev_files)
+
+    # -- Source handling (was test_staging_source_handling) --
+    if "finalized_sources" in rendered:
+        assert isinstance(rendered["finalized_sources"], list)
+
+    # -- About propagation (was test_staging_about_propagation) --
+    about = json.loads((pkg_core / "info/about.json").read_text())
+    assert about["summary"] == "Core library"
+    assert about["license"] == "MIT"
 
 
 def test_staging_with_top_level_inherit(
@@ -468,37 +512,6 @@ def test_staging_with_tests(rattler_build: RattlerBuild, recipes: Path, tmp_path
     assert (pkg2 / "info/index.json").exists()
 
 
-def test_staging_metadata_preserved(
-    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
-):
-    """Test that staging metadata is preserved in package outputs."""
-    rattler_build.build(
-        recipes / "staging/multiple-staging-caches.yaml",
-        tmp_path,
-        extra_args=["--experimental"],
-    )
-
-    pkg = get_extracted_package(tmp_path, "libcore")
-
-    # Check that the rendered recipe includes staging information
-    assert (pkg / "info/recipe/rendered_recipe.yaml").exists()
-
-    import yaml
-
-    rendered = yaml.safe_load((pkg / "info/recipe/rendered_recipe.yaml").read_text())
-
-    # The staging_caches and inherits_from are in the recipe section
-    recipe = rendered["recipe"]
-
-    # The recipe should have staging_caches
-    assert "staging_caches" in recipe
-    assert len(recipe["staging_caches"]) >= 1
-
-    # Should have inherits_from
-    assert "inherits_from" in recipe
-    assert recipe["inherits_from"]["cache_name"] == "core-build"
-
-
 def test_staging_error_invalid_inherit(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
@@ -509,94 +522,6 @@ def test_staging_error_invalid_inherit(
             tmp_path,
             extra_args=["--experimental"],
         )
-
-
-def test_staging_files_selection(
-    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
-):
-    """Test that file selection works correctly with staging inheritance."""
-    rattler_build.build(
-        recipes / "staging/multiple-staging-caches.yaml",
-        tmp_path,
-        extra_args=["--experimental"],
-    )
-
-    # libcore should have both lib and include
-    pkg_core = get_extracted_package(tmp_path, "libcore")
-    paths_core = json.loads((pkg_core / "info/paths.json").read_text())
-    core_files = [p["_path"] for p in paths_core["paths"]]
-    if platform.system() == "Windows":
-        assert any("lib/libcore.dll" in f for f in core_files)
-    else:
-        assert any("lib/libcore.so" in f for f in core_files)
-    assert any("include/core.h" in f for f in core_files)
-
-    # core-headers should only have include
-    pkg_dev = get_extracted_package(tmp_path, "core-headers")
-    paths_dev = json.loads((pkg_dev / "info/paths.json").read_text())
-    dev_files = [p["_path"] for p in paths_dev["paths"]]
-    assert not any("lib/" in f for f in dev_files)
-    assert any("include/" in f for f in dev_files)
-
-
-def test_staging_source_handling(
-    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
-):
-    """Test that sources are properly handled in staging outputs."""
-    # The staging recipes reference sources, ensure they're fetched correctly
-    rattler_build.build(
-        recipes / "staging/multiple-staging-caches.yaml",
-        tmp_path,
-        extra_args=["--experimental"],
-    )
-
-    pkg = get_extracted_package(tmp_path, "libcore")
-
-    # Check finalized sources in rendered recipe
-    assert (pkg / "info/recipe/rendered_recipe.yaml").exists()
-
-    import yaml
-
-    rendered = yaml.safe_load((pkg / "info/recipe/rendered_recipe.yaml").read_text())
-
-    # Should have finalized sources (even if they're dummy URLs in test)
-    if "finalized_sources" in rendered:
-        assert isinstance(rendered["finalized_sources"], list)
-
-
-def test_staging_build_number_propagation(
-    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
-):
-    """Test that build numbers are properly handled with staging."""
-    rattler_build.build(
-        recipes / "staging/staging-with-deps.yaml",
-        tmp_path,
-        extra_args=["--experimental"],
-    )
-
-    pkg = get_extracted_package(tmp_path, "check-1")
-    index = json.loads((pkg / "info/index.json").read_text())
-
-    # Build number should be 0 as specified in context
-    assert index["build_number"] == 0
-
-
-def test_staging_about_propagation(
-    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
-):
-    """Test that about metadata is properly set in package outputs."""
-    rattler_build.build(
-        recipes / "staging/multiple-staging-caches.yaml",
-        tmp_path,
-        extra_args=["--experimental"],
-    )
-
-    pkg = get_extracted_package(tmp_path, "libcore")
-    about = json.loads((pkg / "info/about.json").read_text())
-
-    # About information should be present
-    assert about["summary"] == "Core library"
-    assert about["license"] == "MIT"
 
 
 @pytest.mark.skipif(os.name == "nt", reason="symlinks not fully supported on Windows")
