@@ -322,48 +322,29 @@ impl Relinker for Dylib {
                 tracing::debug!("Builtin relink failed {:?}, trying install_name_tool", e);
                 install_name_tool(&self.path, &changes, system_tools)?;
             }
-            codesign(&self.path, system_tools)?;
+            codesign(&self.path)?;
         }
 
         Ok(())
     }
 }
 
-fn codesign(path: &Path, system_tools: &SystemTools) -> Result<(), RelinkError> {
-    let codesign = system_tools.find_tool(Tool::Codesign).map_err(|e| {
-        tracing::error!("codesign not found: {}", e);
+fn codesign(path: &Path) -> Result<(), RelinkError> {
+    let identifier = path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("-");
+
+    let options = arwen_codesign::AdhocSignOptions::new(identifier)
+        .with_entitlements(arwen_codesign::Entitlements::Preserve)
+        .with_linker_signed();
+
+    tracing::debug!("Ad-hoc signing {:?} with identifier {:?}", path, identifier);
+
+    arwen_codesign::adhoc_sign_file(path, &options).map_err(|e| {
+        tracing::error!("codesign failed for {}: {}", path.display(), e);
         RelinkError::CodesignFailed
-    })?;
-
-    let is_system_codesign = codesign.starts_with("/usr/bin/");
-
-    let mut cmd = std::process::Command::new(codesign);
-    cmd.args(["-f", "-s", "-"]);
-
-    if is_system_codesign {
-        cmd.arg("--preserve-metadata=entitlements,requirements");
-    }
-    cmd.arg(path);
-
-    // log the cmd invocation
-    tracing::debug!("Running codesign: {:?}", cmd);
-
-    let output = cmd.output().map_err(|e| {
-        tracing::error!("codesign failed: {}", e);
-        e
-    })?;
-
-    if !output.status.success() {
-        tracing::error!(
-            "codesign failed with status {}. \n  stdout: {}\n  stderr: {}",
-            output.status,
-            String::from_utf8_lossy(&output.stdout),
-            String::from_utf8_lossy(&output.stderr)
-        );
-        return Err(RelinkError::CodesignFailed);
-    }
-
-    Ok(())
+    })
 }
 
 /// Changes to apply to a dylib

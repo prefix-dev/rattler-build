@@ -223,6 +223,7 @@ tracing-subscriber = { version = "0.3", features = [
 # marked-yaml = { version = "0.8.0" }
 miette = { workspace = true, features = ["fancy"] }
 num_cpus = "1.17.0"
+arwen-codesign = "0.0.1-alpha.1"
 goblin = "0.10.4"
 scroll = "0.13.0"
 pathdiff = { workspace = true }
