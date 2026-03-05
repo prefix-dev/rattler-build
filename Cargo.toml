@@ -13,11 +13,9 @@ rust-version = "1.89.0"
 
 [workspace]
 members = [
-  "crates/rattler_git",
   "crates/rattler_build_networking",
   "crates/rattler_build_source_cache",
   "crates/rattler_build_recipe_generator",
-  "crates/rattler_prefix_guard",
   "crates/rattler_build_recipe",
   "crates/rattler_build_types",
   "crates/rattler_build_jinja",
@@ -75,6 +73,8 @@ rattler_package_streaming = { version = "0.24.2", default-features = false }
 rattler_shell = { version = "0.26.2", default-features = false, features = [
   "sysinfo",
 ] }
+rattler_git = { version = "0.1.0" }
+rattler_prefix_guard = { version = "0.1.0" }
 regex = "1.12.3"
 reqwest = { version = "0.12.28", default-features = false, features = ["json"] }
 reqwest-middleware = "0.4.2"
@@ -119,8 +119,6 @@ rattler_build_networking = { path = "crates/rattler_build_networking" }
 rattler_build_script = { path = "crates/rattler_build_script", default-features = false }
 rattler_build_variant_config = { path = "crates/rattler_build_variant_config" }
 rattler_build_yaml_parser = { path = "crates/rattler_build_yaml_parser" }
-rattler_git = { path = "crates/rattler_git" }
-rattler_prefix_guard = { path = "crates/rattler_prefix_guard" }
 
 [features]
 default = ['rustls-tls', 'recipe-generation', 's3', 'sigstore']

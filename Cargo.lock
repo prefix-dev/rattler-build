@@ -5252,6 +5252,8 @@ dependencies = [
 [[package]]
 name = "rattler_git"
 version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7e3433ae20e2a061b99f8587b497fc2fb0c3f8e63527b047f33aca2d28a949f0"
 dependencies = [
  "dashmap",
  "dunce",
@@ -5260,7 +5262,6 @@ dependencies = [
  "reqwest 0.12.28",
  "reqwest-middleware",
  "serde",
- "tempfile",
  "thiserror 2.0.18",
  "tokio",
  "tracing",
@@ -5420,13 +5421,15 @@ dependencies = [
 [[package]]
 name = "rattler_prefix_guard"
 version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8e61233ecc4db99035f4f97e378e971d4998b45b3bb5fb894350e04b05f8bb97"
 dependencies = [
  "fs-err",
  "libc",
  "serde",
  "serde_json",
  "tokio",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
