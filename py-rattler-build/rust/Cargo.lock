@@ -171,6 +171,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7c02d123df017efcdfbd739ef81735b36c5ba83ec3c59c80a9d7ecc718f92e50"
 
 [[package]]
+name = "arwen-codesign"
+version = "0.0.1-alpha.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "35d7a19757bfe3658d5a95bf25a0492f29ebb21933549bdbfa4075c895510124"
+dependencies = [
+ "goblin",
+ "scroll",
+ "sha2",
+ "tempfile",
+]
+
+[[package]]
 name = "astral-tokio-tar"
 version = "0.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4531,6 +4543,7 @@ name = "rattler-build"
 version = "0.58.4"
 dependencies = [
  "anyhow",
+ "arwen-codesign",
  "async-once-cell",
  "async-recursion",
  "chrono",

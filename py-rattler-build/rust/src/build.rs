@@ -220,6 +220,7 @@ pub fn build_rendered_variant_py(
             sandbox_config: None,
             debug: ::rattler_build::metadata::Debug::new(debug),
             exclude_newer,
+            experimental: false,
         },
         finalized_dependencies: None,
         finalized_sources: None,
