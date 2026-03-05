@@ -961,10 +961,11 @@ async fn run_commands_test(
     // Clone the script and prepend `set -x` to enable bash tracing for test scripts.
     // Only inject for bash/sh scripts (interpreter unset defaults to bash on unix).
     let mut test_script = commands_test.script.clone();
-    let is_bash = cfg!(unix) && matches!(
-        test_script.interpreter.as_deref(),
-        None | Some("bash") | Some("sh")
-    );
+    let is_bash = cfg!(unix)
+        && matches!(
+            test_script.interpreter.as_deref(),
+            None | Some("bash") | Some("sh")
+        );
     if is_bash {
         test_script.content = match test_script.content {
             ScriptContent::Command(cmd) => ScriptContent::Command(format!("set -x\n{}", cmd)),
