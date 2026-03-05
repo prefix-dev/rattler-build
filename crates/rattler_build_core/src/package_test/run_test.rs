@@ -957,8 +957,23 @@ async fn run_commands_test(
     })?;
 
     tracing::info!("Testing commands:");
-    commands_test
-        .script
+
+    // Clone the script and prepend `set -x` to enable bash tracing for test scripts
+    let mut test_script = commands_test.script.clone();
+    test_script.content = match test_script.content {
+        ScriptContent::Command(cmd) => ScriptContent::Command(format!("set -x\n{}", cmd)),
+        ScriptContent::Commands(cmds) => {
+            let mut new_cmds = vec!["set -x".to_string()];
+            new_cmds.extend(cmds);
+            ScriptContent::Commands(new_cmds)
+        }
+        ScriptContent::CommandOrPath(ref s) if s.contains('\n') => {
+            ScriptContent::Command(format!("set -x\n{}", s))
+        }
+        other => other,
+    };
+
+    test_script
         .run_script(
             env_vars,
             &test_dir,
