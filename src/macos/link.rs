@@ -371,10 +371,7 @@ fn codesign_subprocess(path: &Path, system_tools: &SystemTools) -> Result<(), Re
 }
 
 fn codesign_builtin(path: &Path) -> Result<(), RelinkError> {
-    let identifier = path
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("-");
+    let identifier = path.file_stem().and_then(|s| s.to_str()).unwrap_or("-");
 
     let options = arwen_codesign::AdhocSignOptions::new(identifier)
         .with_entitlements(arwen_codesign::Entitlements::Preserve)
