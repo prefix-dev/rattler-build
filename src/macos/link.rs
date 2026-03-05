@@ -186,6 +186,7 @@ impl Relinker for Dylib {
         custom_rpaths: &[String],
         rpath_allowlist: &GlobVec,
         system_tools: &SystemTools,
+        experimental: bool,
     ) -> Result<(), RelinkError> {
         let mut changes = DylibChanges::default();
         let mut modified = false;
@@ -322,14 +323,54 @@ impl Relinker for Dylib {
                 tracing::debug!("Builtin relink failed {:?}, trying install_name_tool", e);
                 install_name_tool(&self.path, &changes, system_tools)?;
             }
-            codesign(&self.path)?;
+            if experimental {
+                codesign_builtin(&self.path)?;
+            } else {
+                codesign_subprocess(&self.path, system_tools)?;
+            }
         }
 
         Ok(())
     }
 }
 
-fn codesign(path: &Path) -> Result<(), RelinkError> {
+fn codesign_subprocess(path: &Path, system_tools: &SystemTools) -> Result<(), RelinkError> {
+    let codesign = system_tools.find_tool(Tool::Codesign).map_err(|e| {
+        tracing::error!("codesign not found: {}", e);
+        RelinkError::CodesignFailed
+    })?;
+
+    let is_system_codesign = codesign.starts_with("/usr/bin/");
+
+    let mut cmd = std::process::Command::new(codesign);
+    cmd.args(["-f", "-s", "-"]);
+
+    if is_system_codesign {
+        cmd.arg("--preserve-metadata=entitlements,requirements");
+    }
+    cmd.arg(path);
+
+    tracing::debug!("Running codesign: {:?}", cmd);
+
+    let output = cmd.output().map_err(|e| {
+        tracing::error!("codesign failed: {}", e);
+        e
+    })?;
+
+    if !output.status.success() {
+        tracing::error!(
+            "codesign failed with status {}. \n  stdout: {}\n  stderr: {}",
+            output.status,
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        return Err(RelinkError::CodesignFailed);
+    }
+
+    Ok(())
+}
+
+fn codesign_builtin(path: &Path) -> Result<(), RelinkError> {
     let identifier = path
         .file_stem()
         .and_then(|s| s.to_str())
@@ -847,6 +888,7 @@ mod tests {
                 &[],
                 &GlobVec::default(),
                 &SystemTools::default(),
+                false,
             )
             .unwrap();
 
@@ -940,6 +982,7 @@ mod tests {
                 &["lib/".to_string()],
                 &GlobVec::default(),
                 &SystemTools::default(),
+                false,
             )
             .unwrap();
 

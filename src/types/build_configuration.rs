@@ -65,6 +65,9 @@ pub struct BuildConfiguration {
     /// Exclude packages newer than this date from the solver
     #[serde(skip_serializing, default)]
     pub exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
+    /// Whether experimental features are enabled
+    #[serde(skip_serializing, default)]
+    pub experimental: bool,
 }
 
 impl BuildConfiguration {

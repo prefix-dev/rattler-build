@@ -162,6 +162,7 @@ impl Relinker for Dll {
         _custom_rpaths: &[String],
         _rpath_allowlist: &GlobVec,
         _system_tools: &crate::system_tools::SystemTools,
+        _experimental: bool,
     ) -> Result<(), crate::post_process::relink::RelinkError> {
         // On Windows, we don't need to relink anything
         Ok(())

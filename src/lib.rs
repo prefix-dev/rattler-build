@@ -608,6 +608,7 @@ pub async fn get_build_output(
                 sandbox_config: build_data.sandbox_configuration.clone(),
                 debug: build_data.debug,
                 exclude_newer: build_data.exclude_newer,
+                experimental: build_data.common.experimental,
             },
             finalized_dependencies: None,
             finalized_sources: None,
