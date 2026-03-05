@@ -330,13 +330,11 @@ pub fn topological_sort_variants(
 
     let recipes: Vec<&Stage1Recipe> = variants.iter().map(|v| &v.recipe).collect();
     let name_to_indices = build_recipe_name_index(&recipes);
-    let graph = build_recipe_dependency_graph(&recipes, &name_to_indices)?;
 
-    // Convert name_to_indices to use PackageName keys for stable_topological_sort
-    let pkg_name_to_indices: BTreeMap<rattler_conda_types::PackageName, Vec<usize>> =
-        name_to_indices;
+    // Validate there are no cycles (uses petgraph toposort internally)
+    validate_no_cycles(&recipes, &name_to_indices)?;
 
-    stable_topological_sort(variants, &graph, &pkg_name_to_indices)
+    stable_topological_sort(variants, &name_to_indices)
 }
 
 /// Sort items with [`Stage1Recipe`]s topologically by their dependencies.
@@ -347,7 +345,7 @@ pub fn topological_sort_variants(
 /// When `up_to` is `None`, returns all items in topological order (dependencies first).
 /// When `up_to` is `Some(name)`, returns only the items needed to build the named
 /// package (its transitive dependencies plus the package itself).
-pub fn topological_sort_by_dependencies<T: Clone>(
+pub fn topological_sort_by_dependencies<T>(
     items: Vec<T>,
     get_recipe: impl Fn(&T) -> &Stage1Recipe,
     up_to: Option<&str>,
@@ -358,41 +356,49 @@ pub fn topological_sort_by_dependencies<T: Clone>(
 
     let recipes: Vec<&Stage1Recipe> = items.iter().map(|item| get_recipe(item)).collect();
     let name_to_indices = build_recipe_name_index(&recipes);
-    let (graph, idx_to_node) = build_recipe_dependency_graph(&recipes, &name_to_indices)?;
+    let (graph, idx_to_node, toposorted) =
+        build_recipe_dependency_graph(&recipes, &name_to_indices)?;
 
-    let sorted_indices = if let Some(up_to) = up_to {
+    let sorted_item_indices: Vec<usize> = if let Some(up_to) = up_to {
         filter_up_to(&graph, &idx_to_node, &name_to_indices, up_to)?
     } else {
-        // Standard topological sort (reversed because petgraph returns leaves-first)
-        let mut indices = petgraph::algo::toposort(&graph, None)
-            .expect("cycle detection already passed in build_recipe_dependency_graph");
-        indices.reverse();
-        indices
+        // Reverse because petgraph toposort returns leaves-first
+        toposorted
+            .into_iter()
+            .rev()
+            .map(|node| graph[node])
+            .collect()
     };
 
-    Ok(sorted_indices
-        .iter()
-        .map(|node| items[graph[*node]].clone())
-        .collect())
-}
+    // Reorder by moving items out via Option<T> to avoid Clone bound
+    let mut item_map: Vec<Option<T>> = items.into_iter().map(Some).collect();
+    let mut result = Vec::with_capacity(sorted_item_indices.len());
+    for &idx in &sorted_item_indices {
+        result.push(
+            item_map[idx]
+                .take()
+                .expect("each index should be taken exactly once"),
+        );
+    }
 
-/// Return type for dependency graph building
-type DependencyGraph = (DiGraph<usize, ()>, BTreeMap<usize, NodeIndex>);
+    Ok(result)
+}
 
 /// Build a dependency graph for topological sorting from a slice of recipes.
 ///
-/// Returns the graph and a mapping from item index to node index.
-/// Also validates that there are no dependency cycles.
+/// Returns the graph, a mapping from item index to node index, and the
+/// topologically sorted node indices (used for cycle detection and reusable
+/// by callers to avoid re-sorting).
 fn build_recipe_dependency_graph(
     recipes: &[&Stage1Recipe],
     name_to_indices: &BTreeMap<rattler_conda_types::PackageName, Vec<usize>>,
-) -> Result<DependencyGraph, TopologicalSortError> {
+) -> Result<(DiGraph<usize, ()>, Vec<NodeIndex>, Vec<NodeIndex>), TopologicalSortError> {
     let mut graph = DiGraph::<usize, ()>::new();
-    let mut idx_to_node: BTreeMap<usize, NodeIndex> = BTreeMap::new();
+    let mut idx_to_node: Vec<NodeIndex> = Vec::with_capacity(recipes.len());
 
     for idx in 0..recipes.len() {
         let node = graph.add_node(idx);
-        idx_to_node.insert(idx, node);
+        idx_to_node.push(node);
     }
 
     for (idx, recipe) in recipes.iter().enumerate() {
@@ -406,21 +412,30 @@ fn build_recipe_dependency_graph(
             if let Some(dep_indices) = name_to_indices.get(&dep_name) {
                 for &dep_idx in dep_indices {
                     // dep must be built before dependent
-                    graph.add_edge(idx_to_node[&dep_idx], idx_to_node[&idx], ());
+                    graph.add_edge(idx_to_node[dep_idx], idx_to_node[idx], ());
                 }
             }
         }
     }
 
-    if let Err(cycle) = petgraph::algo::toposort(&graph, None) {
+    let toposorted = petgraph::algo::toposort(&graph, None).map_err(|cycle| {
         let cycle_idx = graph[cycle.node_id()];
         let cycle_pkg = &recipes[cycle_idx].package.name;
-        return Err(TopologicalSortError::CycleDetected {
+        TopologicalSortError::CycleDetected {
             package: cycle_pkg.as_normalized().to_string(),
-        });
-    }
+        }
+    })?;
 
-    Ok((graph, idx_to_node))
+    Ok((graph, idx_to_node, toposorted))
+}
+
+/// Validate that there are no dependency cycles among the recipes.
+fn validate_no_cycles(
+    recipes: &[&Stage1Recipe],
+    name_to_indices: &BTreeMap<rattler_conda_types::PackageName, Vec<usize>>,
+) -> Result<(), TopologicalSortError> {
+    build_recipe_dependency_graph(recipes, name_to_indices)?;
+    Ok(())
 }
 
 /// Build a mapping from package name to item indices.
@@ -441,13 +456,13 @@ fn build_recipe_name_index(
 /// Filter the dependency graph to only include items needed to build `up_to` package.
 ///
 /// Performs a DFS post-order traversal from all variants of the target package,
-/// returning only the transitive dependencies and the target itself.
+/// returning only the transitive dependencies and the target itself as item indices.
 fn filter_up_to(
     graph: &DiGraph<usize, ()>,
-    idx_to_node: &BTreeMap<usize, NodeIndex>,
+    idx_to_node: &[NodeIndex],
     name_to_indices: &BTreeMap<rattler_conda_types::PackageName, Vec<usize>>,
     up_to: &str,
-) -> Result<Vec<NodeIndex>, TopologicalSortError> {
+) -> Result<Vec<usize>, TopologicalSortError> {
     use std::str::FromStr;
 
     let up_to_name = rattler_conda_types::PackageName::from_str(up_to).map_err(|_| {
@@ -462,20 +477,18 @@ fn filter_up_to(
         }
     })?;
 
-    // We need to traverse edges in reverse (from dependent to dependency)
-    // The graph has edges dep -> dependent, but we need to find all deps OF the up_to package
-    // DfsPostOrder follows outgoing edges, but our edges point from dep to dependent.
-    // So we need to reverse the graph to traverse from up_to to its dependencies.
+    // The graph has edges dep -> dependent. We need to find all deps OF the up_to
+    // package, so reverse the graph and DFS from the target.
     let reversed = petgraph::visit::Reversed(graph);
 
     let mut sorted_indices = Vec::new();
     let mut visited = HashSet::new();
     for &up_to_idx in up_to_indices {
-        let node = idx_to_node[&up_to_idx];
+        let node = idx_to_node[up_to_idx];
         let mut dfs = petgraph::visit::DfsPostOrder::new(&reversed, node);
         while let Some(nx) = dfs.next(&reversed) {
             if visited.insert(nx) {
-                sorted_indices.push(nx);
+                sorted_indices.push(graph[nx]);
             }
         }
     }
@@ -491,7 +504,6 @@ fn filter_up_to(
 /// `pillow(3.10), pillow-tests(3.10), pillow(3.11), pillow-tests(3.11), ...`
 fn stable_topological_sort(
     variants: Vec<RenderedVariant>,
-    _graph: &DependencyGraph,
     name_to_indices: &BTreeMap<rattler_conda_types::PackageName, Vec<usize>>,
 ) -> Result<Vec<RenderedVariant>, TopologicalSortError> {
     // Use a stable topological sort that preserves original order when possible
