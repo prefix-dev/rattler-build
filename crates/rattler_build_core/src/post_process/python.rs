@@ -405,7 +405,8 @@ mod tests {
     #[test]
     fn test_replace_shebang_in_file() {
         let tempdir = tempfile::tempdir().unwrap();
-        let test_data_folder = Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/shebang");
+        let test_data_folder =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/shebang");
 
         // copy file
         let dest = tempdir.path().join("test.py");

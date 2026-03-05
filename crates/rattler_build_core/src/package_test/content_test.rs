@@ -621,8 +621,8 @@ mod tests {
     }
 
     fn load_test_case(path: &Path) -> TestCase {
-        let test_data_dir =
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/package_content");
+        let test_data_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/package_content");
         let file = std::fs::File::open(test_data_dir.join(path)).unwrap();
         serde_yaml::from_reader(file).unwrap()
     }

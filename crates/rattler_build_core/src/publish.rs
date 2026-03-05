@@ -10,14 +10,28 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use crate::BuildString;
-use crate::opt::PublishData;
 use crate::render::reporters::GatewayReporter;
 use crate::tool_configuration::{self, Configuration};
 use crate::types::Output;
 
+/// Configuration for publishing packages to a channel.
+/// This is the core-level type; CLI options are converted into this.
+#[derive(Debug, Clone)]
+pub struct PublishConfig {
+    /// Whether to force overwrite existing packages
+    pub force: bool,
+    /// Whether to generate attestation for packages
+    pub generate_attestation: bool,
+    /// Authentication file path
+    pub auth_file: Option<PathBuf>,
+    /// S3 configuration
+    #[cfg(feature = "s3")]
+    pub s3_config: HashMap<String, rattler_networking::s3_middleware::S3Config>,
+}
+
 /// Represents a parsed build number argument
 #[derive(Debug, Clone)]
-pub(crate) enum BuildNumberOverride {
+pub enum BuildNumberOverride {
     /// Absolute build number (e.g., "12")
     Absolute(u64),
     /// Relative bump (e.g., "+1")
@@ -26,7 +40,7 @@ pub(crate) enum BuildNumberOverride {
 
 impl BuildNumberOverride {
     /// Parse a build number string into either absolute or relative form
-    pub(crate) fn parse(s: &str) -> miette::Result<Self> {
+    pub fn parse(s: &str) -> miette::Result<Self> {
         let s = s.trim();
         if let Some(stripped) = s.strip_prefix('+') {
             let bump: i64 = stripped
@@ -48,7 +62,7 @@ impl BuildNumberOverride {
 }
 
 /// Fetch the highest build number for packages from the target channel
-pub(crate) async fn fetch_highest_build_numbers(
+pub async fn fetch_highest_build_numbers(
     target_url: &NamedChannelOrUrl,
     outputs: &[Output],
     target_platform: Platform,
@@ -159,7 +173,7 @@ pub(crate) async fn fetch_highest_build_numbers(
 }
 
 /// Apply build number override to outputs
-pub(crate) fn apply_build_number_override(
+pub fn apply_build_number_override(
     outputs: &mut [Output],
     build_number_override: &BuildNumberOverride,
     highest_build_numbers: &HashMap<(PackageName, String), u64>,
@@ -222,10 +236,10 @@ pub fn determine_package_subdir(package_path: &Path) -> miette::Result<String> {
 
 /// Upload packages to a channel and run indexing.
 /// After the indexing, the repodata cache for the target channel is cleared.
-pub(crate) async fn upload_and_index_channel(
+pub async fn upload_and_index_channel(
     target_url: &NamedChannelOrUrl,
     package_paths: &[PathBuf],
-    publish_data: &PublishData,
+    publish_config: &PublishConfig,
     repodata_gateway: &Gateway,
 ) -> miette::Result<()> {
     let span = tracing::info_span!("Publishing packages");
@@ -252,28 +266,28 @@ pub(crate) async fn upload_and_index_channel(
 
                     #[cfg(feature = "s3")]
                     {
-                        upload_to_s3(url, package_paths, publish_data).await
+                        upload_to_s3(url, package_paths, publish_config).await
                     }
                 }
-                "quetz" => upload_to_quetz(url, package_paths, publish_data).await,
-                "artifactory" => upload_to_artifactory(url, package_paths, publish_data).await,
-                "prefix" => upload_to_prefix(url, package_paths, publish_data).await,
+                "quetz" => upload_to_quetz(url, package_paths, publish_config).await,
+                "artifactory" => upload_to_artifactory(url, package_paths, publish_config).await,
+                "prefix" => upload_to_prefix(url, package_paths, publish_config).await,
                 "file" => {
                     let path = url
                         .to_file_path()
                         .map_err(|()| miette::miette!("Invalid file URL: {}", url))?;
-                    upload_to_local_filesystem(&path, package_paths, publish_data.force).await
+                    upload_to_local_filesystem(&path, package_paths, publish_config.force).await
                 }
                 "http" | "https" => {
                     // Detect backend from hostname
                     let host = url.host_str().unwrap_or("");
 
                     if host.contains("prefix.dev") {
-                        upload_to_prefix(url, package_paths, publish_data).await
+                        upload_to_prefix(url, package_paths, publish_config).await
                     } else if host.contains("anaconda.org") {
-                        upload_to_anaconda(url, package_paths, publish_data).await
+                        upload_to_anaconda(url, package_paths, publish_config).await
                     } else if host.contains("quetz") {
-                        upload_to_quetz(url, package_paths, publish_data).await
+                        upload_to_quetz(url, package_paths, publish_config).await
                     } else {
                         Err(miette::miette!(
                             "Cannot determine upload backend from URL '{}'. \n\
@@ -290,7 +304,7 @@ pub(crate) async fn upload_and_index_channel(
         }
         NamedChannelOrUrl::Path(path) => {
             let path_buf = PathBuf::from(path.as_str());
-            upload_to_local_filesystem(&path_buf, package_paths, publish_data.force).await
+            upload_to_local_filesystem(&path_buf, package_paths, publish_config.force).await
         }
         NamedChannelOrUrl::Name(name) => Err(miette::miette!(
             "Cannot upload to named channel '{}'. Please use a direct URL instead.",
@@ -330,7 +344,7 @@ pub(crate) async fn upload_and_index_channel(
 async fn upload_to_s3(
     url: &url::Url,
     package_paths: &[PathBuf],
-    publish_data: &PublishData,
+    publish_config: &PublishConfig,
 ) -> miette::Result<()> {
     use rattler_index::{IndexS3Config, ensure_channel_initialized_s3, index_s3};
     use rattler_networking::s3_middleware;
@@ -340,14 +354,13 @@ async fn upload_to_s3(
     tracing::info!("Uploading packages to S3 channel: {}", url);
 
     // Get authentication storage
-    let auth_storage =
-        tool_configuration::get_auth_store(publish_data.build.common.auth_file.clone())
-            .map_err(|e| miette::miette!("Failed to get authentication storage: {}", e))?;
+    let auth_storage = tool_configuration::get_auth_store(publish_config.auth_file.clone())
+        .map_err(|e| miette::miette!("Failed to get authentication storage: {}", e))?;
 
     // Resolve S3 credentials using config + auth storage, falling back to AWS SDK
     let resolved_credentials = tool_configuration::resolve_s3_credentials(
-        &publish_data.build.common.s3_config,
-        publish_data.build.common.auth_file.clone(),
+        &publish_config.s3_config,
+        publish_config.auth_file.clone(),
         url,
     )
     .await
@@ -355,9 +368,7 @@ async fn upload_to_s3(
 
     // Create S3Credentials from the config if available (for upload_package_to_s3)
     let bucket_name = url.host_str().unwrap_or_default();
-    let s3_credentials = publish_data
-        .build
-        .common
+    let s3_credentials = publish_config
         .s3_config
         .get(bucket_name)
         .and_then(|config| {
@@ -402,7 +413,7 @@ async fn upload_to_s3(
         url.clone(),
         s3_credentials,
         &package_paths.to_vec(),
-        publish_data.force,
+        publish_config.force,
     )
     .await
     .map_err(|e| miette::miette!("Failed to upload packages to S3: {}", e))?;
@@ -443,7 +454,7 @@ async fn upload_to_s3(
 async fn upload_to_quetz(
     url: &url::Url,
     package_paths: &[PathBuf],
-    publish_data: &PublishData,
+    publish_config: &PublishConfig,
 ) -> miette::Result<()> {
     use rattler_upload::upload::opt::QuetzData;
     use rattler_upload::upload::upload_package_to_quetz;
@@ -451,9 +462,8 @@ async fn upload_to_quetz(
     tracing::info!("Uploading packages to Quetz server: {}", url);
 
     // Get authentication storage
-    let auth_storage =
-        tool_configuration::get_auth_store(publish_data.build.common.auth_file.clone())
-            .map_err(|e| miette::miette!("Failed to get authentication storage: {}", e))?;
+    let auth_storage = tool_configuration::get_auth_store(publish_config.auth_file.clone())
+        .map_err(|e| miette::miette!("Failed to get authentication storage: {}", e))?;
 
     // Extract channel name from URL path
     let channel = url
@@ -491,7 +501,7 @@ async fn upload_to_quetz(
 async fn upload_to_artifactory(
     url: &url::Url,
     package_paths: &[PathBuf],
-    publish_data: &PublishData,
+    publish_config: &PublishConfig,
 ) -> miette::Result<()> {
     use rattler_upload::upload::opt::ArtifactoryData;
     use rattler_upload::upload::upload_package_to_artifactory;
@@ -499,9 +509,8 @@ async fn upload_to_artifactory(
     tracing::info!("Uploading packages to Artifactory server: {}", url);
 
     // Get authentication storage
-    let auth_storage =
-        tool_configuration::get_auth_store(publish_data.build.common.auth_file.clone())
-            .map_err(|e| miette::miette!("Failed to get authentication storage: {}", e))?;
+    let auth_storage = tool_configuration::get_auth_store(publish_config.auth_file.clone())
+        .map_err(|e| miette::miette!("Failed to get authentication storage: {}", e))?;
 
     // Extract channel name from URL path
     let channel = url
@@ -539,7 +548,7 @@ async fn upload_to_artifactory(
 async fn upload_to_prefix(
     url: &url::Url,
     package_paths: &[PathBuf],
-    publish_data: &PublishData,
+    publish_config: &PublishConfig,
 ) -> miette::Result<()> {
     use rattler_upload::upload::opt::{
         AttestationSource, ForceOverwrite, PrefixData, SkipExisting,
@@ -549,9 +558,8 @@ async fn upload_to_prefix(
     tracing::info!("Uploading packages to Prefix.dev server: {}", url);
 
     // Get authentication storage
-    let auth_storage =
-        tool_configuration::get_auth_store(publish_data.build.common.auth_file.clone())
-            .map_err(|e| miette::miette!("Failed to get authentication storage: {}", e))?;
+    let auth_storage = tool_configuration::get_auth_store(publish_config.auth_file.clone())
+        .map_err(|e| miette::miette!("Failed to get authentication storage: {}", e))?;
 
     // Extract channel name from URL path
     let channel = url
@@ -573,7 +581,7 @@ async fn upload_to_prefix(
     server_url.set_path("");
 
     // Determine attestation source
-    let attestation = if publish_data.generate_attestation {
+    let attestation = if publish_config.generate_attestation {
         AttestationSource::GenerateAttestation
     } else {
         AttestationSource::NoAttestation
@@ -586,7 +594,7 @@ async fn upload_to_prefix(
         None,
         attestation,
         SkipExisting(false),
-        ForceOverwrite(publish_data.force),
+        ForceOverwrite(publish_config.force),
         false, // store_github_attestation
     );
 
@@ -604,7 +612,7 @@ async fn upload_to_prefix(
 async fn upload_to_anaconda(
     url: &url::Url,
     package_paths: &[PathBuf],
-    publish_data: &PublishData,
+    publish_config: &PublishConfig,
 ) -> miette::Result<()> {
     use rattler_upload::upload::opt::{AnacondaData, ForceOverwrite};
     use rattler_upload::upload::upload_package_to_anaconda;
@@ -612,9 +620,8 @@ async fn upload_to_anaconda(
     tracing::info!("Uploading packages to Anaconda.org: {}", url);
 
     // Get authentication storage
-    let auth_storage =
-        tool_configuration::get_auth_store(publish_data.build.common.auth_file.clone())
-            .map_err(|e| miette::miette!("Failed to get authentication storage: {}", e))?;
+    let auth_storage = tool_configuration::get_auth_store(publish_config.auth_file.clone())
+        .map_err(|e| miette::miette!("Failed to get authentication storage: {}", e))?;
 
     // Parse URL path to extract owner and optional channel
     // Expected format: https://anaconda.org/owner/channel or https://anaconda.org/owner
@@ -642,7 +649,7 @@ async fn upload_to_anaconda(
         channel.map(|c| vec![c]), // Automatically uses "main" channel if not specified
         None,                     // API key from auth storage
         Some(url.clone()),
-        ForceOverwrite(publish_data.force),
+        ForceOverwrite(publish_config.force),
     );
 
     // Upload packages

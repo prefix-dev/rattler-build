@@ -8,7 +8,6 @@ use rattler_build_script::InterpreterError;
 use rattler_conda_types::{Channel, MatchSpec, Platform, package::PathsJson};
 
 use crate::{
-    apply_patch_custom,
     metadata::{Output, build_reindexed_channels},
     package_test::PackageContentsTestExt as _,
     packaging::record_files,
@@ -145,7 +144,7 @@ pub async fn run_build(
 
     // Fetch sources for this output
     let output = output
-        .fetch_sources(tool_configuration, apply_patch_custom)
+        .fetch_sources(tool_configuration, crate::source::patch::apply_patch_custom)
         .await
         .into_diagnostic()?;
 

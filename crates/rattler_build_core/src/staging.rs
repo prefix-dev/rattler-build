@@ -228,7 +228,7 @@ impl Output {
             &self.build_configuration.directories,
             &self.system_tools,
             tool_configuration,
-            crate::apply_patch_custom,
+            crate::source::patch::apply_patch_custom,
         )
         .await
         .into_diagnostic()?;

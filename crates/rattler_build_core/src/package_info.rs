@@ -14,7 +14,74 @@ use rattler_package_streaming::seek::read_package_file;
 use reqwest::Client;
 use url::Url;
 
-use crate::opt::{ExtractOpts, InspectOpts, PackageSource};
+use std::str::FromStr;
+
+/// Source of a package file - either a local path or a remote URL
+#[derive(Debug, Clone)]
+pub enum PackageSource {
+    /// Local file path
+    Path(PathBuf),
+    /// Remote URL
+    Url(Url),
+}
+
+impl FromStr for PackageSource {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.starts_with("http://") || s.starts_with("https://") {
+            match Url::parse(s) {
+                Ok(url) => Ok(PackageSource::Url(url)),
+                Err(e) => Err(format!("Invalid URL: {}", e)),
+            }
+        } else {
+            Ok(PackageSource::Path(PathBuf::from(s)))
+        }
+    }
+}
+
+/// Options for the `package inspect` command
+#[derive(Debug, Clone)]
+pub struct InspectOpts {
+    /// Path to the package file (.conda, .tar.bz2)
+    pub package_file: PathBuf,
+    /// Show detailed file listing with hashes and sizes
+    pub paths: bool,
+    /// Show extended about information
+    pub about: bool,
+    /// Show run exports
+    pub run_exports: bool,
+    /// Show all available information
+    pub all: bool,
+    /// Output as JSON
+    pub json: bool,
+}
+
+impl InspectOpts {
+    /// Check if paths should be shown (either explicitly or via --all)
+    pub fn show_paths(&self) -> bool {
+        self.paths || self.all
+    }
+
+    /// Check if about info should be shown (either explicitly or via --all)
+    pub fn show_about(&self) -> bool {
+        self.about || self.all
+    }
+
+    /// Check if run exports should be shown (either explicitly or via --all)
+    pub fn show_run_exports(&self) -> bool {
+        self.run_exports || self.all
+    }
+}
+
+/// Options for the `package extract` command
+#[derive(Debug, Clone)]
+pub struct ExtractOpts {
+    /// Path to the package file (.conda, .tar.bz2) or a URL to download from
+    pub package_file: PackageSource,
+    /// Destination directory for extraction
+    pub dest: Option<PathBuf>,
+}
 
 #[cfg(feature = "s3")]
 use rattler_networking::s3_middleware;

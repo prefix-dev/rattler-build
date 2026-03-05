@@ -764,15 +764,20 @@ pub enum Color {
 }
 
 /// Initializes logging with the given style and verbosity.
-pub fn init_logging(
+///
+/// If `tui_writer` is `Some`, it will be used as the log writer for TUI mode.
+/// The writer must implement both `io::Write + Clone + Send + Sync` and
+/// `MakeWriter` (from `tracing_subscriber`).
+pub fn init_logging<W>(
     log_style: &LogStyle,
     verbosity: &Verbosity<InfoLevel>,
     color: &Color,
     wrap_lines: Option<bool>,
-    #[cfg(feature = "tui")] tui_log_sender: Option<
-        tokio::sync::mpsc::UnboundedSender<crate::tui::event::Event>,
-    >,
-) -> Result<LoggingOutputHandler, ParseError> {
+    tui_writer: Option<W>,
+) -> Result<LoggingOutputHandler, ParseError>
+where
+    W: for<'a> MakeWriter<'a> + Send + Sync + 'static,
+{
     let mut log_handler = LoggingOutputHandler::default();
 
     // Wrap lines by default, but disable it in CI
@@ -810,24 +815,18 @@ pub fn init_logging(
 
     let registry = registry.with(GitHubActionsLayer(github_integration_enabled()));
 
-    #[cfg(feature = "tui")]
-    {
-        if let Some(tui_log_sender) = tui_log_sender {
-            log_handler.set_progress_bars_hidden(true);
-            let writer = crate::tui::logger::TuiOutputHandler {
-                log_sender: tui_log_sender,
-            };
-            registry
-                .with(
-                    fmt::layer()
-                        .with_writer(writer)
-                        .without_time()
-                        .with_level(false)
-                        .with_target(false),
-                )
-                .init();
-            return Ok(log_handler);
-        }
+    if let Some(tui_writer) = tui_writer {
+        log_handler.set_progress_bars_hidden(true);
+        registry
+            .with(
+                fmt::layer()
+                    .with_writer(tui_writer)
+                    .without_time()
+                    .with_level(false)
+                    .with_target(false),
+            )
+            .init();
+        return Ok(log_handler);
     }
 
     match log_style {

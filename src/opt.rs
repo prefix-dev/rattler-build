@@ -1128,31 +1128,7 @@ impl TestData {
     }
 }
 
-/// Represents a package source that can be either a local path or a URL
-#[derive(Debug, Clone)]
-pub enum PackageSource {
-    /// Local file path
-    Path(PathBuf),
-    /// Remote URL
-    Url(Url),
-}
-
-impl FromStr for PackageSource {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        // Try to parse as URL first
-        if s.starts_with("http://") || s.starts_with("https://") {
-            match Url::parse(s) {
-                Ok(url) => Ok(PackageSource::Url(url)),
-                Err(e) => Err(format!("Invalid URL: {}", e)),
-            }
-        } else {
-            // Treat as local path
-            Ok(PackageSource::Path(PathBuf::from(s)))
-        }
-    }
-}
+pub use rattler_build_core::package_info::PackageSource;
 
 /// Rebuild options.
 #[derive(Parser)]
@@ -1335,20 +1311,16 @@ pub struct InspectOpts {
     pub json: bool,
 }
 
-impl InspectOpts {
-    /// Check if paths should be shown (either explicitly or via --all)
-    pub fn show_paths(&self) -> bool {
-        self.paths || self.all
-    }
-
-    /// Check if about info should be shown (either explicitly or via --all)
-    pub fn show_about(&self) -> bool {
-        self.about || self.all
-    }
-
-    /// Check if run exports should be shown (either explicitly or via --all)
-    pub fn show_run_exports(&self) -> bool {
-        self.run_exports || self.all
+impl From<InspectOpts> for rattler_build_core::package_info::InspectOpts {
+    fn from(opts: InspectOpts) -> Self {
+        Self {
+            package_file: opts.package_file,
+            paths: opts.paths,
+            about: opts.about,
+            run_exports: opts.run_exports,
+            all: opts.all,
+            json: opts.json,
+        }
     }
 }
 
@@ -1361,6 +1333,18 @@ pub struct ExtractOpts {
     /// Destination directory for extraction (defaults to package name without extension)
     #[arg(short = 'd', long)]
     pub dest: Option<PathBuf>,
+}
+
+impl From<ExtractOpts> for rattler_build_core::package_info::ExtractOpts {
+    fn from(opts: ExtractOpts) -> Self {
+        Self {
+            package_file: match opts.package_file {
+                PackageSource::Path(p) => rattler_build_core::package_info::PackageSource::Path(p),
+                PackageSource::Url(u) => rattler_build_core::package_info::PackageSource::Url(u),
+            },
+            dest: opts.dest,
+        }
+    }
 }
 
 /// Options for the `bump-recipe` command.

@@ -6,6 +6,7 @@ edition = "2024"
 license = "BSD-3-Clause"
 repository = "https://github.com/prefix-dev/rattler-build"
 description = "WASM playground for the rattler-build recipe parser"
+publish = false
 
 [lib]
 crate-type = ["cdylib", "rlib"]

@@ -599,7 +599,7 @@ mod test {
     #[test]
     fn detect_prefix() {
         let test_data = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("test-data/binary_files/binary_file_fallback");
+            .join("../../test-data/binary_files/binary_file_fallback");
         let prefix = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
 
         create_prefix_placeholder(
