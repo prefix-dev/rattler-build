@@ -962,13 +962,9 @@ async fn run_commands_test(
     let mut test_script = commands_test.script.clone();
     test_script.content = match test_script.content {
         ScriptContent::Command(cmd) => ScriptContent::Command(format!("set -x\n{}", cmd)),
-        ScriptContent::Commands(cmds) => {
-            let mut new_cmds = vec!["set -x".to_string()];
-            new_cmds.extend(cmds);
-            ScriptContent::Commands(new_cmds)
-        }
-        ScriptContent::CommandOrPath(ref s) if s.contains('\n') => {
-            ScriptContent::Command(format!("set -x\n{}", s))
+        ScriptContent::Commands(mut cmds) => {
+            cmds.insert(0, "set -x".to_string());
+            ScriptContent::Commands(cmds)
         }
         other => other,
     };
