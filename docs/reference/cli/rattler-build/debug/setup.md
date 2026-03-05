@@ -26,6 +26,14 @@ rattler-build debug setup [OPTIONS]
 <br>May be provided more than once.
 - <a id="arg---output-name" href="#arg---output-name">`--output-name <OUTPUT_NAME>`</a>
 :  Name of the specific output to debug (only required when a recipe has multiple outputs)
+- <a id="arg---variant-config" href="#arg---variant-config">`--variant-config (-m) <VARIANT_CONFIG>`</a>
+:  Variant configuration files for the build
+<br>May be provided more than once.
+- <a id="arg---variant" href="#arg---variant">`--variant <VARIANT_OVERRIDES>`</a>
+:  Override specific variant values (e.g. --variant python=3.12 or --variant python=3.12,3.11). Multiple values separated by commas will create multiple build variants
+<br>May be provided more than once.
+- <a id="arg---ignore-recipe-variants" href="#arg---ignore-recipe-variants">`--ignore-recipe-variants`</a>
+:  Do not read the `variants.yaml` file next to a recipe
 - <a id="arg---experimental" href="#arg---experimental">`--experimental`</a>
 :  Enable experimental features
 <br>**env**: `RATTLER_BUILD_EXPERIMENTAL`
