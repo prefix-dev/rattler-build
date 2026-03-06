@@ -458,7 +458,7 @@ mod test {
     #[test]
     #[cfg(target_os = "linux")]
     fn test_file_type_detection() -> Result<(), RelinkError> {
-        let test_data = Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/binary_files");
+        let test_data = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/binary_files");
 
         // Test that object files are not recognized as valid for relinking
         let object_file = test_data.join("simple-elf.o");
@@ -492,7 +492,7 @@ mod test {
         }
 
         // copy binary to a temporary directory
-        let prefix = Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/binary_files");
+        let prefix = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/binary_files");
         let tmp_dir = tempdir_in(&prefix)?.keep();
         let binary_path = tmp_dir.join("zlink");
         fs::copy(prefix.join("zlink"), &binary_path)?;
@@ -543,7 +543,7 @@ mod test {
         }
 
         // copy binary to a temporary directory
-        let prefix = Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/binary_files");
+        let prefix = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/binary_files");
         let tmp_dir = tempdir_in(&prefix)?.keep();
         let binary_path = tmp_dir.join("zlink-no-rpath");
         fs::copy(prefix.join("zlink-no-rpath"), &binary_path)?;
@@ -578,7 +578,7 @@ mod test {
     #[test]
     fn relink_builtin() -> Result<(), RelinkError> {
         // copy binary to a temporary directory
-        let prefix = Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/binary_files");
+        let prefix = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/binary_files");
         let tmp_dir = tempdir_in(&prefix)?;
         let binary_path = tmp_dir.path().join("zlink");
         fs::copy(prefix.join("zlink"), &binary_path)?;
@@ -611,7 +611,7 @@ mod test {
     #[test]
     fn relink_builtin_runpath() -> Result<(), RelinkError> {
         // copy binary to a temporary directory
-        let prefix = Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/binary_files");
+        let prefix = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/binary_files");
         let tmp_dir = tempdir_in(&prefix)?;
         let binary_path = tmp_dir.path().join("zlink");
         fs::copy(prefix.join("zlink-runpath"), &binary_path)?;

@@ -249,7 +249,7 @@ mod test {
     #[test]
     fn test_pins() {
         // load data from the test folder
-        let p = Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/pins.yaml");
+        let p = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/pins.yaml");
         let file = fs_err::File::open(p).unwrap();
         let pins: Vec<TestPinExpression> = serde_yaml::from_reader(file).unwrap();
 

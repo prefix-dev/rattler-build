@@ -742,7 +742,7 @@ mod tests {
 
     #[test]
     fn test_extract_tbd_install_names() {
-        let test_sysroot = Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/tbd_files");
+        let test_sysroot = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/tbd_files");
 
         let install_names = extract_tbd_install_names(&test_sysroot);
 

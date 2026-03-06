@@ -663,7 +663,7 @@ mod tests {
 
     #[test]
     fn test_file_type_detection() -> Result<(), RelinkError> {
-        let test_data = Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/binary_files");
+        let test_data = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/binary_files");
 
         // Test that object files are not recognized as valid for relinking
         let object_file = test_data.join("simple-macho.o");
@@ -691,7 +691,7 @@ mod tests {
 
     #[test]
     fn test_relink_builtin() -> Result<(), RelinkError> {
-        let prefix = Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/binary_files");
+        let prefix = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/binary_files");
         let tmp_dir = tempdir_in(&prefix)?;
         let binary_path = tmp_dir.path().join("zlink");
         fs::copy(prefix.join("zlink-macos"), &binary_path)?;
@@ -721,7 +721,7 @@ mod tests {
 
     #[test]
     fn test_relink_install_name_tool() -> Result<(), RelinkError> {
-        let prefix = Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/binary_files");
+        let prefix = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/binary_files");
         let tmp_dir = tempdir_in(&prefix)?;
         let binary_path = tmp_dir.path().join("zlink");
         fs::copy(prefix.join("zlink-macos"), &binary_path)?;
@@ -778,7 +778,7 @@ mod tests {
             return Ok(());
         }
 
-        let prefix = Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/binary_files");
+        let prefix = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/binary_files");
         let tmp_dir = tempdir_in(&prefix)?;
         let binary_path = tmp_dir.path().join("zlink-force-rpath");
         fs::copy(prefix.join("zlink-macos"), &binary_path)?;
@@ -825,7 +825,7 @@ mod tests {
             return Ok(());
         }
 
-        let prefix = Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/binary_files");
+        let prefix = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/binary_files");
         let tmp_dir = tempdir_in(&prefix)?;
         let bin_dir = tmp_dir.path().join("bin");
         fs::create_dir(bin_dir)?;
@@ -934,7 +934,7 @@ mod tests {
             return Ok(());
         }
 
-        let prefix = Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/binary_files");
+        let prefix = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/binary_files");
         let tmp_dir = tempdir_in(&prefix)?;
         let tmp_prefix = tmp_dir.path();
 
@@ -982,7 +982,7 @@ mod tests {
             return Ok(());
         }
 
-        let prefix = Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/binary_files");
+        let prefix = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/binary_files");
         let tmp_dir = tempdir_in(&prefix)?;
         let binary_path = tmp_dir.path().join("zlink-dedup-int");
         make_binary_with_duplicate_rpaths(&prefix.join("duplicate-rpath-macos"), &binary_path)?;

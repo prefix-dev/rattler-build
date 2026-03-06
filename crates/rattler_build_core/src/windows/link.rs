@@ -176,7 +176,7 @@ mod tests {
     use std::io::Write;
     use std::path::Path;
 
-    const TEST_DLL_DIR: &str = "test-data/binary_files/windows/zstd/Library/bin";
+    const TEST_DLL_DIR: &str = "../../test-data/binary_files/windows/zstd/Library/bin";
 
     #[test]
     fn test_dll_detection() -> Result<(), RelinkError> {
@@ -185,7 +185,8 @@ mod tests {
             .join("zstd.dll");
         assert!(Dll::test_file(&dll_path)?);
 
-        let prefix = Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/binary_files/windows");
+        let prefix =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/binary_files/windows");
         fs::create_dir_all(&prefix)?;
         let invalid_file = prefix.join("invalid.dll");
         let mut file = File::create(&invalid_file)?;

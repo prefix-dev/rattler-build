@@ -74,8 +74,8 @@ mod test {
         let yaml2 = serde_yaml::to_string(&resolved_dependencies2).unwrap();
         assert_eq!(yaml, yaml2);
 
-        let test_data_dir =
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/rendered_recipes");
+        let test_data_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/rendered_recipes");
         let yaml3 = fs::read_to_string(test_data_dir.join("dependencies.yaml")).unwrap();
         let parsed_yaml3: resolved_dependencies::ResolvedDependencies =
             serde_yaml::from_str(&yaml3).unwrap();
@@ -87,8 +87,8 @@ mod test {
     #[case::rich("rich_recipe.yaml")]
     #[case::curl("curl_recipe.yaml")]
     fn read_full_recipe(#[case] recipe_path: String) {
-        let test_data_dir =
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/rendered_recipes");
+        let test_data_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/rendered_recipes");
 
         let recipe = fs::read_to_string(test_data_dir.join(&recipe_path)).unwrap();
         let output: Output = serde_yaml::from_str(&recipe).unwrap();
@@ -97,8 +97,8 @@ mod test {
 
     #[test]
     fn read_recipe_with_sources() {
-        let test_data_dir =
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/rendered_recipes");
+        let test_data_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/rendered_recipes");
         let recipe_1 = test_data_dir.join("git_source.yaml");
         let recipe_1 = fs::read_to_string(recipe_1).unwrap();
 

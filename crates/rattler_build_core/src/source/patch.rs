@@ -286,10 +286,8 @@ pub(crate) fn apply_patch_gnu(
     Ok(())
 }
 
-pub(crate) fn apply_patch_custom(
-    work_dir: &Path,
-    patch_file_path: &Path,
-) -> Result<(), SourceError> {
+/// Apply a patch file to the working directory using the `patch` command.
+pub fn apply_patch_custom(work_dir: &Path, patch_file_path: &Path) -> Result<(), SourceError> {
     let patch_file_content = fs_err::read(patch_file_path).map_err(SourceError::Io)?;
 
     let patch = patch_from_bytes(&patch_file_content)
@@ -399,38 +397,15 @@ pub fn summarize_patch(diff: &Patch<[u8]>, work_dir: &Path) -> Result<PatchStats
 mod tests {
     use crate::source::copy_dir::CopyDir;
 
-    #[cfg(feature = "patch-test-extra")]
-    use crate::{
-        get_build_output, get_tool_config,
-        opt::{BuildData, BuildOpts, CommonOpts},
-        script::SandboxArguments,
-        tool_configuration::Configuration,
-    };
-
-    #[cfg(feature = "patch-test-extra")]
-    use rattler_build_recipe::stage1::Source;
-
-    #[cfg(feature = "patch-test-extra")]
-    use std::{ffi::OsStr, process::Command, sync::LazyLock};
-
     use super::*;
     use line_ending::LineEnding;
-
-    #[cfg(feature = "patch-test-extra")]
-    use miette::IntoDiagnostic;
-
-    #[cfg(feature = "patch-test-extra")]
-    use regex::Regex;
-
-    #[cfg(feature = "patch-test-extra")]
-    use rstest::*;
 
     use tempfile::TempDir;
 
     #[test]
     fn test_parse_patch() {
         let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        let patches_dir = manifest_dir.join("test-data/patches");
+        let patches_dir = manifest_dir.join("../../test-data/patches");
 
         // for all patches, just try parsing the patch
         for entry in patches_dir.read_dir().unwrap() {
@@ -451,7 +426,7 @@ mod tests {
     #[test]
     fn get_affected_files() {
         let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        let patches_dir = manifest_dir.join("test-data/patch_application/patches");
+        let patches_dir = manifest_dir.join("../../test-data/patch_application/patches");
 
         let patch_file_content =
             fs_err::read(patches_dir.join("test.patch")).expect("Could not read file contents");
@@ -472,7 +447,7 @@ mod tests {
 
     fn setup_patch_test_dir() -> (TempDir, PathBuf) {
         let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        let patch_test_dir = manifest_dir.join("test-data/patch_application");
+        let patch_test_dir = manifest_dir.join("../../test-data/patch_application");
 
         let tempdir = TempDir::new().unwrap();
         let _ = CopyDir::new(&patch_test_dir, tempdir.path()).run().unwrap();
@@ -582,7 +557,7 @@ mod tests {
         // Test to demonstrate the difference between 'any' and 'all' logic
         let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let patch_file = manifest_dir
-            .join("test-data/patch_application/patches/test_strip_level_edge_case.patch");
+            .join("../../test-data/patch_application/patches/test_strip_level_edge_case.patch");
         let patch_content = fs_err::read(&patch_file).unwrap();
         let patch = patch_from_bytes(&patch_content).unwrap();
 
@@ -962,341 +937,5 @@ index 0000000..638dd9c
         let content = fs_err::read_to_string(&pyproject).unwrap();
         assert!(content.contains("[build-system]"));
         assert!(content.contains("setuptools"));
-    }
-
-    /// Prepare all information needed to test patches for package info path.
-    #[cfg(feature = "patch-test-extra")]
-    async fn prepare_sources(recipe_dir: &Path) -> miette::Result<(Configuration, Vec<Source>)> {
-        let artifacts_dir = tempfile::tempdir().unwrap();
-        let artifacts_dir_path = artifacts_dir.path().join("original");
-        let recipe_path = recipe_dir.join("recipe.yaml");
-
-        // Provide default variant overrides for c_stdlib and compilers so
-        // recipes using stdlib('c') / compiler('c') don't fail during rendering.
-        // This test only cares about patch application, not actual builds.
-        let variant_overrides = vec![
-            ("c_stdlib".to_string(), vec!["sysroot".to_string()]),
-            ("c_stdlib_version".to_string(), vec!["2.17".to_string()]),
-            ("c_compiler".to_string(), vec!["gcc".to_string()]),
-            ("c_compiler_version".to_string(), vec!["12".to_string()]),
-            ("cxx_compiler".to_string(), vec!["gxx".to_string()]),
-            ("cxx_compiler_version".to_string(), vec!["12".to_string()]),
-            ("fortran_compiler".to_string(), vec!["gfortran".to_string()]),
-            (
-                "fortran_compiler_version".to_string(),
-                vec!["12".to_string()],
-            ),
-            ("cuda_compiler".to_string(), vec!["nvcc".to_string()]),
-            (
-                "cuda_compiler_version".to_string(),
-                vec!["11.8".to_string()],
-            ),
-            ("python".to_string(), vec!["3.12".to_string()]),
-            ("numpy".to_string(), vec!["2.0".to_string()]),
-            ("r_base".to_string(), vec!["4.3".to_string()]),
-            ("rust_compiler".to_string(), vec!["rust".to_string()]),
-            (
-                "rust_compiler_version".to_string(),
-                vec!["1.75".to_string()],
-            ),
-        ];
-
-        let opts = BuildOpts {
-            recipe_dir: Some(recipe_dir.into()),
-            // // Good if you want to try out recipe for different platform, since we are not building them anyway.
-            // build_platform: Some(rattler_conda_types::Platform::Win64),
-            // target_platform: Some(rattler_conda_types::Platform::Win64),
-            // host_platform: Some(rattler_conda_types::Platform::Win64),
-            no_build_id: true,
-            no_test: true,
-            variant_overrides,
-            common: CommonOpts {
-                use_zstd: true,
-                use_bz2: true,
-                use_sharded: true,
-                output_dir: Some(artifacts_dir_path),
-                ..Default::default()
-            },
-            sandbox_arguments: SandboxArguments {
-                sandbox: true,
-                allow_network: true,
-                ..Default::default()
-            },
-            continue_on_failure: true,
-            ..Default::default()
-        };
-
-        let build_data: BuildData = BuildData::from_opts_and_config(opts, None);
-        let tool_config: Configuration = get_tool_config(&build_data, &None).unwrap();
-
-        // Try to render the recipe. If it fails (e.g. missing stdlib, invalid
-        // matchspecs, YAML parse errors), we skip the recipe gracefully since
-        // this test suite only cares about patch application, not recipe validity.
-        let outputs = match get_build_output(&build_data, &recipe_path, &tool_config).await {
-            Ok(outputs) => outputs,
-            Err(err) => {
-                tracing::warn!(
-                    "Skipping recipe {}: failed to render: {}",
-                    recipe_dir.display(),
-                    err
-                );
-                return Ok((tool_config, vec![]));
-            }
-        };
-
-        let mut patchable_sources = vec![];
-        for output in outputs {
-            let sources = output.recipe.source();
-            for source in sources {
-                if !source.patches().is_empty() {
-                    patchable_sources.push(source.clone())
-                }
-            }
-        }
-
-        patchable_sources.dedup();
-
-        Ok((tool_config, patchable_sources))
-    }
-
-    #[cfg(feature = "patch-test-extra")]
-    fn show_dir_difference(common_parent: &Path) -> miette::Result<String> {
-        let mut cmd = Command::new("diff");
-        // So snapshots doesn't change all the time
-        let original_dir = PathBuf::from("./original");
-        let copy_dir = PathBuf::from("./copy");
-        let stdout = cmd
-            .current_dir(common_parent)
-            .args([
-                OsStr::new("-rNul"),
-                OsStr::new("--strip-trailing-cr"),
-                OsStr::new("--color=auto"),
-                original_dir.as_os_str(),
-                copy_dir.as_os_str(),
-            ])
-            .output()
-            .into_diagnostic()?
-            .stdout;
-
-        static RE: LazyLock<Regex> =
-            LazyLock::new(|| Regex::new(r"(?m)^(?<fileonly>(\+\+\+|---) .*)\t.*$").unwrap());
-
-        let dir_difference = String::from_utf8(stdout).unwrap();
-        let dir_difference = RE.replace_all(&dir_difference, "$fileonly");
-
-        Ok(dir_difference.to_string())
-    }
-
-    /// Applied patches is vector of strip level and diffs from one patch file.
-    #[cfg(feature = "patch-test-extra")]
-    fn snapshot_patched_files(
-        package_name: &str,
-        applied_patches: &Vec<(usize, Vec<Diff<'_, [u8]>>)>,
-        comparison_dir: &Path,
-    ) -> miette::Result<()> {
-        let mut patch_results = vec![];
-        for (strip_level, patchset) in applied_patches.iter() {
-            for patch in patchset.iter() {
-                let file_paths = custom_patch_stripped_paths(patch, *strip_level);
-                let absolute_file_paths = (
-                    file_paths.0.map(|o| comparison_dir.join("copy").join(&o)),
-                    file_paths.1.map(|m| comparison_dir.join("copy").join(&m)),
-                );
-
-                #[derive(Debug)]
-                #[allow(dead_code)]
-                enum PatchResult {
-                    Created(bool),
-                    Deleted(bool),
-                    Modified(String),
-                }
-
-                match absolute_file_paths {
-                    (None, None) => (), // Assume that it will do nothing.
-                    (None, Some(m)) => {
-                        patch_results.push((patch, PatchResult::Created(m.exists())))
-                    }
-
-                    (Some(o), None) => {
-                        patch_results.push((patch, PatchResult::Deleted(!o.exists())))
-                    }
-                    (Some(_), Some(m)) => {
-                        let modified_file_contents = fs_err::read(m).into_diagnostic()?;
-                        let modified_file_debug_representation =
-                            String::from_utf8(modified_file_contents)
-                                .unwrap_or_else(|e| format!("{:#?}", e.into_bytes()));
-                        patch_results.push((
-                            patch,
-                            PatchResult::Modified(modified_file_debug_representation),
-                        ))
-                    }
-                }
-            }
-        }
-        insta::assert_debug_snapshot!(package_name, patch_results);
-
-        Ok(())
-    }
-
-    /// Compare custom patch application with reference git patch application.
-    ///
-    /// Takes a long time to execute, on my machine it takes around 7
-    /// minutes. Require up to several gigabytes of memory available in
-    /// temporary files directory.
-    ///
-    /// Algorithm:
-    ///
-    /// 1. Create temporary directory which will contain a copy of a work dir.
-    /// 2. Copy work dir to the temporary directory.
-    /// 3. Patch original work dir using `git apply`.
-    /// 4. Patch temporary work dir using custom patch application.
-    /// 5. Compare directories.
-    #[cfg(feature = "patch-test-extra")]
-    #[ignore]
-    #[rstest]
-    #[tokio::test]
-    async fn test_package_from_conda_forge(
-        #[base_dir = "test-data/conda_forge/recipes"]
-        #[dirs]
-        #[files("*")]
-        // Slow tests
-        #[exclude("(root)|(tiledbsoma)|(libmodplug)")]
-        // Insane patch format, needs further investigation on why it
-        // even works.
-        #[exclude("mumps")]
-        // Failed to download source (404)
-        #[exclude("(petsc)|(pgadmin4)")]
-        // GNU patch fails and flickzeug succeeds, seemingly correctly from the diff output.
-        #[exclude("(fastjet-cxx)|(fenics-)|(flask-security-too)|(datatrove)|(love2d)")]
-        // Parse fails, since createrepo-c/438.patch contains two mail
-        // messages in one file. Fix postponed until parser
-        // reimplemented.
-        #[exclude("createrepo_c")]
-        // Patches don't match current upstream source version (both GNU and flickzeug fail)
-        #[exclude("(pyduktape2)|(pytest-asyncio)|(typer)|(vectorscan)|(vale)")]
-        recipe_dir: PathBuf,
-    ) -> miette::Result<()> {
-        let snapshot_tested: [&str; 0] = [];
-        let pkg_name = recipe_dir.as_path().file_name().unwrap().to_str().unwrap();
-        let is_snapshot_test = snapshot_tested.contains(&pkg_name);
-
-        let (tool_config, sources) = prepare_sources(&recipe_dir).await?;
-        for source in sources {
-            use rattler_build_source_cache::{Source as CacheSource, SourceCacheBuilder};
-
-            let comparison_dir = tempfile::tempdir().into_diagnostic()?;
-
-            // If you rename these, don't forget to change names in `show_dir_difference`.
-            let original_dir = comparison_dir.path().join("original");
-            fs_err::create_dir(&original_dir).into_diagnostic()?;
-            let copy_dir = comparison_dir.path().join("copy");
-            fs_err::create_dir(&copy_dir).into_diagnostic()?;
-            let cache_src = comparison_dir.path().join("cache");
-            fs_err::create_dir(&cache_src).into_diagnostic()?;
-
-            // Create the source cache
-            let source_cache = SourceCacheBuilder::new()
-                .cache_dir(&cache_src)
-                .client(tool_config.client.clone())
-                .build()
-                .await
-                .into_diagnostic()?;
-
-            // Convert source and fetch from cache
-            let cache_source = match &source {
-                Source::Git(git_src) => {
-                    let cache_git_source = crate::source::convert_git_source(git_src, &recipe_dir)
-                        .expect("Failed to convert git source to cache source");
-                    CacheSource::Git(cache_git_source)
-                }
-                Source::Url(url_src) => {
-                    let cache_url_source = crate::source::convert_url_source(url_src)
-                        .expect("Failed to convert url source to cache source");
-                    CacheSource::Url(cache_url_source)
-                }
-                Source::Path(_) => {
-                    panic!("Path sources should not have patches to test");
-                }
-            };
-
-            let result = source_cache
-                .get_source(&cache_source)
-                .await
-                .into_diagnostic()?;
-
-            // Copy from cache to work directory
-            CopyDir::new(&result.path, &original_dir)
-                .use_gitignore(false)
-                .run()
-                .into_diagnostic()?;
-
-            // Create copy of that directory.
-            CopyDir::new(&original_dir, &copy_dir)
-                .run()
-                .into_diagnostic()?;
-
-            let patches = source.patches().to_vec();
-            let target_directory = source.target_directory();
-
-            let (original_source_dir_path, patched_source_dir_path) = match target_directory {
-                Some(td) => (&original_dir.join(td), &copy_dir.join(td)),
-                None => (&original_dir, &copy_dir),
-            };
-
-            let gnu_patch_res = if !is_snapshot_test {
-                apply_patches(
-                    patches.as_slice(),
-                    original_source_dir_path,
-                    &recipe_dir,
-                    |wd, p| apply_patch_gnu(&SystemTools::new(), wd, p),
-                )
-            } else {
-                Ok(())
-            };
-
-            let custom_res = apply_patches(
-                patches.as_slice(),
-                patched_source_dir_path,
-                &recipe_dir,
-                apply_patch_custom,
-            );
-
-            match (custom_res, gnu_patch_res) {
-                (Ok(_), Ok(_)) => (),
-                (Ok(_), Err(err)) => panic!("Gnu patch failed:\n{}", err),
-                (Err(err), Ok(_)) => panic!("flickzeug patch failed:\n{}", err),
-                (Err(cerr), Err(gerr)) => panic!("Both failed:\n{}\n{}", cerr, gerr),
-            }
-
-            let difference = show_dir_difference(comparison_dir.path())
-                .expect("Can't show dir difference. Most probably you're missing GNU diff binary.");
-
-            if !difference.trim().is_empty() {
-                if is_snapshot_test {
-                    let patches_file_content = patches
-                        .iter()
-                        .map(|pp| fs_err::read(recipe_dir.join(pp)))
-                        .collect::<Result<Vec<_>, _>>()
-                        .into_diagnostic()?;
-                    let mut patch_files = vec![];
-                    for patch_file_content in patches_file_content.iter() {
-                        let patches = patch_from_bytes(patch_file_content).into_diagnostic()?;
-                        let strip_level = guess_strip_level(&patches, original_source_dir_path)
-                            .into_diagnostic()?;
-                        patch_files.push((strip_level, patches));
-                    }
-                    snapshot_patched_files(pkg_name, &patch_files, comparison_dir.path())?;
-                } else {
-                    // If we panic on just nonempty difference then
-                    // there are 4 more tests failing, because git
-                    // does not apply patches. Specifically
-                    // `hf_transfer`, `lua`, `nordugrid_arc`,
-                    // `openjph`.
-                    panic!("Directories are different:\n{}", difference);
-                }
-            }
-        }
-
-        Ok(())
     }
 }
