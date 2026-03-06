@@ -118,7 +118,7 @@ serial_test = "3.4.0"
 
 # Internal rattler-build crates
 rattler_build_allocator = { path = "crates/rattler_build_allocator", version = "0.1.0" }
-rattler_build_core = { path = "crates/rattler_build_core", version = "0.58.4", default-features = false }
+rattler_build_core = { path = "crates/rattler_build_core", version = "0.58.5", default-features = false }
 rattler_build_jinja = { path = "crates/rattler_build_jinja", version = "0.1.0" }
 rattler_build_networking = { path = "crates/rattler_build_networking", version = "0.1.0" }
 rattler_build_recipe = { path = "crates/rattler_build_recipe", version = "0.1.0" }

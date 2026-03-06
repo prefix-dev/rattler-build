@@ -1,6 +1,6 @@
 [package]
 name = "rattler_build_core"
-version = "0.58.4"
+version = "0.58.5"
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
