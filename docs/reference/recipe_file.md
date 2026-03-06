@@ -534,6 +534,73 @@ build:
     version_independent: true  # defaults to false
 ```
 
+### Post-processing
+
+Applies regex-based text replacements to files in the package during the packaging phase. Each entry specifies a set of files to match and a regex substitution
+to apply.
+
+```yaml title="recipe.yaml"
+build:
+  post_process:
+    - files:
+        - "bin/*"
+      regex: "/old/path"
+      replacement: "/new/path"
+    - files:
+        - "**/*.cmake"
+        - "**/*.pc"
+      regex: "/home/builder"
+      replacement: "$PREFIX"
+```
+
+Each `post_process` entry has the following fields:
+
+- **`files`** (required) — A list of glob patterns selecting which files to
+  process. Supports `include`/`exclude` mappings and `if`/`then`/`else`
+  conditionals.
+- **`regex`** (required) — A regular expression pattern to match within each
+  selected file.
+- **`replacement`** (required) — The replacement string. Supports regex capture
+  group references (e.g. `$1`, `${name}`).
+
+All three fields are required for each entry.
+
+#### Conditional post-processing
+
+`post_process` entries support `if`/`then`/`else` conditionals, including
+nesting:
+
+```yaml title="recipe.yaml"
+build:
+  post_process:
+    - if: unix
+      then:
+        - files:
+            - "lib/**/*.la"
+          regex: "/build/prefix"
+          replacement: "$PREFIX"
+    - files:
+        - "**/*.txt"
+      regex: "old_name"
+      replacement: "new_name"
+```
+
+In the example above, the `.la` file replacement runs only on Unix, while the
+`.txt` replacement runs unconditionally.
+
+#### Behavior
+
+- Post-processing runs during packaging, **after** relocation and Python
+  post-processing, but **before** linking checks.
+- Files are read as UTF-8 text using Rust’s read_to_string. If a matched file is not valid UTF-8, the build will fail.
+- The regex uses `replace_all` semantics from Rust's `regex` crate: all non-overlapping matches in a file are replaced.
+- Steps are applied sequentially. Later entries see the results of earlier ones.
+
+#### Output inheritance
+
+In multi-output recipes, each output inherits the top-level `post_process` if
+the output does not define its own. If an output defines its own `post_process`, it fully overrides the top-level list. No merging is performed.
+
 ## Include build recipe
 
 The recipe and rendered `recipe.yaml` file are included in
