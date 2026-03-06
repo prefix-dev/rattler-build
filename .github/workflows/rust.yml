@@ -1,6 +1,6 @@
 on:
   push:
-    branches: [main]
+    branches: [main, release-plz-*]
     tags:
       - "v*.*.*"
   pull_request:
