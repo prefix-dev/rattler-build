@@ -77,4 +77,8 @@ lint = { features = ["lint"] }
 
 [dependencies]
 requests = ">=2.32.3,<2.33"
+sccache = ">=0.12,<0.13"
 types-requests = ">=2.32.0.20240602,<2.32.1"
+
+[activation.env]
+RUSTC_WRAPPER = "sccache"

@@ -1,0 +1,5 @@
+rules:
+  artipacked:
+    ignore:
+      # docs workflow needs git credentials for mike deploy --push
+      - docs.yml
