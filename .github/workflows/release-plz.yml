@@ -33,6 +33,7 @@ jobs:
 
   release-plz-pr:
     name: Release-plz PR
+    needs: release-plz-release
     runs-on: ubuntu-latest
     permissions:
       contents: write
