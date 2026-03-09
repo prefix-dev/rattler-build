@@ -2,43 +2,38 @@
 
 //! rattler-build library.
 
-pub mod build;
-pub mod bump_recipe;
-// pub mod cache;
-// pub mod conda_build_config;
-pub mod console_utils;
-pub mod metadata;
-pub mod migrate_recipe;
+// Re-export all core modules from rattler_build_core
+pub use rattler_build_core::build;
+pub use rattler_build_core::bump_recipe;
+pub use rattler_build_core::console_utils;
+pub use rattler_build_core::env_vars;
+pub use rattler_build_core::metadata;
+pub use rattler_build_core::migrate_recipe;
+pub use rattler_build_core::package_test;
+pub use rattler_build_core::packaging;
+pub use rattler_build_core::publish;
+pub use rattler_build_core::rebuild;
+pub use rattler_build_core::render;
+pub use rattler_build_core::script;
+pub use rattler_build_core::source;
+pub use rattler_build_core::staging;
+pub use rattler_build_core::system_tools;
+pub use rattler_build_core::tool_configuration;
+#[cfg(feature = "tui")]
+pub mod tui;
+pub use rattler_build_core::types;
+pub use rattler_build_core::utils;
+
 pub mod opt;
-pub mod package_test;
-pub mod packaging;
-pub mod render;
-pub mod script;
-pub mod source;
-pub mod staging;
-pub mod system_tools;
-pub mod tool_configuration;
 
 // Re-export recipe generator
 #[cfg(feature = "recipe-generation")]
 pub use rattler_build_recipe_generator as recipe_generator;
-#[cfg(feature = "tui")]
-pub mod tui;
-pub mod types;
-pub mod utils;
 
-mod consts;
-pub mod env_vars;
-mod linux;
-mod macos;
-mod package_info;
-mod post_process;
-pub mod publish;
-pub mod rebuild;
-mod unix;
-mod windows;
-
-mod package_cache_reporter;
+// Re-export types needed by Python bindings and external consumers
+pub use rattler_build_core::{BuildString, DiscoveredOutput, Recipe, RenderConfig, Variable};
+pub use rattler_build_recipe::stage1::{HashInfo, HashInput};
+pub use rattler_build_types::NormalizedKey;
 
 use std::{
     collections::{BTreeMap, HashMap},
@@ -56,21 +51,12 @@ use futures::FutureExt;
 use miette::{Context, IntoDiagnostic};
 use opt::*;
 use package_test::TestConfiguration;
-use rattler_build_recipe::{
-    stage0,
-    stage1::{Recipe, TestType},
-    variant_render::RenderConfig,
-};
+use rattler_build_core::consts;
+use rattler_build_recipe::{stage0, stage1::TestType};
 use rattler_build_variant_config::VariantConfig;
-
-// Re-export types needed by Python bindings and external consumers
-pub use rattler_build_jinja::Variable;
-pub use rattler_build_recipe::stage1::build::BuildString;
-pub use rattler_build_recipe::stage1::{HashInfo, HashInput};
-pub use rattler_build_types::NormalizedKey;
 use rattler_conda_types::{
-    MatchSpec, NamedChannelOrUrl, PackageName, Platform, compression_level::CompressionLevel,
-    package::CondaArchiveType,
+    MatchSpec, NamedChannelOrUrl, NoArchType, PackageName, Platform,
+    compression_level::CompressionLevel, package::CondaArchiveType,
 };
 use rattler_config::config::build::PackageFormatAndCompression;
 use rattler_index::ensure_channel_initialized_fs;
@@ -90,48 +76,11 @@ use types::{
 
 use crate::metadata::{Debug, Output, PlatformWithVirtualPackages};
 use crate::publish::{
-    BuildNumberOverride, apply_build_number_override, fetch_highest_build_numbers,
+    BuildNumberOverride, PublishConfig, apply_build_number_override, fetch_highest_build_numbers,
     upload_and_index_channel,
 };
 use indexmap::IndexSet;
 use rattler_build_recipe::topological_sort_by_dependencies;
-use rattler_conda_types::NoArchType;
-
-/// A discovered output from variant expansion
-#[allow(missing_docs)]
-#[derive(Debug, Clone)]
-pub struct DiscoveredOutput {
-    pub name: String,
-    pub version: String,
-    pub build_string: String,
-    pub noarch_type: NoArchType,
-    pub target_platform: Platform,
-    pub used_vars: BTreeMap<NormalizedKey, Variable>,
-    pub recipe: Recipe,
-    pub hash: HashInfo,
-}
-
-impl Eq for DiscoveredOutput {}
-
-impl PartialEq for DiscoveredOutput {
-    fn eq(&self, other: &Self) -> bool {
-        self.name == other.name
-            && self.version == other.version
-            && self.build_string == other.build_string
-            && self.noarch_type == other.noarch_type
-            && self.target_platform == other.target_platform
-    }
-}
-
-impl std::hash::Hash for DiscoveredOutput {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.name.hash(state);
-        self.version.hash(state);
-        self.build_string.hash(state);
-        self.noarch_type.hash(state);
-        self.target_platform.hash(state);
-    }
-}
 
 /// Result of finding variants, including the top-level recipe name if available
 struct FoundVariants {
@@ -1288,6 +1237,7 @@ fn sort_build_outputs_topologically(
     Ok(())
 }
 
+
 /// Get the version of rattler-build.
 pub fn get_rattler_build_version() -> &'static str {
     env!("CARGO_PKG_VERSION")
@@ -1570,10 +1520,18 @@ pub async fn publish_packages(
         built_packages
     };
 
+    let publish_config = PublishConfig {
+        force: publish_data.force,
+        generate_attestation: publish_data.generate_attestation,
+        auth_file: publish_data.build.common.auth_file.clone(),
+        #[cfg(feature = "s3")]
+        s3_config: publish_data.build.common.s3_config.clone(),
+    };
+
     upload_and_index_channel(
         &target_url,
         &built_packages,
-        &publish_data,
+        &publish_config,
         &tool_config.repodata_gateway,
     )
     .await?;
@@ -1720,10 +1678,10 @@ pub async fn debug_recipe(
 
 /// Display information about a built package
 pub fn show_package_info(args: InspectOpts) -> miette::Result<()> {
-    package_info::package_info(args)
+    rattler_build_core::package_info::package_info(args.into())
 }
 
 /// Extract a conda package to a directory
 pub async fn extract_package(args: opt::ExtractOpts) -> miette::Result<()> {
-    package_info::extract_package(args).await
+    rattler_build_core::package_info::extract_package(args.into()).await
 }

@@ -1,0 +1,941 @@
+//! Functions for applying patches to a work directory.
+use crate::system_tools::{SystemTools, Tool};
+
+use super::SourceError;
+
+use std::io::Write;
+use std::{
+    collections::HashSet,
+    ffi::OsStr,
+    path::{Path, PathBuf},
+};
+
+use flickzeug::{
+    ApplyConfig, ApplyError, Diff, FuzzyConfig, HunkRangeStrategy, ParsePatchError, ParserConfig,
+    Patch, apply_bytes_with_config, patch_from_bytes_with_config,
+};
+use fs_err::File;
+use itertools::Itertools;
+
+/// Summarize a single patch file by reading and parsing it.
+pub fn summarize_single_patch(
+    patch_path: &Path,
+    work_dir: &Path,
+) -> Result<PatchStats, SourceError> {
+    let data = fs_err::read(patch_path).map_err(SourceError::Io)?;
+    let patch = patch_from_bytes(&data)
+        .map_err(|_| SourceError::PatchParseFailed(patch_path.to_path_buf()))?;
+    summarize_patch(&patch, work_dir)
+}
+
+/// Normalizes backup file paths (.orig/.bak) to their actual file paths
+/// Returns (original_path, modified_path) with backup files resolved
+fn normalize_backup_paths(
+    original_path: Option<PathBuf>,
+    modified_path: Option<PathBuf>,
+) -> (Option<PathBuf>, Option<PathBuf>) {
+    let (Some(orig), Some(modified)) = (&original_path, &modified_path) else {
+        return (original_path, modified_path);
+    };
+
+    // If paths are the same, no backup normalization needed
+    if orig == modified {
+        return (original_path, modified_path);
+    }
+
+    // Check if original file is a backup of the modified file
+    if let (Some(orig_stem), Some(orig_ext)) = (orig.file_stem(), orig.extension())
+        && let Some(mod_filename) = modified.file_name()
+        && matches!(orig_ext.to_str(), Some("orig" | "bak"))
+        && orig_stem == mod_filename
+    {
+        // Original is a backup of modified file, treat as modifying the actual file
+        return (Some(modified.clone()), Some(modified.clone()));
+    }
+
+    (original_path, modified_path)
+}
+
+fn parse_patch(patch: &Patch<[u8]>) -> HashSet<PathBuf> {
+    let mut affected_files = HashSet::new();
+
+    for diff in patch {
+        let original_path = diff
+            .original()
+            .and_then(|p| std::str::from_utf8(p).ok())
+            .map(PathBuf::from);
+
+        let modified_path = diff
+            .modified()
+            .and_then(|p| std::str::from_utf8(p).ok())
+            .map(PathBuf::from);
+
+        let (normalized_orig, normalized_mod) =
+            normalize_backup_paths(original_path, modified_path);
+
+        if let Some(path) = normalized_orig {
+            affected_files.insert(path);
+        }
+        if let Some(path) = normalized_mod {
+            affected_files.insert(path);
+        }
+    }
+
+    affected_files
+}
+
+fn patch_from_bytes(input: &[u8]) -> Result<Patch<'_, [u8]>, ParsePatchError> {
+    patch_from_bytes_with_config(
+        input,
+        ParserConfig {
+            hunk_strategy: HunkRangeStrategy::Recount,
+            skip_order_check: true,
+            strip_ab_prefix: true,
+        },
+    )
+}
+
+/// Parse patch bytes without stripping a/b prefixes.
+/// Used for GNU patch which handles prefix stripping itself via the -p flag.
+fn patch_from_bytes_raw(input: &[u8]) -> Result<Patch<'_, [u8]>, ParsePatchError> {
+    patch_from_bytes_with_config(
+        input,
+        ParserConfig {
+            hunk_strategy: HunkRangeStrategy::Recount,
+            skip_order_check: true,
+            strip_ab_prefix: false,
+        },
+    )
+}
+
+fn apply(base_image: &[u8], diff: &Diff<'_, [u8]>) -> Result<Vec<u8>, ApplyError> {
+    apply_bytes_with_config(
+        base_image,
+        diff,
+        &ApplyConfig {
+            fuzzy_config: FuzzyConfig {
+                max_fuzz: 2,
+                ignore_whitespace: true,
+                ignore_case: false,
+            },
+            ..Default::default()
+        },
+    )
+    .map(|(content, _stats)| content)
+}
+
+// Returns number by which all patch paths must be stripped to be
+// successfully applied, or returns and error if no such number could
+// be determined.
+fn guess_strip_level(patch: &Patch<[u8]>, work_dir: &Path) -> Result<usize, SourceError> {
+    let patched_files = parse_patch(patch);
+
+    let max_components = patched_files
+        .iter()
+        .map(|p| p.components().count())
+        .max()
+        .unwrap_or(0);
+
+    for strip_level in 0..max_components {
+        // We check for _any_ path existing here. Sometimes patches reference
+        // files that are deleted (e.g. `foobar.orig`) and thus it's more robust to look for
+        // the first match in the affected files.
+        let any_paths_exist = patched_files.iter().any(|p| {
+            let path: PathBuf = p.components().skip(strip_level).collect();
+            // Skip empty paths - they can falsely match the work_dir itself
+            !path.as_os_str().is_empty() && work_dir.join(path).exists()
+        });
+        if any_paths_exist {
+            return Ok(strip_level);
+        }
+    }
+
+    // No existing files matched (e.g. all files are new from /dev/null).
+    // Check if paths have git-style a/b prefixes, which need strip level 1.
+    let has_ab_prefix = patched_files.iter().any(|p| {
+        p.components()
+            .next()
+            .and_then(|c| c.as_os_str().to_str())
+            .is_some_and(|s| s == "a" || s == "b")
+    });
+    if has_ab_prefix {
+        return Ok(1);
+    }
+
+    // Default to strip level 0 since flickzeug already strips a/b prefixes.
+    Ok(0)
+}
+
+fn custom_patch_stripped_paths(
+    diff: &Diff<'_, [u8]>,
+    strip_level: usize,
+) -> (Option<PathBuf>, Option<PathBuf>) {
+    let strip_path = |path_bytes: &[u8]| -> Option<PathBuf> {
+        std::str::from_utf8(path_bytes).ok().and_then(|p| {
+            let path: PathBuf = PathBuf::from(p).components().skip(strip_level).collect();
+            // Skip empty paths - they would resolve to work_dir itself
+            if path.as_os_str().is_empty() {
+                return None;
+            }
+            Some(path)
+        })
+    };
+
+    let original_path = diff.original().and_then(strip_path);
+    let modified_path = diff.modified().and_then(strip_path);
+
+    normalize_backup_paths(original_path, modified_path)
+}
+
+fn write_patch_content(content: &[u8], path: &Path) -> Result<(), SourceError> {
+    if let Some(parent) = path.parent() {
+        fs_err::create_dir_all(parent).map_err(SourceError::Io)?;
+    }
+
+    // We want to be able to write to file.
+    if path.exists() {
+        let mut perms = fs_err::metadata(path)
+            .map_err(SourceError::Io)?
+            .permissions();
+        if perms.readonly() {
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let user_write = 0o200;
+                perms.set_mode(perms.mode() | user_write);
+            }
+            #[cfg(not(unix))]
+            {
+                // Assume this means windows
+                #[allow(clippy::permissions_set_readonly_false)]
+                perms.set_readonly(false);
+            }
+            fs_err::set_permissions(path, perms).map_err(SourceError::Io)?;
+        }
+    }
+
+    let mut new_file = File::create(path).map_err(SourceError::Io)?;
+    new_file.write_all(content).map_err(SourceError::Io)?;
+
+    Ok(())
+}
+
+#[cfg(windows)]
+fn temp_copy<P: AsRef<Path>>(src_path: P) -> std::io::Result<tempfile::NamedTempFile> {
+    let mut src = File::open(src_path.as_ref())?;
+    let mut tmp = tempfile::NamedTempFile::new()?;
+    std::io::copy(&mut src, &mut tmp)?;
+    Ok(tmp)
+}
+
+#[allow(dead_code)]
+pub(crate) fn apply_patch_gnu(
+    system_tools: &SystemTools,
+    work_dir: &Path,
+    patch_file_path: &Path,
+) -> Result<(), SourceError> {
+    let patch_file_content = fs_err::read(patch_file_path).map_err(SourceError::Io)?;
+
+    // Use raw parsing (no a/b prefix stripping) for GNU patch since it handles
+    // prefix stripping itself via the -p flag.
+    let patch = patch_from_bytes_raw(&patch_file_content)
+        .map_err(|_| SourceError::PatchParseFailed(patch_file_path.to_path_buf()))?;
+    let strip_level = guess_strip_level(&patch, work_dir)?;
+
+    tracing::debug!("Patch {} will be applied", patch_file_path.display());
+
+    // GNU patch treats some paths incorrectly on windows
+    #[cfg(windows)]
+    let patch_tmp = temp_copy(patch_file_path)?;
+    #[cfg(windows)]
+    let patch_file_path = patch_tmp.path();
+
+    let mut tool = system_tools
+        .call(Tool::Patch)
+        .map_err(|_| SourceError::PatchExeNotFound)?;
+    let cmd_builder = tool
+        .arg(format!("-p{}", strip_level))
+        .arg("--no-backup-if-mismatch")
+        .arg("-i")
+        .arg(String::from(patch_file_path.to_string_lossy()))
+        .arg("-d")
+        .arg(String::from(work_dir.to_string_lossy()));
+    let output = cmd_builder.output()?;
+
+    if !output.status.success() {
+        return Err(SourceError::PatchFailed(format!(
+            "{}\n`patch` failed with a combination of flags.\n\n{}",
+            patch_file_path.display(),
+            {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                format!(
+                    "With the the command:\n\n\t{} {}\n\nThe stdout was:\n\n\t{}\n\nThe stderr was:\n\n\t{}\n\n",
+                    cmd_builder.get_program().to_string_lossy(),
+                    cmd_builder
+                        .get_args()
+                        .map(OsStr::to_string_lossy)
+                        .format(" "),
+                    stdout.lines().format("\n\t"),
+                    stderr.lines().format("\n\t")
+                )
+            }
+        )));
+    }
+
+    Ok(())
+}
+
+/// Apply a patch file to the working directory using the `patch` command.
+pub fn apply_patch_custom(work_dir: &Path, patch_file_path: &Path) -> Result<(), SourceError> {
+    let patch_file_content = fs_err::read(patch_file_path).map_err(SourceError::Io)?;
+
+    let patch = patch_from_bytes(&patch_file_content)
+        .map_err(|_| SourceError::PatchParseFailed(patch_file_path.to_path_buf()))?;
+    let strip_level = guess_strip_level(&patch, work_dir)?;
+
+    for diff in patch {
+        let file_paths = custom_patch_stripped_paths(&diff, strip_level);
+        let absolute_file_paths = (
+            file_paths.0.map(|o| work_dir.join(&o)),
+            file_paths.1.map(|m| work_dir.join(&m)),
+        );
+
+        tracing::debug!(
+            "Patch will be applied:\n\tFrom: {:#?}\n\tTo:{:#?}",
+            absolute_file_paths.0,
+            absolute_file_paths.1
+        );
+
+        match absolute_file_paths {
+            (None, None) => continue,
+            (None, Some(m)) => {
+                let new_file_content = apply(&[], &diff).map_err(SourceError::PatchApplyError)?;
+                write_patch_content(&new_file_content, &m)?;
+            }
+            (Some(o), None) => {
+                fs_err::remove_file(work_dir.join(o)).map_err(SourceError::Io)?;
+            }
+            (Some(o), Some(m)) => {
+                // Check if the original file exists
+                // If it doesn't, treat this as creating a new file
+                if !o.exists() {
+                    let new_file_content =
+                        apply(&[], &diff).map_err(SourceError::PatchApplyError)?;
+                    write_patch_content(&new_file_content, &m)?;
+                } else {
+                    let old_file_content = fs_err::read(&o).map_err(SourceError::Io)?;
+
+                    let new_file_content =
+                        apply(&old_file_content, &diff).map_err(SourceError::PatchApplyError)?;
+
+                    if o != m {
+                        fs_err::remove_file(&o).map_err(SourceError::Io)?;
+                    }
+
+                    write_patch_content(&new_file_content, &m)?;
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Applies all patches in a list of patches to the specified work directory
+pub(crate) fn apply_patches(
+    patches: &[PathBuf],
+    work_dir: &Path,
+    recipe_dir: &Path,
+    apply_patch: impl Fn(&Path, &Path) -> Result<(), SourceError>,
+) -> Result<(), SourceError> {
+    for patch_path_relative in patches {
+        let patch_file_path = recipe_dir.join(patch_path_relative);
+
+        tracing::info!("Applying patch: {}", patch_file_path.to_string_lossy());
+
+        if !patch_file_path.exists() {
+            return Err(SourceError::PatchNotFound(patch_file_path));
+        }
+
+        apply_patch(work_dir, patch_file_path.as_path())?;
+    }
+    Ok(())
+}
+
+/// Summarized statistics of patch operations.
+#[derive(Debug, Default)]
+pub struct PatchStats {
+    /// Files that have been modified (both original and modified exist).
+    pub changed: Vec<PathBuf>,
+    /// Files that have been added (original is /dev/null).
+    pub added: Vec<PathBuf>,
+    /// Files that have been removed (modified is /dev/null).
+    pub removed: Vec<PathBuf>,
+}
+
+/// Summarize a single diff into added, removed, and changed files.
+pub fn summarize_patch(diff: &Patch<[u8]>, work_dir: &Path) -> Result<PatchStats, SourceError> {
+    let mut stats = PatchStats::default();
+    let strip_level = guess_strip_level(diff, work_dir)?;
+    for hunk in diff {
+        let (orig_path, mod_path) = custom_patch_stripped_paths(hunk, strip_level);
+        match (orig_path, mod_path) {
+            // Both original and modified exist: record original (prefix stripped) as changed file
+            (Some(orig), Some(_mod)) => stats.changed.push(orig),
+            // Only modified exists: new file added
+            (None, Some(modified)) => stats.added.push(modified),
+            // Only original exists: file removed
+            (Some(orig), None) => stats.removed.push(orig),
+            _ => {}
+        }
+    }
+    Ok(stats)
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::source::copy_dir::CopyDir;
+
+    use super::*;
+    use line_ending::LineEnding;
+
+    use tempfile::TempDir;
+
+    #[test]
+    fn test_parse_patch() {
+        let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let patches_dir = manifest_dir.join("../../test-data/patches");
+
+        // for all patches, just try parsing the patch
+        for entry in patches_dir.read_dir().unwrap() {
+            let patch = entry.unwrap();
+            let patch_path = patch.path();
+            if patch_path.extension() != Some("patch".as_ref()) {
+                continue;
+            }
+
+            let patch_file_content =
+                fs_err::read(&patch_path).expect("Could not read file contents");
+            let _ = patch_from_bytes(&patch_file_content).expect("Failed to parse patch file");
+
+            println!("Parsing patch: {}", patch_path.display());
+        }
+    }
+
+    #[test]
+    fn get_affected_files() {
+        let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let patches_dir = manifest_dir.join("../../test-data/patch_application/patches");
+
+        let patch_file_content =
+            fs_err::read(patches_dir.join("test.patch")).expect("Could not read file contents");
+        let patch = patch_from_bytes(&patch_file_content).expect("Failed to parse patch file");
+
+        let patched_paths = parse_patch(&patch);
+        assert_eq!(patched_paths.len(), 1);
+        assert!(patched_paths.contains(&PathBuf::from("text.md")));
+
+        let patch_file_content =
+            fs_err::read(patches_dir.join("0001-increase-minimum-cmake-version.patch"))
+                .expect("Could not read file contents");
+        let patch = patch_from_bytes(&patch_file_content).expect("Failed to parse patch file");
+        let patched_paths = parse_patch(&patch);
+        assert_eq!(patched_paths.len(), 1);
+        assert!(patched_paths.contains(&PathBuf::from("CMakeLists.txt")));
+    }
+
+    fn setup_patch_test_dir() -> (TempDir, PathBuf) {
+        let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let patch_test_dir = manifest_dir.join("../../test-data/patch_application");
+
+        let tempdir = TempDir::new().unwrap();
+        let _ = CopyDir::new(&patch_test_dir, tempdir.path()).run().unwrap();
+
+        (tempdir, patch_test_dir)
+    }
+
+    #[test]
+    fn test_apply_patches() {
+        let (tempdir, _) = setup_patch_test_dir();
+
+        // Test with normal patch
+        apply_patches(
+            &[PathBuf::from("test.patch")],
+            &tempdir.path().join("workdir"),
+            &tempdir.path().join("patches"),
+            apply_patch_custom,
+        )
+        .unwrap();
+
+        let text_md = tempdir.path().join("workdir/text.md");
+        let text_md = fs_err::read_to_string(&text_md).unwrap();
+        assert!(text_md.contains("Oh, wow, I was patched! Thank you soooo much!"));
+    }
+
+    #[test]
+    fn test_apply_patches_with_orig() {
+        let (tempdir, _) = setup_patch_test_dir();
+
+        // Test with normal patch
+        apply_patches(
+            &[PathBuf::from("test_with_orig.patch")],
+            &tempdir.path().join("workdir"),
+            &tempdir.path().join("patches"),
+            apply_patch_custom,
+        )
+        .unwrap();
+
+        let text_md = tempdir.path().join("workdir/text.md");
+        let text_md = fs_err::read_to_string(&text_md).unwrap();
+        assert!(text_md.contains("Oh, wow, I was patched! Thank you soooo much!"));
+    }
+
+    #[test]
+    fn test_apply_patches_with_bak() {
+        let (tempdir, _) = setup_patch_test_dir();
+
+        // Test with .bak extension patch
+        apply_patches(
+            &[PathBuf::from("test_with_bak.patch")],
+            &tempdir.path().join("workdir"),
+            &tempdir.path().join("patches"),
+            apply_patch_custom,
+        )
+        .unwrap();
+
+        let text_md = tempdir.path().join("workdir/text.md");
+        let text_md = fs_err::read_to_string(&text_md).unwrap();
+        assert!(text_md.contains("This was patched using .bak extension!"));
+    }
+
+    #[test]
+    fn test_apply_patches_mixed_existing_files() {
+        let (tempdir, _) = setup_patch_test_dir();
+
+        // Test with patch that references both existing and non-existing files
+        apply_patches(
+            &[PathBuf::from("test_simple_mixed.patch")],
+            &tempdir.path().join("workdir"),
+            &tempdir.path().join("patches"),
+            apply_patch_custom,
+        )
+        .unwrap();
+
+        let existing_file = tempdir.path().join("workdir/existing_file.txt");
+        let existing_file = fs_err::read_to_string(&existing_file).unwrap();
+        assert!(existing_file.contains("Mixed files patch applied!"));
+
+        let new_file = tempdir.path().join("workdir/new_file.txt");
+        let new_file = fs_err::read_to_string(&new_file).unwrap();
+        assert!(new_file.contains("This is a new file."));
+        assert!(new_file.contains("Created by patch application."));
+    }
+
+    #[test]
+    fn test_strip_level_detection_edge_case() {
+        let (tempdir, _) = setup_patch_test_dir();
+
+        // Test with patch that has deep paths but only some files exist
+        apply_patches(
+            &[PathBuf::from("test_strip_level_edge_case.patch")],
+            &tempdir.path().join("workdir"),
+            &tempdir.path().join("patches"),
+            apply_patch_custom,
+        )
+        .unwrap();
+
+        let deep_file = tempdir
+            .path()
+            .join("workdir/deep/nested/directory/deep_file.txt");
+        let deep_file = fs_err::read_to_string(&deep_file).unwrap();
+        assert!(deep_file.contains("Strip level test applied!"));
+    }
+
+    #[test]
+    fn test_strip_level_algorithm_comparison() {
+        // Test to demonstrate the difference between 'any' and 'all' logic
+        let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let patch_file = manifest_dir
+            .join("../../test-data/patch_application/patches/test_strip_level_edge_case.patch");
+        let patch_content = fs_err::read(&patch_file).unwrap();
+        let patch = patch_from_bytes(&patch_content).unwrap();
+
+        let (tempdir, _) = setup_patch_test_dir();
+        let work_dir = tempdir.path().join("workdir");
+
+        // The current implementation should find strip level 3 based on existing deep file
+        // (was 4 before flickzeug started stripping a/b prefixes)
+        let strip_level = guess_strip_level(&patch, &work_dir).unwrap();
+        assert_eq!(
+            strip_level, 3,
+            "Current 'any' logic should find strip level 3"
+        );
+
+        // Let's also test what the old 'all' logic would have found
+        // (This is what the function used to do before the PR)
+        let patched_files = parse_patch(&patch);
+        let max_components = patched_files
+            .iter()
+            .map(|p| p.components().count())
+            .max()
+            .unwrap_or(0);
+
+        let mut old_algorithm_result = None;
+        for strip_level in 0..max_components {
+            let all_paths_exist = patched_files.iter().all(|p| {
+                let path: PathBuf = p.components().skip(strip_level).collect();
+                work_dir.join(path).exists()
+            });
+            if all_paths_exist {
+                old_algorithm_result = Some(strip_level);
+                break;
+            }
+        }
+
+        // The old algorithm would not have found any strip level where ALL files exist
+        // because nonexistent_deep.txt.orig doesn't exist
+        assert_eq!(
+            old_algorithm_result, None,
+            "Old 'all' logic should not find a valid strip level"
+        );
+    }
+
+    #[test]
+    fn test_strip_level_with_all_new_files() {
+        // Test that when all files are new (from /dev/null), the strip level
+        // doesn't incorrectly match the workdir itself when paths become empty
+        // after stripping.
+        let patch_content = b"--- /dev/null
++++ b/new_file.txt
+@@ -0,0 +1 @@
++new content
+";
+        let patch = patch_from_bytes(patch_content).unwrap();
+
+        let tempdir = TempDir::new().unwrap();
+        // Work dir exists but contains no files matching the patch
+        let strip_level = guess_strip_level(&patch, tempdir.path()).unwrap();
+
+        // Should return 0 since flickzeug already strips the b/ prefix
+        assert_eq!(
+            strip_level, 0,
+            "Strip level should be 0 since a/b prefixes are already stripped"
+        );
+    }
+
+    #[test]
+    fn test_backup_file_logic_edge_cases() {
+        // Test edge cases in the backup file handling logic
+        let patch_content = b"--- a/file.txt.orig\t2021-12-27 12:22:09.000000000 -0800\n+++ a/file.txt\t2021-12-27 12:22:14.000000000 -0800\n@@ -1 +1,2 @@\n original line\n+new line\n";
+
+        let patch = patch_from_bytes(patch_content).unwrap();
+        let diff = patch.into_iter().next().unwrap();
+
+        // Test the backup file logic
+        // strip_level=0 because flickzeug already strips a/b prefixes
+        let paths = custom_patch_stripped_paths(&diff, 0);
+
+        // Should treat this as modifying file.txt in place
+        assert_eq!(paths.0, Some(PathBuf::from("file.txt")));
+        assert_eq!(paths.1, Some(PathBuf::from("file.txt")));
+
+        // Test .bak extension
+        let patch_content = b"--- a/file.txt.bak\t2021-12-27 12:22:09.000000000 -0800\n+++ a/file.txt\t2021-12-27 12:22:14.000000000 -0800\n@@ -1 +1,2 @@\n original line\n+new line\n";
+
+        let patch = patch_from_bytes(patch_content).unwrap();
+        let diff = patch.into_iter().next().unwrap();
+
+        let paths = custom_patch_stripped_paths(&diff, 0);
+        assert_eq!(paths.0, Some(PathBuf::from("file.txt")));
+        assert_eq!(paths.1, Some(PathBuf::from("file.txt")));
+
+        // Test case where backup file logic should NOT apply
+        let patch_content = b"--- a/different.txt.orig\t2021-12-27 12:22:09.000000000 -0800\n+++ a/file.txt\t2021-12-27 12:22:14.000000000 -0800\n@@ -1 +1,2 @@\n original line\n+new line\n";
+
+        let patch = patch_from_bytes(patch_content).unwrap();
+        let diff = patch.into_iter().next().unwrap();
+
+        let paths = custom_patch_stripped_paths(&diff, 0);
+        // Should NOT apply backup logic because different.txt.orig is not a backup of file.txt
+        assert_eq!(paths.0, Some(PathBuf::from("different.txt.orig")));
+        assert_eq!(paths.1, Some(PathBuf::from("file.txt")));
+    }
+
+    #[test]
+    fn test_apply_patches_with_crlf() {
+        let (tempdir, _) = setup_patch_test_dir();
+
+        // Test with CRLF patch
+        let patch = tempdir.path().join("patches/test.patch");
+        let text = fs_err::read_to_string(&patch).unwrap();
+        let clrf_patch = LineEnding::CRLF.apply(&text);
+
+        fs_err::write(tempdir.path().join("patches/test_crlf.patch"), clrf_patch).unwrap();
+
+        // Test with CRLF patch
+        apply_patches(
+            &[PathBuf::from("test_crlf.patch")],
+            &tempdir.path().join("workdir"),
+            &tempdir.path().join("patches"),
+            apply_patch_custom,
+        )
+        .unwrap();
+
+        let text_md = tempdir.path().join("workdir/text.md");
+        let text_md = fs_err::read_to_string(&text_md).unwrap();
+        assert!(text_md.contains("Oh, wow, I was patched! Thank you soooo much!"));
+    }
+
+    #[test]
+    fn test_apply_pure_rename_patch() {
+        let (tempdir, _) = setup_patch_test_dir();
+
+        // Apply patch with pure renames (100% similarity, no content changes)
+        apply_patches(
+            &[PathBuf::from("test_pure_rename.patch")],
+            &tempdir.path().join("workdir"),
+            &tempdir.path().join("patches"),
+            apply_patch_custom,
+        )
+        .expect("Pure rename patch should apply successfully");
+
+        // Check that the __init__.py file was deleted
+        let init_file = tempdir.path().join("workdir/tinygrad/frontend/__init__.py");
+        assert!(
+            !init_file.exists(),
+            "frontend/__init__.py should be deleted"
+        );
+
+        // Check that onnx.py was renamed from frontend to nn
+        let old_onnx = tempdir.path().join("workdir/tinygrad/frontend/onnx.py");
+        let new_onnx = tempdir.path().join("workdir/tinygrad/nn/onnx.py");
+        assert!(!old_onnx.exists(), "frontend/onnx.py should not exist");
+        assert!(new_onnx.exists(), "nn/onnx.py should exist");
+        let onnx_content = fs_err::read_to_string(&new_onnx).unwrap();
+        assert_eq!(
+            onnx_content, "# onnx code\n",
+            "onnx.py content should be preserved"
+        );
+
+        // Check that torch.py was renamed from frontend to nn
+        let old_torch = tempdir.path().join("workdir/tinygrad/frontend/torch.py");
+        let new_torch = tempdir.path().join("workdir/tinygrad/nn/torch.py");
+        assert!(!old_torch.exists(), "frontend/torch.py should not exist");
+        assert!(new_torch.exists(), "nn/torch.py should exist");
+        let torch_content = fs_err::read_to_string(&new_torch).unwrap();
+        assert_eq!(
+            torch_content, "# torch code\n",
+            "torch.py content should be preserved"
+        );
+    }
+
+    #[test]
+    fn test_apply_create_delete_patch() {
+        let (tempdir, _) = setup_patch_test_dir();
+
+        // Create the file that will be deleted
+        let to_delete = tempdir.path().join("workdir/to_be_deleted.txt");
+        fs_err::write(&to_delete, "This file will be deleted\nby the patch\n").unwrap();
+
+        // Apply patch with creation and deletion
+        apply_patches(
+            &[PathBuf::from("test_create_delete.patch")],
+            &tempdir.path().join("workdir"),
+            &tempdir.path().join("patches"),
+            apply_patch_custom,
+        )
+        .expect("Create/delete patch should apply successfully");
+
+        // Check that the file was deleted
+        assert!(!to_delete.exists(), "to_be_deleted.txt should be deleted");
+
+        // Check that the new file was created with correct content
+        let created_file = tempdir.path().join("workdir/newly_created.txt");
+        assert!(created_file.exists(), "newly_created.txt should exist");
+        let content = fs_err::read_to_string(&created_file).unwrap();
+        assert!(content.contains("This is a newly created file"));
+        assert!(content.contains("via patch application"));
+    }
+
+    #[test]
+    fn test_apply_multiple_new_files_patch() {
+        let (tempdir, _) = setup_patch_test_dir();
+
+        // Apply patch that creates multiple new files in one patch
+        apply_patches(
+            &[PathBuf::from("test_multiple_new_files.patch")],
+            &tempdir.path().join("workdir"),
+            &tempdir.path().join("patches"),
+            apply_patch_custom,
+        )
+        .expect("Multiple new files patch should apply successfully");
+
+        // Check that all new files were created with correct content
+        let first_file = tempdir.path().join("workdir/first_new_file.txt");
+        assert!(first_file.exists(), "first_new_file.txt should exist");
+        let content = fs_err::read_to_string(&first_file).unwrap();
+        assert!(content.contains("This is the first new file"));
+
+        let second_file = tempdir.path().join("workdir/second_new_file.txt");
+        assert!(second_file.exists(), "second_new_file.txt should exist");
+        let content = fs_err::read_to_string(&second_file).unwrap();
+        assert!(content.contains("This is the second new file"));
+
+        let third_file = tempdir.path().join("workdir/subdir/third_new_file.txt");
+        assert!(
+            third_file.exists(),
+            "subdir/third_new_file.txt should exist"
+        );
+        let content = fs_err::read_to_string(&third_file).unwrap();
+        assert!(content.contains("This is the third new file"));
+    }
+
+    #[test]
+    fn test_apply_0001_increase_minimum_cmake_version_patch() {
+        let (tempdir, _) = setup_patch_test_dir();
+
+        apply_patches(
+            &[PathBuf::from("0001-increase-minimum-cmake-version.patch")],
+            &tempdir.path().join("workdir"),
+            &tempdir.path().join("patches"),
+            apply_patch_custom,
+        )
+        .expect("Patch 0001-increase-minimum-cmake-version.patch should apply successfully");
+
+        // Read the cmake list file and make sure that it contains `cmake_minimum_required(VERSION 3.12)`
+        let cmake_list = tempdir.path().join("workdir/CMakeLists.txt");
+        let cmake_list = fs_err::read_to_string(&cmake_list).unwrap();
+        assert!(cmake_list.contains("cmake_minimum_required(VERSION 3.12)"));
+    }
+
+    #[test]
+    fn test_apply_git_patch_in_git_ignored() {
+        let (tempdir, _) = setup_patch_test_dir();
+
+        // Apply the patches in the working directory
+        apply_patches(
+            &[PathBuf::from("0001-increase-minimum-cmake-version.patch")],
+            &tempdir.path().join("workdir"),
+            &tempdir.path().join("patches"),
+            apply_patch_custom,
+        )
+        .expect("Patch 0001-increase-minimum-cmake-version.patch should apply successfully");
+
+        // Read the cmake list file and make sure that it contains `cmake_minimum_required(VERSION 3.12)`
+        let cmake_list = tempdir.path().join("workdir/CMakeLists.txt");
+        let cmake_list = fs_err::read_to_string(&cmake_list).unwrap();
+        assert!(cmake_list.contains("cmake_minimum_required(VERSION 3.12)"));
+    }
+
+    #[test]
+    fn test_missing_patch_file_returns_error() {
+        let (tempdir, _) = setup_patch_test_dir();
+
+        // Try to apply a patch that doesn't exist (simulating a typo in the patch filename)
+        // This could happen e.g. when git format-patch creates a file with a double period
+        // due to a commit message ending with a period, and the user accidentally removes one period
+        let result = apply_patches(
+            &[PathBuf::from("nonexistent-patch-file..patch")],
+            &tempdir.path().join("workdir"),
+            &tempdir.path().join("patches"),
+            apply_patch_custom,
+        );
+
+        // The build should fail with PatchNotFound error, not silently continue
+        assert!(result.is_err(), "Missing patch file should cause an error");
+        let err = result.unwrap_err();
+        assert!(
+            matches!(err, SourceError::PatchNotFound(_)),
+            "Expected PatchNotFound error, got: {:?}",
+            err
+        );
+    }
+
+    #[test]
+    fn test_patch_with_nonexistent_file_no_panic() {
+        // Regression test for https://github.com/prefix-dev/rattler-build/issues/2137
+        // When a patch references a file that doesn't exist in the work directory
+        // (e.g., because file_name renamed it), the patch should fail with a proper
+        // PatchApplyError rather than panicking or producing "Is a directory" error.
+        let (tempdir, _) = setup_patch_test_dir();
+
+        // Apply a patch that references "original_name.md" which doesn't exist
+        // in the workdir (simulates file_name renaming the downloaded file).
+        // This should NOT panic or produce "Is a directory" error.
+        let result = apply_patches(
+            &[PathBuf::from("test_renamed_file.patch")],
+            &tempdir.path().join("workdir"),
+            &tempdir.path().join("patches"),
+            apply_patch_custom,
+        );
+
+        // The patch should fail with a PatchApplyError (not "Is a directory")
+        // since the referenced file doesn't exist and the patch expects existing content.
+        assert!(
+            matches!(result, Err(SourceError::PatchApplyError(_))),
+            "Expected PatchApplyError, got: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_git_format_patch_new_file_issue_2177() {
+        // Regression test for https://github.com/prefix-dev/rattler-build/issues/2177
+        // A git format-patch creating a new file from /dev/null must actually
+        // create the file, not silently skip it or fail with "Is a directory".
+        //
+        // Root cause: flickzeug strips a/b prefixes when a `diff --git` header
+        // is present, so "b/pyproject.toml" becomes "pyproject.toml" (1 component).
+        // If guess_strip_level falls back to 1 (because no files match — the file
+        // is new), stripping 1 component from "pyproject.toml" gives an empty
+        // path. This caused either an "Is a directory" error (v0.57.2) or a
+        // silent skip (after the empty-path guard was added).
+        let (tempdir, _) = setup_patch_test_dir();
+
+        let patch_content =
+            b"From c73bf83977f540a63a974841f79be1e2d7d6616e Mon Sep 17 00:00:00 2001
+From: Matthew Feickert <matthew.feickert@cern.ch>
+Date: Tue, 3 Jun 2025 23:18:31 -0600
+Subject: [PATCH] fix: Add pyproject.toml for build-system
+
+---
+ pyproject.toml | 3 +++
+ 1 file changed, 3 insertions(+)
+ create mode 100644 pyproject.toml
+
+diff --git a/pyproject.toml b/pyproject.toml
+new file mode 100644
+index 0000000..638dd9c
+--- /dev/null
++++ b/pyproject.toml
+@@ -0,0 +1,3 @@
++[build-system]
++requires = [\"setuptools>=61.0\"]
++build-backend = \"setuptools.build_meta\"
+--
+2.49.0
+";
+
+        let work_dir = tempdir.path().join("workdir");
+        let patches_dir = tempdir.path().join("patches");
+        fs_err::write(patches_dir.join("git_format_new_file.patch"), patch_content).unwrap();
+
+        let result = apply_patches(
+            &[PathBuf::from("git_format_new_file.patch")],
+            &work_dir,
+            &patches_dir,
+            apply_patch_custom,
+        );
+        assert!(result.is_ok(), "Patch should not error: {:?}", result.err());
+
+        let pyproject = work_dir.join("pyproject.toml");
+        assert!(
+            pyproject.exists(),
+            "pyproject.toml should be created by the patch"
+        );
+        let content = fs_err::read_to_string(&pyproject).unwrap();
+        assert!(content.contains("[build-system]"));
+        assert!(content.contains("setuptools"));
+    }
+}

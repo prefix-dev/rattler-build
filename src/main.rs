@@ -150,8 +150,7 @@ async fn async_main() -> miette::Result<()> {
                 &app.verbose,
                 &app.color,
                 app.wrap_log_lines,
-                #[cfg(feature = "tui")]
-                None,
+                None::<fn() -> std::io::Stderr>,
             )
             .into_diagnostic()?,
         )
@@ -206,12 +205,15 @@ async fn async_main() -> miette::Result<()> {
                 #[cfg(feature = "tui")]
                 {
                     let tui = rattler_build::tui::init().await?;
+                    let tui_writer = rattler_build::tui::logger::TuiOutputHandler {
+                        log_sender: tui.event_handler.sender.clone(),
+                    };
                     let log_handler = init_logging(
                         &app.log_style,
                         &app.verbose,
                         &app.color,
                         Some(true),
-                        Some(tui.event_handler.sender.clone()),
+                        Some(tui_writer),
                     )
                     .into_diagnostic()?;
                     rattler_build::tui::run(tui, build_data, recipe_paths, log_handler).await?;
