@@ -4623,7 +4623,7 @@ dependencies = [
 
 [[package]]
 name = "rattler_build_core"
-version = "0.58.4"
+version = "0.58.5"
 dependencies = [
  "anyhow",
  "async-once-cell",
