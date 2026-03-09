@@ -2140,6 +2140,52 @@ environments:
       - conda: https://prefix.dev/conda-forge/win-64/vcomp14-14.44.35208-h818238b_34.conda
       - conda: https://prefix.dev/conda-forge/win-64/zstd-1.5.7-h534d264_6.conda
 packages:
+- conda: https://prefix.dev/conda-forge/linux-64/7zip-26.00-h171cf75_0.conda
+  sha256: 1171d3aa93e69d67fc530fd46a8f7186228a8351643f5d62f232d2891c80b794
+  md5: 59c5dcc4517ae352e35f4d584bb94e33
+  depends:
+  - libstdcxx >=14
+  - libgcc >=14
+  - __glibc >=2.17,<3.0.a0
+  constrains:
+  - 7za ==999999999
+  license: LGPL-2.1-or-later AND LicenseRef-LGPL-2.1-or-later-with-unRAR-restriction
+  size: 1663226
+  timestamp: 1770917385576
+- conda: https://prefix.dev/conda-forge/osx-64/7zip-26.00-ha6bc089_0.conda
+  sha256: a5809c7006c076f7da3b4194fa15c1d944754bee95c98410ce2238dcb0e3ea6f
+  md5: be219b3ce49ee1f96ffb6efc200ed16b
+  depends:
+  - __osx >=10.13
+  - libcxx >=19
+  constrains:
+  - 7za ==999999999
+  license: LGPL-2.1-or-later AND LicenseRef-LGPL-2.1-or-later-with-unRAR-restriction
+  size: 1607298
+  timestamp: 1770917400030
+- conda: https://prefix.dev/conda-forge/osx-arm64/7zip-26.00-h3feff0a_0.conda
+  sha256: abde76b9553d3f905b46ea3e154fc5f42f0c06a8c4c8475664ffbf0ee7092e7d
+  md5: 3b7e454f72ca6afd1520a70ca54d8b19
+  depends:
+  - libcxx >=19
+  - __osx >=11.0
+  constrains:
+  - 7za ==999999999
+  license: LGPL-2.1-or-later AND LicenseRef-LGPL-2.1-or-later-with-unRAR-restriction
+  size: 1504505
+  timestamp: 1770917459916
+- conda: https://prefix.dev/conda-forge/win-64/7zip-26.00-h477610d_0.conda
+  sha256: 9eb4485e61c960cb8a639d6c066ef325e0725488bd729c3c4e21829c9524843e
+  md5: 280f1cd98612ff6bb6591db818f985f8
+  depends:
+  - vc >=14.3,<15
+  - vc14_runtime >=14.44.35208
+  - ucrt >=10.0.20348.0
+  constrains:
+  - 7za ==999999999
+  license: LGPL-2.1-or-later AND LicenseRef-LGPL-2.1-or-later-with-unRAR-restriction
+  size: 1727400
+  timestamp: 1770917421844
 - conda: https://prefix.dev/conda-forge/linux-64/_openmp_mutex-4.5-20_gnu.conda
   build_number: 20
   sha256: 1dd3fffd892081df9726d7eb7e0dea6198962ba775bd88842135a4ddb4deb3c9
