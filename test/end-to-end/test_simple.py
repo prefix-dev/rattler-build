@@ -1718,7 +1718,7 @@ def test_cycle_detection(rattler_build: RattlerBuild, recipes: Path, tmp_path: P
             stderr=STDOUT,
         )
     stdout = e.value.output
-    assert "Cycle detected in recipe outputs: bazbus" in stdout
+    assert "Cycle detected in recipe outputs: bazbus, foobar" in stdout
 
 
 def test_python_min_render(

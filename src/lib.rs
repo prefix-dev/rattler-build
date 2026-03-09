@@ -1237,7 +1237,6 @@ fn sort_build_outputs_topologically(
     Ok(())
 }
 
-
 /// Get the version of rattler-build.
 pub fn get_rattler_build_version() -> &'static str {
     env!("CARGO_PKG_VERSION")
