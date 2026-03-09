@@ -362,12 +362,7 @@ pub fn topological_sort_by_dependencies<T>(
     let sorted_item_indices: Vec<usize> = if let Some(up_to) = up_to {
         filter_up_to(&graph, &idx_to_node, &name_to_indices, up_to)?
     } else {
-        // Reverse because petgraph toposort returns leaves-first
-        toposorted
-            .into_iter()
-            .rev()
-            .map(|node| graph[node])
-            .collect()
+        toposorted.into_iter().map(|node| graph[node]).collect()
     };
 
     // Reorder by moving items out via Option<T> to avoid Clone bound
@@ -471,11 +466,12 @@ fn filter_up_to(
         }
     })?;
 
-    let up_to_indices = name_to_indices.get(&up_to_name).ok_or_else(|| {
-        TopologicalSortError::PackageNotFound {
-            package: up_to.to_string(),
-        }
-    })?;
+    let up_to_indices =
+        name_to_indices
+            .get(&up_to_name)
+            .ok_or_else(|| TopologicalSortError::PackageNotFound {
+                package: up_to.to_string(),
+            })?;
 
     // The graph has edges dep -> dependent. We need to find all deps OF the up_to
     // package, so reverse the graph and DFS from the target.
@@ -997,7 +993,6 @@ fn extract_dependency_names(recipe: &Stage1Recipe) -> Vec<rattler_conda_types::P
 
     build_host_run.chain(run_export_pins).collect()
 }
-
 
 /// Helper function to create a JinjaConfig from RenderConfig
 fn create_jinja_config(

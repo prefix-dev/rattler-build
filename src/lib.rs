@@ -1277,12 +1277,8 @@ fn sort_build_outputs_topologically(
     outputs: &mut Vec<Output>,
     up_to: Option<&str>,
 ) -> miette::Result<()> {
-    let sorted = topological_sort_by_dependencies(
-        std::mem::take(outputs),
-        |o| &o.recipe,
-        up_to,
-    )
-    .into_diagnostic()?;
+    let sorted = topological_sort_by_dependencies(std::mem::take(outputs), |o| &o.recipe, up_to)
+        .into_diagnostic()?;
 
     for output in &sorted {
         tracing::debug!("Ordered output: {:?}", output.name().as_normalized());
