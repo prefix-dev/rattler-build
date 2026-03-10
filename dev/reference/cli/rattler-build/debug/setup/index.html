@@ -2681,6 +2681,26 @@
 </li>
 <li>
 <dl>
+<dt><a id="arg---variant-config" href="#arg---variant-config"><code>--variant-config (-m) &lt;VARIANT_CONFIG&gt;</code></a></dt>
+<dd>Variant configuration files for the build
+<br>May be provided more than once.</dd>
+</dl>
+</li>
+<li>
+<dl>
+<dt><a id="arg---variant" href="#arg---variant"><code>--variant &lt;VARIANT_OVERRIDES&gt;</code></a></dt>
+<dd>Override specific variant values (e.g. --variant python=3.12 or --variant python=3.12,3.11). Multiple values separated by commas will create multiple build variants
+<br>May be provided more than once.</dd>
+</dl>
+</li>
+<li>
+<dl>
+<dt><a id="arg---ignore-recipe-variants" href="#arg---ignore-recipe-variants"><code>--ignore-recipe-variants</code></a></dt>
+<dd>Do not read the <code>variants.yaml</code> file next to a recipe</dd>
+</dl>
+</li>
+<li>
+<dl>
 <dt><a id="arg---experimental" href="#arg---experimental"><code>--experimental</code></a></dt>
 <dd>Enable experimental features
 <br><strong>env</strong>: <code>RATTLER_BUILD_EXPERIMENTAL</code></dd>
