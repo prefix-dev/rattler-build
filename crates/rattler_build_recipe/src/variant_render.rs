@@ -1955,6 +1955,169 @@ outputs:
     }
 
     #[test]
+    fn test_up_to_filters_transitive_deps() {
+        // Test that --up-to returns only the target package and its transitive dependencies.
+        // This is the scenario that previously broke: pkg-c depends on pkg-b which depends on pkg-a.
+        // Using --up-to=pkg-b should return [pkg-a, pkg-b] (not pkg-c).
+        let recipe_yaml = r#"
+schema_version: 1
+
+context:
+  version: "1.0.0"
+
+recipe:
+  version: ${{ version }}
+
+build:
+  number: 0
+
+outputs:
+  - package:
+      name: pkg-a
+    build:
+      noarch: generic
+
+  - package:
+      name: pkg-b
+    build:
+      noarch: generic
+    requirements:
+      host:
+        - ${{ pin_subpackage('pkg-a', exact=true) }}
+
+  - package:
+      name: pkg-c
+    build:
+      noarch: generic
+    requirements:
+      host:
+        - ${{ pin_subpackage('pkg-b', exact=true) }}
+"#;
+
+        let variant_yaml = r#"{}"#;
+
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config = VariantConfig::from_yaml_str(variant_yaml).unwrap();
+
+        let rendered =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, RenderConfig::new())
+                .unwrap();
+
+        // --up-to=pkg-b should include pkg-a (dependency) and pkg-b itself, but not pkg-c
+        let sorted =
+            topological_sort_by_dependencies(rendered.clone(), |v| &v.recipe, Some("pkg-b"))
+                .unwrap();
+
+        let names: Vec<_> = sorted
+            .iter()
+            .map(|v| v.recipe.package.name.as_normalized().to_string())
+            .collect();
+        assert_eq!(names, vec!["pkg-a", "pkg-b"]);
+
+        // --up-to=pkg-a should return only pkg-a (no deps)
+        let sorted =
+            topological_sort_by_dependencies(rendered.clone(), |v| &v.recipe, Some("pkg-a"))
+                .unwrap();
+
+        let names: Vec<_> = sorted
+            .iter()
+            .map(|v| v.recipe.package.name.as_normalized().to_string())
+            .collect();
+        assert_eq!(names, vec!["pkg-a"]);
+
+        // --up-to=pkg-c should return all three in dependency order
+        let sorted =
+            topological_sort_by_dependencies(rendered.clone(), |v| &v.recipe, Some("pkg-c"))
+                .unwrap();
+
+        let names: Vec<_> = sorted
+            .iter()
+            .map(|v| v.recipe.package.name.as_normalized().to_string())
+            .collect();
+        assert!(names.contains(&"pkg-a".to_string()));
+        assert!(names.contains(&"pkg-b".to_string()));
+        assert!(names.contains(&"pkg-c".to_string()));
+        assert_eq!(names.len(), 3);
+
+        // --up-to with nonexistent package should error
+        let result = topological_sort_by_dependencies(rendered, |v| &v.recipe, Some("nonexistent"));
+        assert!(matches!(
+            result,
+            Err(TopologicalSortError::PackageNotFound { .. })
+        ));
+    }
+
+    #[test]
+    fn test_up_to_with_variants() {
+        // Test --up-to with multiple variants: should include all variants of the
+        // target package and its transitive dependencies.
+        let recipe_yaml = r#"
+schema_version: 1
+
+context:
+  name: my-package
+
+recipe:
+  name: ${{ name }}
+  version: "1.0.0"
+
+outputs:
+  - package:
+      name: ${{ name }}-${{ variant }}
+    build:
+      noarch: generic
+
+  - package:
+      name: ${{ name }}
+    build:
+      noarch: generic
+    requirements:
+      run:
+        - ${{ pin_subpackage(name ~ '-' ~ variant, exact=true) }}
+"#;
+
+        let variant_yaml = r#"
+variant:
+  - a
+  - b
+"#;
+
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config = VariantConfig::from_yaml_str(variant_yaml).unwrap();
+
+        let rendered =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, RenderConfig::new())
+                .unwrap();
+
+        // --up-to=my-package should include the my-package variants plus
+        // the my-package-a and my-package-b variants they depend on via pin_subpackage
+        let sorted =
+            topological_sort_by_dependencies(rendered.clone(), |v| &v.recipe, Some("my-package"))
+                .unwrap();
+
+        let names: Vec<_> = sorted
+            .iter()
+            .map(|v| v.recipe.package.name.as_normalized().to_string())
+            .collect();
+
+        // Both my-package-a and my-package-b should be included as deps
+        assert!(names.contains(&"my-package-a".to_string()));
+        assert!(names.contains(&"my-package-b".to_string()));
+        assert!(names.contains(&"my-package".to_string()));
+
+        // --up-to=my-package-a should return only my-package-a (no deps)
+        let sorted =
+            topological_sort_by_dependencies(rendered, |v| &v.recipe, Some("my-package-a"))
+                .unwrap();
+
+        let names: Vec<_> = sorted
+            .iter()
+            .map(|v| v.recipe.package.name.as_normalized().to_string())
+            .collect();
+        assert_eq!(names, vec!["my-package-a"]);
+    }
+
+    #[test]
     fn test_staging_requires_experimental() {
         // Test that staging outputs require the experimental flag
         let recipe_yaml = r#"
