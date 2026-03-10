@@ -1,6 +1,6 @@
 # Generating recipes for different ecosystems
 
-Rattler-build has some builtin functionality to generate recipes for different (existing) ecosystems.
+Rattler-Build has some builtin functionality to generate recipes for different (existing) ecosystems.
 
 Currently we support the following ecosystems:
 
@@ -59,4 +59,4 @@ R packages will be prefixed with `r-` to avoid name conflicts with Python packag
 
 !!!tip
 
-    You can use the generated recipes to build your own "forge" with `rattler-build`. Read more about it in the [Building your own forge](./tips_and_tricks.md#building-your-own-forge) section.
+    You can use the generated recipes to build your own "forge" with Rattler-Build. Read more about it in the [Building your own forge](./tips_and_tricks.md#building-your-own-forge) section.

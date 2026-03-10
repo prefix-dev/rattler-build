@@ -1,8 +1,8 @@
 # Converting a recipe from conda-build
 
-The recipe format of `rattler-build` differs in some aspects from `conda-build`.
+The recipe format of Rattler-Build differs in some aspects from `conda-build`.
 This document aims to help you convert a recipe from `conda-build` to
-`rattler-build`.
+Rattler-Build.
 
 ## Automatic conversion
 
@@ -76,7 +76,7 @@ source:
 `conda-build` has a line based "selector" system, to e.g. disable certain fields
 on Windows vs. Unix.
 
-In rattler-build we use two different syntaxes: an `if/else/then` map or a
+In Rattler-Build we use two different syntaxes: an `if/else/then` map or a
 inline jinja expression.
 
 A typical selector in `conda-build` looks something like this:
@@ -87,7 +87,7 @@ requirements:
     - pywin32  # [win]
 ```
 
-To convert this to `rattler-build` syntax, you can use one of the following two
+To convert this to Rattler-Build syntax, you can use one of the following two
 syntaxes:
 
 ```yaml title="recipe.yaml"
@@ -183,7 +183,7 @@ environment.
 
 # Automatic feedstock conversion
 
-Use the tool [`feedrattler`](https://github.com/hadim/feedrattler) by [hadim](https://github.com/hadim) to go directly from an existing conda-forge v0 recipe feedstock to the new v1 recipe used by rattler-build.
+Use the tool [`feedrattler`](https://github.com/hadim/feedrattler) by [hadim](https://github.com/hadim) to go directly from an existing conda-forge v0 recipe feedstock to the new v1 recipe used by Rattler-Build.
 
 You can install and use it directly by running `pixi exec`:
 ```

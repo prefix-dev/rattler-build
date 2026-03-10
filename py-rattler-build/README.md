@@ -1,6 +1,6 @@
 # py-rattler-build
 
-Python bindings for [rattler-build](https://github.com/prefix-dev/rattler-build), the fast conda package builder.
+Python bindings for [Rattler-Build](https://github.com/prefix-dev/rattler-build), the fast conda package builder.
 
 `py-rattler-build` lets you build, inspect, test, and upload conda packages
 directly from Python — no subprocess calls needed.

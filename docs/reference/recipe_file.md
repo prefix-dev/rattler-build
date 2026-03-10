@@ -1,6 +1,6 @@
 # The recipe spec
 
-`rattler-build` implements a new recipe spec, different from the traditional
+Rattler-Build implements a new recipe spec, different from the traditional
 "`meta.yaml`" file used in `conda-build`. A recipe has to be stored as a
 `recipe.yaml` file.
 
@@ -18,7 +18,7 @@ The reason for a new spec are:
   and more)
 - remove any need for recursive parsing & solving
 - finally, the initial implementation in `boa` relied on `conda-build`;
-  `rattler-build` removes any dependency on Python or `conda-build` and
+  Rattler-Build removes any dependency on Python or `conda-build` and
   reimplements everything in Rust
 
 ## Major differences from `conda-build`
@@ -221,7 +221,7 @@ source:
   lfs: true # note: defaults to false
 ```
 
-By default, rattler-build will recursively initialize and update all git
+By default, Rattler-Build will recursively initialize and update all git
 submodules. For repositories with large or numerous submodules that aren't needed
 for the build, you can disable this by setting `submodules: false`:
 
@@ -264,7 +264,7 @@ source is copied to the work directory before building.
 ```
 
 By default, all files in the local path that are ignored by `git` are also ignored
-by `rattler-build`. You can disable this behavior by setting `use_gitignore` to
+by Rattler-Build. You can disable this behavior by setting `use_gitignore` to
 `false`.
 
 #### Patches
@@ -282,8 +282,8 @@ Patches may optionally be applied to the source.
 
 #### Destination path
 
-Within `rattler-build`'s work directory, you may specify a particular folder to
-place the source into. `rattler-build` will always drop you into the same folder
+Within Rattler-Build's work directory, you may specify a particular folder to
+place the source into. Rattler-Build will always drop you into the same folder
 (`[build folder]/work`), but it's up to you whether you want your source extracted
 into that folder, or nested deeper. This feature is particularly useful when dealing
 with multiple sources, but can apply to recipes with single sources as well.
@@ -386,7 +386,7 @@ Recursive globbing using `**` is also supported.
 
 The build number should be incremented for new builds of the same version. The
 number defaults to `0`. The build string cannot contain "`-`". The string defaults
-to the default `rattler-build` build string plus the build number.
+to the default Rattler-Build build string plus the build number.
 
 ```yaml
 build:
@@ -406,7 +406,7 @@ build:
 
 ### Script
 
-By default, `rattler-build` uses a `build.sh` file on Unix (macOS and Linux) and a
+By default, Rattler-Build uses a `build.sh` file on Unix (macOS and Linux) and a
 `build.bat` file on Windows, if they exist in the same folder as the `recipe.yaml`
 file. With the script parameter you can either supply a different filename or
 write out short build scripts. You may need to use selectors to use different
@@ -431,7 +431,7 @@ Please see [Build script](../build_script.md) for more information.
 
 ### Skipping builds
 
-Lists conditions under which `rattler-build` should skip the build of this recipe.
+Lists conditions under which Rattler-Build should skip the build of this recipe.
 Particularly useful for defining recipes that are platform-specific. By default,
 a build is never skipped.
 
@@ -520,7 +520,7 @@ build:
 
 #### Version independent (ABI3) packages
 
-Since rattler-build 0.35.0 and [CEP 20](https://github.com/conda/ceps/blob/main/cep-0020.md)
+Since Rattler-Build 0.35.0 and [CEP 20](https://github.com/conda/ceps/blob/main/cep-0020.md)
 you can create version-independent Python packages that still contain compiled code.
 
 ABI3 packages support building a native Python extension using a specific Python
@@ -804,7 +804,7 @@ Using a runtime dependency name:
 
 ## Tests section
 
-`rattler-build` supports four different types of tests. The "script test" installs
+Rattler-Build supports four different types of tests. The "script test" installs
 the package and runs a list of commands. The "Python test" attempts to import a
 list of Python modules and runs `pip check`. The "downstream test" runs the tests
 of a downstream package that reverse depends on the package being built. And lastly,
@@ -1314,7 +1314,7 @@ form.
 
 ## Templating with Jinja
 
-`rattler-build` supports limited Jinja templating in the `recipe.yaml` file.
+Rattler-Build supports limited Jinja templating in the `recipe.yaml` file.
 
 You can set up Jinja variables in the `context` section:
 
@@ -1346,7 +1346,7 @@ tests:
 
 Jinja has built-in support for some common string manipulations.
 
-In rattler-build, complex Jinja is completely disallowed as we try to produce
+In Rattler-Build, complex Jinja is completely disallowed as we try to produce
 YAML that is valid at all times. So you should not use any `{% if ... %}` or
 similar Jinja constructs that produce invalid YAML. Furthermore, instead of
 plain double curly brackets Jinja statements need to be prefixed by `$`, e.g.
@@ -1367,10 +1367,10 @@ Jinja templates are evaluated during the build process.
 To retrieve a fully rendered `recipe.yaml`, use the `` command.
 -->
 
-#### Additional Jinja2 functionality in rattler-build
+#### Additional Jinja2 functionality in Rattler-Build
 
 Besides the default Jinja2 functionality, additional Jinja functions are
-available during the `rattler-build` process: `pin_compatible`, `pin_subpackage`,
+available during the Rattler-Build process: `pin_compatible`, `pin_subpackage`,
 and `compiler`.
 
 The compiler function takes `c`, `cxx`, `fortran` and other values as argument
@@ -1389,7 +1389,7 @@ specified rules.
 
 #### Pin expressions
 
-`rattler-build` knows pin expressions. A pin expression can have a `lower_bound`,
+Rattler-Build knows pin expressions. A pin expression can have a `lower_bound`,
 `upper_bound` and `exact` value. A `upper_bound` and `lower_bound` are specified with a
 string containing only `x` and `.`, e.g. `upper_bound="x.x.x"` would signify to pin
 the given package to `<1.2.3` (if the package version is `1.2.2`, for example).
@@ -1574,7 +1574,7 @@ tests:
 ## Experimental features
 
 !!! warning
-    These are experimental features of `rattler-build` and may change or go away completely.
+    These are experimental features of Rattler-Build and may change or go away completely.
 
 ### Jinja functions
 

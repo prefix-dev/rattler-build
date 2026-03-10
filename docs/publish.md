@@ -1,6 +1,6 @@
 # Publishing packages to your own channel
 
-Rattler-build comes with an intuitive `publish` subcommand, that will publish a package to a channel.
+Rattler-Build comes with an intuitive `publish` subcommand, that will publish a package to a channel.
 
 You can either point to an already built package, or to a recipe and `publish` them into your channel.
 The channel can be either on prefix.dev, anaconda.org, an S3 bucket, a local filesystem folder (or network mount), or a Quetz or Artifactory instance.
@@ -56,17 +56,17 @@ If the recipe does specify a build number, you have to manually trigger an overr
 
 ## Authentication
 
-Rattler-build uses the same authentication as other tools in the prefix family. It's easiest to login using the `auth` subcommand: `rattler-build auth login`. Note: if you are already logged in with `pixi`, you are also logged in with `rattler-build` - they share credentials.
+Rattler-Build uses the same authentication as other tools in the prefix family. It's easiest to login using the `auth` subcommand: `rattler-build auth login`. Note: if you are already logged in with `pixi`, you are also logged in with Rattler-Build - they share credentials.
 
 Otherwise you can also use the same options as with `upload`, and supply tokens as environment variables or CLI arguments.
 
 ## Channel Initialization
 
-When publishing to local filesystem or S3 channels, rattler-build automatically handles channel initialization:
+When publishing to local filesystem or S3 channels, Rattler-Build automatically handles channel initialization:
 
 ### New channels
 
-If the target channel doesn't exist yet, rattler-build will:
+If the target channel doesn't exist yet, Rattler-Build will:
 
 1. Create the channel directory (for filesystem channels)
 2. Initialize it with an empty `noarch/repodata.json`
@@ -83,16 +83,16 @@ rattler-build publish ./my-package.conda --to s3://my-bucket/channel
 
 ### Existing channels
 
-If the channel directory exists but is not properly initialized (missing `noarch/repodata.json`), rattler-build will fail with a helpful error message. This prevents accidentally treating a random directory as a conda channel.
+If the channel directory exists but is not properly initialized (missing `noarch/repodata.json`), Rattler-Build will fail with a helpful error message. This prevents accidentally treating a random directory as a conda channel.
 
 To initialize an existing directory as a channel, you can either:
 
-- Let rattler-build create it fresh (remove the directory first)
+- Let Rattler-Build create it fresh (remove the directory first)
 - Manually create `noarch/repodata.json` with content `{"packages": {}, "packages.conda": {}}`
 
 ## Indexing S3 and Filesystem channels
 
-Since S3 and Filesystem channels don't know anything about "indexing" (producing repodata.json), rattler-build will internally use `rattler-index` to run the indexing step after a successful upload. This will ensure that the repodata in the channel is up to date and users can start downloading the new packages.
+Since S3 and Filesystem channels don't know anything about "indexing" (producing repodata.json), Rattler-Build will internally use `rattler-index` to run the indexing step after a successful upload. This will ensure that the repodata in the channel is up to date and users can start downloading the new packages.
 
 ## Sigstore attestations
 

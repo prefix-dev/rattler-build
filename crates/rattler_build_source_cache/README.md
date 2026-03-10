@@ -1,6 +1,6 @@
 # Rattler Build Source Cache
 
-A unified source cache for rattler-build that handles Git repositories, URL downloads, and local paths with proper caching, extraction, and concurrent access control.
+A unified source cache for Rattler-Build that handles Git repositories, URL downloads, and local paths with proper caching, extraction, and concurrent access control.
 
 ## Features
 

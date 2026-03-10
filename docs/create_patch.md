@@ -2,7 +2,7 @@
 
 When packaging software, you often need to make small source code changes – fixing a typo, applying a bug fix, or adapting build scripts. Instead of maintaining a fork of the upstream project, you can create patch files that are applied during the build process.
 
-`rattler-build` provides a streamlined workflow for creating patches using the `debug` and `create-patch` commands.
+Rattler-Build provides a streamlined workflow for creating patches using the `debug` and `create-patch` commands.
 
 ## How it works
 

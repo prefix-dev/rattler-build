@@ -1,6 +1,6 @@
 # Variant configuration
 
-`rattler-build` can automatically build multiple _variants_ of a given package.
+Rattler-Build can automatically build multiple _variants_ of a given package.
 For example, a Python package might need multiple variants per Python version
 (especially if it is a binary package such as `numpy`).
 
@@ -59,7 +59,7 @@ would be ignored.
 
 ## Automatic Discovery
 
-`rattler-build` automatically discovers and includes variant configurations from
+Rattler-Build automatically discovers and includes variant configurations from
 either:
 
 - `variants.yaml` file located next to the recipe
@@ -87,7 +87,7 @@ When multiple variant configuration files are merged, the following rules apply:
 
 ### `conda-build` Compatibility
 
-Since version 0.35.0, rattler-build supports `conda_build_config.yaml` files,
+Since version 0.35.0, Rattler-Build supports `conda_build_config.yaml` files,
 parsing a subset of conda-build's configuration syntax. The filename must match
 exactly to be recognized as a conda-build config file.
 

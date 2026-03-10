@@ -1,6 +1,6 @@
-# Rattler-build configuration
+# Rattler-Build configuration
 
-`rattler-build` can be configured by specifying `--config-file ~/.pixi/config.toml`.
+Rattler-Build can be configured by specifying `--config-file ~/.pixi/config.toml`.
 The config file is of the same format as pixi's [global configuration file](https://pixi.sh/latest/reference/pixi_configuration/).
 
 ## Channels
@@ -24,7 +24,7 @@ package-format = "conda:22"
 
 ## Mirror configuration
 
-By specifying the `mirrors` section, you can instruct rattler-build to use mirrors when building.
+By specifying the `mirrors` section, you can instruct Rattler-Build to use mirrors when building.
 For more information, see [pixi's documentation](https://pixi.sh/latest/reference/pixi_configuration/#mirror-configuration).
 
 ```toml title="config.toml"

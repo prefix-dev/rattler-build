@@ -1,16 +1,16 @@
-# What is `rattler-build`?
+# What is Rattler-Build?
 
-`rattler-build` is a tool to build and package software so that it can be
+Rattler-Build is a tool to build and package software so that it can be
 installed on any operating system – with any compatible package manager such as
-`mamba`, `conda`, or `rattler`. We are also intending for `rattler-build` to be
+`mamba`, `conda`, or `rattler`. We are also intending for Rattler-Build to be
 used as a library to drive builds of packages from any other recipe format in
 the future.
 
-### How does `rattler-build` work?
+### How does Rattler-Build work?
 
 Building of packages consists of several steps. It all begins with a
 `recipe.yaml` file that specifies how the package is to be built and what the
-dependencies are. From the recipe file, `rattler-build` executes several steps:
+dependencies are. From the recipe file, Rattler-Build executes several steps:
 
 1. **Rendering**:
 Parse the recipe file and evaluate conditionals, Jinja expressions, and

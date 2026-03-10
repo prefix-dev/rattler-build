@@ -1,6 +1,6 @@
 # Building a Rust package
 
-We're using `rattler-build` to build a Rust package for the `cargo-edit` utility.
+We're using Rattler-Build to build a Rust package for the `cargo-edit` utility.
 This utility manages Cargo dependencies from the command line.
 
 ```yaml title="recipe.yaml"

@@ -144,7 +144,7 @@ variant, and thus the `match` condition always evaluates to `true`.
 
 ### Selector evaluation
 
-Except for the rattler-build specific selectors, the selectors are evaluated using the `minijinja` engine. This means
+Except for the Rattler-Build specific selectors, the selectors are evaluated using the `minijinja` engine. This means
 that the selectors are evaluated by [`minijinja`][minijinja] thus Python like expressions.
 Some notable options are:
 
