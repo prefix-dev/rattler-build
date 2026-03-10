@@ -1,4 +1,4 @@
-"""Package builder API for rattler-build.
+"""Package builder API for Rattler-Build.
 
 This module provides a Pythonic API for creating conda packages programmatically,
 without needing a recipe file. Use this when you have files staged and want to

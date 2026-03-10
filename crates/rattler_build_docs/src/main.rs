@@ -12,7 +12,7 @@ use itertools::Itertools;
 
 const MD_EXTENSION: &str = ".md";
 
-/// Generates documentation for the rattler-build CLI by:
+/// Generates documentation for the Rattler-Build CLI by:
 /// - Loading the clap command from the rattler-build crate
 /// - Creating markdown files for each command
 /// - Organizing commands into a directory structure

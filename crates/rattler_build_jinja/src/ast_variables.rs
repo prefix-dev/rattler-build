@@ -244,7 +244,7 @@ fn collect_variables_from_ast(
 }
 
 /// Collect variables from a Call expression
-/// Special handling for rattler-build Jinja functions that expand to variant variables
+/// Special handling for Rattler-Build Jinja functions that expand to variant variables
 fn collect_variables_from_call(
     call: &minijinja::machinery::ast::Call,
     variables: &mut BTreeSet<String>,

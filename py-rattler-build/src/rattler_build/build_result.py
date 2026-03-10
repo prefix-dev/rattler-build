@@ -1,4 +1,4 @@
-"""Build result types for rattler-build."""
+"""Build result types for Rattler-Build."""
 
 from __future__ import annotations
 

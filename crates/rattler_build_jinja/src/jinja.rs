@@ -46,7 +46,7 @@ const KNOWN_FUNCTIONS: &[&str] = &[
     "hash",
 ];
 
-/// Configuration for Jinja template rendering in rattler-build
+/// Configuration for Jinja template rendering in Rattler-Build
 #[derive(Debug, Clone)]
 pub struct JinjaConfig {
     /// The target platform for the build
@@ -643,7 +643,7 @@ fn parse_platform(platform: &str) -> Result<Platform, minijinja::Error> {
 }
 
 lazy_static::lazy_static! {
-    /// The syntax config for MiniJinja / rattler-build
+    /// The syntax config for MiniJinja / Rattler-Build
     pub static ref SYNTAX_CONFIG: SyntaxConfig = SyntaxConfig::builder()
         .block_delimiters("{%", "%}")
         .variable_delimiters("${{", "}}")

@@ -1,7 +1,7 @@
 """
 VariantConfig - Manage variant configuration for recipe builds.
 
-This module provides Python bindings for rattler-build's VariantConfig,
+This module provides Python bindings for Rattler-Build's VariantConfig,
 which manages variant matrices for building packages with different configurations.
 """
 

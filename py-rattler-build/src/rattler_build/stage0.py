@@ -1,7 +1,7 @@
 """
 Stage0 - Parsed recipe types before evaluation.
 
-This module provides Python bindings for rattler-build's stage0 types,
+This module provides Python bindings for Rattler-Build's stage0 types,
 which represent the parsed YAML recipe before Jinja template evaluation
 and conditional resolution.
 """

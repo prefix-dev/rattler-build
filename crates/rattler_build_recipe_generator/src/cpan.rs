@@ -473,7 +473,7 @@ async fn fetch_cpan_metadata(
 
 /// Construct a `Recipe` from resolved CPAN metadata without performing I/O.
 ///
-/// This function converts MetaCPAN release information into a rattler-build
+/// This function converts MetaCPAN release information into a Rattler-Build
 /// `Recipe`, populating package metadata, sources, requirements, and basic
 /// tests. The provided `opts` are currently reserved for future use.
 ///

@@ -1,5 +1,5 @@
 """
-Tool configuration for rattler-build.
+Tool configuration for Rattler-Build.
 
 This module provides a Pythonic API for configuring the build tool.
 """
@@ -65,7 +65,7 @@ class PlatformConfig:
 
 
 class ToolConfiguration:
-    """Configuration for the rattler-build tool.
+    """Configuration for the Rattler-Build tool.
 
     Args:
         keep_build: Whether to keep the build directory after the build is done

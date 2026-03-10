@@ -1,4 +1,4 @@
-//! Terminal user interface for rattler-build.
+//! Terminal user interface for Rattler-Build.
 
 pub mod event;
 pub mod logger;

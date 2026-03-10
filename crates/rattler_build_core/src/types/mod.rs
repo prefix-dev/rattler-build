@@ -1,4 +1,4 @@
-//! Common types used throughout rattler-build
+//! Common types used throughout Rattler-Build
 //! All the metadata that makes up a recipe file
 use std::{iter, path::PathBuf, str::FromStr};
 
