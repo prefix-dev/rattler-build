@@ -78,7 +78,7 @@ rattler_prefix_guard = { version = "0.1.0" }
 regex = "1.12.3"
 reqwest = { version = "0.12.28", default-features = false, features = ["json"] }
 reqwest-middleware = "0.4.2"
-reqwest-retry = "0.8.0"
+reqwest-retry = "0.9.1"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
 serde_with = "3.16.1"
@@ -86,28 +86,28 @@ serde_yaml = "0.9.34"
 serde-value = "0.7.0"
 sevenz-rust2 = "0.20.0"
 sha2 = "0.10.9"
-strum = "0.27.2"
+strum = "0.28.0"
 tar = "0.4.44"
 tempfile = "3.24.0"
 thiserror = "2.0.17"
 tokio = { version = "1.49.0", features = ["rt", "macros"] }
 tokio-util = { version = "0.7.17", features = ["codec", "compat"] }
-toml = "0.9.11"
+toml = "1.0.3"
 tracing = "0.1.44"
 url = "2.5.8"
 urlencoding = "2.1"
 walkdir = "2.5.0"
 which = "8.0.0"
-windows-sys = "0.59"
-zip = { version = "6.0.0", default-features = false, features = ["deflate"] }
+windows-sys = "0.61"
+zip = { version = "8.2.0", default-features = false, features = ["deflate"] }
 zstd = "0.13.3"
-spdx = "0.12.0"
+spdx = "0.13.4"
 pathdiff = "0.2.3"
 marked-yaml = "0.8.0"
 rstest = "0.26.1"
 petgraph = { version = "0.8.3", default-features = false }
 sha1 = { version = "0.10.6" }
-lzma-rust2 = { version = "0.15", features = ["xz"] }
+lzma-rust2 = { version = "0.16", features = ["xz"] }
 
 anyhow = "1.0.102"
 content_inspector = "0.2.4"

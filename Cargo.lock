@@ -3579,19 +3579,12 @@ checksum = "112b39cec0b298b6c1999fee3e31427f74f676e4cb9879ed1a121b43661a4154"
 
 [[package]]
 name = "lzma-rust2"
-version = "0.15.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1670343e58806300d87950e3401e820b519b9384281bbabfb15e3636689ffd69"
-dependencies = [
- "crc",
- "sha2",
-]
-
-[[package]]
-name = "lzma-rust2"
 version = "0.16.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "47bb1e988e6fb779cf720ad431242d3f03167c1b3f2b1aae7f1a94b2495b36ae"
+dependencies = [
+ "sha2",
+]
 
 [[package]]
 name = "marked-yaml"
@@ -4811,7 +4804,7 @@ dependencies = [
  "reflink-copy",
  "regex",
  "reqwest 0.12.28",
- "reqwest-middleware",
+ "reqwest-middleware 0.4.2",
  "serde",
  "serde_json",
  "simple_spawn_blocking",
@@ -4897,8 +4890,8 @@ dependencies = [
  "reflink-copy",
  "regex",
  "reqwest 0.12.28",
- "reqwest-middleware",
- "reqwest-retry",
+ "reqwest-middleware 0.4.2",
+ "reqwest-retry 0.8.0",
  "retry-policies",
  "rstest",
  "scroll",
@@ -4920,7 +4913,7 @@ dependencies = [
  "throbber-widgets-tui",
  "tokio",
  "tokio-util",
- "toml",
+ "toml 1.0.6+spec-1.1.0",
  "tracing",
  "tracing-core",
  "tracing-indicatif",
@@ -5001,7 +4994,7 @@ dependencies = [
  "reflink-copy",
  "regex",
  "reqwest 0.12.28",
- "reqwest-middleware",
+ "reqwest-middleware 0.4.2",
  "retry-policies",
  "rstest",
  "scroll",
@@ -5056,10 +5049,10 @@ dependencies = [
  "serde_json",
  "serde_with",
  "serde_yaml",
- "strum 0.27.2",
+ "strum 0.28.0",
  "tempfile",
  "thiserror 2.0.18",
- "toml",
+ "toml 1.0.6+spec-1.1.0",
 ]
 
 [[package]]
@@ -5068,8 +5061,8 @@ version = "0.1.0"
 dependencies = [
  "rattler_networking",
  "reqwest 0.12.28",
- "reqwest-middleware",
- "reqwest-retry",
+ "reqwest-middleware 0.4.2",
+ "reqwest-retry 0.9.1",
  "tokio",
  "url",
 ]
@@ -5165,10 +5158,10 @@ dependencies = [
  "tar",
  "tempfile",
  "tokio",
- "toml",
+ "toml 1.0.6+spec-1.1.0",
  "tracing",
  "url",
- "zip",
+ "zip 8.2.0",
 ]
 
 [[package]]
@@ -5207,14 +5200,14 @@ dependencies = [
  "futures",
  "hex",
  "indicatif",
- "lzma-rust2 0.15.7",
+ "lzma-rust2",
  "md-5",
  "rattler_build_networking",
  "rattler_git",
  "rattler_prefix_guard",
  "reqwest 0.12.28",
- "reqwest-middleware",
- "reqwest-retry",
+ "reqwest-middleware 0.4.2",
+ "reqwest-retry 0.9.1",
  "serde",
  "serde_json",
  "sevenz-rust2",
@@ -5229,7 +5222,7 @@ dependencies = [
  "tracing",
  "url",
  "walkdir",
- "zip",
+ "zip 8.2.0",
  "zstd",
 ]
 
@@ -5306,7 +5299,7 @@ dependencies = [
  "rattler_redaction",
  "rayon",
  "reqwest 0.12.28",
- "reqwest-middleware",
+ "reqwest-middleware 0.4.2",
  "serde_json",
  "simple_spawn_blocking",
  "tempfile",
@@ -5372,7 +5365,7 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.18",
- "toml",
+ "toml 0.9.12+spec-1.1.0",
  "tracing",
  "url",
 ]
@@ -5407,7 +5400,7 @@ dependencies = [
  "fs-err",
  "rattler_prefix_guard",
  "reqwest 0.12.28",
- "reqwest-middleware",
+ "reqwest-middleware 0.4.2",
  "serde",
  "thiserror 2.0.18",
  "tokio",
@@ -5518,7 +5511,7 @@ dependencies = [
  "netrc-rs",
  "rattler_config",
  "reqwest 0.12.28",
- "reqwest-middleware",
+ "reqwest-middleware 0.4.2",
  "retry-policies",
  "serde",
  "serde_json",
@@ -5551,7 +5544,7 @@ dependencies = [
  "rattler_networking",
  "rattler_redaction",
  "reqwest 0.12.28",
- "reqwest-middleware",
+ "reqwest-middleware 0.4.2",
  "serde_json",
  "simple_spawn_blocking",
  "tar",
@@ -5561,7 +5554,7 @@ dependencies = [
  "tokio-util",
  "tracing",
  "url",
- "zip",
+ "zip 6.0.0",
  "zstd",
 ]
 
@@ -5598,7 +5591,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "961121cad9792daafc176a7f4caafc0fc889fb17507c23a4c86e1777a8b5e179"
 dependencies = [
  "reqwest 0.12.28",
- "reqwest-middleware",
+ "reqwest-middleware 0.4.2",
  "url",
 ]
 
@@ -5644,7 +5637,7 @@ dependencies = [
  "rattler_package_streaming",
  "rattler_redaction",
  "reqwest 0.12.28",
- "reqwest-middleware",
+ "reqwest-middleware 0.4.2",
  "retry-policies",
  "rmp-serde",
  "self_cell",
@@ -5744,8 +5737,8 @@ dependencies = [
  "rattler_s3",
  "rattler_solve",
  "reqwest 0.12.28",
- "reqwest-middleware",
- "reqwest-retry",
+ "reqwest-middleware 0.4.2",
+ "reqwest-retry 0.8.0",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -6046,6 +6039,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "reqwest-middleware"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "199dda04a536b532d0cc04d7979e39b1c763ea749bf91507017069c00b96056f"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "http 1.4.0",
+ "reqwest 0.13.2",
+ "thiserror 2.0.18",
+ "tower-service",
+]
+
+[[package]]
 name = "reqwest-retry"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6058,7 +6065,28 @@ dependencies = [
  "http 1.4.0",
  "hyper",
  "reqwest 0.12.28",
- "reqwest-middleware",
+ "reqwest-middleware 0.4.2",
+ "retry-policies",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+ "wasmtimer",
+]
+
+[[package]]
+name = "reqwest-retry"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fe2412db2af7d2268e7a5406be0431f37d9eb67ff390f35b395716f5f06c2eaa"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "futures",
+ "getrandom 0.2.17",
+ "http 1.4.0",
+ "hyper",
+ "reqwest 0.13.2",
+ "reqwest-middleware 0.5.1",
  "retry-policies",
  "thiserror 2.0.18",
  "tokio",
@@ -6766,7 +6794,7 @@ dependencies = [
  "crc32fast",
  "getrandom 0.4.2",
  "js-sys",
- "lzma-rust2 0.16.2",
+ "lzma-rust2",
  "ppmd-rust",
  "sha2",
  "wasm-bindgen",
@@ -7160,9 +7188,9 @@ dependencies = [
 
 [[package]]
 name = "spdx"
-version = "0.12.0"
+version = "0.13.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "41cf87c0efffc158b9dde4d6e0567a43e4383adc4c949e687a2039732db2f23a"
+checksum = "a8da593e30beb790fc9424502eb898320b44e5eb30367dbda1c1edde8e2f32d7"
 dependencies = [
  "smallvec",
 ]
@@ -7234,6 +7262,12 @@ checksum = "af23d6f6c1a224baef9d3f61e287d2761385a5b88fdab4eb4c6f11aeb54c4bcf"
 dependencies = [
  "strum_macros 0.27.2",
 ]
+
+[[package]]
+name = "strum"
+version = "0.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9628de9b8791db39ceda2b119bbe13134770b56c138ec1d3af810d045c04f9bd"
 
 [[package]]
 name = "strum_macros"
@@ -7692,6 +7726,21 @@ dependencies = [
  "serde_core",
  "serde_spanned",
  "toml_datetime 0.7.5+spec-1.1.0",
+ "toml_parser",
+ "toml_writer",
+ "winnow",
+]
+
+[[package]]
+name = "toml"
+version = "1.0.6+spec-1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "399b1124a3c9e16766831c6bba21e50192572cdd98706ea114f9502509686ffc"
+dependencies = [
+ "indexmap 2.13.0",
+ "serde_core",
+ "serde_spanned",
+ "toml_datetime 1.0.0+spec-1.1.0",
  "toml_parser",
  "toml_writer",
  "winnow",
@@ -9306,6 +9355,20 @@ dependencies = [
  "indexmap 2.13.0",
  "memchr",
  "time",
+ "zopfli",
+]
+
+[[package]]
+name = "zip"
+version = "8.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b680f2a0cd479b4cff6e1233c483fdead418106eae419dc60200ae9850f6d004"
+dependencies = [
+ "crc32fast",
+ "flate2",
+ "indexmap 2.13.0",
+ "memchr",
+ "typed-path",
  "zopfli",
 ]
 
