@@ -5,7 +5,8 @@ authors.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Recipe generation for PyPI, CRAN, CPAN, and LuaRocks packages"
+readme = "README.md"
+description = "Automatic recipe generation for Python (PyPI), R (CRAN), Perl (CPAN), and Lua (LuaRocks) packages"
 
 [features]
 default = ['rustls-tls']

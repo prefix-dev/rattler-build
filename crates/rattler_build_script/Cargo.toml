@@ -4,9 +4,9 @@ version = "0.1.0"
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
-readme.workspace = true
+readme = "README.md"
 repository.workspace = true
-description = "Script execution and data model for rattler-build"
+description = "Script execution and sandbox configuration for rattler-build, supporting bash, cmd, python, and other interpreters"
 
 [features]
 default = ["execution"]

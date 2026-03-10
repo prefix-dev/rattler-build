@@ -1,8 +1,5 @@
-//! This crate provides the best memory allocator for different platforms.
-//!
-//! On Windows, we use mimalloc because it provides good performance.
-//! On most Unix platforms (Linux, macOS), we use jemalloc for its excellent
-//! performance characteristics with multi-threaded applications.
+//! Platform-optimized memory allocator for rattler-build, using jemalloc on Unix
+//! and mimalloc on Windows.
 //!
 //! This crate is designed to be used as a dependency that, when included,
 //! automatically sets the global allocator. Simply add this crate as a
