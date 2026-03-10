@@ -78,6 +78,7 @@ tracing-subscriber = { version = "0.3", features = [
 ] }
 miette = { workspace = true, features = ["fancy"] }
 num_cpus = "1.17.0"
+arwen-codesign = { workspace = true }
 goblin = "0.10.4"
 scroll = "0.13.0"
 pathdiff = { workspace = true }
