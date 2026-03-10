@@ -4899,6 +4899,7 @@ name = "rattler_build_core"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "arwen-codesign",
  "async-once-cell",
  "async-recursion",
  "chrono",

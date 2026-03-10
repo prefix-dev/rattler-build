@@ -186,7 +186,6 @@ impl Relinker for Dylib {
         custom_rpaths: &[String],
         rpath_allowlist: &GlobVec,
         system_tools: &SystemTools,
-        experimental: bool,
     ) -> Result<(), RelinkError> {
         let mut changes = DylibChanges::default();
         let mut modified = false;
@@ -323,7 +322,7 @@ impl Relinker for Dylib {
                 tracing::debug!("Builtin relink failed {:?}, trying install_name_tool", e);
                 install_name_tool(&self.path, &changes, system_tools)?;
             }
-            if experimental {
+            if std::env::var("RATTLER_BUILD_BUILTIN_CODESIGN").is_ok() {
                 codesign_builtin(&self.path)?;
             } else {
                 codesign_subprocess(&self.path, system_tools)?;
@@ -838,10 +837,24 @@ mod tests {
         Ok(())
     }
 
+    /// Temporarily sets an environment variable for the duration of the closure.
+    fn with_env_var<F: FnOnce()>(key: &str, value: Option<&str>, f: F) {
+        let original = std::env::var(key).ok();
+        match value {
+            Some(v) => unsafe { std::env::set_var(key, v) },
+            None => unsafe { std::env::remove_var(key) },
+        }
+        f();
+        match original {
+            Some(v) => unsafe { std::env::set_var(key, v) },
+            None => unsafe { std::env::remove_var(key) },
+        }
+    }
+
     #[rstest]
     #[case::subprocess_codesign(false)]
     #[case::builtin_codesign(true)]
-    fn test_keep_relative_rpath(#[case] experimental: bool) -> Result<(), RelinkError> {
+    fn test_keep_relative_rpath(#[case] builtin_codesign: bool) -> Result<(), RelinkError> {
         // check if install_name_tool is installed
         if which::which("install_name_tool").is_err() {
             println!("install_name_tool not found, skipping test");
@@ -882,16 +895,18 @@ mod tests {
         let tmp_prefix = tmp_dir.path();
         let encoded_prefix = PathBuf::from("/encoded/long_install_prefix/bla/bin");
 
-        object
-            .relink(
-                tmp_prefix,
-                &encoded_prefix,
-                &[],
-                &GlobVec::default(),
-                &SystemTools::default(),
-                experimental,
-            )
-            .unwrap();
+        let env_val = if builtin_codesign { Some("1") } else { None };
+        with_env_var("RATTLER_BUILD_BUILTIN_CODESIGN", env_val, || {
+            object
+                .relink(
+                    tmp_prefix,
+                    &encoded_prefix,
+                    &[],
+                    &GlobVec::default(),
+                    &SystemTools::default(),
+                )
+                .unwrap();
+        });
 
         let object = Dylib::new(&binary_path)?;
         assert_eq!(vec![PathBuf::from("@loader_path/../lib")], object.rpaths);
@@ -954,7 +969,7 @@ mod tests {
     #[rstest]
     #[case::subprocess_codesign(false)]
     #[case::builtin_codesign(true)]
-    fn test_relink_deduplicates_rpaths(#[case] experimental: bool) -> Result<(), RelinkError> {
+    fn test_relink_deduplicates_rpaths(#[case] builtin_codesign: bool) -> Result<(), RelinkError> {
         if which::which("install_name_tool").is_err() {
             println!("install_name_tool not found, skipping test");
             return Ok(());
@@ -978,16 +993,18 @@ mod tests {
 
         // Full relink: builtin relink can't handle deletions, so this falls
         // back to install_name_tool which performs the deduplication.
-        object
-            .relink(
-                tmp_prefix,
-                tmp_prefix,
-                &["lib/".to_string()],
-                &GlobVec::default(),
-                &SystemTools::default(),
-                experimental,
-            )
-            .unwrap();
+        let env_val = if builtin_codesign { Some("1") } else { None };
+        with_env_var("RATTLER_BUILD_BUILTIN_CODESIGN", env_val, || {
+            object
+                .relink(
+                    tmp_prefix,
+                    tmp_prefix,
+                    &["lib/".to_string()],
+                    &GlobVec::default(),
+                    &SystemTools::default(),
+                )
+                .unwrap();
+        });
 
         // After relinking, rpaths must be deduplicated
         let object = Dylib::new(&binary_path)?;

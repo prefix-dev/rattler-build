@@ -101,7 +101,6 @@ pub trait Relinker {
         custom_rpaths: &[String],
         rpath_allowlist: &GlobVec,
         system_tools: &SystemTools,
-        experimental: bool,
     ) -> Result<(), RelinkError>;
 }
 
@@ -167,7 +166,6 @@ pub fn relink(temp_files: &TempFiles, output: &Output) -> Result<(), RelinkError
     let mut binaries = HashSet::new();
     // allow to use tools from build prefix such as patchelf, install_name_tool, ...
     let system_tools = output.system_tools.with_build_prefix(output.build_prefix());
-    let experimental = output.build_configuration.experimental;
 
     use rayon::prelude::*;
     let results: Vec<Result<Option<PathBuf>, RelinkError>> = temp_files
@@ -198,7 +196,6 @@ pub fn relink(temp_files: &TempFiles, output: &Output) -> Result<(), RelinkError
                             &rpaths,
                             rpath_allowlist,
                             &system_tools,
-                            experimental,
                         )?;
                     }
                     Ok(Some(p.clone()))

@@ -177,7 +177,6 @@ impl Relinker for SharedObject {
         custom_rpaths: &[String],
         rpath_allowlist: &GlobVec,
         system_tools: &SystemTools,
-        _experimental: bool,
     ) -> Result<(), RelinkError> {
         if !self.has_dynamic {
             tracing::info!("{} is not dynamically linked", self.path.display());
@@ -512,7 +511,6 @@ mod test {
             &[],
             &globvec,
             &SystemTools::default(),
-            false,
         )?;
         let object = SharedObject::new(&binary_path)?;
         assert!(SharedObject::test_file(&binary_path)?);
@@ -559,7 +557,6 @@ mod test {
             &[String::from("lib/")],
             &GlobVec::default(),
             &SystemTools::default(),
-            false,
         )?;
         let object = SharedObject::new(&binary_path)?;
         assert_eq!(

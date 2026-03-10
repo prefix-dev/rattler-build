@@ -62,3 +62,17 @@ host:
   - libcurl
   - openssl
 ```
+
+### Builtin codesigning for macOS cross-compilation
+
+When cross-compiling **to** macOS from a non-macOS host (e.g. Linux), the
+system `codesign` tool is not available. In this case you can enable the
+built-in ad-hoc codesigning by setting the `RATTLER_BUILD_BUILTIN_CODESIGN`
+environment variable:
+
+```bash
+RATTLER_BUILD_BUILTIN_CODESIGN=1 rattler-build build --target-platform osx-arm64
+```
+
+This uses a pure-Rust implementation to ad-hoc sign Mach-O binaries after
+relinking, removing the dependency on Apple's `codesign` utility.
