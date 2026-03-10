@@ -671,6 +671,8 @@ mod tests {
     };
     use tempfile::tempdir_in;
 
+    use rstest::rstest;
+
     use super::{RelinkError, install_name_tool};
     use crate::post_process::relink::Relinker;
     use crate::{
@@ -836,8 +838,10 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn test_keep_relative_rpath() -> Result<(), RelinkError> {
+    #[rstest]
+    #[case::subprocess_codesign(false)]
+    #[case::builtin_codesign(true)]
+    fn test_keep_relative_rpath(#[case] experimental: bool) -> Result<(), RelinkError> {
         // check if install_name_tool is installed
         if which::which("install_name_tool").is_err() {
             println!("install_name_tool not found, skipping test");
@@ -885,7 +889,7 @@ mod tests {
                 &[],
                 &GlobVec::default(),
                 &SystemTools::default(),
-                false,
+                experimental,
             )
             .unwrap();
 
@@ -947,8 +951,10 @@ mod tests {
     /// does not reject the binary with "duplicate LC_RPATH" errors at load time.
     /// This exercises the full `Dylib::relink()` path (builtin relink tries
     /// first, falls back to `install_name_tool` for rpath deletions).
-    #[test]
-    fn test_relink_deduplicates_rpaths() -> Result<(), RelinkError> {
+    #[rstest]
+    #[case::subprocess_codesign(false)]
+    #[case::builtin_codesign(true)]
+    fn test_relink_deduplicates_rpaths(#[case] experimental: bool) -> Result<(), RelinkError> {
         if which::which("install_name_tool").is_err() {
             println!("install_name_tool not found, skipping test");
             return Ok(());
@@ -979,7 +985,7 @@ mod tests {
                 &["lib/".to_string()],
                 &GlobVec::default(),
                 &SystemTools::default(),
-                false,
+                experimental,
             )
             .unwrap();
 
