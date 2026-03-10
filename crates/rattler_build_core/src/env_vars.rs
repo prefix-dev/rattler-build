@@ -2,7 +2,7 @@
 use std::path::{Path, PathBuf};
 use std::{collections::HashMap, env};
 
-use rattler_conda_types::Platform;
+use rattler_conda_types::{Platform, RepoDataRecord};
 
 use crate::linux;
 use crate::macos;
@@ -55,9 +55,10 @@ pub fn python_vars(output: &Output) -> HashMap<String, Option<String>> {
         .get(&"python".into())
         .map(|s| s.to_string());
     if python_version.is_none()
-        && let Some((record, requested)) = output.find_resolved_package("python")
-        && requested
+        && let Some((record, _)) = output.find_resolved_package("python")
     {
+        // Use the resolved python version even if it's a transitive dependency
+        // (e.g. pulled in by pip in noarch python packages)
         python_version = Some(record.package_record.version.to_string());
     }
 
@@ -83,6 +84,57 @@ pub fn python_vars(output: &Output) -> HashMap<String, Option<String>> {
 
     if let Some(npy_version) = output.variant().get(&"numpy".into()) {
         let npy_ver = npy_version.to_string();
+        let npy_ver: Vec<_> = npy_ver.split('.').take(2).collect();
+        let npy_ver = npy_ver.join(".");
+        insert!(result, "NPY_VER", npy_ver);
+        insert!(result, "NPY_DISTUTILS_APPEND_FLAGS", "1");
+    }
+
+    result
+}
+
+/// Returns Python-related environment variables derived from solved package records.
+///
+/// This is used in test environments where we have the solve result but no `Output`.
+/// Extracts python and numpy versions from the resolved records.
+pub fn python_vars_from_records(
+    records: &[RepoDataRecord],
+    prefix: &Path,
+    platform: Platform,
+) -> HashMap<String, Option<String>> {
+    let mut result = HashMap::new();
+
+    if platform.is_windows() {
+        let python = prefix.join("python.exe");
+        insert!(result, "PYTHON", python.to_string_lossy());
+    } else {
+        let python = prefix.join("bin/python");
+        insert!(result, "PYTHON", python.to_string_lossy());
+    }
+
+    let python_version = records
+        .iter()
+        .find(|r| r.package_record.name.as_normalized() == "python")
+        .map(|r| r.package_record.version.to_string());
+
+    if let Some(py_ver) = python_version {
+        let py_ver: Vec<_> = py_ver.split('.').take(2).collect();
+        let py_ver_str = py_ver.join(".");
+        let stdlib_dir = get_stdlib_dir(prefix, platform, &py_ver_str);
+        let site_packages_dir = get_sitepackages_dir(prefix, platform, &py_ver_str);
+        let py3k = if py_ver[0] == "3" { "1" } else { "0" };
+        insert!(result, "PY3K", py3k);
+        insert!(result, "PY_VER", py_ver_str);
+        insert!(result, "STDLIB_DIR", stdlib_dir.to_string_lossy());
+        insert!(result, "SP_DIR", site_packages_dir.to_string_lossy());
+    }
+
+    let numpy_version = records
+        .iter()
+        .find(|r| r.package_record.name.as_normalized() == "numpy")
+        .map(|r| r.package_record.version.to_string());
+
+    if let Some(npy_ver) = numpy_version {
         let npy_ver: Vec<_> = npy_ver.split('.').take(2).collect();
         let npy_ver = npy_ver.join(".");
         insert!(result, "NPY_VER", npy_ver);
