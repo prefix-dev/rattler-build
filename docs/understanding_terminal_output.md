@@ -1,6 +1,6 @@
 # Understanding the terminal output
 
-When you build a recipe with rattler-build, a lot of information is printed on the terminal. Some of that information uses short codes that we are explaining here.
+When you build a recipe with Rattler-Build, a lot of information is printed on the terminal. Some of that information uses short codes that we are explaining here.
 
 Let's look at the logs together!
 

@@ -68,7 +68,7 @@ build:
 
 ## Alternative script interpreters
 
-With `rattler-build` and the new recipe syntax you can select an `interpreter`
+With Rattler-Build and the new recipe syntax you can select an `interpreter`
 for your script.
 
 So far, the following interpreters are supported:
@@ -82,7 +82,7 @@ So far, the following interpreters are supported:
 - `ruby`
 - `node` or `nodejs` (for NodeJS scripts)
 
-`rattler-build` automatically detects the interpreter based on the file extension
+Rattler-Build automatically detects the interpreter based on the file extension
 (`.sh`, `.bat`, `.nu`, `.py`, `.pl`, `.r`, `.rb`, `.js`) or you can specify it in the
 `interpreter` key in the `script` section of your recipe.
 
@@ -318,7 +318,7 @@ defined only on Windows.
 | `LIBRARY_PREFIX` | `<build prefix>\Library`.         |
 | `SCRIPTS`        | `<build prefix>\Scripts`.         |
 
-Not yet supported in `rattler-build`:
+Not yet supported in Rattler-Build:
 
 - `CYGWIN_PREFIX`
 - `VS_MAJOR`

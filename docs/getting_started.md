@@ -1,6 +1,6 @@
 # Getting started
 
-This tutorial walks you through building and publishing your first conda package with `rattler-build`.
+This tutorial walks you through building and publishing your first conda package with Rattler-Build.
 
 ## Creating a recipe
 
@@ -290,7 +290,7 @@ jobs:
 | `build-args` | Additional arguments for `rattler-build build` | |
 | `upload-artifact` | Upload built packages as artifacts | `true` |
 | `artifact-name` | Name for the artifact (use with matrix builds) | `package` |
-| `rattler-build-version` | Version of rattler-build to use | latest |
+| `rattler-build-version` | Version of Rattler-Build to use | latest |
 
 ## Next steps
 

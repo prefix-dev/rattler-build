@@ -1,22 +1,22 @@
-## A fast conda package builder: `rattler-build`
+## A fast conda package builder: Rattler-Build
 
-The `rattler-build` tool creates cross-platform relocatable packages from a simple recipe format. 
+The Rattler-Build tool creates cross-platform relocatable packages from a simple recipe format.
 The recipe format is heavily inspired by `conda-build` and `boa`, and the output of `rattler-build`
-is a standard "conda" package that can be installed using [`pixi`](https://pixi.sh), 
+is a standard "conda" package that can be installed using [`pixi`](https://pixi.sh),
 [`mamba`](https://github.com/mamba-org/mamba) or [`conda`](https://docs.conda.io).
 
-`rattler-build` is implemented in Rust, does not have any dependencies on `conda-build` or Python and works as a standalone binary.
+Rattler-Build is implemented in Rust, does not have any dependencies on `conda-build` or Python and works as a standalone binary.
 
-You can use `rattler-build` to publish packages to prefix.dev, anaconda.org, JFrog Artifactory, S3 buckets, or Quetz Servers.
+You can use Rattler-Build to publish packages to prefix.dev, anaconda.org, JFrog Artifactory, S3 buckets, or Quetz Servers.
 
-**Try it out!** You can experiment with rattler-build directly in your browser using our [online playground](https://playground.rattler.build/).
+**Try it out!** You can experiment with Rattler-Build directly in your browser using our [online playground](https://playground.rattler.build/).
 
 ![](https://user-images.githubusercontent.com/885054/244683824-fd1b3896-84c7-498c-b406-40ab2a9e450c.svg)
 
 ## Installation
 
 The recommended way of installing `rattler-build`, being a conda-package builder, is through a conda package manager.
-Next to `rattler-build` we are also building [`pixi`](https://pixi.sh).
+Next to Rattler-Build we are also building [`pixi`](https://pixi.sh).
 
 With `pixi` you can install `rattler-build` globally:
 
@@ -105,9 +105,9 @@ Other options are:
 
 ### Dependencies
 
-Currently `rattler-build` needs some dependencies on the host system which are
+Currently Rattler-Build needs some dependencies on the host system which are
 executed as subprocess. We plan to reduce the number of external dependencies
-over time by writing what we need in Rust to make `rattler-build` fully
+over time by writing what we need in Rust to make Rattler-Build fully
 self-contained.
 
 * `install_name_tool` is necessary on macOS to rewrite the `rpath` of shared
@@ -121,7 +121,7 @@ self-contained.
 
 ### GitHub Action
 
-There is a GitHub Action for `rattler-build`. It can be used to install `rattler-build` in CI/CD workflows and run a build command. Please check out the [GitHub Action documentation](https://github.com/prefix-dev/rattler-build-action) for more information.
+There is a GitHub Action for Rattler-Build. It can be used to install `rattler-build` in CI/CD workflows and run a build command. Please check out the [GitHub Action documentation](https://github.com/prefix-dev/rattler-build-action) for more information.
 
 ## The Recipe Format
 

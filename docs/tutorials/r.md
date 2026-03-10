@@ -4,7 +4,7 @@ Packaging a R package is similar to packaging a Python package!
 
 ## Generating a starting point
 
-You can use rattler-build to generate a starting point for your recipe from the metadata on CRAN.
+You can use Rattler-Build to generate a starting point for your recipe from the metadata on CRAN.
 
 ```bash
 rattler-build generate-recipe cran r-knitr

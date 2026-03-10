@@ -1,6 +1,6 @@
 # Examples
 
-This section contains examples for packaging software in different languages with `rattler-build`. Each example walks you through creating a recipe for a specific language ecosystem.
+This section contains examples for packaging software in different languages with Rattler-Build. Each example walks you through creating a recipe for a specific language ecosystem.
 
 | Example | Description |
 |---------|-------------|
@@ -12,4 +12,4 @@ This section contains examples for packaging software in different languages wit
 | [Perl](perl.md) | Build Perl packages from CPAN with `noarch: generic` support |
 | [R](r.md) | Package R libraries from CRAN |
 | [Repackaging](repackaging.md) | Repackage existing pre-built binaries for distribution |
-| [Converting from conda-build](../converting_from_conda_build.md) | Migrate existing `meta.yaml` recipes to the `rattler-build` format |
+| [Converting from conda-build](../converting_from_conda_build.md) | Migrate existing `meta.yaml` recipes to the Rattler-Build format |

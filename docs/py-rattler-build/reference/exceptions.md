@@ -1,8 +1,8 @@
 # Exceptions
 
-Exception classes raised by rattler-build operations.
+Exception classes raised by Rattler-Build operations.
 
-All exceptions inherit from `RattlerBuildError`, so you can catch all rattler-build
+All exceptions inherit from `RattlerBuildError`, so you can catch all Rattler-Build
 errors with a single except clause:
 
 ```python
@@ -56,7 +56,7 @@ RattlerBuildError (base)
 
 ## `RattlerBuildError`
 
-Base exception for all rattler-build errors. Catch this to handle any error from the library.
+Base exception for all Rattler-Build errors. Catch this to handle any error from the library.
 
 ## `AuthError`
 

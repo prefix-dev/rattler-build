@@ -5,7 +5,7 @@ In the second example we will build a package for `numpy` which contains compile
 
 ## Generating a starter recipe
 
-Rattler-build provides a command to generate a recipe for a package from PyPI.
+Rattler-Build provides a command to generate a recipe for a package from PyPI.
 The generated recipe can be used as a starting point for your recipe.
 The recipe generator will fetch the metadata from PyPI and generate a recipe that will build the package from the `sdist` source distribution.
 
@@ -27,7 +27,7 @@ Additionally, `noarch: python` packages work with a range of Python versions (co
 --8<-- "docs/snippets/recipes/ipywidgets.yaml"
 ```
 
-1. The `noarch: python` line tells `rattler-build` that this package is pure
+1. The `noarch: python` line tells Rattler-Build that this package is pure
    Python and can be one-size-fits-all. `noarch` packages can be installed on any
    platform without modification which is very handy.
 2. The `imports` section in the tests is used to check that the package is
@@ -101,7 +101,7 @@ Running this recipe with the variant config file will build a total of 2 `numpy`
 rattler-build build --recipe ./numpy
 ```
 
-At the beginning of the build process, `rattler-build` will print the following message to show you the variants it found:
+At the beginning of the build process, Rattler-Build will print the following message to show you the variants it found:
 
 ```txt
 Found variants:

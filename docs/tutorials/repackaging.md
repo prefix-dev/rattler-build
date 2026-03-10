@@ -1,6 +1,6 @@
 # Repackaging existing software
 
-It's totally possible to repackage existing software using rattler-build, and make it easy to install
+It's totally possible to repackage existing software using Rattler-Build, and make it easy to install
 with conda, mamba or pixi.
 
 Repackaging existing binaries is not recommended on `conda-forge`, but totally acceptable for your own channels / repositories.

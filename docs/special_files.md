@@ -164,7 +164,7 @@ This means:
 
 ## Post-link and pre-unlink scripts
 
-The `post-link` and `pre-unlink` scripts are executed when the package is installed or uninstalled. They are both heavily discouraged but implemented for compatibility with conda in `rattler-build` since version 0.17.
+The `post-link` and `pre-unlink` scripts are executed when the package is installed or uninstalled. They are both heavily discouraged but implemented for compatibility with conda in Rattler-Build since version 0.17.
 
 For a `post-link` script to be executed when a package is installed, the built package needs to have a `.<package_name>-post-link.{sh/bat}` in its `bin/` folder. The same is applicable for `pre-unlink` scripts, just with the name `.<package_name>-pre-unlink.{sh/bat}` (note the leading period). For example, for a package `mypkg`, you would need to have a `.mypkg-post-link.sh` in its `bin/` folder.
 

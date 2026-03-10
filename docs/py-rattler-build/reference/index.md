@@ -2,12 +2,12 @@
 
 Here's the reference documentation for the `rattler_build` Python bindings API.
 
-If you want to **learn how to use** rattler-build's Python API, check out the
+If you want to **learn how to use** Rattler-Build's Python API, check out the
 [Tutorials](../tutorials/recipe_rendering_basics.md).
 
 ## Version
 
-Get the version of rattler-build:
+Get the version of Rattler-Build:
 
 ```python
 from rattler_build import rattler_build_version
@@ -36,4 +36,4 @@ print(rattler_build_version())
 
 ## Exceptions
 
-- **[Exceptions](exceptions.md)** - Error types raised by rattler-build
+- **[Exceptions](exceptions.md)** - Error types raised by Rattler-Build
