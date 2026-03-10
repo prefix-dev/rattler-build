@@ -3038,7 +3038,7 @@
 <h2 id="build-scripts">Build scripts<a class="headerlink" href="#build-scripts" title="Permanent link">#</a></h2>
 <h3 id="cmdexe">Cmd.exe<a class="headerlink" href="#cmdexe" title="Permanent link">#</a></h3>
 <p>The <em>default interpreter</em> for build scripts on Windows is <code>cmd.exe</code> which has a quite clunky syntax and execution model.</p>
-<p>It will, for example, skip over errors if you do not manually insert <code>if %ERRORLEVEL% neq 0 exit 1</code> after each statement. If the build script is a list of commands, then rattler-build will automatically inject this after each list item. If you pass in a complete build script or file, you will have to do this manually to recognize issues in command execution early on.</p>
+<p>It will, for example, skip over errors if you do not manually insert <code>if %ERRORLEVEL% neq 0 exit 1</code> after each statement. If the build script is a list of commands, then Rattler-Build will automatically inject this after each list item. If you pass in a complete build script or file, you will have to do this manually to recognize issues in command execution early on.</p>
 <h3 id="using-powershell">Using Powershell<a class="headerlink" href="#using-powershell" title="Permanent link">#</a></h3>
 <p>You can select PowerShell as an interpreter, which comes pre-installed on Windows these days. To do so, just set</p>
 <div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">build</span><span class="p">:</span>
@@ -3046,13 +3046,13 @@
 </span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">    </span><span class="nt">interpreter</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">powershell</span>
 </span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">    </span><span class="nt">script</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">...</span>
 </span></code></pre></div>
-<p>Or save your build script as <code>build.ps1</code> (which will automatically use powershell based on the file ending), rattler-build will choose it automatically on Windows if <code>build.bat</code> is absent.</p>
-<p>rattler-build relies on <code>$PSNativeCommandUseErrorActionPreference</code>, which is only available in PowerShell 7.4+. If your PowerShell is not new enough, it will skip over errors from native
+<p>Or save your build script as <code>build.ps1</code> (which will automatically use powershell based on the file ending), Rattler-Build will choose it automatically on Windows if <code>build.bat</code> is absent.</p>
+<p>Rattler-Build relies on <code>$PSNativeCommandUseErrorActionPreference</code>, which is only available in PowerShell 7.4+. If your PowerShell is not new enough, it will skip over errors from native
 command and you have to check <code>$?</code> or <code>$LASTEXITCODE</code> manually like in <code>cmd.exe</code>.</p>
-<p>rattler-build also creates normal variable copies of environment variables, you can use them if you feel <code>Env:</code> prefix is tedious, so you can write</p>
+<p>Rattler-Build also creates normal variable copies of environment variables, you can use them if you feel <code>Env:</code> prefix is tedious, so you can write</p>
 <div class="language-ps1 highlight"><span class="filename">build.ps1</span><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">cmake</span> <span class="n">-S</span> <span class="p">.</span> <span class="n">B</span> <span class="n">build</span> <span class="n">-DCMAKE_INSTALL_PREFIX</span><span class="p">=</span><span class="nv">$LIBRARY_PREFIX</span> <span class="c"># same as $Env:LIBRARY_PREFIX</span>
 </span></code></pre></div>
-<p>All these variables are strings, because rattler-build just copies them, so variables with value <code>'True'</code> will not be <code>$true</code> in current implementation.</p>
+<p>All these variables are strings, because Rattler-Build just copies them, so variables with value <code>'True'</code> will not be <code>$true</code> in current implementation.</p>
 <h3 id="using-bash-on-windows">Using <code>Bash</code> on Windows<a class="headerlink" href="#using-bash-on-windows" title="Permanent link">#</a></h3>
 <p>To use bash on Windows, you can install bash in your build requirements (e.g. on conda-forge it would be <code>m2-bash</code>) and call the bash script from a cmd.exe script:</p>
 <div class="language-batch highlight"><span class="filename">build.bat</span><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>bash <span class="nv">%RECIPE_DIR%</span>/build_win.sh

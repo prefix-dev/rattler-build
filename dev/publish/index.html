@@ -2831,7 +2831,7 @@
 
 
 <h1 id="publishing-packages-to-your-own-channel">Publishing packages to your own channel<a class="headerlink" href="#publishing-packages-to-your-own-channel" title="Permanent link">#</a></h1>
-<p>Rattler-build comes with an intuitive <code>publish</code> subcommand, that will publish a package to a channel.</p>
+<p>Rattler-Build comes with an intuitive <code>publish</code> subcommand, that will publish a package to a channel.</p>
 <p>You can either point to an already built package, or to a recipe and <code>publish</code> them into your channel.
 The channel can be either on prefix.dev, anaconda.org, an S3 bucket, a local filesystem folder (or network mount), or a Quetz or Artifactory instance.</p>
 <p>Publishing a package is a convenience short hand for:</p>
@@ -2874,12 +2874,12 @@ When bumping by a relative amount, we download the repodata and determine for ea
 <p>When the recipe does not specify a build number, the build number is automatically bumped on <code>publish</code> to the <em>next available build number</em>.</p>
 <p>If the recipe does specify a build number, you have to manually trigger an override using the <code>--build-number</code> CLI flag. Alternatively, you can use the <code>--force</code> upload option on S3, your local filesystem, Anaconda and prefix channels to forcibly replace the previous build. Please note that this is heavily discouraged as lockfiles will get out of date and the old build is irrevocably deleted.</p>
 <h2 id="authentication">Authentication<a class="headerlink" href="#authentication" title="Permanent link">#</a></h2>
-<p>Rattler-build uses the same authentication as other tools in the prefix family. It's easiest to login using the <code>auth</code> subcommand: <code>rattler-build auth login</code>. Note: if you are already logged in with <code>pixi</code>, you are also logged in with <code>rattler-build</code> - they share credentials.</p>
+<p>Rattler-Build uses the same authentication as other tools in the prefix family. It's easiest to login using the <code>auth</code> subcommand: <code>rattler-build auth login</code>. Note: if you are already logged in with <code>pixi</code>, you are also logged in with Rattler-Build - they share credentials.</p>
 <p>Otherwise you can also use the same options as with <code>upload</code>, and supply tokens as environment variables or CLI arguments.</p>
 <h2 id="channel-initialization">Channel Initialization<a class="headerlink" href="#channel-initialization" title="Permanent link">#</a></h2>
-<p>When publishing to local filesystem or S3 channels, rattler-build automatically handles channel initialization:</p>
+<p>When publishing to local filesystem or S3 channels, Rattler-Build automatically handles channel initialization:</p>
 <h3 id="new-channels">New channels<a class="headerlink" href="#new-channels" title="Permanent link">#</a></h3>
-<p>If the target channel doesn't exist yet, rattler-build will:</p>
+<p>If the target channel doesn't exist yet, Rattler-Build will:</p>
 <ol>
 <li>Create the channel directory (for filesystem channels)</li>
 <li>Initialize it with an empty <code>noarch/repodata.json</code></li>
@@ -2893,14 +2893,14 @@ When bumping by a relative amount, we download the repodata and determine for ea
 </span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>rattler-build<span class="w"> </span>publish<span class="w"> </span>./my-package.conda<span class="w"> </span>--to<span class="w"> </span>s3://my-bucket/channel
 </span></code></pre></div>
 <h3 id="existing-channels">Existing channels<a class="headerlink" href="#existing-channels" title="Permanent link">#</a></h3>
-<p>If the channel directory exists but is not properly initialized (missing <code>noarch/repodata.json</code>), rattler-build will fail with a helpful error message. This prevents accidentally treating a random directory as a conda channel.</p>
+<p>If the channel directory exists but is not properly initialized (missing <code>noarch/repodata.json</code>), Rattler-Build will fail with a helpful error message. This prevents accidentally treating a random directory as a conda channel.</p>
 <p>To initialize an existing directory as a channel, you can either:</p>
 <ul>
-<li>Let rattler-build create it fresh (remove the directory first)</li>
+<li>Let Rattler-Build create it fresh (remove the directory first)</li>
 <li>Manually create <code>noarch/repodata.json</code> with content <code>{"packages": {}, "packages.conda": {}}</code></li>
 </ul>
 <h2 id="indexing-s3-and-filesystem-channels">Indexing S3 and Filesystem channels<a class="headerlink" href="#indexing-s3-and-filesystem-channels" title="Permanent link">#</a></h2>
-<p>Since S3 and Filesystem channels don't know anything about "indexing" (producing repodata.json), rattler-build will internally use <code>rattler-index</code> to run the indexing step after a successful upload. This will ensure that the repodata in the channel is up to date and users can start downloading the new packages.</p>
+<p>Since S3 and Filesystem channels don't know anything about "indexing" (producing repodata.json), Rattler-Build will internally use <code>rattler-index</code> to run the indexing step after a successful upload. This will ensure that the repodata in the channel is up to date and users can start downloading the new packages.</p>
 <h2 id="sigstore-attestations">Sigstore attestations<a class="headerlink" href="#sigstore-attestations" title="Permanent link">#</a></h2>
 <p>When publishing to prefix.dev, you can automatically generate Sigstore attestations to cryptographically sign your packages and provide verifiable build provenance. Use the <code>--generate-attestation</code> flag:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>rattler-build<span class="w"> </span>publish<span class="w"> </span>./my-recipe.yaml<span class="w"> </span>--to<span class="w"> </span>https://prefix.dev/my-channel<span class="w"> </span>--generate-attestation

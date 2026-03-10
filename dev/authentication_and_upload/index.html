@@ -2887,7 +2887,7 @@ recommended approach for interactive use.</p>
 </span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="c1"># Remove stored credentials</span>
 </span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>rattler-build<span class="w"> </span>auth<span class="w"> </span><span class="nb">logout</span><span class="w"> </span>prefix.dev
 </span></code></pre></div>
-<p>Once logged in, <code>rattler-build</code> will automatically use these credentials when accessing
+<p>Once logged in, Rattler-Build will automatically use these credentials when accessing
 the corresponding hosts.</p>
 <h3 id="using-rattler_auth_file-ephemeral">Using <code>RATTLER_AUTH_FILE</code> (ephemeral)<a class="headerlink" href="#using-rattler_auth_file-ephemeral" title="Permanent link">#</a></h3>
 <p>For CI/CD or ephemeral environments, you can use the <code>RATTLER_AUTH_FILE</code> environment variable to
@@ -2926,7 +2926,7 @@ channels that you have access to.</p>
 <li><code>S3Credentials</code>: S3 buckets</li>
 </ul>
 <h2 id="uploading-packages">Uploading packages<a class="headerlink" href="#uploading-packages" title="Permanent link">#</a></h2>
-<p>If you want to upload packages, then rattler-build comes with a built-in
+<p>If you want to upload packages, then Rattler-Build comes with a built-in
 <code>upload</code> command. There are the following options:</p>
 <ul>
 <li><code>prefix.dev</code>: you can create public or private channels on the prefix.dev
@@ -2943,8 +2943,8 @@ channels that you have access to.</p>
 authenticate with the server.</p>
 <h3 id="prefixdev">prefix.dev<a class="headerlink" href="#prefixdev" title="Permanent link">#</a></h3>
 <h4 id="trusted-publishing-via-oidc">Trusted publishing via OIDC<a class="headerlink" href="#trusted-publishing-via-oidc" title="Permanent link">#</a></h4>
-<p><code>rattler-build</code> supports authentication with <a href="https://prefix.dev">https://prefix.dev</a> through OIDC with GitHub Actions.
-An API key is no longer required, rattler-build can manage the complete authentication workflow for you.
+<p>Rattler-Build supports authentication with <a href="https://prefix.dev">https://prefix.dev</a> through OIDC with GitHub Actions.
+An API key is no longer required, Rattler-Build can manage the complete authentication workflow for you.
 You only have to set up a specific repository and workflow under "Trusted Publishers" on prefix.dev.</p>
 <p><img alt="Trusted Publisher" src="../assets/trusted_publisher.png" /></p>
 <p>Here you can find an example GitHub Actions workflow</p>

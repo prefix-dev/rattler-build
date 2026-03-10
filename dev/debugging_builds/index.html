@@ -3219,7 +3219,7 @@
 
 
 <h1 id="debugging-builds">Debugging Builds<a class="headerlink" href="#debugging-builds" title="Permanent link">#</a></h1>
-<p>This guide covers how to debug conda package builds with rattler-build when
+<p>This guide covers how to debug conda package builds with Rattler-Build when
 things go wrong. It's designed for both humans and AI agents working with
 recipes.</p>
 <h2 id="debugging-workflow">Debugging Workflow<a class="headerlink" href="#debugging-workflow" title="Permanent link">#</a></h2>
@@ -3350,7 +3350,7 @@ build for the first time.</p>
 <p>After extraction, the command reports the SHA256/MD5 checksums and file size, which is useful for verifying package integrity.</p>
 <p>Both <code>.conda</code> and <code>.tar.bz2</code> package formats are supported.</p>
 <h2 id="build-directory-structure">Build Directory Structure<a class="headerlink" href="#build-directory-structure" title="Permanent link">#</a></h2>
-<p>When rattler-build builds a package, it creates:</p>
+<p>When Rattler-Build builds a package, it creates:</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>output/
 </span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>└─ rattler-build-log.txt            # Append-only log of build directories (latest at bottom)
 </span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>└─ bld/                             # Build directories
@@ -3507,7 +3507,7 @@ Code, Codex, etc.) that cannot use interactive shells. The key principle is:
 </span><span id="__span-20-9"><a id="__codelineno-20-9" name="__codelineno-20-9" href="#__codelineno-20-9"></a><span class="p">}</span>
 </span></code></pre></div>
 <h2 id="understanding-relocatability">Understanding Relocatability<a class="headerlink" href="#understanding-relocatability" title="Permanent link">#</a></h2>
-<p>rattler-build makes packages relocatable through:</p>
+<p>Rattler-Build makes packages relocatable through:</p>
 <ol>
 <li>
 <p><strong>RPATH patching</strong> - Changes <code>.dylib</code> and <code>.so</code> files to use relative paths (<code>$ORIGIN</code>, <code>@loader_path</code>) using <code>patchelf</code> or <code>install_name_tool</code></p>

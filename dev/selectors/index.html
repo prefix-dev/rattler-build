@@ -2917,7 +2917,7 @@ selectors (such as <code>py3k</code>, <code>py38</code>, etc.) or the <code>py</
 <p>Please note that during the <em>initial</em> phase of rendering we do not know the
 variant, and thus the <code>match</code> condition always evaluates to <code>true</code>.</p>
 <h3 id="selector-evaluation">Selector evaluation<a class="headerlink" href="#selector-evaluation" title="Permanent link">#</a></h3>
-<p>Except for the rattler-build specific selectors, the selectors are evaluated using the <code>minijinja</code> engine. This means
+<p>Except for the Rattler-Build specific selectors, the selectors are evaluated using the <code>minijinja</code> engine. This means
 that the selectors are evaluated by <a href="https://github.com/mitsuhiko/minijinja"><code>minijinja</code></a> thus Python like expressions.
 Some notable options are:</p>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python == &quot;3.8&quot;</span><span class="w"> </span><span class="c1"># equal</span>

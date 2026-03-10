@@ -3607,7 +3607,7 @@
 
 
 <h1 id="the-recipe-spec">The recipe spec<a class="headerlink" href="#the-recipe-spec" title="Permanent link">#</a></h1>
-<p><code>rattler-build</code> implements a new recipe spec, different from the traditional
+<p>Rattler-Build implements a new recipe spec, different from the traditional
 "<code>meta.yaml</code>" file used in <code>conda-build</code>. A recipe has to be stored as a
 <code>recipe.yaml</code> file.</p>
 <h2 id="history">History<a class="headerlink" href="#history" title="Permanent link">#</a></h2>
@@ -3622,7 +3622,7 @@ The fragments of this discussion can be found <a href="https://github.com/mamba-
   and more)</li>
 <li>remove any need for recursive parsing &amp; solving</li>
 <li>finally, the initial implementation in <code>boa</code> relied on <code>conda-build</code>;
-  <code>rattler-build</code> removes any dependency on Python or <code>conda-build</code> and
+  Rattler-Build removes any dependency on Python or <code>conda-build</code> and
   reimplements everything in Rust</li>
 </ul>
 <h2 id="major-differences-from-conda-build">Major differences from <code>conda-build</code><a class="headerlink" href="#major-differences-from-conda-build" title="Permanent link">#</a></h2>
@@ -3826,7 +3826,7 @@ the <code>lfs</code> files from the repository.</p>
 </span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="w">  </span><span class="nt">tag</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;1.1.4&quot;</span>
 </span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="w">  </span><span class="nt">lfs</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w"> </span><span class="c1"># note: defaults to false</span>
 </span></code></pre></div>
-<p>By default, rattler-build will recursively initialize and update all git
+<p>By default, Rattler-Build will recursively initialize and update all git
 submodules. For repositories with large or numerous submodules that aren't needed
 for the build, you can disable this by setting <code>submodules: false</code>:</p>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="nt">source</span><span class="p">:</span>
@@ -3856,7 +3856,7 @@ source is copied to the work directory before building.</p>
 </span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="w">    </span><span class="nt">use_gitignore</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span><span class="w"> </span><span class="c1"># note: defaults to true</span>
 </span></code></pre></div>
 <p>By default, all files in the local path that are ignored by <code>git</code> are also ignored
-by <code>rattler-build</code>. You can disable this behavior by setting <code>use_gitignore</code> to
+by Rattler-Build. You can disable this behavior by setting <code>use_gitignore</code> to
 <code>false</code>.</p>
 <h4 id="patches">Patches<a class="headerlink" href="#patches" title="Permanent link">#</a></h4>
 <p>Patches may optionally be applied to the source.</p>
@@ -3868,8 +3868,8 @@ by <code>rattler-build</code>. You can disable this behavior by setting <code>us
 <!-- boa (conda-build) automatically determines the patch strip level. -->
 
 <h4 id="destination-path">Destination path<a class="headerlink" href="#destination-path" title="Permanent link">#</a></h4>
-<p>Within <code>rattler-build</code>'s work directory, you may specify a particular folder to
-place the source into. <code>rattler-build</code> will always drop you into the same folder
+<p>Within Rattler-Build's work directory, you may specify a particular folder to
+place the source into. Rattler-Build will always drop you into the same folder
 (<code>[build folder]/work</code>), but it's up to you whether you want your source extracted
 into that folder, or nested deeper. This feature is particularly useful when dealing
 with multiple sources, but can apply to recipes with single sources as well.</p>
@@ -3946,7 +3946,7 @@ project. Quotation marks (<code>""</code>) are required for patterns that start 
 <h4 id="build-number-and-string">Build number and string<a class="headerlink" href="#build-number-and-string" title="Permanent link">#</a></h4>
 <p>The build number should be incremented for new builds of the same version. The
 number defaults to <code>0</code>. The build string cannot contain "<code>-</code>". The string defaults
-to the default <code>rattler-build</code> build string plus the build number.</p>
+to the default Rattler-Build build string plus the build number.</p>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-23-1"><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="nt">build</span><span class="p">:</span>
 </span><span id="__span-23-2"><a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a><span class="w">  </span><span class="nt">number</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
 </span><span id="__span-23-3"><a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a><span class="w">  </span><span class="nt">string</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">abc</span>
@@ -3958,7 +3958,7 @@ to the default <code>rattler-build</code> build string plus the build number.</p
 </span><span id="__span-24-3"><a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a><span class="w">    </span><span class="nt">rpath_allowlist</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;/usr/lib/**&quot;</span><span class="p p-Indicator">]</span>
 </span></code></pre></div>
 <h3 id="script">Script<a class="headerlink" href="#script" title="Permanent link">#</a></h3>
-<p>By default, <code>rattler-build</code> uses a <code>build.sh</code> file on Unix (macOS and Linux) and a
+<p>By default, Rattler-Build uses a <code>build.sh</code> file on Unix (macOS and Linux) and a
 <code>build.bat</code> file on Windows, if they exist in the same folder as the <code>recipe.yaml</code>
 file. With the script parameter you can either supply a different filename or
 write out short build scripts. You may need to use selectors to use different
@@ -3978,7 +3978,7 @@ scripts for different platforms.</p>
 <p>There are many other configurable settings, such as environment variables and secrets.
 Please see <a href="../../build_script/">Build script</a> for more information.</p>
 <h3 id="skipping-builds">Skipping builds<a class="headerlink" href="#skipping-builds" title="Permanent link">#</a></h3>
-<p>Lists conditions under which <code>rattler-build</code> should skip the build of this recipe.
+<p>Lists conditions under which Rattler-Build should skip the build of this recipe.
 Particularly useful for defining recipes that are platform-specific. By default,
 a build is never skipped.</p>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-26-1"><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a><span class="nt">build</span><span class="p">:</span>
@@ -4043,7 +4043,7 @@ OS specific entry points at installation time.</p>
 </span><span id="__span-31-5"><a id="__codelineno-31-5" name="__codelineno-31-5" href="#__codelineno-31-5"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bspatch4 = bsdiff4.cli:main_bspatch4</span>
 </span></code></pre></div>
 <h4 id="version-independent-abi3-packages">Version independent (ABI3) packages<a class="headerlink" href="#version-independent-abi3-packages" title="Permanent link">#</a></h4>
-<p>Since rattler-build 0.35.0 and <a href="https://github.com/conda/ceps/blob/main/cep-0020.md">CEP 20</a>
+<p>Since Rattler-Build 0.35.0 and <a href="https://github.com/conda/ceps/blob/main/cep-0020.md">CEP 20</a>
 you can create version-independent Python packages that still contain compiled code.</p>
 <p>ABI3 packages support building a native Python extension using a specific Python
 version and running it against any later Python version. ABI3 or stable ABI is
@@ -4260,7 +4260,7 @@ You can ignore it in your recipe by listing the upstream package name in the
 <p><code>ignore_run_exports</code> only applies to runtime dependencies coming from an upstream package.</p>
 </div>
 <h2 id="tests-section">Tests section<a class="headerlink" href="#tests-section" title="Permanent link">#</a></h2>
-<p><code>rattler-build</code> supports four different types of tests. The "script test" installs
+<p>Rattler-Build supports four different types of tests. The "script test" installs
 the package and runs a list of commands. The "Python test" attempts to import a
 list of Python modules and runs <code>pip check</code>. The "downstream test" runs the tests
 of a downstream package that reverse depends on the package being built. And lastly,
@@ -4666,7 +4666,7 @@ form.</p>
 </span></code></pre></div>
 </details>
 <h2 id="templating-with-jinja">Templating with Jinja<a class="headerlink" href="#templating-with-jinja" title="Permanent link">#</a></h2>
-<p><code>rattler-build</code> supports limited Jinja templating in the <code>recipe.yaml</code> file.</p>
+<p>Rattler-Build supports limited Jinja templating in the <code>recipe.yaml</code> file.</p>
 <p>You can set up Jinja variables in the <code>context</code> section:</p>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-69-1"><a id="__codelineno-69-1" name="__codelineno-69-1" href="#__codelineno-69-1"></a><span class="nt">context</span><span class="p">:</span>
 </span><span id="__span-69-2"><a id="__codelineno-69-2" name="__codelineno-69-2" href="#__codelineno-69-2"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;test&quot;</span>
@@ -4690,7 +4690,7 @@ with Jinja:</p>
 </span><span id="__span-70-6"><a id="__codelineno-70-6" name="__codelineno-70-6" href="#__codelineno-70-6"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pytest -k &quot;not (${{ tests_to_skip | join(&quot; or &quot;)&quot; }})&quot;</span>
 </span></code></pre></div>
 <p>Jinja has built-in support for some common string manipulations.</p>
-<p>In rattler-build, complex Jinja is completely disallowed as we try to produce
+<p>In Rattler-Build, complex Jinja is completely disallowed as we try to produce
 YAML that is valid at all times. So you should not use any <code>{% if ... %}</code> or
 similar Jinja constructs that produce invalid YAML. Furthermore, instead of
 plain double curly brackets Jinja statements need to be prefixed by <code>$</code>, e.g.
@@ -4707,9 +4707,9 @@ available environment variables <a href=""><code>env-vars</code></a>.</p>
 To retrieve a fully rendered `recipe.yaml`, use the `` command.
 -->
 
-<h4 id="additional-jinja2-functionality-in-rattler-build">Additional Jinja2 functionality in rattler-build<a class="headerlink" href="#additional-jinja2-functionality-in-rattler-build" title="Permanent link">#</a></h4>
+<h4 id="additional-jinja2-functionality-in-rattler-build">Additional Jinja2 functionality in Rattler-Build<a class="headerlink" href="#additional-jinja2-functionality-in-rattler-build" title="Permanent link">#</a></h4>
 <p>Besides the default Jinja2 functionality, additional Jinja functions are
-available during the <code>rattler-build</code> process: <code>pin_compatible</code>, <code>pin_subpackage</code>,
+available during the Rattler-Build process: <code>pin_compatible</code>, <code>pin_subpackage</code>,
 and <code>compiler</code>.</p>
 <p>The compiler function takes <code>c</code>, <code>cxx</code>, <code>fortran</code> and other values as argument
 and automatically selects the right (cross-)compiler for the target platform.</p>
@@ -4721,7 +4721,7 @@ the supplied parameters.</p>
 <p>Similarly, the <code>pin_compatible</code> function will pin a package according to the
 specified rules.</p>
 <h4 id="pin-expressions">Pin expressions<a class="headerlink" href="#pin-expressions" title="Permanent link">#</a></h4>
-<p><code>rattler-build</code> knows pin expressions. A pin expression can have a <code>lower_bound</code>,
+<p>Rattler-Build knows pin expressions. A pin expression can have a <code>lower_bound</code>,
 <code>upper_bound</code> and <code>exact</code> value. A <code>upper_bound</code> and <code>lower_bound</code> are specified with a
 string containing only <code>x</code> and <code>.</code>, e.g. <code>upper_bound="x.x.x"</code> would signify to pin
 the given package to <code>&lt;1.2.3</code> (if the package version is <code>1.2.2</code>, for example).</p>
@@ -4857,7 +4857,7 @@ items under a single selector:</p>
 <h2 id="experimental-features">Experimental features<a class="headerlink" href="#experimental-features" title="Permanent link">#</a></h2>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
-<p>These are experimental features of <code>rattler-build</code> and may change or go away completely.</p>
+<p>These are experimental features of Rattler-Build and may change or go away completely.</p>
 </div>
 <h3 id="jinja-functions">Jinja functions<a class="headerlink" href="#jinja-functions" title="Permanent link">#</a></h3>
 <ul>

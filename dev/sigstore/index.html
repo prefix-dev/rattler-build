@@ -3032,7 +3032,7 @@
 
 <h1 id="sigstore-attestations">Sigstore attestations<a class="headerlink" href="#sigstore-attestations" title="Permanent link">#</a></h1>
 <p>Sigstore is a way to cryptographically sign packages (or any binary artifacts). It was pioneered in the container space, but has been adopted by many packaging ecosystems: PyPI, Python releases, Rust crates, Homebrew, and Rubygems.</p>
-<p>Rattler-build supports creating Sigstore attestations for conda packages, allowing you to cryptographically sign your packages and provide verifiable provenance information.</p>
+<p>Rattler-Build supports creating Sigstore attestations for conda packages, allowing you to cryptographically sign your packages and provide verifiable provenance information.</p>
 <h2 id="what-does-a-sigstore-attestation-provide">What does a Sigstore attestation provide?<a class="headerlink" href="#what-does-a-sigstore-attestation-provide" title="Permanent link">#</a></h2>
 <p>A Sigstore attestation ties the producer of a package (for example, a GitHub Actions workflow) to the package artifact. When the attestation is created, metadata about the artifact is registered in a "Transparency Log" which can be inspected at any time. The metadata contains information such as:</p>
 <ul>
@@ -3134,7 +3134,7 @@
 <p class="admonition-title">Experimental</p>
 <p>This feature requires the <code>--experimental</code> flag: <code>rattler-build build --experimental -r recipe.yaml</code></p>
 </div>
-<p>In addition to signing built packages, rattler-build can also <strong>verify</strong> the attestations of source archives during the build. This lets you ensure that the source code you're building from was produced by a trusted publisher (e.g., a specific GitHub Actions workflow).</p>
+<p>In addition to signing built packages, Rattler-Build can also <strong>verify</strong> the attestations of source archives during the build. This lets you ensure that the source code you're building from was produced by a trusted publisher (e.g., a specific GitHub Actions workflow).</p>
 <h3 id="how-it-works">How it works<a class="headerlink" href="#how-it-works" title="Permanent link">#</a></h3>
 <p>Add an <code>attestation</code> block to a URL source in your recipe:</p>
 <div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">source</span><span class="p">:</span>
@@ -3144,7 +3144,7 @@
 </span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">    </span><span class="nt">publishers</span><span class="p">:</span>
 </span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">github:pallets/flask</span>
 </span></code></pre></div>
-<p>When rattler-build downloads the source, it will:</p>
+<p>When Rattler-Build downloads the source, it will:</p>
 <ol>
 <li>Fetch the Sigstore attestation bundle (automatically derived for PyPI packages, or from <code>bundle_url</code>)</li>
 <li>Verify the bundle signature against the Sigstore transparency log</li>

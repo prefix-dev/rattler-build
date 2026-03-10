@@ -2943,7 +2943,7 @@
 
 
 <h1 id="variant-configuration">Variant configuration<a class="headerlink" href="#variant-configuration" title="Permanent link">#</a></h1>
-<p><code>rattler-build</code> can automatically build multiple <em>variants</em> of a given package.
+<p>Rattler-Build can automatically build multiple <em>variants</em> of a given package.
 For example, a Python package might need multiple variants per Python version
 (especially if it is a binary package such as <code>numpy</code>).</p>
 <p>For this use case, one can specify <em>variant</em> configuration files. A variant
@@ -2989,7 +2989,7 @@ we will build multiple variants of this package, one for each configured
 constraints. If the requirement would be <code>python &gt;3.8,&lt;3.10</code> then the variant entry
 would be ignored.</p>
 <h2 id="automatic-discovery">Automatic Discovery<a class="headerlink" href="#automatic-discovery" title="Permanent link">#</a></h2>
-<p><code>rattler-build</code> automatically discovers and includes variant configurations from
+<p>Rattler-Build automatically discovers and includes variant configurations from
 either:</p>
 <ul>
 <li><code>variants.yaml</code> file located next to the recipe</li>
@@ -3010,7 +3010,7 @@ files, use the <code>--variant-config</code> or <code>-m</code> option:</p>
 <li>Zip key lengths must still match.</li>
 </ul>
 <h3 id="conda-build-compatibility"><code>conda-build</code> Compatibility<a class="headerlink" href="#conda-build-compatibility" title="Permanent link">#</a></h3>
-<p>Since version 0.35.0, rattler-build supports <code>conda_build_config.yaml</code> files,
+<p>Since version 0.35.0, Rattler-Build supports <code>conda_build_config.yaml</code> files,
 parsing a subset of conda-build's configuration syntax. The filename must match
 exactly to be recognized as a conda-build config file.</p>
 <h2 id="overriding-the-variant-configuration-from-the-command-line">Overriding the variant configuration from the command line<a class="headerlink" href="#overriding-the-variant-configuration-from-the-command-line" title="Permanent link">#</a></h2>

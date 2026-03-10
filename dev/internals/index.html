@@ -1777,7 +1777,7 @@
   <a href="#making-packages-relocatable-with-rattler-build" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Making Packages Relocatable with rattler-build
+        Making Packages Relocatable with Rattler-Build
       
     </span>
   </a>
@@ -2710,7 +2710,7 @@
   <a href="#making-packages-relocatable-with-rattler-build" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Making Packages Relocatable with rattler-build
+        Making Packages Relocatable with Rattler-Build
       
     </span>
   </a>
@@ -2742,8 +2742,8 @@
   
 
 
-<h1 id="what-does-rattler-build-do-to-build-a-package">What does <code>rattler-build</code> do to build a package?<a class="headerlink" href="#what-does-rattler-build-do-to-build-a-package" title="Permanent link">#</a></h1>
-<p><code>rattler-build</code> creates conda packages which are relocatable packages.
+<h1 id="what-does-rattler-build-do-to-build-a-package">What does Rattler-Build do to build a package?<a class="headerlink" href="#what-does-rattler-build-do-to-build-a-package" title="Permanent link">#</a></h1>
+<p>Rattler-Build creates conda packages which are relocatable packages.
 These packages are built up with some rules and conventions in mind.</p>
 <h2 id="what-goes-into-a-package">What goes into a package?<a class="headerlink" href="#what-goes-into-a-package" title="Permanent link">#</a></h2>
 <p>Generally speaking, any new files that are copied into the <code>$PREFIX</code> directory
@@ -2794,13 +2794,13 @@ which aids in making the package relocatable:</p>
 <li>On Windows, a warning is issued since symlink creation requires administrator
   privileges.</li>
 </ul>
-<h2 id="making-packages-relocatable-with-rattler-build">Making Packages Relocatable with <code>rattler-build</code><a class="headerlink" href="#making-packages-relocatable-with-rattler-build" title="Permanent link">#</a></h2>
-<p>Often, the most challenging aspect of building a package using <code>rattler-build</code>
+<h2 id="making-packages-relocatable-with-rattler-build">Making Packages Relocatable with Rattler-Build<a class="headerlink" href="#making-packages-relocatable-with-rattler-build" title="Permanent link">#</a></h2>
+<p>Often, the most challenging aspect of building a package using Rattler-Build
 is making it relocatable. A relocatable package can be installed into any
 prefix, allowing it to be used outside the environment in which it was built.
 This is in contrast to a non-relocatable package, which can only be utilized
 within its original build environment.</p>
-<p><code>rattler-build</code> automatically performs the following actions to make packages
+<p>Rattler-Build automatically performs the following actions to make packages
 relocatable:</p>
 <ol>
 <li><strong>Binary object file conversion</strong>: Binary object files are converted to use
@@ -2817,7 +2817,7 @@ their build prefix replaced with the install prefix at install time. This works
 by padding the install prefix with null terminators, such that the length of the
 binary file remains the same. The build prefix must be long enough to
 accommodate any reasonable installation prefix. On macOS and Linux,
-<code>rattler-build</code> pads the build prefix to 255 characters by appending
+Rattler-Build pads the build prefix to 255 characters by appending
 <code>_placehold</code> to the end of the build directory name.</li>
 </ol>
 <!--4. **Prefix replacement for specific binary files**: There may be cases where a

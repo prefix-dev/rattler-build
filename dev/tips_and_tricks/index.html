@@ -1240,7 +1240,7 @@
   <a href="#using-sccache-or-ccache-with-rattler-build" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Using sccache or ccache with rattler-build
+        Using sccache or ccache with Rattler-Build
       
     </span>
   </a>
@@ -2671,7 +2671,7 @@
   <a href="#using-sccache-or-ccache-with-rattler-build" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Using sccache or ccache with rattler-build
+        Using sccache or ccache with Rattler-Build
       
     </span>
   </a>
@@ -2742,9 +2742,9 @@
   
 
 
-<h1 id="tips-and-tricks-for-rattler-build">Tips and tricks for rattler-build<a class="headerlink" href="#tips-and-tricks-for-rattler-build" title="Permanent link">#</a></h1>
-<p>This section contains some tips and tricks for using <code>rattler-build</code>.</p>
-<h2 id="using-sccache-or-ccache-with-rattler-build">Using sccache or ccache with <code>rattler-build</code><a class="headerlink" href="#using-sccache-or-ccache-with-rattler-build" title="Permanent link">#</a></h2>
+<h1 id="tips-and-tricks-for-rattler-build">Tips and tricks for Rattler-Build<a class="headerlink" href="#tips-and-tricks-for-rattler-build" title="Permanent link">#</a></h1>
+<p>This section contains some tips and tricks for using Rattler-Build.</p>
+<h2 id="using-sccache-or-ccache-with-rattler-build">Using sccache or ccache with Rattler-Build<a class="headerlink" href="#using-sccache-or-ccache-with-rattler-build" title="Permanent link">#</a></h2>
 <p>When debugging a recipe it can help a lot to use <code>sccache</code> or <code>ccache</code>. You can
 install both tools e.g. with <code>pixi global install sccache</code>.</p>
 <p>To use them with a CMake project, you can use the following variables:</p>
@@ -2757,7 +2757,7 @@ install both tools e.g. with <code>pixi global install sccache</code>.</p>
 </span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="nb">export</span><span class="w"> </span><span class="nv">CXX</span><span class="o">=</span><span class="s2">&quot;sccache </span><span class="nv">$CXX</span><span class="s2">&quot;</span>
 </span></code></pre></div>
 <p>However, both <code>ccache</code> and <code>sccache</code> are sensitive to changes in the build
-location. Since <code>rattler-build</code>, by default, always creates a new build
+location. Since Rattler-Build, by default, always creates a new build
 directory with the timestamp, you need to use the <code>--no-build-id</code> flag. This
 will disable the time stamp in the build directory and allow <code>ccache</code> and
 <code>sccache</code> to cache the build.</p>
@@ -2767,7 +2767,7 @@ will disable the time stamp in the build directory and allow <code>ccache</code>
 <p>You might want to publish your own software packages to a channel you control.
 These might be packages that are not available in the main conda-forge channel,
 or proprietary packages, or packages that you have modified in some way.</p>
-<p>Doing so is pretty straightforward with <code>rattler-build</code> and a CI provider of
+<p>Doing so is pretty straightforward with Rattler-Build and a CI provider of
 your choice. We have a number of example repositories for "custom" forges:</p>
 <ul>
 <li><a href="https://github.com/wolfv/rust-forge">rust-forge</a>: This repository builds a
@@ -2778,7 +2778,7 @@ your choice. We have a number of example repositories for "custom" forges:</p>
 <h3 id="directory-structure">Directory structure<a class="headerlink" href="#directory-structure" title="Permanent link">#</a></h3>
 <p>To create your own forge, you should create a number of sub-directories where
 each sub-directory should contain at most one recipe. With the <code>--recipe-dir</code>
-flag of rattler-build, the program will go and collect all recipes it finds in
+flag of Rattler-Build, the program will go and collect all recipes it finds in
 the given directory or sub-directories.</p>
 <p>We can combine this with the <code>--skip-existing=all</code> flag which will skip all
 packages that are already built locally or in the channel (if you upload them).
@@ -2795,8 +2795,8 @@ Read more about it in the <a href="../recipe_generation/">Generating recipes</a>
 </div>
 <h3 id="ci-setup">CI setup<a class="headerlink" href="#ci-setup" title="Permanent link">#</a></h3>
 <p>As an example, the following is the CI setup for <code>rust-forge</code>. The workflow uses
-<code>rattler-build</code> to build and upload packages to a custom channel on
-<a href="https://prefix.dev">https://prefix.dev</a> – but you can also use <code>rattler-build</code>
+Rattler-Build to build and upload packages to a custom channel on
+<a href="https://prefix.dev">https://prefix.dev</a> – but you can also use Rattler-Build
 to upload to your own <code>quetz</code> instance, or a channel on <code>anaconda.org</code>.</p>
 <details class="tip">
 <summary>Example CI setup for <code>rust-forge</code></summary>

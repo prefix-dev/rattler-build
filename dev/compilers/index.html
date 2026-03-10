@@ -2689,7 +2689,7 @@ like the following:</p>
 you can use <code>${{ compiler('rust') }}</code> and <code>rust_compiler_{version}</code> in your
 variant config.</p>
 <h2 id="cross-compilation">Cross-compilation<a class="headerlink" href="#cross-compilation" title="Permanent link">#</a></h2>
-<p>Cross-compilation is supported by <code>rattler-build</code> and the compiler template
+<p>Cross-compilation is supported by Rattler-Build and the compiler template
 function is part of what makes it possible. When you want to cross-compile from
 <code>linux-64</code> to <code>linux-aarch64</code> (i.e. intel to ARM), you can pass <code>--target-platform
 linux-aarch64</code> to the <code>rattler-build</code> command. This will cause the compiler
@@ -2705,7 +2705,7 @@ environment resolves to packages for the <code>linux-64</code> architecture (in 
 example). On the other hand, the <code>host</code> packages resolve to <code>linux-aarch64</code> -
 those are packages that we want to link against.</p>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># packages that need to run at build time (cmake, gcc, autotools, etc.)</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="c1"># in the platform that rattler-build is executed on (the build_platform)</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="c1"># in the platform that Rattler-Build is executed on (the build_platform)</span>
 </span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="nt">build</span><span class="p">:</span>
 </span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cmake</span>
 </span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ compiler(&#39;c&#39;) }}</span>

@@ -2843,7 +2843,7 @@
 
 
 <h1 id="packaging-a-c-package">Packaging a C++ package<a class="headerlink" href="#packaging-a-c-package" title="Permanent link">#</a></h1>
-<p>This tutorial will guide you though making a C++ package with <code>rattler-build</code>.</p>
+<p>This tutorial will guide you though making a C++ package with Rattler-Build.</p>
 <h2 id="building-a-header-only-library">Building a Header-only Library<a class="headerlink" href="#building-a-header-only-library" title="Permanent link">#</a></h2>
 <p>To build a package for the header-only library <code>xtensor</code>, you need to manage dependencies and ensure proper installation paths.</p>
 <h3 id="key-steps">Key Steps<a class="headerlink" href="#key-steps" title="Permanent link">#</a></h3>
@@ -3057,7 +3057,7 @@ to the recipe by the file name given, or the default name <code>build.sh</code> 
 </span><span id="__span-4-26"><a id="__codelineno-4-26" name="__codelineno-4-26" href="#__codelineno-4-26"></a>ninja<span class="w"> </span>install
 </span></code></pre></div>
 <h2 id="parsing-the-rattler-build-build-output">Parsing the <code>rattler-build build</code> Output<a class="headerlink" href="#parsing-the-rattler-build-build-output" title="Permanent link">#</a></h2>
-<p>When running the <code>rattler-build</code> command, you might notice some interesting information in the output.
+<p>When running the <code>rattler-build build</code> command, you might notice some interesting information in the output.
 Our package will have some <code>run</code> dependencies, even if we didn't specify any.</p>
 <p>These come from the <code>run-exports</code> of the packages listed in the <code>host</code> section of the recipe.
 This is indicated by <code>"RE of [host: package]"</code> in the output.</p>
@@ -3096,7 +3096,7 @@ This ensures proper linking to shared libraries.</p>
 </span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a> ├─ @rpath/libpoppler-glib.8.dylib
 </span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a> └─ @rpath/libcairo.2.dylib
 </span></code></pre></div>
-<p><code>rattler-build</code> ensures that:</p>
+<p>Rattler-Build ensures that:</p>
 <ol>
 <li>All shared libraries linked against are present in the run dependencies.
 Missing libraries trigger an <code>overlinking</code> warning.</li>

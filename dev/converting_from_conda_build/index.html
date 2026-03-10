@@ -2775,9 +2775,9 @@
 
 
 <h1 id="converting-a-recipe-from-conda-build">Converting a recipe from conda-build<a class="headerlink" href="#converting-a-recipe-from-conda-build" title="Permanent link">#</a></h1>
-<p>The recipe format of <code>rattler-build</code> differs in some aspects from <code>conda-build</code>.
+<p>The recipe format of Rattler-Build differs in some aspects from <code>conda-build</code>.
 This document aims to help you convert a recipe from <code>conda-build</code> to
-<code>rattler-build</code>.</p>
+Rattler-Build.</p>
 <h2 id="automatic-conversion">Automatic conversion<a class="headerlink" href="#automatic-conversion" title="Permanent link">#</a></h2>
 <p>To convert a recipe from <code>meta.yaml</code> to <code>recipe.yaml</code> you can use the automatic
 conversion utility.</p>
@@ -2823,14 +2823,14 @@ makes Jinja fully compatible with the YAML format.</p>
 <h2 id="converting-selectors">Converting selectors<a class="headerlink" href="#converting-selectors" title="Permanent link">#</a></h2>
 <p><code>conda-build</code> has a line based "selector" system, to e.g. disable certain fields
 on Windows vs. Unix.</p>
-<p>In rattler-build we use two different syntaxes: an <code>if/else/then</code> map or a
+<p>In Rattler-Build we use two different syntaxes: an <code>if/else/then</code> map or a
 inline jinja expression.</p>
 <p>A typical selector in <code>conda-build</code> looks something like this:</p>
 <div class="language-yaml highlight"><span class="filename">meta.yaml</span><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nt">requirements</span><span class="p">:</span>
 </span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="nt">host</span><span class="p">:</span>
 </span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pywin32</span><span class="w">  </span><span class="c1"># [win]</span>
 </span></code></pre></div>
-<p>To convert this to <code>rattler-build</code> syntax, you can use one of the following two
+<p>To convert this to Rattler-Build syntax, you can use one of the following two
 syntaxes:</p>
 <div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nt">requirements</span><span class="p">:</span>
 </span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span><span class="nt">host</span><span class="p">:</span>
@@ -2903,7 +2903,7 @@ requirements. The <code>build</code> requirements can be used to install emulato
 similar tools that need to run to execute tests in a cross-compilation
 environment.</p>
 <h1 id="automatic-feedstock-conversion">Automatic feedstock conversion<a class="headerlink" href="#automatic-feedstock-conversion" title="Permanent link">#</a></h1>
-<p>Use the tool <a href="https://github.com/hadim/feedrattler"><code>feedrattler</code></a> by <a href="https://github.com/hadim">hadim</a> to go directly from an existing conda-forge v0 recipe feedstock to the new v1 recipe used by rattler-build.</p>
+<p>Use the tool <a href="https://github.com/hadim/feedrattler"><code>feedrattler</code></a> by <a href="https://github.com/hadim">hadim</a> to go directly from an existing conda-forge v0 recipe feedstock to the new v1 recipe used by Rattler-Build.</p>
 <p>You can install and use it directly by running <code>pixi exec</code>:
 <div class="language-text highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>pixi exec feedrattler my-awesome-feedstock
 </span></code></pre></div></p>
