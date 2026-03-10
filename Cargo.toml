@@ -10,19 +10,20 @@ description = "A fast CLI tool to build conda packages on Windows, macOS and Lin
 documentation = "https://prefix-dev.github.io/rattler-build"
 default-run = "rattler-build"
 rust-version = "1.89.0"
+publish = false
 
 [workspace]
 members = [
-  "crates/rattler_git",
+  "crates/rattler_build_core",
   "crates/rattler_build_networking",
   "crates/rattler_build_source_cache",
   "crates/rattler_build_recipe_generator",
-  "crates/rattler_prefix_guard",
   "crates/rattler_build_recipe",
   "crates/rattler_build_types",
   "crates/rattler_build_jinja",
   "crates/rattler_build_script",
   "crates/rattler_build_yaml_parser",
+  "crates/rattler_build_variant_config",
   "crates/rattler_build_allocator",
   "crates/rattler_build_package",
   "crates/rattler_build_docs",
@@ -67,14 +68,13 @@ rattler_conda_types = { version = "0.43.5", default-features = false }
 rattler_digest = { version = "1.2.2", default-features = false, features = [
   "serde",
 ] }
-rattler_build_types = { path = "crates/rattler_build_types" }
-rattler_build_jinja = { path = "crates/rattler_build_jinja" }
-rattler_build_recipe = { path = "crates/rattler_build_recipe" }
 rattler_networking = { version = "0.26.2", default-features = false }
 rattler_package_streaming = { version = "0.24.2", default-features = false }
 rattler_shell = { version = "0.26.2", default-features = false, features = [
   "sysinfo",
 ] }
+rattler_git = { version = "0.1.0" }
+rattler_prefix_guard = { version = "0.1.0" }
 regex = "1.12.3"
 reqwest = { version = "0.12.28", default-features = false, features = ["json"] }
 reqwest-middleware = "0.4.2"
@@ -115,12 +115,19 @@ memchr = "2.8.0"
 memmap2 = "0.9.10"
 rayon = "1.11.0"
 serial_test = "3.4.0"
-rattler_build_networking = { path = "crates/rattler_build_networking" }
-rattler_build_script = { path = "crates/rattler_build_script", default-features = false }
-rattler_build_variant_config = { path = "crates/rattler_build_variant_config" }
-rattler_build_yaml_parser = { path = "crates/rattler_build_yaml_parser" }
-rattler_git = { path = "crates/rattler_git" }
-rattler_prefix_guard = { path = "crates/rattler_prefix_guard" }
+
+# Internal rattler-build crates
+rattler_build_allocator = { path = "crates/rattler_build_allocator", version = "=0.1.0" }
+rattler_build_core = { path = "crates/rattler_build_core", version = "=0.1.0", default-features = false }
+rattler_build_jinja = { path = "crates/rattler_build_jinja", version = "=0.1.0" }
+rattler_build_networking = { path = "crates/rattler_build_networking", version = "=0.1.0" }
+rattler_build_recipe = { path = "crates/rattler_build_recipe", version = "=0.1.0" }
+rattler_build_recipe_generator = { path = "crates/rattler_build_recipe_generator", version = "=0.1.0", default-features = false }
+rattler_build_script = { path = "crates/rattler_build_script", version = "=0.1.0", default-features = false }
+rattler_build_source_cache = { path = "crates/rattler_build_source_cache", version = "=0.1.0", default-features = false }
+rattler_build_types = { path = "crates/rattler_build_types", version = "=0.1.0" }
+rattler_build_variant_config = { path = "crates/rattler_build_variant_config", version = "=0.1.0" }
+rattler_build_yaml_parser = { path = "crates/rattler_build_yaml_parser", version = "=0.1.0" }
 
 [features]
 default = ['rustls-tls', 'recipe-generation', 's3', 'sigstore']
@@ -129,32 +136,12 @@ default = ['rustls-tls', 'recipe-generation', 's3', 'sigstore']
 # Disabled by default due to increased compile time.
 performance = ["rattler_build_allocator"]
 native-tls = [
-  'reqwest/native-tls',
-  'rattler/native-tls',
-  'rattler_repodata_gateway/native-tls',
-  'rattler_networking/native-tls',
-  'rattler_package_streaming/native-tls',
-  'rattler_index/native-tls',
-  'rattler_redaction/native-tls',
-  'rattler_upload/native-tls',
-  'rattler_build_networking/native-tls',
-  'rattler_build_source_cache/native-tls',
+  'rattler_build_core/native-tls',
   'rattler_build_recipe_generator?/native-tls',
   'http-range-client/default-tls',
 ]
 rustls-tls = [
-  'reqwest/rustls-tls',
-  'reqwest-middleware/rustls-tls',
-  'reqwest/rustls-tls-native-roots',
-  'rattler/rustls-tls',
-  'rattler_repodata_gateway/rustls-tls',
-  'rattler_networking/rustls-tls',
-  'rattler_package_streaming/rustls-tls',
-  'rattler_index/rustls-tls',
-  'rattler_redaction/rustls-tls',
-  'rattler_upload/rustls-tls',
-  'rattler_build_networking/rustls-tls',
-  'rattler_build_source_cache/rustls-tls',
+  'rattler_build_core/rustls-tls',
   'rattler_build_recipe_generator?/rustls-tls',
   'http-range-client/rustls-tls',
 ]
@@ -165,17 +152,8 @@ tui = [
   'throbber-widgets-tui',
   'tui-input',
 ]
-s3 = [
-  'rattler_networking/s3',
-  'rattler_upload/s3',
-  'rattler_index/s3',
-  'rattler_build_networking/s3',
-  'dep:rattler_s3',
-]
-sigstore = [
-  'rattler_upload/sigstore-sign',
-  'rattler_build_source_cache/sigstore',
-]
+s3 = ['rattler_build_core/s3']
+sigstore = ['rattler_build_core/sigstore']
 recipe-generation = ["rattler_build_recipe_generator"]
 patch-test-extra = []
 
@@ -305,18 +283,18 @@ sevenz-rust2 = { workspace = true }
 dialoguer = "0.12.0"
 
 # Local rattler-build crates
-rattler_build_recipe_generator = { path = "crates/rattler_build_recipe_generator", optional = true, default-features = false, features = [
+rattler_build_core = { workspace = true }
+rattler_build_recipe_generator = { workspace = true, optional = true, features = [
   "cli",
 ] }
 rattler_build_types = { workspace = true }
 rattler_build_variant_config = { workspace = true, features = ["parser"] }
 rattler_build_jinja = { workspace = true }
 rattler_build_recipe = { workspace = true, features = ["variant-config"] }
-rattler_git = { workspace = true }
 rattler_build_networking = { workspace = true, features = ["middleware"] }
-rattler_build_source_cache = { path = "crates/rattler_build_source_cache", default-features = false }
+rattler_build_source_cache = { workspace = true }
 rattler_build_script = { workspace = true, features = ["execution"] }
-rattler_build_allocator = { path = "crates/rattler_build_allocator", optional = true }
+rattler_build_allocator = { workspace = true, optional = true }
 
 [target.'cfg(not(target_os = "windows"))'.dependencies]
 sha2 = { workspace = true, features = ["asm"] }

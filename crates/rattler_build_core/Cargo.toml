@@ -1,0 +1,163 @@
+[package]
+name = "rattler_build_core"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+readme.workspace = true
+repository.workspace = true
+description = "Core library for rattler-build"
+
+[features]
+default = ['rustls-tls', 's3']
+native-tls = [
+  'reqwest/native-tls',
+  'rattler/native-tls',
+  'rattler_repodata_gateway/native-tls',
+  'rattler_networking/native-tls',
+  'rattler_package_streaming/native-tls',
+  'rattler_index/native-tls',
+  'rattler_redaction/native-tls',
+  'rattler_upload/native-tls',
+  'rattler_build_networking/native-tls',
+  'rattler_build_source_cache/native-tls',
+]
+rustls-tls = [
+  'reqwest/rustls-tls',
+  'reqwest-middleware/rustls-tls',
+  'reqwest/rustls-tls-native-roots',
+  'rattler/rustls-tls',
+  'rattler_repodata_gateway/rustls-tls',
+  'rattler_networking/rustls-tls',
+  'rattler_package_streaming/rustls-tls',
+  'rattler_index/rustls-tls',
+  'rattler_redaction/rustls-tls',
+  'rattler_upload/rustls-tls',
+  'rattler_build_networking/rustls-tls',
+  'rattler_build_source_cache/rustls-tls',
+]
+s3 = [
+  'rattler_networking/s3',
+  'rattler_upload/s3',
+  'rattler_index/s3',
+  'rattler_build_networking/s3',
+  'dep:rattler_s3',
+]
+sigstore = [
+  'rattler_upload/sigstore-sign',
+  'rattler_build_source_cache/sigstore',
+]
+
+[dependencies]
+serde = { workspace = true }
+serde_yaml = { workspace = true }
+anyhow = { workspace = true }
+walkdir = { workspace = true }
+hex = { workspace = true }
+serde_json = { workspace = true }
+reqwest = { workspace = true, features = ["multipart"] }
+tokio = { workspace = true, features = [
+  "rt",
+  "macros",
+  "rt-multi-thread",
+  "process",
+] }
+itertools = { workspace = true }
+content_inspector = { workspace = true }
+serde_with = { workspace = true }
+serde-untagged = "0.1.9"
+url = { workspace = true }
+tracing = { workspace = true }
+clap = { workspace = true }
+minijinja = { workspace = true }
+tracing-subscriber = { version = "0.3", features = [
+  "env-filter",
+  "fmt",
+  "ansi",
+  "json",
+] }
+miette = { workspace = true, features = ["fancy"] }
+num_cpus = "1.17.0"
+goblin = "0.10.4"
+scroll = "0.13.0"
+pathdiff = { workspace = true }
+comfy-table = "7.2.2"
+futures = { workspace = true }
+indicatif = { workspace = true, features = ["in_memory"] }
+console = { workspace = true }
+thiserror = { workspace = true }
+tempfile = { workspace = true }
+chrono = { workspace = true }
+ignore = "0.4.25"
+globset = { workspace = true }
+text-stub-library = "0.9.0"
+clap-verbosity-flag = "3.0.4"
+tracing-core = "0.1.36"
+indexmap = { workspace = true }
+dunce = { workspace = true }
+fs-err = { workspace = true }
+which = { workspace = true }
+tokio-util = { workspace = true }
+flickzeug = { version = "0.5.1" }
+memmap2 = { workspace = true }
+reqwest-middleware = { version = "0.4.2", features = ["json"] }
+async-once-cell = { workspace = true }
+terminal_size = "0.4.3"
+memchr = { workspace = true }
+reflink-copy = "0.1.28"
+rayon = { workspace = true }
+regex = { workspace = true }
+async-recursion = { workspace = true }
+
+# Rattler crates
+rattler_config = { version = "0.3.2" }
+rattler = { version = "0.39.15", default-features = false, features = [
+  "cli-tools",
+  "indicatif",
+] }
+rattler_cache = { version = "0.6.14", default-features = false }
+rattler_conda_types = { workspace = true, features = ["rayon"] }
+rattler_digest = { workspace = true }
+rattler_index = { version = "0.27.16", default-features = false }
+rattler_networking = { workspace = true, features = ["rattler_config"] }
+rattler_upload = { version = "0.4.15", default-features = false }
+rattler_s3 = { version = "0.1.25", optional = true }
+rattler_redaction = { version = "0.1.13", default-features = false }
+rattler_repodata_gateway = { version = "0.26.2", default-features = false, features = [
+  "gateway",
+] }
+rattler_shell = { version = "0.26.2", default-features = false, features = [
+  "sysinfo",
+] }
+rattler_solve = { version = "4.2.6", default-features = false, features = [
+  "resolvo",
+  "serde",
+] }
+rattler_virtual_packages = { version = "2.3.11", default-features = false }
+rattler_package_streaming = { workspace = true, default-features = false }
+rattler_menuinst = "0.2.49"
+retry-policies = "0.5.1"
+unicode-normalization = "0.1.25"
+line-ending = "1.5.1"
+
+# Local rattler-build crates
+rattler_git = { workspace = true }
+rattler_build_types = { workspace = true }
+rattler_build_jinja = { workspace = true }
+rattler_build_recipe = { workspace = true, features = ["variant-config"] }
+rattler_build_networking = { workspace = true, features = ["middleware"] }
+rattler_build_source_cache = { workspace = true }
+rattler_build_script = { workspace = true, features = ["execution"] }
+
+[target.'cfg(not(target_os = "windows"))'.dependencies]
+sha2 = { workspace = true, features = ["asm"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+sha2 = { workspace = true }
+
+[dev-dependencies]
+insta = { workspace = true, features = ["yaml", "filters"] }
+rstest = { workspace = true }
+tracing-test = "0.2.5"
+serial_test = { workspace = true }
+pretty_assertions = "1.4.1"
