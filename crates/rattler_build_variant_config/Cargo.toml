@@ -5,7 +5,8 @@ authors.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Variant configuration system for rattler-build"
+readme = "README.md"
+description = "Variant configuration system for rattler-build, handling build matrices, zip keys, and loading of variant YAML files"
 
 [features]
 default = ["parser"]

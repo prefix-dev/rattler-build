@@ -1,4 +1,10 @@
-# Rattler Build Source Cache
+<h1>
+  <a href="https://prefix.dev/tools/rattler-build">
+    <img alt="banner" src="https://github.com/user-attachments/assets/456f8ef1-1c7b-463d-ad88-de3496b05db2">
+  </a>
+</h1>
+
+# rattler_build_source_cache
 
 A unified source cache for rattler-build that handles Git repositories, URL downloads, and local paths with proper caching, extraction, and concurrent access control.
 

@@ -4,7 +4,8 @@ version = "0.1.0"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Shared YAML parsing infrastructure for rattler-build with Jinja2 template support"
+readme = "README.md"
+description = "YAML parser with Jinja2 template support for rattler-build, providing shared parsing infrastructure for conditional structures and template values"
 
 [dependencies]
 marked-yaml = { workspace = true }

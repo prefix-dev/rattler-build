@@ -5,7 +5,8 @@ edition.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Networking utilities for rattler-build"
+readme = "README.md"
+description = "Networking utilities for rattler-build, providing shared HTTP client functionality with retry middleware"
 
 [features]
 default = []

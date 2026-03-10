@@ -5,7 +5,8 @@ authors.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "minijinja integration for rattler-build"
+readme = "README.md"
+description = "Jinja template engine integration for rattler-build, powered by minijinja"
 
 [features]
 
