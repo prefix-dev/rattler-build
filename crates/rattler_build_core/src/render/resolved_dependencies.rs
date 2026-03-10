@@ -22,7 +22,7 @@ use crate::{
     metadata::{BuildConfiguration, Output, build_reindexed_channels},
     package_cache_reporter::PackageCacheReporter,
     render::{
-        run_exports::filter_run_exports,
+        run_exports::{filter_inherited_run_exports, filter_run_exports},
         solver::{install_packages, solve_environment},
     },
     tool_configuration::{self, Configuration},
@@ -1001,20 +1001,21 @@ pub(crate) async fn resolve_dependencies(
             .map(|i| i.inherit_run_exports)
             .unwrap_or(true);
 
-        // Add dependencies from cache, but filter out RunExports if inherit_run_exports is false
-        depends = depends
-            .iter()
-            .chain(finalized_cache.run.depends.iter().filter(|dep| {
-                // Include non-RunExport dependencies always
-                // Include RunExport dependencies only if inherit_run_exports is true
-                if matches!(dep, DependencyInfo::RunExport(_)) {
-                    should_inherit_run_exports
-                } else {
-                    true
-                }
-            }))
-            .cloned()
-            .collect();
+        // Add dependencies from cache, but filter out RunExports if inherit_run_exports is
+        // false. Also apply the current output's ignore_run_exports filters to
+        // any inherited run exports.
+        let inherited_deps: Vec<_> = if should_inherit_run_exports {
+            filter_inherited_run_exports(&ignore_run_exports, &finalized_cache.run.depends)
+        } else {
+            finalized_cache
+                .run
+                .depends
+                .iter()
+                .filter(|dep| !matches!(dep, DependencyInfo::RunExport(_)))
+                .cloned()
+                .collect()
+        };
+        depends.extend(inherited_deps);
 
         constraints = constraints
             .iter()
