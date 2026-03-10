@@ -33,6 +33,9 @@ use crate::{
     stage1::{Evaluate, EvaluationContext, Recipe as Stage1Recipe},
 };
 
+/// Result type for [`build_recipe_dependency_graph`]: the graph, node mapping, and sorted item indices.
+type RecipeDependencyGraph = (DiGraph<usize, ()>, Vec<NodeIndex>, Vec<usize>);
+
 /// Errors that can occur during recipe rendering with variant configurations.
 ///
 /// This is the primary error type for the rendering layer, covering parse errors,
@@ -354,7 +357,7 @@ pub fn topological_sort_by_dependencies<T>(
         return Ok(items);
     }
 
-    let recipes: Vec<&Stage1Recipe> = items.iter().map(|item| get_recipe(item)).collect();
+    let recipes: Vec<&Stage1Recipe> = items.iter().map(&get_recipe).collect();
     let name_to_indices = build_recipe_name_index(&recipes);
     let (graph, idx_to_node, toposorted) =
         build_recipe_dependency_graph(&recipes, &name_to_indices)?;
@@ -476,7 +479,7 @@ fn stable_toposort(
 fn build_recipe_dependency_graph(
     recipes: &[&Stage1Recipe],
     name_to_indices: &BTreeMap<rattler_conda_types::PackageName, Vec<usize>>,
-) -> Result<(DiGraph<usize, ()>, Vec<NodeIndex>, Vec<usize>), TopologicalSortError> {
+) -> Result<RecipeDependencyGraph, TopologicalSortError> {
     let (graph, idx_to_node) = build_recipe_graph(recipes, name_to_indices);
     let sorted = stable_toposort(&graph, &idx_to_node, recipes)?;
     Ok((graph, idx_to_node, sorted))
