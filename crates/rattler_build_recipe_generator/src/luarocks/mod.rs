@@ -1,4 +1,4 @@
-//! Implements logic to generate a rattler-build recipe from a LuaRocks rockspec
+//! Implements logic to generate a Rattler-Build recipe from a LuaRocks rockspec
 //! file.
 
 use std::{collections::BTreeMap, io::Write, path::PathBuf};

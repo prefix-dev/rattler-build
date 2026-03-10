@@ -1,6 +1,6 @@
 //! Module for running scripts in different interpreters.
 //!
-//! This module provides integration between rattler-build and the rattler_build_script crate,
+//! This module provides integration between Rattler-Build and the rattler_build_script crate,
 //! specifically handling the execution of build scripts within the Output context.
 
 use indexmap::IndexMap;

@@ -1,6 +1,6 @@
 #![deny(missing_docs)]
 
-//! The core engine of rattler-build, providing recipe rendering, source fetching,
+//! The core engine of Rattler-Build, providing recipe rendering, source fetching,
 //! script execution, package building, testing, and publishing.
 
 pub mod build;

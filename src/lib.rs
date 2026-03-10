@@ -1,6 +1,6 @@
 #![deny(missing_docs)]
 
-//! rattler-build library.
+//! Rattler-Build library.
 
 // Re-export all core modules from rattler_build_core
 pub use rattler_build_core::build;
@@ -1218,12 +1218,12 @@ pub async fn rebuild(
     Ok(())
 }
 
-/// Get the version of rattler-build.
+/// Get the version of Rattler-Build.
 pub fn get_rattler_build_version() -> &'static str {
     env!("CARGO_PKG_VERSION")
 }
 
-/// Build rattler-build recipes
+/// Build Rattler-Build recipes
 pub async fn build_recipes(
     recipe_paths: Vec<std::path::PathBuf>,
     build_data: BuildData,

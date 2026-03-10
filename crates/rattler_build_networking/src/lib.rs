@@ -1,4 +1,4 @@
-//! Networking utilities for rattler-build, providing shared HTTP client functionality
+//! Networking utilities for Rattler-Build, providing shared HTTP client functionality
 //! with retry middleware.
 
 use reqwest_middleware::ClientWithMiddleware;

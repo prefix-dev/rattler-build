@@ -1,4 +1,4 @@
-//! Testing a package produced by rattler-build (or conda-build)
+//! Testing a package produced by Rattler-Build (or conda-build)
 //!
 //! Tests are part of the final package (under the `info/test` directory).
 //! There are multiple test types:

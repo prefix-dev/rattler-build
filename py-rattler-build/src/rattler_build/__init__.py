@@ -128,5 +128,5 @@ __all__ = [
 
 
 def rattler_build_version() -> str:
-    """Get the version of the rattler-build package"""
+    """Get the version of the Rattler-Build package"""
     return get_rattler_build_version_py()

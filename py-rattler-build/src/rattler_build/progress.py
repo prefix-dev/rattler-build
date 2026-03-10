@@ -1,5 +1,5 @@
 """
-Progress reporting and callbacks for rattler-build.
+Progress reporting and callbacks for Rattler-Build.
 
 This module provides base classes and implementations for progress reporting
 during recipe rendering and building. You can use the built-in implementations

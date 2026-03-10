@@ -1,4 +1,4 @@
-//! YAML parser with Jinja2 template support for rattler-build, providing shared parsing
+//! YAML parser with Jinja2 template support for Rattler-Build, providing shared parsing
 //! infrastructure for conditional structures and template values.
 //!
 //! # Core Types

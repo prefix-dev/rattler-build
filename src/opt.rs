@@ -348,11 +348,11 @@ pub struct App {
     )]
     pub wrap_log_lines: Option<bool>,
 
-    /// The rattler-build configuration file to use
+    /// The Rattler-Build configuration file to use
     #[arg(long, global = true)]
     pub config_file: Option<PathBuf>,
 
-    /// Enable or disable colored output from rattler-build.
+    /// Enable or disable colored output from Rattler-Build.
     /// Also honors the `CLICOLOR` and `CLICOLOR_FORCE` environment variable.
     #[clap(
         long,

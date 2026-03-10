@@ -1,4 +1,4 @@
-"""Package inspection and testing API for rattler-build.
+"""Package inspection and testing API for Rattler-Build.
 
 This module provides functionality to load and inspect conda packages (.conda or .tar.bz2),
 examine their metadata and embedded tests, and run tests against them.
