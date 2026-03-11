@@ -61,7 +61,7 @@ libc = "0.2"
 md-5 = "0.10"
 lazy_static = "1.5.0"
 miette = "7.6.0"
-minijinja = { version = "2.15.1", features = [
+minijinja = { version = "2.17.1", features = [
   "unstable_machinery",
   "custom_syntax",
 ] }

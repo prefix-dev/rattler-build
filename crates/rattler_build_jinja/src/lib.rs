@@ -8,10 +8,7 @@ mod jinja;
 mod utils;
 mod variable;
 
-pub use ast_variables::{
-    JinjaExpression, JinjaTemplate, extract_default_guarded_variables_from_expression,
-    extract_default_guarded_variables_from_template,
-};
+pub use ast_variables::{JinjaExpression, JinjaTemplate};
 pub use jinja::{Jinja, JinjaConfig};
 pub use rattler_build_types::NormalizedKey;
 pub use variable::Variable;
