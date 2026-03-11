@@ -178,10 +178,10 @@ jobs:
         env:
           CODESIGN_CERTIFICATE: ${{ secrets.CODESIGN_CERTIFICATE }}
           CODESIGN_CERTIFICATE_PASSWORD: ${{ secrets.CODESIGN_CERTIFICATE_PASSWORD }}
-          CODESIGN_IDENTITY: ${{ secrets.CODESIGN_IDENTITY }}
+          CODESIGN_IDENTITY: ${{ vars.CODESIGN_IDENTITY }}
           APPLEID_USERNAME: ${{ secrets.APPLEID_USERNAME }}
           APPLEID_PASSWORD: ${{ secrets.APPLEID_PASSWORD }}
-          APPLEID_TEAMID: ${{ secrets.APPLEID_TEAMID }}
+          APPLEID_TEAMID: ${{ vars.APPLEID_TEAMID }}
         run: pixi run -e release sign-macos --artifacts-dir artifacts/
       - name: Upload signed artifact
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
@@ -219,8 +219,8 @@ jobs:
       - name: Azure login (OIDC)
         uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2
         with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
           allow-no-subscriptions: true
       - name: Extract executables for signing
         run: pixi run -e release sign-windows-extract --artifacts-dir artifacts/ --sign-dir ${{ runner.temp }}/to-sign
