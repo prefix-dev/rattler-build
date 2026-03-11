@@ -69,9 +69,8 @@ jobs:
             os: windows-2022
           - target: x86_64-pc-windows-msvc
             os: windows-2022
-          # TODO: re-enable once win-arm64 runners are stable
-          # - target: aarch64-pc-windows-msvc
-          #   os: windows-11-arm
+          - target: aarch64-pc-windows-msvc
+            os: windows-11-arm
     env:
       # Enable Link Time Optimization (LTO) for release builds.
       CARGO_PROFILE_RELEASE_LTO: true
@@ -90,6 +89,13 @@ jobs:
         with:
           submodules: recursive
           persist-credentials: false
+
+      - name: Configure pixi for win-arm64
+        if: matrix.target == 'aarch64-pc-windows-msvc'
+        shell: bash
+        run: |
+          mkdir -p ~/.pixi
+          echo 'tool-platform = "win-64"' > ~/.pixi/config.toml
 
       - uses: prefix-dev/setup-pixi@a0af7a228712d6121d37aba47adf55c1332c9c2e # v0.9.4
         with:
@@ -202,12 +208,17 @@ jobs:
         include:
           - target: x86_64-pc-windows-gnu
           - target: x86_64-pc-windows-msvc
-          # TODO: re-enable once win-arm64 runners are stable
-          # - target: aarch64-pc-windows-msvc
+          - target: aarch64-pc-windows-msvc
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
+      - name: Configure pixi for win-arm64
+        if: matrix.target == 'aarch64-pc-windows-msvc'
+        shell: bash
+        run: |
+          mkdir -p ~/.pixi
+          echo 'tool-platform = "win-64"' > ~/.pixi/config.toml
       - uses: prefix-dev/setup-pixi@a0af7a228712d6121d37aba47adf55c1332c9c2e # v0.9.4
         with:
           environments: release
