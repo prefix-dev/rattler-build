@@ -218,12 +218,12 @@ def main() -> None:
 
         if start_step <= 5:
             cprint("\n5. Updating pixi.lock (root)...")
-            run(["pixi", "install"])
+            run(["pixi", "lock"])
             completed.append("Updated pixi.lock (root)")
 
         if start_step <= 6:
             cprint("\n6. Updating pixi.lock (py-rattler-build/)...")
-            run(["pixi", "install"], cwd=ROOT / "py-rattler-build")
+            run(["pixi", "lock"], cwd=ROOT / "py-rattler-build")
             completed.append("Updated pixi.lock (py-rattler-build/)")
 
         cprint("\n=== Done ===")
