@@ -105,7 +105,7 @@ reqwest-middleware = { version = "0.4.2", features = ["json"] }
 async-once-cell = { workspace = true }
 terminal_size = "0.4.3"
 memchr = { workspace = true }
-reflink-copy = "0.1.28"
+reflink-copy = "0.1.29"
 rayon = { workspace = true }
 regex = { workspace = true }
 async-recursion = { workspace = true }
