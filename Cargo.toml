@@ -10,7 +10,7 @@ description = "A fast CLI tool to build conda packages on Windows, macOS and Lin
 documentation = "https://prefix-dev.github.io/rattler-build"
 default-run = "rattler-build"
 rust-version = "1.89.0"
-publish = false
+publish = true
 
 [workspace]
 members = [
