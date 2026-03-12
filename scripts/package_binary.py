@@ -17,13 +17,14 @@ import os
 import shutil
 import subprocess
 import tarfile
+import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
 
-def is_windows_target(target: str) -> bool:
-    return "pc-windows" in target
+def is_linux_target(target: str) -> bool:
+    return "linux" in target
 
 
 def needs_signing(target: str) -> bool:
@@ -36,9 +37,10 @@ def main() -> None:
     args = parser.parse_args()
 
     target: str = args.target
-    windows = is_windows_target(target)
+    windows = "pc-windows" in target
+    linux = is_linux_target(target)
     ext = ".exe" if windows else ""
-    archive_ext = ".zip" if windows else ".tar.gz"
+    archive_ext = ".tar.gz" if linux else ".zip"
 
     pkg_basename = f"rattler-build-{target}"
     pkg_name = f"{pkg_basename}{archive_ext}"
@@ -54,7 +56,11 @@ def main() -> None:
 
     # Create archive
     archive_path = ROOT / "pkg" / pkg_name
-    if windows:
+    if linux:
+        with tarfile.open(archive_path, "w:gz") as tf:
+            for item in sorted(archive_dir.iterdir()):
+                tf.add(item, arcname=f"{pkg_basename}/{item.name}")
+    elif windows:
         # Use 7z on Windows for zip creation (handles paths better)
         subprocess.run(
             ["7z", "-y", "a", str(archive_path), f"{pkg_basename}/*"],
@@ -62,9 +68,9 @@ def main() -> None:
             cwd=ROOT / "pkg",
         )
     else:
-        with tarfile.open(archive_path, "w:gz") as tf:
+        with zipfile.ZipFile(archive_path, "w", zipfile.ZIP_DEFLATED) as zf:
             for item in sorted(archive_dir.iterdir()):
-                tf.add(item, arcname=f"{pkg_basename}/{item.name}")
+                zf.write(item, f"{pkg_basename}/{item.name}")
 
     # Stage everything flat for upload
     staging = ROOT / "staging"

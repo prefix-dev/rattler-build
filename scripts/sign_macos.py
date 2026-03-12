@@ -17,8 +17,8 @@ import base64
 import os
 import subprocess
 import sys
-import tarfile
 import tempfile
+import zipfile
 from pathlib import Path
 
 KEYCHAIN_NAME = "release-signing.keychain-db"
@@ -83,19 +83,19 @@ def cleanup_keychain() -> None:
         print("Warning: failed to delete keychain", file=sys.stderr)
 
 
-def sign_tarball(tarball: Path, identity: str) -> None:
-    """Extract tarball, codesign the binary, re-create the tarball."""
+def sign_zip(archive: Path, identity: str) -> None:
+    """Extract zip, codesign the binary, re-create the zip."""
     with tempfile.TemporaryDirectory() as tmpdir:
         tmp = Path(tmpdir)
 
         # Extract
-        with tarfile.open(tarball, "r:gz") as tf:
-            tf.extractall(tmp)
+        with zipfile.ZipFile(archive, "r") as zf:
+            zf.extractall(tmp)
 
         # Find the binary (top-level dir contains rattler-build)
         binaries = list(tmp.rglob("rattler-build"))
         if not binaries:
-            print(f"  Warning: no rattler-build binary found in {tarball.name}")
+            print(f"  Warning: no rattler-build binary found in {archive.name}")
             return
 
         for binary in binaries:
@@ -112,22 +112,23 @@ def sign_tarball(tarball: Path, identity: str) -> None:
                 ]
             )
 
-        # Re-create tarball
-        tarball.unlink()
-        with tarfile.open(tarball, "w:gz") as tf:
-            for item in sorted(tmp.iterdir()):
-                tf.add(item, arcname=item.name)
+        # Re-create zip
+        archive.unlink()
+        with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as zf:
+            for item in sorted(tmp.rglob("*")):
+                if item.is_file():
+                    zf.write(item, item.relative_to(tmp))
 
 
-def notarize_tarball(tarball: Path, username: str, password: str, team_id: str) -> None:
-    """Submit the tarball to Apple notary service."""
-    print(f"  Notarizing {tarball.name}...")
+def notarize_zip(archive: Path, username: str, password: str, team_id: str) -> None:
+    """Submit the zip to Apple notary service."""
+    print(f"  Notarizing {archive.name}...")
     run(
         [
             "xcrun",
             "notarytool",
             "submit",
-            str(tarball),
+            str(archive),
             "--apple-id",
             username,
             "--password",
@@ -154,13 +155,13 @@ def main() -> None:
     apple_password = os.environ["APPLEID_PASSWORD"]
     apple_team_id = os.environ["APPLEID_TEAMID"]
 
-    # Find macOS tarballs
-    tarballs = sorted(artifacts_dir.glob("*-apple-darwin*.tar.gz"))
-    if not tarballs:
-        print("No macOS tarballs found, nothing to sign.")
+    # Find macOS zips
+    archives = sorted(artifacts_dir.glob("*-apple-darwin*.zip"))
+    if not archives:
+        print("No macOS archives found, nothing to sign.")
         return
 
-    print(f"Found {len(tarballs)} macOS tarball(s) to sign.\n")
+    print(f"Found {len(archives)} macOS archive(s) to sign.\n")
 
     # Write certificate to temp file
     with tempfile.NamedTemporaryFile(suffix=".p12", delete=False) as f:
@@ -172,14 +173,14 @@ def main() -> None:
         print("Setting up signing keychain...")
         setup_keychain(cert_path, cert_password)
 
-        # Sign each tarball
-        for tarball in tarballs:
-            print(f"\nSigning {tarball.name}...")
-            sign_tarball(tarball, identity)
+        # Sign each archive
+        for archive in archives:
+            print(f"\nSigning {archive.name}...")
+            sign_zip(archive, identity)
 
-        # Notarize each tarball
-        for tarball in tarballs:
-            notarize_tarball(tarball, apple_username, apple_password, apple_team_id)
+        # Notarize each archive
+        for archive in archives:
+            notarize_zip(archive, apple_username, apple_password, apple_team_id)
 
     finally:
         cert_path.unlink(missing_ok=True)
