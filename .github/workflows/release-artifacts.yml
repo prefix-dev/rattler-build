@@ -186,9 +186,9 @@ jobs:
   # Windows code signing via Azure Trusted Signing
   sign-windows:
     name: Sign Windows binaries
-    if: ${{ !inputs.dry-run }}
     needs: build-binaries
     runs-on: windows-latest
+    environment: release
     permissions:
       contents: read
       id-token: write
