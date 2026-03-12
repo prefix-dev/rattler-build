@@ -1,6 +1,6 @@
-# What does `rattler-build` do to build a package?
+# What does Rattler-Build do to build a package?
 
-`rattler-build` creates conda packages which are relocatable packages.
+Rattler-Build creates conda packages which are relocatable packages.
 These packages are built up with some rules and conventions in mind.
 
 ## What goes into a package?
@@ -56,15 +56,15 @@ which aids in making the package relocatable:
 - On Windows, a warning is issued since symlink creation requires administrator
   privileges.
 
-## Making Packages Relocatable with `rattler-build`
+## Making Packages Relocatable with Rattler-Build
 
-Often, the most challenging aspect of building a package using `rattler-build`
+Often, the most challenging aspect of building a package using Rattler-Build
 is making it relocatable. A relocatable package can be installed into any
 prefix, allowing it to be used outside the environment in which it was built.
 This is in contrast to a non-relocatable package, which can only be utilized
 within its original build environment.
 
-`rattler-build` automatically performs the following actions to make packages
+Rattler-Build automatically performs the following actions to make packages
 relocatable:
 
 1. **Binary object file conversion**: Binary object files are converted to use
@@ -81,7 +81,7 @@ their build prefix replaced with the install prefix at install time. This works
 by padding the install prefix with null terminators, such that the length of the
 binary file remains the same. The build prefix must be long enough to
 accommodate any reasonable installation prefix. On macOS and Linux,
-`rattler-build` pads the build prefix to 255 characters by appending
+Rattler-Build pads the build prefix to 255 characters by appending
 `_placehold` to the end of the build directory name.
 <!--4. **Prefix replacement for specific binary files**: There may be cases where a
    file is identified as binary but requires the build prefix to be replaced as

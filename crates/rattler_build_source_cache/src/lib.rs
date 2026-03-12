@@ -1,6 +1,6 @@
 //! # Rattler Build Source Cache
 //!
-//! This crate provides a unified source cache for rattler-build, handling Git repositories,
+//! This crate provides a unified source cache for Rattler-Build, handling Git repositories,
 //! URL downloads, and local paths with proper caching, extraction, and concurrent access control.
 
 pub mod builder;

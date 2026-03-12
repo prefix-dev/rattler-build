@@ -185,6 +185,20 @@ pub struct DebugSetupOpts {
     #[arg(long)]
     pub output_name: Option<String>,
 
+    /// Variant configuration files for the build.
+    #[arg(short = 'm', long)]
+    pub variant_config: Option<Vec<PathBuf>>,
+
+    /// Override specific variant values (e.g. --variant python=3.12 or --variant
+    /// python=3.12,3.11). Multiple values separated by commas will create multiple
+    /// build variants.
+    #[arg(long = "variant", value_parser = parse_variant_override, action = clap::ArgAction::Append)]
+    pub variant_overrides: Vec<(String, Vec<String>)>,
+
+    /// Do not read the `variants.yaml` file next to a recipe.
+    #[arg(long)]
+    pub ignore_recipe_variants: bool,
+
     /// Common options (provides --output-dir among others)
     #[clap(flatten)]
     pub common: CommonOpts,
@@ -348,11 +362,11 @@ pub struct App {
     )]
     pub wrap_log_lines: Option<bool>,
 
-    /// The rattler-build configuration file to use
+    /// The Rattler-Build configuration file to use
     #[arg(long, global = true)]
     pub config_file: Option<PathBuf>,
 
-    /// Enable or disable colored output from rattler-build.
+    /// Enable or disable colored output from Rattler-Build.
     /// Also honors the `CLICOLOR` and `CLICOLOR_FORCE` environment variable.
     #[clap(
         long,
@@ -1218,6 +1232,12 @@ pub struct DebugData {
     pub common: CommonData,
     /// Name of the specific output to debug (if recipe has multiple outputs)
     pub output_name: Option<String>,
+    /// Variant configuration files
+    pub variant_config: Vec<PathBuf>,
+    /// Variant overrides
+    pub variant_overrides: HashMap<String, Vec<String>>,
+    /// Whether to ignore recipe variants
+    pub ignore_recipe_variants: bool,
 }
 
 impl DebugData {
@@ -1242,6 +1262,9 @@ impl DebugData {
             channels: opts.channels,
             common: CommonData::from_opts_and_config(opts.common, config.unwrap_or_default()),
             output_name: opts.output_name,
+            variant_config: opts.variant_config.unwrap_or_default(),
+            variant_overrides: opts.variant_overrides.into_iter().collect(),
+            ignore_recipe_variants: opts.ignore_recipe_variants,
         }
     }
 }

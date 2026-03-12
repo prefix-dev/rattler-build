@@ -1,8 +1,8 @@
-# Tips and tricks for rattler-build
+# Tips and tricks for Rattler-Build
 
-This section contains some tips and tricks for using `rattler-build`.
+This section contains some tips and tricks for using Rattler-Build.
 
-## Using sccache or ccache with `rattler-build`
+## Using sccache or ccache with Rattler-Build
 
 When debugging a recipe it can help a lot to use `sccache` or `ccache`. You can
 install both tools e.g. with `pixi global install sccache`.
@@ -20,7 +20,7 @@ export CXX="sccache $CXX"
 ```
 
 However, both `ccache` and `sccache` are sensitive to changes in the build
-location. Since `rattler-build`, by default, always creates a new build
+location. Since Rattler-Build, by default, always creates a new build
 directory with the timestamp, you need to use the `--no-build-id` flag. This
 will disable the time stamp in the build directory and allow `ccache` and
 `sccache` to cache the build.
@@ -35,7 +35,7 @@ You might want to publish your own software packages to a channel you control.
 These might be packages that are not available in the main conda-forge channel,
 or proprietary packages, or packages that you have modified in some way.
 
-Doing so is pretty straightforward with `rattler-build` and a CI provider of
+Doing so is pretty straightforward with Rattler-Build and a CI provider of
 your choice. We have a number of example repositories for "custom" forges:
 
 - [rust-forge](https://github.com/wolfv/rust-forge): This repository builds a
@@ -47,7 +47,7 @@ your choice. We have a number of example repositories for "custom" forges:
 
 To create your own forge, you should create a number of sub-directories where
 each sub-directory should contain at most one recipe. With the `--recipe-dir`
-flag of rattler-build, the program will go and collect all recipes it finds in
+flag of Rattler-Build, the program will go and collect all recipes it finds in
 the given directory or sub-directories.
 
 We can combine this with the `--skip-existing=all` flag which will skip all
@@ -68,8 +68,8 @@ rebuilding should be rebuilt.
 ### CI setup
 
 As an example, the following is the CI setup for `rust-forge`. The workflow uses
-`rattler-build` to build and upload packages to a custom channel on
-[https://prefix.dev](https://prefix.dev) – but you can also use `rattler-build`
+Rattler-Build to build and upload packages to a custom channel on
+[https://prefix.dev](https://prefix.dev) – but you can also use Rattler-Build
 to upload to your own `quetz` instance, or a channel on `anaconda.org`.
 
 ??? tip "Example CI setup for `rust-forge`"

@@ -21,14 +21,14 @@
 
 </h1>
 
-# rattler-build: a fast conda-package builder
+# Rattler-Build: a fast conda-package builder
 
-The `rattler-build` tooling and library creates cross-platform relocatable
+The Rattler-Build tooling and library creates cross-platform relocatable
 binaries / packages from a simple recipe format. The recipe format is heavily
 inspired by `conda-build` and `boa`, and the output of a regular `rattler-build`
 run is a package that can be installed using [`pixi`](https://github.com/prefix-dev/pixi), [`mamba`](https://github.com/mamba-org/mamba), or [`conda`](https://conda.org).
 
-`rattler-build` is a standalone binary written from scratch in Rust, and does not have any dependencies on `conda-build` or Python.
+Rattler-Build is a standalone binary written from scratch in Rust, and does not have any dependencies on `conda-build` or Python.
 
 ![](https://github.com/prefix-dev/rattler-build/assets/885054/98377399-aae4-45a5-a4e9-982a3c7b2d50)
 
@@ -59,7 +59,7 @@ brew install rattler-build
 
 #### Arch Linux
 
-`rattler-build` is available on Arch Linux in the [extra repository](https://archlinux.org/packages/extra/x86_64/rattler-build/):
+Rattler-Build is available on Arch Linux in the [extra repository](https://archlinux.org/packages/extra/x86_64/rattler-build/):
 
 ```
 pacman -S rattler-build
@@ -67,7 +67,7 @@ pacman -S rattler-build
 
 #### Alpine Linux
 
-`rattler-build` is available for [Alpine Edge](https://pkgs.alpinelinux.org/packages?name=rattler-build&branch=edge). It can be installed via [apk](https://wiki.alpinelinux.org/wiki/Alpine_Package_Keeper) after enabling the [testing repository](https://wiki.alpinelinux.org/wiki/Repositories).
+Rattler-Build is available for [Alpine Edge](https://pkgs.alpinelinux.org/packages?name=rattler-build&branch=edge). It can be installed via [apk](https://wiki.alpinelinux.org/wiki/Alpine_Package_Keeper) after enabling the [testing repository](https://wiki.alpinelinux.org/wiki/Repositories).
 
 ```shell
 apk add rattler-build
@@ -75,9 +75,9 @@ apk add rattler-build
 
 #### Dependencies
 
-Currently `rattler-build` needs some dependencies on the host system which are
+Currently Rattler-Build needs some dependencies on the host system which are
 executed as subprocess. We plan to reduce the number of external dependencies
-over time by writing what we need in Rust to make `rattler-build` fully
+over time by writing what we need in Rust to make Rattler-Build fully
 self-contained.
 
 * `install_name_tool` is necessary on macOS to rewrite the `rpath` of shared
@@ -90,16 +90,16 @@ self-contained.
 
 ### Documentation
 
-We have extensive documentation for `rattler-build`. You can find the [book
+We have extensive documentation for Rattler-Build. You can find the [book
 here](https://prefix-dev.github.io/rattler-build).
 
 ### GitHub Action
 
-There is a GitHub Action for `rattler-build`. It can be used to install `rattler-build` in CI/CD workflows and run a build command. Please check out the [GitHub Action documentation](https://github.com/prefix-dev/rattler-build-action) for more information.
+There is a GitHub Action for Rattler-Build. It can be used to install `rattler-build` in CI/CD workflows and run a build command. Please check out the [GitHub Action documentation](https://github.com/prefix-dev/rattler-build-action) for more information.
 
 ### Usage
 
-`rattler-build` comes with two commands: `build` and `test`.
+Rattler-Build comes with two commands: `build` and `test`.
 
 The `build` command takes a `--recipe recipe.yaml` as input and produces a
 package as output. The `test` subcommand can be used to test existing packages
@@ -109,7 +109,7 @@ There is also a [terminal user interface (TUI)](https://prefix-dev.github.io/rat
 
 ### Playground
 
-Want to try `rattler-build` recipes without installing anything? The [online playground](https://playground.rattler.build/) lets you edit recipes, tweak variant configurations, and see evaluated output — all in the browser.
+Want to try Rattler-Build recipes without installing anything? The [online playground](https://playground.rattler.build/) lets you edit recipes, tweak variant configurations, and see evaluated output — all in the browser.
 
 ### The recipe format
 

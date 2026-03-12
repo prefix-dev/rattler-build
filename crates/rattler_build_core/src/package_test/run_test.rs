@@ -1,4 +1,4 @@
-//! Testing a package produced by rattler-build (or conda-build)
+//! Testing a package produced by Rattler-Build (or conda-build)
 //!
 //! Tests are part of the final package (under the `info/test` directory).
 //! There are multiple test types:
@@ -157,12 +157,18 @@ impl Tests {
         environment: &Path,
         cwd: &Path,
         pkg_vars: &HashMap<String, String>,
+        resolved_records: &[rattler_conda_types::RepoDataRecord],
     ) -> Result<(), TestError> {
         tracing::info!("Testing commands:");
 
         let platform = Platform::current();
         let mut env_vars = env_vars::os_vars(environment, &platform);
         env_vars.retain(|key, _| key != ShellEnum::default().path_var(&platform));
+        env_vars.extend(env_vars::python_vars_from_records(
+            resolved_records,
+            environment,
+            platform,
+        ));
         env_vars.extend(pkg_vars.iter().map(|(k, v)| (k.clone(), Some(v.clone()))));
         env_vars.insert(
             "PREFIX".to_string(),
@@ -508,7 +514,7 @@ pub async fn run_test(
         .map_err(|e| TestError::MatchSpecParse(e.to_string()))?;
         dependencies.push(match_spec);
 
-        create_environment(
+        let resolved_records = create_environment(
             "test",
             &dependencies,
             &host_platform,
@@ -526,7 +532,8 @@ pub async fn run_test(
         let (test_folder, tests) = legacy_tests_from_folder(&package_folder).await?;
 
         for test in tests {
-            test.run(&prefix, &test_folder, &env).await?;
+            test.run(&prefix, &test_folder, &env, &resolved_records)
+                .await?;
         }
 
         tracing::info!(
@@ -921,7 +928,7 @@ async fn run_commands_test(
         .unwrap_or(&config.current_platform);
 
     let run_prefix = test_directory.join("test_run_env");
-    create_environment(
+    let resolved_records = create_environment(
         "test",
         &dependencies,
         platform,
@@ -938,6 +945,11 @@ async fn run_commands_test(
     let platform = Platform::current();
     let mut env_vars = env_vars::os_vars(&run_prefix, &platform);
     env_vars.retain(|key, _| key != ShellEnum::default().path_var(&platform));
+    env_vars.extend(env_vars::python_vars_from_records(
+        &resolved_records,
+        &run_prefix,
+        platform,
+    ));
     env_vars.extend(pkg_vars.iter().map(|(k, v)| (k.clone(), Some(v.clone()))));
     env_vars.insert(
         "PREFIX".to_string(),

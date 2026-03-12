@@ -1,6 +1,6 @@
 # Bumping recipe versions
 
-When maintaining conda recipes, you often need to update packages to newer versions. This involves changing the version number in your recipe and updating the SHA256 checksum for the new source archive. `rattler-build` provides the `bump-recipe` command to automate this process.
+When maintaining conda recipes, you often need to update packages to newer versions. This involves changing the version number in your recipe and updating the SHA256 checksum for the new source archive. Rattler-Build provides the `bump-recipe` command to automate this process.
 
 ## How it works
 

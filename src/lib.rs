@@ -1,6 +1,6 @@
 #![deny(missing_docs)]
 
-//! rattler-build library.
+//! Rattler-Build library.
 
 // Re-export all core modules from rattler_build_core
 pub use rattler_build_core::build;
@@ -1237,12 +1237,12 @@ fn sort_build_outputs_topologically(
     Ok(())
 }
 
-/// Get the version of rattler-build.
+/// Get the version of Rattler-Build.
 pub fn get_rattler_build_version() -> &'static str {
     env!("CARGO_PKG_VERSION")
 }
 
-/// Build rattler-build recipes
+/// Build Rattler-Build recipes
 pub async fn build_recipes(
     recipe_paths: Vec<std::path::PathBuf>,
     build_data: BuildData,
@@ -1555,9 +1555,9 @@ pub async fn debug_recipe(
         debug: Debug::new(true),
         test: TestStrategy::Skip,
         up_to: None,
-        variant_config: Vec::new(),
-        variant_overrides: HashMap::new(),
-        ignore_recipe_variants: false,
+        variant_config: debug_data.variant_config,
+        variant_overrides: debug_data.variant_overrides,
+        ignore_recipe_variants: debug_data.ignore_recipe_variants,
         render_only: false,
         with_solve: true,
         no_build_id: false,

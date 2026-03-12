@@ -1,7 +1,8 @@
-//! Script execution and data model for rattler-build.
+//! Script execution and sandbox configuration for Rattler-Build, supporting bash, cmd,
+//! python, and other interpreters.
 //!
 //! This crate provides functionality for defining, parsing, and executing build scripts
-//! in various interpreters (bash, cmd, python, etc.) as part of the rattler-build process.
+//! in various interpreters as part of the Rattler-Build process.
 
 pub mod sandbox;
 mod script;

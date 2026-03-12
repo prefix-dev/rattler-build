@@ -28,7 +28,7 @@ rattler-build auth login s3://my-bucket --s3-access-key-id <key> --s3-secret-acc
 rattler-build auth logout prefix.dev
 ```
 
-Once logged in, `rattler-build` will automatically use these credentials when accessing
+Once logged in, Rattler-Build will automatically use these credentials when accessing
 the corresponding hosts.
 
 ### Using `RATTLER_AUTH_FILE` (ephemeral)
@@ -74,7 +74,7 @@ The following known authentication methods are supported:
 
 ## Uploading packages
 
-If you want to upload packages, then rattler-build comes with a built-in
+If you want to upload packages, then Rattler-Build comes with a built-in
 `upload` command. There are the following options:
 
 - `prefix.dev`: you can create public or private channels on the prefix.dev
@@ -97,8 +97,8 @@ authenticate with the server.
 
 #### Trusted publishing via OIDC
 
-`rattler-build` supports authentication with <https://prefix.dev> through OIDC with GitHub Actions.
-An API key is no longer required, rattler-build can manage the complete authentication workflow for you.
+Rattler-Build supports authentication with <https://prefix.dev> through OIDC with GitHub Actions.
+An API key is no longer required, Rattler-Build can manage the complete authentication workflow for you.
 You only have to set up a specific repository and workflow under "Trusted Publishers" on prefix.dev.
 
 ![Trusted Publisher](assets/trusted_publisher.png)

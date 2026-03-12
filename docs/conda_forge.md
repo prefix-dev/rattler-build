@@ -21,12 +21,12 @@ flowchart LR
 Before submitting to conda-forge:
 
 - Your package should be publicly available (GitHub, PyPI, crates.io, etc.)
-- You have a working `recipe.yaml` that builds successfully with `rattler-build`
+- You have a working `recipe.yaml` that builds successfully with Rattler-Build
 - The package has an OSI-approved open source license
 
 ## Step 1: Prepare your recipe
 
-conda-forge uses the same recipe format as `rattler-build`. If you've already built your
+conda-forge uses the same recipe format as Rattler-Build. If you've already built your
 package locally, you're most of the way there.
 
 ### Recipe location

@@ -1,6 +1,6 @@
 # Packaging a Go package
 
-This tutorial will guide you through making a Go package with `rattler-build`.
+This tutorial will guide you through making a Go package with Rattler-Build.
 
 When building a recipe for Go, most Go dependencies are linked statically. That
 means, we should collect their licenses and add them in the package. The

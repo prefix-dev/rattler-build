@@ -1,6 +1,6 @@
 # Debugging Builds
 
-This guide covers how to debug conda package builds with rattler-build when
+This guide covers how to debug conda package builds with Rattler-Build when
 things go wrong. It's designed for both humans and AI agents working with
 recipes.
 
@@ -157,6 +157,7 @@ build for the first time.
 
 The `rattler-build package` subcommand provides utilities for inspecting and extracting built packages, which is useful for debugging package contents.
 
+
 ### Inspecting Packages
 
 Use `package inspect` to view package metadata without extracting:
@@ -198,7 +199,7 @@ Both `.conda` and `.tar.bz2` package formats are supported.
 
 ## Build Directory Structure
 
-When rattler-build builds a package, it creates:
+When Rattler-Build builds a package, it creates:
 
 ```txt
 output/
@@ -350,7 +351,7 @@ The last line of `output/rattler-build-log.txt` is JSON:
 
 ## Understanding Relocatability
 
-rattler-build makes packages relocatable through:
+Rattler-Build makes packages relocatable through:
 
 1. **RPATH patching** - Changes `.dylib` and `.so` files to use relative paths (`$ORIGIN`, `@loader_path`) using `patchelf` or `install_name_tool`
 

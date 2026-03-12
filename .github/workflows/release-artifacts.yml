@@ -1,0 +1,370 @@
+name: Release artifacts
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: "Run the full build pipeline without publishing or tagging"
+        type: boolean
+        default: false
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  RUST_LOG: info
+  RUST_BACKTRACE: 1
+  RUSTFLAGS: "-D warnings"
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # ============================================================
+  # PHASE 1: Build everything (no publishing)
+  # ============================================================
+
+  # Read version from Cargo.toml and make it available to all jobs
+  prepare:
+    name: Prepare release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: prefix-dev/setup-pixi@a0af7a228712d6121d37aba47adf55c1332c9c2e # v0.9.4
+        with:
+          environments: release
+      - name: Extract version
+        id: version
+        run: pixi run -e release extract-version >> "$GITHUB_OUTPUT"
+
+  # Cross-platform release builds
+  build-binaries:
+    name: Build ${{ matrix.target }}
+    needs: prepare
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-22.04
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-22.04
+            use-cross: true
+          - target: powerpc64le-unknown-linux-gnu
+            os: ubuntu-22.04
+            use-cross: true
+          - target: x86_64-apple-darwin
+            os: macos-latest
+          - target: aarch64-apple-darwin
+            os: macos-latest
+          - target: x86_64-pc-windows-gnu
+            os: windows-2022
+          - target: x86_64-pc-windows-msvc
+            os: windows-2022
+          # TODO: re-enable once win-arm64 runners are stable
+          # - target: aarch64-pc-windows-msvc
+          #   os: windows-11-arm
+    env:
+      # Enable Link Time Optimization (LTO) for release builds.
+      CARGO_PROFILE_RELEASE_LTO: true
+      # Use a single code gen unit to reduce binary size.
+      CARGO_PROFILE_RELEASE_CODEGEN_UNITS: 1
+      # Strip symbols from release binaries.
+      CARGO_PROFILE_RELEASE_STRIP: symbols
+      # Optimize for size.
+      CARGO_PROFILE_RELEASE_OPT_LEVEL: s
+      # Enable performance, s3, and sigstore features for release builds.
+      REQUIRED_FEATURES: recipe-generation,performance,s3,sigstore
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - uses: prefix-dev/setup-pixi@a0af7a228712d6121d37aba47adf55c1332c9c2e # v0.9.4
+        with:
+          environments: release
+
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@a0b538fa0b742a6aa35d6e2c169b4bd06d225a98 # v1
+        with:
+          toolchain: "1.93.1"
+          target: ${{ matrix.target }}
+          cache: false
+
+      - name: Install musl-gcc
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        run: sudo apt install musl-tools
+
+      - name: Install gnu-openssl
+        if: matrix.target == 'powerpc64le-unknown-linux-gnu'
+        run: sudo apt install libssl-dev
+
+      - name: Install cross
+        if: matrix.use-cross
+        uses: taiki-e/install-action@d6e286fa45544157a02d45a43742857ebbc25d12 # v2.68.16
+        with:
+          tool: cross
+
+      - name: Set build options
+        id: options
+        run: pixi run -e release build-options --target ${{ matrix.target }}
+
+      - name: Build
+        run: >-
+          ${{ matrix.use-cross && 'cross' || 'cargo' }}
+          build
+          --locked
+          --release
+          --features ${{ env.REQUIRED_FEATURES }}
+          --target=${{ matrix.target }}
+          ${{ steps.options.outputs.cargo-build-options }}
+
+      - name: Run tests
+        if: matrix.target != 'aarch64-apple-darwin'
+        run: >-
+          ${{ matrix.use-cross && 'cross' || 'cargo' }}
+          test
+          --release
+          --locked
+          --features ${{ env.REQUIRED_FEATURES }}
+          --target=${{ matrix.target }}
+          ${{ steps.options.outputs.cargo-build-options }}
+          ${{ steps.options.outputs.cargo-test-options }}
+
+      - name: Package binary
+        id: package
+        run: pixi run -e release package-binary --target ${{ matrix.target }}
+
+      - name: Upload archive artifact
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: ${{ steps.package.outputs.prefix }}-${{ steps.package.outputs.pkg-name }}
+          path: staging/
+
+  # macOS code signing and notarization
+  sign-macos:
+    name: Sign macOS binaries
+    needs: build-binaries
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        target:
+          - x86_64-apple-darwin
+          - aarch64-apple-darwin
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: prefix-dev/setup-pixi@a0af7a228712d6121d37aba47adf55c1332c9c2e # v0.9.4
+        with:
+          environments: release
+      - name: Download macOS artifact
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
+        with:
+          name: build-rattler-build-${{ matrix.target }}.tar.gz
+          path: artifacts/
+      - name: Sign and notarize
+        env:
+          CODESIGN_CERTIFICATE: ${{ secrets.CODESIGN_CERTIFICATE }}
+          CODESIGN_CERTIFICATE_PASSWORD: ${{ secrets.CODESIGN_CERTIFICATE_PASSWORD }}
+          CODESIGN_IDENTITY: ${{ secrets.CODESIGN_IDENTITY }}
+          APPLEID_USERNAME: ${{ secrets.APPLEID_USERNAME }}
+          APPLEID_PASSWORD: ${{ secrets.APPLEID_PASSWORD }}
+          APPLEID_TEAMID: ${{ secrets.APPLEID_TEAMID }}
+        run: pixi run -e release sign-macos --artifacts-dir artifacts/
+      - name: Upload signed artifact
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: release-rattler-build-${{ matrix.target }}.tar.gz
+          path: artifacts/
+
+  # Windows code signing via Azure Trusted Signing
+  sign-windows:
+    name: Sign Windows binaries
+    needs: build-binaries
+    runs-on: windows-latest
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-pc-windows-gnu
+          - target: x86_64-pc-windows-msvc
+          # TODO: re-enable once win-arm64 runners are stable
+          # - target: aarch64-pc-windows-msvc
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: prefix-dev/setup-pixi@a0af7a228712d6121d37aba47adf55c1332c9c2e # v0.9.4
+        with:
+          environments: release
+      - name: Download Windows artifact
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
+        with:
+          name: build-rattler-build-${{ matrix.target }}.zip
+          path: artifacts/
+      - name: Azure login (OIDC)
+        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          allow-no-subscriptions: true
+      - name: Extract executables for signing
+        run: pixi run -e release sign-windows-extract --artifacts-dir artifacts/ --sign-dir ${{ runner.temp }}/to-sign
+      - name: Sign with Azure Trusted Signing
+        uses: azure/trusted-signing-action@87c2e83e6868da99d3380aa309851b32ed9a8346 # v1.1.0
+        with:
+          endpoint: ${{ vars.AZURE_SIGNING_ENDPOINT }}
+          signing-account-name: ${{ vars.AZURE_SIGNING_ACCOUNT_NAME }}
+          certificate-profile-name: ${{ vars.AZURE_CERTIFICATE_PROFILE_NAME }}
+          files-folder: ${{ runner.temp }}/to-sign
+          files-folder-filter: exe
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+      - name: Repackage signed binaries
+        run: pixi run -e release sign-windows-repackage --artifacts-dir artifacts/ --sign-dir ${{ runner.temp }}/to-sign
+      - name: Upload signed artifact
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: release-rattler-build-${{ matrix.target }}.zip
+          path: artifacts/
+
+  # Sigstore build provenance attestation
+  attest:
+    name: Attest build provenance
+    needs: [build-binaries, sign-macos, sign-windows]
+    runs-on: ubuntu-latest
+    permissions:
+      attestations: write
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: prefix-dev/setup-pixi@a0af7a228712d6121d37aba47adf55c1332c9c2e # v0.9.4
+        with:
+          environments: release
+      - name: Download all final artifacts
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
+        with:
+          pattern: release-*
+          path: artifacts/
+          merge-multiple: true
+      - name: Attest build provenance
+        id: attest
+        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
+        with:
+          subject-path: artifacts/**
+      - name: Save attestation bundle
+        run: pixi run -e release save-attestation --bundle-path "${STEPS_ATTEST_OUTPUTS_BUNDLE_PATH}" --output-dir artifacts/
+        env:
+          STEPS_ATTEST_OUTPUTS_BUNDLE_PATH: ${{ steps.attest.outputs.bundle-path }}
+      - name: Upload attestation
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: attestations
+          path: artifacts/*.intoto.jsonl
+
+  # Build Python wheels (reusable workflow)
+  build-python-wheels:
+    name: Build Python wheels
+    needs: prepare
+    uses: ./.github/workflows/python-build.yml
+    with:
+      sha: ${{ github.sha }}
+
+  # ============================================================
+  # PHASE 2: Publish (only after ALL Phase 1 jobs succeed)
+  # ============================================================
+
+  # Create git tag — only after all builds/signing/attestation/dry-runs pass
+  tag-release:
+    name: Tag release
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      !inputs.dry-run &&
+      github.ref == 'refs/heads/main'
+    needs: [prepare, attest, build-python-wheels]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: prefix-dev/setup-pixi@a0af7a228712d6121d37aba47adf55c1332c9c2e # v0.9.4
+        with:
+          environments: release
+      - name: Create and push tag
+        run: pixi run -e release create-tag --tag ${NEEDS_PREPARE_OUTPUTS_TAG}
+
+        env:
+          NEEDS_PREPARE_OUTPUTS_TAG: ${{ needs.prepare.outputs.tag }}
+
+  # Create GitHub release with all signed + attested artifacts
+  create-release:
+    name: Create GitHub Release
+    needs: [prepare, tag-release]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: prefix-dev/setup-pixi@a0af7a228712d6121d37aba47adf55c1332c9c2e # v0.9.4
+        with:
+          environments: release
+      - name: Download all release artifacts
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
+        with:
+          pattern: release-*
+          path: release-assets/
+          merge-multiple: true
+      - name: Download attestations
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
+        with:
+          name: attestations
+          path: release-assets/
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEEDS_PREPARE_OUTPUTS_TAG: ${{ needs.prepare.outputs.tag }}
+        run: pixi run -e release create-release --tag ${NEEDS_PREPARE_OUTPUTS_TAG} --assets-dir release-assets/
+
+  # Publish Python wheels to PyPI
+  publish-pypi:
+    name: Publish to PyPI
+    needs: tag-release
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      id-token: write
+    steps:
+      - name: Download wheel artifacts
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
+        with:
+          pattern: python-wheels-*
+          path: dist/
+          merge-multiple: true
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@ed0c53931b1dc9bd32cbe73a98c7f6766f8a527e # release/v1
+        with:
+          skip-existing: true
+          packages-dir: dist/

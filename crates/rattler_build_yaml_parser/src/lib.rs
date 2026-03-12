@@ -1,7 +1,5 @@
-//! YAML parser with Jinja2 template support for rattler-build
-//!
-//! This crate provides shared parsing infrastructure for YAML configuration files
-//! that support Jinja2 templates and conditional structures (if/then/else).
+//! YAML parser with Jinja2 template support for Rattler-Build, providing shared parsing
+//! infrastructure for conditional structures and template values.
 //!
 //! # Core Types
 //!

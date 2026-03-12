@@ -1,4 +1,5 @@
 [workspace]
+changelog_config = "cliff.toml"
 allow_dirty = true
 changelog_update = true
 dependencies_update = true

@@ -1,6 +1,7 @@
 #![deny(missing_docs)]
 
-//! Core library for rattler-build.
+//! The core engine of Rattler-Build, providing recipe rendering, source fetching,
+//! script execution, package building, testing, and publishing.
 
 pub mod build;
 pub mod bump_recipe;

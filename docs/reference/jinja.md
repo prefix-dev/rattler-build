@@ -1,6 +1,6 @@
 # Jinja
 
-`rattler-build` comes with a couple of useful [Jinja](https://jinja.palletsprojects.com)
+Rattler-Build comes with a couple of useful [Jinja](https://jinja.palletsprojects.com)
 functions and filters that can be used in the recipe.
 
 ## Functions
@@ -42,7 +42,7 @@ Note that the final output will still contain the `target_platform`, so that the
 full compiler will read `clang_linux-64 9.0` when compiling with
 `--target-platform linux-64`.
 
-`rattler-build` defines some default compilers for the following languages
+Rattler-Build defines some default compilers for the following languages
 (inherited from `conda-build`):
 
 - `c`: `gcc` on Linux, `clang` on `osx` and `vs2017` on Windows

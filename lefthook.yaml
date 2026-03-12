@@ -78,6 +78,9 @@ pre-commit:
     - name: typos
       stage_fixed: true
       run: pixi {run} typos
+    - name: zizmor
+      glob: ".github/workflows/*.{yml,yaml}"
+      run: pixi {run} zizmor
 
 pre-push:
   jobs:

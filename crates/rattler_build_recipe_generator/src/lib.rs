@@ -1,4 +1,4 @@
-//! Recipe generation for Python (PyPI), R (CRAN), Perl (CPAN), and Lua (LuaRocks) packages
+//! Automatic recipe generation for Python (PyPI), R (CRAN), Perl (CPAN), and Lua (LuaRocks) packages.
 
 #[cfg(feature = "cli")]
 use clap::Parser;

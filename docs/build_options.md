@@ -186,7 +186,7 @@ build:
 
 ## Dynamic linking configuration
 
-After the package is built, rattler-build performs some "post-processing" on the
+After the package is built, Rattler-Build performs some "post-processing" on the
 binaries and libraries.
 
 This entails making the shared libraries relocatable and checking that all
@@ -202,11 +202,11 @@ locations outside of the environment. This is useful if you want to link against
 libraries that are not part of the conda environment (e.g. proprietary
 software).
 
-If you want to stop `rattler-build` from relocating the binaries, you can set
+If you want to stop Rattler-Build from relocating the binaries, you can set
 `binary_relocation` to `false`. If you want to only relocate some binaries, you
 can select the relevant ones with a glob pattern.
 
-To read more about `rpath`s and how rattler-build creates relocatable binary
+To read more about `rpath`s and how Rattler-Build creates relocatable binary
 packages, see the [internals](internals.md) docs.
 
 If you link against some libraries (possibly even outside of the prefix, in a
@@ -214,7 +214,7 @@ system location), then you can use the `missing_dso_allowlist` to allow linking
 against these and suppress any warnings. This list is pre-populated with a list
 of known system libraries on the different operating systems.
 
-As part of the post-processing, `rattler-build` checks for overlinking and
+As part of the post-processing, Rattler-Build checks for overlinking and
 overdepending. "Overlinking" is when a binary links against a library that is
 not specified in the run requirements. This is usually a mistake because the
 library would not be present in the environment when the package is installed.
@@ -222,9 +222,9 @@ library would not be present in the environment when the package is installed.
 Conversely, "overdepending" is when a library is part of the run requirements,
 but is not actually used by any of the binaries/libraries in the package.
 
-In addition to handling binary dependencies, `rattler-build` also ensures that
+In addition to handling binary dependencies, Rattler-Build also ensures that
 packages containing hardcoded paths into the environment are relocatable when
-installed outside the of the build environment. To do this, `rattler-build`
+installed outside the of the build environment. To do this, Rattler-Build
 constructs a host environment with a 255 character name of the form
 `host_env_placehold[_placehold[_placehold[...]]]` (for details, see the
 [internals](internals.md) docs). At install time, conda will find these paths
@@ -346,7 +346,7 @@ different Python versions within each platform.
 
 ## Post processing of the package contents (experimental)
 
-rattler-build allows you to post-process the package contents with `regex`
+Rattler-Build allows you to post-process the package contents with `regex`
 replacements after the build has finished. This is only useful in very specific
 cases when you cannot easily identify new files and want to run post-processing
 only on new files.

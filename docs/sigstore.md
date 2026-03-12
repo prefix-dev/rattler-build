@@ -2,7 +2,7 @@
 
 Sigstore is a way to cryptographically sign packages (or any binary artifacts). It was pioneered in the container space, but has been adopted by many packaging ecosystems: PyPI, Python releases, Rust crates, Homebrew, and Rubygems.
 
-Rattler-build supports creating Sigstore attestations for conda packages, allowing you to cryptographically sign your packages and provide verifiable provenance information.
+Rattler-Build supports creating Sigstore attestations for conda packages, allowing you to cryptographically sign your packages and provide verifiable provenance information.
 
 ## What does a Sigstore attestation provide?
 
@@ -118,7 +118,7 @@ This approach gives you full control over the attestation creation and allows yo
 !!! note "Experimental"
     This feature requires the `--experimental` flag: `rattler-build build --experimental -r recipe.yaml`
 
-In addition to signing built packages, rattler-build can also **verify** the attestations of source archives during the build. This lets you ensure that the source code you're building from was produced by a trusted publisher (e.g., a specific GitHub Actions workflow).
+In addition to signing built packages, Rattler-Build can also **verify** the attestations of source archives during the build. This lets you ensure that the source code you're building from was produced by a trusted publisher (e.g., a specific GitHub Actions workflow).
 
 ### How it works
 
@@ -133,7 +133,7 @@ source:
       - github:pallets/flask
 ```
 
-When rattler-build downloads the source, it will:
+When Rattler-Build downloads the source, it will:
 
 1. Fetch the Sigstore attestation bundle (automatically derived for PyPI packages, or from `bundle_url`)
 2. Verify the bundle signature against the Sigstore transparency log

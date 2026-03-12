@@ -2,7 +2,7 @@
 
 Recipe classes for parsing and working with conda recipes.
 
-rattler-build uses a two-stage recipe system:
+Rattler-Build uses a two-stage recipe system:
 
 1. **Stage0** - Parsed YAML recipes before Jinja template evaluation
 2. **Stage1** - Fully evaluated recipes ready for building

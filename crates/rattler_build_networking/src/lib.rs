@@ -1,6 +1,5 @@
-//! Networking utilities for rattler-build
-//!
-//! This crate provides shared HTTP client functionality used across rattler-build components.
+//! Networking utilities for Rattler-Build, providing shared HTTP client functionality
+//! with retry middleware.
 
 use reqwest_middleware::ClientWithMiddleware;
 use reqwest_retry::{RetryTransientMiddleware, policies::ExponentialBackoff};

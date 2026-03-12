@@ -1,13 +1,13 @@
 # Packaging a Javascript (NPM/NodeJS) package
 
 This tutorial will guide you though making a NodeJS package with
-`rattler-build`. Please note that, while packaging executable applications is
+Rattler-Build. Please note that, while packaging executable applications is
 possible, the conda ecosystem is not ideal for NPM libraries. NPM supports a
 number of features that cannot easily be modeled in the conda ecosystem, such as
 peer dependencies, optional dependencies, and the ability to install multiple
 versions of the same package.
 
-However, if you need to package a NodeJS application, `rattler-build` can help!
+However, if you need to package a NodeJS application, Rattler-Build can help!
 
 ## Building a NodeJS Package
 

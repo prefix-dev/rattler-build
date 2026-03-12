@@ -1,6 +1,5 @@
-//! # rattler_build_package
-//!
-//! A library for creating conda packages from files and metadata.
+//! A library for creating conda packages from files and metadata, supporting .tar.bz2
+//! and .conda formats.
 //!
 //! This crate provides a flexible API for building conda packages either from
 //! recipe structures or from manually-constructed metadata. It handles:

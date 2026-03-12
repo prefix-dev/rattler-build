@@ -1,5 +1,5 @@
-//! Configuration for the rattler-build tool
-//! This is useful when using rattler-build as a library
+//! Configuration for the Rattler-Build tool
+//! This is useful when using Rattler-Build as a library
 
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
@@ -141,7 +141,7 @@ pub struct Configuration {
     pub allow_absolute_license_paths: bool,
 
     /// Whether the environments are externally managed (e.g. by `pixi-build`).
-    /// This is only useful for other libraries that build their own environments and only use rattler-build
+    /// This is only useful for other libraries that build their own environments and only use Rattler-Build
     /// to execute scripts / bundle up files.
     pub environments_externally_managed: bool,
 }

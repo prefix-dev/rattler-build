@@ -1,6 +1,6 @@
 # Packaging a C++ package
 
-This tutorial will guide you though making a C++ package with `rattler-build`.
+This tutorial will guide you though making a C++ package with Rattler-Build.
 
 ## Building a Header-only Library
 
@@ -121,7 +121,7 @@ ninja install
 
 ## Parsing the `rattler-build build` Output
 
-When running the `rattler-build` command, you might notice some interesting information in the output.
+When running the `rattler-build build` command, you might notice some interesting information in the output.
 Our package will have some `run` dependencies, even if we didn't specify any.
 
 These come from the `run-exports` of the packages listed in the `host` section of the recipe.
@@ -168,7 +168,7 @@ You can also see "linking" information in the output, for example on macOS:
  └─ @rpath/libcairo.2.dylib
 ```
 
-`rattler-build` ensures that:
+Rattler-Build ensures that:
 
 1. All shared libraries linked against are present in the run dependencies.
 Missing libraries trigger an `overlinking` warning.
