@@ -353,6 +353,25 @@ jobs:
           NEEDS_PREPARE_OUTPUTS_TAG: ${{ needs.prepare.outputs.tag }}
         run: pixi run -e release create-release --tag ${NEEDS_PREPARE_OUTPUTS_TAG} --assets-dir release-assets/
 
+  # Publish to crates.io via trusted publishing
+  publish-crates-io:
+    name: Publish to crates.io
+    needs: tag-release
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: prefix-dev/setup-pixi@a0af7a228712d6121d37aba47adf55c1332c9c2e # v0.9.4
+        with:
+          environments: release
+      - name: Publish to crates.io
+        run: pixi run -e release publish-crates-io
+
   # Publish Python wheels to PyPI
   publish-pypi:
     name: Publish to PyPI

@@ -202,10 +202,10 @@ nbconvert = ">=7.16,<8"
 ipykernel = ">=6.29,<7"
 
 [feature.release.dependencies]
-python = ">=3.13,<3.15"
-git-cliff = "*"
-rust = ">=1.89"
-7zip = "*"
+python = ">=3.14.3,<3.15"
+git-cliff = ">=2.12.0,<3"
+rust = ">=1.94.0,<1.95"
+7zip = ">=26.0,<27"
 
 [feature.release.tasks]
 extract-version = { cmd = "python scripts/extract_version.py", description = "Extract version from Cargo.toml" }
@@ -217,6 +217,7 @@ sign-windows-extract = { cmd = "python scripts/sign_windows.py extract", descrip
 sign-windows-repackage = { cmd = "python scripts/sign_windows.py repackage", description = "Repackage signed Windows executables" }
 save-attestation = { cmd = "python scripts/save_attestation.py", description = "Save attestation bundle" }
 create-release = { cmd = "python scripts/create_release.py", description = "Create GitHub release with all artifacts" }
+publish-crates-io = { cmd = "cargo publish --package rattler-build", description = "Publish rattler-build to crates.io" }
 
 [environments]
 default = { features = ["dev"], solve-group = "default" }

@@ -7,3 +7,8 @@ git_tag_enable = true
 pr_labels = ["release"]
 publish_allow_dirty = false
 semver_check = true
+
+[[package]]
+name = "rattler-build"
+publish = false
+release = false
