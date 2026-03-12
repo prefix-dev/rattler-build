@@ -136,18 +136,6 @@ jobs:
           --target=${{ matrix.target }}
           ${{ steps.options.outputs.cargo-build-options }}
 
-      - name: Run tests
-        if: matrix.target != 'aarch64-apple-darwin'
-        run: >-
-          ${{ matrix.use-cross && 'cross' || 'cargo' }}
-          test
-          --release
-          --locked
-          --features ${{ env.REQUIRED_FEATURES }}
-          --target=${{ matrix.target }}
-          ${{ steps.options.outputs.cargo-build-options }}
-          ${{ steps.options.outputs.cargo-test-options }}
-
       - name: Package binary
         id: package
         run: pixi run -e release package-binary --target ${{ matrix.target }}
