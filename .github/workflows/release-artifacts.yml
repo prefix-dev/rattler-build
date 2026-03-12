@@ -243,48 +243,6 @@ jobs:
           name: release-rattler-build-${{ matrix.target }}.zip
           path: artifacts/
 
-  # Sigstore build provenance attestation
-  attest:
-    name: Attest build provenance
-    needs: [build-binaries, sign-macos, sign-windows]
-    if: >-
-      !cancelled() &&
-      needs.build-binaries.result == 'success' &&
-      needs.sign-macos.result == 'success' &&
-      (needs.sign-windows.result == 'success' || needs.sign-windows.result == 'skipped')
-    runs-on: ubuntu-latest
-    permissions:
-      attestations: write
-      id-token: write
-      contents: read
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          persist-credentials: false
-      - uses: prefix-dev/setup-pixi@a0af7a228712d6121d37aba47adf55c1332c9c2e # v0.9.4
-        with:
-          environments: release
-      - name: Download all final artifacts
-        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
-        with:
-          pattern: release-*
-          path: artifacts/
-          merge-multiple: true
-      - name: Attest build provenance
-        id: attest
-        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
-        with:
-          subject-path: artifacts/**
-      - name: Save attestation bundle
-        run: pixi run -e release save-attestation --bundle-path "${STEPS_ATTEST_OUTPUTS_BUNDLE_PATH}" --output-dir artifacts/
-        env:
-          STEPS_ATTEST_OUTPUTS_BUNDLE_PATH: ${{ steps.attest.outputs.bundle-path }}
-      - name: Upload attestation
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
-        with:
-          name: attestations
-          path: artifacts/*.intoto.jsonl
-
   # Build Python wheels (reusable workflow)
   build-python-wheels:
     name: Build Python wheels
@@ -304,7 +262,7 @@ jobs:
       github.event_name == 'workflow_dispatch' &&
       !inputs.dry-run &&
       github.ref == 'refs/heads/main'
-    needs: [prepare, attest, build-python-wheels]
+    needs: [prepare, sign-macos, sign-windows, build-python-wheels]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -321,7 +279,7 @@ jobs:
         env:
           NEEDS_PREPARE_OUTPUTS_TAG: ${{ needs.prepare.outputs.tag }}
 
-  # Create GitHub release with all signed + attested artifacts
+  # Create GitHub release with all signed artifacts
   create-release:
     name: Create GitHub Release
     needs: [prepare, tag-release]
@@ -342,11 +300,6 @@ jobs:
           pattern: release-*
           path: release-assets/
           merge-multiple: true
-      - name: Download attestations
-        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
-        with:
-          name: attestations
-          path: release-assets/
       - name: Create release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
