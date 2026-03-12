@@ -80,6 +80,7 @@ use crate::publish::{
     upload_and_index_channel,
 };
 use indexmap::IndexSet;
+use rattler_build_recipe::topological_sort_by_dependencies;
 
 /// Result of finding variants, including the top-level recipe name if available
 struct FoundVariants {
@@ -1218,6 +1219,24 @@ pub async fn rebuild(
     Ok(())
 }
 
+/// Sort the build outputs (recipes) topologically based on their dependencies.
+///
+/// When `up_to` is specified, only outputs needed to build the named package are kept.
+fn sort_build_outputs_topologically(
+    outputs: &mut Vec<Output>,
+    up_to: Option<&str>,
+) -> miette::Result<()> {
+    let sorted = topological_sort_by_dependencies(std::mem::take(outputs), |o| &o.recipe, up_to)
+        .into_diagnostic()?;
+
+    for output in &sorted {
+        tracing::debug!("Ordered output: {:?}", output.name().as_normalized());
+    }
+
+    *outputs = sorted;
+    Ok(())
+}
+
 /// Get the version of Rattler-Build.
 pub fn get_rattler_build_version() -> &'static str {
     env!("CARGO_PKG_VERSION")
@@ -1242,8 +1261,7 @@ pub async fn build_recipes(
 
     if build_data.render_only {
         // Sort outputs topologically even in render-only mode to show expected build order
-        // TODO(refactor): figure out if this is still needed
-        // sort_build_outputs_topologically(&mut outputs, build_data.up_to.as_deref())?;
+        sort_build_outputs_topologically(&mut outputs, build_data.up_to.as_deref())?;
 
         let outputs = if build_data.with_solve {
             let mut updated_outputs = Vec::new();
@@ -1270,7 +1288,7 @@ pub async fn build_recipes(
     // Skip noarch builds before the topological sort
     outputs = skip_noarch(outputs, &tool_config).await?;
 
-    // sort_build_outputs_topologically(&mut outputs, build_data.up_to.as_deref())?;
+    sort_build_outputs_topologically(&mut outputs, build_data.up_to.as_deref())?;
     run_build_from_args(outputs, tool_config, build_data.markdown_summary.as_deref()).await?;
 
     Ok(())
@@ -1488,7 +1506,7 @@ pub async fn publish_packages(
         // Skip noarch builds before the topological sort
         outputs = skip_noarch(outputs, &tool_config).await?;
 
-        // sort_build_outputs_topologically(&mut outputs, publish_data.build.up_to.as_deref())?;
+        sort_build_outputs_topologically(&mut outputs, publish_data.build.up_to.as_deref())?;
 
         // Build all packages and collect the paths
         let built_packages = build_and_collect_packages(outputs, &tool_config).await?;

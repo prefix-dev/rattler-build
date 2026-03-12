@@ -33,6 +33,9 @@ use crate::{
     stage1::{Evaluate, EvaluationContext, Recipe as Stage1Recipe},
 };
 
+/// Result type for [`build_recipe_dependency_graph`]: the graph, node mapping, and sorted item indices.
+type RecipeDependencyGraph = (DiGraph<usize, ()>, Vec<NodeIndex>, Vec<usize>);
+
 /// Errors that can occur during recipe rendering with variant configurations.
 ///
 /// This is the primary error type for the rendering layer, covering parse errors,
@@ -302,9 +305,15 @@ fn add_pins_to_variant(
 #[derive(Debug, Clone, Error, Diagnostic)]
 pub enum TopologicalSortError {
     /// A dependency cycle was detected among recipe outputs.
-    #[error("Cycle detected in recipe outputs: {package}")]
+    #[error("Cycle detected in recipe outputs: {packages}")]
     CycleDetected {
-        /// The package name where the cycle was detected.
+        /// The package names involved in the cycle.
+        packages: String,
+    },
+    /// The specified package was not found in the outputs.
+    #[error("The package '{package}' was not found in the outputs")]
+    PackageNotFound {
+        /// The package name that was not found.
         package: String,
     },
 }
@@ -322,61 +331,227 @@ pub fn topological_sort_variants(
         return Ok(variants);
     }
 
-    let name_to_indices = build_name_index(&variants);
-    let graph = build_dependency_graph(&variants, &name_to_indices)?;
+    let recipes: Vec<&Stage1Recipe> = variants.iter().map(|v| &v.recipe).collect();
+    let name_to_indices = build_recipe_name_index(&recipes);
 
-    stable_topological_sort(variants, &graph, &name_to_indices)
+    // Validate there are no cycles (uses petgraph toposort internally)
+    validate_no_cycles(&recipes, &name_to_indices)?;
+
+    stable_topological_sort(variants, &name_to_indices)
 }
 
-/// Return type for dependency graph building
-type DependencyGraph = (DiGraph<usize, ()>, BTreeMap<usize, NodeIndex>);
-
-/// Build a dependency graph for topological sorting
-fn build_dependency_graph(
-    variants: &[RenderedVariant],
-    name_to_indices: &BTreeMap<rattler_conda_types::PackageName, Vec<usize>>,
-) -> Result<DependencyGraph, TopologicalSortError> {
-    // Create a directed graph
-    let mut graph = DiGraph::<usize, ()>::new();
-    let mut idx_to_node: BTreeMap<usize, NodeIndex> = BTreeMap::new();
-
-    // Add nodes for each variant
-    for idx in 0..variants.len() {
-        let node = graph.add_node(idx);
-        idx_to_node.insert(idx, node);
+/// Sort items with [`Stage1Recipe`]s topologically by their dependencies.
+///
+/// Takes a list of items, a function to extract the [`Stage1Recipe`] from each item,
+/// and an optional `up_to` package name to filter the results.
+///
+/// When `up_to` is `None`, returns all items in topological order (dependencies first).
+/// When `up_to` is `Some(name)`, returns only the items needed to build the named
+/// package (its transitive dependencies plus the package itself).
+pub fn topological_sort_by_dependencies<T>(
+    items: Vec<T>,
+    get_recipe: impl Fn(&T) -> &Stage1Recipe,
+    up_to: Option<&str>,
+) -> Result<Vec<T>, TopologicalSortError> {
+    if items.is_empty() {
+        return Ok(items);
     }
 
-    // Add edges based on ALL dependencies (for cycle detection)
-    for (idx, variant) in variants.iter().enumerate() {
-        let current_name = &variant.recipe.package.name;
+    let recipes: Vec<&Stage1Recipe> = items.iter().map(&get_recipe).collect();
+    let name_to_indices = build_recipe_name_index(&recipes);
+    let (graph, idx_to_node, toposorted) =
+        build_recipe_dependency_graph(&recipes, &name_to_indices)?;
 
-        // Check all dependencies in requirements
-        for dep_name in extract_dependency_names(&variant.recipe) {
-            // Skip self-dependencies
+    let sorted_item_indices: Vec<usize> = if let Some(up_to) = up_to {
+        filter_up_to(&graph, &idx_to_node, &name_to_indices, up_to)?
+    } else {
+        toposorted
+    };
+
+    // Reorder by moving items out via Option<T> to avoid Clone bound
+    let mut item_map: Vec<Option<T>> = items.into_iter().map(Some).collect();
+    let mut result = Vec::with_capacity(sorted_item_indices.len());
+    for &idx in &sorted_item_indices {
+        result.push(
+            item_map[idx]
+                .take()
+                .expect("each index should be taken exactly once"),
+        );
+    }
+
+    Ok(result)
+}
+
+/// Build a dependency graph from a slice of recipes.
+///
+/// Returns the graph and a mapping from item index to node index.
+fn build_recipe_graph(
+    recipes: &[&Stage1Recipe],
+    name_to_indices: &BTreeMap<rattler_conda_types::PackageName, Vec<usize>>,
+) -> (DiGraph<usize, ()>, Vec<NodeIndex>) {
+    let mut graph = DiGraph::<usize, ()>::new();
+    let mut idx_to_node: Vec<NodeIndex> = Vec::with_capacity(recipes.len());
+
+    for idx in 0..recipes.len() {
+        let node = graph.add_node(idx);
+        idx_to_node.push(node);
+    }
+
+    for (idx, recipe) in recipes.iter().enumerate() {
+        let current_name = &recipe.package.name;
+
+        for dep_name in extract_dependency_names(recipe) {
             if &dep_name == current_name {
                 continue;
             }
 
-            // Find all variants that produce this dependency
             if let Some(dep_indices) = name_to_indices.get(&dep_name) {
                 for &dep_idx in dep_indices {
-                    // Add edge: dep_idx -> idx (dependency must be built before dependent)
-                    graph.add_edge(idx_to_node[&dep_idx], idx_to_node[&idx], ());
+                    graph.add_edge(idx_to_node[dep_idx], idx_to_node[idx], ());
                 }
             }
         }
     }
 
-    // Check for cycles first
-    if let Err(cycle) = petgraph::algo::toposort(&graph, None) {
-        let cycle_idx = graph[cycle.node_id()];
-        let cycle_pkg = &variants[cycle_idx].recipe.package.name;
+    (graph, idx_to_node)
+}
+
+/// Perform a stable topological sort on the dependency graph using Kahn's algorithm.
+///
+/// Uses a BTreeSet so that items with no dependency relationship preserve
+/// their original order. Detects cycles and reports a package name involved.
+fn stable_toposort(
+    graph: &DiGraph<usize, ()>,
+    idx_to_node: &[NodeIndex],
+    recipes: &[&Stage1Recipe],
+) -> Result<Vec<usize>, TopologicalSortError> {
+    let n = recipes.len();
+    let mut in_degree: Vec<usize> = (0..n)
+        .map(|i| {
+            graph
+                .neighbors_directed(idx_to_node[i], petgraph::Direction::Incoming)
+                .count()
+        })
+        .collect();
+
+    let mut ready: std::collections::BTreeSet<usize> =
+        (0..n).filter(|&i| in_degree[i] == 0).collect();
+
+    let mut sorted = Vec::with_capacity(n);
+    while let Some(&idx) = ready.iter().next() {
+        ready.remove(&idx);
+        sorted.push(idx);
+
+        let neighbors: Vec<_> = graph
+            .neighbors_directed(idx_to_node[idx], petgraph::Direction::Outgoing)
+            .collect();
+        for neighbor in neighbors {
+            let neighbor_idx = graph[neighbor];
+            in_degree[neighbor_idx] -= 1;
+            if in_degree[neighbor_idx] == 0 {
+                ready.insert(neighbor_idx);
+            }
+        }
+    }
+
+    if sorted.len() != n {
+        // All nodes with remaining in-degree are part of (or blocked by) cycles.
+        // Collect unique package names involved.
+        let cycle_names: Vec<_> = in_degree
+            .iter()
+            .enumerate()
+            .filter(|&(_, d)| *d > 0)
+            .map(|(i, _)| recipes[i].package.name.as_normalized().to_string())
+            .collect::<std::collections::BTreeSet<_>>()
+            .into_iter()
+            .collect();
         return Err(TopologicalSortError::CycleDetected {
-            package: cycle_pkg.as_normalized().to_string(),
+            packages: cycle_names.join(", "),
         });
     }
 
-    Ok((graph, idx_to_node))
+    Ok(sorted)
+}
+
+/// Build a dependency graph and perform a stable topological sort.
+///
+/// Returns the graph, node mapping, and sorted item indices.
+fn build_recipe_dependency_graph(
+    recipes: &[&Stage1Recipe],
+    name_to_indices: &BTreeMap<rattler_conda_types::PackageName, Vec<usize>>,
+) -> Result<RecipeDependencyGraph, TopologicalSortError> {
+    let (graph, idx_to_node) = build_recipe_graph(recipes, name_to_indices);
+    let sorted = stable_toposort(&graph, &idx_to_node, recipes)?;
+    Ok((graph, idx_to_node, sorted))
+}
+
+/// Validate that there are no dependency cycles among the recipes.
+fn validate_no_cycles(
+    recipes: &[&Stage1Recipe],
+    name_to_indices: &BTreeMap<rattler_conda_types::PackageName, Vec<usize>>,
+) -> Result<(), TopologicalSortError> {
+    let (graph, idx_to_node) = build_recipe_graph(recipes, name_to_indices);
+    stable_toposort(&graph, &idx_to_node, recipes)?;
+    Ok(())
+}
+
+/// Build a mapping from package name to item indices.
+fn build_recipe_name_index(
+    recipes: &[&Stage1Recipe],
+) -> BTreeMap<rattler_conda_types::PackageName, Vec<usize>> {
+    let mut name_to_indices: BTreeMap<rattler_conda_types::PackageName, Vec<usize>> =
+        BTreeMap::new();
+    for (idx, recipe) in recipes.iter().enumerate() {
+        name_to_indices
+            .entry(recipe.package.name.clone())
+            .or_default()
+            .push(idx);
+    }
+    name_to_indices
+}
+
+/// Filter the dependency graph to only include items needed to build `up_to` package.
+///
+/// Performs a DFS post-order traversal from all variants of the target package,
+/// returning only the transitive dependencies and the target itself as item indices.
+fn filter_up_to(
+    graph: &DiGraph<usize, ()>,
+    idx_to_node: &[NodeIndex],
+    name_to_indices: &BTreeMap<rattler_conda_types::PackageName, Vec<usize>>,
+    up_to: &str,
+) -> Result<Vec<usize>, TopologicalSortError> {
+    use std::str::FromStr;
+
+    let up_to_name = rattler_conda_types::PackageName::from_str(up_to).map_err(|_| {
+        TopologicalSortError::PackageNotFound {
+            package: up_to.to_string(),
+        }
+    })?;
+
+    let up_to_indices =
+        name_to_indices
+            .get(&up_to_name)
+            .ok_or_else(|| TopologicalSortError::PackageNotFound {
+                package: up_to.to_string(),
+            })?;
+
+    // The graph has edges dep -> dependent. We need to find all deps OF the up_to
+    // package, so reverse the graph and DFS from the target.
+    let reversed = petgraph::visit::Reversed(graph);
+
+    let mut sorted_indices = Vec::new();
+    let mut visited = HashSet::new();
+    for &up_to_idx in up_to_indices {
+        let node = idx_to_node[up_to_idx];
+        let mut dfs = petgraph::visit::DfsPostOrder::new(&reversed, node);
+        while let Some(nx) = dfs.next(&reversed) {
+            if visited.insert(nx) {
+                sorted_indices.push(graph[nx]);
+            }
+        }
+    }
+
+    Ok(sorted_indices)
 }
 
 /// Perform a stable topological sort that preserves original order when possible.
@@ -387,7 +562,6 @@ fn build_dependency_graph(
 /// `pillow(3.10), pillow-tests(3.10), pillow(3.11), pillow-tests(3.11), ...`
 fn stable_topological_sort(
     variants: Vec<RenderedVariant>,
-    _graph: &DependencyGraph,
     name_to_indices: &BTreeMap<rattler_conda_types::PackageName, Vec<usize>>,
 ) -> Result<Vec<RenderedVariant>, TopologicalSortError> {
     // Use a stable topological sort that preserves original order when possible
@@ -866,12 +1040,24 @@ fn finalize_build_string_single(result: &mut RenderedVariant) -> Result<(), Rend
 fn extract_dependency_names(recipe: &Stage1Recipe) -> Vec<rattler_conda_types::PackageName> {
     let requirements = recipe.requirements();
 
-    // Collect names from build/host/run dependencies
-    let build_host_run = requirements
+    // Collect names from build/host dependencies (needed at build time)
+    let build_host = requirements
         .build_host()
         .filter_map(|dep| dep.name().cloned());
 
-    // Also collect pin_subpackage names from run_exports (these reference other outputs)
+    // Collect pin_subpackage references from run/run_constraints
+    // (we need those subpackages built first to resolve the pin,
+    // but plain run deps are not needed at build time and may contain cycles)
+    let run_pin_subpackages = requirements
+        .run
+        .iter()
+        .chain(requirements.run_constraints.iter())
+        .filter_map(|dep| match dep {
+            Dependency::PinSubpackage(pin) => Some(pin.pin_subpackage.name.clone()),
+            _ => None,
+        });
+
+    // Collect pin_subpackage names from run_exports (these reference other outputs)
     let run_export_pins = requirements
         .run_exports_and_constraints()
         .filter_map(|dep| match dep {
@@ -879,20 +1065,10 @@ fn extract_dependency_names(recipe: &Stage1Recipe) -> Vec<rattler_conda_types::P
             _ => None,
         });
 
-    build_host_run.chain(run_export_pins).collect()
-}
-
-/// Helper function to build name-to-indices mapping for topological sort
-fn build_name_index(
-    variants: &[RenderedVariant],
-) -> BTreeMap<rattler_conda_types::PackageName, Vec<usize>> {
-    let mut name_to_indices: BTreeMap<rattler_conda_types::PackageName, Vec<usize>> =
-        BTreeMap::new();
-    for (idx, variant) in variants.iter().enumerate() {
-        let pkg_name = variant.recipe.package.name.clone();
-        name_to_indices.entry(pkg_name).or_default().push(idx);
-    }
-    name_to_indices
+    build_host
+        .chain(run_pin_subpackages)
+        .chain(run_export_pins)
+        .collect()
 }
 
 /// Helper function to create a JinjaConfig from RenderConfig
@@ -1776,6 +1952,169 @@ outputs:
 
         // Self-pin should be tracked but not cause ordering issues
         assert_eq!(sorted[0].pin_subpackages.len(), 1);
+    }
+
+    #[test]
+    fn test_up_to_filters_transitive_deps() {
+        // Test that --up-to returns only the target package and its transitive dependencies.
+        // This is the scenario that previously broke: pkg-c depends on pkg-b which depends on pkg-a.
+        // Using --up-to=pkg-b should return [pkg-a, pkg-b] (not pkg-c).
+        let recipe_yaml = r#"
+schema_version: 1
+
+context:
+  version: "1.0.0"
+
+recipe:
+  version: ${{ version }}
+
+build:
+  number: 0
+
+outputs:
+  - package:
+      name: pkg-a
+    build:
+      noarch: generic
+
+  - package:
+      name: pkg-b
+    build:
+      noarch: generic
+    requirements:
+      host:
+        - ${{ pin_subpackage('pkg-a', exact=true) }}
+
+  - package:
+      name: pkg-c
+    build:
+      noarch: generic
+    requirements:
+      host:
+        - ${{ pin_subpackage('pkg-b', exact=true) }}
+"#;
+
+        let variant_yaml = r#"{}"#;
+
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config = VariantConfig::from_yaml_str(variant_yaml).unwrap();
+
+        let rendered =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, RenderConfig::new())
+                .unwrap();
+
+        // --up-to=pkg-b should include pkg-a (dependency) and pkg-b itself, but not pkg-c
+        let sorted =
+            topological_sort_by_dependencies(rendered.clone(), |v| &v.recipe, Some("pkg-b"))
+                .unwrap();
+
+        let names: Vec<_> = sorted
+            .iter()
+            .map(|v| v.recipe.package.name.as_normalized().to_string())
+            .collect();
+        assert_eq!(names, vec!["pkg-a", "pkg-b"]);
+
+        // --up-to=pkg-a should return only pkg-a (no deps)
+        let sorted =
+            topological_sort_by_dependencies(rendered.clone(), |v| &v.recipe, Some("pkg-a"))
+                .unwrap();
+
+        let names: Vec<_> = sorted
+            .iter()
+            .map(|v| v.recipe.package.name.as_normalized().to_string())
+            .collect();
+        assert_eq!(names, vec!["pkg-a"]);
+
+        // --up-to=pkg-c should return all three in dependency order
+        let sorted =
+            topological_sort_by_dependencies(rendered.clone(), |v| &v.recipe, Some("pkg-c"))
+                .unwrap();
+
+        let names: Vec<_> = sorted
+            .iter()
+            .map(|v| v.recipe.package.name.as_normalized().to_string())
+            .collect();
+        assert!(names.contains(&"pkg-a".to_string()));
+        assert!(names.contains(&"pkg-b".to_string()));
+        assert!(names.contains(&"pkg-c".to_string()));
+        assert_eq!(names.len(), 3);
+
+        // --up-to with nonexistent package should error
+        let result = topological_sort_by_dependencies(rendered, |v| &v.recipe, Some("nonexistent"));
+        assert!(matches!(
+            result,
+            Err(TopologicalSortError::PackageNotFound { .. })
+        ));
+    }
+
+    #[test]
+    fn test_up_to_with_variants() {
+        // Test --up-to with multiple variants: should include all variants of the
+        // target package and its transitive dependencies.
+        let recipe_yaml = r#"
+schema_version: 1
+
+context:
+  name: my-package
+
+recipe:
+  name: ${{ name }}
+  version: "1.0.0"
+
+outputs:
+  - package:
+      name: ${{ name }}-${{ variant }}
+    build:
+      noarch: generic
+
+  - package:
+      name: ${{ name }}
+    build:
+      noarch: generic
+    requirements:
+      run:
+        - ${{ pin_subpackage(name ~ '-' ~ variant, exact=true) }}
+"#;
+
+        let variant_yaml = r#"
+variant:
+  - a
+  - b
+"#;
+
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config = VariantConfig::from_yaml_str(variant_yaml).unwrap();
+
+        let rendered =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, RenderConfig::new())
+                .unwrap();
+
+        // --up-to=my-package should include the my-package variants plus
+        // the my-package-a and my-package-b variants they depend on via pin_subpackage
+        let sorted =
+            topological_sort_by_dependencies(rendered.clone(), |v| &v.recipe, Some("my-package"))
+                .unwrap();
+
+        let names: Vec<_> = sorted
+            .iter()
+            .map(|v| v.recipe.package.name.as_normalized().to_string())
+            .collect();
+
+        // Both my-package-a and my-package-b should be included as deps
+        assert!(names.contains(&"my-package-a".to_string()));
+        assert!(names.contains(&"my-package-b".to_string()));
+        assert!(names.contains(&"my-package".to_string()));
+
+        // --up-to=my-package-a should return only my-package-a (no deps)
+        let sorted =
+            topological_sort_by_dependencies(rendered, |v| &v.recipe, Some("my-package-a"))
+                .unwrap();
+
+        let names: Vec<_> = sorted
+            .iter()
+            .map(|v| v.recipe.package.name.as_normalized().to_string())
+            .collect();
+        assert_eq!(names, vec!["my-package-a"]);
     }
 
     #[test]
