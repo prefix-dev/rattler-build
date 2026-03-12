@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.1.0...rattler_build_core-v0.1.1) - 2026-03-12
+
+### Added
+
+- enable arwen-codesign experimentally ([#2269](https://github.com/prefix-dev/rattler-build/pull/2269))
+
+### Fixed
+
+- honor run-export ignore from staging output ([#2282](https://github.com/prefix-dev/rattler-build/pull/2282))
+- always set `SP_DIR` during script execution ([#2142](https://github.com/prefix-dev/rattler-build/pull/2142))
+
+### Other
+
+- use Rattler-Build for program name in doc comments and docstrings ([#2289](https://github.com/prefix-dev/rattler-build/pull/2289))
+- add readme for all crates ([#2292](https://github.com/prefix-dev/rattler-build/pull/2292))
+- *(rattler_build_core)* release v0.1.0 ([#2281](https://github.com/prefix-dev/rattler-build/pull/2281))
+
 ## [0.1.0](https://github.com/prefix-dev/rattler-build/releases/tag/rattler_build_core-v0.1.0) - 2026-03-09
 
 ### Added
