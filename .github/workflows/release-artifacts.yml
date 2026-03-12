@@ -166,7 +166,7 @@ jobs:
       - name: Download macOS artifact
         uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
         with:
-          name: build-rattler-build-${{ matrix.target }}.tar.gz
+          name: build-rattler-build-${{ matrix.target }}.zip
           path: artifacts/
       - name: Sign and notarize
         env:
@@ -180,7 +180,7 @@ jobs:
       - name: Upload signed artifact
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
-          name: release-rattler-build-${{ matrix.target }}.tar.gz
+          name: release-rattler-build-${{ matrix.target }}.zip
           path: artifacts/
 
   # Windows code signing via Azure Trusted Signing
