@@ -186,6 +186,7 @@ jobs:
   # Windows code signing via Azure Trusted Signing
   sign-windows:
     name: Sign Windows binaries
+    if: ${{ !inputs.dry-run }}
     needs: build-binaries
     runs-on: windows-latest
     permissions:
@@ -246,6 +247,11 @@ jobs:
   attest:
     name: Attest build provenance
     needs: [build-binaries, sign-macos, sign-windows]
+    if: >-
+      !cancelled() &&
+      needs.build-binaries.result == 'success' &&
+      needs.sign-macos.result == 'success' &&
+      (needs.sign-windows.result == 'success' || needs.sign-windows.result == 'skipped')
     runs-on: ubuntu-latest
     permissions:
       attestations: write
