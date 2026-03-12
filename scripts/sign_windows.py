@@ -42,7 +42,7 @@ def extract(artifacts_dir: Path, sign_dir: Path) -> None:
                 if name.endswith(".exe"):
                     exe_name = Path(name).name
                     dest = sign_dir / unique_exe_name(zip_path, exe_name)
-                    print(f"  → {dest}")
+                    print(f"  ->{dest}")
                     with zf.open(name) as src, open(dest, "wb") as dst:
                         shutil.copyfileobj(src, dst)
 
@@ -78,7 +78,7 @@ def repackage(artifacts_dir: Path, sign_dir: Path) -> None:
                     exe_name = Path(name).name
                     signed_exe = sign_dir / unique_exe_name(zip_path, exe_name)
                     if signed_exe.exists():
-                        print(f"  → replacing {name} with signed version")
+                        print(f"  ->replacing {name} with signed version")
                         new_zf.write(signed_exe, name)
                     else:
                         print(
