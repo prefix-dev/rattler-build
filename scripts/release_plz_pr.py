@@ -66,7 +66,9 @@ def sync_py_cargo_lock(git_token: str, repo_url: str, branch: str) -> None:
         )
         return
 
+    run(["git", "fetch", "origin", branch])
     run(["git", "checkout", branch])
+    run(["git", "reset", "--hard", f"origin/{branch}"])
     run(["cargo", "update", "--workspace", "--manifest-path", str(PY_MANIFEST)])
 
     diff = subprocess.run(
