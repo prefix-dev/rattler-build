@@ -3,3 +3,5 @@ rules:
     ignore:
       # docs workflow needs git credentials for mike deploy --push
       - docs.yml
+      # tag-release job needs git credentials to push tags
+      - release-artifacts.yml
