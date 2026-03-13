@@ -82,23 +82,23 @@ deploy-dev = { cmd = "mike deploy --push dev devel", depends-on = [
 ] }
 
 [dependencies]
-openssl = "3.*"
-rust = ">=1.93.1,<1.94"
-rust-src = ">=1.93.1,<1.94"
-sccache = ">=0.12,<0.13"
+openssl = ">=3.6.1,<4"
+rust = ">=1.94.0,<1.95"
+rust-src = ">=1.94.0,<2"
+sccache = ">=0.14.0,<0.15"
 compilers = ">=1.11.0,<2"
-libssh2 = "1.11.0.*"
-pkg-config = "0.29.2.*"
-cmake = "3.27.6.*"
-make = "4.3.*"
-perl = "5.32.1.*"
-pytest = "7.4.2.*"
-pytest-xdist = ">=3.6.1,<4"
-pyyaml = ">=6.0.1,<6.1"
-conda-package-handling = "2.2.0.*"
-requests = ">=2.32.2,<2.33"
-syrupy = "4.6.*"
-boto3 = "*"
+libssh2 = ">=1.11.1,<2"
+pkg-config = ">=0.29.2,<0.30"
+cmake = ">=4.2.3,<5"
+make = ">=4.4.1,<5"
+perl = ">=5.32.1,<5.33"
+pytest = ">=8.4.2,<9"
+pytest-xdist = ">=3.8.0,<4"
+pyyaml = ">=6.0.3,<7"
+conda-package-handling = ">=2.4.0,<3"
+requests = ">=2.32.5,<3"
+syrupy = ">=5.1.0,<6"
+boto3 = ">=1.42.66,<2"
 
 [activation.env]
 RUSTC_WRAPPER = "sccache"
@@ -149,11 +149,13 @@ pre-commit-install = "lefthook install"
 pre-commit-install-minimal = "lefthook install pre-commit"
 
 [feature.dev.dependencies]
-tbump = "*"
+tbump = ">=6.9.0,<7"
+git-cliff = ">=2.12.0,<3"
 
 [feature.dev.tasks]
 # Bump version by running `pixi run bump NEW_VERSION`
 bump = "tbump --only-patch"
+bump-changelog = { cmd = "python scripts/bump_changelog.py", description = "Update changelog with unreleased changes" }
 release = { cmd = "python scripts/release.py", description = "Bump version and update lock files" }
 
 [feature.packaging.dependencies]

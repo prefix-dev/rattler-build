@@ -5,6 +5,7 @@ Usage:
 """
 
 import atexit
+import os
 import re
 import subprocess
 import sys
@@ -26,6 +27,7 @@ STEPS = [
     "Pre-flight checks",
     "Patch version files with tbump",
     "Verify version files are in sync",
+    "Update changelog",
     "Update Cargo.lock",
     "Update pixi.lock (root)",
     "Update pixi.lock (py-rattler-build/)",
@@ -202,7 +204,7 @@ def main() -> None:
 
         if start_step <= 2:
             cprint("\n2. Patching version files with tbump...")
-            run(["tbump", "--only-patch", version])
+            run(["tbump", "--non-interactive", "--only-patch", version])
             completed.append("Patched version files")
 
         if start_step <= 3:
@@ -212,17 +214,29 @@ def main() -> None:
             completed.append("Verified version files")
 
         if start_step <= 4:
-            cprint("\n4. Updating Cargo.lock...")
+            cprint("\n4. Updating changelog...")
+            env = {**os.environ, "RELEASE_VERSION": version}
+            cprint("  → pixi run bump-changelog")
+            subprocess.run(
+                ["pixi", "run", "bump-changelog"], check=True, cwd=ROOT, env=env
+            )
+            cinput(
+                "Update the 'Highlights' section in CHANGELOG.md, then press Enter to continue..."
+            )
+            completed.append("Updated changelog")
+
+        if start_step <= 5:
+            cprint("\n5. Updating Cargo.lock...")
             run(["cargo", "update", "--workspace"])
             completed.append("Updated Cargo.lock")
 
-        if start_step <= 5:
-            cprint("\n5. Updating pixi.lock (root)...")
+        if start_step <= 6:
+            cprint("\n6. Updating pixi.lock (root)...")
             run(["pixi", "lock"])
             completed.append("Updated pixi.lock (root)")
 
-        if start_step <= 6:
-            cprint("\n6. Updating pixi.lock (py-rattler-build/)...")
+        if start_step <= 7:
+            cprint("\n7. Updating pixi.lock (py-rattler-build/)...")
             run(["pixi", "lock"], cwd=ROOT / "py-rattler-build")
             completed.append("Updated pixi.lock (py-rattler-build/)")
 
