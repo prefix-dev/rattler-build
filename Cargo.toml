@@ -318,13 +318,17 @@ name = "parse_file"
 harness = false
 
 [patch.crates-io]
+# Patched to make S3Config::Custom fall back to the AWS SDK default credential
+# chain when no credentials are found in rattler's auth storage.  This makes
+# the repodata-loading path (S3Middleware) consistent with the upload path
+# (resolve_s3_credentials) which already has this fallback.
+rattler_networking = { path = "vendor/rattler_networking" }
 # rattler = { git = "https://github.com/conda/rattler", branch = "main" }
 # rattler_sandbox = { git = "https://github.com/conda/rattler", branch = "main" }
 # rattler_cache = { git = "https://github.com/conda/rattler", branch = "main" }
 # rattler_conda_types = { git = "https://github.com/conda/rattler", branch = "main" }
 # rattler_digest = { git = "https://github.com/conda/rattler", branch = "main" }
 # rattler_index = { git = "https://github.com/conda/rattler", branch = "main" }
-# rattler_networking = { git = "https://github.com/conda/rattler", branch = "main" }
 # rattler_repodata_gateway = { git = "https://github.com/conda/rattler", branch = "main" }
 # rattler_shell = { git = "https://github.com/conda/rattler", branch = "main" }
 # rattler_solve = { git = "https://github.com/conda/rattler", branch = "main" }
