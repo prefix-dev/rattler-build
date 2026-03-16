@@ -23,7 +23,8 @@
     secrets:
     - ABC
     - DEF
-    content: print("i am the test")
+    content: |
+      print("i am the test")
 - downstream: foo
 - perl:
     uses:
