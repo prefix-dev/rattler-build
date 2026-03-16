@@ -129,7 +129,6 @@ pub fn build_recipes_py(
         no_include_recipe,
         test,
         common,
-        false, // TUI disabled
         skip_existing,
         noarch_build_platform,
         None, // extra meta
