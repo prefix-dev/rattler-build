@@ -14,7 +14,6 @@ use miette::{Context, IntoDiagnostic};
 use minijinja::Value;
 use rattler_build_jinja::{Jinja, Variable};
 use rattler_build_recipe::stage1::{InheritsFrom, StagingCache};
-use rattler_build_script::Debug as ScriptDebug;
 use rattler_build_types::NormalizedKey;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -298,7 +297,6 @@ impl Output {
                 build_prefix,
                 Some(jinja_renderer),
                 self.build_configuration.sandbox_config(),
-                ScriptDebug::new(self.build_configuration.debug.is_enabled()),
             )
             .await
             .into_diagnostic()?;

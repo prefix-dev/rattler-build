@@ -17,8 +17,8 @@ mod interpreter;
 
 #[cfg(feature = "execution")]
 pub use execution::{
-    Debug, ExecutionArgs, ResolvedScriptContents, create_build_script,
-    run_process_with_replacements, run_script,
+    ExecutionArgs, ResolvedScriptContents, create_build_script, run_process_with_replacements,
+    run_script,
 };
 #[cfg(feature = "execution")]
 pub use interpreter::InterpreterError;

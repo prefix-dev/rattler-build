@@ -11,7 +11,7 @@ use rattler_build_recipe::stage1::{
     TestType,
     tests::{CommandsTest, DownstreamTest, PerlTest, PythonTest, PythonVersion, RTest, RubyTest},
 };
-use rattler_build_script::{Debug as ScriptDebug, Script, ScriptContent};
+use rattler_build_script::{Script, ScriptContent};
 use rattler_conda_types::{
     Channel, ChannelUrl, MatchSpec, ParseStrictness, Platform,
     compression_level::CompressionLevel,
@@ -38,11 +38,8 @@ use rattler::package_cache::PackageCache;
 use rattler_cache::validation::ValidationMode;
 
 use crate::{
-    env_vars,
-    metadata::{Debug, PlatformWithVirtualPackages},
-    render::solver::create_environment,
-    source::copy_dir::CopyDir,
-    tool_configuration,
+    env_vars, metadata::PlatformWithVirtualPackages, render::solver::create_environment,
+    source::copy_dir::CopyDir, tool_configuration,
 };
 
 #[allow(missing_docs)]
@@ -201,7 +198,6 @@ impl Tests {
                         None,
                         None::<fn(&str) -> Result<String, String>>,
                         None,
-                        ScriptDebug::new(false),
                     )
                     .await
                     .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -222,7 +218,6 @@ impl Tests {
                         None,
                         None::<fn(&str) -> Result<String, String>>,
                         None,
-                        ScriptDebug::new(false),
                     )
                     .await
                     .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -291,8 +286,6 @@ pub struct TestConfiguration {
     pub tool_configuration: tool_configuration::Configuration,
     /// The output directory to create the test prefixes in (will be `output_dir/test`)
     pub output_dir: PathBuf,
-    /// Debug mode yes, or no
-    pub debug: Debug,
     /// Exclude packages newer than this date from the solver
     pub exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
 }
@@ -751,7 +744,6 @@ async fn run_python_test_inner(
             None,
             None::<fn(&str) -> Result<String, String>>,
             None,
-            ScriptDebug::new(config.debug.is_enabled()),
         )
         .await
         .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -775,7 +767,6 @@ async fn run_python_test_inner(
                 None,
                 None::<fn(&str) -> Result<String, String>>,
                 None,
-                ScriptDebug::new(config.debug.is_enabled()),
             )
             .await
             .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -858,7 +849,6 @@ async fn run_perl_test(
             None,
             None::<fn(&str) -> Result<String, String>>,
             None,
-            ScriptDebug::new(config.debug.is_enabled()),
         )
         .await
         .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -977,7 +967,6 @@ async fn run_commands_test(
             build_prefix.as_ref(),
             None::<fn(&str) -> Result<String, String>>,
             None,
-            ScriptDebug::new(config.debug.is_enabled()),
         )
         .await
         .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -1162,7 +1151,6 @@ async fn run_r_test(
             None,
             None::<fn(&str) -> Result<String, String>>,
             None,
-            ScriptDebug::new(config.debug.is_enabled()),
         )
         .await
         .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -1240,7 +1228,6 @@ async fn run_ruby_test(
             None,
             None::<fn(&str) -> Result<String, String>>,
             None,
-            ScriptDebug::new(config.debug.is_enabled()),
         )
         .await
         .map_err(|e| TestError::TestFailed(e.to_string()))?;

@@ -9,11 +9,8 @@ use super::{CMDEXE_PREAMBLE, Interpreter, InterpreterError, find_interpreter};
 
 fn print_debug_info(args: &ExecutionArgs) -> String {
     let mut output = String::new();
-    if args.debug.is_enabled() {
-        output.push_str("\nDebug mode enabled - not executing the script.\n\n");
-    } else {
-        output.push_str("\nScript execution failed.\n\n")
-    }
+
+    output.push_str("\nScript execution failed.\n\n");
 
     output.push_str(&format!("  Work directory: {}\n", args.work_dir.display()));
     output.push_str(&format!("  Prefix: {}\n", args.run_prefix.display()));
@@ -59,10 +56,6 @@ impl Interpreter for CmdExeInterpreter {
 
         let build_script_path_str = build_script_path.to_string_lossy().to_string();
         let cmd_args = ["cmd.exe", "/d", "/c", &build_script_path_str];
-
-        if args.debug.is_enabled() {
-            return Err(InterpreterError::Debug(print_debug_info(&args)));
-        }
 
         let output = run_process_with_replacements(
             &cmd_args,

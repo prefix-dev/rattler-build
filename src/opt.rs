@@ -23,7 +23,6 @@ use url::Url;
 
 use crate::{
     console_utils::{Color, LogStyle},
-    metadata::Debug,
     tool_configuration::{ContinueOnFailure, SkipExisting, TestStrategy},
 };
 #[cfg(feature = "recipe-generation")]
@@ -677,10 +676,6 @@ pub struct BuildOpts {
     #[clap(flatten)]
     pub sandbox_arguments: SandboxArguments,
 
-    /// Enable debug output in build scripts
-    #[arg(long, help_heading = "Modifying result")]
-    pub debug: bool,
-
     /// Write a markdown summary to the specified file (appends to the file).
     /// Useful for generating PR comments or custom reports.
     #[arg(long, help_heading = "Modifying result")]
@@ -884,7 +879,6 @@ pub struct BuildData {
     pub noarch_build_platform: Option<Platform>,
     pub extra_meta: Option<Vec<(String, Value)>>,
     pub sandbox_configuration: Option<SandboxConfiguration>,
-    pub debug: Debug,
     pub continue_on_failure: ContinueOnFailure,
     pub error_prefix_in_binary: bool,
     pub allow_symlinks_on_windows: bool,
@@ -921,7 +915,6 @@ impl BuildData {
         noarch_build_platform: Option<Platform>,
         extra_meta: Option<Vec<(String, Value)>>,
         sandbox_configuration: Option<SandboxConfiguration>,
-        debug: Debug,
         continue_on_failure: ContinueOnFailure,
         error_prefix_in_binary: bool,
         allow_symlinks_on_windows: bool,
@@ -962,7 +955,6 @@ impl BuildData {
             noarch_build_platform,
             extra_meta,
             sandbox_configuration,
-            debug,
             continue_on_failure,
             error_prefix_in_binary,
             allow_symlinks_on_windows,
@@ -1014,7 +1006,6 @@ impl BuildData {
             opts.noarch_build_platform,
             opts.extra_meta,
             opts.sandbox_arguments.into(),
-            Debug::new(opts.debug),
             opts.continue_on_failure.into(),
             opts.error_prefix_in_binary,
             opts.allow_symlinks_on_windows,
@@ -1088,10 +1079,6 @@ pub struct TestOpts {
     #[clap(long)]
     pub test_index: Option<usize>,
 
-    /// Build test environment and output debug information for manual debugging.
-    #[arg(long)]
-    pub debug: bool,
-
     /// Common options.
     #[clap(flatten)]
     pub common: CommonOpts,
@@ -1105,7 +1092,6 @@ pub struct TestData {
     pub compression_threads: Option<u32>,
     pub common: CommonData,
     pub test_index: Option<usize>,
-    pub debug: Debug,
 }
 
 impl TestData {
@@ -1116,7 +1102,6 @@ impl TestData {
             value.package_file,
             value.channels,
             value.compression_threads,
-            Debug::new(value.debug),
             value.test_index,
             CommonData::from_opts_and_config(value.common, config.unwrap_or_default()),
         )
@@ -1127,7 +1112,6 @@ impl TestData {
         package_file: PathBuf,
         channels: Option<Vec<NamedChannelOrUrl>>,
         compression_threads: Option<u32>,
-        debug: Debug,
         test_index: Option<usize>,
         common: CommonData,
     ) -> Self {
@@ -1136,7 +1120,6 @@ impl TestData {
             channels,
             compression_threads,
             test_index,
-            debug,
             common,
         }
     }

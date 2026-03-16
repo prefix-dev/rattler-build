@@ -114,22 +114,6 @@ impl<'de> Deserialize<'de> for PlatformWithVirtualPackages {
     }
 }
 
-/// A newtype wrapper around a boolean indicating whether debug output is enabled
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Debug(bool);
-
-impl Debug {
-    /// Create a new Debug instance
-    pub fn new(debug: bool) -> Self {
-        Self(debug)
-    }
-
-    /// Returns true if debug output is enabled
-    pub fn is_enabled(&self) -> bool {
-        self.0
-    }
-}
-
 /// A package identifier
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct PackageIdentifier {

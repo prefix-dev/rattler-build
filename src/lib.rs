@@ -74,7 +74,7 @@ use types::{
     build_reindexed_channels,
 };
 
-use crate::metadata::{Debug, Output, PlatformWithVirtualPackages};
+use crate::metadata::{Output, PlatformWithVirtualPackages};
 use crate::publish::{
     BuildNumberOverride, PublishConfig, apply_build_number_override, fetch_highest_build_numbers,
     upload_and_index_channel,
@@ -556,7 +556,6 @@ pub async fn get_build_output(
                 store_recipe: !build_data.no_include_recipe,
                 force_colors: build_data.color_build_log && console::colors_enabled(),
                 sandbox_config: build_data.sandbox_configuration.clone(),
-                debug: build_data.debug,
                 exclude_newer: build_data.exclude_newer,
             },
             finalized_dependencies: None,
@@ -795,7 +794,6 @@ pub async fn run_build_from_args(
                         tool_configuration: tool_configuration.clone(),
                         test_index: None,
                         output_dir: output.build_configuration.directories.output_dir.clone(),
-                        debug: output.build_configuration.debug,
                         exclude_newer: output.build_configuration.exclude_newer,
                     },
                     None,
@@ -957,7 +955,6 @@ pub async fn run_test(
         solve_strategy: SolveStrategy::Highest,
         tool_configuration: tool_config,
         output_dir: test_data.common.output_dir,
-        debug: test_data.debug,
         exclude_newer: None,
     };
 
@@ -1552,7 +1549,6 @@ pub async fn debug_recipe(
         channels: debug_data.channels,
         common: debug_data.common,
         keep_build: true,
-        debug: Debug::new(true),
         test: TestStrategy::Skip,
         up_to: None,
         variant_config: debug_data.variant_config,

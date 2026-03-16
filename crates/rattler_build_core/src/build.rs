@@ -183,12 +183,6 @@ pub async fn run_build(
 
     match output.run_build_script().await {
         Ok(_) => {}
-        Err(InterpreterError::Debug(info)) => {
-            tracing::info!("{}", info);
-            return Err(miette::miette!(
-                "Script not executed because debug mode is enabled"
-            ));
-        }
         Err(InterpreterError::ExecutionFailed(_)) => {
             return Err(miette::miette!("Script failed to execute"));
         }

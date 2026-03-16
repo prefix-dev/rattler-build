@@ -223,7 +223,6 @@ class Package:
         *,
         channel: "Sequence[str] | None" = None,
         channel_priority: Literal["disabled", "strict", "flexible"] | None = None,
-        debug: bool = False,
         auth_file: str | Path | None = None,
         allow_insecure_host: "Sequence[str] | None" = None,
         compression_threads: int | None = None,
@@ -237,7 +236,6 @@ class Package:
             index: Index of the test to run (0-based)
             channel: List of channels to use for dependencies
             channel_priority: Channel priority ("disabled", "strict", or "flexible")
-            debug: Enable debug mode (keeps test environment)
             auth_file: Path to authentication file
             allow_insecure_host: List of hosts to allow insecure connections
             compression_threads: Number of compression threads
@@ -263,7 +261,6 @@ class Package:
                 index,
                 channel=list(channel) if channel else None,
                 channel_priority=channel_priority,
-                debug=debug,
                 auth_file=str(auth_file) if auth_file else None,
                 allow_insecure_host=list(allow_insecure_host) if allow_insecure_host else None,
                 compression_threads=compression_threads,
@@ -278,7 +275,6 @@ class Package:
         *,
         channel: "Sequence[str] | None" = None,
         channel_priority: Literal["disabled", "strict", "flexible"] | None = None,
-        debug: bool = False,
         auth_file: str | Path | None = None,
         allow_insecure_host: "Sequence[str] | None" = None,
         compression_threads: int | None = None,
@@ -291,7 +287,6 @@ class Package:
         Args:
             channel: List of channels to use for dependencies
             channel_priority: Channel priority ("disabled", "strict", or "flexible")
-            debug: Enable debug mode (keeps test environment)
             auth_file: Path to authentication file
             allow_insecure_host: List of hosts to allow insecure connections
             compression_threads: Number of compression threads
@@ -315,7 +310,6 @@ class Package:
             for r in self._inner.run_tests(
                 channel=list(channel) if channel else None,
                 channel_priority=channel_priority,
-                debug=debug,
                 auth_file=str(auth_file) if auth_file else None,
                 allow_insecure_host=list(allow_insecure_host) if allow_insecure_host else None,
                 compression_threads=compression_threads,
