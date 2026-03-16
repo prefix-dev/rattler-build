@@ -67,7 +67,7 @@ minijinja = { version = "2.18.0", features = [
 ] }
 regex = "1.12.3"
 reqwest = { version = "0.12.28", default-features = false, features = ["json"] }
-reqwest-middleware = "0.4.2"
+reqwest-middleware = { version = "0.4.2", features = ["json"] }
 reqwest-retry = "0.8.0"
 retry-policies = "0.5.1"
 serde = { version = "1.0.228", features = ["derive"] }
@@ -108,7 +108,24 @@ rayon = "1.11.0"
 serial_test = "3.4.0"
 unicode-normalization = "0.1.25"
 
-# rattler crates 
+# Dependencies used in subcrates (workspace-level)
+clap-verbosity-flag = "3.0.4"
+comfy-table = "7.2.2"
+flickzeug = "0.5.1"
+goblin = "0.10.5"
+ignore = "0.4.25"
+num_cpus = "1.17.0"
+pretty_assertions = "1.4.1"
+reflink-copy = "0.1.29"
+scroll = "0.13.0"
+serde-untagged = "0.1.9"
+terminal_size = "0.4.3"
+text-stub-library = "0.9.0"
+tracing-core = "0.1.36"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "ansi", "json"] }
+tracing-test = "0.2.6"
+
+# rattler crates
 # Rattler crates
 rattler_conda_types = { version = "0.44.0", default-features = false }
 rattler_digest = { version = "1.2.2", default-features = false, features = [
@@ -195,7 +212,7 @@ path = "./scripts/patch-apply-gen-test-data.rs"
 [dependencies]
 serde = { workspace = true }
 serde_yaml = { workspace = true }
-serde-untagged = "0.1.9"
+serde-untagged = { workspace = true }
 anyhow = { workspace = true }
 walkdir = { workspace = true }
 hex = { workspace = true }
@@ -219,20 +236,15 @@ minijinja = { workspace = true }
 # care about this because it uses a custom formatter. However, downstream packages might care,
 # therefor we explicitly loosen the bounds on tracing-subscriber.
 # See: https://github.com/tokio-rs/tracing/issues/3378
-tracing-subscriber = { version = "0.3", features = [
-  "env-filter",
-  "fmt",
-  "ansi",
-  "json",
-] }
+tracing-subscriber = { workspace = true }
 # marked-yaml = { version = "0.8.0" }
 miette = { workspace = true, features = ["fancy"] }
-num_cpus = "1.17.0"
+num_cpus = { workspace = true }
 arwen-codesign = { workspace = true }
-goblin = "0.10.5"
-scroll = "0.13.0"
+goblin = { workspace = true }
+scroll = { workspace = true }
 pathdiff = { workspace = true }
-comfy-table = "7.2.2"
+comfy-table = { workspace = true }
 futures = { workspace = true }
 indicatif = { workspace = true, features = ["in_memory"] }
 console = { workspace = true }
@@ -240,11 +252,11 @@ thiserror = { workspace = true }
 tempfile = { workspace = true }
 chrono = { workspace = true }
 spdx = { workspace = true }
-ignore = "0.4.25"
+ignore = { workspace = true }
 globset = { workspace = true }
-text-stub-library = "0.9.0"
-clap-verbosity-flag = "3.0.4"
-tracing-core = "0.1.36"
+text-stub-library = { workspace = true }
+clap-verbosity-flag = { workspace = true }
+tracing-core = { workspace = true }
 indexmap = { workspace = true }
 dunce = { workspace = true }
 fs-err = { workspace = true }
@@ -252,19 +264,19 @@ which = { workspace = true }
 clap_complete = "4.6.0"
 clap_complete_nushell = "4.6.0"
 tokio-util = { workspace = true }
-flickzeug = { version = "0.5.1" }
+flickzeug = { workspace = true }
 toml = { workspace = true }
 memmap2 = { workspace = true }
-reqwest-middleware = { version = "0.4.2", features = ["json"] }
+reqwest-middleware = { workspace = true }
 async-once-cell = { workspace = true }
-terminal_size = "0.4.3"
+terminal_size = { workspace = true }
 memchr = { workspace = true }
 ratatui = { version = "0.29.0", optional = true }
 crossterm = { version = "0.28.1", features = ["event-stream"], optional = true }
 ansi-to-tui = { version = "7.0.0", optional = true }
 throbber-widgets-tui = { version = "0.8", optional = true }
 tui-input = { version = "0.14.0", optional = true }
-reflink-copy = "0.1.29"
+reflink-copy = { workspace = true }
 rayon = { workspace = true }
 regex = { workspace = true }
 async-recursion = { workspace = true }
@@ -329,11 +341,11 @@ sha2 = { workspace = true }
 [dev-dependencies]
 insta = { workspace = true, features = ["yaml", "filters"] }
 rstest = { workspace = true }
-tracing-test = "0.2.6"
+tracing-test = { workspace = true }
 tracing-indicatif = "0.2"
 serial_test = { workspace = true }
 criterion = { version = "0.8.2", features = ["html_reports"] }
-pretty_assertions = "1.4.1"
+pretty_assertions = { workspace = true }
 
 
 [[bench]]

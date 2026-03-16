@@ -65,47 +65,42 @@ tokio = { workspace = true, features = [
 itertools = { workspace = true }
 content_inspector = { workspace = true }
 serde_with = { workspace = true }
-serde-untagged = "0.1.9"
+serde-untagged = { workspace = true }
 url = { workspace = true }
 tracing = { workspace = true }
 clap = { workspace = true }
 minijinja = { workspace = true }
-tracing-subscriber = { version = "0.3", features = [
-  "env-filter",
-  "fmt",
-  "ansi",
-  "json",
-] }
+tracing-subscriber = { workspace = true }
 miette = { workspace = true, features = ["fancy"] }
-num_cpus = "1.17.0"
+num_cpus = { workspace = true }
 arwen-codesign = { workspace = true }
-goblin = "0.10.5"
-scroll = "0.13.0"
+goblin = { workspace = true }
+scroll = { workspace = true }
 pathdiff = { workspace = true }
-comfy-table = "7.2.2"
+comfy-table = { workspace = true }
 futures = { workspace = true }
 indicatif = { workspace = true, features = ["in_memory"] }
 console = { workspace = true }
 thiserror = { workspace = true }
 tempfile = { workspace = true }
 chrono = { workspace = true }
-ignore = "0.4.25"
+ignore = { workspace = true }
 globset = { workspace = true }
-text-stub-library = "0.9.0"
-clap-verbosity-flag = "3.0.4"
-tracing-core = "0.1.36"
+text-stub-library = { workspace = true }
+clap-verbosity-flag = { workspace = true }
+tracing-core = { workspace = true }
 indexmap = { workspace = true }
 dunce = { workspace = true }
 fs-err = { workspace = true }
 which = { workspace = true }
 tokio-util = { workspace = true }
-flickzeug = { version = "0.5.1" }
+flickzeug = { workspace = true }
 memmap2 = { workspace = true }
-reqwest-middleware = { version = "0.4.2", features = ["json"] }
+reqwest-middleware = { workspace = true }
 async-once-cell = { workspace = true }
-terminal_size = "0.4.3"
+terminal_size = { workspace = true }
 memchr = { workspace = true }
-reflink-copy = "0.1.29"
+reflink-copy = { workspace = true }
 rayon = { workspace = true }
 regex = { workspace = true }
 async-recursion = { workspace = true }
@@ -159,6 +154,6 @@ sha2 = { workspace = true }
 [dev-dependencies]
 insta = { workspace = true, features = ["yaml", "filters"] }
 rstest = { workspace = true }
-tracing-test = "0.2.6"
+tracing-test = { workspace = true }
 serial_test = { workspace = true }
-pretty_assertions = "1.4.1"
+pretty_assertions = { workspace = true }
