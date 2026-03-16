@@ -272,12 +272,9 @@ fn check_for_binary_prefix(output: &Output, paths_json: &PathsJson) -> Result<()
 fn has_unix_virtual_package(output: &Output) -> bool {
     output.finalized_dependencies.as_ref().is_some_and(|deps| {
         deps.run.depends.iter().any(|dep| {
-            matches!(
-                &dep.spec().name,
-                Some(rattler_conda_types::PackageNameMatcher::Exact(name))
-                    if ["__unix", "__osx", "__linux", "__glibc"]
-                        .contains(&name.as_normalized())
-            )
+            dep.spec().name.as_exact().is_some_and(|name| {
+                ["__unix", "__osx", "__linux", "__glibc"].contains(&name.as_normalized())
+            })
         })
     })
 }

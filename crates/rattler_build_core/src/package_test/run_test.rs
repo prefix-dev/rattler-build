@@ -1035,10 +1035,9 @@ async fn run_downstream_test(
 
     match resolved {
         Ok(solution) => {
-            let spec_name_matcher = match_specs[0].name.clone().expect("matchspec has a name");
-            let spec_name = match spec_name_matcher {
-                rattler_conda_types::PackageNameMatcher::Exact(name) => name,
-                _ => {
+            let spec_name = match match_specs[0].name.clone().into_exact() {
+                Some(name) => name,
+                None => {
                     return Err(TestError::TestFailed(
                         "Expected exact package name in matchspec".to_string(),
                     ));

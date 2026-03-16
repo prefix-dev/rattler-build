@@ -131,8 +131,7 @@ fn host_run_export_dso_packages(
             // Only consider run dependencies that came from host run_exports
             if let Some(RunExportDependency { from, .. }) = dep.as_run_export()
                 && from == "host"
-                && let Some(rattler_conda_types::PackageNameMatcher::Exact(exact_name)) =
-                    &dep.spec().name
+                && let Some(exact_name) = dep.spec().name.as_exact()
                 && let Some(nature) = package_to_nature_map.get(exact_name)
                 && nature == &PackageNature::DSOLibrary
             {
@@ -542,13 +541,7 @@ pub fn perform_linking_checks(
         .run
         .depends
         .iter()
-        .filter_map(|dep| {
-            if let Some(rattler_conda_types::PackageNameMatcher::Exact(name)) = &dep.spec().name {
-                Some(name.clone())
-            } else {
-                None
-            }
-        })
+        .filter_map(|dep| dep.spec().name.as_exact().cloned())
         .collect();
 
     // check all DSOs and what they are linking

@@ -100,7 +100,7 @@ pub async fn fetch_highest_build_numbers(
 
         // Create a matchspec that matches the package name (any version)
         let spec = MatchSpec {
-            name: Some(rattler_conda_types::PackageNameMatcher::Exact(name)),
+            name: rattler_conda_types::PackageNameMatcher::Exact(name),
             ..Default::default()
         };
         if !package_specs.iter().any(|s| s.name == spec.name) {
