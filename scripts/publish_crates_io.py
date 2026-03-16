@@ -48,7 +48,7 @@ def exchange_for_publish_token(oidc_token: str) -> str:
     response = httpx.post(
         CRATES_IO_TOKEN_URL,
         headers={"User-Agent": USER_AGENT},
-        json={"oidc_token": oidc_token},
+        json={"jwt": oidc_token},
     )
     response.raise_for_status()
     return response.json()["token"]
