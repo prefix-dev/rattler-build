@@ -212,12 +212,8 @@ path = "./scripts/patch-apply-gen-test-data.rs"
 [dependencies]
 serde = { workspace = true }
 serde_yaml = { workspace = true }
-serde-untagged = { workspace = true }
-anyhow = { workspace = true }
-walkdir = { workspace = true }
-hex = { workspace = true }
 serde_json = { workspace = true }
-sha1 = { workspace = true }
+anyhow = { workspace = true }
 reqwest = { workspace = true, features = ["multipart"] }
 tokio = { workspace = true, features = [
   "rt",
@@ -225,98 +221,50 @@ tokio = { workspace = true, features = [
   "rt-multi-thread",
   "process",
 ] }
-itertools = { workspace = true }
-content_inspector = { workspace = true }
-serde_with = { workspace = true }
 url = { workspace = true }
 tracing = { workspace = true }
 clap = { workspace = true, features = ["env", "cargo", "suggestions"] }
 minijinja = { workspace = true }
-# Ansi colored logging using tracing subscriber is broken since 0.3.20. Rattler-build doesnt really
-# care about this because it uses a custom formatter. However, downstream packages might care,
-# therefor we explicitly loosen the bounds on tracing-subscriber.
-# See: https://github.com/tokio-rs/tracing/issues/3378
 tracing-subscriber = { workspace = true }
-# marked-yaml = { version = "0.8.0" }
 miette = { workspace = true, features = ["fancy"] }
 num_cpus = { workspace = true }
-arwen-codesign = { workspace = true }
-goblin = { workspace = true }
-scroll = { workspace = true }
-pathdiff = { workspace = true }
 comfy-table = { workspace = true }
 futures = { workspace = true }
-indicatif = { workspace = true, features = ["in_memory"] }
 console = { workspace = true }
-thiserror = { workspace = true }
 tempfile = { workspace = true }
 chrono = { workspace = true }
-spdx = { workspace = true }
 ignore = { workspace = true }
 globset = { workspace = true }
-text-stub-library = { workspace = true }
 clap-verbosity-flag = { workspace = true }
-tracing-core = { workspace = true }
 indexmap = { workspace = true }
 dunce = { workspace = true }
 fs-err = { workspace = true }
-which = { workspace = true }
 clap_complete = "4.6.0"
 clap_complete_nushell = "4.6.0"
 tokio-util = { workspace = true }
-flickzeug = { workspace = true }
-toml = { workspace = true }
 memmap2 = { workspace = true }
-reqwest-middleware = { workspace = true }
-async-once-cell = { workspace = true }
-terminal_size = { workspace = true }
-memchr = { workspace = true }
 ratatui = { version = "0.29.0", optional = true }
 crossterm = { version = "0.28.1", features = ["event-stream"], optional = true }
 ansi-to-tui = { version = "7.0.0", optional = true }
 throbber-widgets-tui = { version = "0.8", optional = true }
 tui-input = { version = "0.14.0", optional = true }
-reflink-copy = { workspace = true }
-rayon = { workspace = true }
-regex = { workspace = true }
-async-recursion = { workspace = true }
-
-# Rattler crates
-rattler_config = { version = "0.3.3" }
-rattler = { version = "0.40.0", default-features = false, features = [
-  "cli-tools",
-  "indicatif",
-] }
-rattler_cache = { version = "0.6.15", default-features = false }
-rattler_conda_types = { workspace = true, features = ["rayon"] }
-rattler_digest = { workspace = true }
-rattler_index = { version = "0.27.17", default-features = false }
-rattler_networking = { workspace = true, features = ["rattler_config"] }
-rattler_upload = { version = "0.5.0", default-features = false }
-rattler_s3 = { version = "0.1.26", optional = true }
-rattler_redaction = { version = "0.1.13", default-features = false }
-rattler_repodata_gateway = { version = "0.27.0", default-features = false, features = [
-  "gateway",
-] }
-rattler_shell = { version = "0.26.3", default-features = false, features = [
-  "sysinfo",
-] }
-rattler_prefix_guard = { workspace = true }
-rattler_solve = { version = "5.0", default-features = false, features = [
-  "resolvo",
-  "serde",
-] }
-rattler_virtual_packages = { version = "2.3.12", default-features = false }
-rattler_package_streaming = { workspace = true, default-features = false }
-rattler_menuinst = "0.2.50"
-lazy_static = { workspace = true }
-reqwest-retry = { workspace = true }
-strum = "0.27.2"
+dialoguer = "0.12.0"
 http-range-client = { version = "0.9.1", default-features = false, features = [
   "reqwest-sync",
 ] }
-sevenz-rust2 = { workspace = true }
-dialoguer = "0.12.0"
+
+# Rattler crates
+rattler = { workspace = true }
+rattler_config = { workspace = true }
+rattler_conda_types = { workspace = true, features = ["rayon"] }
+rattler_digest = { workspace = true }
+rattler_index = { workspace = true }
+rattler_networking = { workspace = true, features = ["rattler_config"] }
+rattler_package_streaming = { workspace = true, default-features = false }
+rattler_repodata_gateway = { workspace = true }
+rattler_upload = { workspace = true }
+rattler_solve = { workspace = true }
+rattler_virtual_packages = { workspace = true }
 
 # Local rattler-build crates
 rattler_build_core = { workspace = true }
@@ -325,10 +273,7 @@ rattler_build_recipe_generator = { workspace = true, optional = true, features =
 ] }
 rattler_build_types = { workspace = true }
 rattler_build_variant_config = { workspace = true, features = ["parser"] }
-rattler_build_jinja = { workspace = true }
 rattler_build_recipe = { workspace = true, features = ["variant-config"] }
-rattler_build_networking = { workspace = true, features = ["middleware"] }
-rattler_build_source_cache = { workspace = true }
 rattler_build_script = { workspace = true, features = ["execution"] }
 rattler_build_allocator = { workspace = true, optional = true }
 
