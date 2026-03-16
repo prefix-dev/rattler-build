@@ -143,23 +143,16 @@ fn main() -> miette::Result<()> {
 
 async fn async_main() -> miette::Result<()> {
     let app = App::parse();
-    let log_handler = if !app.is_tui() {
-        Some(
-            init_logging(
-                &app.log_style,
-                &app.verbose,
-                &app.color,
-                app.wrap_log_lines,
-                None::<fn() -> std::io::Stderr>,
-            )
-            .into_diagnostic()?,
+    let log_handler = Some(
+        init_logging(
+            &app.log_style,
+            &app.verbose,
+            &app.color,
+            app.wrap_log_lines,
+            None::<fn() -> std::io::Stderr>,
         )
-    } else {
-        #[cfg(not(feature = "tui"))]
-        return Err(miette::miette!("tui feature is not enabled!"));
-        #[cfg(feature = "tui")]
-        None
-    };
+        .into_diagnostic()?,
+    );
 
     let config = if let Some(config_path) = app.config_file {
         Some(ConfigBase::<()>::load_from_files(&[config_path]).into_diagnostic()?)
@@ -199,26 +192,6 @@ async fn async_main() -> miette::Result<()> {
                 } else {
                     miette::bail!("Couldn't find recipe.")
                 }
-            }
-
-            if build_data.tui {
-                #[cfg(feature = "tui")]
-                {
-                    let tui = rattler_build::tui::init().await?;
-                    let tui_writer = rattler_build::tui::logger::TuiOutputHandler {
-                        log_sender: tui.event_handler.sender.clone(),
-                    };
-                    let log_handler = init_logging(
-                        &app.log_style,
-                        &app.verbose,
-                        &app.color,
-                        Some(true),
-                        Some(tui_writer),
-                    )
-                    .into_diagnostic()?;
-                    rattler_build::tui::run(tui, build_data, recipe_paths, log_handler).await?;
-                }
-                return Ok(());
             }
 
             build_recipes(recipe_paths, build_data, &log_handler).await

@@ -19,8 +19,6 @@ pub use rattler_build_core::source;
 pub use rattler_build_core::staging;
 pub use rattler_build_core::system_tools;
 pub use rattler_build_core::tool_configuration;
-#[cfg(feature = "tui")]
-pub mod tui;
 pub use rattler_build_core::types;
 pub use rattler_build_core::utils;
 
@@ -1564,7 +1562,6 @@ pub async fn debug_recipe(
         io_concurrency_limit: num_cpus::get(),
         no_include_recipe: false,
         color_build_log: true,
-        tui: false,
         skip_existing: SkipExisting::None,
         noarch_build_platform: None,
         extra_meta: None,

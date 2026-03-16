@@ -53,7 +53,7 @@ fs-err = "3.3.0"
 futures = "0.3.32"
 globset = "0.4.18"
 indexmap = "2.13.0"
-indicatif = "0.18.0"
+indicatif = "0.18.4"
 insta = "1.46.3"
 itertools = "0.14.0"
 hex = "0.4.3"
@@ -89,16 +89,16 @@ url = "2.5.8"
 urlencoding = "2.1"
 walkdir = "2.5.0"
 which = "8.0.2"
-windows-sys = "0.59"
-zip = { version = "6.0.0", default-features = false, features = ["deflate"] }
+windows-sys = "0.61"
+zip = { version = "8.2.0", default-features = false, features = ["deflate"] }
 zstd = "0.13.3"
-spdx = "0.12.0"
+spdx = "0.13.4"
 pathdiff = "0.2.3"
 marked-yaml = "0.8.0"
 rstest = "0.26.1"
 petgraph = { version = "0.8.3", default-features = false }
 sha1 = { version = "0.10.6" }
-lzma-rust2 = { version = "0.15", features = ["xz"] }
+lzma-rust2 = { version = "0.16", features = ["xz"] }
 line-ending = "1.5.1"
 anyhow = "1.0.102"
 content_inspector = "0.2.4"
@@ -189,13 +189,6 @@ rustls-tls = [
   'rattler_build_recipe_generator?/rustls-tls',
   'http-range-client/rustls-tls',
 ]
-tui = [
-  'ratatui',
-  'crossterm',
-  'ansi-to-tui',
-  'throbber-widgets-tui',
-  'tui-input',
-]
 s3 = ['rattler_build_core/s3']
 sigstore = ['rattler_build_core/sigstore']
 recipe-generation = ["rattler_build_recipe_generator"]
@@ -243,11 +236,6 @@ clap_complete = "4.6.0"
 clap_complete_nushell = "4.6.0"
 tokio-util = { workspace = true }
 memmap2 = { workspace = true }
-ratatui = { version = "0.29.0", optional = true }
-crossterm = { version = "0.28.1", features = ["event-stream"], optional = true }
-ansi-to-tui = { version = "7.0.0", optional = true }
-throbber-widgets-tui = { version = "0.8", optional = true }
-tui-input = { version = "0.14.0", optional = true }
 dialoguer = "0.12.0"
 http-range-client = { version = "0.9.1", default-features = false, features = [
   "reqwest-sync",
@@ -287,7 +275,7 @@ sha2 = { workspace = true }
 insta = { workspace = true, features = ["yaml", "filters"] }
 rstest = { workspace = true }
 tracing-test = { workspace = true }
-tracing-indicatif = "0.2"
+tracing-indicatif = "0.3"
 serial_test = { workspace = true }
 criterion = { version = "0.8.2", features = ["html_reports"] }
 pretty_assertions = { workspace = true }
