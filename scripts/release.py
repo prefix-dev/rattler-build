@@ -28,7 +28,8 @@ STEPS = [
     "Patch version files with tbump",
     "Verify version files are in sync",
     "Update changelog",
-    "Update Cargo.lock",
+    "Update Cargo.lock (root)",
+    "Update Cargo.lock (py-rattler-build/rust/)",
     "Update pixi.lock (root)",
     "Update pixi.lock (py-rattler-build/)",
 ]
@@ -226,17 +227,25 @@ def main() -> None:
             completed.append("Updated changelog")
 
         if start_step <= 5:
-            cprint("\n5. Updating Cargo.lock...")
+            cprint("\n5. Updating Cargo.lock (root)...")
             run(["cargo", "update", "--workspace"])
-            completed.append("Updated Cargo.lock")
+            completed.append("Updated Cargo.lock (root)")
 
         if start_step <= 6:
-            cprint("\n6. Updating pixi.lock (root)...")
+            cprint("\n6. Updating Cargo.lock (py-rattler-build/rust/)...")
+            run(
+                ["cargo", "update", "--workspace"],
+                cwd=ROOT / "py-rattler-build" / "rust",
+            )
+            completed.append("Updated Cargo.lock (py-rattler-build/rust/)")
+
+        if start_step <= 7:
+            cprint("\n7. Updating pixi.lock (root)...")
             run(["pixi", "lock"])
             completed.append("Updated pixi.lock (root)")
 
-        if start_step <= 7:
-            cprint("\n7. Updating pixi.lock (py-rattler-build/)...")
+        if start_step <= 8:
+            cprint("\n8. Updating pixi.lock (py-rattler-build/)...")
             run(["pixi", "lock"], cwd=ROOT / "py-rattler-build")
             completed.append("Updated pixi.lock (py-rattler-build/)")
 
