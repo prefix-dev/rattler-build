@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.60.0] - 2026-03-16
+
+### Fixed
+
+- Fix oidc workflow for crates.io by @Hofer-Julian in [#2315](https://github.com/prefix-dev/rattler-build/pull/2315)
+- Fix release-plz by @Hofer-Julian in [#2319](https://github.com/prefix-dev/rattler-build/pull/2319)
+- Fetch and reset release branch before syncing Cargo.lock by @Hofer-Julian in [#2320](https://github.com/prefix-dev/rattler-build/pull/2320)
+
+
+### Removed
+
+- Remove windows-gnu job by @Hofer-Julian in [#2316](https://github.com/prefix-dev/rattler-build/pull/2316)
+- Remove anaconda upload test by @Hofer-Julian in [#2318](https://github.com/prefix-dev/rattler-build/pull/2318)
+
+
+### New Contributors
+* @prefix-dev-release-bot[bot] made their first contribution in [#2309](https://github.com/prefix-dev/rattler-build/pull/2309)
+
 ## [0.58.2] - 2026-02-27
 
 ### ✨ Highlights
