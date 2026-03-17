@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.1.1...rattler_build_core-v0.2.0) - 2026-03-17
+
+### Added
+
+- update crates, move to workspace, drop tui ([#2331](https://github.com/prefix-dev/rattler-build/pull/2331))
+
+### Fixed
+
+- [**breaking**] remove `--debug` from CLI and Python API ([#2329](https://github.com/prefix-dev/rattler-build/pull/2329))
+
 ## [0.1.1](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.1.0...rattler_build_core-v0.1.1) - 2026-03-13
 
 ### Added
