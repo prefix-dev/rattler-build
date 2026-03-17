@@ -102,6 +102,9 @@ boto3 = ">=1.42.66,<2"
 
 [activation.env]
 RUSTC_WRAPPER = "sccache"
+# Use cmake to build aws-lc-sys, because conda's CFLAGS inject -O2 which
+# overrides the -O0 required by jitterentropy-base.c, causing a build failure.
+AWS_LC_SYS_CMAKE_BUILDER = "1"
 
 [feature.lint.dependencies]
 actionlint = ">=1.7.4,<2"
