@@ -1752,6 +1752,28 @@ impl Evaluate for Stage0DynamicLinking {
             }
         };
 
+        // Parse missing_run_exports_behavior
+        let missing_run_exports_behavior = match &self.missing_run_exports_behavior {
+            None => LinkingCheckBehavior::Ignore,
+            Some(v) => {
+                let s = evaluate_value_to_string(v, context)?;
+                match s.as_str() {
+                    "ignore" => LinkingCheckBehavior::Ignore,
+                    "error" => LinkingCheckBehavior::Error,
+                    _ => {
+                        return Err(ParseError::invalid_value(
+                            "missing_run_exports_behavior",
+                            format!(
+                                "Invalid missing_run_exports_behavior '{}'. Expected 'ignore' or 'error'",
+                                s
+                            ),
+                            Span::new_blank(),
+                        ));
+                    }
+                }
+            }
+        };
+
         Ok(Stage1DynamicLinking {
             rpaths: Rpaths::new(evaluate_string_list(&self.rpaths, context)?),
             binary_relocation,
@@ -1759,6 +1781,7 @@ impl Evaluate for Stage0DynamicLinking {
             rpath_allowlist,
             overdepending_behavior,
             overlinking_behavior,
+            missing_run_exports_behavior,
         })
     }
 }

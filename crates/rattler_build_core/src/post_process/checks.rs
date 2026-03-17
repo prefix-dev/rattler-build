@@ -6,7 +6,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::post_process::{package_nature::PackageNature, relink};
+use crate::post_process::{package_nature::{PackageNature, is_dso}, relink};
 use crate::{
     metadata::Output,
     post_process::{package_nature::PrefixInfo, relink::RelinkError},
@@ -31,6 +31,13 @@ pub enum LinkingCheckError {
 
     #[error("Overdepending against: {package}")]
     Overdepending { package: PathBuf },
+
+    #[error(
+        "Package contains shared libraries without run_exports defined: {libs:?}\n\
+        Add run_exports to ensure that packages linking against these libraries \
+        automatically get this package as a runtime dependency."
+    )]
+    MissingRunExports { libs: Vec<PathBuf> },
 
     #[error("failed to build glob from pattern")]
     GlobError(#[from] globset::Error),
@@ -110,6 +117,54 @@ impl fmt::Display for LinkedPackage {
             }
         }
     }
+}
+
+/// Returns the relative paths of shared libraries in the package that would
+/// typically need run_exports to be defined. This excludes:
+/// - Python extension modules (under `site-packages/` or `.pyd` files)
+/// - R library extensions (under `lib/R/library/`)
+///
+/// These are the files that, if present without run_exports, may cause other
+/// packages that link against them to have unsatisfied runtime dependencies.
+pub fn find_shared_libs_needing_run_exports(
+    new_files: &HashSet<PathBuf>,
+    tmp_prefix: &Path,
+) -> Vec<PathBuf> {
+    let mut libs: Vec<PathBuf> = new_files
+        .iter()
+        .filter_map(|file| {
+            let rel_path = file.strip_prefix(tmp_prefix).unwrap_or(file);
+            if !is_dso(rel_path) {
+                return None;
+            }
+            // Skip Windows Python extension modules
+            if rel_path
+                .extension()
+                .is_some_and(|e| e.eq_ignore_ascii_case("pyd"))
+            {
+                return None;
+            }
+            // Skip Python extension modules under site-packages/
+            if rel_path
+                .components()
+                .any(|c| c.as_os_str() == "site-packages")
+            {
+                return None;
+            }
+            // Skip R library extensions under lib/R/library/
+            let components: Vec<_> = rel_path.components().collect();
+            if components.windows(3).any(|w| {
+                w[0].as_os_str() == "lib"
+                    && w[1].as_os_str() == "R"
+                    && w[2].as_os_str() == "library"
+            }) {
+                return None;
+            }
+            Some(rel_path.to_path_buf())
+        })
+        .collect();
+    libs.sort();
+    libs
 }
 
 /// Returns run dependencies that originated from host run_exports and are DSO
@@ -732,6 +787,34 @@ pub fn perform_linking_checks(
             output.record_warning(&format!("Overdepending against {host_package}"));
         }
     }
+
+    // Check if the package contains shared libraries but has no run_exports defined.
+    // Shared libraries should declare run_exports so that packages linking against
+    // them automatically receive this package as a runtime dependency.
+    let run_exports = &output.recipe.requirements().run_exports;
+    if run_exports.is_empty() {
+        let shared_libs = find_shared_libs_needing_run_exports(new_files, tmp_prefix);
+        if !shared_libs.is_empty() {
+            let lib_list = shared_libs
+                .iter()
+                .map(|p| p.display().to_string())
+                .collect::<Vec<_>>()
+                .join(", ");
+            let warn_str = format!(
+                "Package contains shared libraries ({lib_list}) but has no run_exports defined. \
+                Consider adding run_exports so that packages linking against these libraries \
+                automatically get this package as a runtime dependency."
+            );
+            if dynamic_linking.missing_run_exports_behavior == LinkingCheckBehavior::Error {
+                tracing::error!("{warn_str}");
+                return Err(LinkingCheckError::MissingRunExports { libs: shared_libs });
+            } else {
+                tracing::warn!("{warn_str}");
+                output.record_warning(&warn_str);
+            }
+        }
+    }
+
     Ok(())
 }
 
@@ -1094,5 +1177,98 @@ mod tests {
         let result = validate_dsolist_files(tmp.path());
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("Failed to parse"));
+    }
+
+    #[test]
+    fn test_find_shared_libs_needing_run_exports_dso_in_lib() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut new_files = HashSet::new();
+        new_files.insert(tmp.path().join("lib/libfoo.so.1.0"));
+        new_files.insert(tmp.path().join("lib/libfoo.dylib"));
+        new_files.insert(tmp.path().join("Library/bin/foo.dll"));
+
+        let result = find_shared_libs_needing_run_exports(&new_files, tmp.path());
+        assert_eq!(result.len(), 3, "Expected all 3 DSOs to need run_exports");
+        assert!(result.contains(&PathBuf::from("lib/libfoo.so.1.0")));
+        assert!(result.contains(&PathBuf::from("lib/libfoo.dylib")));
+        assert!(result.contains(&PathBuf::from("Library/bin/foo.dll")));
+    }
+
+    #[test]
+    fn test_find_shared_libs_needing_run_exports_no_dso() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut new_files = HashSet::new();
+        new_files.insert(tmp.path().join("bin/myapp"));
+        new_files.insert(tmp.path().join("lib/python3.10/foo.py"));
+
+        let result = find_shared_libs_needing_run_exports(&new_files, tmp.path());
+        assert!(result.is_empty(), "Executables and scripts should not trigger");
+    }
+
+    #[test]
+    fn test_find_shared_libs_needing_run_exports_skips_site_packages() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut new_files = HashSet::new();
+        // Python extension on Linux under site-packages
+        new_files.insert(
+            tmp.path()
+                .join("lib/python3.10/site-packages/foo.cpython-310-x86_64-linux-gnu.so"),
+        );
+        // Python extension on macOS under site-packages
+        new_files.insert(
+            tmp.path()
+                .join("lib/python3.10/site-packages/bar.cpython-310-darwin.so"),
+        );
+
+        let result = find_shared_libs_needing_run_exports(&new_files, tmp.path());
+        assert!(
+            result.is_empty(),
+            "Python extensions under site-packages should be skipped"
+        );
+    }
+
+    #[test]
+    fn test_find_shared_libs_needing_run_exports_skips_r_library() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut new_files = HashSet::new();
+        new_files.insert(tmp.path().join("lib/R/library/Rcpp/libs/Rcpp.so"));
+
+        let result = find_shared_libs_needing_run_exports(&new_files, tmp.path());
+        assert!(
+            result.is_empty(),
+            "R library extensions should be skipped"
+        );
+    }
+
+    #[test]
+    fn test_find_shared_libs_needing_run_exports_skips_pyd() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut new_files = HashSet::new();
+        // Windows Python extension module
+        new_files.insert(tmp.path().join("Lib/site-packages/foo/bar.pyd"));
+        // Another .pyd outside site-packages (still a Python extension)
+        new_files.insert(tmp.path().join("lib/foo.pyd"));
+
+        let result = find_shared_libs_needing_run_exports(&new_files, tmp.path());
+        assert!(result.is_empty(), ".pyd files should always be skipped");
+    }
+
+    #[test]
+    fn test_find_shared_libs_needing_run_exports_mixed() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut new_files = HashSet::new();
+        // A real shared library that should trigger the warning
+        new_files.insert(tmp.path().join("lib/libfoo.so.1"));
+        // A Python extension that should be skipped
+        new_files.insert(
+            tmp.path()
+                .join("lib/python3.10/site-packages/foo/_foo.so"),
+        );
+        // An executable that should be skipped
+        new_files.insert(tmp.path().join("bin/foo"));
+
+        let result = find_shared_libs_needing_run_exports(&new_files, tmp.path());
+        assert_eq!(result.len(), 1, "Only the real DSO should be returned");
+        assert_eq!(result[0], PathBuf::from("lib/libfoo.so.1"));
     }
 }

@@ -33,6 +33,7 @@ build:
     rpath_allowlist: []
     overdepending_behavior: null
     overlinking_behavior: null
+    missing_run_exports_behavior: null
   variant:
     use_keys: []
     ignore_keys: []
@@ -83,6 +84,7 @@ outputs:
       rpath_allowlist: []
       overdepending_behavior: null
       overlinking_behavior: null
+      missing_run_exports_behavior: null
     variant:
       use_keys: []
       ignore_keys: []
@@ -136,6 +138,7 @@ outputs:
       rpath_allowlist: []
       overdepending_behavior: null
       overlinking_behavior: null
+      missing_run_exports_behavior: null
     variant:
       use_keys: []
       ignore_keys: []
@@ -190,6 +193,7 @@ outputs:
       rpath_allowlist: []
       overdepending_behavior: null
       overlinking_behavior: null
+      missing_run_exports_behavior: null
     variant:
       use_keys: []
       ignore_keys: []

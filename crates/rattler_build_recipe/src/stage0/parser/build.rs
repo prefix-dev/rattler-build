@@ -510,10 +510,16 @@ fn parse_dynamic_linking(node: &Node) -> Result<DynamicLinking, ParseError> {
                     value_node
                 ));
             }
+            "missing_run_exports_behavior" => {
+                dynamic_linking.missing_run_exports_behavior = Some(parse_field!(
+                    "dynamic_linking.missing_run_exports_behavior",
+                    value_node
+                ));
+            }
             _ => {
                 return Err(
                     ParseError::invalid_value("dynamic_linking", format!("unknown field '{}'", key), *key_node.span())
-                        .with_suggestion("Valid fields are: rpaths, binary_relocation, missing_dso_allowlist, rpath_allowlist, overdepending_behavior, overlinking_behavior")
+                        .with_suggestion("Valid fields are: rpaths, binary_relocation, missing_dso_allowlist, rpath_allowlist, overdepending_behavior, overlinking_behavior, missing_run_exports_behavior")
                 );
             }
         }

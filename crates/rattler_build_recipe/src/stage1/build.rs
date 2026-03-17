@@ -387,6 +387,11 @@ pub struct DynamicLinking {
     /// What to do when detecting overlinking (ignore or error)
     #[serde(default, skip_serializing_if = "LinkingCheckBehavior::is_ignore")]
     pub overlinking_behavior: LinkingCheckBehavior,
+
+    /// What to do when a package contains shared libraries but no run_exports are defined.
+    /// By default this emits a warning; set to "error" to fail the build.
+    #[serde(default, skip_serializing_if = "LinkingCheckBehavior::is_ignore")]
+    pub missing_run_exports_behavior: LinkingCheckBehavior,
 }
 
 impl Default for DynamicLinking {
@@ -398,6 +403,7 @@ impl Default for DynamicLinking {
             rpath_allowlist: GlobVec::default(),
             overdepending_behavior: LinkingCheckBehavior::default(),
             overlinking_behavior: LinkingCheckBehavior::default(),
+            missing_run_exports_behavior: LinkingCheckBehavior::default(),
         }
     }
 }
@@ -411,6 +417,7 @@ impl DynamicLinking {
             && self.rpath_allowlist.is_empty()
             && self.overdepending_behavior.is_ignore()
             && self.overlinking_behavior.is_ignore()
+            && self.missing_run_exports_behavior.is_ignore()
     }
 }
 

@@ -146,6 +146,10 @@ pub struct DynamicLinking {
     /// What to do when detecting overlinking
     #[serde(default)]
     pub overlinking_behavior: Option<Value<String>>,
+
+    /// What to do when a package contains shared libraries but no run_exports are defined
+    #[serde(default)]
+    pub missing_run_exports_behavior: Option<Value<String>>,
 }
 
 /// Force file type configuration for prefix detection
@@ -345,6 +349,7 @@ impl Build {
             rpath_allowlist,
             overdepending_behavior,
             overlinking_behavior,
+            missing_run_exports_behavior,
         } = dynamic_linking;
 
         vars.extend(rpaths.used_variables());
@@ -369,6 +374,10 @@ impl Build {
 
         if let Some(overlinking_behavior) = overlinking_behavior {
             vars.extend(overlinking_behavior.used_variables());
+        }
+
+        if let Some(missing_run_exports_behavior) = missing_run_exports_behavior {
+            vars.extend(missing_run_exports_behavior.used_variables());
         }
 
         // Variant
