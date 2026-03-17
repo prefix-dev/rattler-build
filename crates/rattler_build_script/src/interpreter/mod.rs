@@ -34,10 +34,6 @@ use crate::execution::ExecutionArgs;
 /// The error type for the interpreter
 #[derive(Debug, thiserror::Error)]
 pub enum InterpreterError {
-    /// This error is returned when running in debug mode
-    #[error("Debugging information: {0}")]
-    Debug(String),
-
     /// This error is returned when the script execution fails or the
     /// interpreter is not found
     #[error("IO Error: {0}")]

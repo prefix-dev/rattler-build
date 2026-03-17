@@ -9,7 +9,7 @@ use rattler_solve::{ChannelPriority, SolveStrategy};
 use serde::{Deserialize, Serialize};
 
 use crate::types::{
-    Debug, Directories, PackageIdentifier, PackagingSettings, PlatformWithVirtualPackages,
+    Directories, PackageIdentifier, PackagingSettings, PlatformWithVirtualPackages,
 };
 
 use rattler_build_script::SandboxConfiguration;
@@ -59,9 +59,6 @@ pub struct BuildConfiguration {
     /// The configuration for the sandbox
     #[serde(skip_serializing, default)]
     pub sandbox_config: Option<SandboxConfiguration>,
-    /// Whether to enable debug output in build scripts
-    #[serde(skip_serializing, default)]
-    pub debug: Debug,
     /// Exclude packages newer than this date from the solver
     #[serde(skip_serializing, default)]
     pub exclude_newer: Option<chrono::DateTime<chrono::Utc>>,

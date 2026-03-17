@@ -269,14 +269,13 @@ impl PyPackage {
     }
 
     /// Run a specific test by index
-    #[pyo3(signature = (index, channel=None, channel_priority=None, debug=false, auth_file=None, allow_insecure_host=None, compression_threads=None, use_bz2=true, use_zstd=true, use_sharded=true))]
+    #[pyo3(signature = (index, channel=None, channel_priority=None, auth_file=None, allow_insecure_host=None, compression_threads=None, use_bz2=true, use_zstd=true, use_sharded=true))]
     #[allow(clippy::too_many_arguments)]
     fn run_test(
         &self,
         index: usize,
         channel: Option<Vec<String>>,
         channel_priority: Option<String>,
-        debug: bool,
         auth_file: Option<PathBuf>,
         allow_insecure_host: Option<Vec<String>>,
         compression_threads: Option<u32>,
@@ -288,7 +287,6 @@ impl PyPackage {
             Some(index),
             channel,
             channel_priority,
-            debug,
             auth_file,
             allow_insecure_host,
             compression_threads,
@@ -300,13 +298,12 @@ impl PyPackage {
     }
 
     /// Run all tests in the package
-    #[pyo3(signature = (channel=None, channel_priority=None, debug=false, auth_file=None, allow_insecure_host=None, compression_threads=None, use_bz2=true, use_zstd=true, use_sharded=true))]
+    #[pyo3(signature = (channel=None, channel_priority=None, auth_file=None, allow_insecure_host=None, compression_threads=None, use_bz2=true, use_zstd=true, use_sharded=true))]
     #[allow(clippy::too_many_arguments)]
     fn run_tests(
         &self,
         channel: Option<Vec<String>>,
         channel_priority: Option<String>,
-        debug: bool,
         auth_file: Option<PathBuf>,
         allow_insecure_host: Option<Vec<String>>,
         compression_threads: Option<u32>,
@@ -318,7 +315,6 @@ impl PyPackage {
             None,
             channel,
             channel_priority,
-            debug,
             auth_file,
             allow_insecure_host,
             compression_threads,
@@ -486,7 +482,6 @@ impl PyPackage {
         test_index: Option<usize>,
         channel: Option<Vec<String>>,
         channel_priority: Option<String>,
-        debug: bool,
         auth_file: Option<PathBuf>,
         allow_insecure_host: Option<Vec<String>>,
         compression_threads: Option<u32>,
@@ -495,7 +490,6 @@ impl PyPackage {
         use_sharded: bool,
     ) -> PyResult<Vec<PyTestResult>> {
         use ::rattler_build::{
-            metadata::Debug,
             opt::{ChannelPriorityWrapper, CommonData, TestData},
             run_test,
         };
@@ -552,7 +546,6 @@ impl PyPackage {
             self.path.clone(),
             channel,
             compression_threads,
-            Debug::new(debug),
             test_index,
             common,
         );

@@ -38,9 +38,6 @@ pub struct ExecutionArgs {
 
     /// The sandbox configuration to use for the script execution
     pub sandbox_config: Option<SandboxConfiguration>,
-
-    /// Whether to enable debug output
-    pub debug: Debug,
 }
 
 impl ExecutionArgs {
@@ -116,28 +113,6 @@ impl ResolvedScriptContents {
     }
 }
 
-/// Debug mode for script execution
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Debug(bool);
-
-impl Debug {
-    /// Create a new Debug mode
-    pub fn new(enabled: bool) -> Self {
-        Self(enabled)
-    }
-
-    /// Check if debug mode is enabled
-    pub fn is_enabled(&self) -> bool {
-        self.0
-    }
-}
-
-impl From<bool> for Debug {
-    fn from(enabled: bool) -> Self {
-        Self(enabled)
-    }
-}
-
 impl Script {
     /// Run the script with the given parameters
     ///
@@ -157,7 +132,6 @@ impl Script {
         build_prefix: Option<&PathBuf>,
         jinja_renderer: Option<F>,
         sandbox_config: Option<&SandboxConfiguration>,
-        debug: Debug,
     ) -> Result<(), crate::InterpreterError>
     where
         F: Fn(&str) -> Result<String, String>,
@@ -226,7 +200,6 @@ impl Script {
             execution_platform: Platform::current(),
             work_dir,
             sandbox_config: sandbox_config.cloned(),
-            debug,
         };
 
         crate::execution::run_script(exec_args, interpreter).await?;

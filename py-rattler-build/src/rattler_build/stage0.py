@@ -264,7 +264,6 @@ class Stage0Recipe(ABC):
         no_build_id: bool = False,
         package_format: str | None = None,
         no_include_recipe: bool = False,
-        debug: bool = False,
         exclude_newer: datetime | None = None,
     ) -> list[BuildResult]:
         """Build this recipe.
@@ -283,7 +282,6 @@ class Stage0Recipe(ABC):
             no_build_id: Don't include build ID in output directory.
             package_format: Package format ("conda" or "tar.bz2").
             no_include_recipe: Don't include recipe in the output package.
-            debug: Enable debug mode.
             exclude_newer: Exclude packages newer than this timestamp.
 
         Returns:
@@ -319,7 +317,6 @@ class Stage0Recipe(ABC):
                 no_build_id=no_build_id,
                 package_format=package_format,
                 no_include_recipe=no_include_recipe,
-                debug=debug,
                 exclude_newer=exclude_newer,
             )
             results.append(result)

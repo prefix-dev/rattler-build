@@ -11,8 +11,8 @@ use std::{collections::HashMap, collections::HashSet};
 
 // Re-export from rattler_build_script
 pub use rattler_build_script::{
-    Debug as ScriptDebug, ExecutionArgs, InterpreterError, ResolvedScriptContents,
-    SandboxArguments, SandboxConfiguration, Script, ScriptContent,
+    ExecutionArgs, InterpreterError, ResolvedScriptContents, SandboxArguments,
+    SandboxConfiguration, Script, ScriptContent,
 };
 
 use crate::{
@@ -78,7 +78,6 @@ impl Output {
             execution_platform: Platform::current(),
             work_dir: work_dir.clone(),
             sandbox_config: self.build_configuration.sandbox_config().cloned(),
-            debug: ScriptDebug::new(self.build_configuration.debug.is_enabled()),
         })
     }
 
@@ -135,7 +134,6 @@ impl Output {
                 build_prefix,
                 Some(jinja_renderer),
                 self.build_configuration.sandbox_config(),
-                ScriptDebug::new(self.build_configuration.debug.is_enabled()),
             )
             .await?;
 

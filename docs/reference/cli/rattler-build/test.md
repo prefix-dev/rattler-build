@@ -23,8 +23,6 @@ rattler-build test [OPTIONS] --package-file <PACKAGE_FILE>
 <br>**env**: `RATTLER_COMPRESSION_THREADS`
 - <a id="arg---test-index" href="#arg---test-index">`--test-index <TEST_INDEX>`</a>
 :  The index of the test to run. This is used to run a specific test from the package
-- <a id="arg---debug" href="#arg---debug">`--debug`</a>
-:  Build test environment and output debug information for manual debugging
 - <a id="arg---experimental" href="#arg---experimental">`--experimental`</a>
 :  Enable experimental features
 <br>**env**: `RATTLER_BUILD_EXPERIMENTAL`

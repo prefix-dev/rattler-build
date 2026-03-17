@@ -1,6 +1,6 @@
 //! All the metadata that makes up a recipe file
 pub use crate::types::{
-    BuildConfiguration, Debug, Output, PlatformWithVirtualPackages, build_reindexed_channels,
+    BuildConfiguration, Output, PlatformWithVirtualPackages, build_reindexed_channels,
 };
 
 #[cfg(test)]

@@ -92,8 +92,6 @@ e.g. `tar-bz2:<number>` (from 1 to 9) or `conda:<number>` (from -7 to
 <br>**options**: `none`, `local`, `all`
 - <a id="arg---noarch-build-platform" href="#arg---noarch-build-platform">`--noarch-build-platform <NOARCH_BUILD_PLATFORM>`</a>
 :  Define a "noarch platform" for which the noarch packages will be built for. The noarch builds will be skipped on the other platforms
-- <a id="arg---debug" href="#arg---debug">`--debug`</a>
-:  Enable debug output in build scripts
 - <a id="arg---markdown-summary" href="#arg---markdown-summary">`--markdown-summary <MARKDOWN_SUMMARY>`</a>
 :  Write a markdown summary to the specified file (appends to the file). Useful for generating PR comments or custom reports
 - <a id="arg---error-prefix-in-binary" href="#arg---error-prefix-in-binary">`--error-prefix-in-binary`</a>

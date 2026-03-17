@@ -91,7 +91,6 @@ pub fn build_rendered_variant_py(
     no_build_id: bool,
     package_format: Option<String>,
     no_include_recipe: bool,
-    debug: bool,
     exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
 ) -> PyResult<BuildResultPy> {
     let tool_config = tool_config.inner;
@@ -218,7 +217,6 @@ pub fn build_rendered_variant_py(
             store_recipe: !effective_no_include_recipe,
             force_colors: false, // Set to false for Python API
             sandbox_config: None,
-            debug: ::rattler_build::metadata::Debug::new(debug),
             exclude_newer,
         },
         finalized_dependencies: None,
