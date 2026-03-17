@@ -28,6 +28,10 @@ print(rattler_build_version())
 
 - **[Configuration](configuration.md)** - Build and platform settings (`ToolConfiguration`, `PlatformConfig`, `JinjaConfig`, `RenderConfig`)
 
+## Debug
+
+- **[Debug Session](debug.md)** - Interactive build debugging (`DebugSession`, `DebugPaths`, `ScriptResult`)
+
 ## Utilities
 
 - **[Upload](upload.md)** - Upload packages to various servers

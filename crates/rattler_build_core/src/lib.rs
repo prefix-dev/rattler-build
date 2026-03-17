@@ -6,6 +6,7 @@
 pub mod build;
 pub mod bump_recipe;
 pub mod console_utils;
+pub mod debug;
 pub mod metadata;
 pub mod migrate_recipe;
 pub mod package_test;

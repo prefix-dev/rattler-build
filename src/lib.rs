@@ -6,6 +6,7 @@
 pub use rattler_build_core::build;
 pub use rattler_build_core::bump_recipe;
 pub use rattler_build_core::console_utils;
+pub use rattler_build_core::debug;
 pub use rattler_build_core::env_vars;
 pub use rattler_build_core::metadata;
 pub use rattler_build_core::migrate_recipe;
@@ -63,7 +64,6 @@ use rattler_index::ensure_channel_initialized_s3;
 use rattler_solve::SolveStrategy;
 use rattler_virtual_packages::VirtualPackageOverrides;
 use render::resolved_dependencies::RunExportsDownload;
-use source::patch::apply_patch_custom;
 use system_tools::SystemTools;
 use tool_configuration::{Configuration, ContinueOnFailure, SkipExisting, TestStrategy};
 use types::Directories;
@@ -1602,25 +1602,7 @@ pub async fn debug_recipe(
     tracing::info!("Build and/or host environments created for debugging.");
 
     for output in outputs {
-        output
-            .build_configuration
-            .directories
-            .recreate_directories()
-            .into_diagnostic()?;
-        let output = output
-            .fetch_sources(&tool_config, apply_patch_custom)
-            .await
-            .into_diagnostic()?;
-        let output = output
-            .resolve_dependencies(&tool_config, RunExportsDownload::DownloadMissing)
-            .await
-            .into_diagnostic()?;
-        output
-            .install_environments(&tool_config)
-            .await
-            .into_diagnostic()?;
-
-        output.create_build_script().await.into_diagnostic()?;
+        let output = output.setup_debug_environment(&tool_config).await?;
 
         if let Some(deps) = &output.finalized_dependencies {
             if deps.build.is_some() {
