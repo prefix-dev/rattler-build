@@ -400,7 +400,9 @@ fn build_recipe_graph(
     for (idx, recipe) in recipes.iter().enumerate() {
         let current_name = &recipe.package.name;
 
-        for dep_name in extract_dependency_names(recipe) {
+        for dep_name in
+            extract_dependency_names_with_sibling_context(recipe, Some(name_to_indices))
+        {
             if &dep_name == current_name {
                 continue;
             }
@@ -583,8 +585,11 @@ fn stable_topological_sort(
             let current_name = &variants[idx].recipe.package.name;
             let current_combination = &variants[idx].full_combination;
 
-            // Check all dependencies in requirements
-            for dep_name in extract_dependency_names(&variants[idx].recipe) {
+            // Check all dependencies in requirements (including run deps on sibling outputs)
+            for dep_name in extract_dependency_names_with_sibling_context(
+                &variants[idx].recipe,
+                Some(name_to_indices),
+            ) {
                 // Skip self-dependencies
                 if &dep_name == current_name {
                     continue;
@@ -1029,15 +1034,17 @@ fn finalize_build_string_single(result: &mut RenderedVariant) -> Result<(), Rend
     Ok(())
 }
 
-/// Helper function to extract all dependency package names from a recipe.
+/// Extract dependency names, optionally including plain run dependencies that reference
+/// sibling outputs in the same recipe.
 ///
-/// This collects:
-/// - All named dependencies from build/host/run requirements
-/// - All pin_subpackage references from run_exports (these reference other outputs
-///   and create build-order dependencies even though they're not direct build deps)
-///
-/// Note: May contain duplicates, which is acceptable for dependency graph construction.
-fn extract_dependency_names(recipe: &Stage1Recipe) -> Vec<rattler_conda_types::PackageName> {
+/// When `sibling_names` is provided, plain run/run_constraints dependencies whose names
+/// match sibling output names are included as build-order dependencies. This ensures that
+/// when output B has a run dependency on output A (e.g., `polars` depends on
+/// `polars-runtime-32`), A is built before B so that B's test environment can install A.
+fn extract_dependency_names_with_sibling_context(
+    recipe: &Stage1Recipe,
+    sibling_names: Option<&BTreeMap<rattler_conda_types::PackageName, Vec<usize>>>,
+) -> Vec<rattler_conda_types::PackageName> {
     let requirements = recipe.requirements();
 
     // Collect names from build/host dependencies (needed at build time)
@@ -1065,9 +1072,30 @@ fn extract_dependency_names(recipe: &Stage1Recipe) -> Vec<rattler_conda_types::P
             _ => None,
         });
 
+    // Collect plain run/run_constraints dependencies that reference sibling outputs.
+    // These create build-order dependencies: if output B has a run dep on sibling output A,
+    // then A must be built before B (e.g., so B's test environment can install A).
+    let run_sibling_deps: Vec<rattler_conda_types::PackageName> = if let Some(sibling_names) =
+        sibling_names
+    {
+        requirements
+            .run
+            .iter()
+            .chain(requirements.run_constraints.iter())
+            .filter_map(|dep| match dep {
+                Dependency::Spec(_) => dep.name().cloned(),
+                _ => None, // pin_subpackage already handled above
+            })
+            .filter(|name| sibling_names.contains_key(name))
+            .collect()
+    } else {
+        Vec::new()
+    };
+
     build_host
         .chain(run_pin_subpackages)
         .chain(run_export_pins)
+        .chain(run_sibling_deps)
         .collect()
 }
 
@@ -2990,6 +3018,270 @@ outputs:
             result.unwrap().len(),
             0,
             "All outputs should be skipped on Windows"
+        );
+    }
+
+    /// Test that build order respects run dependencies between sibling outputs.
+    /// This is the "polars build order" bug: when output B has a plain run dependency
+    /// on output A (not pin_subpackage), A must be built before B.
+    #[test]
+    fn test_build_order_respects_run_deps_on_sibling_outputs() {
+        // This mimics the polars feedstock structure:
+        // - polars-runtime: the Rust extension
+        // - polars: the noarch Python wrapper that depends on polars-runtime at runtime
+        let recipe_yaml = r#"
+schema_version: 1
+
+context:
+  version: "1.0.0"
+
+recipe:
+  name: polars
+  version: ${{ version }}
+
+build:
+  number: 0
+
+outputs:
+  - package:
+      name: polars
+    build:
+      noarch: python
+    requirements:
+      host:
+        - python >=3.10
+        - pip
+      run:
+        - polars-runtime ==${{ version }}
+        - python >=3.10
+
+  - package:
+      name: polars-runtime
+    requirements:
+      build:
+        - ${{ compiler('c') }}
+      host:
+        - python
+"#;
+
+        let variant_yaml = r#"
+python:
+  - "3.10.*"
+"#;
+
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config = VariantConfig::from_yaml_str(variant_yaml).unwrap();
+
+        let rendered =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, RenderConfig::new())
+                .unwrap_or_else(|e| panic!("Failed to render: {:?}", e));
+
+        assert_eq!(rendered.len(), 2);
+
+        // polars-runtime should come BEFORE polars because polars depends on it at runtime
+        let names: Vec<String> = rendered
+            .iter()
+            .map(|r| r.recipe.package.name.as_normalized().to_string())
+            .collect();
+
+        let runtime_idx = names
+            .iter()
+            .position(|n| n == "polars-runtime")
+            .expect("polars-runtime not found");
+        let polars_idx = names
+            .iter()
+            .position(|n| n == "polars")
+            .expect("polars not found");
+
+        assert!(
+            runtime_idx < polars_idx,
+            "polars-runtime (idx={}) should be built before polars (idx={}). Order: {:?}",
+            runtime_idx,
+            polars_idx,
+            names
+        );
+    }
+
+    /// Test that build order is correct even when the dependent output is listed first
+    /// in the recipe (reversed order from what's needed).
+    #[test]
+    fn test_build_order_reversed_recipe_order() {
+        // The wrapper output is listed first, but depends on runtime via run dep.
+        // The topological sort should reorder them so runtime comes first.
+        let recipe_yaml = r#"
+schema_version: 1
+
+context:
+  version: "1.0.0"
+
+recipe:
+  name: my-pkg
+  version: ${{ version }}
+
+build:
+  number: 0
+
+outputs:
+  - package:
+      name: my-wrapper
+    build:
+      noarch: python
+    requirements:
+      host:
+        - python >=3.10
+        - pip
+      run:
+        - my-runtime ==${{ version }}
+        - python >=3.10
+
+  - package:
+      name: my-runtime
+    requirements:
+      build:
+        - ${{ compiler('c') }}
+      host:
+        - python
+"#;
+
+        let variant_yaml = r#"
+python:
+  - "3.10.*"
+"#;
+
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config = VariantConfig::from_yaml_str(variant_yaml).unwrap();
+
+        let rendered =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, RenderConfig::new())
+                .unwrap_or_else(|e| panic!("Failed to render: {:?}", e));
+
+        let names: Vec<String> = rendered
+            .iter()
+            .map(|r| r.recipe.package.name.as_normalized().to_string())
+            .collect();
+
+        let runtime_idx = names
+            .iter()
+            .position(|n| n == "my-runtime")
+            .expect("my-runtime not found");
+        let wrapper_idx = names
+            .iter()
+            .position(|n| n == "my-wrapper")
+            .expect("my-wrapper not found");
+
+        assert!(
+            runtime_idx < wrapper_idx,
+            "my-runtime (idx={}) should be built before my-wrapper (idx={}) \
+             even though my-wrapper is listed first in the recipe. Order: {:?}",
+            runtime_idx,
+            wrapper_idx,
+            names
+        );
+    }
+
+    /// Test that the polars-like recipe with skip conditions properly filters python variants.
+    #[test]
+    fn test_skip_conditions_filter_python_variants_in_multi_output() {
+        let recipe_yaml = r#"
+schema_version: 1
+
+context:
+  version: "1.0.0"
+
+recipe:
+  name: my-pkg
+  version: ${{ version }}
+
+build:
+  number: 0
+
+outputs:
+  - package:
+      name: my-runtime
+    build:
+      skip: not match(python, python_min ~ ".*")
+    requirements:
+      host:
+        - python
+
+  - package:
+      name: my-wrapper
+    build:
+      noarch: python
+      skip: not match(python, python_min ~ ".*")
+    requirements:
+      host:
+        - python ${{ python_min }}.*
+      run:
+        - my-runtime ==${{ version }}
+        - python >=${{ python_min }}
+"#;
+
+        let variant_yaml = r#"
+python:
+  - "3.10.*"
+  - "3.11.*"
+  - "3.12.*"
+python_min:
+  - "3.10"
+"#;
+
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config = VariantConfig::from_yaml_str(variant_yaml).unwrap();
+
+        let rendered =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, RenderConfig::new())
+                .unwrap_or_else(|e| panic!("Failed to render: {:?}", e));
+
+        // Only python 3.10 should survive the skip condition
+        let output_info: Vec<(String, Option<String>)> = rendered
+            .iter()
+            .map(|r| {
+                let name = r.recipe.package.name.as_normalized().to_string();
+                let python = r.variant.get(&"python".into()).map(|v| v.to_string());
+                (name, python)
+            })
+            .collect();
+
+        // my-runtime should have python=3.10 in variant (it's not noarch)
+        let runtime_variants: Vec<_> = output_info
+            .iter()
+            .filter(|(name, _)| name == "my-runtime")
+            .collect();
+        assert_eq!(
+            runtime_variants.len(),
+            1,
+            "Should have exactly 1 my-runtime variant (python 3.10 only), got: {:?}",
+            runtime_variants
+        );
+        assert_eq!(
+            runtime_variants[0].1.as_deref(),
+            Some("3.10.*"),
+            "my-runtime should use python 3.10"
+        );
+
+        // my-wrapper is noarch python, so python is excluded from variant
+        let wrapper_variants: Vec<_> = output_info
+            .iter()
+            .filter(|(name, _)| name == "my-wrapper")
+            .collect();
+        assert_eq!(
+            wrapper_variants.len(),
+            1,
+            "Should have exactly 1 my-wrapper variant, got: {:?}",
+            wrapper_variants
+        );
+
+        // Build order: my-runtime should come before my-wrapper
+        let names: Vec<String> = rendered
+            .iter()
+            .map(|r| r.recipe.package.name.as_normalized().to_string())
+            .collect();
+        let runtime_idx = names.iter().position(|n| n == "my-runtime").unwrap();
+        let wrapper_idx = names.iter().position(|n| n == "my-wrapper").unwrap();
+        assert!(
+            runtime_idx < wrapper_idx,
+            "my-runtime should be built before my-wrapper"
         );
     }
 }
