@@ -376,16 +376,6 @@ pub struct App {
     pub color: Color,
 }
 
-impl App {
-    /// Returns true if the application will launch a TUI.
-    pub fn is_tui(&self) -> bool {
-        match &self.subcommand {
-            Some(SubCommands::Build(args)) => args.tui,
-            _ => false,
-        }
-    }
-}
-
 /// Common opts that are shared between [`Rebuild`] and [`Build`]` subcommands
 #[derive(Parser, Clone, Debug, Default)]
 pub struct CommonOpts {
@@ -650,10 +640,6 @@ pub struct BuildOpts {
     #[clap(flatten)]
     pub common: CommonOpts,
 
-    /// Launch the terminal user interface.
-    #[arg(long, hide = !cfg!(feature = "tui"))]
-    pub tui: bool,
-
     /// Whether to skip packages that already exist in any channel
     /// If set to `none`, do not skip any packages, default when not specified.
     /// If set to `local`, only skip packages that already exist locally,
@@ -874,7 +860,6 @@ pub struct BuildData {
     pub test: TestStrategy,
     pub color_build_log: bool,
     pub common: CommonData,
-    pub tui: bool,
     pub skip_existing: SkipExisting,
     pub noarch_build_platform: Option<Platform>,
     pub extra_meta: Option<Vec<(String, Value)>>,
@@ -910,7 +895,6 @@ impl BuildData {
         no_include_recipe: bool,
         test: Option<TestStrategy>,
         common: CommonData,
-        tui: bool,
         skip_existing: Option<SkipExisting>,
         noarch_build_platform: Option<Platform>,
         extra_meta: Option<Vec<(String, Value)>>,
@@ -950,7 +934,6 @@ impl BuildData {
             test: test.unwrap_or_default(),
             color_build_log: true,
             common,
-            tui,
             skip_existing: skip_existing.unwrap_or(SkipExisting::None),
             noarch_build_platform,
             extra_meta,
@@ -1001,7 +984,6 @@ impl BuildData {
                 None
             }),
             CommonData::from_opts_and_config(opts.common, config.unwrap_or_default()),
-            opts.tui,
             opts.skip_existing,
             opts.noarch_build_platform,
             opts.extra_meta,

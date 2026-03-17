@@ -59,9 +59,9 @@ tempfile = { workspace = true }
 dunce = { workspace = true }
 rattler_git = { workspace = true }
 hex = { workspace = true }
-sigstore-verify = { version = "0.6.3", default-features = false, optional = true }
-sigstore-trust-root = { version = "0.6.3", default-features = false, optional = true }
-sigstore-types = { version = "0.6.3", optional = true }
+sigstore-verify = { version = "0.6.4", default-features = false, optional = true }
+sigstore-trust-root = { version = "0.6.4", default-features = false, optional = true }
+sigstore-types = { version = "0.6.4", optional = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["rt", "macros", "test-util"] }

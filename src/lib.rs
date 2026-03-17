@@ -19,8 +19,6 @@ pub use rattler_build_core::source;
 pub use rattler_build_core::staging;
 pub use rattler_build_core::system_tools;
 pub use rattler_build_core::tool_configuration;
-#[cfg(feature = "tui")]
-pub mod tui;
 pub use rattler_build_core::types;
 pub use rattler_build_core::utils;
 
@@ -611,11 +609,7 @@ pub async fn get_build_output(
 
 fn can_test(output: &Output, all_output_names: &[&PackageName], done_outputs: &[Output]) -> bool {
     let check_if_matches = |spec: &MatchSpec, output: &Output| -> bool {
-        if spec.name.as_ref()
-            != Some(&rattler_conda_types::PackageNameMatcher::Exact(
-                output.name().clone(),
-            ))
-        {
+        if spec.name.as_exact() != Some(&output.name().clone()) {
             return false;
         }
         if let Some(version_spec) = &spec.version
@@ -634,11 +628,10 @@ fn can_test(output: &Output, all_output_names: &[&PackageName], done_outputs: &[
     // Check if any run dependencies are not built yet
     if let Some(ref deps) = output.finalized_dependencies {
         for dep in &deps.run.depends {
-            if all_output_names.iter().any(|o| {
-                Some(&rattler_conda_types::PackageNameMatcher::Exact(
-                    (*o).clone(),
-                )) == dep.spec().name.as_ref()
-            }) {
+            if all_output_names
+                .iter()
+                .any(|o| dep.spec().name.as_exact() == Some(*o))
+            {
                 // this dependency might not be built yet
                 if !done_outputs.iter().any(|o| check_if_matches(dep.spec(), o)) {
                     return false;
@@ -1565,7 +1558,6 @@ pub async fn debug_recipe(
         io_concurrency_limit: num_cpus::get(),
         no_include_recipe: false,
         color_build_log: true,
-        tui: false,
         skip_existing: SkipExisting::None,
         noarch_build_platform: None,
         extra_meta: None,

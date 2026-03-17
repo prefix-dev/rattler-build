@@ -141,8 +141,6 @@ impl NodeConverter<PackageName> for IgnoreListConverter {
     /// # Returns
     /// The converted PackageName or a parse error
     fn convert_scalar(&self, node: &MarkedNode, field_name: &str) -> ParseResult<PackageName> {
-        use rattler_conda_types::PackageNameMatcher;
-
         let scalar = node
             .as_scalar()
             .ok_or_else(|| ParseError::expected_type("scalar", "non-scalar", get_span(node)))?;
@@ -155,10 +153,7 @@ impl NodeConverter<PackageName> for IgnoreListConverter {
 
         as_match_spec
             .name
-            .and_then(|matcher| match matcher {
-                PackageNameMatcher::Exact(name) => Some(name),
-                _ => None,
-            })
+            .into_exact()
             .ok_or(ParseError::invalid_value(
                 field_name,
                 format!("Could not find exact package name in \"{}\"", s),

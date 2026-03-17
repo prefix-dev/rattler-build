@@ -25,7 +25,7 @@ fn resolve_dependency(dep: &Dependency, output: &Output) -> Dependency {
                     Err(_) => {
                         // If apply fails, fall back to just the package name
                         Dependency::Spec(Box::new(MatchSpec {
-                            name: Some(PackageNameMatcher::Exact(name.clone())),
+                            name: PackageNameMatcher::Exact(name.clone()),
                             ..Default::default()
                         }))
                     }
@@ -33,7 +33,7 @@ fn resolve_dependency(dep: &Dependency, output: &Output) -> Dependency {
             } else {
                 // Subpackage not found, fall back to just the package name
                 Dependency::Spec(Box::new(MatchSpec {
-                    name: Some(PackageNameMatcher::Exact(name.clone())),
+                    name: PackageNameMatcher::Exact(name.clone()),
                     ..Default::default()
                 }))
             }
@@ -43,7 +43,7 @@ fn resolve_dependency(dep: &Dependency, output: &Output) -> Dependency {
             // since we don't have compatibility_specs available here
             let name = &pin.pin_compatible.name;
             Dependency::Spec(Box::new(MatchSpec {
-                name: Some(PackageNameMatcher::Exact(name.clone())),
+                name: PackageNameMatcher::Exact(name.clone()),
                 ..Default::default()
             }))
         }

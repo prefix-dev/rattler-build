@@ -100,7 +100,7 @@ pub async fn fetch_highest_build_numbers(
 
         // Create a matchspec that matches the package name (any version)
         let spec = MatchSpec {
-            name: Some(rattler_conda_types::PackageNameMatcher::Exact(name)),
+            name: rattler_conda_types::PackageNameMatcher::Exact(name),
             ..Default::default()
         };
         if !package_specs.iter().any(|s| s.name == spec.name) {
@@ -631,31 +631,26 @@ async fn upload_to_anaconda(
         .collect();
 
     let (owner, channel) = match path_segments.len() {
-        1 => (path_segments[0].to_string(), None),
-        2 => (
-            path_segments[0].to_string(),
-            Some(path_segments[1].to_string()),
-        ),
+        1 => (path_segments[0].to_string(), "main".to_string()),
+        2 => (path_segments[0].to_string(), path_segments[1].to_string()),
         _ => {
             return Err(miette::miette!(
-                "Invalid Anaconda.org URL format. Expected: https://anaconda.org/owner or https://anaconda.org/owner/channel"
+                "Invalid Anaconda.org URL format. Expected: https://anaconda.org/owner or https://anaconda.org/owner/label"
             ));
         }
     };
 
-    // Create AnacondaData with owner, optional channel, API key, URL, and force flag
     let anaconda_data = AnacondaData::new(
         owner,
-        channel.map(|c| vec![c]), // Automatically uses "main" channel if not specified
-        None,                     // API key from auth storage
-        Some(url.clone()),
+        Some(vec![channel]),
+        None,
+        None,
         ForceOverwrite(publish_config.force),
     );
 
-    // Upload packages
     upload_package_to_anaconda(&auth_storage, &package_paths.to_vec(), anaconda_data)
         .await
-        .map_err(|e| miette::miette!("Failed to upload packages to Anaconda.org: {}", e))?;
+        .into_diagnostic()?;
 
     tracing::info!("Successfully uploaded packages to Anaconda.org");
     tracing::info!("Note: Anaconda.org handles indexing automatically on the server side");

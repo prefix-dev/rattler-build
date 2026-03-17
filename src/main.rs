@@ -143,23 +143,14 @@ fn main() -> miette::Result<()> {
 
 async fn async_main() -> miette::Result<()> {
     let app = App::parse();
-    let log_handler = if !app.is_tui() {
-        Some(
-            init_logging(
-                &app.log_style,
-                &app.verbose,
-                &app.color,
-                app.wrap_log_lines,
-                None::<fn() -> std::io::Stderr>,
-            )
-            .into_diagnostic()?,
-        )
-    } else {
-        #[cfg(not(feature = "tui"))]
-        return Err(miette::miette!("tui feature is not enabled!"));
-        #[cfg(feature = "tui")]
-        None
-    };
+    let log_handler = init_logging(
+        &app.log_style,
+        &app.verbose,
+        &app.color,
+        app.wrap_log_lines,
+        None::<fn() -> std::io::Stderr>,
+    )
+    .into_diagnostic()?;
 
     let config = if let Some(config_path) = app.config_file {
         Some(ConfigBase::<()>::load_from_files(&[config_path]).into_diagnostic()?)
@@ -201,45 +192,25 @@ async fn async_main() -> miette::Result<()> {
                 }
             }
 
-            if build_data.tui {
-                #[cfg(feature = "tui")]
-                {
-                    let tui = rattler_build::tui::init().await?;
-                    let tui_writer = rattler_build::tui::logger::TuiOutputHandler {
-                        log_sender: tui.event_handler.sender.clone(),
-                    };
-                    let log_handler = init_logging(
-                        &app.log_style,
-                        &app.verbose,
-                        &app.color,
-                        Some(true),
-                        Some(tui_writer),
-                    )
-                    .into_diagnostic()?;
-                    rattler_build::tui::run(tui, build_data, recipe_paths, log_handler).await?;
-                }
-                return Ok(());
-            }
-
-            build_recipes(recipe_paths, build_data, &log_handler).await
+            build_recipes(recipe_paths, build_data, &Some(log_handler)).await
         }
 
         Some(SubCommands::Publish(publish_args)) => {
             let publish_data = PublishData::from_opts_and_config(publish_args, config);
-            publish_packages(publish_data, &log_handler).await
+            publish_packages(publish_data, &Some(log_handler)).await
         }
 
         Some(SubCommands::Test(test_args)) => {
             run_test(
                 TestData::from_opts_and_config(test_args, config),
-                log_handler,
+                Some(log_handler),
             )
             .await
         }
         Some(SubCommands::Rebuild(rebuild_args)) => {
             rebuild(
                 RebuildData::from_opts_and_config(rebuild_args, config),
-                log_handler.expect("logger is not initialized"),
+                log_handler,
             )
             .await
         }
@@ -252,14 +223,14 @@ async fn async_main() -> miette::Result<()> {
         Some(SubCommands::Debug(args)) => match args.subcommand {
             DebugSubCommands::Setup(opts) => {
                 let debug_data = DebugData::from_setup_opts_and_config(opts, config);
-                debug_recipe(debug_data, &log_handler).await
+                debug_recipe(debug_data, &Some(log_handler)).await
             }
             DebugSubCommands::Shell(opts) => debug::debug_shell(opts).into_diagnostic(),
             DebugSubCommands::HostAdd(opts) => {
-                debug::debug_env_add("host", opts, config, &log_handler).await
+                debug::debug_env_add("host", opts, config, &Some(log_handler)).await
             }
             DebugSubCommands::BuildAdd(opts) => {
-                debug::debug_env_add("build", opts, config, &log_handler).await
+                debug::debug_env_add("build", opts, config, &Some(log_handler)).await
             }
             DebugSubCommands::Workdir(opts) => debug::debug_workdir(opts).into_diagnostic(),
             DebugSubCommands::Run(opts) => {

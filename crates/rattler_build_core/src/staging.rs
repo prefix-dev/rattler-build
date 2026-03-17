@@ -93,8 +93,7 @@ impl Output {
                     // Only include variables that appear in simple specs without version/build
                     if spec.version.is_none()
                         && spec.build.is_none()
-                        && let Some(matcher) = spec.name.as_ref()
-                        && let rattler_conda_types::PackageNameMatcher::Exact(name) = matcher
+                        && let Some(name) = spec.name.as_exact()
                     {
                         return Some(name.as_normalized().to_string());
                     }

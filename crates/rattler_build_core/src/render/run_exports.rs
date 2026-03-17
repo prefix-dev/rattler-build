@@ -2,8 +2,7 @@ use std::collections::HashMap;
 
 use rattler_build_recipe::stage1::requirements::IgnoreRunExports;
 use rattler_conda_types::{
-    MatchSpec, PackageName, PackageNameMatcher, ParseMatchSpecError, ParseStrictness,
-    package::RunExportsJson,
+    MatchSpec, PackageName, ParseMatchSpecError, ParseStrictness, package::RunExportsJson,
 };
 
 use super::resolved_dependencies::{DependencyInfo, RunExportDependency};
@@ -36,14 +35,10 @@ pub fn filter_run_exports(
             .map(|s| MatchSpec::from_str(s, ParseStrictness::Lenient))
             .filter_map(|result| match result {
                 Ok(spec) => {
-                    let should_include = spec.name.as_ref().is_some_and(|matcher| {
-                        match matcher {
-                            PackageNameMatcher::Exact(name) => {
-                                !ignore_run_exports.by_name.contains(name)
-                            }
-                            _ => true, // Include non-exact matchers
-                        }
-                    });
+                    let should_include = match spec.name.as_exact() {
+                        Some(name) => !ignore_run_exports.by_name.contains(name),
+                        None => true, // Include non-exact matchers
+                    };
                     if should_include { Some(Ok(spec)) } else { None }
                 }
                 Err(e) => Some(Err(e)),
@@ -115,7 +110,7 @@ pub fn filter_inherited_run_exports(
 
                 // Check by_name: ignore run exports whose dependency name
                 // matches one of the listed names.
-                if let Some(PackageNameMatcher::Exact(name)) = re.spec.name.as_ref()
+                if let Some(name) = re.spec.name.as_exact()
                     && ignore_run_exports.by_name.contains(name)
                 {
                     return false;

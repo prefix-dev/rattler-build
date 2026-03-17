@@ -105,8 +105,7 @@ impl Requirements {
                         // A spec is "free" if it has no version and no build constraints
                         if matchspec.version.is_none()
                             && matchspec.build.is_none()
-                            && let Some(name) = &matchspec.name
-                            && let Some(pkg_name) = extract_name(name)
+                            && let Some(pkg_name) = extract_name(&matchspec.name)
                         {
                             specs.push(pkg_name);
                         }

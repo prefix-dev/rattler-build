@@ -150,13 +150,7 @@ impl BuildOutput {
             .iter()
             .find(|p| p.package_record.name.as_normalized() == name);
 
-        let is_requested = host.specs.iter().any(|s| {
-            s.spec()
-                .name
-                .as_ref()
-                .map(|n| n.to_string() == name)
-                .unwrap_or(false)
-        });
+        let is_requested = host.specs.iter().any(|s| s.spec().name.to_string() == name);
 
         record.map(|r| (r, is_requested))
     }

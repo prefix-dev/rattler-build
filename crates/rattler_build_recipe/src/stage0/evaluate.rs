@@ -745,7 +745,7 @@ pub fn evaluate_package_name_list(
                 // such as `gxx_linux-64 =13` which are valid MatchSpecs but
                 // not valid bare PackageNames.
                 if let Ok(ms) = MatchSpec::from_str(&s, ParseStrictness::Lenient)
-                    && let Some(PackageNameMatcher::Exact(name)) = ms.name
+                    && let PackageNameMatcher::Exact(name) = ms.name
                 {
                     return Ok(Some(name));
                 }
@@ -899,7 +899,7 @@ pub(crate) fn is_free_matchspec(spec: &rattler_conda_types::MatchSpec) -> bool {
         track_features,
     } = spec;
 
-    name.is_some()
+    name.as_exact().is_some()
         && version.is_none()
         && build.is_none()
         && build_number.is_none()
@@ -2598,8 +2598,7 @@ impl Evaluate for Stage0Recipe {
         // Virtual packages (starting with '__') should be included in the hash
         for dep in &requirements.run {
             if let crate::stage1::Dependency::Spec(spec) = dep
-                && let Some(ref matcher) = spec.name
-                && let rattler_conda_types::PackageNameMatcher::Exact(pkg_name) = matcher
+                && let rattler_conda_types::PackageNameMatcher::Exact(ref pkg_name) = spec.name
                 && pkg_name.as_normalized().starts_with("__")
             {
                 actual_variant.insert(
@@ -3016,8 +3015,7 @@ fn evaluate_package_output_to_recipe(
     // Virtual packages (starting with '__') should be included in the hash
     for dep in &requirements.run {
         if let crate::stage1::Dependency::Spec(spec) = dep
-            && let Some(ref matcher) = spec.name
-            && let rattler_conda_types::PackageNameMatcher::Exact(pkg_name) = matcher
+            && let rattler_conda_types::PackageNameMatcher::Exact(ref pkg_name) = spec.name
             && pkg_name.as_normalized().starts_with("__")
         {
             actual_variant.insert(

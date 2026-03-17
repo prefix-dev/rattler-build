@@ -10,8 +10,8 @@ use rattler::install::Placement;
 use rattler_build_recipe::stage1::{Dependency, Requirements};
 use rattler_build_types::{PinArgs, PinError};
 use rattler_conda_types::{
-    ChannelUrl, MatchSpec, NamelessMatchSpec, PackageName, PackageRecord, Platform, RepoDataRecord,
-    package::RunExportsJson,
+    ChannelUrl, MatchSpec, NamelessMatchSpec, PackageName, PackageNameMatcher, PackageRecord,
+    Platform, RepoDataRecord, package::RunExportsJson,
 };
 use rattler_repodata_gateway::{Gateway, RunExportExtractorError, RunExportsReporter};
 use serde::{Deserialize, Serialize};
@@ -271,12 +271,10 @@ impl ResolvedDependencies {
             .resolved
             .iter()
             .map(|r| {
-                let spec = self.specs.iter().find(|s| {
-                    s.spec().name.as_ref()
-                        == Some(&rattler_conda_types::PackageNameMatcher::Exact(
-                            r.package_record.name.clone(),
-                        ))
-                });
+                let spec = self
+                    .specs
+                    .iter()
+                    .find(|s| s.spec().name.as_exact() == Some(&r.package_record.name));
 
                 if let Some(s) = spec {
                     (r, Some(s))
@@ -343,12 +341,7 @@ impl ResolvedDependencies {
                     .iter()
                     // Run export dependencies are not direct dependencies
                     .filter(|s| !matches!(s, DependencyInfo::RunExport(_)))
-                    .any(|s| {
-                        s.spec().name.as_ref()
-                            == Some(&rattler_conda_types::PackageNameMatcher::Exact(
-                                record.package_record.name.clone(),
-                            ))
-                    })
+                    .any(|s| s.spec().name.as_exact() == Some(&record.package_record.name))
             {
                 continue;
             }
@@ -567,8 +560,8 @@ pub fn apply_variant(
                     if build_time
                         && m.version.is_none()
                         && m.build.is_none()
-                        && let Some(name) = &m.name
-                        && let Some(version) = variant.get(&name.to_string().into())
+                        && let Some(name) = m.name.as_exact()
+                        && let Some(version) = variant.get(&name.as_normalized().to_string().into())
                     {
                         // if the variant starts with an alphanumeric character,
                         // we have to add a '=' to the version spec
@@ -580,12 +573,13 @@ pub fn apply_variant(
                             spec = format!("={spec}");
                         }
 
-                        let variant = name.to_string();
+                        let variant = name.as_normalized().to_string();
                         let spec: NamelessMatchSpec = spec
                             .parse()
                             .map_err(|e| ResolveError::VariantSpecParseError(variant.clone(), e))?;
 
-                        let spec = MatchSpec::from_nameless(spec, Some(name.clone()));
+                        let spec =
+                            MatchSpec::from_nameless(spec, PackageNameMatcher::Exact(name.clone()));
 
                         return Ok(VariantDependency { spec, variant }.into());
                     }
