@@ -922,9 +922,10 @@ fn render_with_empty_combinations(
     // Evaluate the recipe
     let outputs = evaluate_recipe(stage0_recipe, &context)?;
 
-    // Convert each output to a RenderedVariant
+    // Convert each output to a RenderedVariant, filtering out skipped outputs
     let results: Vec<_> = outputs
         .into_iter()
+        .filter(|recipe| !recipe.build.skip)
         .map(|recipe| {
             let mut variant = recipe.used_variant.clone();
 
@@ -1360,8 +1361,14 @@ fn render_with_variants(
         let context = build_evaluation_context(&combination, &config)?;
         let outputs = evaluate_recipe(stage0_recipe, &context)?;
 
-        // Convert each output to a RenderedVariant
+        // Convert each output to a RenderedVariant, filtering out skipped outputs.
+        // Multi-output recipes already filter skipped outputs in evaluate(), but
+        // single-output recipes may return a recipe with build.skip = true.
         for recipe in outputs {
+            if recipe.build.skip {
+                continue;
+            }
+
             let mut variant = recipe.used_variant.clone();
 
             // Add use_keys to the variant (forces them to be included even if not referenced)
@@ -2794,7 +2801,9 @@ mpi:
 
     #[test]
     fn test_single_output_skip_true_filters_output() {
-        // Test that a single-output recipe with `skip: true` returns an empty result
+        // Test that a single-output recipe with `skip: true` returns an empty result.
+        // Skipped variants must be filtered during rendering so that they don't leak
+        // into render-only JSON output (which conda-smithy consumes to generate CI configs).
         use crate::stage0::parse_recipe_from_source;
 
         let recipe_yaml = r#"
@@ -2817,21 +2826,15 @@ build:
             render_recipe_with_variant_config(&stage0, &variant_config, RenderConfig::new())
                 .unwrap();
 
-        // Single-output recipes with skip: true are NOT filtered during variant rendering
-        // The skip check happens at build time in src/lib.rs (like main branch)
-        // This allows the CLI to show the variant as "(skipped)" in the output
+        // Skipped outputs should not be included in the rendered variants.
+        // Previously they were included (with build.skip=true on the recipe), but
+        // since build.skip is not serialized to JSON, consumers like conda-smithy
+        // had no way to know the variant was skipped.
         assert_eq!(
             rendered.len(),
-            1,
-            "Single-output recipe should still be returned (skip happens at build time), got {} outputs",
+            0,
+            "Single-output recipe with skip: true should produce 0 rendered variants, got {}",
             rendered.len()
-        );
-
-        // Verify the recipe has skip evaluated to true
-        let recipe = &rendered[0].recipe;
-        assert!(
-            recipe.build.skip,
-            "Recipe with `skip: true` should have skip evaluated to true"
         );
     }
 
@@ -3282,6 +3285,170 @@ python_min:
         assert!(
             runtime_idx < wrapper_idx,
             "my-runtime should be built before my-wrapper"
+        );
+    }
+
+    /// Test that skipped single-output recipes are NOT included in rendered variants.
+    #[test]
+    fn test_skipped_single_output_not_in_rendered_variants() {
+        let recipe_yaml = r#"
+package:
+  name: test-pkg
+  version: "1.0.0"
+
+build:
+  skip:
+    - true
+"#;
+
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config = VariantConfig::default();
+
+        let rendered =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, RenderConfig::new())
+                .unwrap();
+
+        // Skipped outputs should NOT appear in rendered variants
+        assert_eq!(
+            rendered.len(),
+            0,
+            "Skipped single-output recipe should produce 0 rendered variants, got {}. \
+             Variants: {:?}",
+            rendered.len(),
+            rendered
+                .iter()
+                .map(|r| (
+                    r.recipe.package.name.as_normalized().to_string(),
+                    r.recipe.build.skip
+                ))
+                .collect::<Vec<_>>()
+        );
+    }
+
+    /// Test that skipped multi-output variants (per python version skip) are not emitted.
+    #[test]
+    fn test_no_skipped_variants_emitted_for_multi_output() {
+        // Mimics polars-like recipe: polars_runtime output should only build
+        // for python_min, not all python versions
+        let recipe_yaml = r#"
+schema_version: 1
+
+context:
+  version: "1.0.0"
+
+recipe:
+  name: my-pkg
+  version: ${{ version }}
+
+build:
+  number: 0
+
+outputs:
+  - package:
+      name: my-runtime
+    build:
+      skip: not match(python, python_min ~ ".*")
+    requirements:
+      host:
+        - python
+
+  - package:
+      name: my-wrapper
+    build:
+      noarch: python
+      skip: not (polars_runtime == "32" and match(python, python_min ~ ".*"))
+    requirements:
+      host:
+        - python ${{ python_min }}.*
+      run:
+        - my-runtime ==${{ version }}
+        - python >=${{ python_min }}
+"#;
+
+        let variant_yaml = r#"
+python:
+  - "3.10.*"
+  - "3.11.*"
+  - "3.12.*"
+  - "3.13.*"
+python_min:
+  - "3.10"
+polars_runtime:
+  - "32"
+  - "64"
+"#;
+
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config = VariantConfig::from_yaml_str(variant_yaml).unwrap();
+
+        let rendered =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, RenderConfig::new())
+                .unwrap();
+
+        // No rendered variant should have build.skip == true
+        for variant in &rendered {
+            assert!(
+                !variant.recipe.build.skip,
+                "Rendered variant {} should not be skipped, but build.skip is true. \
+                 Python variant: {:?}",
+                variant.recipe.package.name.as_normalized(),
+                variant.variant.get(&"python".into())
+            );
+        }
+
+        // Check that only python=3.10 variants exist for my-runtime
+        let runtime_variants: Vec<_> = rendered
+            .iter()
+            .filter(|v| v.recipe.package.name.as_normalized() == "my-runtime")
+            .collect();
+
+        // Should be 2 (one for polars_runtime=32, one for polars_runtime=64)
+        // both with python=3.10 only
+        assert_eq!(
+            runtime_variants.len(),
+            2,
+            "Expected 2 my-runtime variants (polars_runtime 32 and 64 with python 3.10), \
+             got: {:?}",
+            runtime_variants
+                .iter()
+                .map(|v| format!(
+                    "python={:?}, polars_runtime={:?}",
+                    v.variant.get(&"python".into()),
+                    v.variant.get(&"polars_runtime".into())
+                ))
+                .collect::<Vec<_>>()
+        );
+
+        for v in &runtime_variants {
+            let python = v
+                .variant
+                .get(&"python".into())
+                .map(|v| v.to_string())
+                .unwrap_or_default();
+            assert_eq!(
+                python, "3.10.*",
+                "my-runtime should only have python=3.10, got python={}",
+                python
+            );
+        }
+
+        // my-wrapper should only exist once (polars_runtime=32, python=3.10, noarch)
+        let wrapper_variants: Vec<_> = rendered
+            .iter()
+            .filter(|v| v.recipe.package.name.as_normalized() == "my-wrapper")
+            .collect();
+        assert_eq!(
+            wrapper_variants.len(),
+            1,
+            "Expected 1 my-wrapper variant, got: {:?}",
+            wrapper_variants
+                .iter()
+                .map(|v| format!(
+                    "python={:?}, polars_runtime={:?}",
+                    v.variant.get(&"python".into()),
+                    v.variant.get(&"polars_runtime".into())
+                ))
+                .collect::<Vec<_>>()
         );
     }
 }
