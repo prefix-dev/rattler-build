@@ -441,7 +441,7 @@ dependencies = [
  "itertools 0.13.0",
  "memmap2",
  "reqwest 0.12.28",
- "reqwest-middleware",
+ "reqwest-middleware 0.4.2",
  "thiserror 1.0.69",
  "tokio",
  "tokio-stream",
@@ -4685,7 +4685,7 @@ dependencies = [
  "reflink-copy",
  "regex",
  "reqwest 0.12.28",
- "reqwest-middleware",
+ "reqwest-middleware 0.4.2",
  "serde",
  "serde_json",
  "simple_spawn_blocking",
@@ -4829,7 +4829,7 @@ dependencies = [
  "reflink-copy",
  "regex",
  "reqwest 0.12.28",
- "reqwest-middleware",
+ "reqwest-middleware 0.4.2",
  "retry-policies",
  "rstest",
  "scroll",
@@ -4884,7 +4884,7 @@ dependencies = [
  "serde_json",
  "serde_with",
  "serde_yaml",
- "strum",
+ "strum 0.28.0",
  "tempfile",
  "thiserror 2.0.18",
  "toml 1.0.6+spec-1.1.0",
@@ -4896,8 +4896,8 @@ version = "0.1.1"
 dependencies = [
  "rattler_networking",
  "reqwest 0.12.28",
- "reqwest-middleware",
- "reqwest-retry",
+ "reqwest-middleware 0.4.2",
+ "reqwest-retry 0.9.1",
  "tokio",
  "url",
 ]
@@ -5041,8 +5041,8 @@ dependencies = [
  "rattler_git",
  "rattler_prefix_guard",
  "reqwest 0.12.28",
- "reqwest-middleware",
- "reqwest-retry",
+ "reqwest-middleware 0.4.2",
+ "reqwest-retry 0.9.1",
  "serde",
  "serde_json",
  "sevenz-rust2",
@@ -5134,7 +5134,7 @@ dependencies = [
  "rattler_redaction",
  "rayon",
  "reqwest 0.12.28",
- "reqwest-middleware",
+ "reqwest-middleware 0.4.2",
  "serde_json",
  "simple_spawn_blocking",
  "tempfile",
@@ -5179,7 +5179,7 @@ dependencies = [
  "serde_yaml",
  "simd-json",
  "smallvec",
- "strum",
+ "strum 0.27.2",
  "tempfile",
  "thiserror 2.0.18",
  "tracing",
@@ -5235,7 +5235,7 @@ dependencies = [
  "fs-err",
  "rattler_prefix_guard",
  "reqwest 0.12.28",
- "reqwest-middleware",
+ "reqwest-middleware 0.4.2",
  "serde",
  "thiserror 2.0.18",
  "tokio",
@@ -5346,7 +5346,7 @@ dependencies = [
  "netrc-rs",
  "rattler_config",
  "reqwest 0.12.28",
- "reqwest-middleware",
+ "reqwest-middleware 0.4.2",
  "retry-policies",
  "serde",
  "serde_json",
@@ -5381,7 +5381,7 @@ dependencies = [
  "rattler_networking",
  "rattler_redaction",
  "reqwest 0.12.28",
- "reqwest-middleware",
+ "reqwest-middleware 0.4.2",
  "serde_json",
  "simple_spawn_blocking",
  "tar",
@@ -5428,7 +5428,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "961121cad9792daafc176a7f4caafc0fc889fb17507c23a4c86e1777a8b5e179"
 dependencies = [
  "reqwest 0.12.28",
- "reqwest-middleware",
+ "reqwest-middleware 0.4.2",
  "url",
 ]
 
@@ -5474,7 +5474,7 @@ dependencies = [
  "rattler_package_streaming",
  "rattler_redaction",
  "reqwest 0.12.28",
- "reqwest-middleware",
+ "reqwest-middleware 0.4.2",
  "retry-policies",
  "rmp-serde",
  "self_cell",
@@ -5482,7 +5482,7 @@ dependencies = [
  "serde_json",
  "serde_with",
  "simple_spawn_blocking",
- "strum",
+ "strum 0.27.2",
  "superslice",
  "tempfile",
  "thiserror 2.0.18",
@@ -5574,8 +5574,8 @@ dependencies = [
  "rattler_s3",
  "rattler_solve",
  "reqwest 0.12.28",
- "reqwest-middleware",
- "reqwest-retry",
+ "reqwest-middleware 0.4.2",
+ "reqwest-retry 0.8.0",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -5876,6 +5876,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "reqwest-middleware"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "199dda04a536b532d0cc04d7979e39b1c763ea749bf91507017069c00b96056f"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "http 1.4.0",
+ "reqwest 0.13.2",
+ "thiserror 2.0.18",
+ "tower-service",
+]
+
+[[package]]
 name = "reqwest-retry"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5888,7 +5902,28 @@ dependencies = [
  "http 1.4.0",
  "hyper",
  "reqwest 0.12.28",
- "reqwest-middleware",
+ "reqwest-middleware 0.4.2",
+ "retry-policies",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+ "wasmtimer",
+]
+
+[[package]]
+name = "reqwest-retry"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fe2412db2af7d2268e7a5406be0431f37d9eb67ff390f35b395716f5f06c2eaa"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "futures",
+ "getrandom 0.2.17",
+ "http 1.4.0",
+ "hyper",
+ "reqwest 0.13.2",
+ "reqwest-middleware 0.5.1",
  "retry-policies",
  "thiserror 2.0.18",
  "tokio",
@@ -7044,6 +7079,12 @@ checksum = "af23d6f6c1a224baef9d3f61e287d2761385a5b88fdab4eb4c6f11aeb54c4bcf"
 dependencies = [
  "strum_macros",
 ]
+
+[[package]]
+name = "strum"
+version = "0.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9628de9b8791db39ceda2b119bbe13134770b56c138ec1d3af810d045c04f9bd"
 
 [[package]]
 name = "strum_macros"
