@@ -70,7 +70,11 @@ def main() -> None:
     else:
         with zipfile.ZipFile(archive_path, "w", zipfile.ZIP_DEFLATED) as zf:
             for item in sorted(archive_dir.iterdir()):
-                zf.write(item, f"{pkg_basename}/{item.name}")
+                zi = zipfile.ZipInfo(f"{pkg_basename}/{item.name}")
+                zi.compress_type = zipfile.ZIP_DEFLATED
+                # Preserve Unix permissions (including executable bit) in ZIP external attrs
+                zi.external_attr = item.stat().st_mode << 16
+                zf.writestr(zi, item.read_bytes())
 
     # Stage everything flat for upload
     staging = ROOT / "staging"
