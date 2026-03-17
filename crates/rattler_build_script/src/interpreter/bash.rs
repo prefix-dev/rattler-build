@@ -53,12 +53,7 @@ impl Interpreter for BashInterpreter {
         }
 
         let build_script_path_str = build_script_path.to_string_lossy().to_string();
-        let mut cmd_args = vec!["bash", "-x"];
-        cmd_args.push(&build_script_path_str);
-
-        if args.debug.is_enabled() {
-            return Err(InterpreterError::Debug(print_debug_info(&args)));
-        }
+        let cmd_args = vec!["bash", "-x", &build_script_path_str];
 
         let output = run_process_with_replacements(
             &cmd_args,
