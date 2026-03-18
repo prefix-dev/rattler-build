@@ -169,12 +169,13 @@ pub(crate) fn convert_git_source(
         GitRev::Head => RattlerGitReference::DefaultBranch,
     };
 
-    Ok(CacheGitSource::new(
+    Ok(CacheGitSource::with_expected_commit(
         url,
         reference,
         git_src.depth,
         git_src.lfs,
         git_src.submodules,
+        git_src.expected_commit.clone(),
     ))
 }
 
