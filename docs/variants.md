@@ -94,7 +94,6 @@ exactly to be recognized as a conda-build config file.
 !!! note
     `os.environ.get` like python function in [conda-forge-pinning-feedstock](https://github.com/conda-forge/conda-forge-pinning-feedstock/blob/main/recipe/conda_build_config.yaml) is **not supported yet** in `rattler-build`.
 
-
 ## Overriding the variant configuration from the command line
 
 You can override the chosen variant configuration by passing in the variant you want from the CLI:
