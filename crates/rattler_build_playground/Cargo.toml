@@ -25,7 +25,7 @@ rattler_build_types = { path = "../rattler_build_types" }
 rattler_build_yaml_parser = { path = "../rattler_build_yaml_parser" }
 indexmap = "2"
 rattler_conda_types = { version = "0.44", default-features = false }
-getrandom = { version = "0.3", features = ["wasm_js"] }
+getrandom = { version = "0.4", features = ["wasm_js"] }
 serde_yaml = "0.9"
 arborium = { version = "2", default-features = false, features = ["lang-yaml"] }
 
