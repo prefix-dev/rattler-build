@@ -226,7 +226,6 @@ sign-windows-extract = { cmd = "python scripts/sign_windows.py extract", descrip
 sign-windows-repackage = { cmd = "python scripts/sign_windows.py repackage", description = "Repackage signed Windows executables" }
 save-attestation = { cmd = "python scripts/save_attestation.py", description = "Save attestation bundle" }
 create-release = { cmd = "python scripts/create_release.py", description = "Create GitHub release with all artifacts" }
-publish-crates-io = { cmd = "python scripts/publish_crates_io.py", description = "Publish rattler-build to crates.io via trusted publishing" }
 
 [environments]
 default = { features = ["dev"], solve-group = "default" }
