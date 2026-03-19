@@ -5,6 +5,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.61.0] - 2026-03-19
+### ✨ Highlights
+
+In this release, the Python API got a lot of love:
+- Added a Python API for `rattler-build debug`
+- Allow loading and merging of multiple variants
+
+**⚠️ Breaking:** On the CLI side we removed the `--debug` flag from multiple subcommands since this is sufficiently covered by `rattler-build debug`.
+
+
+### Added
+
+- Update crates, move to workspace, drop tui by @wolfv in [#2331](https://github.com/prefix-dev/rattler-build/pull/2331)
+- Add Python API for `debug` by @Hofer-Julian in [#2337](https://github.com/prefix-dev/rattler-build/pull/2337)
+- Allow loading and merging of multiple variant configs by @Hofer-Julian in [#2348](https://github.com/prefix-dev/rattler-build/pull/2348)
+
+
+### Fixed
+
+- Use correct api for trusted publishers by @Hofer-Julian in [#2325](https://github.com/prefix-dev/rattler-build/pull/2325)
+- Expected commit usage by @wolfv in [#2335](https://github.com/prefix-dev/rattler-build/pull/2335)
+- Pre-release building by @wolfv in [#2345](https://github.com/prefix-dev/rattler-build/pull/2345)
+
+
+### Refactor
+
+- Update mininjinja and remove custom undefined variable handling by @Hofer-Julian in [#2300](https://github.com/prefix-dev/rattler-build/pull/2300)
+
+
+### Removed
+
+- Remove `--debug` from CLI and Python API by @Hofer-Julian in [#2329](https://github.com/prefix-dev/rattler-build/pull/2329)
+
+
+
 ## [0.60.0] - 2026-03-16
 
 ### Fixed
