@@ -8,31 +8,31 @@
       
       
       
-        <link rel="canonical" href="https://rattler-build.prefix.dev/dev/highlevel/">
+        <link rel="canonical" href="https://rattler-build.prefix.dev/dev/py-rattler-build/tutorials/debug_session/">
       
       
-        <link rel="prev" href="../getting_started/">
+        <link rel="prev" href="../package_assembly/">
       
       
-        <link rel="next" href="../understanding_terminal_output/">
+        <link rel="next" href="../../../reference/recipe_file/">
       
       
         
       
       
-      <link rel="icon" href="../assets/favicon.png">
+      <link rel="icon" href="../../../assets/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.2">
     
     
       
-        <title>High-level overview - Rattler-Build</title>
+        <title>Debug Session - Rattler-Build</title>
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
       
         
-        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -51,11 +51,11 @@
       
     
     
-      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
     
-      <link rel="stylesheet" href="../stylesheets/extra.css">
+      <link rel="stylesheet" href="../../../stylesheets/extra.css">
     
-    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -63,15 +63,15 @@
     
   
 <meta property="og:type" content="website" />
-<meta property="og:title" content="High-level overview - Rattler-Build" />
-<meta property="og:image" content="https://rattler-build.prefix.dev/dev/assets/images/social/highlevel.png" />
+<meta property="og:title" content="Debug Session - Rattler-Build" />
+<meta property="og:image" content="https://rattler-build.prefix.dev/dev/assets/images/social/py-rattler-build/tutorials/debug_session.png" />
 <meta property="og:image:type" content="image/png" />
 <meta property="og:image:width" content="1200" />
 <meta property="og:image:height" content="630" />
-<meta property="og:url" content="https://rattler-build.prefix.dev/dev/highlevel/" />
+<meta property="og:url" content="https://rattler-build.prefix.dev/dev/py-rattler-build/tutorials/debug_session/" />
 <meta property="twitter:card" content="summary_large_image" />
-<meta property="twitter:title" content="High-level overview - Rattler-Build" />
-<meta property="twitter:image" content="https://rattler-build.prefix.dev/dev/assets/images/social/highlevel.png" />
+<meta property="twitter:title" content="Debug Session - Rattler-Build" />
+<meta property="twitter:image" content="https://rattler-build.prefix.dev/dev/assets/images/social/py-rattler-build/tutorials/debug_session.png" />
 </head>
   
   
@@ -91,7 +91,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#what-is-rattler-build" class="md-skip">
+        <a href="#debug-session" class="md-skip">
           Skip to content
         </a>
       
@@ -113,7 +113,7 @@
   <nav class="md-header__inner md-grid" aria-label="Header">
     <a href="https://rattler-build.prefix.dev" title="Rattler-Build" class="md-header__button md-logo" aria-label="Rattler-Build" data-md-component="logo">
       
-  <img src="../assets/rattler-build-logo-no-padding.svg" alt="logo">
+  <img src="../../../assets/rattler-build-logo-no-padding.svg" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -130,7 +130,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              High-level overview
+              Debug Session
             
           </span>
         </div>
@@ -258,7 +258,7 @@
   <label class="md-nav__title" for="__drawer">
     <a href="https://rattler-build.prefix.dev" title="Rattler-Build" class="md-nav__button md-logo" aria-label="Rattler-Build" data-md-component="logo">
       
-  <img src="../assets/rattler-build-logo-no-padding.svg" alt="logo">
+  <img src="../../../assets/rattler-build-logo-no-padding.svg" alt="logo">
 
     </a>
     Rattler-Build
@@ -285,7 +285,7 @@
   
   
     <li class="md-nav__item">
-      <a href=".." class="md-nav__link">
+      <a href="../../.." class="md-nav__link">
         
   
   
@@ -312,7 +312,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../getting_started/" class="md-nav__link">
+      <a href="../../../getting_started/" class="md-nav__link">
         
   
   
@@ -336,37 +336,10 @@
       
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    High-level overview
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../../highlevel/" class="md-nav__link">
         
   
   
@@ -382,59 +355,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#how-does-rattler-build-work" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        How does Rattler-Build work?
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#how-to-run-rattler-build" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        How to run rattler-build
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#overview-of-a-recipeyaml" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Overview of a recipe.yaml
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -446,7 +366,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../understanding_terminal_output/" class="md-nav__link">
+      <a href="../../../understanding_terminal_output/" class="md-nav__link">
         
   
   
@@ -509,7 +429,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../tutorials/" class="md-nav__link ">
+            <a href="../../../tutorials/" class="md-nav__link ">
               
   
   
@@ -553,7 +473,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../tutorials/python/" class="md-nav__link">
+      <a href="../../../tutorials/python/" class="md-nav__link">
         
   
   
@@ -581,7 +501,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../tutorials/cpp/" class="md-nav__link">
+      <a href="../../../tutorials/cpp/" class="md-nav__link">
         
   
   
@@ -609,7 +529,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../tutorials/javascript/" class="md-nav__link">
+      <a href="../../../tutorials/javascript/" class="md-nav__link">
         
   
   
@@ -637,7 +557,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../tutorials/rust/" class="md-nav__link">
+      <a href="../../../tutorials/rust/" class="md-nav__link">
         
   
   
@@ -665,7 +585,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../tutorials/go/" class="md-nav__link">
+      <a href="../../../tutorials/go/" class="md-nav__link">
         
   
   
@@ -693,7 +613,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../tutorials/perl/" class="md-nav__link">
+      <a href="../../../tutorials/perl/" class="md-nav__link">
         
   
   
@@ -721,7 +641,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../tutorials/r/" class="md-nav__link">
+      <a href="../../../tutorials/r/" class="md-nav__link">
         
   
   
@@ -749,7 +669,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../tutorials/repackaging/" class="md-nav__link">
+      <a href="../../../tutorials/repackaging/" class="md-nav__link">
         
   
   
@@ -777,7 +697,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../converting_from_conda_build/" class="md-nav__link">
+      <a href="../../../converting_from_conda_build/" class="md-nav__link">
         
   
   
@@ -891,7 +811,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../build_options/" class="md-nav__link">
+      <a href="../../../build_options/" class="md-nav__link">
         
   
   
@@ -919,7 +839,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../selectors/" class="md-nav__link">
+      <a href="../../../selectors/" class="md-nav__link">
         
   
   
@@ -947,7 +867,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../build_script/" class="md-nav__link">
+      <a href="../../../build_script/" class="md-nav__link">
         
   
   
@@ -975,7 +895,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../variants/" class="md-nav__link">
+      <a href="../../../variants/" class="md-nav__link">
         
   
   
@@ -1003,7 +923,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../config/" class="md-nav__link">
+      <a href="../../../config/" class="md-nav__link">
         
   
   
@@ -1031,7 +951,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../compilers/" class="md-nav__link">
+      <a href="../../../compilers/" class="md-nav__link">
         
   
   
@@ -1059,7 +979,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../experimental_features/" class="md-nav__link">
+      <a href="../../../experimental_features/" class="md-nav__link">
         
   
   
@@ -1087,7 +1007,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../multiple_output_cache/" class="md-nav__link">
+      <a href="../../../multiple_output_cache/" class="md-nav__link">
         
   
   
@@ -1115,7 +1035,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../sandbox/" class="md-nav__link">
+      <a href="../../../sandbox/" class="md-nav__link">
         
   
   
@@ -1143,7 +1063,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../recipe_generation/" class="md-nav__link">
+      <a href="../../../recipe_generation/" class="md-nav__link">
         
   
   
@@ -1171,7 +1091,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../bump_recipe/" class="md-nav__link">
+      <a href="../../../bump_recipe/" class="md-nav__link">
         
   
   
@@ -1199,7 +1119,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../create_patch/" class="md-nav__link">
+      <a href="../../../create_patch/" class="md-nav__link">
         
   
   
@@ -1227,7 +1147,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../debugging_builds/" class="md-nav__link">
+      <a href="../../../debugging_builds/" class="md-nav__link">
         
   
   
@@ -1255,7 +1175,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../tips_and_tricks/" class="md-nav__link">
+      <a href="../../../tips_and_tricks/" class="md-nav__link">
         
   
   
@@ -1283,7 +1203,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../windows_quirks/" class="md-nav__link">
+      <a href="../../../windows_quirks/" class="md-nav__link">
         
   
   
@@ -1371,7 +1291,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../testing/" class="md-nav__link">
+      <a href="../../../testing/" class="md-nav__link">
         
   
   
@@ -1399,7 +1319,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../rebuild/" class="md-nav__link">
+      <a href="../../../rebuild/" class="md-nav__link">
         
   
   
@@ -1493,7 +1413,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../authentication_and_upload/" class="md-nav__link">
+      <a href="../../../authentication_and_upload/" class="md-nav__link">
         
   
   
@@ -1521,7 +1441,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../publish/" class="md-nav__link">
+      <a href="../../../publish/" class="md-nav__link">
         
   
   
@@ -1549,7 +1469,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../sigstore/" class="md-nav__link">
+      <a href="../../../sigstore/" class="md-nav__link">
         
   
   
@@ -1577,7 +1497,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../conda_forge/" class="md-nav__link">
+      <a href="../../../conda_forge/" class="md-nav__link">
         
   
   
@@ -1605,7 +1525,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../automatic_linting/" class="md-nav__link">
+      <a href="../../../automatic_linting/" class="md-nav__link">
         
   
   
@@ -1697,7 +1617,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../package_spec/" class="md-nav__link">
+      <a href="../../../package_spec/" class="md-nav__link">
         
   
   
@@ -1725,7 +1645,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../special_files/" class="md-nav__link">
+      <a href="../../../special_files/" class="md-nav__link">
         
   
   
@@ -1753,7 +1673,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../internals/" class="md-nav__link">
+      <a href="../../../internals/" class="md-nav__link">
         
   
   
@@ -1781,7 +1701,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../system_integration/" class="md-nav__link">
+      <a href="../../../system_integration/" class="md-nav__link">
         
   
   
@@ -1813,8 +1733,10 @@
       
   
   
+    
   
   
+  
     
     
       
@@ -1826,11 +1748,11 @@
     
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" checked>
         
           
           <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
@@ -1851,7 +1773,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_10">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1909,7 +1831,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../py-rattler-build/reference/" class="md-nav__link ">
+            <a href="../../reference/" class="md-nav__link ">
               
   
   
@@ -1953,7 +1875,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../py-rattler-build/reference/recipe/" class="md-nav__link">
+      <a href="../../reference/recipe/" class="md-nav__link">
         
   
   
@@ -1981,7 +1903,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../py-rattler-build/reference/rendering/" class="md-nav__link">
+      <a href="../../reference/rendering/" class="md-nav__link">
         
   
   
@@ -2009,7 +1931,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../py-rattler-build/reference/configuration/" class="md-nav__link">
+      <a href="../../reference/configuration/" class="md-nav__link">
         
   
   
@@ -2037,7 +1959,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../py-rattler-build/reference/package/" class="md-nav__link">
+      <a href="../../reference/package/" class="md-nav__link">
         
   
   
@@ -2065,7 +1987,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../py-rattler-build/reference/build_result/" class="md-nav__link">
+      <a href="../../reference/build_result/" class="md-nav__link">
         
   
   
@@ -2093,7 +2015,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../py-rattler-build/reference/upload/" class="md-nav__link">
+      <a href="../../reference/upload/" class="md-nav__link">
         
   
   
@@ -2121,7 +2043,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../py-rattler-build/reference/exceptions/" class="md-nav__link">
+      <a href="../../reference/exceptions/" class="md-nav__link">
         
   
   
@@ -2149,7 +2071,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../py-rattler-build/reference/recipe_generation/" class="md-nav__link">
+      <a href="../../reference/recipe_generation/" class="md-nav__link">
         
   
   
@@ -2177,7 +2099,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../py-rattler-build/reference/progress/" class="md-nav__link">
+      <a href="../../reference/progress/" class="md-nav__link">
         
   
   
@@ -2205,7 +2127,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../py-rattler-build/reference/package_assembler/" class="md-nav__link">
+      <a href="../../reference/package_assembler/" class="md-nav__link">
         
   
   
@@ -2233,7 +2155,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../py-rattler-build/reference/debug/" class="md-nav__link">
+      <a href="../../reference/debug/" class="md-nav__link">
         
   
   
@@ -2266,8 +2188,10 @@
                 
   
   
+    
   
   
+  
     
     
       
@@ -2285,11 +2209,11 @@
     
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10_2" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10_2" checked>
         
           
           <label class="md-nav__link" for="__nav_10_2" id="__nav_10_2_label" tabindex="0">
@@ -2310,7 +2234,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_10_2_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_10_2_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_10_2">
             <span class="md-nav__icon md-icon"></span>
             
@@ -2328,7 +2252,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../py-rattler-build/tutorials/recipe_rendering_basics/" class="md-nav__link">
+      <a href="../recipe_rendering_basics/" class="md-nav__link">
         
   
   
@@ -2356,7 +2280,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../py-rattler-build/tutorials/multi_output_and_staging/" class="md-nav__link">
+      <a href="../multi_output_and_staging/" class="md-nav__link">
         
   
   
@@ -2384,7 +2308,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../py-rattler-build/tutorials/inspecting_built_packages/" class="md-nav__link">
+      <a href="../inspecting_built_packages/" class="md-nav__link">
         
   
   
@@ -2412,7 +2336,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../py-rattler-build/tutorials/package_assembly/" class="md-nav__link">
+      <a href="../package_assembly/" class="md-nav__link">
         
   
   
@@ -2437,10 +2361,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../py-rattler-build/tutorials/debug_session/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Debug Session
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -2456,6 +2407,103 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#parse-and-render-a-recipe" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parse and Render a Recipe
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#create-the-debug-session" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Create the Debug Session
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#read-the-build-script" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Read the Build Script
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#run-the-build-script" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Run the Build Script
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#iterate-modify-and-re-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Iterate — Modify and Re-run
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#error-handling-for-ai-agents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Error Handling for AI Agents
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -2542,7 +2590,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../reference/recipe_file/" class="md-nav__link">
+      <a href="../../../reference/recipe_file/" class="md-nav__link">
         
   
   
@@ -2570,7 +2618,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../reference/multi_output/" class="md-nav__link">
+      <a href="../../../reference/multi_output/" class="md-nav__link">
         
   
   
@@ -2598,7 +2646,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../reference/cli/rattler-build/" class="md-nav__link">
+      <a href="../../../reference/cli/rattler-build/" class="md-nav__link">
         
   
   
@@ -2626,7 +2674,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../reference/jinja/" class="md-nav__link">
+      <a href="../../../reference/jinja/" class="md-nav__link">
         
   
   
@@ -2654,7 +2702,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../rattler_index/" class="md-nav__link">
+      <a href="../../../rattler_index/" class="md-nav__link">
         
   
   
@@ -2709,10 +2757,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#how-does-rattler-build-work" class="md-nav__link">
+  <a href="#parse-and-render-a-recipe" class="md-nav__link">
     <span class="md-ellipsis">
       
-        How does Rattler-Build work?
+        Parse and Render a Recipe
       
     </span>
   </a>
@@ -2720,10 +2768,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#how-to-run-rattler-build" class="md-nav__link">
+  <a href="#create-the-debug-session" class="md-nav__link">
     <span class="md-ellipsis">
       
-        How to run rattler-build
+        Create the Debug Session
       
     </span>
   </a>
@@ -2731,10 +2779,54 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#overview-of-a-recipeyaml" class="md-nav__link">
+  <a href="#read-the-build-script" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Overview of a recipe.yaml
+        Read the Build Script
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#run-the-build-script" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Run the Build Script
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#iterate-modify-and-re-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Iterate — Modify and Re-run
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#error-handling-for-ai-agents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Error Handling for AI Agents
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary
       
     </span>
   </a>
@@ -2758,7 +2850,7 @@
 
 
   
-    <a href="https://github.com/prefix-dev/rattler-build/edit/main/docs/highlevel.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+    <a href="https://github.com/prefix-dev/rattler-build/edit/main/docs/py-rattler-build/tutorials/debug_session.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.71 7.04c.39-.39.39-1.04 0-1.41l-2.34-2.34c-.37-.39-1.02-.39-1.41 0l-1.84 1.83 3.75 3.75M3 17.25V21h3.75L17.81 9.93l-3.75-3.75z"/></svg>
     </a>
@@ -2766,140 +2858,152 @@
   
 
 
-<h1 id="what-is-rattler-build">What is Rattler-Build?<a class="headerlink" href="#what-is-rattler-build" title="Permanent link">#</a></h1>
-<p>Rattler-Build is a tool to build and package software so that it can be
-installed on any operating system – with any compatible package manager such as
-<code>mamba</code>, <code>conda</code>, or <code>rattler</code>. We are also intending for Rattler-Build to be
-used as a library to drive builds of packages from any other recipe format in
-the future.</p>
-<h3 id="how-does-rattler-build-work">How does Rattler-Build work?<a class="headerlink" href="#how-does-rattler-build-work" title="Permanent link">#</a></h3>
-<p>Building of packages consists of several steps. It all begins with a
-<code>recipe.yaml</code> file that specifies how the package is to be built and what the
-dependencies are. From the recipe file, Rattler-Build executes several steps:</p>
-<ol>
-<li>
-<p><strong>Rendering</strong>:
-Parse the recipe file and evaluate conditionals, Jinja expressions, and
-variables, and variants.</p>
-</li>
-<li>
-<p><strong>Fetch source</strong>:
-Retrieve specified source files, such as <code>.tar.gz</code> files, <code>git</code> repositories, local paths.
-Additionally, this step will apply patches that can be specified alongside the source file.</p>
-</li>
-<li>
-<p><strong>Install build environments</strong>:
-Download and install dependencies into temporary "host" and "build" workspaces.
-Any dependencies that are needed at build time are installed in this step.</p>
-</li>
-<li>
-<p><strong>Build source</strong>:
-Execute the build script to <em>build/compile</em> the source code and <em>install</em> it into the host environment.</p>
-</li>
-<li>
-<p><strong>Prepare package files</strong>:
-Collect <em>all</em> files that are new in the "host" environment and apply some transformations if necessary;
-specifically, we edit the <code>rpath</code> on <code>Linux</code> and <code>macOS</code> to make binaries relocatable.</p>
-</li>
-<li>
-<p><strong>Package</strong>:
-Bundle all the files in a package and write out any additional metadata into the <code>info/index.json</code>, <code>info/about.json</code>, and <code>info/paths.json</code> files.
-This also creates the test files that are bundled with the package.</p>
-</li>
-<li>
-<p><strong>Test</strong>:
-Run any tests specified in the recipe.
-The package is considered <em>done</em> if it passes all the tests, otherwise its moved to <code>broken/</code> in the output directory.</p>
-</li>
-</ol>
-<p>After this process, a package is created. This package can be uploaded to somewhere like a custom <a href="https://prefix.dev">prefix.dev</a> private or public channel.</p>
-<h3 id="how-to-run-rattler-build">How to run <code>rattler-build</code><a class="headerlink" href="#how-to-run-rattler-build" title="Permanent link">#</a></h3>
-<p>Running <code>rattler-build</code> is straightforward. It can be done on the command line:</p>
-<div class="language-sh highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>rattler-build<span class="w"> </span>build<span class="w"> </span>--recipe<span class="w"> </span>myrecipe/recipe.yaml
+<h1 id="debug-session">Debug Session<a class="headerlink" href="#debug-session" title="Permanent link">#</a></h1>
+<p>This notebook demonstrates the <code>DebugSession</code> API for interactive build debugging.
+It sets up the full build environment without running the build, then lets you
+iteratively run and re-run the build script, inspecting output each time.</p>
+<p>This is ideal for:</p>
+<ul>
+<li>Debugging build failures interactively</li>
+<li>AI agents that need to fix and retry builds programmatically</li>
+<li>Understanding what happens during a build step by step</li>
+</ul>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">rattler_build</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">DebugSession</span><span class="p">,</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">RenderConfig</span><span class="p">,</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">Stage0Recipe</span><span class="p">,</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">VariantConfig</span><span class="p">,</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="p">)</span>
 </span></code></pre></div>
-<p>A custom channel that is not conda-forge (the default) can be specified like so:</p>
-<div class="language-sh highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>rattler-build<span class="w"> </span>build<span class="w"> </span>-c<span class="w"> </span>robostack<span class="w"> </span>--recipe<span class="w"> </span>myrecipe/recipe.yaml
+<h2 id="parse-and-render-a-recipe">Parse and Render a Recipe<a class="headerlink" href="#parse-and-render-a-recipe" title="Permanent link">#</a></h2>
+<p>Create a simple recipe with an inline build script and render it:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">recipe_yaml</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="s2">package:</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="s2">  name: debug-demo</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="s2">  version: &quot;1.0.0&quot;</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="s2">build:</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="s2">  number: 0</span>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="s2">  noarch: generic</span>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="s2">  script:</span>
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="s2">    content: |</span>
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="s2">      echo &quot;Hello from the build script!&quot;</span>
+</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="s2">      mkdir -p $PREFIX/bin</span>
+</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="s2">      echo &quot;hello from debug-demo&quot; &gt; $PREFIX/bin/hello</span>
+</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>
+</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="s2">requirements:</span>
+</span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="s2">  run:</span>
+</span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="s2">    - python</span>
+</span><span id="__span-1-18"><a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a><span class="s2">&quot;&quot;&quot;</span>
+</span><span id="__span-1-19"><a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>
+</span><span id="__span-1-20"><a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a><span class="n">recipe</span> <span class="o">=</span> <span class="n">Stage0Recipe</span><span class="o">.</span><span class="n">from_yaml</span><span class="p">(</span><span class="n">recipe_yaml</span><span class="p">)</span>
+</span><span id="__span-1-21"><a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a><span class="n">variants</span> <span class="o">=</span> <span class="n">recipe</span><span class="o">.</span><span class="n">render</span><span class="p">(</span><span class="n">VariantConfig</span><span class="p">(),</span> <span class="n">RenderConfig</span><span class="p">())</span>
+</span><span id="__span-1-22"><a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Rendered </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">variants</span><span class="p">)</span><span class="si">}</span><span class="s2"> variant(s)&quot;</span><span class="p">)</span>
 </span></code></pre></div>
-<p>You can also use the <code>--recipe-dir</code> argument if you want to build all the packages in a directory:</p>
-<div class="language-sh highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>rattler-build<span class="w"> </span>build<span class="w"> </span>--recipe-dir<span class="w"> </span>myrecipes/
+<div class="language-text highlight"><pre><span></span><code>Rendered 1 variant(s)
+</code></pre></div>
+<h2 id="create-the-debug-session">Create the Debug Session<a class="headerlink" href="#create-the-debug-session" title="Permanent link">#</a></h2>
+<p><code>DebugSession.create()</code> resolves dependencies, fetches sources, installs
+environments, and creates the build script — all without running the actual build.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">session</span> <span class="o">=</span> <span class="n">DebugSession</span><span class="o">.</span><span class="n">create</span><span class="p">(</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="n">variants</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="n">channels</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;conda-forge&quot;</span><span class="p">],</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="p">)</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Work directory:  </span><span class="si">{</span><span class="n">session</span><span class="o">.</span><span class="n">work_dir</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </span></code></pre></div>
-<h3 id="overview-of-a-recipeyaml">Overview of a <code>recipe.yaml</code><a class="headerlink" href="#overview-of-a-recipeyaml" title="Permanent link">#</a></h3>
-<p>A <code>recipe.yaml</code> file is separated into multiple sections and can conditionally
-include or exclude sections. Recipe files also support a limited amount of
-string interpolation with Jinja (specifically <code>minijinja</code> in our case).</p>
-<p>A simple example of a recipe file for the <code>zlib</code> package would look as follows:</p>
-<div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># variables from the context section can be used in the rest of the recipe</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="c1"># in jinja expressions</span>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="nt">context</span><span class="p">:</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1.2.13</span>
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="nt">package</span><span class="p">:</span>
-</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">zlib</span>
-</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">  </span><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ version }}</span>
-</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>
-</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="nt">source</span><span class="p">:</span>
-</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="w">  </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">http://zlib.net/zlib-${{ version }}.tar.gz</span>
-</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="w">  </span><span class="nt">sha256</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">b3a24de97a8fdbc835b9833169501030b8977031bcb54b3b3ac13740f846ab30</span>
-</span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>
-</span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="nt">build</span><span class="p">:</span>
-</span><span id="__span-3-15"><a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a><span class="w">  </span><span class="c1"># build numbers can be set arbitrarily</span>
-</span><span id="__span-3-16"><a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a><span class="w">  </span><span class="nt">number</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
-</span><span id="__span-3-17"><a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a><span class="w">  </span><span class="nt">script</span><span class="p">:</span>
-</span><span id="__span-3-18"><a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a><span class="w">    </span><span class="c1"># build script to install the package into the $PREFIX (host prefix)</span>
-</span><span id="__span-3-19"><a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">unix</span>
-</span><span id="__span-3-20"><a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a><span class="w">      </span><span class="nt">then</span><span class="p">:</span>
-</span><span id="__span-3-21"><a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">./configure --prefix=$PREFIX</span>
-</span><span id="__span-3-22"><a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">make -j$CPU_COUNT</span>
-</span><span id="__span-3-23"><a id="__codelineno-3-23" name="__codelineno-3-23" href="#__codelineno-3-23"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">win</span>
-</span><span id="__span-3-24"><a id="__codelineno-3-24" name="__codelineno-3-24" href="#__codelineno-3-24"></a><span class="w">      </span><span class="nt">then</span><span class="p">:</span>
-</span><span id="__span-3-25"><a id="__codelineno-3-25" name="__codelineno-3-25" href="#__codelineno-3-25"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cmake -G &quot;Ninja&quot; -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=%LIBRARY_PREFIX%</span>
-</span><span id="__span-3-26"><a id="__codelineno-3-26" name="__codelineno-3-26" href="#__codelineno-3-26"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ninja install</span>
-</span><span id="__span-3-27"><a id="__codelineno-3-27" name="__codelineno-3-27" href="#__codelineno-3-27"></a>
-</span><span id="__span-3-28"><a id="__codelineno-3-28" name="__codelineno-3-28" href="#__codelineno-3-28"></a><span class="nt">requirements</span><span class="p">:</span>
-</span><span id="__span-3-29"><a id="__codelineno-3-29" name="__codelineno-3-29" href="#__codelineno-3-29"></a><span class="w">  </span><span class="nt">build</span><span class="p">:</span>
-</span><span id="__span-3-30"><a id="__codelineno-3-30" name="__codelineno-3-30" href="#__codelineno-3-30"></a><span class="w">    </span><span class="c1"># compiler is a special function.</span>
-</span><span id="__span-3-31"><a id="__codelineno-3-31" name="__codelineno-3-31" href="#__codelineno-3-31"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ compiler(&quot;c&quot;) }}</span>
-</span><span id="__span-3-32"><a id="__codelineno-3-32" name="__codelineno-3-32" href="#__codelineno-3-32"></a><span class="w">    </span><span class="c1"># The following two dependencies are only needed on Windows,</span>
-</span><span id="__span-3-33"><a id="__codelineno-3-33" name="__codelineno-3-33" href="#__codelineno-3-33"></a><span class="w">    </span><span class="c1"># and thus conditionally selected</span>
-</span><span id="__span-3-34"><a id="__codelineno-3-34" name="__codelineno-3-34" href="#__codelineno-3-34"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">win</span>
-</span><span id="__span-3-35"><a id="__codelineno-3-35" name="__codelineno-3-35" href="#__codelineno-3-35"></a><span class="w">      </span><span class="nt">then</span><span class="p">:</span>
-</span><span id="__span-3-36"><a id="__codelineno-3-36" name="__codelineno-3-36" href="#__codelineno-3-36"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cmake</span>
-</span><span id="__span-3-37"><a id="__codelineno-3-37" name="__codelineno-3-37" href="#__codelineno-3-37"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ninja</span>
-</span><span id="__span-3-38"><a id="__codelineno-3-38" name="__codelineno-3-38" href="#__codelineno-3-38"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">unix</span>
-</span><span id="__span-3-39"><a id="__codelineno-3-39" name="__codelineno-3-39" href="#__codelineno-3-39"></a><span class="w">      </span><span class="nt">then</span><span class="p">:</span>
-</span><span id="__span-3-40"><a id="__codelineno-3-40" name="__codelineno-3-40" href="#__codelineno-3-40"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">make</span>
+<div class="language-text highlight"><pre><span></span><code>Work directory:  /tmp/rattler_build_11d93ebcb98fc38/output/bld/rattler-build_debug-demo/work
+</code></pre></div>
+<h2 id="read-the-build-script">Read the Build Script<a class="headerlink" href="#read-the-build-script" title="Permanent link">#</a></h2>
+<p>Before running, inspect the generated build script:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Build script contents:&quot;</span><span class="p">)</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="nb">print</span><span class="p">(</span><span class="n">session</span><span class="o">.</span><span class="n">read_build_script</span><span class="p">())</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Work directory contents:&quot;</span><span class="p">)</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">session</span><span class="o">.</span><span class="n">work_dir</span><span class="o">.</span><span class="n">iterdir</span><span class="p">()):</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  </span><span class="si">{</span><span class="n">p</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </span></code></pre></div>
-<p>The sections of a recipe are:</p>
-<table>
-<thead>
-<tr>
-<th>sections</th>
-<th>description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>context</code></td>
-<td>Defines variables that can be used in the Jinja context later in the recipe (e.g. name and version are commonly interpolated in strings)</td>
-</tr>
-<tr>
-<td><code>package</code></td>
-<td>This section defines the name and version of the package you are currently building and will be the name of the final output</td>
-</tr>
-<tr>
-<td><code>source</code></td>
-<td>Defines where the source code is going to be downloaded from and checksums</td>
-</tr>
-<tr>
-<td><code>build</code></td>
-<td>Settings for the build and the build script</td>
-</tr>
-<tr>
-<td><code>requirements</code></td>
-<td>Allows the definition of build, host, run and run-constrained dependencies</td>
-</tr>
-</tbody>
-</table>
+<div class="language-text highlight"><pre><span></span><code>Build script contents:
+#!/usr/bin/env bash
+set -e
+## Start of bash preamble
+if [ -z ${CONDA_BUILD+x} ]; then
+    source &quot;/tmp/rattler_build_11d93ebcb98fc38/output/bld/rattler-build_debug-demo/work/build_env.sh&quot;
+fi
+## End of preamble
+
+echo &quot;Hello from the build script!&quot;
+mkdir -p $PREFIX/bin
+echo &quot;hello from debug-demo&quot; &gt; $PREFIX/bin/hello
+
+Work directory contents:
+  build_env.sh
+  conda_build.sh
+</code></pre></div>
+<h2 id="run-the-build-script">Run the Build Script<a class="headerlink" href="#run-the-build-script" title="Permanent link">#</a></h2>
+<p>Run with <code>trace=True</code> to see each command as it executes:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="n">run_script</span><span class="p">(</span><span class="n">trace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Exit code: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">exit_code</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Success:   </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">success</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Stdout:</span><span class="se">\n</span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">stdout</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">stderr</span><span class="p">:</span>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Stderr:</span><span class="se">\n</span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">stderr</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span></code></pre></div>
+<div class="language-text highlight"><pre><span></span><code>Exit code: 0
+Success:   True
+
+Stdout:
+Hello from the build script!
+
+
+Stderr:
++ set -e
++ &#39;[&#39; -z x &#39;]&#39;
++ echo &#39;Hello from the build script!&#39;
++ mkdir -p /tmp/rattler_build_11d93ebcb98fc38/output/bld/rattler-build_debug-demo/host_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_place/bin
++ echo &#39;hello from debug-demo&#39;
+</code></pre></div>
+<h2 id="iterate-modify-and-re-run">Iterate — Modify and Re-run<a class="headerlink" href="#iterate-modify-and-re-run" title="Permanent link">#</a></h2>
+<p>The key advantage: modify the build script and re-run without repeating
+the expensive dependency resolution and environment setup.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># Modify the build script</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="n">content</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="n">build_script</span><span class="o">.</span><span class="n">read_text</span><span class="p">()</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">content</span> <span class="o">=</span> <span class="n">content</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    <span class="s1">&#39;echo &quot;Hello from the build script!&quot;&#39;</span><span class="p">,</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    <span class="s1">&#39;echo &quot;Hello from the MODIFIED build script!&quot;&#39;</span><span class="p">,</span>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="p">)</span>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="n">session</span><span class="o">.</span><span class="n">build_script</span><span class="o">.</span><span class="n">write_text</span><span class="p">(</span><span class="n">content</span><span class="p">)</span>
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="c1"># Re-run — fast since environments are already installed</span>
+</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="n">result</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="n">run_script</span><span class="p">(</span><span class="n">trace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Exit code: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">exit_code</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Stdout:</span><span class="se">\n</span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">stdout</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span></code></pre></div>
+<div class="language-text highlight"><pre><span></span><code>Exit code: 0
+Stdout:
+Hello from the MODIFIED build script!
+</code></pre></div>
+<h2 id="error-handling-for-ai-agents">Error Handling for AI Agents<a class="headerlink" href="#error-handling-for-ai-agents" title="Permanent link">#</a></h2>
+<p>For automated workflows, <code>ScriptResult</code> gives structured access to the output.
+Non-zero exit codes are values, not exceptions — making it easy to write
+retry loops.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="n">run_script</span><span class="p">()</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="k">if</span> <span class="ow">not</span> <span class="n">result</span><span class="o">.</span><span class="n">success</span><span class="p">:</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Build failed!&quot;</span><span class="p">)</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;stderr: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">stderr</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>    <span class="k">if</span> <span class="s2">&quot;command not found&quot;</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">stderr</span><span class="p">:</span>
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Missing command — may need a build dependency&quot;</span><span class="p">)</span>
+</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>    <span class="k">elif</span> <span class="s2">&quot;No such file or directory&quot;</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">stderr</span><span class="p">:</span>
+</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Missing file — check source extraction&quot;</span><span class="p">)</span>
+</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="k">else</span><span class="p">:</span>
+</span><span id="__span-6-11"><a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Build succeeded!&quot;</span><span class="p">)</span>
+</span></code></pre></div>
+<div class="language-text highlight"><pre><span></span><code>Build succeeded!
+</code></pre></div>
+<h2 id="summary">Summary<a class="headerlink" href="#summary" title="Permanent link">#</a></h2>
+<p>Use <code>DebugSession.create(variant)</code> to set up a full build environment, then call <code>run_script()</code> to execute the build. Modify files and re-run without repeating the expensive setup. See also <code>add_packages()</code> and <code>create_patch()</code> in the <a href="../../reference/debug/">API reference</a>.</p>
 
 
 
@@ -2968,9 +3072,9 @@ string interpolation with Jinja (specifically <code>minijinja</code> in our case
           
             
             <a
-              href="../getting_started/"
+              href="../package_assembly/"
               class="md-footer__link md-footer__link--prev"
-              aria-label="Previous: Getting started"
+              aria-label="Previous: Package Assembly"
             >
               <div class="md-footer__button md-icon">
                 
@@ -2981,7 +3085,7 @@ string interpolation with Jinja (specifically <code>minijinja</code> in our case
                   Previous
                 </span>
                 <div class="md-ellipsis">
-                  Getting started
+                  Package Assembly
                 </div>
               </div>
             </a>
@@ -2991,16 +3095,16 @@ string interpolation with Jinja (specifically <code>minijinja</code> in our case
           
             
             <a
-              href="../understanding_terminal_output/"
+              href="../../../reference/recipe_file/"
               class="md-footer__link md-footer__link--next"
-              aria-label="Next: Understanding the logs"
+              aria-label="Next: Recipe file"
             >
               <div class="md-footer__title">
                 <span class="md-footer__direction">
                   Next
                 </span>
                 <div class="md-ellipsis">
-                  Understanding the logs
+                  Recipe file
                 </div>
               </div>
               <div class="md-footer__button md-icon">
@@ -3026,8 +3130,8 @@ string interpolation with Jinja (specifically <code>minijinja</code> in our case
         <!-- prefix logo -->
         <div class="md-footer-meta__item md-footer-meta__item--prefix-logo">
             <a href="https://prefix.dev" target="_blank">
-                <img class="prefix-logo prefix-logo__dark" src="../assets/logo_dark.svg" alt="">
-                <img class="prefix-logo prefix-logo__light" src="../assets/logo_light.svg" alt="">
+                <img class="prefix-logo prefix-logo__dark" src="../../../assets/logo_dark.svg" alt="">
+                <img class="prefix-logo prefix-logo__light" src="../../../assets/logo_light.svg" alt="">
             </a>
         </div>
 
@@ -3099,10 +3203,10 @@ string interpolation with Jinja (specifically <code>minijinja</code> in our case
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["content.tabs.link", "content.code.copy", "content.action.edit", "content.code.annotate", "content.tooltips", "navigation.instant", "navigation.instant.progress", "navigation.tracking", "navigation.indexes", "navigation.top", "navigation.footer"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["content.tabs.link", "content.code.copy", "content.action.edit", "content.code.annotate", "content.tooltips", "navigation.instant", "navigation.instant.progress", "navigation.tracking", "navigation.indexes", "navigation.top", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
-      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
     
   </body>

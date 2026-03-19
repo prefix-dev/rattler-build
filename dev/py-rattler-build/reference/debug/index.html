@@ -8,13 +8,13 @@
       
       
       
-        <link rel="canonical" href="https://rattler-build.prefix.dev/dev/py-rattler-build/reference/configuration/">
+        <link rel="canonical" href="https://rattler-build.prefix.dev/dev/py-rattler-build/reference/debug/">
       
       
-        <link rel="prev" href="../rendering/">
+        <link rel="prev" href="../package_assembler/">
       
       
-        <link rel="next" href="../package/">
+        <link rel="next" href="../../tutorials/recipe_rendering_basics/">
       
       
         
@@ -25,7 +25,7 @@
     
     
       
-        <title>Configuration - Rattler-Build</title>
+        <title>Debug Session - Rattler-Build</title>
       
     
     
@@ -63,15 +63,15 @@
     
   
 <meta property="og:type" content="website" />
-<meta property="og:title" content="Configuration - Rattler-Build" />
-<meta property="og:image" content="https://rattler-build.prefix.dev/dev/assets/images/social/py-rattler-build/reference/configuration.png" />
+<meta property="og:title" content="Debug Session - Rattler-Build" />
+<meta property="og:image" content="https://rattler-build.prefix.dev/dev/assets/images/social/py-rattler-build/reference/debug.png" />
 <meta property="og:image:type" content="image/png" />
 <meta property="og:image:width" content="1200" />
 <meta property="og:image:height" content="630" />
-<meta property="og:url" content="https://rattler-build.prefix.dev/dev/py-rattler-build/reference/configuration/" />
+<meta property="og:url" content="https://rattler-build.prefix.dev/dev/py-rattler-build/reference/debug/" />
 <meta property="twitter:card" content="summary_large_image" />
-<meta property="twitter:title" content="Configuration - Rattler-Build" />
-<meta property="twitter:image" content="https://rattler-build.prefix.dev/dev/assets/images/social/py-rattler-build/reference/configuration.png" />
+<meta property="twitter:title" content="Debug Session - Rattler-Build" />
+<meta property="twitter:image" content="https://rattler-build.prefix.dev/dev/assets/images/social/py-rattler-build/reference/debug.png" />
 </head>
   
   
@@ -91,7 +91,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#configuration" class="md-skip">
+        <a href="#debug-session" class="md-skip">
           Skip to content
         </a>
       
@@ -130,7 +130,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Configuration
+              Debug Session
             
           </span>
         </div>
@@ -1930,37 +1930,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Configuration
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../configuration/" class="md-nav__link">
         
   
   
@@ -1976,389 +1949,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#toolconfiguration" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        ToolConfiguration
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#rattler_build.ToolConfiguration" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        ToolConfiguration
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#rattler_build.ToolConfiguration.keep_build" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        keep_build
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#rattler_build.ToolConfiguration.test_strategy" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        test_strategy
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#rattler_build.ToolConfiguration.skip_existing" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        skip_existing
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#rattler_build.ToolConfiguration.continue_on_failure" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        continue_on_failure
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#rattler_build.ToolConfiguration.channel_priority" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        channel_priority
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#rattler_build.ToolConfiguration.use_zstd" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        use_zstd
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#rattler_build.ToolConfiguration.use_bz2" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        use_bz2
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#rattler_build.ToolConfiguration.use_sharded" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        use_sharded
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#rattler_build.ToolConfiguration.compression_threads" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        compression_threads
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#rattler_build.ToolConfiguration.io_concurrency_limit" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        io_concurrency_limit
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#rattler_build.ToolConfiguration.allow_insecure_host" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        allow_insecure_host
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#rattler_build.ToolConfiguration.error_prefix_in_binary" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        error_prefix_in_binary
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#rattler_build.ToolConfiguration.allow_symlinks_on_windows" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        allow_symlinks_on_windows
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#rattler_build.ToolConfiguration.__init__" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        __init__
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#platformconfig" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        PlatformConfig
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#rattler_build.PlatformConfig" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        PlatformConfig
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#rattler_build.PlatformConfig.target_platform" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        target_platform
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#rattler_build.PlatformConfig.build_platform" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        build_platform
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#rattler_build.PlatformConfig.host_platform" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        host_platform
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#rattler_build.PlatformConfig.experimental" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        experimental
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#rattler_build.PlatformConfig.__init__" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        __init__
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#jinjaconfig" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        JinjaConfig
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#rattler_build.JinjaConfig" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        JinjaConfig
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#rattler_build.JinjaConfig.target_platform" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        target_platform
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#rattler_build.JinjaConfig.host_platform" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        host_platform
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#rattler_build.JinjaConfig.build_platform" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        build_platform
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#rattler_build.JinjaConfig.experimental" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        experimental
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#rattler_build.JinjaConfig.allow_undefined" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        allow_undefined
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#rattler_build.JinjaConfig.variant" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        variant
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#rattler_build.JinjaConfig.recipe_path" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        recipe_path
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#rattler_build.JinjaConfig.__init__" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        __init__
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -2564,10 +2154,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../debug/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Debug Session
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -2583,6 +2200,367 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#debugsession" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DebugSession
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rattler_build.debug.DebugSession" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DebugSession
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rattler_build.debug.DebugSession.paths" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        paths
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rattler_build.debug.DebugSession.work_dir" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        work_dir
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rattler_build.debug.DebugSession.host_prefix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        host_prefix
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rattler_build.debug.DebugSession.build_prefix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        build_prefix
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rattler_build.debug.DebugSession.build_script" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        build_script
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rattler_build.debug.DebugSession.output_dir" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        output_dir
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rattler_build.debug.DebugSession.setup_log" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        setup_log
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rattler_build.debug.DebugSession.run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        run
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rattler_build.debug.DebugSession.create" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        create
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rattler_build.debug.DebugSession.run_script" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        run_script
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rattler_build.debug.DebugSession.add_packages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        add_packages
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rattler_build.debug.DebugSession.create_patch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        create_patch
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rattler_build.debug.DebugSession.read_build_script" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        read_build_script
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#debugpaths" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DebugPaths
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rattler_build.debug.DebugPaths" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DebugPaths
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rattler_build.debug.DebugPaths.work_dir" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        work_dir
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rattler_build.debug.DebugPaths.host_prefix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        host_prefix
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rattler_build.debug.DebugPaths.build_prefix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        build_prefix
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rattler_build.debug.DebugPaths.build_script" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        build_script
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rattler_build.debug.DebugPaths.build_env_script" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        build_env_script
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rattler_build.debug.DebugPaths.build_dir" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        build_dir
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rattler_build.debug.DebugPaths.output_dir" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        output_dir
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rattler_build.debug.DebugPaths.recipe_dir" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        recipe_dir
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scriptresult" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ScriptResult
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rattler_build.debug.ScriptResult" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ScriptResult
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rattler_build.debug.ScriptResult.exit_code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        exit_code
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rattler_build.debug.ScriptResult.stdout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        stdout
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rattler_build.debug.ScriptResult.stderr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        stderr
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rattler_build.debug.ScriptResult.success" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        success
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -3043,10 +3021,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#toolconfiguration" class="md-nav__link">
+  <a href="#debugsession" class="md-nav__link">
     <span class="md-ellipsis">
       
-        ToolConfiguration
+        DebugSession
       
     </span>
   </a>
@@ -3054,10 +3032,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#rattler_build.ToolConfiguration" class="md-nav__link">
+  <a href="#rattler_build.debug.DebugSession" class="md-nav__link">
     <span class="md-ellipsis">
       
-        ToolConfiguration
+        DebugSession
       
     </span>
   </a>
@@ -3065,10 +3043,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#rattler_build.ToolConfiguration.keep_build" class="md-nav__link">
+  <a href="#rattler_build.debug.DebugSession.paths" class="md-nav__link">
     <span class="md-ellipsis">
       
-        keep_build
+        paths
       
     </span>
   </a>
@@ -3076,10 +3054,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#rattler_build.ToolConfiguration.test_strategy" class="md-nav__link">
+  <a href="#rattler_build.debug.DebugSession.work_dir" class="md-nav__link">
     <span class="md-ellipsis">
       
-        test_strategy
+        work_dir
       
     </span>
   </a>
@@ -3087,10 +3065,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#rattler_build.ToolConfiguration.skip_existing" class="md-nav__link">
+  <a href="#rattler_build.debug.DebugSession.host_prefix" class="md-nav__link">
     <span class="md-ellipsis">
       
-        skip_existing
+        host_prefix
       
     </span>
   </a>
@@ -3098,10 +3076,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#rattler_build.ToolConfiguration.continue_on_failure" class="md-nav__link">
+  <a href="#rattler_build.debug.DebugSession.build_prefix" class="md-nav__link">
     <span class="md-ellipsis">
       
-        continue_on_failure
+        build_prefix
       
     </span>
   </a>
@@ -3109,10 +3087,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#rattler_build.ToolConfiguration.channel_priority" class="md-nav__link">
+  <a href="#rattler_build.debug.DebugSession.build_script" class="md-nav__link">
     <span class="md-ellipsis">
       
-        channel_priority
+        build_script
       
     </span>
   </a>
@@ -3120,10 +3098,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#rattler_build.ToolConfiguration.use_zstd" class="md-nav__link">
+  <a href="#rattler_build.debug.DebugSession.output_dir" class="md-nav__link">
     <span class="md-ellipsis">
       
-        use_zstd
+        output_dir
       
     </span>
   </a>
@@ -3131,10 +3109,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#rattler_build.ToolConfiguration.use_bz2" class="md-nav__link">
+  <a href="#rattler_build.debug.DebugSession.setup_log" class="md-nav__link">
     <span class="md-ellipsis">
       
-        use_bz2
+        setup_log
       
     </span>
   </a>
@@ -3142,10 +3120,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#rattler_build.ToolConfiguration.use_sharded" class="md-nav__link">
+  <a href="#rattler_build.debug.DebugSession.run" class="md-nav__link">
     <span class="md-ellipsis">
       
-        use_sharded
+        run
       
     </span>
   </a>
@@ -3153,10 +3131,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#rattler_build.ToolConfiguration.compression_threads" class="md-nav__link">
+  <a href="#rattler_build.debug.DebugSession.create" class="md-nav__link">
     <span class="md-ellipsis">
       
-        compression_threads
+        create
       
     </span>
   </a>
@@ -3164,10 +3142,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#rattler_build.ToolConfiguration.io_concurrency_limit" class="md-nav__link">
+  <a href="#rattler_build.debug.DebugSession.run_script" class="md-nav__link">
     <span class="md-ellipsis">
       
-        io_concurrency_limit
+        run_script
       
     </span>
   </a>
@@ -3175,10 +3153,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#rattler_build.ToolConfiguration.allow_insecure_host" class="md-nav__link">
+  <a href="#rattler_build.debug.DebugSession.add_packages" class="md-nav__link">
     <span class="md-ellipsis">
       
-        allow_insecure_host
+        add_packages
       
     </span>
   </a>
@@ -3186,10 +3164,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#rattler_build.ToolConfiguration.error_prefix_in_binary" class="md-nav__link">
+  <a href="#rattler_build.debug.DebugSession.create_patch" class="md-nav__link">
     <span class="md-ellipsis">
       
-        error_prefix_in_binary
+        create_patch
       
     </span>
   </a>
@@ -3197,10 +3175,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#rattler_build.ToolConfiguration.allow_symlinks_on_windows" class="md-nav__link">
+  <a href="#rattler_build.debug.DebugSession.read_build_script" class="md-nav__link">
     <span class="md-ellipsis">
       
-        allow_symlinks_on_windows
+        read_build_script
       
     </span>
   </a>
@@ -3208,10 +3186,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#rattler_build.ToolConfiguration.__init__" class="md-nav__link">
+  <a href="#debugpaths" class="md-nav__link">
     <span class="md-ellipsis">
       
-        __init__
+        DebugPaths
       
     </span>
   </a>
@@ -3219,10 +3197,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#platformconfig" class="md-nav__link">
+  <a href="#rattler_build.debug.DebugPaths" class="md-nav__link">
     <span class="md-ellipsis">
       
-        PlatformConfig
+        DebugPaths
       
     </span>
   </a>
@@ -3230,10 +3208,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#rattler_build.PlatformConfig" class="md-nav__link">
+  <a href="#rattler_build.debug.DebugPaths.work_dir" class="md-nav__link">
     <span class="md-ellipsis">
       
-        PlatformConfig
+        work_dir
       
     </span>
   </a>
@@ -3241,10 +3219,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#rattler_build.PlatformConfig.target_platform" class="md-nav__link">
+  <a href="#rattler_build.debug.DebugPaths.host_prefix" class="md-nav__link">
     <span class="md-ellipsis">
       
-        target_platform
+        host_prefix
       
     </span>
   </a>
@@ -3252,10 +3230,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#rattler_build.PlatformConfig.build_platform" class="md-nav__link">
+  <a href="#rattler_build.debug.DebugPaths.build_prefix" class="md-nav__link">
     <span class="md-ellipsis">
       
-        build_platform
+        build_prefix
       
     </span>
   </a>
@@ -3263,10 +3241,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#rattler_build.PlatformConfig.host_platform" class="md-nav__link">
+  <a href="#rattler_build.debug.DebugPaths.build_script" class="md-nav__link">
     <span class="md-ellipsis">
       
-        host_platform
+        build_script
       
     </span>
   </a>
@@ -3274,10 +3252,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#rattler_build.PlatformConfig.experimental" class="md-nav__link">
+  <a href="#rattler_build.debug.DebugPaths.build_env_script" class="md-nav__link">
     <span class="md-ellipsis">
       
-        experimental
+        build_env_script
       
     </span>
   </a>
@@ -3285,10 +3263,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#rattler_build.PlatformConfig.__init__" class="md-nav__link">
+  <a href="#rattler_build.debug.DebugPaths.build_dir" class="md-nav__link">
     <span class="md-ellipsis">
       
-        __init__
+        build_dir
       
     </span>
   </a>
@@ -3296,10 +3274,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#jinjaconfig" class="md-nav__link">
+  <a href="#rattler_build.debug.DebugPaths.output_dir" class="md-nav__link">
     <span class="md-ellipsis">
       
-        JinjaConfig
+        output_dir
       
     </span>
   </a>
@@ -3307,10 +3285,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#rattler_build.JinjaConfig" class="md-nav__link">
+  <a href="#rattler_build.debug.DebugPaths.recipe_dir" class="md-nav__link">
     <span class="md-ellipsis">
       
-        JinjaConfig
+        recipe_dir
       
     </span>
   </a>
@@ -3318,10 +3296,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#rattler_build.JinjaConfig.target_platform" class="md-nav__link">
+  <a href="#scriptresult" class="md-nav__link">
     <span class="md-ellipsis">
       
-        target_platform
+        ScriptResult
       
     </span>
   </a>
@@ -3329,10 +3307,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#rattler_build.JinjaConfig.host_platform" class="md-nav__link">
+  <a href="#rattler_build.debug.ScriptResult" class="md-nav__link">
     <span class="md-ellipsis">
       
-        host_platform
+        ScriptResult
       
     </span>
   </a>
@@ -3340,10 +3318,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#rattler_build.JinjaConfig.build_platform" class="md-nav__link">
+  <a href="#rattler_build.debug.ScriptResult.exit_code" class="md-nav__link">
     <span class="md-ellipsis">
       
-        build_platform
+        exit_code
       
     </span>
   </a>
@@ -3351,10 +3329,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#rattler_build.JinjaConfig.experimental" class="md-nav__link">
+  <a href="#rattler_build.debug.ScriptResult.stdout" class="md-nav__link">
     <span class="md-ellipsis">
       
-        experimental
+        stdout
       
     </span>
   </a>
@@ -3362,10 +3340,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#rattler_build.JinjaConfig.allow_undefined" class="md-nav__link">
+  <a href="#rattler_build.debug.ScriptResult.stderr" class="md-nav__link">
     <span class="md-ellipsis">
       
-        allow_undefined
+        stderr
       
     </span>
   </a>
@@ -3373,32 +3351,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#rattler_build.JinjaConfig.variant" class="md-nav__link">
+  <a href="#rattler_build.debug.ScriptResult.success" class="md-nav__link">
     <span class="md-ellipsis">
       
-        variant
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#rattler_build.JinjaConfig.recipe_path" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        recipe_path
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#rattler_build.JinjaConfig.__init__" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        __init__
+        success
       
     </span>
   </a>
@@ -3422,7 +3378,7 @@
 
 
   
-    <a href="https://github.com/prefix-dev/rattler-build/edit/main/docs/py-rattler-build/reference/configuration.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+    <a href="https://github.com/prefix-dev/rattler-build/edit/main/docs/py-rattler-build/reference/debug.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.71 7.04c.39-.39.39-1.04 0-1.41l-2.34-2.34c-.37-.39-1.02-.39-1.41 0l-1.84 1.83 3.75 3.75M3 17.25V21h3.75L17.81 9.93l-3.75-3.75z"/></svg>
     </a>
@@ -3430,278 +3386,33 @@
   
 
 
-<h1 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">#</a></h1>
-<p>Configuration classes for controlling build behavior and platform settings.</p>
-<p>You can import the configuration classes from <code>rattler_build</code>:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">rattler_build</span><span class="w"> </span><span class="kn">import</span> <span class="n">ToolConfiguration</span><span class="p">,</span> <span class="n">PlatformConfig</span><span class="p">,</span> <span class="n">JinjaConfig</span><span class="p">,</span> <span class="n">RenderConfig</span>
+<h1 id="debug-session">Debug Session<a class="headerlink" href="#debug-session" title="Permanent link">#</a></h1>
+<p>Interactive debugging for conda recipe builds. Set up the full build
+environment without running the build, then iteratively run, inspect, and
+modify the build script.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">rattler_build</span><span class="w"> </span><span class="kn">import</span> <span class="n">DebugSession</span><span class="p">,</span> <span class="n">DebugPaths</span><span class="p">,</span> <span class="n">ScriptResult</span>
 </span></code></pre></div>
-<h2 id="toolconfiguration"><code>ToolConfiguration</code><a class="headerlink" href="#toolconfiguration" title="Permanent link">#</a></h2>
+<h2 id="debugsession"><code>DebugSession</code><a class="headerlink" href="#debugsession" title="Permanent link">#</a></h2>
 
 
 <div class="doc doc-object doc-class">
 
 
 
-<a id="rattler_build.ToolConfiguration"></a>
+<a id="rattler_build.debug.DebugSession"></a>
     <div class="doc doc-contents first">
 
 
 
-        <p>Configuration for the Rattler-Build tool.</p>
+        <p>Interactive debugging session for a conda recipe.</p>
+<p>Use :meth:<code>create</code> to set up the environment. Then call :meth:<code>run_script</code>
+to execute the build, inspect results, modify files, and re-run.</p>
+<p>Example::</p>
+<div class="language-text highlight"><pre><span></span><code>session = DebugSession.create(variant, channels=[&quot;conda-forge&quot;])
+result = session.run_script(trace=True)
+print(result.stdout)
+</code></pre></div>
 
-
-<p><span class="doc-section-title">Parameters:</span></p>
-    <table>
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th>Type</th>
-          <th>Description</th>
-          <th>Default</th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                <code>keep_build</code>
-            </td>
-            <td>
-                  <code><span title="bool">bool</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Whether to keep the build directory after the build is done</p>
-              </div>
-            </td>
-            <td>
-                  <code>False</code>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>compression_threads</code>
-            </td>
-            <td>
-                  <code><span title="int">int</span> | None</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Number of threads to use for compression (default: None - auto)</p>
-              </div>
-            </td>
-            <td>
-                  <code>None</code>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>io_concurrency_limit</code>
-            </td>
-            <td>
-                  <code><span title="int">int</span> | None</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Maximum number of concurrent I/O operations (default: None)</p>
-              </div>
-            </td>
-            <td>
-                  <code>None</code>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>test_strategy</code>
-            </td>
-            <td>
-                  <code><span title="typing.Literal">Literal</span>[&#39;skip&#39;, &#39;native&#39;, &#39;tests&#39;]</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Test strategy to use ("skip", "native", or "tests") (default: "skip")</p>
-              </div>
-            </td>
-            <td>
-                  <code>&#39;skip&#39;</code>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>skip_existing</code>
-            </td>
-            <td>
-                  <code><span title="typing.Literal">Literal</span>[&#39;none&#39;, &#39;local&#39;, &#39;all&#39;]</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Whether to skip packages that already exist ("none", "local", or "all") (default: "none")</p>
-              </div>
-            </td>
-            <td>
-                  <code>&#39;none&#39;</code>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>continue_on_failure</code>
-            </td>
-            <td>
-                  <code><span title="bool">bool</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Whether to continue building other recipes even if one fails (default: False)</p>
-              </div>
-            </td>
-            <td>
-                  <code>False</code>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>noarch_build_platform</code>
-            </td>
-            <td>
-                  <code><span title="str">str</span> | None</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Platform to use for noarch builds (default: None)</p>
-              </div>
-            </td>
-            <td>
-                  <code>None</code>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>channel_priority</code>
-            </td>
-            <td>
-                  <code><span title="typing.Literal">Literal</span>[&#39;strict&#39;, &#39;disabled&#39;]</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Channel priority for solving ("strict" or "disabled") (default: "strict")</p>
-              </div>
-            </td>
-            <td>
-                  <code>&#39;strict&#39;</code>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>allow_insecure_host</code>
-            </td>
-            <td>
-                  <code><span title="list">list</span>[<span title="str">str</span>] | None</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>List of hosts for which SSL certificate verification should be skipped</p>
-              </div>
-            </td>
-            <td>
-                  <code>None</code>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>error_prefix_in_binary</code>
-            </td>
-            <td>
-                  <code><span title="bool">bool</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Whether to error if the host prefix is detected in binary files (default: False)</p>
-              </div>
-            </td>
-            <td>
-                  <code>False</code>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>allow_symlinks_on_windows</code>
-            </td>
-            <td>
-                  <code><span title="bool">bool</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Whether to allow symlinks in packages on Windows (default: False)</p>
-              </div>
-            </td>
-            <td>
-                  <code>False</code>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>use_zstd</code>
-            </td>
-            <td>
-                  <code><span title="bool">bool</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Whether to use zstd compression when downloading repodata (default: True)</p>
-              </div>
-            </td>
-            <td>
-                  <code>True</code>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>use_bz2</code>
-            </td>
-            <td>
-                  <code><span title="bool">bool</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Whether to use bzip2 compression when downloading repodata (default: True)</p>
-              </div>
-            </td>
-            <td>
-                  <code>True</code>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>use_sharded</code>
-            </td>
-            <td>
-                  <code><span title="bool">bool</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Whether to use sharded repodata when downloading (default: True)</p>
-              </div>
-            </td>
-            <td>
-                  <code>True</code>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-<details class="example" open>
-  <summary>Example</summary>
-  <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">config</span> <span class="o">=</span> <span class="n">ToolConfiguration</span><span class="p">(</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">keep_build</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">test_strategy</span><span class="o">=</span><span class="s2">&quot;native&quot;</span><span class="p">,</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">compression_threads</span><span class="o">=</span><span class="mi">4</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="p">)</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="nb">print</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">keep_build</span><span class="p">)</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="c1"># True</span>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="nb">print</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">test_strategy</span><span class="p">)</span>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="c1"># Native</span>
-</span></code></pre></div>
-</details>
 
 
 
@@ -3724,21 +3435,21 @@
 
 
 
-<h2 id="rattler_build.ToolConfiguration.keep_build" class="doc doc-heading">
-            <span class="doc doc-object-name doc-attribute-name">keep_build</span>
+<h2 id="rattler_build.debug.DebugSession.paths" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">paths</span>
 
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-property"><code>property</code></small>
   </span>
 
-<a href="#rattler_build.ToolConfiguration.keep_build" class="headerlink" title="Permanent link">#</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">keep_build</span>
+<a href="#rattler_build.debug.DebugSession.paths" class="headerlink" title="Permanent link">#</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">paths</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">
 
-        <p>Whether to keep the build directory after the build is done.</p>
+        <p>All paths associated with this debug session.</p>
 
     </div>
 
@@ -3748,21 +3459,21 @@
 
 
 
-<h2 id="rattler_build.ToolConfiguration.test_strategy" class="doc doc-heading">
-            <span class="doc doc-object-name doc-attribute-name">test_strategy</span>
+<h2 id="rattler_build.debug.DebugSession.work_dir" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">work_dir</span>
 
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-property"><code>property</code></small>
   </span>
 
-<a href="#rattler_build.ToolConfiguration.test_strategy" class="headerlink" title="Permanent link">#</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">test_strategy</span>
+<a href="#rattler_build.debug.DebugSession.work_dir" class="headerlink" title="Permanent link">#</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">work_dir</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">
 
-        <p>The test strategy to use.</p>
+        <p>Work directory where the build script and sources live.</p>
 
     </div>
 
@@ -3772,21 +3483,21 @@
 
 
 
-<h2 id="rattler_build.ToolConfiguration.skip_existing" class="doc doc-heading">
-            <span class="doc doc-object-name doc-attribute-name">skip_existing</span>
+<h2 id="rattler_build.debug.DebugSession.host_prefix" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">host_prefix</span>
 
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-property"><code>property</code></small>
   </span>
 
-<a href="#rattler_build.ToolConfiguration.skip_existing" class="headerlink" title="Permanent link">#</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">skip_existing</span>
+<a href="#rattler_build.debug.DebugSession.host_prefix" class="headerlink" title="Permanent link">#</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">host_prefix</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">
 
-        <p>Whether to skip existing packages.</p>
+        <p>Host prefix (where host dependencies are installed).</p>
 
     </div>
 
@@ -3796,21 +3507,21 @@
 
 
 
-<h2 id="rattler_build.ToolConfiguration.continue_on_failure" class="doc doc-heading">
-            <span class="doc doc-object-name doc-attribute-name">continue_on_failure</span>
+<h2 id="rattler_build.debug.DebugSession.build_prefix" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">build_prefix</span>
 
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-property"><code>property</code></small>
   </span>
 
-<a href="#rattler_build.ToolConfiguration.continue_on_failure" class="headerlink" title="Permanent link">#</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">continue_on_failure</span>
+<a href="#rattler_build.debug.DebugSession.build_prefix" class="headerlink" title="Permanent link">#</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">build_prefix</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">
 
-        <p>Whether to continue building on failure.</p>
+        <p>Build prefix (where build dependencies are installed).</p>
 
     </div>
 
@@ -3820,21 +3531,21 @@
 
 
 
-<h2 id="rattler_build.ToolConfiguration.channel_priority" class="doc doc-heading">
-            <span class="doc doc-object-name doc-attribute-name">channel_priority</span>
+<h2 id="rattler_build.debug.DebugSession.build_script" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">build_script</span>
 
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-property"><code>property</code></small>
   </span>
 
-<a href="#rattler_build.ToolConfiguration.channel_priority" class="headerlink" title="Permanent link">#</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">channel_priority</span>
+<a href="#rattler_build.debug.DebugSession.build_script" class="headerlink" title="Permanent link">#</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">build_script</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">
 
-        <p>The channel priority to use in solving.</p>
+        <p>Path to the build script.</p>
 
     </div>
 
@@ -3844,21 +3555,21 @@
 
 
 
-<h2 id="rattler_build.ToolConfiguration.use_zstd" class="doc doc-heading">
-            <span class="doc doc-object-name doc-attribute-name">use_zstd</span>
+<h2 id="rattler_build.debug.DebugSession.output_dir" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">output_dir</span>
 
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-property"><code>property</code></small>
   </span>
 
-<a href="#rattler_build.ToolConfiguration.use_zstd" class="headerlink" title="Permanent link">#</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">use_zstd</span>
+<a href="#rattler_build.debug.DebugSession.output_dir" class="headerlink" title="Permanent link">#</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">output_dir</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">
 
-        <p>Whether to use zstd compression.</p>
+        <p>Output directory where packages are written.</p>
 
     </div>
 
@@ -3868,21 +3579,21 @@
 
 
 
-<h2 id="rattler_build.ToolConfiguration.use_bz2" class="doc doc-heading">
-            <span class="doc doc-object-name doc-attribute-name">use_bz2</span>
+<h2 id="rattler_build.debug.DebugSession.setup_log" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">setup_log</span>
 
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-property"><code>property</code></small>
   </span>
 
-<a href="#rattler_build.ToolConfiguration.use_bz2" class="headerlink" title="Permanent link">#</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">use_bz2</span>
+<a href="#rattler_build.debug.DebugSession.setup_log" class="headerlink" title="Permanent link">#</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">setup_log</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">
 
-        <p>Whether to use bzip2 compression.</p>
+        <p>Log messages captured during environment setup.</p>
 
     </div>
 
@@ -3892,141 +3603,20 @@
 
 
 
-<h2 id="rattler_build.ToolConfiguration.use_sharded" class="doc doc-heading">
-            <span class="doc doc-object-name doc-attribute-name">use_sharded</span>
+<h2 id="rattler_build.debug.DebugSession.run" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">run</span>
 
 
   <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-property"><code>property</code></small>
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
   </span>
 
-<a href="#rattler_build.ToolConfiguration.use_sharded" class="headerlink" title="Permanent link">#</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">use_sharded</span>
+<a href="#rattler_build.debug.DebugSession.run" class="headerlink" title="Permanent link">#</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">run</span> <span class="o">=</span> <span class="n">run_script</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">
-
-        <p>Whether to use sharded repodata.</p>
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-attribute">
-
-
-
-<h2 id="rattler_build.ToolConfiguration.compression_threads" class="doc doc-heading">
-            <span class="doc doc-object-name doc-attribute-name">compression_threads</span>
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-property"><code>property</code></small>
-  </span>
-
-<a href="#rattler_build.ToolConfiguration.compression_threads" class="headerlink" title="Permanent link">#</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">compression_threads</span>
-</span></code></pre></div>
-
-    <div class="doc doc-contents ">
-
-        <p>Number of compression threads.</p>
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-attribute">
-
-
-
-<h2 id="rattler_build.ToolConfiguration.io_concurrency_limit" class="doc doc-heading">
-            <span class="doc doc-object-name doc-attribute-name">io_concurrency_limit</span>
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-property"><code>property</code></small>
-  </span>
-
-<a href="#rattler_build.ToolConfiguration.io_concurrency_limit" class="headerlink" title="Permanent link">#</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">io_concurrency_limit</span>
-</span></code></pre></div>
-
-    <div class="doc doc-contents ">
-
-        <p>IO concurrency limit.</p>
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-attribute">
-
-
-
-<h2 id="rattler_build.ToolConfiguration.allow_insecure_host" class="doc doc-heading">
-            <span class="doc doc-object-name doc-attribute-name">allow_insecure_host</span>
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-property"><code>property</code></small>
-  </span>
-
-<a href="#rattler_build.ToolConfiguration.allow_insecure_host" class="headerlink" title="Permanent link">#</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">allow_insecure_host</span>
-</span></code></pre></div>
-
-    <div class="doc doc-contents ">
-
-        <p>List of hosts for which SSL certificate verification should be skipped.</p>
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-attribute">
-
-
-
-<h2 id="rattler_build.ToolConfiguration.error_prefix_in_binary" class="doc doc-heading">
-            <span class="doc doc-object-name doc-attribute-name">error_prefix_in_binary</span>
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-property"><code>property</code></small>
-  </span>
-
-<a href="#rattler_build.ToolConfiguration.error_prefix_in_binary" class="headerlink" title="Permanent link">#</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">error_prefix_in_binary</span>
-</span></code></pre></div>
-
-    <div class="doc doc-contents ">
-
-        <p>Whether to error if the host prefix is detected in binary files.</p>
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-attribute">
-
-
-
-<h2 id="rattler_build.ToolConfiguration.allow_symlinks_on_windows" class="doc doc-heading">
-            <span class="doc doc-object-name doc-attribute-name">allow_symlinks_on_windows</span>
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-property"><code>property</code></small>
-  </span>
-
-<a href="#rattler_build.ToolConfiguration.allow_symlinks_on_windows" class="headerlink" title="Permanent link">#</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">allow_symlinks_on_windows</span>
-</span></code></pre></div>
-
-    <div class="doc doc-contents ">
-
-        <p>Whether to allow symlinks in packages on Windows.</p>
 
     </div>
 
@@ -4038,33 +3628,172 @@
 <div class="doc doc-object doc-function">
 
 
-<h2 id="rattler_build.ToolConfiguration.__init__" class="doc doc-heading">
-            <span class="doc doc-object-name doc-function-name">__init__</span>
+<h2 id="rattler_build.debug.DebugSession.create" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">create</span>
 
 
-<a href="#rattler_build.ToolConfiguration.__init__" class="headerlink" title="Permanent link">#</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">__init__</span><span class="p">(</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="o">*</span><span class="p">,</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">keep_build</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">compression_threads</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">io_concurrency_limit</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">test_strategy</span><span class="o">=</span><span class="s2">&quot;skip&quot;</span><span class="p">,</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">skip_existing</span><span class="o">=</span><span class="s2">&quot;none&quot;</span><span class="p">,</span>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">continue_on_failure</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">noarch_build_platform</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="n">channel_priority</span><span class="o">=</span><span class="s2">&quot;strict&quot;</span><span class="p">,</span>
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="n">allow_insecure_host</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>    <span class="n">error_prefix_in_binary</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>    <span class="n">allow_symlinks_on_windows</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>    <span class="n">use_zstd</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>    <span class="n">use_bz2</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>    <span class="n">use_sharded</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="p">)</span>
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
+  </span>
+
+<a href="#rattler_build.debug.DebugSession.create" class="headerlink" title="Permanent link">#</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">create</span><span class="p">(</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">variant</span><span class="p">,</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">tool_config</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">output_dir</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">channels</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">no_build_id</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">progress_callback</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="p">)</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">
 
-        <p>Create a new tool configuration.</p>
+        <p>Create a debug session from a rendered variant.</p>
+<p>This resolves dependencies, fetches sources, installs environments,
+and creates the build script — all without running the actual build.</p>
+<h4 id="rattler_build.debug.DebugSession.create--parameters">Parameters<a class="headerlink" href="#rattler_build.debug.DebugSession.create--parameters" title="Permanent link">#</a></h4>
+<p>variant:
+    A rendered variant from <code>recipe.render()</code>.
+tool_config:
+    Optional tool configuration. Uses defaults if not provided.
+output_dir:
+    Where to write build artifacts. A temporary directory is used if
+    not specified.
+channels:
+    Conda channels to use. Defaults to <code>["conda-forge"]</code>.
+no_build_id:
+    If <code>True</code> (default), omit the build ID from directory paths,
+    giving stable paths across iterations.
+progress_callback:
+    Optional callback for progress events during setup.</p>
+<h4 id="rattler_build.debug.DebugSession.create--returns">Returns<a class="headerlink" href="#rattler_build.debug.DebugSession.create--returns" title="Permanent link">#</a></h4>
+<p>DebugSession
+    A session with the environment fully set up and ready to run.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="rattler_build.debug.DebugSession.run_script" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">run_script</span>
+
+
+<a href="#rattler_build.debug.DebugSession.run_script" class="headerlink" title="Permanent link">#</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">run_script</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">trace</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Run the build script and capture output.</p>
+<h4 id="rattler_build.debug.DebugSession.run_script--parameters">Parameters<a class="headerlink" href="#rattler_build.debug.DebugSession.run_script--parameters" title="Permanent link">#</a></h4>
+<p>trace:
+    If <code>True</code>, run bash with <code>-x</code> flag to trace each command.</p>
+<h4 id="rattler_build.debug.DebugSession.run_script--returns">Returns<a class="headerlink" href="#rattler_build.debug.DebugSession.run_script--returns" title="Permanent link">#</a></h4>
+<p>ScriptResult
+    The exit code, stdout, and stderr from the build script.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="rattler_build.debug.DebugSession.add_packages" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">add_packages</span>
+
+
+<a href="#rattler_build.debug.DebugSession.add_packages" class="headerlink" title="Permanent link">#</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">add_packages</span><span class="p">(</span><span class="n">specs</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">environment</span><span class="o">=</span><span class="s1">&#39;host&#39;</span><span class="p">,</span> <span class="n">channels</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Add packages to the host or build environment.</p>
+<h4 id="rattler_build.debug.DebugSession.add_packages--parameters">Parameters<a class="headerlink" href="#rattler_build.debug.DebugSession.add_packages--parameters" title="Permanent link">#</a></h4>
+<p>specs:
+    Conda match specs (e.g. <code>["numpy", "pandas&gt;=2"]</code>).
+environment:
+    <code>"host"</code> or <code>"build"</code>.
+channels:
+    Override channels for this operation.</p>
+<h4 id="rattler_build.debug.DebugSession.add_packages--returns">Returns<a class="headerlink" href="#rattler_build.debug.DebugSession.add_packages--returns" title="Permanent link">#</a></h4>
+<p>list[str]
+    The specs that were requested (confirmation).</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="rattler_build.debug.DebugSession.create_patch" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">create_patch</span>
+
+
+<a href="#rattler_build.debug.DebugSession.create_patch" class="headerlink" title="Permanent link">#</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">create_patch</span><span class="p">(</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;changes&quot;</span><span class="p">,</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">output_dir</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">overwrite</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">exclude</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">add</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">include</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">dry_run</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="p">)</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Create a patch from changes in the work directory.</p>
+<h4 id="rattler_build.debug.DebugSession.create_patch--parameters">Parameters<a class="headerlink" href="#rattler_build.debug.DebugSession.create_patch--parameters" title="Permanent link">#</a></h4>
+<p>name:
+    Patch file name (without extension).
+output_dir:
+    Where to write the patch file. Defaults to the recipe directory.
+overwrite:
+    Overwrite existing patch file.
+exclude:
+    Glob patterns to exclude from the patch.
+add:
+    Glob patterns for untracked files to include.
+include:
+    Glob patterns to restrict the patch to.
+dry_run:
+    If <code>True</code>, print the patch without writing it.</p>
+<h4 id="rattler_build.debug.DebugSession.create_patch--returns">Returns<a class="headerlink" href="#rattler_build.debug.DebugSession.create_patch--returns" title="Permanent link">#</a></h4>
+<p>str
+    Empty string on success.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="rattler_build.debug.DebugSession.read_build_script" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">read_build_script</span>
+
+
+<a href="#rattler_build.debug.DebugSession.read_build_script" class="headerlink" title="Permanent link">#</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">read_build_script</span><span class="p">()</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Read and return the build script contents.</p>
 
 
     </div>
@@ -4077,121 +3806,20 @@
 
     </div>
 
-</div><h2 id="platformconfig"><code>PlatformConfig</code><a class="headerlink" href="#platformconfig" title="Permanent link">#</a></h2>
+</div><h2 id="debugpaths"><code>DebugPaths</code><a class="headerlink" href="#debugpaths" title="Permanent link">#</a></h2>
 
 
 <div class="doc doc-object doc-class">
 
 
 
-<a id="rattler_build.PlatformConfig"></a>
+<a id="rattler_build.debug.DebugPaths"></a>
     <div class="doc doc-contents first">
 
 
 
-        <p>Platform configuration for building packages.</p>
-<p>This class provides platform settings that are shared across different
-configuration objects (JinjaConfig, RenderConfig).</p>
+        <p>All paths associated with a debug session.</p>
 
-
-<p><span class="doc-section-title">Parameters:</span></p>
-    <table>
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th>Type</th>
-          <th>Description</th>
-          <th>Default</th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                <code>target_platform</code>
-            </td>
-            <td>
-                  <code><span title="str">str</span> | None</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Target platform (e.g., "linux-64", "osx-arm64").
-If not specified, defaults to the current platform.</p>
-              </div>
-            </td>
-            <td>
-                  <code>None</code>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>build_platform</code>
-            </td>
-            <td>
-                  <code><span title="str">str</span> | None</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Build platform (where the build runs).
-If not specified, defaults to the target platform.</p>
-              </div>
-            </td>
-            <td>
-                  <code>None</code>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>host_platform</code>
-            </td>
-            <td>
-                  <code><span title="str">str</span> | None</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Host platform (for cross-compilation).
-If not specified, defaults to the target platform.</p>
-              </div>
-            </td>
-            <td>
-                  <code>None</code>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>experimental</code>
-            </td>
-            <td>
-                  <code><span title="bool">bool</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Enable experimental features</p>
-              </div>
-            </td>
-            <td>
-                  <code>False</code>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-<details class="example" open>
-  <summary>Example</summary>
-  <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># Create with default (current) platform</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="n">config</span> <span class="o">=</span> <span class="n">PlatformConfig</span><span class="p">()</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="c1"># Create for a specific platform (build and host will default to target)</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="n">config</span> <span class="o">=</span> <span class="n">PlatformConfig</span><span class="p">(</span><span class="n">target_platform</span><span class="o">=</span><span class="s2">&quot;linux-64&quot;</span><span class="p">)</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="c1"># Create with different platforms for cross-compilation</span>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="n">config</span> <span class="o">=</span> <span class="n">PlatformConfig</span><span class="p">(</span>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">target_platform</span><span class="o">=</span><span class="s2">&quot;osx-arm64&quot;</span><span class="p">,</span>
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="n">build_platform</span><span class="o">=</span><span class="s2">&quot;linux-64&quot;</span><span class="p">,</span>
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="n">host_platform</span><span class="o">=</span><span class="s2">&quot;osx-arm64&quot;</span>
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="p">)</span>
-</span></code></pre></div>
-</details>
 
 
 
@@ -4214,19 +3842,21 @@ If not specified, defaults to the target platform.</p>
 
 
 
-<h2 id="rattler_build.PlatformConfig.target_platform" class="doc doc-heading">
-            <span class="doc doc-object-name doc-attribute-name">target_platform</span>
+<h2 id="rattler_build.debug.DebugPaths.work_dir" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">work_dir</span>
 
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
   </span>
 
-<a href="#rattler_build.PlatformConfig.target_platform" class="headerlink" title="Permanent link">#</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">target_platform</span> <span class="o">=</span> <span class="n">target_platform</span>
+<a href="#rattler_build.debug.DebugPaths.work_dir" class="headerlink" title="Permanent link">#</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">work_dir</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">
+
+        <p>Work directory where the build script and sources live.</p>
 
     </div>
 
@@ -4236,21 +3866,21 @@ If not specified, defaults to the target platform.</p>
 
 
 
-<h2 id="rattler_build.PlatformConfig.build_platform" class="doc doc-heading">
-            <span class="doc doc-object-name doc-attribute-name">build_platform</span>
+<h2 id="rattler_build.debug.DebugPaths.host_prefix" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">host_prefix</span>
 
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
   </span>
 
-<a href="#rattler_build.PlatformConfig.build_platform" class="headerlink" title="Permanent link">#</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">build_platform</span> <span class="o">=</span> <span class="p">(</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">build_platform</span> <span class="k">if</span> <span class="n">build_platform</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="p">)</span>
+<a href="#rattler_build.debug.DebugPaths.host_prefix" class="headerlink" title="Permanent link">#</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">host_prefix</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">
+
+        <p>Host prefix (where host dependencies are installed).</p>
 
     </div>
 
@@ -4260,21 +3890,21 @@ If not specified, defaults to the target platform.</p>
 
 
 
-<h2 id="rattler_build.PlatformConfig.host_platform" class="doc doc-heading">
-            <span class="doc doc-object-name doc-attribute-name">host_platform</span>
+<h2 id="rattler_build.debug.DebugPaths.build_prefix" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">build_prefix</span>
 
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
   </span>
 
-<a href="#rattler_build.PlatformConfig.host_platform" class="headerlink" title="Permanent link">#</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">host_platform</span> <span class="o">=</span> <span class="p">(</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">host_platform</span> <span class="k">if</span> <span class="n">host_platform</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="p">)</span>
+<a href="#rattler_build.debug.DebugPaths.build_prefix" class="headerlink" title="Permanent link">#</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">build_prefix</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">
+
+        <p>Build prefix (where build dependencies are installed).</p>
 
     </div>
 
@@ -4284,19 +3914,117 @@ If not specified, defaults to the target platform.</p>
 
 
 
-<h2 id="rattler_build.PlatformConfig.experimental" class="doc doc-heading">
-            <span class="doc doc-object-name doc-attribute-name">experimental</span>
+<h2 id="rattler_build.debug.DebugPaths.build_script" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">build_script</span>
 
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
   </span>
 
-<a href="#rattler_build.PlatformConfig.experimental" class="headerlink" title="Permanent link">#</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">experimental</span> <span class="o">=</span> <span class="n">experimental</span>
+<a href="#rattler_build.debug.DebugPaths.build_script" class="headerlink" title="Permanent link">#</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">build_script</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">
+
+        <p>Path to the build script (<code>conda_build.sh</code> / <code>conda_build.bat</code>).</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="rattler_build.debug.DebugPaths.build_env_script" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">build_env_script</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#rattler_build.debug.DebugPaths.build_env_script" class="headerlink" title="Permanent link">#</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">build_env_script</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Path to the environment script (<code>build_env.sh</code> / <code>build_env.bat</code>).</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="rattler_build.debug.DebugPaths.build_dir" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">build_dir</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#rattler_build.debug.DebugPaths.build_dir" class="headerlink" title="Permanent link">#</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">build_dir</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Build directory (parent of work, host_env, build_env).</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="rattler_build.debug.DebugPaths.output_dir" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">output_dir</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#rattler_build.debug.DebugPaths.output_dir" class="headerlink" title="Permanent link">#</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">output_dir</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Output directory where packages are written.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="rattler_build.debug.DebugPaths.recipe_dir" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">recipe_dir</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#rattler_build.debug.DebugPaths.recipe_dir" class="headerlink" title="Permanent link">#</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">recipe_dir</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Recipe directory.</p>
 
     </div>
 
@@ -4304,32 +4032,6 @@ If not specified, defaults to the target platform.</p>
 
 
 
-
-<div class="doc doc-object doc-function">
-
-
-<h2 id="rattler_build.PlatformConfig.__init__" class="doc doc-heading">
-            <span class="doc doc-object-name doc-function-name">__init__</span>
-
-
-<a href="#rattler_build.PlatformConfig.__init__" class="headerlink" title="Permanent link">#</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">__init__</span><span class="p">(</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="o">*</span><span class="p">,</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">target_platform</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">build_platform</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">host_platform</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">experimental</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="p">)</span>
-</span></code></pre></div>
-
-    <div class="doc doc-contents ">
-
-        <p>Create a new platform configuration.</p>
-
-
-    </div>
-
-</div>
 
 
 
@@ -4337,108 +4039,22 @@ If not specified, defaults to the target platform.</p>
 
     </div>
 
-</div><h2 id="jinjaconfig"><code>JinjaConfig</code><a class="headerlink" href="#jinjaconfig" title="Permanent link">#</a></h2>
+</div><h2 id="scriptresult"><code>ScriptResult</code><a class="headerlink" href="#scriptresult" title="Permanent link">#</a></h2>
 
 
 <div class="doc doc-object doc-class">
 
 
 
-<a id="rattler_build.JinjaConfig"></a>
+<a id="rattler_build.debug.ScriptResult"></a>
     <div class="doc doc-contents first">
 
 
 
-        <p>Python wrapper for PyJinjaConfig to provide a cleaner interface.</p>
+        <p>Result of running a build script.</p>
+<p>Non-zero <code>exit_code</code> is <strong>not</strong> an exception — it is expected during
+debugging.  Inspect <code>stdout</code> and <code>stderr</code> to diagnose the failure.</p>
 
-
-<p><span class="doc-section-title">Parameters:</span></p>
-    <table>
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th>Type</th>
-          <th>Description</th>
-          <th>Default</th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                <code>platform</code>
-            </td>
-            <td>
-                  <code><a class="autorefs autorefs-internal" title="&lt;code&gt;rattler_build.tool_config.PlatformConfig&lt;/code&gt;" href="#rattler_build.PlatformConfig">PlatformConfig</a> | None</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Platform configuration (target, build, host platforms, experimental flag)</p>
-              </div>
-            </td>
-            <td>
-                  <code>None</code>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>allow_undefined</code>
-            </td>
-            <td>
-                  <code><span title="bool">bool</span> | None</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Whether to allow undefined variables in Jinja templates</p>
-              </div>
-            </td>
-            <td>
-                  <code>None</code>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>variant</code>
-            </td>
-            <td>
-                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>] | None</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Variant configuration dictionary</p>
-              </div>
-            </td>
-            <td>
-                  <code>None</code>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>recipe_path</code>
-            </td>
-            <td>
-                  <code><span title="str">str</span> | <span title="pathlib.Path">Path</span> | None</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Path to the recipe file (for relative path resolution in Jinja functions)</p>
-              </div>
-            </td>
-            <td>
-                  <code>None</code>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-<details class="example" open>
-  <summary>Example</summary>
-  <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">rattler_build.tool_config</span><span class="w"> </span><span class="kn">import</span> <span class="n">PlatformConfig</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">platform</span> <span class="o">=</span> <span class="n">PlatformConfig</span><span class="p">(</span><span class="n">target_platform</span><span class="o">=</span><span class="s2">&quot;linux-64&quot;</span><span class="p">)</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">config</span> <span class="o">=</span> <span class="n">JinjaConfig</span><span class="p">(</span><span class="n">platform</span><span class="o">=</span><span class="n">platform</span><span class="p">)</span>
-</span></code></pre></div>
-</details>
 
 
 
@@ -4461,21 +4077,21 @@ If not specified, defaults to the target platform.</p>
 
 
 
-<h2 id="rattler_build.JinjaConfig.target_platform" class="doc doc-heading">
-            <span class="doc doc-object-name doc-attribute-name">target_platform</span>
+<h2 id="rattler_build.debug.ScriptResult.exit_code" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">exit_code</span>
 
 
   <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-property"><code>property</code></small>
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
   </span>
 
-<a href="#rattler_build.JinjaConfig.target_platform" class="headerlink" title="Permanent link">#</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">target_platform</span>
+<a href="#rattler_build.debug.ScriptResult.exit_code" class="headerlink" title="Permanent link">#</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">exit_code</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">
 
-        <p>Get the target platform.</p>
+        <p>Process exit code (0 = success).</p>
 
     </div>
 
@@ -4485,21 +4101,21 @@ If not specified, defaults to the target platform.</p>
 
 
 
-<h2 id="rattler_build.JinjaConfig.host_platform" class="doc doc-heading">
-            <span class="doc doc-object-name doc-attribute-name">host_platform</span>
+<h2 id="rattler_build.debug.ScriptResult.stdout" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">stdout</span>
 
 
   <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-property"><code>property</code></small>
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
   </span>
 
-<a href="#rattler_build.JinjaConfig.host_platform" class="headerlink" title="Permanent link">#</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">host_platform</span>
+<a href="#rattler_build.debug.ScriptResult.stdout" class="headerlink" title="Permanent link">#</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">stdout</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">
 
-        <p>Get the host platform.</p>
+        <p>Captured standard output.</p>
 
     </div>
 
@@ -4509,21 +4125,21 @@ If not specified, defaults to the target platform.</p>
 
 
 
-<h2 id="rattler_build.JinjaConfig.build_platform" class="doc doc-heading">
-            <span class="doc doc-object-name doc-attribute-name">build_platform</span>
+<h2 id="rattler_build.debug.ScriptResult.stderr" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">stderr</span>
 
 
   <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-property"><code>property</code></small>
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
   </span>
 
-<a href="#rattler_build.JinjaConfig.build_platform" class="headerlink" title="Permanent link">#</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">build_platform</span>
+<a href="#rattler_build.debug.ScriptResult.stderr" class="headerlink" title="Permanent link">#</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">stderr</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">
 
-        <p>Get the build platform.</p>
+        <p>Captured standard error.</p>
 
     </div>
 
@@ -4533,93 +4149,21 @@ If not specified, defaults to the target platform.</p>
 
 
 
-<h2 id="rattler_build.JinjaConfig.experimental" class="doc doc-heading">
-            <span class="doc doc-object-name doc-attribute-name">experimental</span>
+<h2 id="rattler_build.debug.ScriptResult.success" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">success</span>
 
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-property"><code>property</code></small>
   </span>
 
-<a href="#rattler_build.JinjaConfig.experimental" class="headerlink" title="Permanent link">#</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">experimental</span>
+<a href="#rattler_build.debug.ScriptResult.success" class="headerlink" title="Permanent link">#</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">success</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">
 
-        <p>Get whether experimental features are enabled.</p>
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-attribute">
-
-
-
-<h2 id="rattler_build.JinjaConfig.allow_undefined" class="doc doc-heading">
-            <span class="doc doc-object-name doc-attribute-name">allow_undefined</span>
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-property"><code>property</code></small>
-  </span>
-
-<a href="#rattler_build.JinjaConfig.allow_undefined" class="headerlink" title="Permanent link">#</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">allow_undefined</span>
-</span></code></pre></div>
-
-    <div class="doc doc-contents ">
-
-        <p>Get whether undefined variables are allowed.</p>
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-attribute">
-
-
-
-<h2 id="rattler_build.JinjaConfig.variant" class="doc doc-heading">
-            <span class="doc doc-object-name doc-attribute-name">variant</span>
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-property"><code>property</code></small>
-  </span>
-
-<a href="#rattler_build.JinjaConfig.variant" class="headerlink" title="Permanent link">#</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">variant</span>
-</span></code></pre></div>
-
-    <div class="doc doc-contents ">
-
-        <p>Get the variant configuration.</p>
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-attribute">
-
-
-
-<h2 id="rattler_build.JinjaConfig.recipe_path" class="doc doc-heading">
-            <span class="doc doc-object-name doc-attribute-name">recipe_path</span>
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-property"><code>property</code></small>
-  </span>
-
-<a href="#rattler_build.JinjaConfig.recipe_path" class="headerlink" title="Permanent link">#</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">recipe_path</span>
-</span></code></pre></div>
-
-    <div class="doc doc-contents ">
-
-        <p>Get the recipe path.</p>
+        <p>Whether the script exited successfully.</p>
 
     </div>
 
@@ -4627,29 +4171,6 @@ If not specified, defaults to the target platform.</p>
 
 
 
-
-<div class="doc doc-object doc-function">
-
-
-<h2 id="rattler_build.JinjaConfig.__init__" class="doc doc-heading">
-            <span class="doc doc-object-name doc-function-name">__init__</span>
-
-
-<a href="#rattler_build.JinjaConfig.__init__" class="headerlink" title="Permanent link">#</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">__init__</span><span class="p">(</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">platform</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">allow_undefined</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">variant</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">recipe_path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="p">)</span>
-</span></code></pre></div>
-
-    <div class="doc doc-contents ">
-
-
-    </div>
-
-</div>
 
 
 
@@ -4726,9 +4247,9 @@ If not specified, defaults to the target platform.</p>
           
             
             <a
-              href="../rendering/"
+              href="../package_assembler/"
               class="md-footer__link md-footer__link--prev"
-              aria-label="Previous: Rendering"
+              aria-label="Previous: Package Assembler"
             >
               <div class="md-footer__button md-icon">
                 
@@ -4739,7 +4260,7 @@ If not specified, defaults to the target platform.</p>
                   Previous
                 </span>
                 <div class="md-ellipsis">
-                  Rendering
+                  Package Assembler
                 </div>
               </div>
             </a>
@@ -4749,16 +4270,16 @@ If not specified, defaults to the target platform.</p>
           
             
             <a
-              href="../package/"
+              href="../../tutorials/recipe_rendering_basics/"
               class="md-footer__link md-footer__link--next"
-              aria-label="Next: Package"
+              aria-label="Next: Recipe Rendering Basics"
             >
               <div class="md-footer__title">
                 <span class="md-footer__direction">
                   Next
                 </span>
                 <div class="md-ellipsis">
-                  Package
+                  Recipe Rendering Basics
                 </div>
               </div>
               <div class="md-footer__button md-icon">
