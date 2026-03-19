@@ -59,9 +59,14 @@ from rattler_build.upload import (
     upload_package_to_quetz,
     upload_packages_to_conda_forge,
 )
+from rattler_build.debug import DebugPaths, DebugSession, ScriptResult
 from rattler_build.variant_config import VariantConfig
 
 __all__ = [
+    # Debug
+    "DebugSession",
+    "DebugPaths",
+    "ScriptResult",
     # Core API
     "rattler_build_version",
     "build_recipes",

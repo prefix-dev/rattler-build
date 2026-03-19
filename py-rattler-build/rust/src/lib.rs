@@ -5,6 +5,7 @@ use pyo3::prelude::*;
 
 mod build;
 mod cli_api;
+mod debug;
 mod error;
 mod jinja_config;
 mod package;
@@ -74,6 +75,7 @@ fn rattler_build<'py>(_py: Python<'py>, m: Bound<'py, PyModule>) -> PyResult<()>
     tool_config::register_tool_config_module(_py, &m)?;
     package::register_package_module(_py, &m)?;
     package_assembler::register_package_assembler_module(_py, &m)?;
+    debug::register_debug_module(_py, &m)?;
 
     Ok(())
 }

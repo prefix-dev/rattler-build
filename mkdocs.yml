@@ -162,11 +162,13 @@ nav:
           - py-rattler-build/reference/recipe_generation.md
           - py-rattler-build/reference/progress.md
           - py-rattler-build/reference/package_assembler.md
+          - py-rattler-build/reference/debug.md
       - Tutorials:
           - py-rattler-build/tutorials/recipe_rendering_basics.md
           - py-rattler-build/tutorials/multi_output_and_staging.md
           - py-rattler-build/tutorials/inspecting_built_packages.md
           - py-rattler-build/tutorials/package_assembly.md
+          - py-rattler-build/tutorials/debug_session.md
 
   - References:
       - Recipe file: reference/recipe_file.md
