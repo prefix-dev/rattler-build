@@ -409,10 +409,16 @@ fn run_build_script_platform(work_dir: &Path, trace: bool) -> std::io::Result<De
 
     let comspec = std::env::var("COMSPEC").unwrap_or_else(|_| "cmd.exe".to_string());
 
+    let script = if trace {
+        "@echo on && conda_build.bat"
+    } else {
+        "conda_build.bat"
+    };
+
     let output = Command::new(&comspec)
         .arg("/d")
         .arg("/c")
-        .arg("conda_build.bat")
+        .arg(script)
         .current_dir(work_dir)
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
@@ -426,15 +432,21 @@ fn run_build_script_platform(work_dir: &Path, trace: bool) -> std::io::Result<De
 }
 
 #[cfg(windows)]
-fn run_build_script_interactive_platform(work_dir: &Path, _trace: bool) -> std::io::Result<i32> {
+fn run_build_script_interactive_platform(work_dir: &Path, trace: bool) -> std::io::Result<i32> {
     require_file(work_dir, "conda_build.bat")?;
 
     let comspec = std::env::var("COMSPEC").unwrap_or_else(|_| "cmd.exe".to_string());
 
+    let script = if trace {
+        "@echo on && conda_build.bat"
+    } else {
+        "conda_build.bat"
+    };
+
     let status = Command::new(&comspec)
         .arg("/d")
         .arg("/c")
-        .arg("conda_build.bat")
+        .arg(script)
         .current_dir(work_dir)
         .status()?;
 

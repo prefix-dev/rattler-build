@@ -15,8 +15,7 @@ from typing import TYPE_CHECKING
 from rattler_build._rattler_build import debug as _debug
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
-
+    from rattler_build.progress import ProgressCallback
     from rattler_build.render import RenderedVariant
     from rattler_build.tool_config import ToolConfiguration
 
@@ -98,7 +97,7 @@ class DebugSession:
         output_dir: str | Path | None = None,
         channels: list[str] | None = None,
         no_build_id: bool = True,
-        progress_callback: Callable | None = None,
+        progress_callback: ProgressCallback | None = None,
     ) -> DebugSession:
         """Create a debug session from a rendered variant.
 
