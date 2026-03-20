@@ -88,9 +88,21 @@ def sign_zip(archive: Path, identity: str) -> None:
     with tempfile.TemporaryDirectory() as tmpdir:
         tmp = Path(tmpdir)
 
-        # Extract
+        # Extract and save original ZIP metadata (external_attr stores Unix permissions)
+        original_attrs: dict[str, int] = {}
         with zipfile.ZipFile(archive, "r") as zf:
+            for info in zf.infolist():
+                original_attrs[info.filename] = info.external_attr
             zf.extractall(tmp)
+
+        # Restore Unix permissions from original zip entries
+        # (extractall does not reliably restore permissions across Python versions)
+        for filename, attr in original_attrs.items():
+            path = tmp / filename
+            if path.is_file():
+                mode = (attr >> 16) & 0xFFFF  # Unix permission bits from external_attr
+                if mode:
+                    os.chmod(path, mode)
 
         # Find the binary (top-level dir contains rattler-build)
         binaries = list(tmp.rglob("rattler-build"))
@@ -112,12 +124,16 @@ def sign_zip(archive: Path, identity: str) -> None:
                 ]
             )
 
-        # Re-create zip
+        # Re-create zip (preserving Unix permissions including executable bit)
         archive.unlink()
         with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as zf:
             for item in sorted(tmp.rglob("*")):
                 if item.is_file():
-                    zf.write(item, item.relative_to(tmp))
+                    arcname = str(item.relative_to(tmp))
+                    zi = zipfile.ZipInfo(arcname)
+                    zi.compress_type = zipfile.ZIP_DEFLATED
+                    zi.external_attr = item.stat().st_mode << 16
+                    zf.writestr(zi, item.read_bytes())
 
 
 def notarize_zip(archive: Path, username: str, password: str, team_id: str) -> None:
