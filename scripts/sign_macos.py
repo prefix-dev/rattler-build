@@ -116,7 +116,7 @@ def sign_zip(archive: Path, identity: str) -> None:
                 ]
             )
 
-        # Re-create zip (preserving Unix permissions including executable bit)
+        # Re-create zip
         archive.unlink()
         with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as zf:
             for item in sorted(tmp.rglob("*")):
