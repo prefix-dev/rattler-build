@@ -88,19 +88,11 @@ def sign_zip(archive: Path, identity: str) -> None:
     with tempfile.TemporaryDirectory() as tmpdir:
         tmp = Path(tmpdir)
 
-        # Extract and save original ZIP metadata (external_attr stores Unix permissions)
-        original_attrs: dict[str, int] = {}
+        # Extract and restore Unix permissions from ZIP metadata
         with zipfile.ZipFile(archive, "r") as zf:
             for info in zf.infolist():
-                original_attrs[info.filename] = info.external_attr
-            zf.extractall(tmp)
-
-        # Restore Unix permissions from original zip entries
-        # (extractall does not reliably restore permissions across Python versions)
-        for filename, attr in original_attrs.items():
-            path = tmp / filename
-            if path.is_file():
-                mode = (attr >> 16) & 0xFFFF  # Unix permission bits from external_attr
+                path = Path(zf.extract(info, tmp))
+                mode = (info.external_attr >> 16) & 0xFFFF
                 if mode:
                     os.chmod(path, mode)
 
