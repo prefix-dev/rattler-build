@@ -131,7 +131,7 @@ ruff-lint = "ruff check --fix --exit-non-zero-on-fix --force-exclude"
 toml-format = { cmd = "taplo fmt", env = { RUST_LOG = "warn" } }
 toml-lint = "taplo lint --verbose **/pixi.toml"
 typos = "typos --force-exclude"
-zizmor = { cmd = "zizmor --min-severity=low .github/", description = "Security audit GitHub Actions" }
+zizmor = { cmd = "zizmor --quiet --min-severity=low .github/", description = "Security audit GitHub Actions" }
 
 [feature.pre-commit.dependencies]
 lefthook = ">=2.0.11,<3"
