@@ -129,11 +129,7 @@ def sign_zip(archive: Path, identity: str) -> None:
         with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as zf:
             for item in sorted(tmp.rglob("*")):
                 if item.is_file():
-                    arcname = str(item.relative_to(tmp))
-                    zi = zipfile.ZipInfo(arcname)
-                    zi.compress_type = zipfile.ZIP_DEFLATED
-                    zi.external_attr = item.stat().st_mode << 16
-                    zf.writestr(zi, item.read_bytes())
+                    zf.write(item, item.relative_to(tmp))
 
 
 def notarize_zip(archive: Path, username: str, password: str, team_id: str) -> None:
