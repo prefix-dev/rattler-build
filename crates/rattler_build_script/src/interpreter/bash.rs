@@ -65,10 +65,11 @@ impl Interpreter for BashInterpreter {
 
         if !output.status.success() {
             let status_code = output.status.code().unwrap_or(1);
+            let debug_info = print_debug_info(&args);
             tracing::error!("Script failed with status {}", status_code);
-            tracing::error!("{}", print_debug_info(&args));
+            tracing::error!("{}", debug_info);
             return Err(InterpreterError::ExecutionFailed(std::io::Error::other(
-                "Script failed".to_string(),
+                format!("Script failed with status {}{}", status_code, debug_info),
             )));
         }
 
