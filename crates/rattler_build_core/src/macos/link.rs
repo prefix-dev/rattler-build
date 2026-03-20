@@ -151,17 +151,14 @@ impl Relinker for Dylib {
                 }
             } else if let Ok(lib_without_exec) = lib.strip_prefix("@executable_path") {
                 // @executable_path resolves relative to the main executable directory.
-                // In a conda prefix, executables are typically in bin/, so we try that
-                // as well as the prefix root itself.
-                let candidate_dirs = [encoded_prefix.join("bin"), encoded_prefix.to_path_buf()];
-                for exec_dir in &candidate_dirs {
-                    let resolved = to_lexical_absolute(lib_without_exec, exec_dir);
-                    if resolved.exists() {
-                        let resolved_library_path =
-                            Some(resolved.canonicalize().unwrap_or(resolved));
-                        resolved_libraries.insert(lib.clone(), resolved_library_path);
-                        break;
-                    }
+                // At link-check time we don't know which executable will load this library,
+                // so we use <prefix>/bin as the conventional executable location.
+                let exec_dir = encoded_prefix.join("bin");
+                let resolved = to_lexical_absolute(lib_without_exec, &exec_dir);
+                if resolved.exists() {
+                    let resolved_library_path =
+                        Some(resolved.canonicalize().unwrap_or(resolved));
+                    resolved_libraries.insert(lib.clone(), resolved_library_path);
                 }
             } else if lib.is_absolute() {
                 resolved_libraries.insert(lib.clone(), Some(lib.clone()));
