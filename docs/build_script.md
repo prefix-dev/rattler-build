@@ -183,7 +183,7 @@ During the build process, the following environment variables are set, on
 Windows with `build.bat` and on macOS and Linux with `build.sh`. By default,
 these are the only variables available to your build script. Unless otherwise
 noted, no variables are inherited from the shell environment in which you invoke
-`conda-build`. To override this behavior, see :ref:`inherited-env-vars`.
+`rattler-build`. To override this behavior, see :ref:`inherited-env-vars`.
 
 `ARCH`
 
@@ -200,7 +200,7 @@ noted, no variables are inherited from the shell environment in which you invoke
 
 `CONDA_BUILD=1`
 
-: Always set to indicate that the conda-build process is
+: Always set to indicate that the build process is
   running.
 
 `CPU_COUNT`
@@ -263,7 +263,7 @@ noted, no variables are inherited from the shell environment in which you invoke
 `PKG_HASH`
 
 : Represents the hash of the package being built, excluding the
-  leading 'h' (e.g. 21422ab). This is applicable from conda-build 3.0 onwards.
+  leading 'h' (e.g. 21422ab).
 
 `PYTHON`
 

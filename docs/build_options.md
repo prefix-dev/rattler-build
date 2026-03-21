@@ -285,9 +285,9 @@ being automatically compiled from `.py` to `.pyc`. Note that `noarch: python`
 packages never contain `.pyc` files. Some packages ship .py files that cannot be
 compiled, such as those that contain templates. Some packages also ship .py
 files that should not be compiled yet, because the Python interpreter that will
-be used is not known at build time. In these cases, conda-build can skip
-attempting to compile these files. The patterns used in this section do not need
-the ** to handle recursive paths.
+be used is not known at build time. In these cases, rattler-build can skip
+attempting to compile these files. The patterns used are glob patterns — use
+`**` to match files in nested directories (e.g. `foo/**/*.py`).
 
 The `site_packages_path` is a specific option that is only used when build
 `python` itself. It will add metadata to the package record of the python

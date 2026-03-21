@@ -1536,7 +1536,7 @@ them in the ["Selectors in recipes" chapter](../selectors.md).
 
 The use of the Python version selectors, `py27`, `py34`, etc. is discouraged in
 favor of the more general comparison operators. Additional selectors in this
-series will not be added to `conda-build`.
+series will not be added to `rattler-build`.
 
 Because the selector is any valid Python expression, complicated logic is
 possible:
