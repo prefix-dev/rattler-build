@@ -1534,9 +1534,9 @@ source:
 A selector is a valid Python statement that is executed. You can read more about
 them in the ["Selectors in recipes" chapter](../selectors.md).
 
-The use of the Python version selectors, `py27`, `py34`, etc. is discouraged in
-favor of the more general comparison operators. Additional selectors in this
-series will not be added to `rattler-build`.
+Note that `conda-build`'s Python version selectors (`py27`, `py34`, etc.) are
+not supported in `rattler-build`. Use the more general comparison operators
+instead.
 
 Because the selector is any valid Python expression, complicated logic is
 possible:
