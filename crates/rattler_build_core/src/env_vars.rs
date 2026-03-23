@@ -1,8 +1,12 @@
 //! Functions to collect environment variables that are used during the build process.
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::{collections::HashMap, env};
 
+use rattler_build_jinja::Variable;
+use rattler_build_types::NormalizedKey;
 use rattler_conda_types::{Platform, RepoDataRecord};
+use std::collections::BTreeMap;
 
 use crate::linux;
 use crate::macos;
@@ -364,4 +368,58 @@ pub fn vars(output: &Output, build_state: &str) -> HashMap<String, Option<String
     insert!(vars, "SOURCE_DATE_EPOCH", timestamp_epoch_secs);
 
     vars
+}
+
+/// Return environment variables that should be set during the test process.
+///
+/// This is a minimal subset of [`vars`] appropriate for test scripts — it does
+/// not include build-time paths (`RECIPE_DIR`, `SRC_DIR`, …) or pip settings.
+pub fn test_vars(
+    target_platform: Platform,
+    build_platform: Platform,
+    host_platform: Platform,
+) -> HashMap<String, Option<String>> {
+    let mut vars = HashMap::new();
+
+    insert!(vars, "CONDA_BUILD", "1");
+    insert!(vars, "CONDA_BUILD_STATE", "TEST");
+    insert!(vars, "SUBDIR", target_platform.to_string());
+    insert!(vars, "target_platform", target_platform.to_string());
+    insert!(vars, "build_platform", build_platform.to_string());
+    insert!(vars, "host_platform", host_platform.to_string());
+
+    if let Some((_, arch)) = target_platform.to_string().rsplit_once('-') {
+        insert!(vars, "ARCH", arch);
+    }
+
+    if target_platform != build_platform {
+        insert!(vars, "CONDA_BUILD_CROSS_COMPILATION", "1");
+    } else {
+        insert!(vars, "CONDA_BUILD_CROSS_COMPILATION", "0");
+    }
+
+    vars
+}
+
+/// Language-specific variant keys that are excluded from environment variables
+/// because they are handled separately (e.g. via `python_vars_from_records`).
+const LANGUAGE_VARIANT_KEYS: &[&str] = &["PERL", "LUA", "R", "NUMPY", "PYTHON", "RUBY", "NODEJS"];
+
+/// Convert a variant map into environment variables, excluding language-specific
+/// keys that are handled separately.
+pub fn env_vars_from_variant(
+    variant: &BTreeMap<NormalizedKey, Variable>,
+) -> HashMap<String, Option<String>> {
+    let languages: HashSet<&str> = HashSet::from_iter(LANGUAGE_VARIANT_KEYS.iter().copied());
+    variant
+        .iter()
+        .filter_map(|(k, v)| {
+            let key_upper = k.normalize().to_uppercase();
+            if !languages.contains(key_upper.as_str()) {
+                Some((k.normalize(), Some(v.to_string())))
+            } else {
+                None
+            }
+        })
+        .collect()
 }
