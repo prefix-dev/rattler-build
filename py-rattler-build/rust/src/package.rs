@@ -8,6 +8,7 @@ use std::{
 };
 
 use crate::error::RattlerBuildError;
+use crate::tracing_subscriber;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use rattler_build_recipe::stage1::tests::{
@@ -269,7 +270,7 @@ impl PyPackage {
     }
 
     /// Run a specific test by index
-    #[pyo3(signature = (index, channel=None, channel_priority=None, auth_file=None, allow_insecure_host=None, compression_threads=None, use_bz2=true, use_zstd=true, use_sharded=true))]
+    #[pyo3(signature = (index, channel=None, channel_priority=None, auth_file=None, allow_insecure_host=None, compression_threads=None, use_bz2=true, use_zstd=true, use_sharded=true, progress_callback=None))]
     #[allow(clippy::too_many_arguments)]
     fn run_test(
         &self,
@@ -282,6 +283,7 @@ impl PyPackage {
         use_bz2: bool,
         use_zstd: bool,
         use_sharded: bool,
+        progress_callback: Option<Py<PyAny>>,
     ) -> PyResult<PyTestResult> {
         self.run_test_internal(
             Some(index),
@@ -293,12 +295,13 @@ impl PyPackage {
             use_bz2,
             use_zstd,
             use_sharded,
+            progress_callback,
         )
         .map(|results| results.into_iter().next().unwrap())
     }
 
     /// Run all tests in the package
-    #[pyo3(signature = (channel=None, channel_priority=None, auth_file=None, allow_insecure_host=None, compression_threads=None, use_bz2=true, use_zstd=true, use_sharded=true))]
+    #[pyo3(signature = (channel=None, channel_priority=None, auth_file=None, allow_insecure_host=None, compression_threads=None, use_bz2=true, use_zstd=true, use_sharded=true, progress_callback=None))]
     #[allow(clippy::too_many_arguments)]
     fn run_tests(
         &self,
@@ -310,6 +313,7 @@ impl PyPackage {
         use_bz2: bool,
         use_zstd: bool,
         use_sharded: bool,
+        progress_callback: Option<Py<PyAny>>,
     ) -> PyResult<Vec<PyTestResult>> {
         self.run_test_internal(
             None,
@@ -321,6 +325,7 @@ impl PyPackage {
             use_bz2,
             use_zstd,
             use_sharded,
+            progress_callback,
         )
     }
 
@@ -488,6 +493,7 @@ impl PyPackage {
         use_bz2: bool,
         use_zstd: bool,
         use_sharded: bool,
+        progress_callback: Option<Py<PyAny>>,
     ) -> PyResult<Vec<PyTestResult>> {
         use ::rattler_build::{
             opt::{ChannelPriorityWrapper, CommonData, TestData},
@@ -550,8 +556,15 @@ impl PyPackage {
             common,
         );
 
-        // Run the test(s)
-        let result = run_async_task(async { run_test(test_data, None).await });
+        // Run the test(s) with log capture and optional streaming callback
+        let (result, log_buffer) = tracing_subscriber::with_log_capture(progress_callback, || {
+            run_async_task(async { run_test(test_data, None).await })
+        });
+
+        let captured_logs = log_buffer
+            .lock()
+            .map(|buffer| buffer.clone())
+            .unwrap_or_default();
 
         match result {
             Ok(()) => {
@@ -559,14 +572,14 @@ impl PyPackage {
                 let results = if let Some(idx) = test_index {
                     vec![PyTestResult {
                         success: true,
-                        output: Vec::new(),
+                        output: captured_logs,
                         test_index: idx,
                     }]
                 } else {
                     (0..test_count)
                         .map(|idx| PyTestResult {
                             success: true,
-                            output: Vec::new(),
+                            output: captured_logs.clone(),
                             test_index: idx,
                         })
                         .collect()
@@ -574,20 +587,21 @@ impl PyPackage {
                 Ok(results)
             }
             Err(e) => {
-                // Test failed
-                let error_msg = e.to_string();
+                // Test failed — include both captured logs and the error message
+                let mut output = captured_logs;
+                output.push(e.to_string());
+
                 if let Some(idx) = test_index {
                     Ok(vec![PyTestResult {
                         success: false,
-                        output: vec![error_msg],
+                        output,
                         test_index: idx,
                     }])
                 } else {
                     // When running all tests and one fails, we don't know which one
-                    // Return a single result indicating failure
                     Ok(vec![PyTestResult {
                         success: false,
-                        output: vec![error_msg],
+                        output,
                         test_index: 0,
                     }])
                 }
