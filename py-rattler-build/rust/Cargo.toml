@@ -42,7 +42,7 @@ rattler_virtual_packages = "2.3.13"
 clap = "4.6.0"
 url = "2.5.8"
 chrono = "0.4.44"
-rattler_upload = "0.5.1"
+rattler_upload = "0.5.2"
 rattler_package_streaming = { version = "0.24.4", default-features = false }
 miette = "7.6.0"
 tempfile = "3.27.0"

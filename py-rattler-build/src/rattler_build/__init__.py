@@ -56,6 +56,7 @@ from rattler_build.tool_config import PlatformConfig, ToolConfiguration
 from rattler_build.upload import (
     upload_package_to_anaconda,
     upload_package_to_artifactory,
+    upload_package_to_cloudsmith,
     upload_package_to_prefix,
     upload_package_to_quetz,
     upload_packages_to_conda_forge,
@@ -83,6 +84,7 @@ __all__ = [
     "upload_package_to_artifactory",
     "upload_package_to_prefix",
     "upload_package_to_anaconda",
+    "upload_package_to_cloudsmith",
     "upload_packages_to_conda_forge",
     # Recipe generation
     "generate_pypi_recipe",
