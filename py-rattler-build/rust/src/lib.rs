@@ -63,6 +63,7 @@ fn rattler_build<'py>(_py: Python<'py>, m: Bound<'py, PyModule>) -> PyResult<()>
     m.add_function(wrap_pyfunction!(upload::upload_package_to_artifactory_py, &m).unwrap())?;
     m.add_function(wrap_pyfunction!(upload::upload_package_to_prefix_py, &m).unwrap())?;
     m.add_function(wrap_pyfunction!(upload::upload_package_to_anaconda_py, &m).unwrap())?;
+    m.add_function(wrap_pyfunction!(upload::upload_package_to_cloudsmith_py, &m).unwrap())?;
     m.add_function(wrap_pyfunction!(upload::upload_packages_to_conda_forge_py, &m).unwrap())?;
     m.add_class::<PyJinjaConfig>()?;
     m.add_class::<BuildResultPy>()?;

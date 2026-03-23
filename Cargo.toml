@@ -151,7 +151,7 @@ rattler = { version = "0.40.1", default-features = false, features = [
 ] }
 rattler_cache = { version = "0.6.16", default-features = false }
 rattler_index = { version = "0.27.18", default-features = false }
-rattler_upload = { version = "0.5.1", default-features = false }
+rattler_upload = { version = "0.5.2", default-features = false }
 rattler_s3 = { version = "0.1.27" }
 rattler_redaction = { version = "0.1.13", default-features = false }
 rattler_repodata_gateway = { version = "0.27.1", default-features = false, features = [
