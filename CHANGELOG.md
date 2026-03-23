@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.61.1] - 2026-03-23
+### ✨ Highlights
+
+This release mostly contains fixes for our Python API.
+
+
+### Added
+
+- Add progress_callback to run_tests by @Hofer-Julian in [#2356](https://github.com/prefix-dev/rattler-build/pull/2356)
+- Remove log from `__str__` of `BuildError` by @Hofer-Julian in [#2364](https://github.com/prefix-dev/rattler-build/pull/2364)
+
+
+### Fixed
+
+- Remove publish-crates-io task, CI job, and script by @Hofer-Julian in [#2350](https://github.com/prefix-dev/rattler-build/pull/2350)
+- Reduce zizmor output by @Hofer-Julian in [#2353](https://github.com/prefix-dev/rattler-build/pull/2353)
+- Use platform-specific script extensions for test scripts by @Hofer-Julian in [#2354](https://github.com/prefix-dev/rattler-build/pull/2354)
+
+
+
 ## [0.61.0] - 2026-03-19
 ### ✨ Highlights
 
