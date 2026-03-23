@@ -210,6 +210,7 @@ use std::path::Path;
 #[pyfunction]
 #[allow(clippy::too_many_arguments)]
 pub fn build_rendered_variant_py(
+    py: Python<'_>,
     rendered_variant: render::PyRenderedVariant,
     tool_config: tool_config::PyToolConfiguration,
     output_dir: PathBuf,
@@ -264,15 +265,13 @@ pub fn build_rendered_variant_py(
         .map(|buffer| buffer.clone())
         .unwrap_or_default();
 
-    // Check if build succeeded, if not enrich error with logs
+    // Check if build succeeded, if not raise BuildError with log as separate attribute
     if let Err(err) = build_result {
-        let log_text = if captured_logs.is_empty() {
-            String::new()
-        } else {
-            format!("\n\nBuild log:\n{}", captured_logs.join("\n"))
-        };
-
-        return Err(RattlerBuildError::Other(format!("{}{}", err, log_text)).into());
+        return Err(crate::error::build_error_with_log(
+            py,
+            err.to_string(),
+            captured_logs,
+        ));
     }
 
     // Calculate build time

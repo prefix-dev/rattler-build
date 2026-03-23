@@ -1,5 +1,6 @@
 from rattler_build._rattler_build import (
     AuthError,
+    BuildError,
     ChannelError,
     ChannelPriorityError,
     IoError,
@@ -118,6 +119,7 @@ __all__ = [
     "RebuildResult",
     # Exceptions
     "RattlerBuildError",
+    "BuildError",
     "AuthError",
     "ChannelError",
     "ChannelPriorityError",

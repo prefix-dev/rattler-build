@@ -15,6 +15,7 @@ create_exception!(rattler_build, PyRecipeParseError, PyRattlerBuildError);
 create_exception!(rattler_build, PyVariantError, PyRattlerBuildError);
 create_exception!(rattler_build, PyJsonError, PyRattlerBuildError);
 create_exception!(rattler_build, PyIoError, PyRattlerBuildError);
+create_exception!(rattler_build, PyBuildError, PyRattlerBuildError);
 
 #[derive(Error, Debug)]
 pub enum RattlerBuildError {
@@ -80,6 +81,18 @@ impl From<miette::Report> for RattlerBuildError {
     }
 }
 
+/// Create a `BuildError` with a `.message` and `.log` attribute.
+///
+/// `str(error)` returns just the message; the captured build log is
+/// available separately via the `.log` attribute as a `list[str]`.
+pub(crate) fn build_error_with_log(py: Python<'_>, message: String, log: Vec<String>) -> PyErr {
+    let err = PyBuildError::new_err(message.clone());
+    let val = err.value(py);
+    val.setattr("message", message).ok();
+    val.setattr("log", log).ok();
+    err
+}
+
 pub(crate) fn register_exceptions(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("RattlerBuildError", py.get_type::<PyRattlerBuildError>())?;
     m.add("PlatformParseError", py.get_type::<PyPlatformParseError>())?;
@@ -96,5 +109,6 @@ pub(crate) fn register_exceptions(py: Python<'_>, m: &Bound<'_, PyModule>) -> Py
     m.add("VariantError", py.get_type::<PyVariantError>())?;
     m.add("JsonError", py.get_type::<PyJsonError>())?;
     m.add("IoError", py.get_type::<PyIoError>())?;
+    m.add("BuildError", py.get_type::<PyBuildError>())?;
     Ok(())
 }

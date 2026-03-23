@@ -241,6 +241,7 @@ impl PyDebugSession {
 #[allow(clippy::too_many_arguments)]
 #[pyo3(signature = (rendered_variant, tool_config=None, output_dir=None, channels=None, no_build_id=true, progress_callback=None))]
 pub fn create_debug_session_py(
+    py: Python<'_>,
     rendered_variant: PyRenderedVariant,
     tool_config: Option<PyToolConfiguration>,
     output_dir: Option<PathBuf>,
@@ -301,12 +302,11 @@ pub fn create_debug_session_py(
     let output = match setup_result {
         Ok(output) => output,
         Err(err) => {
-            let log_text = if captured_logs.is_empty() {
-                String::new()
-            } else {
-                format!("\n\nSetup log:\n{}", captured_logs.join("\n"))
-            };
-            return Err(RattlerBuildError::Other(format!("{}{}", err, log_text)).into());
+            return Err(crate::error::build_error_with_log(
+                py,
+                err.to_string(),
+                captured_logs,
+            ));
         }
     };
 
