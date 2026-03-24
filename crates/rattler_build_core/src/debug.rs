@@ -500,12 +500,14 @@ pub async fn add_packages_to_prefix(
     )
     .into_diagnostic()?;
 
-    tracing::info!(
-        "\nAdding {} new spec(s) to {} environment ({} existing packages)",
+    let span_msg = format!(
+        "Adding {} new spec(s) to {env_name} environment ({} existing packages)",
         specs.len(),
-        env_name,
         existing_records.len(),
     );
+    let span = tracing::info_span!("", message = %span_msg);
+    let _enter = span.enter();
+    tracing::info!("");
 
     crate::render::solver::create_environment(
         env_name,
@@ -520,7 +522,10 @@ pub async fn add_packages_to_prefix(
     )
     .await?;
 
-    tracing::info!("\nSuccessfully added packages to {} environment.", env_name);
+    tracing::info!(
+        "{} Successfully added packages to {env_name} environment",
+        console::style(console::Emoji("✔", "")).green(),
+    );
 
     Ok(())
 }

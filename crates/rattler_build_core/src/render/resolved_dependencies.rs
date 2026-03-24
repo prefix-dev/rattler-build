@@ -1077,9 +1077,6 @@ impl Output {
         tool_configuration: &tool_configuration::Configuration,
         download_missing_run_exports: RunExportsDownload,
     ) -> Result<Output, ResolveError> {
-        let span = tracing::info_span!("Resolving environments");
-        let _enter = span.enter();
-
         if self.finalized_dependencies.is_some() {
             return Ok(self);
         }
