@@ -653,6 +653,13 @@ pub struct BuildOpts {
     #[arg(long, default_value = "true", help_heading = "Modifying result")]
     pub color_build_log: bool,
 
+    /// Environment isolation mode for build scripts.
+    /// `strict` (default): clean environment with normalized locale, HOME, USER etc.
+    /// `conda-build`: match conda-build behavior (forward CFLAGS, LDFLAGS, LANG, HOME etc.)
+    /// `none`: inherit the entire host environment
+    #[arg(long, default_value = "strict", help_heading = "Modifying result")]
+    pub env_isolation: rattler_build_script::EnvironmentIsolation,
+
     #[allow(missing_docs)]
     #[clap(flatten)]
     pub common: CommonOpts,
@@ -880,6 +887,7 @@ pub struct BuildData {
     pub no_include_recipe: bool,
     pub test: TestStrategy,
     pub color_build_log: bool,
+    pub env_isolation: rattler_build_script::EnvironmentIsolation,
     pub common: CommonData,
     pub skip_existing: SkipExisting,
     pub noarch_build_platform: Option<Platform>,
@@ -921,6 +929,7 @@ impl BuildData {
         noarch_build_platform: Option<Platform>,
         extra_meta: Option<Vec<(String, Value)>>,
         sandbox_configuration: Option<SandboxConfiguration>,
+        env_isolation: rattler_build_script::EnvironmentIsolation,
         continue_on_failure: ContinueOnFailure,
         error_prefix_in_binary: bool,
         allow_symlinks_on_windows: bool,
@@ -956,6 +965,7 @@ impl BuildData {
             no_include_recipe,
             test: test.unwrap_or_default(),
             color_build_log: true,
+            env_isolation,
             common,
             skip_existing: skip_existing.unwrap_or(SkipExisting::None),
             noarch_build_platform,
@@ -1012,6 +1022,7 @@ impl BuildData {
             opts.noarch_build_platform,
             opts.extra_meta,
             opts.sandbox_arguments.into(),
+            opts.env_isolation,
             opts.continue_on_failure.into(),
             opts.error_prefix_in_binary,
             opts.allow_symlinks_on_windows,

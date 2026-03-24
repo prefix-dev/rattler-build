@@ -255,7 +255,11 @@ impl Output {
         // Run the build script
         let target_platform = self.build_configuration.target_platform;
         let mut env_vars = env_vars::vars(self, "BUILD");
-        env_vars.extend(env_vars::os_vars(self.prefix(), &target_platform));
+        env_vars.extend(env_vars::os_vars(
+            self.prefix(),
+            &target_platform,
+            self.build_configuration.env_isolation,
+        ));
 
         // Create Jinja context
         let selector_config = self.build_configuration.selector_config();
@@ -296,6 +300,7 @@ impl Output {
                 build_prefix,
                 Some(jinja_renderer),
                 self.build_configuration.sandbox_config(),
+                self.build_configuration.env_isolation,
             )
             .await
             .into_diagnostic()?;

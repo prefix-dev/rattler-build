@@ -287,6 +287,7 @@ pub fn create_debug_session_py(
         true,            // no_include_recipe
         None,            // recipe_path
         None,            // exclude_newer
+        rattler_build_script::EnvironmentIsolation::default(),
         BTreeMap::new(), // extra_subpackages
     )?;
 

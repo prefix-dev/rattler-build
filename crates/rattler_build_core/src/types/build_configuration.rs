@@ -12,7 +12,7 @@ use crate::types::{
     Directories, PackageIdentifier, PackagingSettings, PlatformWithVirtualPackages,
 };
 
-use rattler_build_script::SandboxConfiguration;
+use rattler_build_script::{EnvironmentIsolation, SandboxConfiguration};
 
 /// Default value for store recipe for backwards compatibility
 fn default_true() -> bool {
@@ -55,6 +55,10 @@ pub struct BuildConfiguration {
     /// build script or not
     #[serde(skip_serializing, default = "default_true")]
     pub force_colors: bool,
+
+    /// The environment isolation mode for build scripts
+    #[serde(skip_serializing, default)]
+    pub env_isolation: EnvironmentIsolation,
 
     /// The configuration for the sandbox
     #[serde(skip_serializing, default)]

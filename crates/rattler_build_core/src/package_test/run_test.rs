@@ -12,7 +12,7 @@ use rattler_build_recipe::stage1::{
     TestType,
     tests::{CommandsTest, DownstreamTest, PerlTest, PythonTest, PythonVersion, RTest, RubyTest},
 };
-use rattler_build_script::{Script, ScriptContent};
+use rattler_build_script::{EnvironmentIsolation, Script, ScriptContent};
 use rattler_build_types::NormalizedKey;
 use rattler_conda_types::{
     Channel, ChannelUrl, MatchSpec, ParseStrictness, Platform,
@@ -171,7 +171,7 @@ impl Tests {
             .unwrap_or(target_platform);
 
         let platform = Platform::current();
-        let mut env_vars = env_vars::os_vars(environment, &platform);
+        let mut env_vars = env_vars::os_vars(environment, &platform, config.env_isolation);
         env_vars.retain(|key, _| key != ShellEnum::default().path_var(&platform));
         env_vars.extend(env_vars::test_vars(
             target_platform,
@@ -215,6 +215,7 @@ impl Tests {
                         None,
                         None::<fn(&str) -> Result<String, String>>,
                         None,
+                        config.env_isolation,
                     )
                     .await
                     .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -235,6 +236,7 @@ impl Tests {
                         None,
                         None::<fn(&str) -> Result<String, String>>,
                         None,
+                        config.env_isolation,
                     )
                     .await
                     .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -779,6 +781,7 @@ async fn run_python_test_inner(
             None,
             None::<fn(&str) -> Result<String, String>>,
             None,
+            config.env_isolation,
         )
         .await
         .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -802,6 +805,7 @@ async fn run_python_test_inner(
                 None,
                 None::<fn(&str) -> Result<String, String>>,
                 None,
+                config.env_isolation,
             )
             .await
             .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -884,6 +888,7 @@ async fn run_perl_test(
             None,
             None::<fn(&str) -> Result<String, String>>,
             None,
+            config.env_isolation,
         )
         .await
         .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -976,7 +981,7 @@ async fn run_commands_test(
         .unwrap_or(target_platform);
 
     let platform = Platform::current();
-    let mut env_vars = env_vars::os_vars(&run_prefix, &platform);
+    let mut env_vars = env_vars::os_vars(&run_prefix, &platform, config.env_isolation);
     env_vars.retain(|key, _| key != ShellEnum::default().path_var(&platform));
     env_vars.extend(env_vars::test_vars(
         target_platform,
@@ -1015,6 +1020,7 @@ async fn run_commands_test(
             build_prefix.as_ref(),
             None::<fn(&str) -> Result<String, String>>,
             None,
+            config.env_isolation,
         )
         .await
         .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -1198,6 +1204,7 @@ async fn run_r_test(
             None,
             None::<fn(&str) -> Result<String, String>>,
             None,
+            config.env_isolation,
         )
         .await
         .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -1275,6 +1282,7 @@ async fn run_ruby_test(
             None,
             None::<fn(&str) -> Result<String, String>>,
             None,
+            config.env_isolation,
         )
         .await
         .map_err(|e| TestError::TestFailed(e.to_string()))?;

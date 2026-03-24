@@ -89,6 +89,7 @@ pub(crate) fn output_from_rendered_variant(
     no_include_recipe: bool,
     recipe_path: Option<&Path>,
     exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
+    env_isolation: rattler_build_script::EnvironmentIsolation,
     extra_subpackages: BTreeMap<rattler_conda_types::PackageName, PackageIdentifier>,
 ) -> Result<Output, RattlerBuildError> {
     let timestamp = chrono::Utc::now();
@@ -189,6 +190,7 @@ pub(crate) fn output_from_rendered_variant(
             ),
             store_recipe: !effective_no_include_recipe,
             force_colors: false,
+            env_isolation,
             sandbox_config: None,
             exclude_newer,
         },
@@ -222,6 +224,7 @@ pub fn build_rendered_variant_py(
     package_format: Option<String>,
     no_include_recipe: bool,
     exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
+    env_isolation: Option<String>,
     sibling_variants: Vec<render::PyRenderedVariant>,
 ) -> PyResult<BuildResultPy> {
     let tool_config = tool_config.inner;
@@ -230,6 +233,14 @@ pub fn build_rendered_variant_py(
         .map(|p| PackageFormatAndCompression::from_str(&p))
         .transpose()
         .map_err(|e| RattlerBuildError::PackageFormat(e.to_string()))?;
+
+    let env_isolation = env_isolation
+        .map(|s| {
+            s.parse::<rattler_build_script::EnvironmentIsolation>()
+                .map_err(|e| RattlerBuildError::Other(e))
+        })
+        .transpose()?
+        .unwrap_or_default();
 
     let channels: Vec<NamedChannelOrUrl> = channels
         .iter()
@@ -264,6 +275,7 @@ pub fn build_rendered_variant_py(
         no_include_recipe,
         recipe_path.as_deref(),
         exclude_newer,
+        env_isolation,
         extra_subpackages,
     )?;
 

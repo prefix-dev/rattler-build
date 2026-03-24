@@ -6,7 +6,9 @@ use futures::TryStreamExt;
 use indexmap::IndexMap;
 use itertools::Itertools;
 use rattler_conda_types::Platform;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fmt;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
@@ -14,6 +16,53 @@ use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWriteExt};
 use tokio_util::bytes::BytesMut;
 use tokio_util::codec::{Decoder, FramedRead};
 use tokio_util::compat::FuturesAsyncReadCompatExt;
+
+/// Controls how the build subprocess environment is constructed.
+///
+/// This determines which host environment variables are visible to build scripts.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum EnvironmentIsolation {
+    /// Clean environment with only explicitly set build variables and a minimal
+    /// passthrough whitelist (SSL certs, SSH agent, proxies). Locale is
+    /// normalized to `C.UTF-8`, HOME to the work directory, and USER to
+    /// `"rattler"`. Maximum reproducibility.
+    #[default]
+    Strict,
+    /// Match conda-build behavior: forward `CFLAGS`, `CXXFLAGS`, `LDFLAGS`,
+    /// `MAKEFLAGS`, `LANG`, `LC_ALL`, and `HOME` from the host. Does not
+    /// normalize USER, SHELL, EDITOR, or TERM.
+    CondaBuild,
+    /// Inherit the entire host environment. Build variables are set on top.
+    /// Least reproducible but useful for debugging.
+    None,
+}
+
+impl fmt::Display for EnvironmentIsolation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Strict => write!(f, "strict"),
+            Self::CondaBuild => write!(f, "conda-build"),
+            Self::None => write!(f, "none"),
+        }
+    }
+}
+
+impl std::str::FromStr for EnvironmentIsolation {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "strict" => Ok(Self::Strict),
+            "conda-build" => Ok(Self::CondaBuild),
+            "none" => Ok(Self::None),
+            _ => Err(format!(
+                "unknown environment isolation mode '{}', expected 'strict', 'conda-build', or 'none'",
+                s
+            )),
+        }
+    }
+}
 
 /// Arguments for executing a script in a given interpreter.
 #[derive(Debug)]
@@ -38,6 +87,9 @@ pub struct ExecutionArgs {
 
     /// The sandbox configuration to use for the script execution
     pub sandbox_config: Option<SandboxConfiguration>,
+
+    /// The environment isolation mode
+    pub env_isolation: EnvironmentIsolation,
 }
 
 impl ExecutionArgs {
@@ -132,6 +184,7 @@ impl Script {
         build_prefix: Option<&PathBuf>,
         jinja_renderer: Option<F>,
         sandbox_config: Option<&SandboxConfiguration>,
+        env_isolation: EnvironmentIsolation,
     ) -> Result<(), crate::InterpreterError>
     where
         F: Fn(&str) -> Result<String, String>,
@@ -194,6 +247,7 @@ impl Script {
             execution_platform: Platform::current(),
             work_dir,
             sandbox_config: sandbox_config.cloned(),
+            env_isolation,
         };
 
         crate::execution::run_script(exec_args, interpreter).await?;
@@ -449,12 +503,36 @@ fn find_rattler_sandbox() -> Option<PathBuf> {
     which::which("rattler-sandbox").ok()
 }
 
+/// Environment variables that are passed through from the host environment
+/// into the build subprocess. These are variables that cannot be computed
+/// by rattler-build but are needed for builds to function correctly.
+const PASSTHROUGH_ENV_VARS: &[&str] = &[
+    // TLS certificates (needed for https in build scripts)
+    "SSL_CERT_FILE",
+    "SSL_CERT_DIR",
+    // Python requests CA bundle (needed for pip/requests in corporate environments)
+    "REQUESTS_CA_BUNDLE",
+    // SSH agent (needed for private git repo access)
+    "SSH_AUTH_SOCK",
+    // Display server (needed for GUI-related builds on Linux)
+    "DISPLAY",
+    // Proxy configuration (needed in corporate/CI environments)
+    "http_proxy",
+    "https_proxy",
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "no_proxy",
+    "NO_PROXY",
+];
+
 /// Spawns a process and replaces the given strings in the output with the given replacements.
 /// This is used to replace the host prefix with $PREFIX and the build prefix with $BUILD_PREFIX
 pub async fn run_process_with_replacements(
     args: &[&str],
     cwd: &Path,
     replacements: &HashMap<String, String>,
+    env_vars: &IndexMap<String, String>,
+    env_isolation: EnvironmentIsolation,
     sandbox_config: Option<&SandboxConfiguration>,
 ) -> Result<std::process::Output, std::io::Error> {
     // Create or open the build log file
@@ -491,6 +569,30 @@ pub async fn run_process_with_replacements(
     } else {
         tokio::process::Command::new(args[0])
     };
+
+    match env_isolation {
+        EnvironmentIsolation::Strict | EnvironmentIsolation::CondaBuild => {
+            // Start with a clean environment for reproducible builds.
+            command.env_clear();
+
+            // Pass through whitelisted host environment variables
+            for var in PASSTHROUGH_ENV_VARS {
+                if let Ok(value) = std::env::var(var) {
+                    command.env(var, value);
+                }
+            }
+
+            // Apply build environment variables (PATH, HOME, PREFIX, etc.)
+            // but exclude CONDA_BUILD so that the preamble in conda_build.sh
+            // will source the activation script (build_env.sh), which also
+            // runs package activation scripts (e.g., compiler setup for $CC).
+            command.envs(env_vars.iter().filter(|(k, _)| k.as_str() != "CONDA_BUILD"));
+        }
+        EnvironmentIsolation::None => {
+            // Inherit full host environment, then overlay build variables
+            command.envs(env_vars);
+        }
+    }
 
     command
         .current_dir(cwd)
