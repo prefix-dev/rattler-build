@@ -2866,97 +2866,62 @@
 </span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a> │ ╰─────────────────── (took 0 seconds)
 </span></code></pre></div>
 <p>In this next section, the source code is fetched. The source is first downloaded to a cache directory located under the "output" directory (by default <code>./output/src_cache</code>, but you can change the output directory. From the cache it is copied into the <code>$SRC_DIR</code>, which is a temporary directory used during the build (in our case <code>/Users/wolfv/Programs/rattler-build/output/bld/rattler-build_curl_1764660286/work</code>). The <code>rattler-build_curl_1764660286</code> is the build folder that is created for this particular build (the <code>176...</code> is a timestamp). </p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a> │ ╭─ Resolving environments
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a> │ │ 
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a> │ │ Resolving build environment:
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a> │ │   Platform: osx-arm64 [__unix=0=0, __osx=15.6=0, __archspec=1=m2]
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a> │ │   Channels: 
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a> │ │    - file:///Users/wolfv/Programs/rattler-build/output/
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a> │ │    - conda-forge
-</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a> │ │   Specs:
-</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a> │ │    - clang_osx-arm64
-</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a> │ │    - make
-</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a> │ │    - perl
-</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a> │ │    - pkg-config
-</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a> │ │    - libtool
-</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a> │ │ 
-</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a> │ │ ╭─────────────────────────┬─────────────┬─────────────────────┬─────────────┬─────────────╮
-</span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a> │ │ │ Package                 ┆ Version     ┆ Build               ┆ Channel     ┆        Size │
-</span><span id="__span-2-17"><a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a> │ │ ╞═════════════════════════╪═════════════╪═════════════════════╪═════════════╪═════════════╡
-</span><span id="__span-2-18"><a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a> │ │ │ bzip2                   ┆ 1.0.8       ┆ hd037594_8          ┆ conda-forge ┆  122.13 KiB │
-</span><span id="__span-2-19"><a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a> │ │ │ ca-certificates         ┆ 2025.11.12  ┆ hbd8a1cb_0          ┆ conda-forge ┆  148.86 KiB │
-</span><span id="__span-2-20"><a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a> │ │ │ cctools_impl_osx-arm64  ┆ 1030.6.3    ┆ llvm21_1_haddd2d4_1 ┆ conda-forge ┆  730.35 KiB │
-</span><span id="__span-2-21"><a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a> │ │ │ cctools_osx-arm64       ┆ 1030.6.3    ┆ llvm21_1_h6d92914_1 ┆ conda-forge ┆   22.26 KiB │
-</span><span id="__span-2-22"><a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a> │ │ │ clang                   ┆ 21.1.6      ┆ default_hf9bcbb7_0  ┆ conda-forge ┆   24.39 KiB │
-</span><span id="__span-2-23"><a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a> │ │ │ clang-21                ┆ 21.1.6      ┆ default_h489deba_0  ┆ conda-forge ┆  807.97 KiB │
-</span><span id="__span-2-24"><a id="__codelineno-2-24" name="__codelineno-2-24" href="#__codelineno-2-24"></a> │ │ │ clang_impl_osx-arm64    ┆ 21.1.6      ┆ hdbf2fcc_26         ┆ conda-forge ┆   17.52 KiB │
-</span><span id="__span-2-25"><a id="__codelineno-2-25" name="__codelineno-2-25" href="#__codelineno-2-25"></a> │ │ │ clang_osx-arm64         ┆ 21.1.6      ┆ h07b0088_26         ┆ conda-forge ┆   20.12 KiB │
-</span><span id="__span-2-26"><a id="__codelineno-2-26" name="__codelineno-2-26" href="#__codelineno-2-26"></a> │ │ │ compiler-rt             ┆ 21.1.6      ┆ hce30654_0          ┆ conda-forge ┆   15.62 KiB │
-</span><span id="__span-2-27"><a id="__codelineno-2-27" name="__codelineno-2-27" href="#__codelineno-2-27"></a> │ │ │ compiler-rt21           ┆ 21.1.6      ┆ h855ad52_0          ┆ conda-forge ┆   96.03 KiB │
-</span><span id="__span-2-28"><a id="__codelineno-2-28" name="__codelineno-2-28" href="#__codelineno-2-28"></a> │ │ │ compiler-rt21_osx-arm64 ┆ 21.1.6      ┆ h2514db7_0          ┆ conda-forge ┆   10.31 MiB │
-</span><span id="__span-2-29"><a id="__codelineno-2-29" name="__codelineno-2-29" href="#__codelineno-2-29"></a> │ │ │ ld64                    ┆ 956.6       ┆ llvm21_1_h5d6df6c_1 ┆ conda-forge ┆   20.66 KiB │
-</span><span id="__span-2-30"><a id="__codelineno-2-30" name="__codelineno-2-30" href="#__codelineno-2-30"></a> │ │ │ ld64_osx-arm64          ┆ 956.6       ┆ llvm21_1_hde6573c_1 ┆ conda-forge ┆ 1013.34 KiB │
-</span><span id="__span-2-31"><a id="__codelineno-2-31" name="__codelineno-2-31" href="#__codelineno-2-31"></a> │ │ │ libclang-cpp21.1        ┆ 21.1.6      ┆ default_h73dfc95_0  ┆ conda-forge ┆   13.04 MiB │
-</span><span id="__span-2-32"><a id="__codelineno-2-32" name="__codelineno-2-32" href="#__codelineno-2-32"></a> │ │ │ libcxx                  ┆ 21.1.6      ┆ hf598326_0          ┆ conda-forge ┆  556.47 KiB │
-</span><span id="__span-2-33"><a id="__codelineno-2-33" name="__codelineno-2-33" href="#__codelineno-2-33"></a> │ │ │ libffi                  ┆ 3.5.2       ┆ he5f378a_0          ┆ conda-forge ┆   39.31 KiB │
-</span><span id="__span-2-34"><a id="__codelineno-2-34" name="__codelineno-2-34" href="#__codelineno-2-34"></a> │ │ │ libglib                 ┆ 2.86.2      ┆ hfe11c1f_1          ┆ conda-forge ┆    3.47 MiB │
-</span><span id="__span-2-35"><a id="__codelineno-2-35" name="__codelineno-2-35" href="#__codelineno-2-35"></a> │ │ │ libiconv                ┆ 1.18        ┆ h23cfdf5_2          ┆ conda-forge ┆  732.79 KiB │
-</span><span id="__span-2-36"><a id="__codelineno-2-36" name="__codelineno-2-36" href="#__codelineno-2-36"></a> │ │ │ libintl                 ┆ 0.25.1      ┆ h493aca8_0          ┆ conda-forge ┆   88.83 KiB │
-</span><span id="__span-2-37"><a id="__codelineno-2-37" name="__codelineno-2-37" href="#__codelineno-2-37"></a> │ │ │ libllvm21               ┆ 21.1.6      ┆ h8e0c9ce_0          ┆ conda-forge ┆   28.04 MiB │
-</span><span id="__span-2-38"><a id="__codelineno-2-38" name="__codelineno-2-38" href="#__codelineno-2-38"></a> │ │ │ libltdl                 ┆ 2.4.3a      ┆ h286801f_0          ┆ conda-forge ┆   36.45 KiB │
-</span><span id="__span-2-39"><a id="__codelineno-2-39" name="__codelineno-2-39" href="#__codelineno-2-39"></a> │ │ │ liblzma                 ┆ 5.8.1       ┆ h39f12f2_2          ┆ conda-forge ┆   90.12 KiB │
-</span><span id="__span-2-40"><a id="__codelineno-2-40" name="__codelineno-2-40" href="#__codelineno-2-40"></a> │ │ │ libtool                 ┆ 2.5.4       ┆ h286801f_0          ┆ conda-forge ┆  404.96 KiB │
-</span><span id="__span-2-41"><a id="__codelineno-2-41" name="__codelineno-2-41" href="#__codelineno-2-41"></a> │ │ │ libxml2                 ┆ 2.15.1      ┆ hba2cd1d_0          ┆ conda-forge ┆   39.66 KiB │
-</span><span id="__span-2-42"><a id="__codelineno-2-42" name="__codelineno-2-42" href="#__codelineno-2-42"></a> │ │ │ libxml2-16              ┆ 2.15.1      ┆ h8eac4d7_0          ┆ conda-forge ┆  453.31 KiB │
-</span><span id="__span-2-43"><a id="__codelineno-2-43" name="__codelineno-2-43" href="#__codelineno-2-43"></a> │ │ │ libzlib                 ┆ 1.3.1       ┆ h8359307_2          ┆ conda-forge ┆   45.35 KiB │
-</span><span id="__span-2-44"><a id="__codelineno-2-44" name="__codelineno-2-44" href="#__codelineno-2-44"></a> │ │ │ llvm-openmp             ┆ 21.1.6      ┆ h4a912ad_0          ┆ conda-forge ┆  279.50 KiB │
-</span><span id="__span-2-45"><a id="__codelineno-2-45" name="__codelineno-2-45" href="#__codelineno-2-45"></a> │ │ │ llvm-tools              ┆ 21.1.6      ┆ h855ad52_0          ┆ conda-forge ┆   86.46 KiB │
-</span><span id="__span-2-46"><a id="__codelineno-2-46" name="__codelineno-2-46" href="#__codelineno-2-46"></a> │ │ │ llvm-tools-21           ┆ 21.1.6      ┆ h91fd4e7_0          ┆ conda-forge ┆   17.42 MiB │
-</span><span id="__span-2-47"><a id="__codelineno-2-47" name="__codelineno-2-47" href="#__codelineno-2-47"></a> │ │ │ make                    ┆ 4.4.1       ┆ hc9fafa5_2          ┆ conda-forge ┆  267.62 KiB │
-</span><span id="__span-2-48"><a id="__codelineno-2-48" name="__codelineno-2-48" href="#__codelineno-2-48"></a> │ │ │ ncurses                 ┆ 6.5         ┆ h5e97a16_3          ┆ conda-forge ┆  778.35 KiB │
-</span><span id="__span-2-49"><a id="__codelineno-2-49" name="__codelineno-2-49" href="#__codelineno-2-49"></a> │ │ │ openssl                 ┆ 3.6.0       ┆ h5503f6c_0          ┆ conda-forge ┆    2.96 MiB │
-</span><span id="__span-2-50"><a id="__codelineno-2-50" name="__codelineno-2-50" href="#__codelineno-2-50"></a> │ │ │ pcre2                   ┆ 10.47       ┆ h30297fc_0          ┆ conda-forge ┆  830.30 KiB │
-</span><span id="__span-2-51"><a id="__codelineno-2-51" name="__codelineno-2-51" href="#__codelineno-2-51"></a> │ │ │ perl                    ┆ 5.32.1      ┆ 7_h4614cfb_perl5    ┆ conda-forge ┆   13.77 MiB │
-</span><span id="__span-2-52"><a id="__codelineno-2-52" name="__codelineno-2-52" href="#__codelineno-2-52"></a> │ │ │ pkg-config              ┆ 0.29.2      ┆ hde07d2e_1009       ┆ conda-forge ┆   48.56 KiB │
-</span><span id="__span-2-53"><a id="__codelineno-2-53" name="__codelineno-2-53" href="#__codelineno-2-53"></a> │ │ │ sdkroot_env_osx-arm64   ┆ 14.5        ┆ hfa17104_3          ┆ conda-forge ┆    8.58 KiB │
-</span><span id="__span-2-54"><a id="__codelineno-2-54" name="__codelineno-2-54" href="#__codelineno-2-54"></a> │ │ │ sigtool                 ┆ 0.1.3       ┆ h44b9a77_0          ┆ conda-forge ┆  205.34 KiB │
-</span><span id="__span-2-55"><a id="__codelineno-2-55" name="__codelineno-2-55" href="#__codelineno-2-55"></a> │ │ │ tapi                    ┆ 1600.0.11.8 ┆ h997e182_0          ┆ conda-forge ┆  195.02 KiB │
-</span><span id="__span-2-56"><a id="__codelineno-2-56" name="__codelineno-2-56" href="#__codelineno-2-56"></a> │ │ │ zstd                    ┆ 1.5.7       ┆ hd0aec43_5          ┆ conda-forge ┆  380.61 KiB │
-</span><span id="__span-2-57"><a id="__codelineno-2-57" name="__codelineno-2-57" href="#__codelineno-2-57"></a> │ │ ╰─────────────────────────┴─────────────┴─────────────────────┴─────────────┴─────────────╯
-</span><span id="__span-2-58"><a id="__codelineno-2-58" name="__codelineno-2-58" href="#__codelineno-2-58"></a> │ │ 
-</span><span id="__span-2-59"><a id="__codelineno-2-59" name="__codelineno-2-59" href="#__codelineno-2-59"></a> │ │ Resolving host environment:
-</span><span id="__span-2-60"><a id="__codelineno-2-60" name="__codelineno-2-60" href="#__codelineno-2-60"></a> │ │   Platform: osx-arm64 [__unix=0=0, __osx=15.6=0, __archspec=1=m2]
-</span><span id="__span-2-61"><a id="__codelineno-2-61" name="__codelineno-2-61" href="#__codelineno-2-61"></a> │ │   Channels: 
-</span><span id="__span-2-62"><a id="__codelineno-2-62" name="__codelineno-2-62" href="#__codelineno-2-62"></a> │ │    - file:///Users/wolfv/Programs/rattler-build/output/
-</span><span id="__span-2-63"><a id="__codelineno-2-63" name="__codelineno-2-63" href="#__codelineno-2-63"></a> │ │    - conda-forge
-</span><span id="__span-2-64"><a id="__codelineno-2-64" name="__codelineno-2-64" href="#__codelineno-2-64"></a> │ │   Specs:
-</span><span id="__span-2-65"><a id="__codelineno-2-65" name="__codelineno-2-65" href="#__codelineno-2-65"></a> │ │    - zlib
-</span><span id="__span-2-66"><a id="__codelineno-2-66" name="__codelineno-2-66" href="#__codelineno-2-66"></a> │ │ 
-</span><span id="__span-2-67"><a id="__codelineno-2-67" name="__codelineno-2-67" href="#__codelineno-2-67"></a> │ │ ╭─────────┬─────────┬────────────┬─────────────┬───────────╮
-</span><span id="__span-2-68"><a id="__codelineno-2-68" name="__codelineno-2-68" href="#__codelineno-2-68"></a> │ │ │ Package ┆ Version ┆ Build      ┆ Channel     ┆      Size │
-</span><span id="__span-2-69"><a id="__codelineno-2-69" name="__codelineno-2-69" href="#__codelineno-2-69"></a> │ │ ╞═════════╪═════════╪════════════╪═════════════╪═══════════╡
-</span><span id="__span-2-70"><a id="__codelineno-2-70" name="__codelineno-2-70" href="#__codelineno-2-70"></a> │ │ │ libzlib ┆ 1.3.1   ┆ h8359307_2 ┆ conda-forge ┆ 45.35 KiB │
-</span><span id="__span-2-71"><a id="__codelineno-2-71" name="__codelineno-2-71" href="#__codelineno-2-71"></a> │ │ │ zlib    ┆ 1.3.1   ┆ h8359307_2 ┆ conda-forge ┆ 75.79 KiB │
-</span><span id="__span-2-72"><a id="__codelineno-2-72" name="__codelineno-2-72" href="#__codelineno-2-72"></a> │ │ ╰─────────┴─────────┴────────────┴─────────────┴───────────╯
-</span><span id="__span-2-73"><a id="__codelineno-2-73" name="__codelineno-2-73" href="#__codelineno-2-73"></a> │ │ 
-</span><span id="__span-2-74"><a id="__codelineno-2-74" name="__codelineno-2-74" href="#__codelineno-2-74"></a> │ │ Finalized run dependencies (curl-8.0.1-h60d57d3_0):
-</span><span id="__span-2-75"><a id="__codelineno-2-75" name="__codelineno-2-75" href="#__codelineno-2-75"></a> │ │ ╭──────────────────┬─────────────────────────────────────╮
-</span><span id="__span-2-76"><a id="__codelineno-2-76" name="__codelineno-2-76" href="#__codelineno-2-76"></a> │ │ │ Name             ┆ Spec                                │
-</span><span id="__span-2-77"><a id="__codelineno-2-77" name="__codelineno-2-77" href="#__codelineno-2-77"></a> │ │ ╞══════════════════╪═════════════════════════════════════╡
-</span><span id="__span-2-78"><a id="__codelineno-2-78" name="__codelineno-2-78" href="#__codelineno-2-78"></a> │ │ │ Run dependencies ┆                                     │
-</span><span id="__span-2-79"><a id="__codelineno-2-79" name="__codelineno-2-79" href="#__codelineno-2-79"></a> │ │ │ libzlib          ┆ &gt;=1.3.1,&lt;2.0a0 (RE of [host: zlib]) │
-</span><span id="__span-2-80"><a id="__codelineno-2-80" name="__codelineno-2-80" href="#__codelineno-2-80"></a> │ │ ╰──────────────────┴─────────────────────────────────────╯
-</span><span id="__span-2-81"><a id="__codelineno-2-81" name="__codelineno-2-81" href="#__codelineno-2-81"></a> │ │
-</span><span id="__span-2-82"><a id="__codelineno-2-82" name="__codelineno-2-82" href="#__codelineno-2-82"></a> │ ╰─────────────────── (took 1 second)
+<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a> │ ╭─ Resolving build environment
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a> │ │   Platform: osx-arm64 [__unix=0=0, __osx=15.6=0, __archspec=1=m2]
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a> │ │   Channels:
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a> │ │    - file:///Users/wolfv/Programs/rattler-build/output/
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a> │ │    - conda-forge
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a> │ │   Specs:
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a> │ │    - clang_osx-arm64
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a> │ │    - make
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a> │ │    - perl
+</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a> │ │    - pkg-config
+</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a> │ │    - libtool
+</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a> │ │
+</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a> │ │ ╭─────────────────────────┬─────────────┬─────────────────────┬─────────────┬─────────────╮
+</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a> │ │ │ Package                 ┆ Version     ┆ Build               ┆ Channel     ┆        Size │
+</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a> │ │ ╞═════════════════════════╪═════════════╪═════════════════════╪═════════════╪═════════════╡
+</span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a> │ │ │ bzip2                   ┆ 1.0.8       ┆ hd037594_8          ┆ conda-forge ┆  122.13 KiB │
+</span><span id="__span-2-17"><a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a> │ │ │ ca-certificates         ┆ 2025.11.12  ┆ hbd8a1cb_0          ┆ conda-forge ┆  148.86 KiB │
+</span><span id="__span-2-18"><a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a> │ │ │ ...                     ┆             ┆                     ┆             ┆             │
+</span><span id="__span-2-19"><a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a> │ │ │ zstd                    ┆ 1.5.7       ┆ hd0aec43_5          ┆ conda-forge ┆  380.61 KiB │
+</span><span id="__span-2-20"><a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a> │ │ ╰─────────────────────────┴─────────────┴─────────────────────┴─────────────┴─────────────╯
+</span><span id="__span-2-21"><a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a> │ ╰─────────────────── (took 1 second)
+</span><span id="__span-2-22"><a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a> │
+</span><span id="__span-2-23"><a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a> │ ╭─ Resolving host environment
+</span><span id="__span-2-24"><a id="__codelineno-2-24" name="__codelineno-2-24" href="#__codelineno-2-24"></a> │ │   Platform: osx-arm64 [__unix=0=0, __osx=15.6=0, __archspec=1=m2]
+</span><span id="__span-2-25"><a id="__codelineno-2-25" name="__codelineno-2-25" href="#__codelineno-2-25"></a> │ │   Channels:
+</span><span id="__span-2-26"><a id="__codelineno-2-26" name="__codelineno-2-26" href="#__codelineno-2-26"></a> │ │    - file:///Users/wolfv/Programs/rattler-build/output/
+</span><span id="__span-2-27"><a id="__codelineno-2-27" name="__codelineno-2-27" href="#__codelineno-2-27"></a> │ │    - conda-forge
+</span><span id="__span-2-28"><a id="__codelineno-2-28" name="__codelineno-2-28" href="#__codelineno-2-28"></a> │ │   Specs:
+</span><span id="__span-2-29"><a id="__codelineno-2-29" name="__codelineno-2-29" href="#__codelineno-2-29"></a> │ │    - zlib
+</span><span id="__span-2-30"><a id="__codelineno-2-30" name="__codelineno-2-30" href="#__codelineno-2-30"></a> │ │
+</span><span id="__span-2-31"><a id="__codelineno-2-31" name="__codelineno-2-31" href="#__codelineno-2-31"></a> │ │ ╭─────────┬─────────┬────────────┬─────────────┬───────────╮
+</span><span id="__span-2-32"><a id="__codelineno-2-32" name="__codelineno-2-32" href="#__codelineno-2-32"></a> │ │ │ Package ┆ Version ┆ Build      ┆ Channel     ┆      Size │
+</span><span id="__span-2-33"><a id="__codelineno-2-33" name="__codelineno-2-33" href="#__codelineno-2-33"></a> │ │ ╞═════════╪═════════╪════════════╪═════════════╪═══════════╡
+</span><span id="__span-2-34"><a id="__codelineno-2-34" name="__codelineno-2-34" href="#__codelineno-2-34"></a> │ │ │ libzlib ┆ 1.3.1   ┆ h8359307_2 ┆ conda-forge ┆ 45.35 KiB │
+</span><span id="__span-2-35"><a id="__codelineno-2-35" name="__codelineno-2-35" href="#__codelineno-2-35"></a> │ │ │ zlib    ┆ 1.3.1   ┆ h8359307_2 ┆ conda-forge ┆ 75.79 KiB │
+</span><span id="__span-2-36"><a id="__codelineno-2-36" name="__codelineno-2-36" href="#__codelineno-2-36"></a> │ │ ╰─────────┴─────────┴────────────┴─────────────┴───────────╯
+</span><span id="__span-2-37"><a id="__codelineno-2-37" name="__codelineno-2-37" href="#__codelineno-2-37"></a> │ │
+</span><span id="__span-2-38"><a id="__codelineno-2-38" name="__codelineno-2-38" href="#__codelineno-2-38"></a> │ │ Finalized run dependencies (curl-8.0.1-h60d57d3_0):
+</span><span id="__span-2-39"><a id="__codelineno-2-39" name="__codelineno-2-39" href="#__codelineno-2-39"></a> │ │ ╭──────────────────┬─────────────────────────────────────╮
+</span><span id="__span-2-40"><a id="__codelineno-2-40" name="__codelineno-2-40" href="#__codelineno-2-40"></a> │ │ │ Name             ┆ Spec                                │
+</span><span id="__span-2-41"><a id="__codelineno-2-41" name="__codelineno-2-41" href="#__codelineno-2-41"></a> │ │ ╞══════════════════╪═════════════════════════════════════╡
+</span><span id="__span-2-42"><a id="__codelineno-2-42" name="__codelineno-2-42" href="#__codelineno-2-42"></a> │ │ │ Run dependencies ┆                                     │
+</span><span id="__span-2-43"><a id="__codelineno-2-43" name="__codelineno-2-43" href="#__codelineno-2-43"></a> │ │ │ libzlib          ┆ &gt;=1.3.1,&lt;2.0a0 (RE of [host: zlib]) │
+</span><span id="__span-2-44"><a id="__codelineno-2-44" name="__codelineno-2-44" href="#__codelineno-2-44"></a> │ │ ╰──────────────────┴─────────────────────────────────────╯
+</span><span id="__span-2-45"><a id="__codelineno-2-45" name="__codelineno-2-45" href="#__codelineno-2-45"></a> │ ╰─────────────────── (took 1 second)
 </span></code></pre></div>
 <p>In this section, the build and host environments are <em>resolved</em> and the "run-exports" are collected in order to compute the final run dependencies. In this case, we did not have any explicit run dependencies, however, the <code>zlib</code> host dependency has a "run-export" of <code>zlib &gt;=1.3.1,&lt;2.0a0</code>.</p>
 <p>For the resolution of the host and build environments, the variants are also taken into account (for example compiler variants will influence what compiler is chosen).</p>
 <p>In the next step, the build and host environments are installed. The build environment goes to a folder called <code>build_env</code>, and the host environment to a folder called <code>host_env_placehold_placehold...</code>. The host environment is referenced by <code>$PREFIX</code>, and is where we install the new files to.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a> │ Installing build environment
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a> │ ✔ Successfully updated the build environment
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a> │ 
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a> │ Installing host environment
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a> │ ✔ Successfully updated the host environment
+<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a> │ ╭─ Installing build environment
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a> │ │ ✔ Successfully updated the build environment
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a> │ ╰─────────────────── (took 2 seconds)
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a> │
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a> │ ╭─ Installing host environment
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a> │ │ ✔ Successfully updated the host environment
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a> │ ╰─────────────────── (took 1 second)
 </span></code></pre></div>
 <h2 id="running-the-build-script">Running the build script<a class="headerlink" href="#running-the-build-script" title="Permanent link">#</a></h2>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a> │ ╭─ Running build script
@@ -3275,17 +3240,18 @@ Ideally, no file contains the installation prefix as string, so that there is no
 </span><span id="__span-10-16"><a id="__codelineno-10-16" name="__codelineno-10-16" href="#__codelineno-10-16"></a> │ │ libzlib ┆ 1.3.1   ┆ h8359307_2 ┆ conda-forge ┆  45.35 KiB │
 </span><span id="__span-10-17"><a id="__codelineno-10-17" name="__codelineno-10-17" href="#__codelineno-10-17"></a> │ ╰─────────┴─────────┴────────────┴─────────────┴────────────╯
 </span><span id="__span-10-18"><a id="__codelineno-10-18" name="__codelineno-10-18" href="#__codelineno-10-18"></a> │ 
-</span><span id="__span-10-19"><a id="__codelineno-10-19" name="__codelineno-10-19" href="#__codelineno-10-19"></a> │ Installing test environment
-</span><span id="__span-10-20"><a id="__codelineno-10-20" name="__codelineno-10-20" href="#__codelineno-10-20"></a> │ ✔ Successfully updated the test environment
-</span><span id="__span-10-21"><a id="__codelineno-10-21" name="__codelineno-10-21" href="#__codelineno-10-21"></a> │ Testing commands:
-</span><span id="__span-10-22"><a id="__codelineno-10-22" name="__codelineno-10-22" href="#__codelineno-10-22"></a> │ curl 8.0.1 (aarch64-apple-darwin20.0.0) libcurl/8.0.1 SecureTransport zlib/1.3.1
-</span><span id="__span-10-23"><a id="__codelineno-10-23" name="__codelineno-10-23" href="#__codelineno-10-23"></a> │ Release-Date: 2023-03-20
-</span><span id="__span-10-24"><a id="__codelineno-10-24" name="__codelineno-10-24" href="#__codelineno-10-24"></a> │ Protocols: dict file ftp ftps gopher gophers http https imap imaps ldap ldaps mqtt pop3 pop3s rtsp smb smbs smtp smtps tel
-</span><span id="__span-10-25"><a id="__codelineno-10-25" name="__codelineno-10-25" href="#__codelineno-10-25"></a> │ net tftp
-</span><span id="__span-10-26"><a id="__codelineno-10-26" name="__codelineno-10-26" href="#__codelineno-10-26"></a> │ Features: alt-svc AsynchDNS HSTS HTTPS-proxy Largefile libz NTLM NTLM_WB SSL threadsafe UnixSockets
-</span><span id="__span-10-27"><a id="__codelineno-10-27" name="__codelineno-10-27" href="#__codelineno-10-27"></a> │
-</span><span id="__span-10-28"><a id="__codelineno-10-28" name="__codelineno-10-28" href="#__codelineno-10-28"></a> ╰─────────────────── (took 0 seconds)
-</span><span id="__span-10-29"><a id="__codelineno-10-29" name="__codelineno-10-29" href="#__codelineno-10-29"></a> ✔ all tests passed!
+</span><span id="__span-10-19"><a id="__codelineno-10-19" name="__codelineno-10-19" href="#__codelineno-10-19"></a> │ ╭─ Installing test environment
+</span><span id="__span-10-20"><a id="__codelineno-10-20" name="__codelineno-10-20" href="#__codelineno-10-20"></a> │ │ ✔ Successfully updated the test environment
+</span><span id="__span-10-21"><a id="__codelineno-10-21" name="__codelineno-10-21" href="#__codelineno-10-21"></a> │ ╰─────────────────── (took 1 second)
+</span><span id="__span-10-22"><a id="__codelineno-10-22" name="__codelineno-10-22" href="#__codelineno-10-22"></a> │ Testing commands:
+</span><span id="__span-10-23"><a id="__codelineno-10-23" name="__codelineno-10-23" href="#__codelineno-10-23"></a> │ curl 8.0.1 (aarch64-apple-darwin20.0.0) libcurl/8.0.1 SecureTransport zlib/1.3.1
+</span><span id="__span-10-24"><a id="__codelineno-10-24" name="__codelineno-10-24" href="#__codelineno-10-24"></a> │ Release-Date: 2023-03-20
+</span><span id="__span-10-25"><a id="__codelineno-10-25" name="__codelineno-10-25" href="#__codelineno-10-25"></a> │ Protocols: dict file ftp ftps gopher gophers http https imap imaps ldap ldaps mqtt pop3 pop3s rtsp smb smbs smtp smtps tel
+</span><span id="__span-10-26"><a id="__codelineno-10-26" name="__codelineno-10-26" href="#__codelineno-10-26"></a> │ net tftp
+</span><span id="__span-10-27"><a id="__codelineno-10-27" name="__codelineno-10-27" href="#__codelineno-10-27"></a> │ Features: alt-svc AsynchDNS HSTS HTTPS-proxy Largefile libz NTLM NTLM_WB SSL threadsafe UnixSockets
+</span><span id="__span-10-28"><a id="__codelineno-10-28" name="__codelineno-10-28" href="#__codelineno-10-28"></a> │
+</span><span id="__span-10-29"><a id="__codelineno-10-29" name="__codelineno-10-29" href="#__codelineno-10-29"></a> ╰─────────────────── (took 0 seconds)
+</span><span id="__span-10-30"><a id="__codelineno-10-30" name="__codelineno-10-30" href="#__codelineno-10-30"></a> ✔ all tests passed!
 </span></code></pre></div>
 <p>This executes a "script" test which just runs <code>curl --version</code>.</p>
 <h2 id="build-summary">Build summary<a class="headerlink" href="#build-summary" title="Permanent link">#</a></h2>

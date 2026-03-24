@@ -2334,10 +2334,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#example-3-understanding-variantconfig-with-zip-keys" class="md-nav__link">
+  <a href="#example-3-understanding-variantconfig-merging-and-zip-keys" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Example 3: Understanding VariantConfig with Zip Keys
+        Example 3: Understanding VariantConfig — Merging and Zip Keys
       
     </span>
   </a>
@@ -2779,10 +2779,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#example-3-understanding-variantconfig-with-zip-keys" class="md-nav__link">
+  <a href="#example-3-understanding-variantconfig-merging-and-zip-keys" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Example 3: Understanding VariantConfig with Zip Keys
+        Example 3: Understanding VariantConfig — Merging and Zip Keys
       
     </span>
   </a>
@@ -3015,16 +3015,18 @@ Recipe structure (as dict):
 
 Both recipes are identical!
 </code></pre></div>
-<h2 id="example-3-understanding-variantconfig-with-zip-keys">Example 3: Understanding VariantConfig with Zip Keys<a class="headerlink" href="#example-3-understanding-variantconfig-with-zip-keys" title="Permanent link">#</a></h2>
-<p>Variants allow you to build the same package with different configurations (e.g., different Python versions, compilers, or dependencies). By default, VariantConfig creates all possible combinations (Cartesian product), but we can use <code>zip_keys</code> to pair specific variants together:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># Create a VariantConfig from a dictionary</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">variant_dict</span> <span class="o">=</span> <span class="p">{</span>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="s2">&quot;python&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;3.9&quot;</span><span class="p">,</span> <span class="s2">&quot;3.10&quot;</span><span class="p">,</span> <span class="s2">&quot;3.11&quot;</span><span class="p">],</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="s2">&quot;numpy&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;1.21&quot;</span><span class="p">,</span> <span class="s2">&quot;1.22&quot;</span><span class="p">,</span> <span class="s2">&quot;1.23&quot;</span><span class="p">],</span>
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="p">}</span>
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="n">variant_config_without_zip</span> <span class="o">=</span> <span class="n">VariantConfig</span><span class="p">(</span><span class="n">variant_dict</span><span class="p">)</span>
+<h2 id="example-3-understanding-variantconfig-merging-and-zip-keys">Example 3: Understanding VariantConfig — Merging and Zip Keys<a class="headerlink" href="#example-3-understanding-variantconfig-merging-and-zip-keys" title="Permanent link">#</a></h2>
+<p>Variants allow you to build the same package with different configurations (e.g., different Python versions, compilers, or dependencies).</p>
+<p>In practice, variant configs often come from separate sources — for example, one config defines Python versions and another defines NumPy versions. You can combine them with <code>merge()</code>, which returns a new config where the other config's values take precedence for overlapping keys.</p>
+<p>By default, VariantConfig creates all possible combinations (Cartesian product), but we can use <code>zip_keys</code> to pair specific variants together:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># Variant configs often come from separate sources — merge them together</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">python_variants</span> <span class="o">=</span> <span class="n">VariantConfig</span><span class="p">({</span><span class="s2">&quot;python&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;3.9&quot;</span><span class="p">,</span> <span class="s2">&quot;3.10&quot;</span><span class="p">,</span> <span class="s2">&quot;3.11&quot;</span><span class="p">]})</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">numpy_variants</span> <span class="o">=</span> <span class="n">VariantConfig</span><span class="p">({</span><span class="s2">&quot;numpy&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;1.21&quot;</span><span class="p">,</span> <span class="s2">&quot;1.22&quot;</span><span class="p">,</span> <span class="s2">&quot;1.23&quot;</span><span class="p">]})</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="c1"># merge() returns a new config — originals are not modified</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="n">variant_config_without_zip</span> <span class="o">=</span> <span class="n">python_variants</span><span class="o">.</span><span class="n">merge</span><span class="p">(</span><span class="n">numpy_variants</span><span class="p">)</span>
 </span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>
-</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Variant Configuration&quot;</span><span class="p">)</span>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Variant Configuration (merged from two configs)&quot;</span><span class="p">)</span>
 </span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;=&quot;</span> <span class="o">*</span> <span class="mi">60</span><span class="p">)</span>
 </span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Variant keys: </span><span class="si">{</span><span class="n">variant_config_without_zip</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Python versions: </span><span class="si">{</span><span class="n">variant_config_without_zip</span><span class="o">.</span><span class="n">get_values</span><span class="p">(</span><span class="s1">&#39;python&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
@@ -3036,19 +3038,22 @@ Both recipes are identical!
 </span><span id="__span-3-17"><a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a><span class="n">pprint</span><span class="o">.</span><span class="n">pprint</span><span class="p">(</span><span class="n">variant_config_without_zip</span><span class="o">.</span><span class="n">combinations</span><span class="p">())</span>
 </span><span id="__span-3-18"><a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a>
 </span><span id="__span-3-19"><a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a><span class="c1"># Create a new VariantConfig with zip_keys (python and numpy zipped together by index)</span>
-</span><span id="__span-3-20"><a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a><span class="n">variant_config</span> <span class="o">=</span> <span class="n">VariantConfig</span><span class="p">(</span><span class="n">variant_dict</span><span class="p">,</span> <span class="n">zip_keys</span><span class="o">=</span><span class="p">[[</span><span class="s2">&quot;python&quot;</span><span class="p">,</span> <span class="s2">&quot;numpy&quot;</span><span class="p">]])</span>
-</span><span id="__span-3-21"><a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a>
-</span><span id="__span-3-22"><a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="o">+</span> <span class="s2">&quot;=&quot;</span> <span class="o">*</span> <span class="mi">60</span><span class="p">)</span>
-</span><span id="__span-3-23"><a id="__codelineno-3-23" name="__codelineno-3-23" href="#__codelineno-3-23"></a><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;WITH zip_keys (paired by index):&quot;</span><span class="p">)</span>
-</span><span id="__span-3-24"><a id="__codelineno-3-24" name="__codelineno-3-24" href="#__codelineno-3-24"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Zip keys: </span><span class="si">{</span><span class="n">variant_config</span><span class="o">.</span><span class="n">zip_keys</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-</span><span id="__span-3-25"><a id="__codelineno-3-25" name="__codelineno-3-25" href="#__codelineno-3-25"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Total combinations: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">variant_config</span><span class="o">.</span><span class="n">combinations</span><span class="p">())</span><span class="si">}</span><span class="s2"> (paired)&quot;</span><span class="p">)</span>
-</span><span id="__span-3-26"><a id="__codelineno-3-26" name="__codelineno-3-26" href="#__codelineno-3-26"></a><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Paired combinations:&quot;</span><span class="p">)</span>
-</span><span id="__span-3-27"><a id="__codelineno-3-27" name="__codelineno-3-27" href="#__codelineno-3-27"></a><span class="n">pprint</span><span class="o">.</span><span class="n">pprint</span><span class="p">(</span><span class="n">variant_config</span><span class="o">.</span><span class="n">combinations</span><span class="p">())</span>
-</span><span id="__span-3-28"><a id="__codelineno-3-28" name="__codelineno-3-28" href="#__codelineno-3-28"></a>
-</span><span id="__span-3-29"><a id="__codelineno-3-29" name="__codelineno-3-29" href="#__codelineno-3-29"></a><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Variant config as dict:&quot;</span><span class="p">)</span>
-</span><span id="__span-3-30"><a id="__codelineno-3-30" name="__codelineno-3-30" href="#__codelineno-3-30"></a><span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">variant_config</span><span class="o">.</span><span class="n">to_dict</span><span class="p">(),</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">))</span>
+</span><span id="__span-3-20"><a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a><span class="n">variant_config</span> <span class="o">=</span> <span class="n">VariantConfig</span><span class="p">(</span>
+</span><span id="__span-3-21"><a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a>    <span class="n">variant_config_without_zip</span><span class="o">.</span><span class="n">to_dict</span><span class="p">(),</span>
+</span><span id="__span-3-22"><a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a>    <span class="n">zip_keys</span><span class="o">=</span><span class="p">[[</span><span class="s2">&quot;python&quot;</span><span class="p">,</span> <span class="s2">&quot;numpy&quot;</span><span class="p">]],</span>
+</span><span id="__span-3-23"><a id="__codelineno-3-23" name="__codelineno-3-23" href="#__codelineno-3-23"></a><span class="p">)</span>
+</span><span id="__span-3-24"><a id="__codelineno-3-24" name="__codelineno-3-24" href="#__codelineno-3-24"></a>
+</span><span id="__span-3-25"><a id="__codelineno-3-25" name="__codelineno-3-25" href="#__codelineno-3-25"></a><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="o">+</span> <span class="s2">&quot;=&quot;</span> <span class="o">*</span> <span class="mi">60</span><span class="p">)</span>
+</span><span id="__span-3-26"><a id="__codelineno-3-26" name="__codelineno-3-26" href="#__codelineno-3-26"></a><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;WITH zip_keys (paired by index):&quot;</span><span class="p">)</span>
+</span><span id="__span-3-27"><a id="__codelineno-3-27" name="__codelineno-3-27" href="#__codelineno-3-27"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Zip keys: </span><span class="si">{</span><span class="n">variant_config</span><span class="o">.</span><span class="n">zip_keys</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span><span id="__span-3-28"><a id="__codelineno-3-28" name="__codelineno-3-28" href="#__codelineno-3-28"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Total combinations: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">variant_config</span><span class="o">.</span><span class="n">combinations</span><span class="p">())</span><span class="si">}</span><span class="s2"> (paired)&quot;</span><span class="p">)</span>
+</span><span id="__span-3-29"><a id="__codelineno-3-29" name="__codelineno-3-29" href="#__codelineno-3-29"></a><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Paired combinations:&quot;</span><span class="p">)</span>
+</span><span id="__span-3-30"><a id="__codelineno-3-30" name="__codelineno-3-30" href="#__codelineno-3-30"></a><span class="n">pprint</span><span class="o">.</span><span class="n">pprint</span><span class="p">(</span><span class="n">variant_config</span><span class="o">.</span><span class="n">combinations</span><span class="p">())</span>
+</span><span id="__span-3-31"><a id="__codelineno-3-31" name="__codelineno-3-31" href="#__codelineno-3-31"></a>
+</span><span id="__span-3-32"><a id="__codelineno-3-32" name="__codelineno-3-32" href="#__codelineno-3-32"></a><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Variant config as dict:&quot;</span><span class="p">)</span>
+</span><span id="__span-3-33"><a id="__codelineno-3-33" name="__codelineno-3-33" href="#__codelineno-3-33"></a><span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">variant_config</span><span class="o">.</span><span class="n">to_dict</span><span class="p">(),</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">))</span>
 </span></code></pre></div>
-<div class="language-text highlight"><pre><span></span><code>Variant Configuration
+<div class="language-text highlight"><pre><span></span><code>Variant Configuration (merged from two configs)
 ============================================================
 Variant keys: [&#39;numpy&#39;, &#39;python&#39;]
 Python versions: [&#39;3.9&#39;, &#39;3.10&#39;, &#39;3.11&#39;]
@@ -3264,7 +3269,7 @@ Recipe rendering complete!
 </span></code></pre></div>
 <div class="language-text highlight"><pre><span></span><code>Building packages...
 ============================================================
-Recipe path: /tmp/rattler_build_wnrkje9d/recipe.yaml
+Recipe path: /tmp/rattler_build_kvspgv3u/recipe.yaml
 
 Building variant 1/3
   Package: my-simple-package
@@ -3272,23 +3277,23 @@ Building variant 1/3
   Build string: np121py39h13fef27_0
 
 
-  Build complete in 2.99s!
-  Package: /tmp/rattler_build_wnrkje9d/output/linux-64/my-simple-package-1.0.0-np121py39h13fef27_0.conda
-  Variant: {&#39;python&#39;: &#39;3.9&#39;, &#39;target_platform&#39;: &#39;linux-64&#39;, &#39;numpy&#39;: &#39;1.21&#39;}
-  Build log: 52 messages captured
+  Build complete in 3.04s!
+  Package: /tmp/rattler_build_kvspgv3u/output/linux-64/my-simple-package-1.0.0-np121py39h13fef27_0.conda
+  Variant: {&#39;python&#39;: &#39;3.9&#39;, &#39;numpy&#39;: &#39;1.21&#39;, &#39;target_platform&#39;: &#39;linux-64&#39;}
+  Build log: 51 messages captured
 
   Build log details:
     Starting build of 1 outputs
     No sources to fetch
-    Could not find linux-64/repodata.json. Creating new one.
-    Adding 0 packages to subdir linux-64.
-    Successfully added 0 packages to subdir linux-64.
-    Writing repodata to linux-64/repodata.json
     Could not find noarch/repodata.json. Creating new one.
     Adding 0 packages to subdir noarch.
     Successfully added 0 packages to subdir noarch.
     Writing repodata to noarch/repodata.json
-    ... and 42 more messages
+    Could not find linux-64/repodata.json. Creating new one.
+    Adding 0 packages to subdir linux-64.
+    Successfully added 0 packages to subdir linux-64.
+    Writing repodata to linux-64/repodata.json
+    ... and 41 more messages
 
 Building variant 2/3
   Package: my-simple-package
@@ -3297,9 +3302,9 @@ Building variant 2/3
 
 
   Build complete in 2.64s!
-  Package: /tmp/rattler_build_wnrkje9d/output/linux-64/my-simple-package-1.0.0-np122py310h27bf20f_0.conda
-  Variant: {&#39;python&#39;: &#39;3.10&#39;, &#39;target_platform&#39;: &#39;linux-64&#39;, &#39;numpy&#39;: &#39;1.22&#39;}
-  Build log: 47 messages captured
+  Package: /tmp/rattler_build_kvspgv3u/output/linux-64/my-simple-package-1.0.0-np122py310h27bf20f_0.conda
+  Variant: {&#39;python&#39;: &#39;3.10&#39;, &#39;numpy&#39;: &#39;1.22&#39;, &#39;target_platform&#39;: &#39;linux-64&#39;}
+  Build log: 46 messages captured
 
   Build log details:
     Starting build of 1 outputs
@@ -3307,14 +3312,12 @@ Building variant 2/3
     Adding 0 packages to subdir linux-64.
     Successfully added 0 packages to subdir linux-64.
     Writing repodata to linux-64/repodata.json
-
-Resolving host environment:
-
       Platform: linux-64 [2m[__unix=0=0, __linux=6.14.0=0, __glibc=2.39=0, __archspec=1=zen2][0m
       Channels: 
-       - file:///tmp/rattler_build_wnrkje9d/output/
+       - file:///tmp/rattler_build_kvspgv3u/output/
        - conda-forge
-    ... and 37 more messages
+      Specs:
+    ... and 36 more messages
 
 Building variant 3/3
   Package: my-simple-package
@@ -3322,10 +3325,10 @@ Building variant 3/3
   Build string: np123py311hadc6f11_0
 
 
-  Build complete in 2.38s!
-  Package: /tmp/rattler_build_wnrkje9d/output/linux-64/my-simple-package-1.0.0-np123py311hadc6f11_0.conda
-  Variant: {&#39;target_platform&#39;: &#39;linux-64&#39;, &#39;numpy&#39;: &#39;1.23&#39;, &#39;python&#39;: &#39;3.11&#39;}
-  Build log: 47 messages captured
+  Build complete in 3.86s!
+  Package: /tmp/rattler_build_kvspgv3u/output/linux-64/my-simple-package-1.0.0-np123py311hadc6f11_0.conda
+  Variant: {&#39;numpy&#39;: &#39;1.23&#39;, &#39;python&#39;: &#39;3.11&#39;, &#39;target_platform&#39;: &#39;linux-64&#39;}
+  Build log: 46 messages captured
 
   Build log details:
     Starting build of 1 outputs
@@ -3333,25 +3336,23 @@ Building variant 3/3
     Adding 0 packages to subdir linux-64.
     Successfully added 0 packages to subdir linux-64.
     Writing repodata to linux-64/repodata.json
-
-Resolving host environment:
-
       Platform: linux-64 [2m[__unix=0=0, __linux=6.14.0=0, __glibc=2.39=0, __archspec=1=zen2][0m
       Channels: 
-       - file:///tmp/rattler_build_wnrkje9d/output/
+       - file:///tmp/rattler_build_kvspgv3u/output/
        - conda-forge
-    ... and 37 more messages
+      Specs:
+    ... and 36 more messages
 
 ============================================================
 All builds completed successfully!
 
-Built packages are available in: /tmp/rattler_build_wnrkje9d/output
+Built packages are available in: /tmp/rattler_build_kvspgv3u/output
 </code></pre></div>
 <h2 id="summary">Summary<a class="headerlink" href="#summary" title="Permanent link">#</a></h2>
 <p>In this tutorial, you learned:</p>
 <ul>
 <li><strong>Recipe Creation</strong>: Load recipes from YAML strings (<code>Stage0Recipe.from_yaml()</code>) or Python dicts (<code>Stage0Recipe.from_dict()</code>)</li>
-<li><strong>VariantConfig</strong>: Define build variants and use <code>zip_keys</code> to pair specific combinations</li>
+<li><strong>VariantConfig</strong>: Define build variants, use <code>zip_keys</code> to pair specific combinations, and load/merge multiple variant config files</li>
 <li><strong>RenderConfig</strong>: Configure target platforms and add custom context variables</li>
 <li><strong>Stage0 vs Stage1</strong>: Understand the difference between parsed templates and evaluated recipes</li>
 <li><strong>Rendering</strong>: Use <code>recipe.render()</code> to transform Stage0 -&gt; Stage1 with variants</li>

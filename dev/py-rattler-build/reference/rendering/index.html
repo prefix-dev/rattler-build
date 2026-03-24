@@ -2031,6 +2031,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#rattler_build.VariantConfig.from_files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        from_files
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rattler_build.VariantConfig.from_files_with_context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        from_files_with_context
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#rattler_build.VariantConfig.from_conda_build_config" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2057,6 +2079,17 @@
     <span class="md-ellipsis">
       
         from_yaml_with_context
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rattler_build.VariantConfig.merge" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        merge
       
     </span>
   </a>
@@ -3231,6 +3264,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#rattler_build.VariantConfig.from_files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        from_files
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rattler_build.VariantConfig.from_files_with_context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        from_files_with_context
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#rattler_build.VariantConfig.from_conda_build_config" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3257,6 +3312,17 @@
     <span class="md-ellipsis">
       
         from_yaml_with_context
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rattler_build.VariantConfig.merge" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        merge
       
     </span>
   </a>
@@ -4079,6 +4145,205 @@ The jinja_config provides platform information and other context needed for eval
 <div class="doc doc-object doc-function">
 
 
+<h2 id="rattler_build.VariantConfig.from_files" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">from_files</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
+  </span>
+
+<a href="#rattler_build.VariantConfig.from_files" class="headerlink" title="Permanent link">#</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">from_files</span><span class="p">(</span><span class="n">paths</span><span class="p">)</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Load multiple VariantConfig files and merge them.</p>
+<p>Files are merged in order, with later files taking precedence
+for overlapping keys. Zip keys from the last file that specifies
+them will be used.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>paths</code>
+            </td>
+            <td>
+                  <code><span title="list">list</span>[<span title="str">str</span> | <span title="pathlib.Path">Path</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>List of paths to variant configuration YAML files</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="&lt;code&gt;rattler_build.variant_config.VariantConfig&lt;/code&gt;" href="#rattler_build.VariantConfig">VariantConfig</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A new VariantConfig instance with all files merged</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="example" open>
+  <summary>Example</summary>
+  <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">config</span> <span class="o">=</span> <span class="n">VariantConfig</span><span class="o">.</span><span class="n">from_files</span><span class="p">([</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="s2">&quot;base_variants.yaml&quot;</span><span class="p">,</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="s2">&quot;override_variants.yaml&quot;</span><span class="p">,</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="p">])</span>
+</span></code></pre></div>
+</details>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="rattler_build.VariantConfig.from_files_with_context" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">from_files_with_context</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
+  </span>
+
+<a href="#rattler_build.VariantConfig.from_files_with_context" class="headerlink" title="Permanent link">#</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">from_files_with_context</span><span class="p">(</span><span class="n">paths</span><span class="p">,</span> <span class="n">jinja_config</span><span class="p">)</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Load multiple VariantConfig files with a JinjaConfig context and merge them.</p>
+<p>Files are merged in order, with later files taking precedence.
+Files named <code>conda_build_config.yaml</code> are loaded using the legacy
+loader which supports <code># [selector]</code> syntax.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>paths</code>
+            </td>
+            <td>
+                  <code><span title="list">list</span>[<span title="str">str</span> | <span title="pathlib.Path">Path</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>List of paths to variant configuration YAML files</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>jinja_config</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="&lt;code&gt;rattler_build.jinja_config.JinjaConfig&lt;/code&gt;" href="../configuration/#rattler_build.JinjaConfig">JinjaConfig</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>JinjaConfig providing context for evaluation</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="&lt;code&gt;rattler_build.variant_config.VariantConfig&lt;/code&gt;" href="#rattler_build.VariantConfig">VariantConfig</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A new VariantConfig instance with all files merged</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="example" open>
+  <summary>Example</summary>
+  <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">rattler_build</span><span class="w"> </span><span class="kn">import</span> <span class="n">JinjaConfig</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">jinja_config</span> <span class="o">=</span> <span class="n">JinjaConfig</span><span class="p">(</span><span class="n">target_platform</span><span class="o">=</span><span class="s2">&quot;linux-64&quot;</span><span class="p">)</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">config</span> <span class="o">=</span> <span class="n">VariantConfig</span><span class="o">.</span><span class="n">from_files_with_context</span><span class="p">(</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="p">[</span><span class="s2">&quot;base_variants.yaml&quot;</span><span class="p">,</span> <span class="s2">&quot;conda_build_config.yaml&quot;</span><span class="p">],</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">jinja_config</span><span class="p">,</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="p">)</span>
+</span></code></pre></div>
+</details>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
 <h2 id="rattler_build.VariantConfig.from_conda_build_config" class="doc doc-heading">
             <span class="doc doc-object-name doc-function-name">from_conda_build_config</span>
 
@@ -4375,6 +4640,94 @@ The jinja_config provides platform information and other context needed for eval
 </span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="s1">&#39;&#39;&#39;</span>
 </span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="n">jinja_config</span> <span class="o">=</span> <span class="n">JinjaConfig</span><span class="p">(</span><span class="n">target_platform</span><span class="o">=</span><span class="s2">&quot;linux-64&quot;</span><span class="p">)</span>
 </span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="n">config</span> <span class="o">=</span> <span class="n">VariantConfig</span><span class="o">.</span><span class="n">from_yaml_with_context</span><span class="p">(</span><span class="n">yaml_str</span><span class="p">,</span> <span class="n">jinja_config</span><span class="p">)</span>
+</span></code></pre></div>
+</details>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="rattler_build.VariantConfig.merge" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">merge</span>
+
+
+<a href="#rattler_build.VariantConfig.merge" class="headerlink" title="Permanent link">#</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">merge</span><span class="p">(</span><span class="n">other</span><span class="p">)</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Merge another VariantConfig into this one, returning a new VariantConfig.</p>
+<p>Values from <code>other</code> take precedence for overlapping keys.
+Zip keys from <code>other</code> replace those in <code>self</code> if present.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>other</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="&lt;code&gt;rattler_build.variant_config.VariantConfig&lt;/code&gt;" href="#rattler_build.VariantConfig">VariantConfig</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The VariantConfig to merge into this one</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="&lt;code&gt;rattler_build.variant_config.VariantConfig&lt;/code&gt;" href="#rattler_build.VariantConfig">VariantConfig</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A new VariantConfig with merged values</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="example" open>
+  <summary>Example</summary>
+  <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">base</span> <span class="o">=</span> <span class="n">VariantConfig</span><span class="p">({</span><span class="s2">&quot;python&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;3.9&quot;</span><span class="p">,</span> <span class="s2">&quot;3.10&quot;</span><span class="p">]})</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="n">override</span> <span class="o">=</span> <span class="n">VariantConfig</span><span class="p">({</span><span class="s2">&quot;python&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;3.11&quot;</span><span class="p">],</span> <span class="s2">&quot;numpy&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;1.24&quot;</span><span class="p">]})</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">merged</span> <span class="o">=</span> <span class="n">base</span><span class="o">.</span><span class="n">merge</span><span class="p">(</span><span class="n">override</span><span class="p">)</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">merged</span><span class="p">[</span><span class="s2">&quot;python&quot;</span><span class="p">]</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="c1"># [&#39;3.11&#39;]</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="n">merged</span><span class="p">[</span><span class="s2">&quot;numpy&quot;</span><span class="p">]</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="c1"># [&#39;1.24&#39;]</span>
 </span></code></pre></div>
 </details>
 

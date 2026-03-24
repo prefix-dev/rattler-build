@@ -3048,7 +3048,7 @@ Package: test-demo-package
 Version: 1.0.0
 
 Building package...
-Built: /tmp/rattler_build_as8xge22/output/noarch/test-demo-package-1.0.0-pyh4616a5c_0.conda
+Built: /tmp/rattler_build_zv39fqdx/output/noarch/test-demo-package-1.0.0-pyh4616a5c_0.conda
 </code></pre></div>
 <h2 id="step-2-loading-a-package">Step 2: Loading a Package<a class="headerlink" href="#step-2-loading-a-package" title="Permanent link">#</a></h2>
 <p>Use <code>Package.from_file()</code> to load a built package. This reads the package metadata without extracting the entire archive.</p>
@@ -3063,7 +3063,7 @@ Built: /tmp/rattler_build_as8xge22/output/noarch/test-demo-package-1.0.0-pyh4616
 </span></code></pre></div>
 <div class="language-text highlight"><pre><span></span><code>Package Loaded Successfully!
 ============================================================
-Path: /tmp/rattler_build_as8xge22/output/noarch/test-demo-package-1.0.0-pyh4616a5c_0.conda
+Path: /tmp/rattler_build_zv39fqdx/output/noarch/test-demo-package-1.0.0-pyh4616a5c_0.conda
 Type: Package
 
 String representation: Package(test-demo-package-1.0.0-pyh4616a5c_0)
@@ -3112,7 +3112,7 @@ NoArch:         python
 License:        MIT
 Arch:           None
 Platform:       None
-Timestamp:      2026-03-19 10:56:11.005000+00:00
+Timestamp:      2026-03-24 16:36:03.500000+00:00
 
 Archive Information
 ----------------------------------------
@@ -3150,10 +3150,10 @@ Constraints (constrains):
   &quot;constrains&quot;: [],
   &quot;license&quot;: &quot;MIT&quot;,
   &quot;license_family&quot;: null,
-  &quot;timestamp&quot;: &quot;2026-03-19 10:56:11.005000+00:00&quot;,
+  &quot;timestamp&quot;: &quot;2026-03-24 16:36:03.500000+00:00&quot;,
   &quot;arch&quot;: null,
   &quot;platform&quot;: null,
-  &quot;path&quot;: &quot;/tmp/rattler_build_as8xge22/output/noarch/test-demo-package-1.0.0-pyh4616a5c_0.conda&quot;,
+  &quot;path&quot;: &quot;/tmp/rattler_build_zv39fqdx/output/noarch/test-demo-package-1.0.0-pyh4616a5c_0.conda&quot;,
   &quot;archive_type&quot;: &quot;conda&quot;,
   &quot;filename&quot;: &quot;test-demo-package-1.0.0-pyh4616a5c_0.conda&quot;
 }
@@ -3306,6 +3306,13 @@ Test 0: PythonTest
 Running test 0...
    PASS
    Test index: 0
+   Output (20 lines):
+     Could not find noarch/repodata.json. Creating new one.
+     Adding 1 packages to subdir noarch.
+     Successfully added 1 packages to subdir noarch.
+     Writing repodata to noarch/repodata.json
+     Collecting tests from &#39;/tmp/.tmpDAsLgr/test-demo-package-1.0.0-pyh4616a5c_0&#39;
+     ... and 15 more lines
 </code></pre></div>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Running All Tests at Once&quot;</span><span class="p">)</span>
 </span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;=&quot;</span> <span class="o">*</span> <span class="mi">60</span><span class="p">)</span>
@@ -3372,7 +3379,7 @@ Results summary:
 Test 0:
   success:    True
   test_index: 0
-  output:     0 lines
+  output:     20 lines
   bool():     True
   repr():     TestResult(index=0, status=PASS)
 
@@ -3464,11 +3471,11 @@ Example: Running test with conda-forge channel:
 </span></code></pre></div>
 <div class="language-text highlight"><pre><span></span><code>Rebuilding Package
 ============================================================
-Original package: /tmp/rattler_build_as8xge22/output/noarch/test-demo-package-1.0.0-pyh4616a5c_0.conda
-Rebuilt package:  output/test-demo-package-1.0.0-pyh4616a5c_0-rebuilt-20260319-105618.conda
+Original package: /tmp/rattler_build_zv39fqdx/output/noarch/test-demo-package-1.0.0-pyh4616a5c_0.conda
+Rebuilt package:  output/test-demo-package-1.0.0-pyh4616a5c_0-rebuilt-20260324-163611.conda
 
-Original SHA256:  6894a9059b9b4f71c41627a4f6fcecbdf904bfe3856bcc063cfb025bd1be876c
-Rebuilt SHA256:   6894a9059b9b4f71c41627a4f6fcecbdf904bfe3856bcc063cfb025bd1be876c
+Original SHA256:  12070f212f4a1eb34492fb6d45098dd60e90bf29f2bd95767458bbb98776c7fe
+Rebuilt SHA256:   12070f212f4a1eb34492fb6d45098dd60e90bf29f2bd95767458bbb98776c7fe
 
 Identical (reproducible): True
 </code></pre></div>
@@ -3489,7 +3496,7 @@ Identical (reproducible): True
 Name:         test-demo-package
 Version:      1.0.0
 Build string: pyh4616a5c_0
-Path:         output/test-demo-package-1.0.0-pyh4616a5c_0-rebuilt-20260319-105618.conda
+Path:         output/test-demo-package-1.0.0-pyh4616a5c_0-rebuilt-20260324-163611.conda
 Files:        1 files
 </code></pre></div>
 <h2 id="summary">Summary<a class="headerlink" href="#summary" title="Permanent link">#</a></h2>
