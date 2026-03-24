@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.61.2] - 2026-03-24
+### ✨ Highlights
+
+This release brings Cloudsmith upload for Python and the CLI.
+
+### Added
+
+- Add Cloudsmith upload bindings by @benmoss in [#2368](https://github.com/prefix-dev/rattler-build/pull/2368)
+
+
+### Documentation
+
+- Update CLI docs by @Hofer-Julian in [#2370](https://github.com/prefix-dev/rattler-build/pull/2370)
+
+
+
 ## [0.61.1] - 2026-03-23
 ### ✨ Highlights
 
