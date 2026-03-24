@@ -3165,3 +3165,15 @@ def test_target_platform_in_variant_config_warning(
         in combined
     )
     assert "Please use the '--target-platform' command-line flag" in combined
+
+
+def test_c_compilation(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(recipes / "c_compilation", tmp_path)
+    pkg = get_extracted_package(tmp_path, "c_compilation")
+    assert (pkg / "bin/hello").exists()
+
+
+def test_rust_compilation(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(recipes / "rust_compilation", tmp_path)
+    pkg = get_extracted_package(tmp_path, "rust_compilation")
+    assert (pkg / "bin/hello-rust").exists()

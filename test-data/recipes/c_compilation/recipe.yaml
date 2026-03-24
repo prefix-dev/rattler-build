@@ -1,0 +1,28 @@
+package:
+  name: c_compilation
+  version: 0.1.0
+
+build:
+  number: 0
+  script:
+    content:
+      - if: unix
+        then: |
+          cp $RECIPE_DIR/hello.c .
+          mkdir -p $PREFIX/bin
+          $CC hello.c -o $PREFIX/bin/hello
+      - if: win
+        then: |
+          copy %RECIPE_DIR%\hello.c .
+          cl.exe hello.c /Fe:%PREFIX%\bin\hello.exe
+
+requirements:
+  build:
+    - ${{ compiler('c') }}
+
+tests:
+  - script:
+      - if: unix
+        then: hello
+      - if: win
+        then: hello.exe
