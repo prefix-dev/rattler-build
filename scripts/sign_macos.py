@@ -88,9 +88,13 @@ def sign_zip(archive: Path, identity: str) -> None:
     with tempfile.TemporaryDirectory() as tmpdir:
         tmp = Path(tmpdir)
 
-        # Extract
+        # Extract and restore Unix permissions from ZIP metadata
         with zipfile.ZipFile(archive, "r") as zf:
-            zf.extractall(tmp)
+            for info in zf.infolist():
+                path = Path(zf.extract(info, tmp))
+                mode = (info.external_attr >> 16) & 0xFFFF
+                if mode:
+                    os.chmod(path, mode)
 
         # Find the binary (top-level dir contains rattler-build)
         binaries = list(tmp.rglob("rattler-build"))
