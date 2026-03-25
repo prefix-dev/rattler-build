@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2](https://github.com/prefix-dev/rattler-build/compare/rattler_build_script-v0.2.1...rattler_build_script-v0.2.2) - 2026-03-25
+
+### Added
+
+- *(py)* add progress_callback to run_tests ([#2356](https://github.com/prefix-dev/rattler-build/pull/2356))
+
+### Fixed
+
+- use platform-specific script extensions for test scripts ([#2354](https://github.com/prefix-dev/rattler-build/pull/2354))
+
 ## [0.2.1](https://github.com/prefix-dev/rattler-build/compare/rattler_build_script-v0.2.0...rattler_build_script-v0.2.1) - 2026-03-18
 
 ### Other
