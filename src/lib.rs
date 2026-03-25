@@ -112,7 +112,7 @@ fn find_variants(
             .name
             .as_ref()
             .and_then(|v| v.as_concrete())
-            .map(|name| name.0.as_normalized().to_string()),
+            .map(|name| name.as_str().to_string()),
         stage0::Recipe::SingleOutput(_) => None,
     };
 

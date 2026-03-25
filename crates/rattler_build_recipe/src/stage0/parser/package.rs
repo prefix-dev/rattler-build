@@ -3,6 +3,7 @@
 use marked_yaml::Node as MarkedNode;
 use rattler_build_jinja::JinjaTemplate;
 use rattler_build_yaml_parser::{ParseMapping, helpers::contains_jinja_template};
+use rattler_conda_types::SourcePackageName;
 
 use std::str::FromStr;
 
@@ -53,10 +54,7 @@ pub fn parse_package(yaml: &MarkedNode) -> ParseResult<Package> {
         // Concrete package name
         let package_name = rattler_conda_types::PackageName::try_from(name_str)
             .map_err(|e| ParseError::invalid_value("name", e.to_string(), name_span))?;
-        Value::new_concrete(
-            crate::stage0::package::PackageName(package_name),
-            Some(name_span),
-        )
+        Value::new_concrete(SourcePackageName::from(package_name), Some(name_span))
     };
 
     // Parse required 'version' field

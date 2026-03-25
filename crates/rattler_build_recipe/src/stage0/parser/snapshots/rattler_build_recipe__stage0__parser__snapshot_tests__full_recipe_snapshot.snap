@@ -1,20 +1,17 @@
 ---
 source: crates/rattler_build_recipe/src/stage0/parser/snapshot_tests.rs
+assertion_line: 26
 expression: "serde_yaml::to_string(&recipe).unwrap()"
 ---
 package:
   name: full-package
   version: 2.5.1
 build:
-  number: null
-  string: null
   script: {}
-  noarch: null
   python:
     entry_points: []
     skip_pyc_compilation: []
     use_python_app_entrypoint: false
-    site_packages_path: null
   skip: []
   always_copy_files: []
   always_include_files: []
@@ -25,12 +22,9 @@ build:
     binary_relocation: true
     missing_dso_allowlist: []
     rpath_allowlist: []
-    overdepending_behavior: null
-    overlinking_behavior: null
   variant:
     use_keys: []
     ignore_keys: []
-    down_prioritize_variant: null
   prefix_detection:
     force_file_type:
       text: []
@@ -56,7 +50,6 @@ about:
   license: MIT
   license_file:
   - LICENSE
-  license_family: null
   summary: A comprehensive test package
   description: This package demonstrates all available fields in a recipe
   documentation: https://docs.example.com/
