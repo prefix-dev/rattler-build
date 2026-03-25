@@ -1,5 +1,6 @@
 ---
 source: crates/rattler_build_recipe/src/stage0/parser/snapshot_tests.rs
+assertion_line: 112
 expression: "serde_yaml::to_string(&recipe).unwrap()"
 ---
 schema_version: 1
@@ -15,14 +16,11 @@ source:
   sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
 build:
   number: ${{ build_number }}
-  string: null
   script: {}
-  noarch: null
   python:
     entry_points: []
     skip_pyc_compilation: []
     use_python_app_entrypoint: false
-    site_packages_path: null
   skip: []
   always_copy_files: []
   always_include_files: []
@@ -33,12 +31,9 @@ build:
     binary_relocation: true
     missing_dso_allowlist: []
     rpath_allowlist: []
-    overdepending_behavior: null
-    overlinking_behavior: null
   variant:
     use_keys: []
     ignore_keys: []
-    down_prioritize_variant: null
   prefix_detection:
     force_file_type:
       text: []
@@ -49,11 +44,7 @@ build:
 about:
   homepage: https://example.com/
   license: Apache-2.0
-  license_family: null
   summary: A complex multi-output project
-  description: null
-  documentation: null
-  repository: null
 extra:
   recipe-maintainers:
   - alice
@@ -102,15 +93,11 @@ outputs:
     run:
     - zlib
   build:
-    number: null
-    string: null
     script: {}
-    noarch: null
     python:
       entry_points: []
       skip_pyc_compilation: []
       use_python_app_entrypoint: false
-      site_packages_path: null
     skip: []
     always_copy_files: []
     always_include_files: []
@@ -121,12 +108,9 @@ outputs:
       binary_relocation: true
       missing_dso_allowlist: []
       rpath_allowlist: []
-      overdepending_behavior: null
-      overlinking_behavior: null
     variant:
       use_keys: []
       ignore_keys: []
-      down_prioritize_variant: null
     prefix_detection:
       force_file_type:
         text: []
@@ -135,13 +119,8 @@ outputs:
       ignore_binary_files: false
     post_process: []
   about:
-    homepage: null
     license: Apache-2.0
-    license_family: null
     summary: Complex project core library
-    description: null
-    documentation: null
-    repository: null
   tests:
   - script:
       content:
@@ -155,15 +134,11 @@ outputs:
     - python
     - libcomplex ${{ version }}.*
   build:
-    number: null
-    string: null
     script: {}
-    noarch: null
     python:
       entry_points: []
       skip_pyc_compilation: []
       use_python_app_entrypoint: false
-      site_packages_path: null
     skip: []
     always_copy_files: []
     always_include_files: []
@@ -174,12 +149,9 @@ outputs:
       binary_relocation: true
       missing_dso_allowlist: []
       rpath_allowlist: []
-      overdepending_behavior: null
-      overlinking_behavior: null
     variant:
       use_keys: []
       ignore_keys: []
-      down_prioritize_variant: null
     prefix_detection:
       force_file_type:
         text: []
@@ -188,15 +160,11 @@ outputs:
       ignore_binary_files: false
     post_process: []
   about:
-    homepage: null
     license: Apache-2.0
-    license_family: null
     summary: Python bindings for complex project
     description: |
       This package provides Python bindings for the complex project.
       It allows you to use complex project functionality from Python.
-    documentation: null
-    repository: null
   tests:
   - python:
       imports:
@@ -210,15 +178,11 @@ outputs:
     run:
     - libcomplex ${{ version }}.*
   build:
-    number: null
-    string: null
     script: {}
-    noarch: null
     python:
       entry_points: []
       skip_pyc_compilation: []
       use_python_app_entrypoint: false
-      site_packages_path: null
     skip: []
     always_copy_files: []
     always_include_files: []
@@ -229,12 +193,9 @@ outputs:
       binary_relocation: true
       missing_dso_allowlist: []
       rpath_allowlist: []
-      overdepending_behavior: null
-      overlinking_behavior: null
     variant:
       use_keys: []
       ignore_keys: []
-      down_prioritize_variant: null
     prefix_detection:
       force_file_type:
         text: []
@@ -243,10 +204,5 @@ outputs:
       ignore_binary_files: false
     post_process: []
   about:
-    homepage: null
     license: Apache-2.0
-    license_family: null
     summary: Development headers for complex project
-    description: null
-    documentation: null
-    repository: null

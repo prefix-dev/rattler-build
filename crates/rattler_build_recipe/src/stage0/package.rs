@@ -1,27 +1,20 @@
-use std::fmt::Display;
-
-use rattler_conda_types::VersionWithSource;
+use rattler_conda_types::{SourcePackageName, VersionWithSource};
 use serde::Serialize;
 
 use crate::stage0::types::Value;
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
-#[serde(transparent)]
-pub struct PackageName(pub rattler_conda_types::PackageName);
-
-impl Display for PackageName {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0.as_source())
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Package {
-    pub name: Value<PackageName>,
+    pub name: Value<SourcePackageName>,
     pub version: Value<VersionWithSource>,
 }
 
 impl Package {
+    /// Create a new package with the given name and version
+    pub fn new(name: Value<SourcePackageName>, version: Value<VersionWithSource>) -> Self {
+        Self { name, version }
+    }
+
     pub fn used_variables(&self) -> Vec<String> {
         let Package { name, version } = self;
 
@@ -39,7 +32,7 @@ impl Package {
 /// and will be inherited from the recipe-level version.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct PackageMetadata {
-    pub name: Value<PackageName>,
+    pub name: Value<SourcePackageName>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub version: Option<Value<VersionWithSource>>,
 }

@@ -3,6 +3,7 @@
 use marked_yaml::Node as MarkedNode;
 use rattler_build_jinja::JinjaTemplate;
 use rattler_build_yaml_parser::{ParseMapping, helpers::contains_jinja_template, parse_value};
+use rattler_conda_types::SourcePackageName;
 
 use crate::{
     error::{ParseError, ParseResult},
@@ -180,7 +181,7 @@ fn parse_recipe_metadata(yaml: &MarkedNode) -> ParseResult<RecipeMetadata> {
             let package_name = rattler_conda_types::PackageName::try_from(name_str)
                 .map_err(|e| ParseError::invalid_value("name", e.to_string(), span))?;
             Some(Value::new_concrete(
-                crate::stage0::package::PackageName(package_name),
+                SourcePackageName::from(package_name),
                 Some(span),
             ))
         }
@@ -409,10 +410,7 @@ fn parse_package_metadata(yaml: &MarkedNode) -> ParseResult<crate::stage0::Packa
         // Parse as PackageName
         let package_name = rattler_conda_types::PackageName::try_from(name_str)
             .map_err(|e| ParseError::invalid_value("name", e.to_string(), span))?;
-        Value::new_concrete(
-            crate::stage0::package::PackageName(package_name),
-            Some(span),
-        )
+        Value::new_concrete(SourcePackageName::from(package_name), Some(span))
     };
 
     // Parse optional version (can be inherited from recipe)

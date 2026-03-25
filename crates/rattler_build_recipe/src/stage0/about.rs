@@ -75,15 +75,22 @@ impl Display for License {
 
 #[derive(Debug, Serialize, Deserialize, Default, Clone, PartialEq)]
 pub struct About {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub homepage: Option<Value<Url>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub license: Option<Value<License>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub license_file: Option<ConditionalList<String>>,
     /// License family (deprecated, but still used in some recipes)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub license_family: Option<Value<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub summary: Option<Value<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<Value<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub documentation: Option<Value<Url>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub repository: Option<Value<Url>>,
 }
 

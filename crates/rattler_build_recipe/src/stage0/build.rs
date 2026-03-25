@@ -18,6 +18,7 @@ pub struct VariantKeyUsage {
     pub ignore_keys: ConditionalList<String>,
 
     /// Down-prioritize variant by setting priority to a negative value
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub down_prioritize_variant: Option<Value<i32>>,
 }
 
@@ -26,10 +27,11 @@ pub struct VariantKeyUsage {
 pub struct Build {
     /// Build number (increments with each rebuild)
     /// None means inherit from top-level, Some(n) means use n (even if n is 0)
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub number: Option<Value<u64>>,
 
     /// Build string (usually auto-generated from variant hash)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub string: Option<Value<String>>,
 
     /// Build script - contains script content, interpreter, environment variables, etc.
@@ -38,6 +40,7 @@ pub struct Build {
     pub script: Script,
 
     /// Noarch type - python or generic
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub noarch: Option<Value<NoArchType>>,
 
     /// Python-specific configuration
@@ -140,11 +143,11 @@ pub struct DynamicLinking {
     pub rpath_allowlist: ConditionalList<String>,
 
     /// What to do when detecting overdepending
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub overdepending_behavior: Option<Value<String>>,
 
     /// What to do when detecting overlinking
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub overlinking_behavior: Option<Value<String>>,
 }
 
@@ -223,6 +226,7 @@ pub struct PythonBuild {
 
     /// The relative site-packages path that a Python build exports for other packages to use
     /// This setting only makes sense for the `python` package itself
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub site_packages_path: Option<Value<String>>,
 }
 
