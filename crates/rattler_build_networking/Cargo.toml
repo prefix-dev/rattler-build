@@ -1,6 +1,6 @@
 [package]
 name = "rattler_build_networking"
-version = "0.1.3"
+version = "0.1.4"
 edition.workspace = true
 authors.workspace = true
 license.workspace = true

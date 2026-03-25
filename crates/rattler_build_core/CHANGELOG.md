@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.1...rattler_build_core-v0.2.2) - 2026-03-25
+
+### Added
+
+- Add Python API for `debug` ([#2337](https://github.com/prefix-dev/rattler-build/pull/2337))
+
+### Fixed
+
+- use platform-specific script extensions for test scripts ([#2354](https://github.com/prefix-dev/rattler-build/pull/2354))
+
+### Other
+
+- improve table output ([#2369](https://github.com/prefix-dev/rattler-build/pull/2369))
+
 ## [0.2.1](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.0...rattler_build_core-v0.2.1) - 2026-03-18
 
 ### Fixed
