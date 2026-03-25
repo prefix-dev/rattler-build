@@ -10,6 +10,8 @@ use rattler_build_recipe::variant_render::{
 };
 use rattler_conda_types::Platform;
 
+use rattler_build_script::EnvironmentIsolation;
+
 use crate::error::RattlerBuildError;
 use crate::stage0::PyStage0Recipe;
 use crate::stage1::PyStage1Recipe;
@@ -71,11 +73,14 @@ impl PyRenderConfig {
 
         // Get OS environment variable keys that can be overridden by variant config
         // We use an empty prefix path since we just need the keys, not the values
-        let os_env_var_keys =
-            rattler_build::env_vars::os_vars(&std::path::PathBuf::new(), &host_platform)
-                .keys()
-                .cloned()
-                .collect();
+        let os_env_var_keys = rattler_build::env_vars::os_vars(
+            &std::path::PathBuf::new(),
+            &host_platform,
+            EnvironmentIsolation::default(),
+        )
+        .keys()
+        .cloned()
+        .collect();
 
         Ok(Self {
             inner: RustRenderConfig {

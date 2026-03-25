@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from rattler_build import stage1
-from rattler_build._rattler_build import build_rendered_variant_py
+from rattler_build._rattler_build import EnvironmentIsolation, build_rendered_variant_py
 from rattler_build._rattler_build import render as _render
 from rattler_build.build_result import BuildResult
 from rattler_build.tool_config import PlatformConfig, ToolConfiguration
@@ -330,6 +330,7 @@ class RenderedVariant:
         package_format: str | None = None,
         no_include_recipe: bool = False,
         exclude_newer: datetime | None = None,
+        env_isolation: EnvironmentIsolation = EnvironmentIsolation.STRICT,
     ) -> BuildResult:
         """Build this rendered variant.
 
@@ -351,6 +352,7 @@ class RenderedVariant:
             package_format: Package format ("conda" or "tar.bz2").
             no_include_recipe: Don't include recipe in the output package.
             exclude_newer: Exclude packages newer than this timestamp.
+            env_isolation: Environment isolation mode. Defaults to ``EnvironmentIsolation.STRICT``.
 
         Returns:
             BuildResult: Information about the built package including paths, metadata, and timing.
@@ -394,6 +396,7 @@ class RenderedVariant:
             package_format=package_format,
             no_include_recipe=no_include_recipe,
             exclude_newer=exclude_newer,
+            env_isolation=env_isolation,
             sibling_variants=rust_siblings,
         )
 
@@ -415,6 +418,7 @@ def build_rendered_variants(
     package_format: str | None = None,
     no_include_recipe: bool = False,
     exclude_newer: datetime | None = None,
+    env_isolation: EnvironmentIsolation = EnvironmentIsolation.STRICT,
 ) -> list[BuildResult]:
     """Build multiple rendered variants.
 
@@ -434,6 +438,7 @@ def build_rendered_variants(
         package_format: Package format ("conda" or "tar.bz2").
         no_include_recipe: Don't include recipe in the output package.
         exclude_newer: Exclude packages newer than this timestamp.
+        env_isolation: Environment isolation mode. Defaults to ``EnvironmentIsolation.STRICT``.
 
     Returns:
         list[BuildResult]: List of build results, one per variant built.
@@ -473,6 +478,7 @@ def build_rendered_variants(
             package_format=package_format,
             no_include_recipe=no_include_recipe,
             exclude_newer=exclude_newer,
+            env_isolation=env_isolation,
         )
         results.append(result)
 

@@ -15,7 +15,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from rattler_build._rattler_build import render as _render
+from rattler_build._rattler_build import EnvironmentIsolation, render as _render
 from rattler_build._rattler_build import stage0 as _stage0
 from rattler_build.render import RenderConfig, RenderedVariant
 from rattler_build.tool_config import ToolConfiguration
@@ -268,6 +268,7 @@ class Stage0Recipe(ABC):
         package_format: str | None = None,
         no_include_recipe: bool = False,
         exclude_newer: datetime | None = None,
+        env_isolation: EnvironmentIsolation = EnvironmentIsolation.STRICT,
     ) -> list[BuildResult]:
         """Build this recipe.
 
@@ -286,6 +287,7 @@ class Stage0Recipe(ABC):
             package_format: Package format ("conda" or "tar.bz2").
             no_include_recipe: Don't include recipe in the output package.
             exclude_newer: Exclude packages newer than this timestamp.
+            env_isolation: Environment isolation mode. Defaults to ``EnvironmentIsolation.STRICT``.
 
         Returns:
             list[BuildResult]: List of build results, one per variant built.
@@ -321,6 +323,7 @@ class Stage0Recipe(ABC):
                 package_format=package_format,
                 no_include_recipe=no_include_recipe,
                 exclude_newer=exclude_newer,
+                env_isolation=env_isolation,
             )
             results.append(result)
 
