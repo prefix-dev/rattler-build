@@ -753,6 +753,7 @@ pub async fn run_build_from_args(
                         test_index: None,
                         output_dir: output.build_configuration.directories.output_dir.clone(),
                         exclude_newer: output.build_configuration.exclude_newer,
+                        env_isolation: output.build_configuration.env_isolation,
                     },
                     None,
                 )
@@ -914,6 +915,7 @@ pub async fn run_test(
         tool_configuration: tool_config,
         output_dir: test_data.common.output_dir,
         exclude_newer: None,
+        env_isolation: rattler_build_script::EnvironmentIsolation::default(),
     };
 
     let package_name = package_file

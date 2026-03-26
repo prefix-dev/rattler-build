@@ -307,6 +307,8 @@ pub struct TestConfiguration {
     pub output_dir: PathBuf,
     /// Exclude packages newer than this date from the solver
     pub exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
+    /// The environment isolation mode for test scripts
+    pub env_isolation: EnvironmentIsolation,
 }
 
 fn env_vars_from_package(index_json: &IndexJson) -> HashMap<String, String> {
