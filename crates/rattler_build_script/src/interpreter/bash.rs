@@ -60,6 +60,7 @@ impl Interpreter for BashInterpreter {
             &args.work_dir,
             &args.replacements("$((var))"),
             &args.env_vars,
+            &args.secrets,
             args.env_isolation,
             args.sandbox_config.as_ref(),
         )

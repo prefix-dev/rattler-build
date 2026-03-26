@@ -872,6 +872,20 @@ def test_console_logging(rattler_build: RattlerBuild, recipes: Path, tmp_path: P
     assert "I am ********" in output
 
 
+def test_secret_passthrough(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    """Verify that secrets declared in the recipe are available as env vars
+    inside the build script, even in strict isolation mode."""
+    os.environ["BUILD_SECRET"] = "s3cret_token_42"
+    rattler_build.build(recipes / "secret_passthrough", tmp_path)
+    pkg = get_extracted_package(tmp_path, "secret_passthrough")
+    value_file = pkg / "secret_check" / "value.txt"
+    assert value_file.exists(), "build script did not write secret value file"
+    contents = value_file.read_text().strip()
+    assert contents == "s3cret_token_42", (
+        f"secret was not passed through to build script, got: {contents!r}"
+    )
+
+
 @pytest.mark.skipif(
     os.name == "nt", reason="recipe does not support execution on windows"
 )

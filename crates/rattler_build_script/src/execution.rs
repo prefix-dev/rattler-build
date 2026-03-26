@@ -525,6 +525,37 @@ const PASSTHROUGH_ENV_VARS: &[&str] = &[
     "NO_PROXY",
 ];
 
+/// Platform-critical environment variables that must always be passed through
+/// to avoid breaking fundamental OS functionality.
+#[cfg(target_os = "windows")]
+const PLATFORM_PASSTHROUGH_ENV_VARS: &[&str] = &[
+    // Required for Winsock/networking and DLL loading
+    "SYSTEMROOT",
+    "WINDIR",
+    // Command interpreter
+    "COMSPEC",
+    // Temp directories
+    "TEMP",
+    "TMP",
+    // Executable extension resolution
+    "PATHEXT",
+];
+
+/// Platform-critical environment variables that must always be passed through
+/// to avoid breaking fundamental OS functionality.
+#[cfg(target_os = "macos")]
+const PLATFORM_PASSTHROUGH_ENV_VARS: &[&str] = &[
+    // macOS uses per-session temp directories
+    "TMPDIR",
+    // CoreFoundation text encoding
+    "__CF_USER_TEXT_ENCODING",
+];
+
+/// Platform-critical environment variables that must always be passed through
+/// to avoid breaking fundamental OS functionality.
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
+const PLATFORM_PASSTHROUGH_ENV_VARS: &[&str] = &[];
+
 /// Spawns a process and replaces the given strings in the output with the given replacements.
 /// This is used to replace the host prefix with $PREFIX and the build prefix with $BUILD_PREFIX
 pub async fn run_process_with_replacements(
@@ -532,6 +563,7 @@ pub async fn run_process_with_replacements(
     cwd: &Path,
     replacements: &HashMap<String, String>,
     env_vars: &IndexMap<String, String>,
+    secrets: &IndexMap<String, String>,
     env_isolation: EnvironmentIsolation,
     sandbox_config: Option<&SandboxConfiguration>,
 ) -> Result<std::process::Output, std::io::Error> {
@@ -576,7 +608,10 @@ pub async fn run_process_with_replacements(
             command.env_clear();
 
             // Pass through whitelisted host environment variables
-            for var in PASSTHROUGH_ENV_VARS {
+            for var in PASSTHROUGH_ENV_VARS
+                .iter()
+                .chain(PLATFORM_PASSTHROUGH_ENV_VARS)
+            {
                 if let Ok(value) = std::env::var(var) {
                     command.env(var, value);
                 }
@@ -587,6 +622,10 @@ pub async fn run_process_with_replacements(
             // will source the activation script (build_env.sh), which also
             // runs package activation scripts (e.g., compiler setup for $CC).
             command.envs(env_vars.iter().filter(|(k, _)| k.as_str() != "CONDA_BUILD"));
+
+            // Inject secrets so build scripts can access them (output masking
+            // is handled by the replacements map).
+            command.envs(secrets.iter());
         }
         EnvironmentIsolation::None => {
             // Inherit full host environment, then overlay build variables
