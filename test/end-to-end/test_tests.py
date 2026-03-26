@@ -53,6 +53,13 @@ def test_conditional_script_empty(
     assert snapshot == content
 
 
+def test_env_vars_in_test_scripts(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Test that variant env vars, platform vars, and CONDA_BUILD are set in test scripts (issue #1317)."""
+    rattler_build.build(recipes / "test-env-vars-in-tests", tmp_path)
+
+
 @pytest.mark.skipif(
     os.name != "nt", reason="recipe does not support execution on windows"
 )

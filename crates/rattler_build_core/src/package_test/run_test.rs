@@ -7,11 +7,13 @@
 //! * `imports` - import a list of modules and check if they can be imported
 //! * `files` - check if a list of files exist
 use fs_err as fs;
+use rattler_build_jinja::Variable;
 use rattler_build_recipe::stage1::{
     TestType,
     tests::{CommandsTest, DownstreamTest, PerlTest, PythonTest, PythonVersion, RTest, RubyTest},
 };
 use rattler_build_script::{Script, ScriptContent};
+use rattler_build_types::NormalizedKey;
 use rattler_conda_types::{
     Channel, ChannelUrl, MatchSpec, ParseStrictness, Platform,
     compression_level::CompressionLevel,
@@ -24,6 +26,7 @@ use rattler_shell::{
     shell::{Shell, ShellEnum},
 };
 use rattler_solve::{ChannelPriority, SolveStrategy};
+use std::collections::BTreeMap;
 use std::fmt::Write;
 use std::{
     collections::HashMap,
@@ -155,12 +158,26 @@ impl Tests {
         cwd: &Path,
         pkg_vars: &HashMap<String, String>,
         resolved_records: &[rattler_conda_types::RepoDataRecord],
+        config: &TestConfiguration,
     ) -> Result<(), TestError> {
         tracing::info!("Testing commands:");
+
+        let target_platform = config.target_platform.unwrap_or(Platform::current());
+        let build_platform = config.current_platform.platform;
+        let host_platform = config
+            .host_platform
+            .as_ref()
+            .map(|p| p.platform)
+            .unwrap_or(target_platform);
 
         let platform = Platform::current();
         let mut env_vars = env_vars::os_vars(environment, &platform);
         env_vars.retain(|key, _| key != ShellEnum::default().path_var(&platform));
+        env_vars.extend(env_vars::test_vars(
+            target_platform,
+            build_platform,
+            host_platform,
+        ));
         env_vars.extend(env_vars::python_vars_from_records(
             resolved_records,
             environment,
@@ -309,6 +326,19 @@ fn env_vars_from_package(index_json: &IndexJson) -> HashMap<String, String> {
     );
 
     res
+}
+
+/// Read variant environment variables from `info/hash_input.json` in the
+/// package directory.  This file contains the full variant map that was used
+/// to build the package.  We expose every key as an environment variable
+/// (matching the behaviour of build scripts) except for language-specific
+/// keys which are already handled via `python_vars_from_records` and friends.
+fn env_vars_from_hash_input(package_folder: &Path) -> HashMap<String, Option<String>> {
+    let hash_input_path = package_folder.join("info/hash_input.json");
+    let content = fs::read_to_string(&hash_input_path).unwrap_or_default();
+    let variant: BTreeMap<NormalizedKey, Variable> =
+        serde_json::from_str(&content).unwrap_or_default();
+    env_vars::env_vars_from_variant(&variant)
 }
 
 /// Run a test for a single package
@@ -471,7 +501,12 @@ pub async fn run_test(
     tracing::info!("Collecting tests from '{}'", package_folder.display());
 
     let index_json = IndexJson::from_package_directory(&package_folder)?;
-    let env = env_vars_from_package(&index_json);
+    let mut env = env_vars_from_package(&index_json);
+    env.extend(
+        env_vars_from_hash_input(&package_folder)
+            .into_iter()
+            .filter_map(|(k, v)| v.map(|v| (k, v))),
+    );
 
     let has_legacy_tests = package_folder.join("info/test").exists();
     let has_modern_tests = package_folder.join("info/tests/tests.yaml").exists();
@@ -525,7 +560,7 @@ pub async fn run_test(
         let (test_folder, tests) = legacy_tests_from_folder(&package_folder).await?;
 
         for test in tests {
-            test.run(&prefix, &test_folder, &env, &resolved_records)
+            test.run(&prefix, &test_folder, &env, &resolved_records, &config)
                 .await?;
         }
 
@@ -932,9 +967,22 @@ async fn run_commands_test(
     .await
     .map_err(|e| TestError::TestEnvironmentSetup(format!("{e:?}")))?;
 
+    let target_platform = config.target_platform.unwrap_or(Platform::current());
+    let build_platform = config.current_platform.platform;
+    let host_platform = config
+        .host_platform
+        .as_ref()
+        .map(|p| p.platform)
+        .unwrap_or(target_platform);
+
     let platform = Platform::current();
     let mut env_vars = env_vars::os_vars(&run_prefix, &platform);
     env_vars.retain(|key, _| key != ShellEnum::default().path_var(&platform));
+    env_vars.extend(env_vars::test_vars(
+        target_platform,
+        build_platform,
+        host_platform,
+    ));
     env_vars.extend(env_vars::python_vars_from_records(
         &resolved_records,
         &run_prefix,

@@ -7,7 +7,6 @@ use indexmap::IndexMap;
 use minijinja::Value;
 use rattler_build_jinja::Jinja;
 use rattler_conda_types::Platform;
-use std::{collections::HashMap, collections::HashSet};
 
 // Re-export from rattler_build_script
 pub use rattler_build_script::{
@@ -21,23 +20,6 @@ use crate::{
 };
 
 impl Output {
-    /// Add environment variables from the variant to the environment variables.
-    fn env_vars_from_variant(&self) -> HashMap<String, Option<String>> {
-        let languages: HashSet<&str> =
-            HashSet::from(["PERL", "LUA", "R", "NUMPY", "PYTHON", "RUBY", "NODEJS"]);
-        self.variant()
-            .iter()
-            .filter_map(|(k, v)| {
-                let key_upper = k.normalize().to_uppercase();
-                if !languages.contains(key_upper.as_str()) {
-                    Some((k.normalize(), Some(v.to_string())))
-                } else {
-                    None
-                }
-            })
-            .collect()
-    }
-
     /// Helper function to get a jinja renderer for the output's recipe context.
     pub(crate) fn jinja_renderer(&self) -> impl Fn(&str) -> Result<String, String> {
         let selector_config = self.build_configuration.selector_config();
@@ -51,7 +33,7 @@ impl Output {
         let target_platform = self.build_configuration.target_platform;
         let mut env_vars = env_vars::vars(self, "BUILD");
         env_vars.extend(env_vars::os_vars(&host_prefix, &target_platform));
-        env_vars.extend(self.env_vars_from_variant());
+        env_vars.extend(env_vars::env_vars_from_variant(self.variant()));
 
         let jinja_renderer = self.jinja_renderer();
 
