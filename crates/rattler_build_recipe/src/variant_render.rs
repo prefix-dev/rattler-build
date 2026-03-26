@@ -106,6 +106,12 @@ pub struct RenderConfig {
     /// like `MACOSX_DEPLOYMENT_TARGET` on macOS that have default values but can be
     /// customized via variant config.
     pub os_env_var_keys: HashSet<String>,
+    /// An optional prefix to prepend to the auto-generated build string.
+    /// When set, the build string becomes `{prefix}_{default_build_string}`.
+    pub build_string_prefix: Option<String>,
+    /// An optional build number override.
+    /// When set, this replaces the build number from the recipe.
+    pub build_number: Option<u64>,
 }
 
 impl Default for RenderConfig {
@@ -118,6 +124,8 @@ impl Default for RenderConfig {
             build_platform: rattler_conda_types::Platform::current(),
             host_platform: rattler_conda_types::Platform::current(),
             os_env_var_keys: HashSet::new(),
+            build_string_prefix: None,
+            build_number: None,
         }
     }
 }
@@ -173,6 +181,18 @@ impl RenderConfig {
     /// These are typically derived from `env_vars::os_vars()` keys.
     pub fn with_os_env_var_keys(mut self, keys: HashSet<String>) -> Self {
         self.os_env_var_keys = keys;
+        self
+    }
+
+    /// Set a prefix to prepend to the auto-generated build string.
+    pub fn with_build_string_prefix(mut self, prefix: impl Into<String>) -> Self {
+        self.build_string_prefix = Some(prefix.into());
+        self
+    }
+
+    /// Override the build number from the recipe.
+    pub fn with_build_number(mut self, build_number: u64) -> Self {
+        self.build_number = Some(build_number);
         self
     }
 }
@@ -978,7 +998,7 @@ fn render_with_empty_combinations(
         results[i].pin_subpackages = pin_subpackages;
 
         // Finalize build string with complete pin information
-        finalize_build_string_single(&mut results[i])?;
+        finalize_build_string_single(&mut results[i], config)?;
     }
 
     Ok(results)
@@ -988,11 +1008,25 @@ fn render_with_empty_combinations(
 ///
 /// This computes the hash from the variant (which includes pin information)
 /// and resolves the build string for one variant.
-fn finalize_build_string_single(result: &mut RenderedVariant) -> Result<(), RenderError> {
+fn finalize_build_string_single(
+    result: &mut RenderedVariant,
+    config: &RenderConfig,
+) -> Result<(), RenderError> {
+    let build_string_prefix = config.build_string_prefix.as_deref();
     let noarch = result.recipe.build.noarch.unwrap_or(NoArchType::none());
 
     // Compute hash from the variant (which now includes pin_subpackage information)
-    let hash_info = HashInfo::from_variant(&result.variant, &noarch);
+    let mut hash_info = HashInfo::from_variant(&result.variant, &noarch);
+
+    // Prepend the user-provided build string prefix to the hash prefix so it
+    // becomes part of the default build string format: {prefix}h{hash}_{number}.
+    if let Some(prefix) = build_string_prefix {
+        if hash_info.prefix.is_empty() {
+            hash_info.prefix = format!("{prefix}_");
+        } else {
+            hash_info.prefix = format!("{prefix}_{}", hash_info.prefix);
+        }
+    }
 
     // If build string is not set (Default), or if it needs resolving
     if matches!(
@@ -1017,6 +1051,11 @@ fn finalize_build_string_single(result: &mut RenderedVariant) -> Result<(), Rend
         }
 
         let eval_ctx = EvaluationContext::from_variables(variables);
+
+        // Apply the build number override if provided.
+        if let Some(bn) = config.build_number {
+            result.recipe.build.number = Some(bn);
+        }
 
         // Resolve the build string template with the hash
         result.recipe.build.string.resolve(
@@ -1395,7 +1434,7 @@ fn render_with_variants(
         results[i].pin_subpackages = pin_subpackages;
 
         // Finalize build string with complete pin information
-        finalize_build_string_single(&mut results[i])?;
+        finalize_build_string_single(&mut results[i], &config)?;
     }
 
     Ok(results)
@@ -3034,5 +3073,202 @@ postgresql:
             .collect();
         // postgresql 16 should be skipped (<=16), 17 should build
         assert_eq!(skip_flags, vec![("16".into(), true), ("17".into(), false)]);
+    }
+
+    #[test]
+    fn test_build_string_prefix_simple() {
+        let recipe_yaml = r#"
+package:
+  name: test-pkg
+  version: "1.0.0"
+"#;
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config = VariantConfig::default();
+
+        let config = RenderConfig::new().with_build_string_prefix("foobar");
+        let rendered =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, config).unwrap();
+
+        assert_eq!(rendered.len(), 1);
+        let build_string = rendered[0]
+            .recipe
+            .build
+            .string
+            .as_resolved()
+            .unwrap()
+            .to_string();
+        assert!(
+            build_string.starts_with("foobar_h"),
+            "build string should start with 'foobar_h', got '{build_string}'"
+        );
+    }
+
+    #[test]
+    fn test_build_string_prefix_with_variants() {
+        let recipe_yaml = r#"
+package:
+  name: test-pkg
+  version: "1.0.0"
+
+requirements:
+  host:
+    - python ${{ python }}
+  run:
+    - python
+"#;
+        let variant_yaml = r#"
+python:
+  - "3.9.*"
+  - "3.10.*"
+"#;
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config = VariantConfig::from_yaml_str(variant_yaml).unwrap();
+
+        let config = RenderConfig::new().with_build_string_prefix("myprefix");
+        let rendered =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, config).unwrap();
+
+        assert_eq!(rendered.len(), 2);
+        for variant in &rendered {
+            let build_string = variant
+                .recipe
+                .build
+                .string
+                .as_resolved()
+                .unwrap()
+                .to_string();
+            assert!(
+                build_string.starts_with("myprefix_"),
+                "build string should start with 'myprefix_', got '{build_string}'"
+            );
+        }
+
+        // The two variants should produce different build strings
+        let bs0 = rendered[0].recipe.build.string.as_resolved().unwrap();
+        let bs1 = rendered[1].recipe.build.string.as_resolved().unwrap();
+        assert_ne!(
+            bs0, bs1,
+            "different variants should produce different build strings"
+        );
+    }
+
+    #[test]
+    fn test_build_string_prefix_absent_gives_default() {
+        let recipe_yaml = r#"
+package:
+  name: test-pkg
+  version: "1.0.0"
+"#;
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config = VariantConfig::default();
+
+        let with_prefix = render_recipe_with_variant_config(
+            &stage0_recipe,
+            &variant_config,
+            RenderConfig::new().with_build_string_prefix("pfx"),
+        )
+        .unwrap();
+        let without_prefix =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, RenderConfig::new())
+                .unwrap();
+
+        let bs_with = with_prefix[0].recipe.build.string.as_resolved().unwrap();
+        let bs_without = without_prefix[0].recipe.build.string.as_resolved().unwrap();
+
+        // The prefixed version should contain the unprefixed version
+        assert!(
+            bs_with.starts_with("pfx_"),
+            "prefixed build string should start with 'pfx_', got '{bs_with}'"
+        );
+        assert!(
+            bs_with.ends_with(bs_without),
+            "prefixed '{bs_with}' should end with default '{bs_without}'"
+        );
+    }
+
+    #[test]
+    fn test_build_number_override() {
+        let recipe_yaml = r#"
+package:
+  name: test-pkg
+  version: "1.0.0"
+
+build:
+  number: 5
+"#;
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config = VariantConfig::default();
+
+        // Without override — should use the recipe's build number (5)
+        let rendered_default =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, RenderConfig::new())
+                .unwrap();
+        assert_eq!(rendered_default[0].recipe.build.number, Some(5));
+
+        // With override — should use 42
+        let rendered_override = render_recipe_with_variant_config(
+            &stage0_recipe,
+            &variant_config,
+            RenderConfig::new().with_build_number(42),
+        )
+        .unwrap();
+        assert_eq!(rendered_override[0].recipe.build.number, Some(42));
+
+        // Build string should contain the overridden build number
+        let bs = rendered_override[0]
+            .recipe
+            .build
+            .string
+            .as_resolved()
+            .unwrap();
+        assert!(
+            bs.ends_with("_42"),
+            "build string should end with '_42', got '{bs}'"
+        );
+    }
+
+    #[test]
+    fn test_build_number_override_default_recipe() {
+        let recipe_yaml = r#"
+package:
+  name: test-pkg
+  version: "1.0.0"
+"#;
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config = VariantConfig::default();
+
+        // Recipe has no build number (defaults to 0)
+        let rendered_default =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, RenderConfig::new())
+                .unwrap();
+        let bs_default = rendered_default[0]
+            .recipe
+            .build
+            .string
+            .as_resolved()
+            .unwrap();
+        assert!(
+            bs_default.ends_with("_0"),
+            "default build string should end with '_0', got '{bs_default}'"
+        );
+
+        // Override to 7
+        let rendered_override = render_recipe_with_variant_config(
+            &stage0_recipe,
+            &variant_config,
+            RenderConfig::new().with_build_number(7),
+        )
+        .unwrap();
+        assert_eq!(rendered_override[0].recipe.build.number, Some(7));
+        let bs_override = rendered_override[0]
+            .recipe
+            .build
+            .string
+            .as_resolved()
+            .unwrap();
+        assert!(
+            bs_override.ends_with("_7"),
+            "overridden build string should end with '_7', got '{bs_override}'"
+        );
     }
 }
