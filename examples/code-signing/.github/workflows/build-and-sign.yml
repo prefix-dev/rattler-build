@@ -1,5 +1,9 @@
 # Example GitHub Actions workflow that builds a small C library with rattler-build
-# and code-signs the binaries on macOS and Windows.
+# and code-signs the binaries on macOS and Windows using --signing-config-file.
+#
+# The recipe itself contains NO signing configuration -- signing is injected
+# purely at build time via a standalone YAML file and the --signing-config-file
+# flag. This keeps the recipe portable and CI-agnostic.
 #
 # Copy this workflow (and the recipe.yaml + hello/ source) into your own repo.
 # Then configure the secrets listed below.
@@ -58,6 +62,7 @@ jobs:
         env:
           CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
           CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
         run: |
           KEYCHAIN_PATH="$RUNNER_TEMP/signing.keychain-db"
           KEYCHAIN_PASSWORD="$(openssl rand -base64 32)"
@@ -74,28 +79,44 @@ jobs:
             -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security list-keychains -d user -s "$KEYCHAIN_PATH"
 
+          # Write the signing config with the real identity
+          cat > signing.yaml <<EOF
+          macos:
+            identity: "$MACOS_SIGNING_IDENTITY"
+            options:
+              - runtime
+          EOF
+
       # ── Windows: decode the .pfx certificate to a temp file ────────────
-      - name: Decode Windows signing certificate
+      - name: Prepare Windows signing config
         if: runner.os == 'Windows'
         shell: pwsh
         env:
           WIN_CERT_FILE_B64: ${{ secrets.WIN_CERT_FILE_B64 }}
+          WIN_CERT_PASSWORD: ${{ secrets.WIN_CERT_PASSWORD }}
         run: |
           $certPath = Join-Path $env:RUNNER_TEMP "cert.pfx"
           [IO.File]::WriteAllBytes($certPath, [Convert]::FromBase64String($env:WIN_CERT_FILE_B64))
-          echo "WIN_CERT_FILE=$certPath" >> $env:GITHUB_ENV
 
-      # ── Build the package (signing happens automatically) ──────────────
+          # Write the signing config pointing to the decoded certificate.
+          # certificate_password_env names the env var holding the password
+          # (rattler-build reads it at build time to avoid leaking into recipes).
+          @"
+          windows:
+            signtool:
+              certificate_file: "$certPath"
+              certificate_password_env: "WIN_CERT_PASSWORD"
+            timestamp_url: "http://timestamp.digicert.com"
+            digest_algorithm: sha256
+          "@ | Set-Content -Path signing.yaml
+
+      # ── Build the package (signing injected via --signing-config-file) ─
       - name: Build conda package
-        env:
-          MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
-          WIN_CERT_FILE: ${{ env.WIN_CERT_FILE }}
-          WIN_CERT_PASSWORD: ${{ secrets.WIN_CERT_PASSWORD }}
-        run: |
-          rattler-build build \
-            --experimental \
-            --recipe recipe.yaml \
-            --target-platform ${{ matrix.platform }}
+        run: >-
+          rattler-build build
+          --recipe recipe.yaml
+          --target-platform ${{ matrix.platform }}
+          ${{ runner.os != 'Linux' && '--signing-config-file signing.yaml' || '' }}
 
       # ── Upload the built .conda package as an artifact ─────────────────
       - name: Upload package
@@ -198,17 +219,30 @@ jobs:
           echo "$signtoolDir" >> $env:GITHUB_PATH
           Write-Host "Added $signtoolDir to PATH"
 
-      # ── Build the package (Azure Trusted Signing) ──────────────────────
-      - name: Build conda package
+      # ── Write Azure Trusted Signing config ──────────────────────────────
+      - name: Prepare Azure signing config
+        shell: pwsh
         env:
           AZURE_SIGNING_ENDPOINT: ${{ secrets.AZURE_SIGNING_ENDPOINT }}
           AZURE_SIGNING_ACCOUNT: ${{ secrets.AZURE_SIGNING_ACCOUNT }}
           AZURE_SIGNING_PROFILE: ${{ secrets.AZURE_SIGNING_PROFILE }}
         run: |
-          rattler-build build \
-            --experimental \
-            --recipe recipe.yaml \
-            --target-platform win-64
+          @"
+          windows:
+            azure_trusted_signing:
+              endpoint: "$env:AZURE_SIGNING_ENDPOINT"
+              account_name: "$env:AZURE_SIGNING_ACCOUNT"
+              certificate_profile: "$env:AZURE_SIGNING_PROFILE"
+            timestamp_url: "http://timestamp.acs.microsoft.com"
+          "@ | Set-Content -Path signing.yaml
+
+      # ── Build the package (Azure Trusted Signing via --signing-config-file)
+      - name: Build conda package
+        run: >-
+          rattler-build build
+          --recipe recipe.yaml
+          --target-platform win-64
+          --signing-config-file signing.yaml
 
       # ── Upload ─────────────────────────────────────────────────────────
       - name: Upload package

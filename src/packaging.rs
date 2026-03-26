@@ -705,8 +705,12 @@ pub fn package_conda(
 
     tracing::info!("Post-processing done!");
 
-    // Sign binaries with real certificates (if configured in recipe)
-    let signed_files = post_process::signing::sign_binaries(&tmp, output)?;
+    // Sign binaries with real certificates (if configured via --signing-config-file or recipe)
+    let signed_files = post_process::signing::sign_binaries(
+        &tmp,
+        output,
+        tool_configuration.signing_config_override.as_ref(),
+    )?;
 
     // Check that signed binaries don't contain the build prefix
     // (prefix replacement at install time would destroy signatures)

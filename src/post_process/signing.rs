@@ -436,8 +436,10 @@ fn is_signable_binary(platform: Platform, path: &Path) -> bool {
 pub fn sign_binaries(
     temp_files: &TempFiles,
     output: &Output,
+    signing_override: Option<&Signing>,
 ) -> Result<Vec<PathBuf>, SigningError> {
-    let signing = &output.recipe.build().signing;
+    let recipe_signing = &output.recipe.build().signing;
+    let signing = signing_override.unwrap_or(recipe_signing);
     let target_platform = output.build_configuration.target_platform;
     let system_tools = &output.system_tools;
 

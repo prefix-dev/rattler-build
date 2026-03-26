@@ -21,19 +21,8 @@ build:
     - cmake --build build --config Release
     - cmake --install build
 
-  # Code signing: rattler-build signs all detected binaries after relinking,
-  # right before the package archive is created.
-  signing:
-    macos:
-      identity: "${{ env.MACOS_SIGNING_IDENTITY }}"
-      options:
-        - runtime
-    windows:
-      signtool:
-        certificate_file: "${{ env.WIN_CERT_FILE }}"
-        certificate_password_env: WIN_CERT_PASSWORD
-      timestamp_url: "http://timestamp.digicert.com"
-      digest_algorithm: sha256
+  # Note: no signing config here! Signing is injected externally via
+  # --signing-config-file so this recipe stays portable and CI-agnostic.
 
 requirements:
   build:

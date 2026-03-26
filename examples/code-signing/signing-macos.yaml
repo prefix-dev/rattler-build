@@ -1,0 +1,8 @@
+# macOS code signing configuration
+# Pass to rattler-build via: --signing-config-file signing-macos.yaml
+#
+# The values below reference environment variables that should be set in CI.
+macos:
+  identity: "Developer ID Application: My Company (TEAMID)"
+  options:
+    - runtime

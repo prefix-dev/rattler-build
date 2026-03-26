@@ -19,6 +19,8 @@ use rattler_solve::ChannelPriority;
 use thiserror::Error;
 use url::Url;
 
+use rattler_build_recipe::stage1::build::Signing;
+
 use crate::console_utils::LoggingOutputHandler;
 
 /// The user agent to use for the reqwest client
@@ -144,6 +146,10 @@ pub struct Configuration {
     /// This is only useful for other libraries that build their own environments and only use rattler-build
     /// to execute scripts / bundle up files.
     pub environments_externally_managed: bool,
+
+    /// Optional signing configuration loaded from a `--signing-config-file`.
+    /// When set, this overrides any signing config in the recipe.
+    pub signing_config_override: Option<Signing>,
 }
 
 /// Get the authentication storage from the given file
@@ -207,6 +213,7 @@ pub struct ConfigurationBuilder {
     allow_symlinks_on_windows: bool,
     allow_absolute_license_paths: bool,
     environments_externally_managed: bool,
+    signing_config_override: Option<Signing>,
 }
 
 impl Configuration {
@@ -241,6 +248,7 @@ impl ConfigurationBuilder {
             allow_symlinks_on_windows: false,
             allow_absolute_license_paths: false,
             environments_externally_managed: false,
+            signing_config_override: None,
         }
     }
 
@@ -414,6 +422,14 @@ impl ConfigurationBuilder {
         }
     }
 
+    /// Set the signing configuration override (from `--signing-config-file`).
+    pub fn with_signing_config_override(self, signing_config_override: Option<Signing>) -> Self {
+        Self {
+            signing_config_override,
+            ..self
+        }
+    }
+
     /// Set whether the environments are externally managed (e.g. by `pixi-build`).
     /// This is only useful for other libraries that build their own environments and only use rattler
     /// to execute scripts / bundle up files.
@@ -482,6 +498,7 @@ impl ConfigurationBuilder {
             allow_symlinks_on_windows: self.allow_symlinks_on_windows,
             allow_absolute_license_paths: self.allow_absolute_license_paths,
             environments_externally_managed: self.environments_externally_managed,
+            signing_config_override: self.signing_config_override,
         }
     }
 }

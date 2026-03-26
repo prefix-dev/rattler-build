@@ -544,6 +544,12 @@ pub struct BuildOpts {
     /// Override the build number for all outputs (defaults to the build number in the recipe)
     #[arg(long, help_heading = "Modifying result")]
     pub build_num: Option<u64>,
+
+    /// Path to a YAML file with code signing configuration. This overrides any
+    /// signing config in the recipe, allowing you to keep recipes free of
+    /// CI-specific signing details.
+    #[arg(long, help_heading = "Modifying result")]
+    pub signing_config_file: Option<PathBuf>,
 }
 
 /// Publish options for the `publish` command.
@@ -726,6 +732,7 @@ pub struct BuildData {
     pub exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
     pub build_num_override: Option<u64>,
     pub markdown_summary: Option<PathBuf>,
+    pub signing_config_file: Option<PathBuf>,
 }
 
 impl BuildData {
@@ -763,6 +770,7 @@ impl BuildData {
         exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
         build_num_override: Option<u64>,
         markdown_summary: Option<PathBuf>,
+        signing_config_file: Option<PathBuf>,
     ) -> Self {
         Self {
             up_to,
@@ -804,6 +812,7 @@ impl BuildData {
             exclude_newer,
             build_num_override,
             markdown_summary,
+            signing_config_file,
         }
     }
 }
@@ -856,6 +865,7 @@ impl BuildData {
             opts.exclude_newer,
             opts.build_num,
             opts.markdown_summary,
+            opts.signing_config_file,
         )
     }
 }

@@ -1,0 +1,11 @@
+# Windows code signing configuration (signtool with local .pfx certificate)
+# Pass to rattler-build via: --signing-config-file signing-windows.yaml
+#
+# The certificate_file path and certificate_password_env (name of the env var
+# holding the password) are filled in by the GitHub Actions workflow.
+windows:
+  signtool:
+    certificate_file: "cert.pfx"
+    certificate_password_env: "WIN_CERT_PASSWORD"
+  timestamp_url: "http://timestamp.digicert.com"
+  digest_algorithm: sha256

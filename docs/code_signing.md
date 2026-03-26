@@ -45,6 +45,45 @@ Because relinking invalidates existing signatures, rattler-build first applies
 an ad-hoc signature (`codesign -s -`) on macOS during relinking, then overwrites
 it with the real identity during the signing step using `--force`.
 
+## External signing config (`--signing-config-file`)
+
+Signing is often a CI/build-environment concern -- not something that belongs
+in the recipe itself. The `--signing-config-file` flag lets you keep your
+recipe completely free of signing details and inject them only when needed:
+
+```bash
+rattler-build build --recipe recipe.yaml --signing-config-file signing.yaml
+```
+
+The signing config file uses the exact same YAML structure as the `build.signing`
+section of a recipe:
+
+```yaml title="signing.yaml"
+macos:
+  identity: "Developer ID Application: My Company (TEAMID)"
+  options:
+    - runtime
+```
+
+```yaml title="signing.yaml"
+windows:
+  signtool:
+    certificate_file: "/path/to/cert.pfx"
+    certificate_password_env: "MY_CERT_PASSWORD"
+  timestamp_url: "http://timestamp.digicert.com"
+  digest_algorithm: sha256
+```
+
+When `--signing-config-file` is provided, it **completely overrides** any
+`build.signing` section in the recipe. If the flag is not provided, the recipe's
+signing configuration (if any) is used as before.
+
+This approach has several benefits:
+
+- **Portable recipes**: the same recipe works everywhere, signed or unsigned
+- **Separation of concerns**: signing credentials stay in CI config, not in source
+- **Local development**: developers can build without needing certificates
+
 ## macOS signing
 
 macOS signing uses Apple's `codesign` tool. You must provide a signing identity,
@@ -330,9 +369,10 @@ The [`examples/code-signing/`](https://github.com/prefix-dev/rattler-build/tree/
 directory contains a complete, copy-paste-ready example:
 
 - A small C project (executable + shared library) built with CMake
-- A `recipe.yaml` with signing configured for both macOS and Windows
-- A GitHub Actions workflow that imports certificates from secrets, builds the
-  package, and signs the binaries
+- A `recipe.yaml` with **no signing config** -- the recipe stays portable
+- Standalone signing YAML files for macOS and Windows
+- A GitHub Actions workflow that generates signing config from secrets and
+  passes it via `--signing-config-file`
 
 To try it in your own repo, copy the example directory and configure the
 required GitHub secrets (see the workflow file for the full list).

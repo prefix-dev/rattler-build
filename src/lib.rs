@@ -285,6 +285,20 @@ pub fn get_tool_config(
     )
     .into_diagnostic()?;
 
+    // Load signing config from file if specified
+    let signing_config_override = if let Some(ref path) = build_data.signing_config_file {
+        let content = fs::read_to_string(path)
+            .into_diagnostic()
+            .wrap_err_with(|| format!("Failed to read signing config file: {}", path.display()))?;
+        let signing: rattler_build_recipe::stage1::build::Signing =
+            serde_yaml::from_str(&content)
+                .into_diagnostic()
+                .wrap_err("Failed to parse signing config file")?;
+        Some(signing)
+    } else {
+        None
+    };
+
     let configuration_builder = Configuration::builder()
         .with_keep_build(build_data.keep_build)
         .with_compression_threads(build_data.compression_threads)
@@ -301,7 +315,8 @@ pub fn get_tool_config(
         .with_io_concurrency_limit(Some(build_data.io_concurrency_limit))
         .with_zstd_repodata_enabled(build_data.common.use_zstd)
         .with_bz2_repodata_enabled(build_data.common.use_bz2)
-        .with_sharded_repodata_enabled(build_data.common.use_sharded);
+        .with_sharded_repodata_enabled(build_data.common.use_sharded)
+        .with_signing_config_override(signing_config_override);
 
     let configuration_builder = if let Some(fancy_log_handler) = fancy_log_handler {
         configuration_builder.with_logging_output_handler(fancy_log_handler.clone())
@@ -1694,6 +1709,7 @@ pub async fn debug_recipe(
         exclude_newer: None,
         build_num_override: None,
         markdown_summary: None,
+        signing_config_file: None,
     };
 
     let tool_config = get_tool_config(&build_data, log_handler)?;
