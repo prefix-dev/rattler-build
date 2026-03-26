@@ -84,6 +84,9 @@ e.g. `tar-bz2:<number>` (from 1 to 9) or `conda:<number>` (from -7 to
 - <a id="arg---color-build-log" href="#arg---color-build-log">`--color-build-log`</a>
 :  Don't force colors in the output of the build script
 <br>**default**: `true`
+- <a id="arg---env-isolation" href="#arg---env-isolation">`--env-isolation <ENV_ISOLATION>`</a>
+:  Environment isolation mode for build scripts. `strict` (default): clean environment with normalized locale, HOME, USER etc. `conda-build`: match conda-build behavior (forward CFLAGS, LDFLAGS, LANG, HOME etc.) `none`: inherit the entire host environment
+<br>**default**: `strict`
 - <a id="arg---output-dir" href="#arg---output-dir">`--output-dir <OUTPUT_DIR>`</a>
 :  Output directory for build artifacts.
 <br>**env**: `CONDA_BLD_PATH`
