@@ -2931,18 +2931,15 @@ Recipe structure (as dict):
   },
   &quot;build&quot;: {
     &quot;number&quot;: 0,
-    &quot;string&quot;: null,
     &quot;script&quot;: {
       &quot;content&quot;: [
         &quot;echo \&quot;Building my package\&quot;&quot;
       ]
     },
-    &quot;noarch&quot;: null,
     &quot;python&quot;: {
       &quot;entry_points&quot;: [],
       &quot;skip_pyc_compilation&quot;: [],
-      &quot;use_python_app_entrypoint&quot;: false,
-      &quot;site_packages_path&quot;: null
+      &quot;use_python_app_entrypoint&quot;: false
     },
     &quot;skip&quot;: [],
     &quot;always_copy_files&quot;: [],
@@ -2953,14 +2950,11 @@ Recipe structure (as dict):
       &quot;rpaths&quot;: [],
       &quot;binary_relocation&quot;: true,
       &quot;missing_dso_allowlist&quot;: [],
-      &quot;rpath_allowlist&quot;: [],
-      &quot;overdepending_behavior&quot;: null,
-      &quot;overlinking_behavior&quot;: null
+      &quot;rpath_allowlist&quot;: []
     },
     &quot;variant&quot;: {
       &quot;use_keys&quot;: [],
-      &quot;ignore_keys&quot;: [],
-      &quot;down_prioritize_variant&quot;: null
+      &quot;ignore_keys&quot;: []
     },
     &quot;prefix_detection&quot;: {
       &quot;force_file_type&quot;: {
@@ -2985,11 +2979,7 @@ Recipe structure (as dict):
   &quot;about&quot;: {
     &quot;homepage&quot;: &quot;https://github.com/example/my-package&quot;,
     &quot;license&quot;: &quot;MIT&quot;,
-    &quot;license_family&quot;: null,
-    &quot;summary&quot;: &quot;A simple example package&quot;,
-    &quot;description&quot;: null,
-    &quot;documentation&quot;: null,
-    &quot;repository&quot;: null
+    &quot;summary&quot;: &quot;A simple example package&quot;
   },
   &quot;extra&quot;: {}
 }
@@ -3269,7 +3259,7 @@ Recipe rendering complete!
 </span></code></pre></div>
 <div class="language-text highlight"><pre><span></span><code>Building packages...
 ============================================================
-Recipe path: /tmp/rattler_build_kvspgv3u/recipe.yaml
+Recipe path: /tmp/rattler_build_l8apt7wv/recipe.yaml
 
 Building variant 1/3
   Package: my-simple-package
@@ -3277,22 +3267,22 @@ Building variant 1/3
   Build string: np121py39h13fef27_0
 
 
-  Build complete in 3.04s!
-  Package: /tmp/rattler_build_kvspgv3u/output/linux-64/my-simple-package-1.0.0-np121py39h13fef27_0.conda
-  Variant: {&#39;python&#39;: &#39;3.9&#39;, &#39;numpy&#39;: &#39;1.21&#39;, &#39;target_platform&#39;: &#39;linux-64&#39;}
+  Build complete in 2.86s!
+  Package: /tmp/rattler_build_l8apt7wv/output/linux-64/my-simple-package-1.0.0-np121py39h13fef27_0.conda
+  Variant: {&#39;target_platform&#39;: &#39;linux-64&#39;, &#39;numpy&#39;: &#39;1.21&#39;, &#39;python&#39;: &#39;3.9&#39;}
   Build log: 51 messages captured
 
   Build log details:
     Starting build of 1 outputs
     No sources to fetch
-    Could not find noarch/repodata.json. Creating new one.
-    Adding 0 packages to subdir noarch.
-    Successfully added 0 packages to subdir noarch.
-    Writing repodata to noarch/repodata.json
     Could not find linux-64/repodata.json. Creating new one.
     Adding 0 packages to subdir linux-64.
     Successfully added 0 packages to subdir linux-64.
     Writing repodata to linux-64/repodata.json
+    Could not find noarch/repodata.json. Creating new one.
+    Adding 0 packages to subdir noarch.
+    Successfully added 0 packages to subdir noarch.
+    Writing repodata to noarch/repodata.json
     ... and 41 more messages
 
 Building variant 2/3
@@ -3301,9 +3291,9 @@ Building variant 2/3
   Build string: np122py310h27bf20f_0
 
 
-  Build complete in 2.64s!
-  Package: /tmp/rattler_build_kvspgv3u/output/linux-64/my-simple-package-1.0.0-np122py310h27bf20f_0.conda
-  Variant: {&#39;python&#39;: &#39;3.10&#39;, &#39;numpy&#39;: &#39;1.22&#39;, &#39;target_platform&#39;: &#39;linux-64&#39;}
+  Build complete in 2.66s!
+  Package: /tmp/rattler_build_l8apt7wv/output/linux-64/my-simple-package-1.0.0-np122py310h27bf20f_0.conda
+  Variant: {&#39;python&#39;: &#39;3.10&#39;, &#39;target_platform&#39;: &#39;linux-64&#39;, &#39;numpy&#39;: &#39;1.22&#39;}
   Build log: 46 messages captured
 
   Build log details:
@@ -3312,9 +3302,9 @@ Building variant 2/3
     Adding 0 packages to subdir linux-64.
     Successfully added 0 packages to subdir linux-64.
     Writing repodata to linux-64/repodata.json
-      Platform: linux-64 [2m[__unix=0=0, __linux=6.14.0=0, __glibc=2.39=0, __archspec=1=zen2][0m
+      Platform: linux-64 [2m[__unix=0=0, __linux=6.17.0=0, __glibc=2.39=0, __archspec=1=zen2][0m
       Channels: 
-       - file:///tmp/rattler_build_kvspgv3u/output/
+       - file:///tmp/rattler_build_l8apt7wv/output/
        - conda-forge
       Specs:
     ... and 36 more messages
@@ -3323,11 +3313,9 @@ Building variant 3/3
   Package: my-simple-package
   Version: 1.0.0
   Build string: np123py311hadc6f11_0
-
-
-  Build complete in 3.86s!
-  Package: /tmp/rattler_build_kvspgv3u/output/linux-64/my-simple-package-1.0.0-np123py311hadc6f11_0.conda
-  Variant: {&#39;numpy&#39;: &#39;1.23&#39;, &#39;python&#39;: &#39;3.11&#39;, &#39;target_platform&#39;: &#39;linux-64&#39;}
+  Build complete in 2.89s!
+  Package: /tmp/rattler_build_l8apt7wv/output/linux-64/my-simple-package-1.0.0-np123py311hadc6f11_0.conda
+  Variant: {&#39;python&#39;: &#39;3.11&#39;, &#39;target_platform&#39;: &#39;linux-64&#39;, &#39;numpy&#39;: &#39;1.23&#39;}
   Build log: 46 messages captured
 
   Build log details:
@@ -3336,9 +3324,9 @@ Building variant 3/3
     Adding 0 packages to subdir linux-64.
     Successfully added 0 packages to subdir linux-64.
     Writing repodata to linux-64/repodata.json
-      Platform: linux-64 [2m[__unix=0=0, __linux=6.14.0=0, __glibc=2.39=0, __archspec=1=zen2][0m
+      Platform: linux-64 [2m[__unix=0=0, __linux=6.17.0=0, __glibc=2.39=0, __archspec=1=zen2][0m
       Channels: 
-       - file:///tmp/rattler_build_kvspgv3u/output/
+       - file:///tmp/rattler_build_l8apt7wv/output/
        - conda-forge
       Specs:
     ... and 36 more messages
@@ -3346,7 +3334,7 @@ Building variant 3/3
 ============================================================
 All builds completed successfully!
 
-Built packages are available in: /tmp/rattler_build_kvspgv3u/output
+Built packages are available in: /tmp/rattler_build_l8apt7wv/output
 </code></pre></div>
 <h2 id="summary">Summary<a class="headerlink" href="#summary" title="Permanent link">#</a></h2>
 <p>In this tutorial, you learned:</p>

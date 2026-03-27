@@ -3175,9 +3175,9 @@ being automatically compiled from <code>.py</code> to <code>.pyc</code>. Note th
 packages never contain <code>.pyc</code> files. Some packages ship .py files that cannot be
 compiled, such as those that contain templates. Some packages also ship .py
 files that should not be compiled yet, because the Python interpreter that will
-be used is not known at build time. In these cases, conda-build can skip
-attempting to compile these files. The patterns used in this section do not need
-the ** to handle recursive paths.</p>
+be used is not known at build time. In these cases, rattler-build can skip
+attempting to compile these files. The patterns used are glob patterns — use
+<code>**</code> to match files in nested directories (e.g. <code>foo/**/*.py</code>).</p>
 <p>The <code>site_packages_path</code> is a specific option that is only used when build
 <code>python</code> itself. It will add metadata to the package record of the python
 package to tell the installer where the <code>site-packages</code> path is located. This is

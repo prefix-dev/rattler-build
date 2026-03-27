@@ -4885,9 +4885,9 @@ removed.</p>
 </span></code></pre></div>
 <p>A selector is a valid Python statement that is executed. You can read more about
 them in the <a href="../../selectors/">"Selectors in recipes" chapter</a>.</p>
-<p>The use of the Python version selectors, <code>py27</code>, <code>py34</code>, etc. is discouraged in
-favor of the more general comparison operators. Additional selectors in this
-series will not be added to <code>conda-build</code>.</p>
+<p>Note that <code>conda-build</code>'s Python version selectors (<code>py27</code>, <code>py34</code>, etc.) are
+not supported in <code>rattler-build</code>. Use the more general comparison operators
+instead.</p>
 <p>Because the selector is any valid Python expression, complicated logic is
 possible:</p>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-81-1"><a id="__codelineno-81-1" name="__codelineno-81-1" href="#__codelineno-81-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">unix and not win</span>
