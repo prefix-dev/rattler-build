@@ -248,6 +248,9 @@ channels = [
   "https://prefix.dev/conda-forge",
 ]
 
+[package.build-dependencies]
+cmake = ">=4.3.0, <5"
+
 [package.build.config]
 compilers = ["rust", "c"]
 # Use cmake to build aws-lc-sys, because conda's CFLAGS inject -O2 which
