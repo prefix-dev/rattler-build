@@ -1371,14 +1371,16 @@ To retrieve a fully rendered `recipe.yaml`, use the `` command.
 
 Besides the default Jinja2 functionality, additional Jinja functions are
 available during the Rattler-Build process: `pin_compatible`, `pin_subpackage`,
-and `compiler`.
+`compiler` and `stdlib`.
 
-The compiler function takes `c`, `cxx`, `fortran` and other values as argument
+The `compiler` function takes `c`, `cxx`, `fortran` and other values as argument
 and automatically selects the right (cross-)compiler for the target platform.
+Similarly, `stdlib` function selects the right standard library dependencies.
 
 ```
 build:
   - ${{ compiler('c') }}
+  - ${{ stdlib('c') }}
 ```
 
 The `pin_subpackage` function pins another package produced by the recipe with
