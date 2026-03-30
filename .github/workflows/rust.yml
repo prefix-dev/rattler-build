@@ -102,7 +102,9 @@ jobs:
         run: pixi run test-ci
       - name: Run end-to-end tests
         # Run pytest directly to avoid pixi's build-release dependency (already built above)
-        run: pixi run pytest test/end-to-end --snapshot-warn-unused --snapshot-details --numprocesses=auto --durations=0 -v
+        # On Windows, use a short basetemp path to avoid hitting the cmd.exe line-length limit
+        # during VS compiler activation (vcvars64.bat).
+        run: pixi run pytest test/end-to-end --snapshot-warn-unused --snapshot-details --numprocesses=auto --durations=0 -v ${{ runner.os == 'Windows' && '--basetemp=C:\bld' || '' }}
         env:
           PREFIX_DEV_READ_ONLY_TOKEN: ${{ secrets.PREFIX_DEV_READ_ONLY_TOKEN }}
           ANACONDA_ORG_TEST_TOKEN: ${{ secrets.ANACONDA_ORG_TEST_TOKEN }}
