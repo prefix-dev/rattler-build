@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.61.3] - 2026-03-30
+### ✨ Highlights
+
+This release brings a couple of important fixes and documentation updates.
+
+### Documentation
+
+- Update documentation references from conda-build to rattler-build by @wolfv in [#2360](https://github.com/prefix-dev/rattler-build/pull/2360)
+- Clarify the documentation of pin functions by @mgorny in [#2382](https://github.com/prefix-dev/rattler-build/pull/2382)
+- Fix obsolete `min_pin` and `max_pin` references by @mgorny in [#2380](https://github.com/prefix-dev/rattler-build/pull/2380)
+- Mention `stdlib()` function in the recipe doc by @mgorny in [#2381](https://github.com/prefix-dev/rattler-build/pull/2381)
+
+
+### Fixed
+
+- Set variant and platform env vars in test scripts by @Hofer-Julian in [#2365](https://github.com/prefix-dev/rattler-build/pull/2365)
+- Reindex all platform subdirs in build_reindexed_channels by @Hofer-Julian in [#2383](https://github.com/prefix-dev/rattler-build/pull/2383)
+- Fix "built with" metadata by @Hofer-Julian in [#2377](https://github.com/prefix-dev/rattler-build/pull/2377)
+- Add `cmake` as build dependency by @ruben-arts in [#2376](https://github.com/prefix-dev/rattler-build/pull/2376)
+
+
+### Refactor
+
+- Improve table output by @Hofer-Julian in [#2369](https://github.com/prefix-dev/rattler-build/pull/2369)
+- Adapt recipe stage 0 to fit Pixi's needs by @Hofer-Julian in [#2373](https://github.com/prefix-dev/rattler-build/pull/2373)
+
+
+
 ## [0.61.2] - 2026-03-24
 ### ✨ Highlights
 
