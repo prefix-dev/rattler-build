@@ -1438,7 +1438,7 @@ requirements:
     - numpy
   run:
     # this will export `numpy >=1.11,<2`, instead of the stricter `1.11` pin
-    - ${{ pin_compatible('numpy', min_pin='x.x', upper_bound='x') }}
+    - ${{ pin_compatible('numpy', lower_bound='x.x', upper_bound='x') }}
 ```
 
 #### The env Jinja functions
