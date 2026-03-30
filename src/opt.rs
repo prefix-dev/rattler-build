@@ -691,6 +691,12 @@ pub struct BuildOpts {
     /// Override the build number for all outputs (defaults to the build number in the recipe)
     #[arg(long, help_heading = "Modifying result")]
     pub build_num: Option<u64>,
+
+    /// Set the timestamp for the build. This is used as SOURCE_DATE_EPOCH and for the build
+    /// directory name. Accepts either a Unix epoch in seconds (e.g. 1700000000) or an RFC3339
+    /// timestamp (e.g. 2024-03-15T12:00:00Z). Defaults to the current time.
+    #[arg(long, help_heading = "Modifying result", value_parser = parse_timestamp)]
+    pub timestamp: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 /// Publish options for the `publish` command.
@@ -871,6 +877,7 @@ pub struct BuildData {
     pub exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
     pub build_num_override: Option<u64>,
     pub markdown_summary: Option<PathBuf>,
+    pub timestamp: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 impl BuildData {
@@ -906,6 +913,7 @@ impl BuildData {
         exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
         build_num_override: Option<u64>,
         markdown_summary: Option<PathBuf>,
+        timestamp: Option<chrono::DateTime<chrono::Utc>>,
     ) -> Self {
         Self {
             up_to,
@@ -945,6 +953,7 @@ impl BuildData {
             exclude_newer,
             build_num_override,
             markdown_summary,
+            timestamp,
         }
     }
 }
@@ -995,6 +1004,7 @@ impl BuildData {
             opts.exclude_newer,
             opts.build_num,
             opts.markdown_summary,
+            opts.timestamp,
         )
     }
 }
@@ -1040,6 +1050,16 @@ fn parse_datetime(s: &str) -> Result<chrono::DateTime<chrono::Utc>, String> {
                 s, e
             )
         })
+}
+
+fn parse_timestamp(s: &str) -> Result<chrono::DateTime<chrono::Utc>, String> {
+    // First try parsing as a Unix epoch (integer seconds)
+    if let Ok(epoch) = s.parse::<i64>() {
+        return chrono::DateTime::from_timestamp(epoch, 0)
+            .ok_or_else(|| format!("Invalid Unix epoch timestamp: {s}"));
+    }
+    // Fall back to RFC3339
+    parse_datetime(s)
 }
 
 /// Test options.

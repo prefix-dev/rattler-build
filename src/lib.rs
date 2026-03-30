@@ -442,7 +442,7 @@ pub async fn get_build_output(
         .or_else(|| outputs_and_variants.first().map(|o| o.name.clone()))
         .unwrap_or_else(|| "build".to_string());
 
-    let timestamp = chrono::Utc::now();
+    let timestamp = build_data.timestamp.unwrap_or_else(chrono::Utc::now);
 
     for discovered_output in outputs_and_variants {
         let recipe = &discovered_output.recipe;
@@ -1576,6 +1576,7 @@ pub async fn debug_recipe(
         exclude_newer: None,
         build_num_override: None,
         markdown_summary: None,
+        timestamp: None,
     };
 
     let tool_config = get_tool_config(&build_data, log_handler)?;
