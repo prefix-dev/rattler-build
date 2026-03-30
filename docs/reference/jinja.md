@@ -89,10 +89,11 @@ resolution).
 
 The pin functions take the following three arguments:
 
-- `lower_bound` (default: `"x.x.x.x.x.x"`): The lower bound pin expression to be
-  used. When set to `None`, no lower bound is set.
-- `upper_bound` (default: `"x"`): The maximum pin to be used. When set to
-  `None`, no upper bound is set.
+1. The package name.
+2. `lower_bound=...` (default: `"x.x.x.x.x.x"`): The lower bound pin expression
+   to be used. When set to `None`, no lower bound is set.
+3. `upper_bound=...` (default: `"x"`): The maximum pin to be used. When set to
+   `None`, no upper bound is set.
 
 The lower bound and upper bound can either be a "pin expression" (only `x` and
 `.` are allowed) or a hard-coded version string.
@@ -109,22 +110,11 @@ then incrementing the version will set that letter to `a`, e.g. `9e` will become
 `10a`, and `1.1.1j` will become `1.1.2a`. In this case, also no `0a0` is
 appended to the end.
 
-Sometimes you want to strongly connect your outputs. This can be achieved with
-the following input:
+Sometimes you want to strongly connect your outputs. This can be achieved by
+passing the following argument instead of `lower_bound` and `upper_bound`:
 
 - `exact=True` (default: `False`): This will pin the version exactly to the
   version of the output, incl. the build string.
-
-To override the lower or upper bound with a hard-coded value, you can use the
-following input:
-
-- `lower_bound` (default: `None`): This will override the lower bound with the
-  given value.
-- `upper_bound` (default: `None`): This will override the upper bound with the
-  given value.
-
-Both `lower_bound` and `upper_bound` expect a valid version string (e.g.
-`1.2.3`).
 
 To add an build-string matching expression, you can use the `build` argument:
 
