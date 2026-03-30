@@ -39,6 +39,19 @@ pub struct PyPIOpts {
     /// Whether to generate recipes for all dependencies
     #[cfg_attr(feature = "cli", arg(short, long))]
     pub tree: bool,
+
+    /// Specify the PyPI index URL(s) to use for recipe generation
+    #[cfg_attr(
+        feature = "cli",
+        arg(
+            long = "pypi-index-url",
+            env = "RATTLER_BUILD_PYPI_INDEX_URL",
+            default_value = "https://pypi.org/pypi",
+            value_delimiter = ',',
+            help = "Specify the PyPI index URL(s) to use for recipe generation"
+        )
+    )]
+    pub pypi_index_urls: Vec<String>,
 }
 
 #[derive(Deserialize, Clone, Debug, Default)]
@@ -283,53 +296,98 @@ async fn fetch_pypi_metadata(
     opts: &PyPIOpts,
     client: &reqwest::Client,
 ) -> miette::Result<PyPiMetadata> {
-    let (info, urls) = if let Some(version) = &opts.version {
-        let url = format!("https://pypi.org/pypi/{}/{}/json", opts.package, version);
-        let response = client.get(&url).send().await.into_diagnostic()?;
-        if response.status() == reqwest::StatusCode::NOT_FOUND {
-            miette::bail!(
-                "Package '{}' version '{}' not found on PyPI",
-                opts.package,
-                version
-            );
+    // Try each PyPI index URL in sequence until one works
+    let mut errors = Vec::new();
+
+    for base_url in &opts.pypi_index_urls {
+        let base_url = if base_url.ends_with('/') {
+            base_url.to_string()
+        } else {
+            format!("{}/", base_url)
+        };
+
+        let result: Result<(PyPiInfo, Vec<PyPiRelease>), miette::Error> = async {
+            if let Some(version) = &opts.version {
+                let url = format!("{}{}/{}/json", base_url, opts.package, version);
+                let response = client
+                    .get(&url)
+                    .send()
+                    .await
+                    .into_diagnostic()
+                    .context(format!("Failed to fetch from {}", url))?;
+
+                if !response.status().is_success() {
+                    return Err(miette::miette!(
+                        "Server returned status code: {}",
+                        response.status()
+                    ));
+                }
+
+                let release: PyPrReleaseResponse = response.json().await.into_diagnostic()?;
+                Ok((release.info, release.urls))
+            } else {
+                let url = format!("{}{}/json", base_url, opts.package);
+                let response = client
+                    .get(&url)
+                    .send()
+                    .await
+                    .into_diagnostic()
+                    .context(format!("Failed to fetch from {}", url))?;
+
+                if !response.status().is_success() {
+                    return Err(miette::miette!(
+                        "Server returned status code: {}",
+                        response.status()
+                    ));
+                }
+
+                let response: PyPiResponse = response.json().await.into_diagnostic()?;
+
+                // Get the latest release
+                let urls = response
+                    .releases
+                    .get(&response.info.version)
+                    .ok_or_else(|| miette::miette!("No source distribution found"))?;
+                Ok((response.info, urls.clone()))
+            }
         }
-        let response = response.error_for_status().into_diagnostic()?;
-        let release: PyPrReleaseResponse = response.json().await.into_diagnostic()?;
-        (release.info, release.urls)
-    } else {
-        let url = format!("https://pypi.org/pypi/{}/json", opts.package);
-        let response = client.get(&url).send().await.into_diagnostic()?;
-        if response.status() == reqwest::StatusCode::NOT_FOUND {
-            miette::bail!("Package '{}' not found on PyPI", opts.package);
+        .await;
+
+        match result {
+            Ok((info, urls)) => {
+                tracing::info!("Successfully fetched metadata from {}", base_url);
+
+                let release = urls
+                    .iter()
+                    .find(|r| r.filename.ends_with(".tar.gz"))
+                    .ok_or_else(|| miette::miette!("No source distribution found in {}", base_url))?
+                    .clone();
+
+                let wheel_url = urls
+                    .iter()
+                    .find(|r| r.filename.ends_with(".whl"))
+                    .map(|r| r.url.clone());
+
+                return Ok(PyPiMetadata {
+                    info,
+                    urls,
+                    release,
+                    wheel_url,
+                });
+            }
+            Err(err) => {
+                tracing::warn!("Failed to fetch from {}: {}", base_url, err);
+                errors.push(format!("{}: {}", base_url, err));
+            }
         }
-        let response = response.error_for_status().into_diagnostic()?;
-        let response: PyPiResponse = response.json().await.into_diagnostic()?;
+    }
 
-        // Get the latest release
-        let urls = response
-            .releases
-            .get(&response.info.version)
-            .ok_or_else(|| miette::miette!("No source distribution found"))?;
-        (response.info, urls.clone())
-    };
-
-    let release = urls
-        .iter()
-        .find(|r| r.filename.ends_with(".tar.gz"))
-        .ok_or_else(|| miette::miette!("No source distribution found"))?
-        .clone();
-
-    let wheel_url = urls
-        .iter()
-        .find(|r| r.filename.ends_with(".whl"))
-        .map(|r| r.url.clone());
-
-    Ok(PyPiMetadata {
-        info,
-        urls,
-        release,
-        wheel_url,
-    })
+    // If we get here, all URLs failed
+    let error_message = format!(
+        "Failed to fetch metadata from all provided PyPI URLs:\n- {}",
+        errors.join("\n- ")
+    );
+    Err(miette::miette!(error_message))
 }
 
 async fn map_requirement(
@@ -710,11 +768,18 @@ pub async fn create_recipe(
     recipe.package.version = "${{ version }}".to_string();
     recipe.build.number = "${{ build_number }}".to_string();
 
-    // replace URL with the shorter version that does not contain the hash
-    let release_url = if metadata
-        .release
-        .url
-        .starts_with("https://files.pythonhosted.org/")
+    // Check if we're using the standard PyPI
+    let is_default_pypi = opts
+        .pypi_index_urls
+        .iter()
+        .any(|url| url.starts_with("https://pypi.org"));
+
+    // replace URL with the shorter version that does not contain the hash if using the standard PyPI
+    let release_url = if is_default_pypi
+        && metadata
+            .release
+            .url
+            .starts_with("https://files.pythonhosted.org/")
     {
         let simple_url = format!(
             "https://pypi.org/packages/source/{}/{}/{}-{}.tar.gz",
@@ -897,6 +962,7 @@ mod tests {
             write: false,
             use_mapping: true,
             tree: false,
+            pypi_index_urls: vec!["https://pypi.org/pypi".to_string()],
         };
 
         let client = reqwest::Client::new();
@@ -914,6 +980,7 @@ mod tests {
             write: false,
             use_mapping: true,
             tree: false,
+            pypi_index_urls: vec!["https://pypi.org/pypi".to_string()],
         };
 
         let client = reqwest::Client::new();
@@ -1094,6 +1161,7 @@ mod tests {
             write: false,
             use_mapping: true,
             tree: false,
+            pypi_index_urls: vec!["https://pypi.org/pypi".to_string()],
         };
 
         let client = reqwest::Client::new();

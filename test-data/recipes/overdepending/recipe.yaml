@@ -24,8 +24,7 @@ requirements:
     - cmake
   host:
     - zlib
-  run:
-    - yaml
+    - bzip2
 
 tests:
   - script:

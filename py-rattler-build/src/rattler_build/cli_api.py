@@ -35,7 +35,6 @@ def build_recipes(
     noarch_build_platform: str | None = None,
     allow_insecure_host: list[str] | None = None,
     continue_on_failure: bool = False,
-    debug: bool = False,
     error_prefix_in_binary: bool = False,
     allow_symlinks_on_windows: bool = False,
     allow_absolute_license_paths: bool = False,
@@ -43,7 +42,6 @@ def build_recipes(
     build_num: int | None = None,
     use_bz2: bool = True,
     use_zstd: bool = True,
-    use_jlap: bool = False,
     use_sharded: bool = True,
 ) -> None:
     """
@@ -78,7 +76,6 @@ def build_recipes(
         noarch_build_platform: Define a "noarch platform" for which the noarch packages will be built for. The noarch builds will be skipped on the other platforms.
         allow_insecure_host: Allow insecure hosts for the build.
         continue_on_failure: Continue building other recipes even if one fails. (default: False)
-        debug: Enable or disable debug mode. (default: False)
         error_prefix_in_binary: Do not allow the $PREFIX to appear in binary files. (default: False)
         allow_symlinks_on_windows: Allow symlinks on Windows and `noarch` packages. (default: False)
         allow_absolute_license_paths: Allow absolute paths in license files. (default: False)
@@ -86,7 +83,6 @@ def build_recipes(
         build_num: Override the build number for all outputs. (default: None, uses build number from recipe)
         use_bz2: Allow the use of bzip2 compression when downloading repodata. (default: True)
         use_zstd: Allow the use of zstd compression when downloading repodata. (default: True)
-        use_jlap: Allow the use of jlap compression when downloading repodata. (default: False)
         use_sharded: Allow the use of sharded repodata when downloading repodata. (default: True)
 
     Returns:
@@ -124,7 +120,6 @@ def build_recipes(
         noarch_build_platform,
         allow_insecure_host,
         continue_on_failure,
-        debug,
         error_prefix_in_binary,
         allow_symlinks_on_windows,
         allow_absolute_license_paths,
@@ -132,7 +127,6 @@ def build_recipes(
         build_num,
         use_bz2,
         use_zstd,
-        use_jlap,
         use_sharded,
     )
 
@@ -145,11 +139,9 @@ def test_package(
     auth_file: str | Path | None = None,
     channel_priority: str | None = None,
     allow_insecure_host: list[str] | None = None,
-    debug: bool = False,
     test_index: int | None = None,
     use_bz2: bool = True,
     use_zstd: bool = True,
-    use_jlap: bool = False,
     use_sharded: bool = True,
 ) -> None:
     """
@@ -165,11 +157,9 @@ def test_package(
         auth_file: The authentication file.
         channel_priority: The channel priority.
         allow_insecure_host: Allow insecure hosts for the build.
-        debug: Enable or disable debug mode. (default: False)
         test_index: The test to run, selected by index. (default: None - run all tests)
         use_bz2: Allow the use of bzip2 compression when downloading repodata. (default: True)
         use_zstd: Allow the use of zstd compression when downloading repodata. (default: True)
-        use_jlap: Allow the use of jlap compression when downloading repodata. (default: False)
         use_sharded: Allow the use of sharded repodata when downloading repodata. (default: True)
 
     Returns:
@@ -187,10 +177,8 @@ def test_package(
         auth_file,
         channel_priority,
         allow_insecure_host,
-        debug,
         test_index,
         use_bz2,
         use_zstd,
-        use_jlap,
         use_sharded,
     )

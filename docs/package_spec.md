@@ -1,6 +1,6 @@
 # Package specification
 
-`rattler-build` produces "conda" packages. These packages work with the `mamba`
+Rattler-Build produces "conda" packages. These packages work with the `mamba`
 and `conda` package managers, and they work cross-platform on Windows, Linux and
 macOS.
 

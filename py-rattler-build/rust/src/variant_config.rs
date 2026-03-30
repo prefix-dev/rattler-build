@@ -10,7 +10,7 @@ use rattler_build_variant_config::config::VariantConfig;
 use std::path::PathBuf;
 
 /// Python wrapper for VariantConfig
-#[pyclass(name = "VariantConfig")]
+#[pyclass(name = "VariantConfig", from_py_object)]
 #[derive(Clone)]
 pub struct PyVariantConfig {
     pub(crate) inner: VariantConfig,
@@ -104,6 +104,41 @@ impl PyVariantConfig {
         )
         .map_err(|e| RattlerBuildError::Variant(format!("{:?}", e)))?;
         Ok(PyVariantConfig { inner: config })
+    }
+
+    /// Load multiple VariantConfig files and merge them
+    ///
+    /// Files are merged in order, with later files taking precedence.
+    #[staticmethod]
+    fn from_files(paths: Vec<PathBuf>) -> PyResult<Self> {
+        let jinja_config = rattler_build_jinja::JinjaConfig::default();
+        let config = VariantConfig::from_files_with_context(&paths, &jinja_config)
+            .map_err(|e| RattlerBuildError::Variant(format!("{:?}", e)))?;
+        Ok(PyVariantConfig { inner: config })
+    }
+
+    /// Load multiple VariantConfig files with a JinjaConfig context and merge them
+    ///
+    /// Files are merged in order, with later files taking precedence.
+    /// Files named `conda_build_config.yaml` are loaded using the legacy loader.
+    #[staticmethod]
+    fn from_files_with_context(
+        paths: Vec<PathBuf>,
+        jinja_config: &PyJinjaConfig,
+    ) -> PyResult<Self> {
+        let config = VariantConfig::from_files_with_context(&paths, &jinja_config.inner)
+            .map_err(|e| RattlerBuildError::Variant(format!("{:?}", e)))?;
+        Ok(PyVariantConfig { inner: config })
+    }
+
+    /// Merge another VariantConfig into this one, returning a new VariantConfig
+    ///
+    /// Values from `other` take precedence for overlapping keys.
+    /// Zip keys from `other` replace those in `self` if present.
+    fn merge(&self, other: &PyVariantConfig) -> Self {
+        let mut merged = self.inner.clone();
+        merged.merge(other.inner.clone());
+        PyVariantConfig { inner: merged }
     }
 
     /// Load VariantConfig from a YAML string (variants.yaml format)

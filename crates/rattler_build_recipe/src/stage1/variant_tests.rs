@@ -215,6 +215,156 @@ build:
     }
 
     #[test]
+    fn test_conda_build_sysroot_included_with_compiler() {
+        // When compiler() or stdlib() functions are used and CONDA_BUILD_SYSROOT
+        // is in the variant, it should automatically be included in used_variant
+        // for hash computation. This matches conda-build's behavior.
+        let yaml = r#"
+package:
+  name: test
+  version: "1.0.0"
+
+requirements:
+  build:
+    - ${{ compiler('c') }}
+
+build:
+  number: 0
+"#;
+        let mut variant = IndexMap::new();
+        variant.insert("target_platform".to_string(), Variable::from("osx-arm64"));
+        variant.insert("c_compiler".to_string(), Variable::from("clang"));
+        variant.insert("c_compiler_version".to_string(), Variable::from("14"));
+        variant.insert(
+            "CONDA_BUILD_SYSROOT".to_string(),
+            Variable::from("/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX11.0.sdk"),
+        );
+
+        let (_recipe, used_variant) = evaluate_recipe(yaml, variant);
+
+        assert!(
+            used_variant.contains_key(&NormalizedKey::from("CONDA_BUILD_SYSROOT")),
+            "CONDA_BUILD_SYSROOT should be included in used_variant when compiler() is used. \
+            Actual used_variant keys: {:?}",
+            used_variant.keys().collect::<Vec<_>>()
+        );
+        assert!(used_variant.contains_key(&NormalizedKey::from("c_compiler")));
+    }
+
+    #[test]
+    fn test_conda_build_sysroot_included_with_stdlib() {
+        // Same as above but with stdlib() instead of compiler()
+        let yaml = r#"
+package:
+  name: test
+  version: "1.0.0"
+
+requirements:
+  build:
+    - ${{ stdlib('c') }}
+
+build:
+  number: 0
+"#;
+        let mut variant = IndexMap::new();
+        variant.insert("target_platform".to_string(), Variable::from("linux-64"));
+        variant.insert("c_stdlib".to_string(), Variable::from("sysroot"));
+        variant.insert("c_stdlib_version".to_string(), Variable::from("2.17"));
+        variant.insert(
+            "CONDA_BUILD_SYSROOT".to_string(),
+            Variable::from("/opt/sysroot"),
+        );
+
+        let (_recipe, used_variant) = evaluate_recipe(yaml, variant);
+
+        assert!(
+            used_variant.contains_key(&NormalizedKey::from("CONDA_BUILD_SYSROOT")),
+            "CONDA_BUILD_SYSROOT should be included in used_variant when stdlib() is used. \
+            Actual used_variant keys: {:?}",
+            used_variant.keys().collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn test_conda_build_sysroot_not_included_without_compiler() {
+        // When no compiler/stdlib is used, CONDA_BUILD_SYSROOT should NOT
+        // be included in used_variant even if it's in the variant.
+        let yaml = r#"
+package:
+  name: test
+  version: "1.0.0"
+
+requirements:
+  host:
+    - python
+
+build:
+  number: 0
+"#;
+        let mut variant = IndexMap::new();
+        variant.insert("target_platform".to_string(), Variable::from("linux-64"));
+        variant.insert("python".to_string(), Variable::from("3.11"));
+        variant.insert(
+            "CONDA_BUILD_SYSROOT".to_string(),
+            Variable::from("/opt/sysroot"),
+        );
+
+        let (_recipe, used_variant) = evaluate_recipe(yaml, variant);
+
+        assert!(
+            !used_variant.contains_key(&NormalizedKey::from("CONDA_BUILD_SYSROOT")),
+            "CONDA_BUILD_SYSROOT should NOT be included when no compiler/stdlib is used. \
+            Actual used_variant keys: {:?}",
+            used_variant.keys().collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn test_conda_build_sysroot_affects_hash() {
+        // Different CONDA_BUILD_SYSROOT values should produce different hashes
+        let yaml = r#"
+package:
+  name: test
+  version: "1.0.0"
+
+requirements:
+  build:
+    - ${{ compiler('c') }}
+
+build:
+  number: 0
+"#;
+        let mut variant1 = IndexMap::new();
+        variant1.insert("target_platform".to_string(), Variable::from("osx-arm64"));
+        variant1.insert("c_compiler".to_string(), Variable::from("clang"));
+        variant1.insert("c_compiler_version".to_string(), Variable::from("14"));
+        variant1.insert(
+            "CONDA_BUILD_SYSROOT".to_string(),
+            Variable::from("/opt/MacOSX10.9.sdk"),
+        );
+
+        let mut variant2 = IndexMap::new();
+        variant2.insert("target_platform".to_string(), Variable::from("osx-arm64"));
+        variant2.insert("c_compiler".to_string(), Variable::from("clang"));
+        variant2.insert("c_compiler_version".to_string(), Variable::from("14"));
+        variant2.insert(
+            "CONDA_BUILD_SYSROOT".to_string(),
+            Variable::from("/opt/MacOSX11.0.sdk"),
+        );
+
+        let (_recipe1, used_variant1) = evaluate_recipe(yaml, variant1);
+        let (_recipe2, used_variant2) = evaluate_recipe(yaml, variant2);
+
+        let hash1 = HashInfo::from_variant(&used_variant1, &NoArchType::none());
+        let hash2 = HashInfo::from_variant(&used_variant2, &NoArchType::none());
+
+        assert_ne!(
+            hash1.hash, hash2.hash,
+            "Different CONDA_BUILD_SYSROOT values should produce different hashes"
+        );
+    }
+
+    #[test]
     fn test_pinned_dependency_no_variant() {
         let yaml = r#"
 package:
@@ -1271,6 +1421,68 @@ build:
             used_variant.contains_key(&NormalizedKey::from("win_only_var")),
             "win_only_var should be in used_variant (from non-taken branch). Got: {:?}",
             used_variant.keys().collect::<Vec<_>>()
+        );
+    }
+
+    /// Regression test: conditional dependency with undefined variant variable
+    ///
+    /// When a variant variable is only defined conditionally (e.g., only for `unix and x86_64`),
+    /// and a dependency uses that variable in a Jinja template guarded by the same condition,
+    /// the recipe should render successfully when the condition is false — even though the
+    /// variable is undefined. The Jinja rendering must be deferred so it only happens when
+    /// the `if` clause is truthy.
+    ///
+    /// Regression test: a conditional dependency that uses a variant variable in the `then`
+    /// branch must not be rendered when the condition is false (even if the variable is
+    /// undefined), and must render correctly when the condition is true.
+    #[test]
+    fn test_conditional_dependency_with_variant_variable() {
+        let yaml = r#"
+package:
+  name: test
+  version: "1.0.0"
+
+requirements:
+  run:
+    - if: unix and x86_64
+      then: x86_64-microarch-level ==${{ x86_64_microarch_level }}
+
+build:
+  number: 0
+"#;
+
+        // Case 1: condition is false, variable is undefined — should not error.
+        let mut variant = IndexMap::new();
+        variant.insert("target_platform".to_string(), Variable::from("osx-arm64"));
+        variant.insert("unix".to_string(), Variable::from(true));
+        variant.insert("x86_64".to_string(), Variable::from(false));
+
+        let (recipe, _used_variant) = evaluate_recipe(yaml, variant);
+        assert_eq!(recipe.package().name().as_source(), "test");
+        assert!(
+            recipe.requirements.run.is_empty(),
+            "Expected no run dependencies when condition is false, got: {:?}",
+            recipe.requirements.run
+        );
+
+        // Case 2: condition is true, variable is defined — dependency should render.
+        let mut variant = IndexMap::new();
+        variant.insert("target_platform".to_string(), Variable::from("linux-64"));
+        variant.insert("unix".to_string(), Variable::from(true));
+        variant.insert("x86_64".to_string(), Variable::from(true));
+        variant.insert("x86_64_microarch_level".to_string(), Variable::from("3"));
+
+        let (recipe, used_variant) = evaluate_recipe(yaml, variant);
+        assert_eq!(recipe.package().name().as_source(), "test");
+        assert_eq!(
+            recipe.requirements.run.len(),
+            1,
+            "Expected one run dependency when condition is true, got: {:?}",
+            recipe.requirements.run
+        );
+        assert!(
+            used_variant.contains_key(&NormalizedKey::from("x86_64_microarch_level")),
+            "x86_64_microarch_level should be tracked in used_variant"
         );
     }
 }

@@ -1,0 +1,15 @@
+package:
+  name: post-link-leaker
+  version: "1.0.0"
+
+build:
+  skip:
+    - win
+  script:
+    - mkdir -p $PREFIX/lib/post-link-leaker
+    - echo "marker" > $PREFIX/lib/post-link-leaker/marker.txt
+    - mkdir -p $PREFIX/bin
+    - echo '#!/bin/bash' > $PREFIX/bin/.post-link-leaker-post-link.sh
+    - echo 'mkdir -p "$PREFIX/lib/post-link-leaker-cache"' >> $PREFIX/bin/.post-link-leaker-post-link.sh
+    - echo 'echo "leaked" > "$PREFIX/lib/post-link-leaker-cache/leaked-cache.txt"' >> $PREFIX/bin/.post-link-leaker-post-link.sh
+    - chmod +x $PREFIX/bin/.post-link-leaker-post-link.sh

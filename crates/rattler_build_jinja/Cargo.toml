@@ -1,11 +1,12 @@
 [package]
 name = "rattler_build_jinja"
-version = "0.1.0"
+version = "0.1.4"
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "minijinja integration for rattler-build"
+readme = "README.md"
+description = "Jinja template engine integration for rattler-build, powered by minijinja"
 
 [features]
 
@@ -22,10 +23,11 @@ rattler_conda_types = { workspace = true, default-features = false }
 strum = { workspace = true }
 lazy_static = { workspace = true }
 indexmap = { workspace = true }
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 fs-err = { workspace = true }
 toml = { workspace = true }
 
 [dev-dependencies]
 insta = { workspace = true, features = ["yaml"] }
 tempfile = { workspace = true }
-anyhow = "1.0"
+anyhow = { workspace = true }

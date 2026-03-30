@@ -1,6 +1,5 @@
-//! # rattler_build_variant_config
-//!
-//! A standalone library for managing variant configurations in conda package builds.
+//! Variant configuration system for rattler-build, handling build matrices, zip keys,
+//! and loading of variant YAML files.
 //!
 //! This crate provides functionality for:
 //! - Loading variant configurations from YAML files (`variants.yaml`)
@@ -120,7 +119,9 @@ pub mod yaml_parser;
 
 // Re-export main types
 pub use combination::compute_combinations;
+#[cfg(not(target_arch = "wasm32"))]
 pub use conda_build_config::load_conda_build_config;
+pub use conda_build_config::parse_conda_build_config;
 pub use config::VariantConfig;
 pub use error::{VariantConfigError, VariantError, VariantExpandError};
 

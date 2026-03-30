@@ -283,4 +283,106 @@ filter:
         assert_eq!(filter_vals.len(), 1);
         assert_eq!(filter_vals[0].to_string(), "appears");
     }
+
+    #[test]
+    fn test_evaluate_emscripten_conditional() {
+        // Regression test for https://github.com/prefix-dev/rattler-build/issues/2222
+        // Variant keys with `if: emscripten` should resolve when targeting emscripten-wasm32
+        let yaml = r#"
+c_compiler_version:
+  - if: emscripten
+    then:
+      - 4.0.9
+  - if: linux
+    then:
+      - 9
+  - if: osx
+    then:
+      - 11
+
+cxx_compiler_version:
+  - if: emscripten
+    then:
+      - 4.0.9
+  - if: linux
+    then:
+      - 9
+  - if: osx
+    then:
+      - 11
+
+zip_keys:
+  -
+    - cxx_compiler_version
+    - c_compiler_version
+"#;
+        let stage0 = parse_variant_str(yaml, None).unwrap();
+
+        // Test with emscripten-wasm32 platform
+        let jinja_config = JinjaConfig {
+            target_platform: Platform::EmscriptenWasm32,
+            host_platform: Platform::EmscriptenWasm32,
+            ..Default::default()
+        };
+        let config = evaluate_variant_config(&stage0, &jinja_config).unwrap();
+
+        let c_vals = config.get(&"c_compiler_version".into()).unwrap();
+        assert_eq!(c_vals.len(), 1);
+        assert_eq!(c_vals[0].to_string(), "4.0.9");
+
+        let cxx_vals = config.get(&"cxx_compiler_version".into()).unwrap();
+        assert_eq!(cxx_vals.len(), 1);
+        assert_eq!(cxx_vals[0].to_string(), "4.0.9");
+
+        // zip_keys validation should also pass
+        let used_vars = config
+            .keys()
+            .cloned()
+            .collect::<std::collections::HashSet<_>>();
+        let combos = config.combinations(&used_vars).unwrap();
+        assert_eq!(combos.len(), 1);
+    }
+
+    #[test]
+    fn test_evaluate_emscripten_conditional_on_linux() {
+        // When targeting linux, emscripten conditionals should not match
+        // and zip_keys with missing keys should be gracefully skipped
+        let yaml = r#"
+c_compiler_version:
+  - if: emscripten
+    then:
+      - 4.0.9
+
+cxx_compiler_version:
+  - if: emscripten
+    then:
+      - 4.0.9
+
+zip_keys:
+  -
+    - cxx_compiler_version
+    - c_compiler_version
+"#;
+        let stage0 = parse_variant_str(yaml, None).unwrap();
+
+        // Test with Linux platform - emscripten conditionals should not match
+        let jinja_config = JinjaConfig {
+            target_platform: Platform::Linux64,
+            host_platform: Platform::Linux64,
+            ..Default::default()
+        };
+        let config = evaluate_variant_config(&stage0, &jinja_config).unwrap();
+
+        // Both keys should be filtered out (no matching conditionals)
+        assert!(config.get(&"c_compiler_version".into()).is_none());
+        assert!(config.get(&"cxx_compiler_version".into()).is_none());
+
+        // zip_keys validation should still pass (missing keys are skipped)
+        let used_vars = config
+            .keys()
+            .cloned()
+            .collect::<std::collections::HashSet<_>>();
+        let combos = config.combinations(&used_vars).unwrap();
+        assert_eq!(combos.len(), 1); // single empty combination
+    }
 }

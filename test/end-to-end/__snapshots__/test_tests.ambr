@@ -1,17 +1,16 @@
 # serializer version: 1
+# name: test_conditional_script_empty
+  '''
+  - script:
+      content: ''
+  
+  '''
+# ---
 # name: test_perl_tests
   '''
   - perl:
       uses:
       - Call::Context
-  
-  '''
-# ---
-# name: test_r_tests
-  '''
-  - r:
-      libraries:
-      - ggplot2
   
   '''
 # ---

@@ -9,7 +9,7 @@ use rattler_build_recipe::stage0;
 ///
 /// This is a union type that wraps either SingleOutputRecipe or MultiOutputRecipe.
 /// Most users should use `from_yaml()` which returns the specific type directly.
-#[pyclass(name = "Stage0Recipe")]
+#[pyclass(name = "Stage0Recipe", from_py_object)]
 #[derive(Clone)]
 pub struct PyStage0Recipe {
     pub(crate) inner: stage0::Recipe,
@@ -165,7 +165,7 @@ impl PyStage0Recipe {
 }
 
 /// Stage0 Single Output Recipe
-#[pyclass(name = "SingleOutputRecipe")]
+#[pyclass(name = "SingleOutputRecipe", from_py_object)]
 #[derive(Clone)]
 pub struct PySingleOutputRecipe {
     pub(crate) inner: stage0::SingleOutputRecipe,
@@ -240,7 +240,7 @@ impl PySingleOutputRecipe {
 }
 
 /// Stage0 Multi Output Recipe
-#[pyclass(name = "MultiOutputRecipe")]
+#[pyclass(name = "MultiOutputRecipe", from_py_object)]
 #[derive(Clone)]
 pub struct PyMultiOutputRecipe {
     pub(crate) inner: stage0::MultiOutputRecipe,
@@ -321,7 +321,7 @@ impl PyMultiOutputRecipe {
 }
 
 /// Stage0 Package (full package with name and version)
-#[pyclass(name = "Stage0Package")]
+#[pyclass(name = "Stage0Package", from_py_object)]
 #[derive(Clone)]
 pub struct PyStage0Package {
     pub(crate) inner: stage0::Package,
@@ -357,7 +357,7 @@ impl PyStage0Package {
 }
 
 /// Stage0 Package metadata (package with optional version for multi-output recipes)
-#[pyclass(name = "Stage0PackageMetadata")]
+#[pyclass(name = "Stage0PackageMetadata", from_py_object)]
 #[derive(Clone)]
 pub struct PyStage0PackageMetadata {
     pub(crate) inner: stage0::PackageMetadata,
@@ -397,7 +397,7 @@ impl PyStage0PackageMetadata {
 }
 
 /// Stage0 Recipe metadata (for multi-output recipes)
-#[pyclass(name = "Stage0RecipeMetadata")]
+#[pyclass(name = "Stage0RecipeMetadata", from_py_object)]
 #[derive(Clone)]
 pub struct PyStage0RecipeMetadata {
     pub(crate) inner: stage0::RecipeMetadata,
@@ -414,7 +414,7 @@ impl PyStage0RecipeMetadata {
 }
 
 /// Stage0 Build configuration
-#[pyclass(name = "Stage0Build")]
+#[pyclass(name = "Stage0Build", from_py_object)]
 #[derive(Clone)]
 pub struct PyStage0Build {
     pub(crate) inner: stage0::Build,
@@ -479,7 +479,7 @@ impl PyStage0Build {
 }
 
 /// Stage0 Requirements
-#[pyclass(name = "Stage0Requirements")]
+#[pyclass(name = "Stage0Requirements", from_py_object)]
 #[derive(Clone)]
 pub struct PyStage0Requirements {
     pub(crate) inner: stage0::Requirements,
@@ -534,7 +534,7 @@ impl PyStage0Requirements {
 }
 
 /// Stage0 About metadata
-#[pyclass(name = "Stage0About")]
+#[pyclass(name = "Stage0About", from_py_object)]
 #[derive(Clone)]
 pub struct PyStage0About {
     pub(crate) inner: stage0::About,
@@ -653,7 +653,7 @@ impl PyStage0About {
 }
 
 /// Stage0 Package Output
-#[pyclass(name = "Stage0PackageOutput")]
+#[pyclass(name = "Stage0PackageOutput", from_py_object)]
 #[derive(Clone)]
 pub struct PyStage0PackageOutput {
     pub(crate) inner: stage0::PackageOutput,
@@ -677,7 +677,7 @@ impl PyStage0PackageOutput {
 }
 
 /// Stage0 Staging Output
-#[pyclass(name = "Stage0StagingOutput")]
+#[pyclass(name = "Stage0StagingOutput", from_py_object)]
 #[derive(Clone)]
 pub struct PyStage0StagingOutput {
     pub(crate) inner: stage0::StagingOutput,

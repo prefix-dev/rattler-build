@@ -1,8 +1,10 @@
 ---
 source: crates/rattler_build_recipe/src/stage0/parser/snapshot_tests.rs
+assertion_line: 145
 expression: vars
 ---
 [
+    "CONDA_BUILD_SYSROOT",
     "build_number",
     "c_compiler",
     "c_compiler_version",

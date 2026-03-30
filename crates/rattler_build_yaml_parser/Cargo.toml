@@ -1,14 +1,15 @@
 [package]
 name = "rattler_build_yaml_parser"
-version = "0.1.0"
+version = "0.1.4"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Shared YAML parsing infrastructure for rattler-build with Jinja2 template support"
+readme = "README.md"
+description = "YAML parser with Jinja2 template support for rattler-build, providing shared parsing infrastructure for conditional structures and template values"
 
 [dependencies]
 marked-yaml = { workspace = true }
-rattler_build_jinja = { path = "../rattler_build_jinja", version = "0.1.0" }
+rattler_build_jinja = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 thiserror = { workspace = true }
 miette = { workspace = true }

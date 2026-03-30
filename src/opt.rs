@@ -3,7 +3,7 @@
 use std::{collections::HashMap, error::Error, path::PathBuf, str::FromStr};
 
 use chrono;
-use clap::{Parser, ValueEnum, arg, builder::ArgPredicate, crate_version};
+use clap::{Parser, ValueEnum, builder::ArgPredicate, crate_version};
 use clap_complete::{Generator, shells};
 use clap_complete_nushell::Nushell;
 use clap_verbosity_flag::{InfoLevel, Verbosity};
@@ -23,7 +23,6 @@ use url::Url;
 
 use crate::{
     console_utils::{Color, LogStyle},
-    metadata::Debug,
     tool_configuration::{ContinueOnFailure, SkipExisting, TestStrategy},
 };
 #[cfg(feature = "recipe-generation")]
@@ -73,14 +72,8 @@ pub enum SubCommands {
     /// Handle authentication to external channels
     Auth(rattler::cli::auth::Args),
 
-    /// Debug a recipe by setting up the environment without running the build script
-    Debug(DebugOpts),
-
-    /// Create a patch for a directory
-    CreatePatch(CreatePatchOpts),
-
-    /// Open a debug shell in the build environment
-    DebugShell(DebugShellOpts),
+    /// Debug a recipe build
+    Debug(DebugArgs),
 
     /// Package-related subcommands
     #[command(subcommand)]
@@ -92,11 +85,178 @@ pub enum SubCommands {
     /// It can either use a specified version or auto-detect the latest version
     /// from supported providers (GitHub, PyPI, crates.io).
     BumpRecipe(BumpRecipeOpts),
+
+    /// Migrate a recipe from the deprecated `cache:` format to `staging:` outputs
+    MigrateRecipe(MigrateRecipeOpts),
 }
 
-/// Options for the debug-shell command
+/// Arguments for the `debug` command.
+///
+/// A subcommand is always required. Use `debug setup` to prepare a debug
+/// environment from a recipe, `debug shell` to enter an existing one
+/// interactively, and `debug run` to execute the build script
+/// non-interactively.
+#[derive(Parser)]
+#[command(subcommand_required = true, arg_required_else_help = true)]
+pub struct DebugArgs {
+    /// The debug subcommand to run.
+    #[command(subcommand)]
+    pub subcommand: DebugSubCommands,
+}
+
+/// Debug subcommands
+#[derive(Parser)]
+pub enum DebugSubCommands {
+    /// Set up a debug environment from a recipe.
+    ///
+    /// Resolves dependencies, downloads sources, applies patches, installs
+    /// build/host environments, and creates the build script — then stops.
+    /// Use `debug shell` or `debug run` afterwards to work in the environment.
+    Setup(DebugSetupOpts),
+
+    /// Open an interactive debug shell in an existing build environment.
+    ///
+    /// By default, reads the work directory from the last build in
+    /// rattler-build-log.txt. You can also specify --work-dir explicitly.
+    Shell(DebugShellOpts),
+
+    /// Install additional packages into the host prefix
+    ///
+    /// This command resolves and installs the specified packages into the host
+    /// environment of an existing debug build. Useful for iterating on
+    /// dependencies without re-running the full debug setup.
+    HostAdd(DebugEnvAddOpts),
+
+    /// Install additional packages into the build prefix
+    ///
+    /// This command resolves and installs the specified packages into the build
+    /// environment of an existing debug build. Useful for adding build tools
+    /// without re-running the full debug setup.
+    BuildAdd(DebugEnvAddOpts),
+
+    /// Print the work directory path.
+    ///
+    /// Prints the absolute path to the work directory from the last debug
+    /// setup (or the directory given by --work-dir). Useful for scripts and
+    /// AI agents that need to locate the build directory.
+    Workdir(DebugWorkdirOpts),
+
+    /// Re-run the build script in an existing debug environment.
+    ///
+    /// Sources `build_env.sh` and executes `conda_build.sh` (or `.bat` on
+    /// Windows). Use --trace to enable `bash -x` for verbose output.
+    /// The exit code of the build script is propagated.
+    Run(DebugRunOpts),
+
+    /// Create a patch from changes in the work directory.
+    ///
+    /// Generates a unified diff between the original sources and your
+    /// modifications. The patch file is written to the recipe directory
+    /// so you can add it to the recipe's `patches:` list.
+    CreatePatch(CreatePatchOpts),
+}
+
+/// Options for the `debug setup` command.
+#[derive(Parser, Debug, Clone)]
+pub struct DebugSetupOpts {
+    /// Recipe file or directory to debug
+    #[arg(short, long, default_value = ".")]
+    pub recipe: PathBuf,
+
+    /// The target platform to build for
+    #[arg(long)]
+    pub target_platform: Option<Platform>,
+
+    /// The host platform to build for (defaults to target_platform)
+    #[arg(long)]
+    pub host_platform: Option<Platform>,
+
+    /// The build platform to build for (defaults to current platform)
+    #[arg(long)]
+    pub build_platform: Option<Platform>,
+
+    /// Channels to use when building
+    #[arg(short = 'c', long = "channel")]
+    pub channels: Option<Vec<NamedChannelOrUrl>>,
+
+    /// Name of the specific output to debug (only required when a recipe has
+    /// multiple outputs)
+    #[arg(long)]
+    pub output_name: Option<String>,
+
+    /// Variant configuration files for the build.
+    #[arg(short = 'm', long)]
+    pub variant_config: Option<Vec<PathBuf>>,
+
+    /// Override specific variant values (e.g. --variant python=3.12 or --variant
+    /// python=3.12,3.11). Multiple values separated by commas will create multiple
+    /// build variants.
+    #[arg(long = "variant", value_parser = parse_variant_override, action = clap::ArgAction::Append)]
+    pub variant_overrides: Vec<(String, Vec<String>)>,
+
+    /// Do not read the `variants.yaml` file next to a recipe.
+    #[arg(long)]
+    pub ignore_recipe_variants: bool,
+
+    /// Common options (provides --output-dir among others)
+    #[clap(flatten)]
+    pub common: CommonOpts,
+}
+
+/// Options for the `debug shell` command.
 #[derive(Parser, Debug, Clone)]
 pub struct DebugShellOpts {
+    /// Work directory to use (reads from last build in rattler-build-log.txt
+    /// if not specified)
+    #[arg(long)]
+    pub work_dir: Option<PathBuf>,
+
+    /// Common options (provides --output-dir among others)
+    #[clap(flatten)]
+    pub common: CommonOpts,
+}
+
+/// Options for the `debug workdir` command.
+#[derive(Parser, Debug, Clone)]
+pub struct DebugWorkdirOpts {
+    /// Work directory to use (reads from last build in rattler-build-log.txt
+    /// if not specified)
+    #[arg(long)]
+    pub work_dir: Option<PathBuf>,
+
+    /// Common options (provides --output-dir among others)
+    #[clap(flatten)]
+    pub common: CommonOpts,
+}
+
+/// Options for the `debug run` command.
+#[derive(Parser, Debug, Clone)]
+pub struct DebugRunOpts {
+    /// Work directory to use (reads from last build in rattler-build-log.txt
+    /// if not specified)
+    #[arg(long)]
+    pub work_dir: Option<PathBuf>,
+
+    /// Enable shell tracing (bash -x) for verbose build output
+    #[arg(long)]
+    pub trace: bool,
+
+    /// Common options (provides --output-dir among others)
+    #[clap(flatten)]
+    pub common: CommonOpts,
+}
+
+/// Options for `debug host-add` and `debug build-add`
+#[derive(Parser, Debug, Clone)]
+pub struct DebugEnvAddOpts {
+    /// Package specs to install (e.g. "python>=3.11", "cmake", "numpy 1.26.*")
+    #[arg(required = true)]
+    pub specs: Vec<String>,
+
+    /// Channels to search for packages in
+    #[arg(short = 'c', long = "channel")]
+    pub channels: Option<Vec<NamedChannelOrUrl>>,
+
     /// Work directory to use (reads from last build in rattler-build-log.txt if not specified)
     #[arg(long)]
     pub work_dir: Option<PathBuf>,
@@ -104,6 +264,10 @@ pub struct DebugShellOpts {
     /// Output directory containing rattler-build-log.txt
     #[arg(short, long, default_value = "./output")]
     pub output_dir: PathBuf,
+
+    /// Path to an auth-file to read authentication information from
+    #[clap(long, env = "RATTLER_AUTH_FILE", hide = true)]
+    pub auth_file: Option<PathBuf>,
 }
 
 /// Package-related subcommands.
@@ -197,11 +361,11 @@ pub struct App {
     )]
     pub wrap_log_lines: Option<bool>,
 
-    /// The rattler-build configuration file to use
+    /// The Rattler-Build configuration file to use
     #[arg(long, global = true)]
     pub config_file: Option<PathBuf>,
 
-    /// Enable or disable colored output from rattler-build.
+    /// Enable or disable colored output from Rattler-Build.
     /// Also honors the `CLICOLOR` and `CLICOLOR_FORCE` environment variable.
     #[clap(
         long,
@@ -210,16 +374,6 @@ pub struct App {
         global = true
     )]
     pub color: Color,
-}
-
-impl App {
-    /// Returns true if the application will launch a TUI.
-    pub fn is_tui(&self) -> bool {
-        match &self.subcommand {
-            Some(SubCommands::Build(args)) => args.tui,
-            _ => false,
-        }
-    }
 }
 
 /// Common opts that are shared between [`Rebuild`] and [`Build`]` subcommands
@@ -245,10 +399,6 @@ pub struct CommonOpts {
     /// Enable support for sharded repodata
     #[clap(long, env = "RATTLER_SHARDED", default_value = "true", hide = true)]
     pub use_sharded: bool,
-
-    /// Enable support for JLAP (JSON Lines Append Protocol)
-    #[clap(long, env = "RATTLER_JLAP", default_value = "false", hide = true)]
-    pub use_jlap: bool,
 
     /// Enable experimental features
     #[arg(long, env = "RATTLER_BUILD_EXPERIMENTAL")]
@@ -281,7 +431,6 @@ pub struct CommonData {
     pub use_zstd: bool,
     pub use_bz2: bool,
     pub use_sharded: bool,
-    pub use_jlap: bool,
 }
 
 impl CommonData {
@@ -297,7 +446,6 @@ impl CommonData {
         use_zstd: bool,
         use_bz2: bool,
         use_sharded: bool,
-        use_jlap: bool,
     ) -> Self {
         // mirror config
         // todo: this is a duplicate in pixi and pixi-pack: do it like in `compute_s3_config`
@@ -320,7 +468,6 @@ impl CommonData {
             for v in value {
                 mirrors.push(mirror_middleware::Mirror {
                     url: ensure_trailing_slash(v),
-                    no_jlap: false,
                     no_bz2: false,
                     no_zstd: false,
                     max_failures: None,
@@ -344,11 +491,11 @@ impl CommonData {
             use_zstd,
             use_bz2,
             use_sharded,
-            use_jlap,
         }
     }
 
-    fn from_opts_and_config(value: CommonOpts, config: ConfigBase<()>) -> Self {
+    /// Create from CLI options and config file
+    pub fn from_opts_and_config(value: CommonOpts, config: ConfigBase<()>) -> Self {
         Self::new(
             value.output_dir,
             value.experimental,
@@ -359,7 +506,6 @@ impl CommonData {
             value.use_zstd,
             value.use_bz2,
             value.use_sharded,
-            value.use_jlap,
         )
     }
 }
@@ -494,10 +640,6 @@ pub struct BuildOpts {
     #[clap(flatten)]
     pub common: CommonOpts,
 
-    /// Launch the terminal user interface.
-    #[arg(long, hide = !cfg!(feature = "tui"))]
-    pub tui: bool,
-
     /// Whether to skip packages that already exist in any channel
     /// If set to `none`, do not skip any packages, default when not specified.
     /// If set to `local`, only skip packages that already exist locally,
@@ -519,10 +661,6 @@ pub struct BuildOpts {
     #[allow(missing_docs)]
     #[clap(flatten)]
     pub sandbox_arguments: SandboxArguments,
-
-    /// Enable debug output in build scripts
-    #[arg(long, help_heading = "Modifying result")]
-    pub debug: bool,
 
     /// Write a markdown summary to the specified file (appends to the file).
     /// Useful for generating PR comments or custom reports.
@@ -722,12 +860,10 @@ pub struct BuildData {
     pub test: TestStrategy,
     pub color_build_log: bool,
     pub common: CommonData,
-    pub tui: bool,
     pub skip_existing: SkipExisting,
     pub noarch_build_platform: Option<Platform>,
     pub extra_meta: Option<Vec<(String, Value)>>,
     pub sandbox_configuration: Option<SandboxConfiguration>,
-    pub debug: Debug,
     pub continue_on_failure: ContinueOnFailure,
     pub error_prefix_in_binary: bool,
     pub allow_symlinks_on_windows: bool,
@@ -759,12 +895,10 @@ impl BuildData {
         no_include_recipe: bool,
         test: Option<TestStrategy>,
         common: CommonData,
-        tui: bool,
         skip_existing: Option<SkipExisting>,
         noarch_build_platform: Option<Platform>,
         extra_meta: Option<Vec<(String, Value)>>,
         sandbox_configuration: Option<SandboxConfiguration>,
-        debug: Debug,
         continue_on_failure: ContinueOnFailure,
         error_prefix_in_binary: bool,
         allow_symlinks_on_windows: bool,
@@ -800,12 +934,10 @@ impl BuildData {
             test: test.unwrap_or_default(),
             color_build_log: true,
             common,
-            tui,
             skip_existing: skip_existing.unwrap_or(SkipExisting::None),
             noarch_build_platform,
             extra_meta,
             sandbox_configuration,
-            debug,
             continue_on_failure,
             error_prefix_in_binary,
             allow_symlinks_on_windows,
@@ -852,12 +984,10 @@ impl BuildData {
                 None
             }),
             CommonData::from_opts_and_config(opts.common, config.unwrap_or_default()),
-            opts.tui,
             opts.skip_existing,
             opts.noarch_build_platform,
             opts.extra_meta,
             opts.sandbox_arguments.into(),
-            Debug::new(opts.debug),
             opts.continue_on_failure.into(),
             opts.error_prefix_in_binary,
             opts.allow_symlinks_on_windows,
@@ -931,10 +1061,6 @@ pub struct TestOpts {
     #[clap(long)]
     pub test_index: Option<usize>,
 
-    /// Build test environment and output debug information for manual debugging.
-    #[arg(long)]
-    pub debug: bool,
-
     /// Common options.
     #[clap(flatten)]
     pub common: CommonOpts,
@@ -948,7 +1074,6 @@ pub struct TestData {
     pub compression_threads: Option<u32>,
     pub common: CommonData,
     pub test_index: Option<usize>,
-    pub debug: Debug,
 }
 
 impl TestData {
@@ -959,7 +1084,6 @@ impl TestData {
             value.package_file,
             value.channels,
             value.compression_threads,
-            Debug::new(value.debug),
             value.test_index,
             CommonData::from_opts_and_config(value.common, config.unwrap_or_default()),
         )
@@ -970,7 +1094,6 @@ impl TestData {
         package_file: PathBuf,
         channels: Option<Vec<NamedChannelOrUrl>>,
         compression_threads: Option<u32>,
-        debug: Debug,
         test_index: Option<usize>,
         common: CommonData,
     ) -> Self {
@@ -979,37 +1102,12 @@ impl TestData {
             channels,
             compression_threads,
             test_index,
-            debug,
             common,
         }
     }
 }
 
-/// Represents a package source that can be either a local path or a URL
-#[derive(Debug, Clone)]
-pub enum PackageSource {
-    /// Local file path
-    Path(PathBuf),
-    /// Remote URL
-    Url(Url),
-}
-
-impl FromStr for PackageSource {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        // Try to parse as URL first
-        if s.starts_with("http://") || s.starts_with("https://") {
-            match Url::parse(s) {
-                Ok(url) => Ok(PackageSource::Url(url)),
-                Err(e) => Err(format!("Invalid URL: {}", e)),
-            }
-        } else {
-            // Treat as local path
-            Ok(PackageSource::Path(PathBuf::from(s)))
-        }
-    }
-}
+pub use rattler_build_core::package_info::PackageSource;
 
 /// Rebuild options.
 #[derive(Parser)]
@@ -1080,42 +1178,6 @@ impl RebuildData {
     }
 }
 
-/// Debug options
-#[derive(Parser)]
-pub struct DebugOpts {
-    /// Recipe file to debug
-    #[arg(short, long)]
-    pub recipe: PathBuf,
-
-    /// Output directory for build artifacts
-    #[arg(short, long)]
-    pub output: Option<PathBuf>,
-
-    /// The target platform to build for
-    #[arg(long)]
-    pub target_platform: Option<Platform>,
-
-    /// The host platform to build for (defaults to target_platform)
-    #[arg(long)]
-    pub host_platform: Option<Platform>,
-
-    /// The build platform to build for (defaults to current platform)
-    #[arg(long)]
-    pub build_platform: Option<Platform>,
-
-    /// Channels to use when building
-    #[arg(short = 'c', long = "channel")]
-    pub channels: Option<Vec<NamedChannelOrUrl>>,
-
-    /// Common options
-    #[clap(flatten)]
-    pub common: CommonOpts,
-
-    /// Name of the specific output to debug (only required when a recipe has multiple outputs)
-    #[arg(long, help = "Name of the specific output to debug")]
-    pub output_name: Option<String>,
-}
-
 #[derive(Debug, Clone)]
 /// Data structure containing the configuration for debugging a recipe
 pub struct DebugData {
@@ -1135,15 +1197,28 @@ pub struct DebugData {
     pub common: CommonData,
     /// Name of the specific output to debug (if recipe has multiple outputs)
     pub output_name: Option<String>,
+    /// Variant configuration files
+    pub variant_config: Vec<PathBuf>,
+    /// Variant overrides
+    pub variant_overrides: HashMap<String, Vec<String>>,
+    /// Whether to ignore recipe variants
+    pub ignore_recipe_variants: bool,
 }
 
 impl DebugData {
-    /// Generate a new TestData struct from TestOpts and an optional pixi config.
-    /// TestOpts have higher priority than the pixi config.
-    pub fn from_opts_and_config(opts: DebugOpts, config: Option<ConfigBase<()>>) -> Self {
+    /// Generate a new DebugData struct from DebugSetupOpts and an optional
+    /// config.
+    pub fn from_setup_opts_and_config(
+        opts: DebugSetupOpts,
+        config: Option<ConfigBase<()>>,
+    ) -> Self {
         Self {
             recipe_path: opts.recipe,
-            output_dir: opts.output.unwrap_or_else(|| PathBuf::from("./output")),
+            output_dir: opts
+                .common
+                .output_dir
+                .clone()
+                .unwrap_or_else(|| PathBuf::from("./output")),
             build_platform: opts.build_platform.unwrap_or(Platform::current()),
             target_platform: opts.target_platform.unwrap_or(Platform::current()),
             host_platform: opts
@@ -1152,6 +1227,9 @@ impl DebugData {
             channels: opts.channels,
             common: CommonData::from_opts_and_config(opts.common, config.unwrap_or_default()),
             output_name: opts.output_name,
+            variant_config: opts.variant_config.unwrap_or_default(),
+            variant_overrides: opts.variant_overrides.into_iter().collect(),
+            ignore_recipe_variants: opts.ignore_recipe_variants,
         }
     }
 }
@@ -1221,20 +1299,16 @@ pub struct InspectOpts {
     pub json: bool,
 }
 
-impl InspectOpts {
-    /// Check if paths should be shown (either explicitly or via --all)
-    pub fn show_paths(&self) -> bool {
-        self.paths || self.all
-    }
-
-    /// Check if about info should be shown (either explicitly or via --all)
-    pub fn show_about(&self) -> bool {
-        self.about || self.all
-    }
-
-    /// Check if run exports should be shown (either explicitly or via --all)
-    pub fn show_run_exports(&self) -> bool {
-        self.run_exports || self.all
+impl From<InspectOpts> for rattler_build_core::package_info::InspectOpts {
+    fn from(opts: InspectOpts) -> Self {
+        Self {
+            package_file: opts.package_file,
+            paths: opts.paths,
+            about: opts.about,
+            run_exports: opts.run_exports,
+            all: opts.all,
+            json: opts.json,
+        }
     }
 }
 
@@ -1247,6 +1321,18 @@ pub struct ExtractOpts {
     /// Destination directory for extraction (defaults to package name without extension)
     #[arg(short = 'd', long)]
     pub dest: Option<PathBuf>,
+}
+
+impl From<ExtractOpts> for rattler_build_core::package_info::ExtractOpts {
+    fn from(opts: ExtractOpts) -> Self {
+        Self {
+            package_file: match opts.package_file {
+                PackageSource::Path(p) => rattler_build_core::package_info::PackageSource::Path(p),
+                PackageSource::Url(u) => rattler_build_core::package_info::PackageSource::Url(u),
+            },
+            dest: opts.dest,
+        }
+    }
 }
 
 /// Options for the `bump-recipe` command.
@@ -1276,4 +1362,17 @@ pub struct BumpRecipeOpts {
     /// Keep the current build number instead of resetting it to 0.
     #[arg(long, default_value = "false")]
     pub keep_build_number: bool,
+}
+
+/// Options for the `migrate-recipe` subcommand.
+#[derive(Parser)]
+pub struct MigrateRecipeOpts {
+    /// Path to the recipe file or directory containing recipe.yaml. Defaults to
+    /// current directory.
+    #[arg(short, long, default_value = ".")]
+    pub recipe: PathBuf,
+
+    /// Perform a dry-run: show the migrated recipe without writing to the file.
+    #[arg(long, default_value = "false")]
+    pub dry_run: bool,
 }

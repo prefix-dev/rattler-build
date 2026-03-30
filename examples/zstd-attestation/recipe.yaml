@@ -1,0 +1,47 @@
+# Example: GitHub-released software with attestation verification
+#
+# For non-PyPI sources, you must provide `bundle_url` explicitly since it
+# cannot be auto-derived. The bundle is a standard sigstore .sigstore.json file
+# published alongside the release artifact.
+#
+# GitHub Actions artifacts are signed with:
+#   identity: https://github.com/{owner}/{repo}/...
+#   issuer:   https://token.actions.githubusercontent.com
+
+context:
+  version: "1.5.7"
+
+package:
+  name: zstd
+  version: ${{ version }}
+
+source:
+  url: https://github.com/facebook/zstd/releases/download/v${{ version }}/zstd-${{ version }}.tar.gz
+  sha256: eb718b8dfe0e01a2afa65a12b1a825fbab982fbe9d7302bc399eed5b3859daa1
+  attestation:
+    bundle_url: https://github.com/facebook/zstd/releases/download/v${{ version }}/zstd-${{ version }}.tar.gz.sigstore.json
+    publishers:
+      - github:facebook/zstd
+
+build:
+  number: 0
+
+requirements:
+  build:
+    - ${{ compiler('c') }}
+    - ${{ compiler('cxx') }}
+    - if: win
+      then: cmake
+    - if: unix
+      then: make
+
+tests:
+  - script:
+      - zstd --version
+
+about:
+  homepage: https://facebook.github.io/zstd/
+  license: BSD-3-Clause
+  license_file: LICENSE
+  summary: Zstandard - fast real-time compression algorithm
+  repository: https://github.com/facebook/zstd

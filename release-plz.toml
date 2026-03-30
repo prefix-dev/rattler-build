@@ -1,0 +1,15 @@
+[workspace]
+allow_dirty = true
+changelog_update = true
+dependencies_update = true
+git_release_enable = false
+git_tag_enable = true
+pr_labels = ["release"]
+pr_name = "chore: bump & publish crates"
+publish_allow_dirty = false
+semver_check = true
+
+[[package]]
+name = "rattler-build"
+publish = false
+release = false

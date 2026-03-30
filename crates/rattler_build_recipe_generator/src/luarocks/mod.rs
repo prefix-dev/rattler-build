@@ -1,4 +1,4 @@
-//! Implements logic to generate a rattler-build recipe from a LuaRocks rockspec
+//! Implements logic to generate a Rattler-Build recipe from a LuaRocks rockspec
 //! file.
 
 use std::{collections::BTreeMap, io::Write, path::PathBuf};
@@ -207,7 +207,7 @@ pub async fn generate_luarocks_recipe(opts: &LuarocksOpts) -> miette::Result<()>
     // Build recipe once and reuse for printing/writing
     let recipe = build_luarocks_recipe(&opts.rock).await?;
     let recipe_str = recipe.to_string();
-    if opts.write_to == PathBuf::from(".") {
+    if &opts.write_to == "." {
         println!("{}", recipe_str);
     } else {
         let package_name = recipe.package.name.clone();
@@ -229,7 +229,7 @@ async fn fetch_and_generate_from_module(
     let rockspec = parse_rockspec(&rockspec_content)?;
     let recipe = rockspec_to_recipe(&rockspec)?;
     let recipe_str = recipe.to_string();
-    if opts.write_to == PathBuf::from(".") {
+    if &opts.write_to == "." {
         println!("{}", recipe_str);
     } else {
         let package_name = recipe.package.name.clone();

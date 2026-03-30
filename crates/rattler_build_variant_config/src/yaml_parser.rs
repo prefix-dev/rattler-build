@@ -9,7 +9,9 @@ use marked_yaml::{Node, Span};
 use rattler_build_types::NormalizedKey;
 use rattler_build_yaml_parser::{ParseError, ParseNode, ParseResult, parse_yaml};
 use std::collections::BTreeMap;
-use std::path::{Path, PathBuf};
+#[cfg(not(target_arch = "wasm32"))]
+use std::path::Path;
+use std::path::PathBuf;
 
 /// Stage0 variant configuration - contains templates and conditionals before evaluation
 #[derive(Debug, Clone, Default)]
@@ -25,6 +27,7 @@ pub struct Stage0VariantConfig {
 }
 
 /// Check if content contains legacy `# [selector]` syntax and warn about it
+#[cfg(not(target_arch = "wasm32"))]
 fn warn_about_legacy_selectors(content: &str, path: &Path) {
     // Look for patterns like `# [win]`, `# [unix]`, `# [osx]`, `# [linux]` etc.
     let selector_pattern = regex::Regex::new(r"#\s*\[[\w\s]+\]").unwrap();
@@ -48,6 +51,7 @@ fn warn_about_legacy_selectors(content: &str, path: &Path) {
 }
 
 /// Parse a variant configuration file using marked_yaml
+#[cfg(not(target_arch = "wasm32"))]
 pub fn parse_variant_file(path: &Path) -> Result<Stage0VariantConfig, VariantConfigError> {
     let content = fs_err::read_to_string(path)
         .map_err(|e| VariantConfigError::IoError(path.to_path_buf(), e))?;

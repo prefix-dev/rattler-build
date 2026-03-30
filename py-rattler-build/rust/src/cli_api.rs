@@ -6,7 +6,6 @@ use std::{collections::HashMap, path::PathBuf, str::FromStr};
 
 use ::rattler_build::{
     build_recipes,
-    metadata::Debug,
     opt::{BuildData, ChannelPriorityWrapper, CommonData, TestData},
     run_test,
     tool_configuration::{ContinueOnFailure, SkipExisting, TestStrategy},
@@ -20,7 +19,7 @@ use crate::error::RattlerBuildError;
 use crate::run_async_task;
 
 #[pyfunction]
-#[pyo3(signature = (recipes, up_to, build_platform, target_platform, host_platform, channel, variant_config, variant_overrides=None, ignore_recipe_variants=false, render_only=false, with_solve=false, keep_build=false, no_build_id=false, package_format=None, compression_threads=None, io_concurrency_limit=None, no_include_recipe=false, test=None, output_dir=None, auth_file=None, channel_priority=None, skip_existing=None, noarch_build_platform=None, allow_insecure_host=None, continue_on_failure=false, debug=false, error_prefix_in_binary=false, allow_symlinks_on_windows=false, allow_absolute_license_paths=false, exclude_newer=None, build_num=None, use_bz2=true, use_zstd=true, use_jlap=false, use_sharded=true))]
+#[pyo3(signature = (recipes, up_to, build_platform, target_platform, host_platform, channel, variant_config, variant_overrides=None, ignore_recipe_variants=false, render_only=false, with_solve=false, keep_build=false, no_build_id=false, package_format=None, compression_threads=None, io_concurrency_limit=None, no_include_recipe=false, test=None, output_dir=None, auth_file=None, channel_priority=None, skip_existing=None, noarch_build_platform=None, allow_insecure_host=None, continue_on_failure=false, error_prefix_in_binary=false, allow_symlinks_on_windows=false, allow_absolute_license_paths=false, exclude_newer=None, build_num=None, use_bz2=true, use_zstd=true, use_sharded=true))]
 #[allow(clippy::too_many_arguments)]
 pub fn build_recipes_py(
     recipes: Vec<PathBuf>,
@@ -48,7 +47,6 @@ pub fn build_recipes_py(
     noarch_build_platform: Option<String>,
     allow_insecure_host: Option<Vec<String>>,
     continue_on_failure: bool,
-    debug: bool,
     error_prefix_in_binary: bool,
     allow_symlinks_on_windows: bool,
     allow_absolute_license_paths: bool,
@@ -56,7 +54,6 @@ pub fn build_recipes_py(
     build_num: Option<u64>,
     use_bz2: bool,
     use_zstd: bool,
-    use_jlap: bool,
     use_sharded: bool,
 ) -> PyResult<()> {
     let channel_priority = channel_priority
@@ -73,7 +70,6 @@ pub fn build_recipes_py(
         allow_insecure_host,
         use_bz2,
         use_zstd,
-        use_jlap,
         use_sharded,
     );
     let build_platform = build_platform
@@ -131,12 +127,10 @@ pub fn build_recipes_py(
         no_include_recipe,
         test,
         common,
-        false, // TUI disabled
         skip_existing,
         noarch_build_platform,
         None, // extra meta
         None, // sandbox configuration
-        Debug::new(debug),
         ContinueOnFailure::from(continue_on_failure),
         error_prefix_in_binary,
         allow_symlinks_on_windows,
@@ -154,7 +148,7 @@ pub fn build_recipes_py(
 
 #[allow(clippy::too_many_arguments)]
 #[pyfunction]
-#[pyo3(signature = (package_file, channel, compression_threads, auth_file, channel_priority, allow_insecure_host=None, debug=false, test_index=None, use_bz2=true, use_zstd=true, use_jlap=false, use_sharded=true))]
+#[pyo3(signature = (package_file, channel, compression_threads, auth_file, channel_priority, allow_insecure_host=None, test_index=None, use_bz2=true, use_zstd=true, use_sharded=true))]
 pub fn test_package_py(
     package_file: PathBuf,
     channel: Option<Vec<String>>,
@@ -162,11 +156,9 @@ pub fn test_package_py(
     auth_file: Option<PathBuf>,
     channel_priority: Option<String>,
     allow_insecure_host: Option<Vec<String>>,
-    debug: bool,
     test_index: Option<usize>,
     use_bz2: bool,
     use_zstd: bool,
-    use_jlap: bool,
     use_sharded: bool,
 ) -> PyResult<()> {
     let channel_priority = channel_priority
@@ -183,7 +175,6 @@ pub fn test_package_py(
         allow_insecure_host,
         use_bz2,
         use_zstd,
-        use_jlap,
         use_sharded,
     );
     let channel = match channel {
@@ -203,7 +194,6 @@ pub fn test_package_py(
         package_file,
         channel,
         compression_threads,
-        Debug::new(debug),
         test_index,
         common,
     );

@@ -5,11 +5,12 @@
 #[cfg(feature = "performance")]
 use rattler_build_allocator as _;
 
+mod debug;
+
 use std::{
     fs::File,
     io::{self, IsTerminal},
     path::PathBuf,
-    process::Command,
 };
 
 use clap::{CommandFactory, Parser};
@@ -17,156 +18,17 @@ use miette::IntoDiagnostic;
 use rattler_build::{
     build_recipes, bump_recipe,
     console_utils::init_logging,
-    debug_recipe, extract_package, get_recipe_path,
+    debug_recipe, extract_package, get_recipe_path, migrate_recipe,
     opt::{
-        App, BuildData, BumpRecipeOpts, DebugData, DebugShellOpts, PackageCommands, PublishData,
-        RebuildData, ShellCompletion, SubCommands, TestData,
+        App, BuildData, BumpRecipeOpts, DebugData, DebugSubCommands, MigrateRecipeOpts,
+        PackageCommands, PublishData, RebuildData, ShellCompletion, SubCommands, TestData,
     },
     publish_packages, rebuild, run_test, show_package_info,
-    source::create_patch,
     tool_configuration::APP_USER_AGENT,
 };
 use rattler_config::config::ConfigBase;
 use rattler_upload::upload_from_args;
 use tempfile::{TempDir, tempdir};
-
-/// Open a debug shell in the build environment
-fn debug_shell(opts: DebugShellOpts) -> std::io::Result<()> {
-    // Parse the directories info from the log file
-    let (work_dir, directories_json) = if let Some(dir) = opts.work_dir {
-        (dir, None)
-    } else {
-        // Read from rattler-build-log.txt
-        let log_file = opts.output_dir.join("rattler-build-log.txt");
-        if !log_file.exists() {
-            eprintln!(
-                "Error: Could not find rattler-build-log.txt at {}",
-                log_file.display()
-            );
-            eprintln!("Please specify --work-dir or run a build first.");
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::NotFound,
-                "rattler-build-log.txt not found",
-            ));
-        }
-
-        let content = fs_err::read_to_string(&log_file)?;
-        let last_line = content.lines().last().ok_or_else(|| {
-            std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                "rattler-build-log.txt is empty",
-            )
-        })?;
-
-        // Try to parse as JSON, fall back to plain path for backwards compatibility
-        let (work_dir, json_data) =
-            if let Ok(json) = serde_json::from_str::<serde_json::Value>(last_line) {
-                let work_dir = json["work_dir"].as_str().ok_or_else(|| {
-                    std::io::Error::new(
-                        std::io::ErrorKind::InvalidData,
-                        "work_dir not found in JSON",
-                    )
-                })?;
-                (PathBuf::from(work_dir), Some(json))
-            } else {
-                // Old format: plain path
-                (PathBuf::from(last_line.trim()), None)
-            };
-
-        (work_dir, json_data)
-    };
-
-    // Check if work_dir exists
-    if !work_dir.exists() {
-        eprintln!(
-            "Error: Work directory does not exist: {}",
-            work_dir.display()
-        );
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::NotFound,
-            format!("Work directory not found: {}", work_dir.display()),
-        ));
-    }
-
-    // Check if build_env.sh exists
-    let build_env = work_dir.join("build_env.sh");
-    if !build_env.exists() {
-        eprintln!("Warning: build_env.sh not found in {}", work_dir.display());
-        eprintln!("The build environment may not have been set up yet.");
-    }
-
-    println!("Opening debug shell in: {}", work_dir.display());
-    println!("The build environment will be sourced automatically.");
-    if directories_json.is_some() {
-        println!("Build directories info available in RATTLER_BUILD_DIRECTORIES");
-    }
-    println!("Exit the shell with 'exit' or Ctrl+D to return.\n");
-
-    // Determine the shell to use
-    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".to_string());
-
-    // Build environment variable exports
-    let mut env_exports = String::new();
-    if let Some(ref json) = directories_json {
-        // Export the full JSON as RATTLER_BUILD_DIRECTORIES
-        env_exports.push_str(&format!(
-            "export RATTLER_BUILD_DIRECTORIES='{}'\n",
-            serde_json::to_string(json).unwrap_or_default()
-        ));
-
-        // Export individual directories for convenience
-        if let Some(recipe_path) = json["recipe_path"].as_str() {
-            env_exports.push_str(&format!(
-                "export RATTLER_BUILD_RECIPE_PATH='{}'\n",
-                recipe_path
-            ));
-        }
-        if let Some(recipe_dir) = json["recipe_dir"].as_str() {
-            env_exports.push_str(&format!(
-                "export RATTLER_BUILD_RECIPE_DIR='{}'\n",
-                recipe_dir
-            ));
-        }
-        if let Some(build_dir) = json["build_dir"].as_str() {
-            env_exports.push_str(&format!("export RATTLER_BUILD_BUILD_DIR='{}'\n", build_dir));
-        }
-        if let Some(output_dir) = json["output_dir"].as_str() {
-            env_exports.push_str(&format!(
-                "export RATTLER_BUILD_OUTPUT_DIR='{}'\n",
-                output_dir
-            ));
-        }
-    }
-
-    // Create a shell script that sources build_env.sh and then starts an interactive shell
-    let shell_script = if build_env.exists() {
-        format!(
-            "cd '{}' && {}source build_env.sh && exec {} -i",
-            work_dir.display(),
-            env_exports,
-            shell
-        )
-    } else {
-        format!(
-            "cd '{}' && {}exec {} -i",
-            work_dir.display(),
-            env_exports,
-            shell
-        )
-    };
-
-    // Execute the shell
-    let status = Command::new(&shell).arg("-c").arg(&shell_script).status()?;
-
-    if !status.success() {
-        return Err(std::io::Error::other(format!(
-            "Shell exited with status: {}",
-            status
-        )));
-    }
-
-    Ok(())
-}
 
 /// Run the bump-recipe command
 async fn run_bump_recipe(opts: BumpRecipeOpts) -> miette::Result<()> {
@@ -225,6 +87,29 @@ async fn run_bump_recipe(opts: BumpRecipeOpts) -> miette::Result<()> {
     Ok(())
 }
 
+/// Run the migrate-recipe command
+fn run_migrate_recipe(opts: MigrateRecipeOpts) -> miette::Result<()> {
+    let recipe_path = get_recipe_path(&opts.recipe)?;
+
+    match migrate_recipe::migrate_recipe(&recipe_path, opts.dry_run) {
+        Ok(_) => {
+            if !opts.dry_run {
+                tracing::info!("Recipe migrated successfully: {}", recipe_path.display());
+            }
+        }
+        Err(migrate_recipe::MigrateRecipeError::NoCacheKey) => {
+            tracing::info!(
+                "Recipe does not use the deprecated 'cache:' format — no migration needed"
+            );
+        }
+        Err(e) => {
+            return Err(miette::miette!("Failed to migrate recipe: {}", e));
+        }
+    }
+
+    Ok(())
+}
+
 fn main() -> miette::Result<()> {
     // Stack size varies significantly across platforms:
     // - Windows: only 1MB by default
@@ -258,24 +143,14 @@ fn main() -> miette::Result<()> {
 
 async fn async_main() -> miette::Result<()> {
     let app = App::parse();
-    let log_handler = if !app.is_tui() {
-        Some(
-            init_logging(
-                &app.log_style,
-                &app.verbose,
-                &app.color,
-                app.wrap_log_lines,
-                #[cfg(feature = "tui")]
-                None,
-            )
-            .into_diagnostic()?,
-        )
-    } else {
-        #[cfg(not(feature = "tui"))]
-        return Err(miette::miette!("tui feature is not enabled!"));
-        #[cfg(feature = "tui")]
-        None
-    };
+    let log_handler = init_logging(
+        &app.log_style,
+        &app.verbose,
+        &app.color,
+        app.wrap_log_lines,
+        None::<fn() -> std::io::Stderr>,
+    )
+    .into_diagnostic()?;
 
     let config = if let Some(config_path) = app.config_file {
         Some(ConfigBase::<()>::load_from_files(&[config_path]).into_diagnostic()?)
@@ -317,42 +192,25 @@ async fn async_main() -> miette::Result<()> {
                 }
             }
 
-            if build_data.tui {
-                #[cfg(feature = "tui")]
-                {
-                    let tui = rattler_build::tui::init().await?;
-                    let log_handler = init_logging(
-                        &app.log_style,
-                        &app.verbose,
-                        &app.color,
-                        Some(true),
-                        Some(tui.event_handler.sender.clone()),
-                    )
-                    .into_diagnostic()?;
-                    rattler_build::tui::run(tui, build_data, recipe_paths, log_handler).await?;
-                }
-                return Ok(());
-            }
-
-            build_recipes(recipe_paths, build_data, &log_handler).await
+            build_recipes(recipe_paths, build_data, &Some(log_handler)).await
         }
 
         Some(SubCommands::Publish(publish_args)) => {
             let publish_data = PublishData::from_opts_and_config(publish_args, config);
-            publish_packages(publish_data, &log_handler).await
+            publish_packages(publish_data, &Some(log_handler)).await
         }
 
         Some(SubCommands::Test(test_args)) => {
             run_test(
                 TestData::from_opts_and_config(test_args, config),
-                log_handler,
+                Some(log_handler),
             )
             .await
         }
         Some(SubCommands::Rebuild(rebuild_args)) => {
             rebuild(
                 RebuildData::from_opts_and_config(rebuild_args, config),
-                log_handler.expect("logger is not initialized"),
+                log_handler,
             )
             .await
         }
@@ -362,84 +220,34 @@ async fn async_main() -> miette::Result<()> {
             rattler_build::recipe_generator::generate_recipe(args).await
         }
         Some(SubCommands::Auth(args)) => rattler::cli::auth::execute(args).await.into_diagnostic(),
-        Some(SubCommands::Debug(opts)) => {
-            let debug_data = DebugData::from_opts_and_config(opts, config);
-            debug_recipe(debug_data, &log_handler).await?;
-            Ok(())
-        }
-        Some(SubCommands::CreatePatch(opts)) => {
-            let exclude_vec = opts.exclude.clone().unwrap_or_default();
-            let add_vec = opts.add.clone().unwrap_or_default();
-            let include_vec = opts.include.clone().unwrap_or_default();
-
-            // Try to parse environment variable if available
-            let env_dirs = std::env::var("RATTLER_BUILD_DIRECTORIES")
-                .ok()
-                .and_then(|json_str| serde_json::from_str::<serde_json::Value>(&json_str).ok());
-
-            // Determine the directory to use
-            let directory = if let Some(dir) = opts.directory {
-                dir
-            } else if let Some(ref json) = env_dirs {
-                // Use work_dir from environment variable (set by debug-shell)
-                if let Some(work_dir) = json["work_dir"].as_str() {
-                    tracing::info!(
-                        "Using work directory from RATTLER_BUILD_DIRECTORIES: {}",
-                        work_dir
-                    );
-                    PathBuf::from(work_dir)
-                } else {
-                    std::env::current_dir().into_diagnostic()?
-                }
-            } else {
-                // Fall back to current directory
-                std::env::current_dir().into_diagnostic()?
-            };
-
-            // Determine patch_dir - use recipe_dir from environment if available and not specified
-            let patch_dir = if opts.patch_dir.is_none() {
-                if let Some(ref json) = env_dirs {
-                    if let Some(recipe_dir) = json["recipe_dir"].as_str() {
-                        tracing::info!(
-                            "Using recipe directory from RATTLER_BUILD_DIRECTORIES for patch output: {}",
-                            recipe_dir
-                        );
-                        Some(PathBuf::from(recipe_dir))
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            } else {
-                opts.patch_dir
-            };
-
-            match create_patch::create_patch(
-                directory,
-                &opts.name,
-                opts.overwrite,
-                patch_dir.as_deref(),
-                &exclude_vec,
-                &add_vec,
-                &include_vec,
-                opts.dry_run,
-            ) {
-                Ok(()) => Ok(()),
-                Err(create_patch::GeneratePatchError::PatchFileAlreadyExists(path)) => {
-                    tracing::warn!("Not writing patch file, already exists: {}", path.display());
-                    tracing::warn!("Use --overwrite to replace the existing patch file.");
-                    Ok(())
-                }
-                Err(e) => Err(e.into()),
+        Some(SubCommands::Debug(args)) => match args.subcommand {
+            DebugSubCommands::Setup(opts) => {
+                let debug_data = DebugData::from_setup_opts_and_config(opts, config);
+                debug_recipe(debug_data, &Some(log_handler)).await
             }
-        }
-        Some(SubCommands::DebugShell(opts)) => debug_shell(opts).into_diagnostic(),
+            DebugSubCommands::Shell(opts) => debug::debug_shell(opts).into_diagnostic(),
+            DebugSubCommands::HostAdd(opts) => {
+                debug::debug_env_add("host", opts, config, &Some(log_handler)).await
+            }
+            DebugSubCommands::BuildAdd(opts) => {
+                debug::debug_env_add("build", opts, config, &Some(log_handler)).await
+            }
+            DebugSubCommands::Workdir(opts) => debug::debug_workdir(opts).into_diagnostic(),
+            DebugSubCommands::Run(opts) => {
+                let exit_code = debug::debug_run(opts).into_diagnostic()?;
+                if exit_code != 0 {
+                    std::process::exit(exit_code);
+                }
+                Ok(())
+            }
+            DebugSubCommands::CreatePatch(opts) => debug::debug_create_patch(opts),
+        },
         Some(SubCommands::Package(cmd)) => match cmd {
             PackageCommands::Inspect(opts) => show_package_info(opts),
             PackageCommands::Extract(opts) => extract_package(opts).await,
         },
         Some(SubCommands::BumpRecipe(opts)) => run_bump_recipe(opts).await,
+        Some(SubCommands::MigrateRecipe(opts)) => run_migrate_recipe(opts),
         None => {
             _ = App::command().print_long_help();
             Ok(())

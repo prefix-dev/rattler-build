@@ -16,9 +16,12 @@ from rattler_build import VariantConfig, RenderConfig, RenderedVariant
             - __init__
             - from_file
             - from_file_with_context
+            - from_files
+            - from_files_with_context
             - from_conda_build_config
             - from_yaml
             - from_yaml_with_context
+            - merge
             - keys
             - zip_keys
             - get_values

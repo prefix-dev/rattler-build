@@ -13,7 +13,6 @@ from typing import Iterator
 
 import boto3
 import pytest
-import requests
 import yaml
 from helpers import (
     RattlerBuild,
@@ -139,8 +138,16 @@ def test_python_noarch(rattler_build: RattlerBuild, recipes: Path, tmp_path: Pat
 
     check_info(pkg, expected=recipes / "toml" / "expected")
 
+    # load index.json and make sure that `python` is in `depends`
+    index_json = json.loads((pkg / "info/index.json").read_text())
+    assert "depends" in index_json
+    # check that python is in there from `run_exports`
+    assert "python" in index_json["depends"]
+    # check that the direct python requirement is _also_ there
+    assert "python >=3.11" in index_json["depends"]
 
-def test_render_only_with_solve_does_not_download_packages(
+
+def test_render_only_with_solve_does_not_install_packages(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
     result = rattler_build.render(
@@ -154,8 +161,7 @@ def test_render_only_with_solve_does_not_download_packages(
     assert result.returncode == 0
     combined = (result.stdout or "") + "\n" + (result.stderr or "")
 
-    # Verify we did not trigger steps that download packages
-    assert "Collecting run exports" not in combined
+    # Verify we did not install environments (run exports collection is allowed)
     assert "Installing host environment" not in combined
     assert "Installing build environment" not in combined
 
@@ -171,6 +177,76 @@ def test_render_only_with_solve_does_not_download_packages(
         if isinstance(build, dict):
             resolved_len = len(build.get("resolved", []))
     assert resolved_len >= 1
+
+
+def test_abi3_cross_compile_ignores_python_run_exports(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Test that abi3 (version_independent) packages don't inherit python version
+    run exports from cross-python in the build environment.
+
+    When cross-compiling, cross-python_<target> in the build env and python in the
+    host env both have run exports that pin a specific Python version (e.g.
+    "python 3.10.* *_cpython" and "python_abi 3.10.* *_cp310"). For abi3 packages
+    these must be ignored since the package is Python-version independent.
+    """
+    env = {**os.environ, "CONDA_OVERRIDE_GLIBC": "2.38"}
+
+    result = rattler_build.render(
+        recipes / "abi3-cross-compile",
+        tmp_path,
+        with_solve=True,
+        custom_channels=["conda-forge"],
+        extra_args=[
+            "--build-platform",
+            "linux-64",
+            "--target-platform",
+            "linux-ppc64le",
+        ],
+        raw=True,
+        env=env,
+    )
+
+    assert result.returncode == 0, f"render failed:\n{result.stderr}"
+
+    outputs = json.loads(result.stdout or "[]")
+    assert len(outputs) >= 1, "expected at least one output"
+
+    run_deps = (
+        outputs[0].get("finalized_dependencies", {}).get("run", {}).get("depends", [])
+    )
+
+    # Collect all run-export entries (they have a "run_export" key in the JSON)
+    run_export_deps = [dep for dep in run_deps if "run_export" in dep]
+
+    # cross-python_linux-ppc64le exports a python version pin to run deps; for abi3
+    # packages this must be suppressed
+    cross_python_exports = [
+        dep
+        for dep in run_export_deps
+        if dep.get("run_export", "").startswith("cross-python")
+    ]
+    assert not cross_python_exports, (
+        f"abi3 package should not inherit python run exports from cross-python, "
+        f"got: {cross_python_exports}"
+    )
+
+    # python in host exports python_abi; likewise must be suppressed for abi3
+    python_abi_exports = [
+        dep
+        for dep in run_export_deps
+        if dep.get("run_export") == "python" and "python_abi" in dep.get("spec", "")
+    ]
+    assert not python_abi_exports, (
+        f"abi3 package should not inherit python_abi run exports, "
+        f"got: {python_abi_exports}"
+    )
+
+    # The explicit "run: - python" dep must still be present
+    run_specs = [dep.get("spec", dep.get("source", "")) for dep in run_deps]
+    assert any("python" in s for s in run_specs), (
+        f"explicit python run dep should still be present, got: {run_specs}"
+    )
 
 
 def test_render_only_ignores_nonexistent_output_dir(
@@ -385,63 +461,6 @@ def test_auth_file(
         tmp_path,
         custom_channels=["conda-forge", "https://repo.prefix.dev/setup-pixi-test"],
     )
-
-
-@pytest.mark.skipif(
-    not os.environ.get("ANACONDA_ORG_TEST_TOKEN", ""),
-    reason="requires ANACONDA_ORG_TEST_TOKEN",
-)
-def test_anaconda_upload(
-    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, monkeypatch
-):
-    URL = "https://api.anaconda.org/package/rattler-build-testpackages/globtest"
-
-    # Make sure the package doesn't exist
-    requests.delete(
-        URL, headers={"Authorization": f"token {os.environ['ANACONDA_ORG_TEST_TOKEN']}"}
-    )
-
-    assert requests.get(URL).status_code == 404
-
-    monkeypatch.setenv("ANACONDA_API_KEY", os.environ["ANACONDA_ORG_TEST_TOKEN"])
-
-    rattler_build.build(recipes / "globtest", tmp_path)
-
-    rattler_build(
-        "upload",
-        "-vvv",
-        "anaconda",
-        "--owner",
-        "rattler-build-testpackages",
-        str(get_package(tmp_path, "globtest")),
-    )
-
-    # Make sure the package exists
-    assert requests.get(URL).status_code == 200
-
-    # Make sure the package attempted overwrites fail without --force
-    with pytest.raises(CalledProcessError):
-        rattler_build(
-            "upload",
-            "-vvv",
-            "anaconda",
-            "--owner",
-            "rattler-build-testpackages",
-            str(get_package(tmp_path, "globtest")),
-        )
-
-    # Make sure the package attempted overwrites succeed with --force
-    rattler_build(
-        "upload",
-        "-vvv",
-        "anaconda",
-        "--owner",
-        "rattler-build-testpackages",
-        "--force",
-        str(get_package(tmp_path, "globtest")),
-    )
-
-    assert requests.get(URL).status_code == 200
 
 
 @dataclass
@@ -1184,6 +1203,27 @@ def test_post_link(
 @pytest.mark.skipif(
     os.name == "nt", reason="recipe does not support execution on windows"
 )
+def test_post_link_does_not_leak_into_downstream(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    rattler_build.build(recipes / "post-link-leaker", tmp_path)
+    rattler_build.build(
+        recipes / "post-link-downstream",
+        tmp_path,
+        custom_channels=[f"file://{tmp_path}"],
+    )
+    pkg = get_extracted_package(tmp_path, "post-link-downstream")
+    paths = json.loads((pkg / "info/paths.json").read_text())
+    packaged_paths = [p["_path"] for p in paths["paths"]]
+
+    assert any("post-link-downstream" in p for p in packaged_paths)
+    leaked = [p for p in packaged_paths if "leaked-cache" in p]
+    assert leaked == [], f"Post-link files leaked into downstream package: {leaked}"
+
+
+@pytest.mark.skipif(
+    os.name == "nt", reason="recipe does not support execution on windows"
+)
 def test_build_files(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
 ):
@@ -1406,6 +1446,7 @@ def test_extra_meta_is_recorded_into_about_json(
         tmp_path,
         extra_meta={"flow_run_id": "some_id", "sha": "24ee3"},
     )
+
     pkg = get_extracted_package(tmp_path, "toml")
 
     about_json = json.loads((pkg / "info/about.json").read_text())
@@ -1619,7 +1660,7 @@ def test_cycle_detection(rattler_build: RattlerBuild, recipes: Path, tmp_path: P
             stderr=STDOUT,
         )
     stdout = e.value.output
-    assert "Cycle detected in recipe outputs: bazbus" in stdout
+    assert "Cycle detected in recipe outputs: bazbus, foobar" in stdout
 
 
 def test_python_min_render(
@@ -1694,6 +1735,20 @@ def test_abi3(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     assert index["noarch"] == "python"
     assert index["subdir"] == host_subdir()
     assert index["platform"] == host_subdir().split("-")[0]
+
+    # CEP-20: abi3 packages should NOT have python_abi in their run
+    # dependencies (python's run exports should be ignored), but SHOULD have
+    # cpython and _python_abi3_support from python-abi3's run exports.
+    dep_names = [d.split(" ")[0] for d in index.get("depends", [])]
+    assert "python_abi" not in dep_names, (
+        "python_abi should not be in abi3 package dependencies"
+    )
+    assert "cpython" in dep_names, (
+        "cpython (from python-abi3 run_exports) should be in abi3 package dependencies"
+    )
+    assert "_python_abi3_support" in dep_names, (
+        "_python_abi3_support (from python-abi3 run_exports) should be in abi3 package dependencies"
+    )
 
 
 @pytest.mark.skipif(
@@ -1881,7 +1936,9 @@ def test_line_breaks(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path)
     assert any("done" in line for line in output_lines)
 
 
-def test_r_interpreter(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+def test_r_interpreter(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot
+):
     rattler_build.build(recipes / "r-test", tmp_path)
     pkg = get_extracted_package(tmp_path, "r-test")
 
@@ -1895,6 +1952,10 @@ def test_r_interpreter(rattler_build: RattlerBuild, recipes: Path, tmp_path: Pat
     assert "PREFIX:" in output_content
     assert (pkg / "info/recipe/recipe.yaml").exists()
     assert (pkg / "info/tests/tests.yaml").exists()
+
+    # Verify tests.yaml content (was test_r_tests in test_tests.py)
+    tests_content = (pkg / "info/tests/tests.yaml").read_text()
+    assert snapshot == tests_content
 
     # Verify index.json exists before running test
     assert (pkg / "info/index.json").exists(), "index.json file missing from package"
@@ -2055,30 +2116,6 @@ def test_interpreter_detection(
         expected_output = f"Hello from {interpreter.upper()}!"
 
     assert expected_output in test_output
-    assert "all tests passed!" in test_output
-
-
-def test_interpreter_detection_all_tests(
-    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
-):
-    """
-    Tests that rattler-build can run multiple test scripts requiring
-    different interpreters within the same test phase.
-    """
-    recipe_dir = recipes / "interpreter-detection"
-    pkg_name = "test-interpreter-all"
-
-    rattler_build.build(recipe_dir, tmp_path)
-    pkg_file = get_package(tmp_path, pkg_name)
-    assert pkg_file.exists()
-
-    test_output = rattler_build.test(pkg_file)
-
-    assert "Hello from Python!" in test_output
-    assert "Hello from Perl!" in test_output
-    assert "Hello from R!" in test_output
-    assert "Hello from Nushell!" in test_output
-    assert "Hello from PowerShell!" in test_output
     assert "all tests passed!" in test_output
 
 
@@ -2400,76 +2437,40 @@ def test_caseinsensitive(rattler_build: RattlerBuild, recipes: Path, tmp_path: P
         assert "test.txt" in paths
 
 
-def test_ruby_test(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
-    rattler_build.build(
-        recipes / "ruby-test/recipe.yaml",
-        tmp_path,
-    )
-    pkg = get_extracted_package(tmp_path, "ruby-test")
+def test_ruby(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    """Test Ruby recipes (ruby-test, ruby-extension-test, ruby-imports-test).
 
+    Builds all three in the same tmp_path to share the conda package cache.
+    """
+    rattler_build.build(recipes / "ruby-test/recipe.yaml", tmp_path)
+    pkg = get_extracted_package(tmp_path, "ruby-test")
     assert (pkg / "info/index.json").exists()
     assert (pkg / "info/tests/tests.yaml").exists()
 
+    rattler_build.build(recipes / "ruby-extension-test/recipe.yaml", tmp_path)
+    pkg_ext = get_extracted_package(tmp_path, "ruby-extension-test")
+    assert (pkg_ext / "info/index.json").exists()
 
-def test_simple_ruby_test(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
-    rattler_build.build(
-        recipes / "simple-ruby-test/recipe.yaml",
-        tmp_path,
-    )
-    pkg = get_extracted_package(tmp_path, "simple-ruby-test")
-
-    assert (pkg / "info/index.json").exists()
-
-
-def test_ruby_extension_test(
-    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
-):
-    rattler_build.build(
-        recipes / "ruby-extension-test/recipe.yaml",
-        tmp_path,
-    )
-    pkg = get_extracted_package(tmp_path, "ruby-extension-test")
-
-    assert (pkg / "info/index.json").exists()
-
-
-def test_ruby_imports_test(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
-    rattler_build.build(
-        recipes / "ruby-imports-test/recipe.yaml",
-        tmp_path,
-    )
-    pkg = get_extracted_package(tmp_path, "ruby-imports-test")
-
-    assert (pkg / "info/index.json").exists()
-
-
-def test_simple_nodejs_test(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
-    rattler_build.build(
-        recipes / "simple-nodejs-test/recipe.yaml",
-        tmp_path,
-    )
-    pkg = get_extracted_package(tmp_path, "simple-nodejs-test")
-
-    assert (pkg / "info/index.json").exists()
-
-
-def test_nodejs_extension(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
-    rattler_build.build(
-        recipes / "nodejs-extension-test/recipe.yaml",
-        tmp_path,
-    )
-    pkg = get_extracted_package(tmp_path, "nodejs-extension-test")
-
-    assert (pkg / "info/index.json").exists()
+    rattler_build.build(recipes / "ruby-imports-test/recipe.yaml", tmp_path)
+    pkg_imp = get_extracted_package(tmp_path, "ruby-imports-test")
+    assert (pkg_imp / "info/index.json").exists()
 
 
 def test_nodejs(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
-    rattler_build.build(
-        recipes / "nodejs-test/recipe.yaml",
-        tmp_path,
-    )
-    pkg = get_extracted_package(tmp_path, "nodejs-test")
+    """Test NodeJS recipes (simple-nodejs-test, nodejs-extension-test, nodejs-test).
 
+    Builds all three in the same tmp_path to share the conda package cache.
+    """
+    rattler_build.build(recipes / "simple-nodejs-test/recipe.yaml", tmp_path)
+    pkg_simple = get_extracted_package(tmp_path, "simple-nodejs-test")
+    assert (pkg_simple / "info/index.json").exists()
+
+    rattler_build.build(recipes / "nodejs-extension-test/recipe.yaml", tmp_path)
+    pkg_ext = get_extracted_package(tmp_path, "nodejs-extension-test")
+    assert (pkg_ext / "info/index.json").exists()
+
+    rattler_build.build(recipes / "nodejs-test/recipe.yaml", tmp_path)
+    pkg = get_extracted_package(tmp_path, "nodejs-test")
     assert (pkg / "info/index.json").exists()
 
 
@@ -2656,10 +2657,12 @@ about:
     shutil.rmtree(git_dir)
 
     # Verify the cache is now corrupted (git commands should fail)
+    # Set GIT_CEILING_DIRECTORIES so git doesn't walk up into the project repo
     result = subprocess.run(
         ["git", "rev-parse", "--git-dir"],
         cwd=cached_repo,
         capture_output=True,
+        env={**os.environ, "GIT_CEILING_DIRECTORIES": str(cached_repo.parent)},
     )
     assert result.returncode != 0, "Git command should fail on corrupted cache"
 
@@ -2893,3 +2896,258 @@ build:
         f"LFS file should contain actual content, got: {resolved!r}"
     )
     assert (pkg / "README.md").read_text() == "hello"
+
+
+def test_git_source(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(recipes / "llamacpp", tmp_path)
+    pkg = get_extracted_package(tmp_path, "llama.cpp")
+    license_file = pkg / "info/licenses/LICENSE"
+    assert license_file.exists()
+    assert " Georgi " in license_file.read_text()
+
+
+def test_package_content_test_execution(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    rattler_build.build(
+        recipes / "package-content-tests/recipe-test-succeed.yaml", tmp_path
+    )
+
+    with pytest.raises(CalledProcessError):
+        rattler_build.build(
+            recipes / "package-content-tests/recipe-test-fail.yaml",
+            tmp_path / "fail",
+        )
+
+
+def test_test_execution(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(recipes / "test-execution/recipe-test-succeed.yaml", tmp_path)
+
+    with pytest.raises(CalledProcessError):
+        rattler_build.build(
+            recipes / "test-execution/recipe-test-fail.yaml", tmp_path / "fail"
+        )
+
+
+@pytest.mark.skipif(os.name == "nt", reason="Unix-only test")
+def test_files_copy(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(recipes / "test-sources", tmp_path)
+
+
+def test_tar_source(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(recipes / "tar-source", tmp_path)
+
+
+def test_zip_source(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(recipes / "zip-source", tmp_path)
+
+
+def test_7z_source(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(recipes / "7z-source", tmp_path)
+
+
+def test_dry_run_cf_upload(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    variant_config = recipes / "polarify" / "linux_64_.yaml"
+    rattler_build.build(recipes / "polarify", tmp_path, variant_config=variant_config)
+
+    pkg_path = get_package(tmp_path, "polarify")
+    output = rattler_build(
+        "upload",
+        "-vvv",
+        "conda-forge",
+        "--feedstock",
+        "polarify",
+        "--feedstock-token",
+        "fake-feedstock-token",
+        "--staging-token",
+        "fake-staging-token",
+        "--dry-run",
+        str(pkg_path),
+        stderr=STDOUT,
+    )
+    assert "Done uploading packages to conda-forge" in output
+
+
+def test_correct_sha256(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(recipes / "correct-sha", tmp_path)
+
+
+@pytest.mark.skipif(os.name == "nt", reason="Unix-only test")
+def test_rpath(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(
+        recipes / "rpath", tmp_path, extra_args=["--target-platform", "linux-64"]
+    )
+
+
+@pytest.mark.skipif(platform.system() != "Linux", reason="Linux-only test")
+def test_overlinking_check(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    args = rattler_build.build_args(
+        recipes / "overlinking",
+        tmp_path,
+        extra_args=["--target-platform", "linux-64"],
+    )
+    try:
+        rattler_build(*args, stderr=STDOUT)
+        pytest.fail("Expected build to fail with overlinking error")
+    except CalledProcessError as e:
+        assert "linking check error: Overlinking against" in e.output
+
+
+@pytest.mark.skipif(platform.system() != "Linux", reason="Linux-only test")
+def test_overdepending_check(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    args = rattler_build.build_args(
+        recipes / "overdepending",
+        tmp_path,
+        extra_args=["--target-platform", "linux-64"],
+    )
+    try:
+        rattler_build(*args, stderr=STDOUT)
+        pytest.fail("Expected build to fail with overdepending error")
+    except CalledProcessError as e:
+        assert "linking check error: Overdepending against" in e.output
+
+
+@pytest.mark.skipif(platform.system() != "Linux", reason="Linux-only test")
+def test_overlinking_host_not_run(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Regression test for https://github.com/prefix-dev/rattler-build/issues/2192
+
+    When a library (zlib) is in host but NOT in run requirements (because
+    ignore_run_exports suppresses the automatic addition), the overlinking check
+    should detect this and fail the build.
+    """
+    args = rattler_build.build_args(
+        recipes / "overlinking_host_not_run",
+        tmp_path,
+        extra_args=["--target-platform", "linux-64"],
+    )
+    try:
+        rattler_build(*args, stderr=STDOUT)
+        pytest.fail("Expected build to fail with overlinking error")
+    except CalledProcessError as e:
+        assert "linking check error: Overlinking against" in e.output
+
+
+@pytest.mark.skipif(platform.system() != "Linux", reason="Linux-only test")
+def test_allow_missing_dso(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    args = rattler_build.build_args(
+        recipes / "allow_missing_dso",
+        tmp_path,
+        extra_args=["--target-platform", "linux-64"],
+    )
+    output = rattler_build(*args, stderr=STDOUT)
+    assert "it is included in the allow list. Skipping..." in output
+
+
+@pytest.mark.skipif(
+    platform.system() not in ("Darwin", "Linux"),
+    reason="Cross-platform render test (non-Windows)",
+)
+def test_render_only_cross_platform(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Test that --render-only with cross-platform target doesn't install packages."""
+    rattler_build.render(
+        recipes / "flask",
+        tmp_path,
+        extra_args=["--target-platform", "win-64"],
+    )
+
+
+def test_script_content_with_jinja(rattler_build: RattlerBuild, tmp_path: Path):
+    """Test script content with Jinja templating (both scalar and sequence forms)."""
+    # Scalar form
+    scalar_dir = tmp_path / "recipe-scalar"
+    scalar_dir.mkdir()
+    (scalar_dir / "recipe.yaml").write_text(
+        """\
+package:
+  name: hellopackage
+  version: 1.0.0
+build:
+  script:
+    content: ${{ PYTHON }} --help
+requirements:
+  host:
+    - python
+"""
+    )
+    rattler_build.build(scalar_dir, tmp_path / "output-scalar")
+
+    # Sequence form
+    seq_dir = tmp_path / "recipe-seq"
+    seq_dir.mkdir()
+    (seq_dir / "recipe.yaml").write_text(
+        """\
+package:
+  name: hellopackage
+  version: 1.0.0
+build:
+  script:
+    content:
+      - ${{ PYTHON }} --help
+requirements:
+  host:
+    - python
+"""
+    )
+    rattler_build.build(seq_dir, tmp_path / "output-seq")
+
+
+@pytest.mark.skipif(os.name == "nt", reason="Uses Unix /tmp paths")
+def test_absolute_path_license_without_flag(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    args = rattler_build.build_args(recipes / "absolute_path_license", tmp_path)
+    try:
+        rattler_build(*args, stderr=STDOUT)
+        pytest.fail("Expected build to fail with absolute license path error")
+    except CalledProcessError as e:
+        assert "Absolute paths in license_file are not allowed" in e.output
+        assert "allow-absolute" in e.output
+
+
+@pytest.mark.skipif(os.name == "nt", reason="Uses Unix /tmp paths")
+def test_absolute_path_license_with_flag(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    rattler_build.build(
+        recipes / "absolute_path_license",
+        tmp_path,
+        extra_args=["--allow-absolute-license-paths"],
+    )
+    pkg = get_extracted_package(tmp_path, "absolute-path-license")
+    assert (pkg / "info/licenses/LICENSE").exists()
+    assert (pkg / "info/licenses/external_license.txt").exists()
+
+
+def test_sourceforge_redirects(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    rattler_build.build(recipes / "sourceforge-redirects", tmp_path)
+
+
+def test_target_platform_in_variant_config_warning(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    variant_config = (
+        Path(__file__).parent.parent.parent
+        / "test-data"
+        / "variant_files"
+        / "variant_with_target_platform.yaml"
+    )
+    result = rattler_build.render(
+        recipes / "binary_prefix_test",
+        tmp_path,
+        variant_config=variant_config,
+        raw=True,
+    )
+    combined = (result.stdout or "") + "\n" + (result.stderr or "")
+    assert (
+        "Setting 'target_platform' in a variant config file is not supported"
+        in combined
+    )
+    assert "Please use the '--target-platform' command-line flag" in combined

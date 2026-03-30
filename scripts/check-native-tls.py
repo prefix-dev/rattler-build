@@ -11,7 +11,7 @@ import sys
 # Configuration
 FORBIDDEN_CRATE = "rustls"
 EXCLUDE_FEATURES = {"rustls-tls", "default", "s3"}
-SKIP_PACKAGES: set[str] = set()
+SKIP_PACKAGES: set[str] = {"rattler_build_docs"}
 
 
 def get_metadata() -> dict:

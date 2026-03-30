@@ -9,7 +9,7 @@ use crate::{
     error::CacheError,
     index::{CacheEntry, CacheIndex, SourceType},
     lock::LockManager,
-    source::{Checksum, GitSource, Source, UrlSource},
+    source::{AttestationVerification, Checksum, GitSource, Source, UrlSource},
 };
 use rattler_build_networking::BaseClient;
 use rattler_git::resolver::GitResolver;
@@ -151,6 +151,7 @@ impl SourceCache {
             last_accessed: chrono::Utc::now(),
             created: chrono::Utc::now(),
             lock_file: Some(_lock.path().to_path_buf()),
+            attestation_verified: false,
         };
 
         self.index.insert(key, entry).await?;
@@ -274,7 +275,12 @@ impl SourceCache {
 
         for url in &source.urls {
             match self
-                .try_url(url, &source.checksums, source.file_name.as_deref())
+                .try_url(
+                    url,
+                    &source.checksums,
+                    source.file_name.as_deref(),
+                    source.attestation.as_ref(),
+                )
                 .await
             {
                 Ok(path) => {
@@ -299,6 +305,7 @@ impl SourceCache {
         url: &url::Url,
         checksums: &[Checksum],
         file_name: Option<&str>,
+        attestation: Option<&AttestationVerification>,
     ) -> Result<PathBuf, CacheError> {
         let key = CacheIndex::generate_cache_key(url, checksums);
 
@@ -313,6 +320,15 @@ impl SourceCache {
             if let Some(extracted_path) = self.index.get_extracted_path(&entry)
                 && extracted_path.exists()
             {
+                // Re-verify attestation if configured but not yet verified for this entry
+                if let Some(attestation_config) = attestation
+                    && !entry.attestation_verified
+                {
+                    let archive_path = self.index.get_cache_path(&entry);
+                    self.verify_attestation(&archive_path, url, attestation_config)
+                        .await?;
+                    self.index.set_attestation_verified(&key).await?;
+                }
                 self.index.touch(&key).await?;
                 tracing::info!(
                     "Found extracted source in cache: {}",
@@ -332,11 +348,27 @@ impl SourceCache {
                         tracing::warn!("Checksum validation failed, re-downloading");
                         fs_err::tokio::remove_file(&cache_path).await?;
                     } else {
+                        // Re-verify attestation if configured but not yet verified for this entry
+                        if let Some(attestation_config) = attestation
+                            && !entry.attestation_verified
+                        {
+                            self.verify_attestation(&cache_path, url, attestation_config)
+                                .await?;
+                            self.index.set_attestation_verified(&key).await?;
+                        }
                         self.index.touch(&key).await?;
                         tracing::info!("Found source in cache: {}", cache_path.display());
                         return Ok(cache_path);
                     }
                 } else {
+                    // Re-verify attestation if configured but not yet verified for this entry
+                    if let Some(attestation_config) = attestation
+                        && !entry.attestation_verified
+                    {
+                        self.verify_attestation(&cache_path, url, attestation_config)
+                            .await?;
+                        self.index.set_attestation_verified(&key).await?;
+                    }
                     self.index.touch(&key).await?;
                     tracing::info!("Found source in cache: {}", cache_path.display());
                     return Ok(cache_path);
@@ -359,6 +391,12 @@ impl SourceCache {
                     kind: mismatch.kind.to_string(),
                 });
             }
+        }
+
+        // Perform attestation verification if configured
+        if let Some(attestation_config) = attestation {
+            self.verify_attestation(&cache_path, url, attestation_config)
+                .await?;
         }
 
         // Extract if needed and no explicit filename was provided
@@ -397,6 +435,7 @@ impl SourceCache {
             last_accessed: chrono::Utc::now(),
             created: chrono::Utc::now(),
             lock_file: Some(_lock.path().to_path_buf()),
+            attestation_verified: attestation.is_some(),
         };
 
         self.index.insert(key, entry).await?;
@@ -550,6 +589,38 @@ impl SourceCache {
             handler.on_extraction_complete(archive_path);
         }
 
+        Ok(())
+    }
+
+    /// Verify a downloaded file using attestation (sigstore-based).
+    ///
+    /// When the `sigstore` feature is enabled, delegates to the full verification
+    /// implementation. When disabled, logs a warning and skips verification.
+    async fn verify_attestation(
+        &self,
+        file_path: &Path,
+        source_url: &url::Url,
+        attestation_config: &AttestationVerification,
+    ) -> Result<(), CacheError> {
+        #[cfg(feature = "sigstore")]
+        {
+            crate::sigstore::verify_attestation(
+                &self.client,
+                file_path,
+                source_url,
+                attestation_config,
+            )
+            .await?;
+        }
+        #[cfg(not(feature = "sigstore"))]
+        {
+            let _ = (file_path, attestation_config);
+            tracing::warn!(
+                url = %source_url,
+                "sigstore verification is disabled at compile time — \
+                 attestation will NOT be verified"
+            );
+        }
         Ok(())
     }
 
@@ -770,4 +841,25 @@ async fn strip_and_move_extracted_dir(src: &Path, dest: &Path) -> Result<(), Cac
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_filename_from_header() {
+        assert_eq!(
+            extract_filename_from_header("attachment; filename=\"test.tar.gz\""),
+            Some("test.tar.gz".to_string())
+        );
+    }
+
+    #[test]
+    fn test_is_archive() {
+        assert!(is_archive("test.tar.gz"));
+        assert!(is_archive("test.zip"));
+        assert!(is_archive("test.7z"));
+        assert!(!is_archive("test.txt"));
+    }
 }

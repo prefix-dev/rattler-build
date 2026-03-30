@@ -1,43 +1,38 @@
 #![deny(missing_docs)]
 
-//! rattler-build library.
+//! Rattler-Build library.
 
-pub mod build;
-pub mod bump_recipe;
-// pub mod cache;
-// pub mod conda_build_config;
-pub mod console_utils;
-pub mod metadata;
+// Re-export all core modules from rattler_build_core
+pub use rattler_build_core::build;
+pub use rattler_build_core::bump_recipe;
+pub use rattler_build_core::console_utils;
+pub use rattler_build_core::debug;
+pub use rattler_build_core::env_vars;
+pub use rattler_build_core::metadata;
+pub use rattler_build_core::migrate_recipe;
+pub use rattler_build_core::package_test;
+pub use rattler_build_core::packaging;
+pub use rattler_build_core::publish;
+pub use rattler_build_core::rebuild;
+pub use rattler_build_core::render;
+pub use rattler_build_core::script;
+pub use rattler_build_core::source;
+pub use rattler_build_core::staging;
+pub use rattler_build_core::system_tools;
+pub use rattler_build_core::tool_configuration;
+pub use rattler_build_core::types;
+pub use rattler_build_core::utils;
+
 pub mod opt;
-pub mod package_test;
-pub mod packaging;
-pub mod render;
-pub mod script;
-pub mod source;
-pub mod staging;
-pub mod system_tools;
-pub mod tool_configuration;
 
 // Re-export recipe generator
 #[cfg(feature = "recipe-generation")]
 pub use rattler_build_recipe_generator as recipe_generator;
-#[cfg(feature = "tui")]
-pub mod tui;
-pub mod types;
-pub mod utils;
 
-mod consts;
-pub mod env_vars;
-mod linux;
-mod macos;
-mod package_info;
-mod post_process;
-pub mod publish;
-pub mod rebuild;
-mod unix;
-mod windows;
-
-mod package_cache_reporter;
+// Re-export types needed by Python bindings and external consumers
+pub use rattler_build_core::{BuildString, DiscoveredOutput, Recipe, RenderConfig, Variable};
+pub use rattler_build_recipe::stage1::{HashInfo, HashInput};
+pub use rattler_build_types::NormalizedKey;
 
 use std::{
     collections::{BTreeMap, HashMap},
@@ -55,21 +50,12 @@ use futures::FutureExt;
 use miette::{Context, IntoDiagnostic};
 use opt::*;
 use package_test::TestConfiguration;
-use rattler_build_recipe::{
-    stage0,
-    stage1::{Recipe, TestType},
-    variant_render::RenderConfig,
-};
+use rattler_build_core::consts;
+use rattler_build_recipe::{stage0, stage1::TestType};
 use rattler_build_variant_config::VariantConfig;
-
-// Re-export types needed by Python bindings and external consumers
-pub use rattler_build_jinja::Variable;
-pub use rattler_build_recipe::stage1::build::BuildString;
-pub use rattler_build_recipe::stage1::{HashInfo, HashInput};
-pub use rattler_build_types::NormalizedKey;
 use rattler_conda_types::{
-    MatchSpec, NamedChannelOrUrl, PackageName, Platform, compression_level::CompressionLevel,
-    package::CondaArchiveType,
+    MatchSpec, NamedChannelOrUrl, NoArchType, PackageName, Platform,
+    compression_level::CompressionLevel, package::CondaArchiveType,
 };
 use rattler_config::config::build::PackageFormatAndCompression;
 use rattler_index::ensure_channel_initialized_fs;
@@ -78,7 +64,6 @@ use rattler_index::ensure_channel_initialized_s3;
 use rattler_solve::SolveStrategy;
 use rattler_virtual_packages::VirtualPackageOverrides;
 use render::resolved_dependencies::RunExportsDownload;
-use source::patch::apply_patch_custom;
 use system_tools::SystemTools;
 use tool_configuration::{Configuration, ContinueOnFailure, SkipExisting, TestStrategy};
 use types::Directories;
@@ -87,49 +72,13 @@ use types::{
     build_reindexed_channels,
 };
 
-use crate::metadata::{Debug, Output, PlatformWithVirtualPackages};
+use crate::metadata::{Output, PlatformWithVirtualPackages};
 use crate::publish::{
-    BuildNumberOverride, apply_build_number_override, fetch_highest_build_numbers,
+    BuildNumberOverride, PublishConfig, apply_build_number_override, fetch_highest_build_numbers,
     upload_and_index_channel,
 };
 use indexmap::IndexSet;
-use rattler_conda_types::NoArchType;
-
-/// A discovered output from variant expansion
-#[allow(missing_docs)]
-#[derive(Debug, Clone)]
-pub struct DiscoveredOutput {
-    pub name: String,
-    pub version: String,
-    pub build_string: String,
-    pub noarch_type: NoArchType,
-    pub target_platform: Platform,
-    pub used_vars: BTreeMap<NormalizedKey, Variable>,
-    pub recipe: Recipe,
-    pub hash: HashInfo,
-}
-
-impl Eq for DiscoveredOutput {}
-
-impl PartialEq for DiscoveredOutput {
-    fn eq(&self, other: &Self) -> bool {
-        self.name == other.name
-            && self.version == other.version
-            && self.build_string == other.build_string
-            && self.noarch_type == other.noarch_type
-            && self.target_platform == other.target_platform
-    }
-}
-
-impl std::hash::Hash for DiscoveredOutput {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.name.hash(state);
-        self.version.hash(state);
-        self.build_string.hash(state);
-        self.noarch_type.hash(state);
-        self.target_platform.hash(state);
-    }
-}
+use rattler_build_recipe::topological_sort_by_dependencies;
 
 /// Result of finding variants, including the top-level recipe name if available
 struct FoundVariants {
@@ -163,7 +112,7 @@ fn find_variants(
             .name
             .as_ref()
             .and_then(|v| v.as_concrete())
-            .map(|name| name.0.as_normalized().to_string()),
+            .map(|name| name.as_str().to_string()),
         stage0::Recipe::SingleOutput(_) => None,
     };
 
@@ -301,8 +250,7 @@ pub fn get_tool_config(
         .with_io_concurrency_limit(Some(build_data.io_concurrency_limit))
         .with_zstd_repodata_enabled(build_data.common.use_zstd)
         .with_bz2_repodata_enabled(build_data.common.use_bz2)
-        .with_sharded_repodata_enabled(build_data.common.use_sharded)
-        .with_jlap_enabled(build_data.common.use_jlap);
+        .with_sharded_repodata_enabled(build_data.common.use_sharded);
 
     let configuration_builder = if let Some(fancy_log_handler) = fancy_log_handler {
         configuration_builder.with_logging_output_handler(fancy_log_handler.clone())
@@ -344,6 +292,18 @@ pub async fn get_build_output(
 
     // Read the recipe content
     let recipe_content = fs::read_to_string(recipe_path).into_diagnostic()?;
+
+    // Detect deprecated `cache:` key and give a helpful error
+    if migrate_recipe::has_cache_key(&recipe_content) {
+        return Err(miette::miette!(
+            "this recipe uses the deprecated top-level 'cache:' key. \
+             The 'cache' format has been replaced by 'staging' outputs. \
+             To automatically migrate your recipe, run:\n\n\
+             rattler-build migrate-recipe --recipe {}\n\n\
+             For more information, see: https://rattler-build.prefix.dev/latest/multiple_output_cache/",
+            recipe_path.display()
+        ));
+    }
 
     // Check if there is a `variants.yaml` or `conda_build_config.yaml` file next to
     // the recipe that we should potentially use.
@@ -594,7 +554,6 @@ pub async fn get_build_output(
                 store_recipe: !build_data.no_include_recipe,
                 force_colors: build_data.color_build_log && console::colors_enabled(),
                 sandbox_config: build_data.sandbox_configuration.clone(),
-                debug: build_data.debug,
                 exclude_newer: build_data.exclude_newer,
             },
             finalized_dependencies: None,
@@ -650,11 +609,7 @@ pub async fn get_build_output(
 
 fn can_test(output: &Output, all_output_names: &[&PackageName], done_outputs: &[Output]) -> bool {
     let check_if_matches = |spec: &MatchSpec, output: &Output| -> bool {
-        if spec.name.as_ref()
-            != Some(&rattler_conda_types::PackageNameMatcher::Exact(
-                output.name().clone(),
-            ))
-        {
+        if spec.name.as_exact() != Some(&output.name().clone()) {
             return false;
         }
         if let Some(version_spec) = &spec.version
@@ -673,11 +628,10 @@ fn can_test(output: &Output, all_output_names: &[&PackageName], done_outputs: &[
     // Check if any run dependencies are not built yet
     if let Some(ref deps) = output.finalized_dependencies {
         for dep in &deps.run.depends {
-            if all_output_names.iter().any(|o| {
-                Some(&rattler_conda_types::PackageNameMatcher::Exact(
-                    (*o).clone(),
-                )) == dep.spec().name.as_ref()
-            }) {
+            if all_output_names
+                .iter()
+                .any(|o| dep.spec().name.as_exact() == Some(*o))
+            {
                 // this dependency might not be built yet
                 if !done_outputs.iter().any(|o| check_if_matches(dep.spec(), o)) {
                     return false;
@@ -833,7 +787,6 @@ pub async fn run_build_from_args(
                         tool_configuration: tool_configuration.clone(),
                         test_index: None,
                         output_dir: output.build_configuration.directories.output_dir.clone(),
-                        debug: output.build_configuration.debug,
                         exclude_newer: output.build_configuration.exclude_newer,
                     },
                     None,
@@ -995,7 +948,6 @@ pub async fn run_test(
         solve_strategy: SolveStrategy::Highest,
         tool_configuration: tool_config,
         output_dir: test_data.common.output_dir,
-        debug: test_data.debug,
         exclude_newer: None,
     };
 
@@ -1257,113 +1209,30 @@ pub async fn rebuild(
     Ok(())
 }
 
-// /// Sort the build outputs (recipes) topologically based on their dependencies.
-// pub fn sort_build_outputs_topologically(
-//     outputs: &mut Vec<Output>,
-//     up_to: Option<&str>,
-// ) -> miette::Result<()> {
-//     let mut graph = DiGraph::<usize, ()>::new();
-//     // Store all node indices for each package name (multiple variants produce same name)
-//     let mut name_to_indices: HashMap<PackageName, Vec<NodeIndex>> = HashMap::new();
-//     // Also store direct mapping from output index to node index
-//     let mut output_to_node: Vec<NodeIndex> = Vec::with_capacity(outputs.len());
+/// Sort the build outputs (recipes) topologically based on their dependencies.
+///
+/// When `up_to` is specified, only outputs needed to build the named package are kept.
+fn sort_build_outputs_topologically(
+    outputs: &mut Vec<Output>,
+    up_to: Option<&str>,
+) -> miette::Result<()> {
+    let sorted = topological_sort_by_dependencies(std::mem::take(outputs), |o| &o.recipe, up_to)
+        .into_diagnostic()?;
 
-//     // Index outputs by their produced names for quick lookup
-//     for (idx, output) in outputs.iter().enumerate() {
-//         let node_idx = graph.add_node(idx);
-//         output_to_node.push(node_idx);
-//         name_to_indices
-//             .entry(output.name().clone())
-//             .or_default()
-//             .push(node_idx);
-//     }
+    for output in &sorted {
+        tracing::debug!("Ordered output: {:?}", output.name().as_normalized());
+    }
 
-//     // Add edges based on dependencies
-//     for (output_idx, output) in outputs.iter().enumerate() {
-//         let output_node = output_to_node[output_idx];
-//         for dep in output.recipe.requirements().build_host() {
-//             let dep_name: Option<PackageName> = match dep {
-//                 Dependency::Spec(spec) => spec.name.clone().and_then(|matcher| {
-//                     use rattler_conda_types::PackageNameMatcher;
-//                     match matcher {
-//                         PackageNameMatcher::Exact(name) => Some(name),
-//                         _ => None,
-//                     }
-//                 }),
-//                 Dependency::PinSubpackage(pin) => Some(pin.pin_subpackage.name.clone()),
-//                 Dependency::PinCompatible(pin) => Some(pin.pin_compatible.name.clone()),
-//             };
+    *outputs = sorted;
+    Ok(())
+}
 
-//             if let Some(dep_name) = dep_name
-//                 && let Some(dep_nodes) = name_to_indices.get(&dep_name)
-//             {
-//                 // Add edge to ALL variants of the dependency package
-//                 for &dep_node in dep_nodes {
-//                     // do not point to self (circular dependency) - this can happen with
-//                     // pin_subpackage in run_exports, for example.
-//                     if output_node == dep_node {
-//                         continue;
-//                     }
-//                     graph.add_edge(output_node, dep_node, ());
-//                 }
-//             }
-//         }
-//     }
-
-//     let sorted_indices = if let Some(up_to) = up_to {
-//         // Find the node indices for the "up-to" package (may have multiple variants)
-//         let up_to_name = PackageName::from_str(up_to)
-//             .map_err(|_| miette::miette!("Invalid package name: '{}'", up_to))?;
-//         let up_to_indices = name_to_indices.get(&up_to_name).ok_or_else(|| {
-//             miette::miette!("The package '{}' was not found in the outputs", up_to)
-//         })?;
-
-//         // Perform DFS post-order traversal from ALL variants of the "up-to" package
-//         let mut sorted_indices = Vec::new();
-//         let mut visited = HashSet::new();
-//         for &up_to_index in up_to_indices {
-//             let mut dfs = DfsPostOrder::new(&graph, up_to_index);
-//             while let Some(nx) = dfs.next(&graph) {
-//                 if visited.insert(nx) {
-//                     sorted_indices.push(nx);
-//                 }
-//             }
-//         }
-
-//         sorted_indices
-//     } else {
-//         // Perform topological sort
-//         let mut sorted_indices = toposort(&graph, None).map_err(|cycle| {
-//             let node = cycle.node_id();
-//             let name = outputs[node.index()].name();
-//             miette::miette!("Cycle detected in dependencies: {}", name.as_source())
-//         })?;
-//         sorted_indices.reverse();
-//         sorted_indices
-//     };
-
-//     sorted_indices
-//         .iter()
-//         .map(|idx| &outputs[idx.index()])
-//         .for_each(|output| {
-//             tracing::debug!("Ordered output: {:?}", output.name().as_normalized());
-//         });
-
-//     // Reorder outputs based on the sorted indices
-//     *outputs = sorted_indices
-//         .iter()
-//         .map(|node| outputs[node.index()].clone())
-//         .collect();
-
-//     Ok(())
-// }
-
-/// Get the version of rattler-build.
+/// Get the version of Rattler-Build.
 pub fn get_rattler_build_version() -> &'static str {
     env!("CARGO_PKG_VERSION")
 }
 
-/// Build rattler-build recipes
+/// Build Rattler-Build recipes
 pub async fn build_recipes(
     recipe_paths: Vec<std::path::PathBuf>,
     build_data: BuildData,
@@ -1382,15 +1251,14 @@ pub async fn build_recipes(
 
     if build_data.render_only {
         // Sort outputs topologically even in render-only mode to show expected build order
-        // TODO(refactor): figure out if this is still needed
-        // sort_build_outputs_topologically(&mut outputs, build_data.up_to.as_deref())?;
+        sort_build_outputs_topologically(&mut outputs, build_data.up_to.as_deref())?;
 
         let outputs = if build_data.with_solve {
             let mut updated_outputs = Vec::new();
             for output in outputs {
                 updated_outputs.push(
                     output
-                        .resolve_dependencies(&tool_config, RunExportsDownload::SkipDownload)
+                        .resolve_dependencies(&tool_config, RunExportsDownload::DownloadMissing)
                         .await
                         .into_diagnostic()?,
                 );
@@ -1410,7 +1278,7 @@ pub async fn build_recipes(
     // Skip noarch builds before the topological sort
     outputs = skip_noarch(outputs, &tool_config).await?;
 
-    // sort_build_outputs_topologically(&mut outputs, build_data.up_to.as_deref())?;
+    sort_build_outputs_topologically(&mut outputs, build_data.up_to.as_deref())?;
     run_build_from_args(outputs, tool_config, build_data.markdown_summary.as_deref()).await?;
 
     Ok(())
@@ -1608,7 +1476,7 @@ pub async fn publish_packages(
                 for output in outputs {
                     updated_outputs.push(
                         output
-                            .resolve_dependencies(&tool_config, RunExportsDownload::SkipDownload)
+                            .resolve_dependencies(&tool_config, RunExportsDownload::DownloadMissing)
                             .await
                             .into_diagnostic()?,
                     );
@@ -1628,7 +1496,7 @@ pub async fn publish_packages(
         // Skip noarch builds before the topological sort
         outputs = skip_noarch(outputs, &tool_config).await?;
 
-        // sort_build_outputs_topologically(&mut outputs, publish_data.build.up_to.as_deref())?;
+        sort_build_outputs_topologically(&mut outputs, publish_data.build.up_to.as_deref())?;
 
         // Build all packages and collect the paths
         let built_packages = build_and_collect_packages(outputs, &tool_config).await?;
@@ -1641,10 +1509,18 @@ pub async fn publish_packages(
         built_packages
     };
 
+    let publish_config = PublishConfig {
+        force: publish_data.force,
+        generate_attestation: publish_data.generate_attestation,
+        auth_file: publish_data.build.common.auth_file.clone(),
+        #[cfg(feature = "s3")]
+        s3_config: publish_data.build.common.s3_config.clone(),
+    };
+
     upload_and_index_channel(
         &target_url,
         &built_packages,
-        &publish_data,
+        &publish_config,
         &tool_config.repodata_gateway,
     )
     .await?;
@@ -1666,12 +1542,11 @@ pub async fn debug_recipe(
         channels: debug_data.channels,
         common: debug_data.common,
         keep_build: true,
-        debug: Debug::new(true),
         test: TestStrategy::Skip,
         up_to: None,
-        variant_config: Vec::new(),
-        variant_overrides: HashMap::new(),
-        ignore_recipe_variants: false,
+        variant_config: debug_data.variant_config,
+        variant_overrides: debug_data.variant_overrides,
+        ignore_recipe_variants: debug_data.ignore_recipe_variants,
         render_only: false,
         with_solve: true,
         no_build_id: false,
@@ -1683,7 +1558,6 @@ pub async fn debug_recipe(
         io_concurrency_limit: num_cpus::get(),
         no_include_recipe: false,
         color_build_log: true,
-        tui: false,
         skip_existing: SkipExisting::None,
         noarch_build_platform: None,
         extra_meta: None,
@@ -1728,25 +1602,7 @@ pub async fn debug_recipe(
     tracing::info!("Build and/or host environments created for debugging.");
 
     for output in outputs {
-        output
-            .build_configuration
-            .directories
-            .recreate_directories()
-            .into_diagnostic()?;
-        let output = output
-            .fetch_sources(&tool_config, apply_patch_custom)
-            .await
-            .into_diagnostic()?;
-        let output = output
-            .resolve_dependencies(&tool_config, RunExportsDownload::DownloadMissing)
-            .await
-            .into_diagnostic()?;
-        output
-            .install_environments(&tool_config)
-            .await
-            .into_diagnostic()?;
-
-        output.create_build_script().await.into_diagnostic()?;
+        let output = output.setup_debug_environment(&tool_config).await?;
 
         if let Some(deps) = &output.finalized_dependencies {
             if deps.build.is_some() {
@@ -1791,10 +1647,10 @@ pub async fn debug_recipe(
 
 /// Display information about a built package
 pub fn show_package_info(args: InspectOpts) -> miette::Result<()> {
-    package_info::package_info(args)
+    rattler_build_core::package_info::package_info(args.into())
 }
 
 /// Extract a conda package to a directory
 pub async fn extract_package(args: opt::ExtractOpts) -> miette::Result<()> {
-    package_info::extract_package(args).await
+    rattler_build_core::package_info::extract_package(args.into()).await
 }

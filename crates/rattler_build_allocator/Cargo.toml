@@ -1,11 +1,12 @@
 [package]
 name = "rattler_build_allocator"
-version = "0.1.0"
+version = "0.1.1"
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "A crate that provides the best memory allocator for different platforms"
+readme = "README.md"
+description = "Platform-optimized memory allocator for rattler-build, using jemalloc on Unix and mimalloc on Windows"
 
 [lib]
 doctest = false

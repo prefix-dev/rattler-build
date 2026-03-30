@@ -4,7 +4,7 @@
     The sandbox feature is experimental and may not work as expected. The options might
     change in future releases.
 
-Since the 0.34.0 release, `rattler-build` has a new experimental feature called
+Since the 0.34.0 release, Rattler-Build has a new experimental feature called
 `sandbox`. With the sandbox feature enabled (via `--sandbox`), the build process
 has much more restricted access to system resources on macOS and Linux.
 As the sandbox feature is experimental it is disabled by default.

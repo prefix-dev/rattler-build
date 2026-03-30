@@ -38,9 +38,6 @@ pub struct ExecutionArgs {
 
     /// The sandbox configuration to use for the script execution
     pub sandbox_config: Option<SandboxConfiguration>,
-
-    /// Whether to enable debug output
-    pub debug: Debug,
 }
 
 impl ExecutionArgs {
@@ -116,28 +113,6 @@ impl ResolvedScriptContents {
     }
 }
 
-/// Debug mode for script execution
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Debug(bool);
-
-impl Debug {
-    /// Create a new Debug mode
-    pub fn new(enabled: bool) -> Self {
-        Self(enabled)
-    }
-
-    /// Check if debug mode is enabled
-    pub fn is_enabled(&self) -> bool {
-        self.0
-    }
-}
-
-impl From<bool> for Debug {
-    fn from(enabled: bool) -> Self {
-        Self(enabled)
-    }
-}
-
 impl Script {
     /// Run the script with the given parameters
     ///
@@ -157,28 +132,21 @@ impl Script {
         build_prefix: Option<&PathBuf>,
         jinja_renderer: Option<F>,
         sandbox_config: Option<&SandboxConfiguration>,
-        debug: Debug,
     ) -> Result<(), crate::InterpreterError>
     where
         F: Fn(&str) -> Result<String, String>,
     {
-        // Determine the valid script extensions based on the available interpreters.
-        let mut valid_script_extensions = Vec::new();
-        if cfg!(windows) {
-            valid_script_extensions.push("bat");
-            valid_script_extensions.push("ps1");
-        } else {
-            valid_script_extensions.push("sh");
-        }
-
         let env_vars = env_vars
             .into_iter()
             .filter_map(|(k, v)| v.map(|v| (k, v)))
             .chain(self.env().clone().into_iter())
             .collect::<IndexMap<String, String>>();
 
-        let contents =
-            self.resolve_content(recipe_dir, jinja_renderer, &valid_script_extensions)?;
+        let contents = self.resolve_content(
+            recipe_dir,
+            jinja_renderer,
+            crate::platform_script_extensions(),
+        )?;
 
         let secrets = self
             .secrets()
@@ -226,7 +194,6 @@ impl Script {
             execution_platform: Platform::current(),
             work_dir,
             sandbox_config: sandbox_config.cloned(),
-            debug,
         };
 
         crate::execution::run_script(exec_args, interpreter).await?;
@@ -781,5 +748,58 @@ mod tests {
 
         let resolved_missing = ResolvedScriptContents::Missing;
         assert_eq!(resolved_missing.infer_interpreter(), None);
+    }
+
+    /// Regression test for <https://github.com/prefix-dev/rattler-build/issues/2199>
+    ///
+    /// Extension order in `resolve_content` determines which file is picked
+    /// when both `.sh` and `.bat` exist. `platform_script_extensions()` must
+    /// select the platform-appropriate one.
+    #[test]
+    fn test_script_extension_resolution_respects_order() {
+        use std::path::PathBuf;
+
+        use crate::script::{Script, ScriptContent};
+
+        let dir = tempfile::tempdir().unwrap();
+        fs_err::write(dir.path().join("test-script.sh"), "#!/bin/bash\necho hello").unwrap();
+        fs_err::write(dir.path().join("test-script.bat"), "@echo off\necho hello").unwrap();
+
+        let resolve = |content: ScriptContent, exts: &[&str]| -> PathBuf {
+            let script = Script {
+                content,
+                ..Script::default()
+            };
+            match script
+                .resolve_content(dir.path(), None::<fn(&str) -> Result<String, String>>, exts)
+                .unwrap()
+            {
+                ResolvedScriptContents::Path(path, _) => path,
+                other => panic!("expected Path variant, got {:?}", other),
+            }
+        };
+
+        // Extension list order controls which file wins
+        let path_content = || ScriptContent::Path(PathBuf::from("test-script"));
+        assert_eq!(
+            resolve(path_content(), &["sh", "bat"]).extension().unwrap(),
+            "sh"
+        );
+        assert_eq!(
+            resolve(path_content(), &["bat", "sh"]).extension().unwrap(),
+            "bat"
+        );
+
+        // CommandOrPath variant behaves the same
+        let cop_content = || ScriptContent::CommandOrPath("test-script".into());
+        assert_eq!(resolve(cop_content(), &["sh"]).extension().unwrap(), "sh");
+        assert_eq!(resolve(cop_content(), &["bat"]).extension().unwrap(), "bat");
+
+        // platform_script_extensions() picks the right one for the current platform
+        let ext = resolve(path_content(), crate::platform_script_extensions())
+            .extension()
+            .unwrap()
+            .to_owned();
+        assert_eq!(ext, if cfg!(windows) { "bat" } else { "sh" });
     }
 }

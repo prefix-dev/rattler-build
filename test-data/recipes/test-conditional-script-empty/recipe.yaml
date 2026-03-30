@@ -1,0 +1,9 @@
+package:
+  name: test-conditional-script-empty
+  version: "0.1.0"
+
+tests:
+  - script:
+      - if: win
+        then:
+          - echo "This should only run on Windows"

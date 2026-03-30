@@ -1,12 +1,12 @@
 [package]
 name = "rattler_build_script"
-version = "0.1.0"
+version = "0.2.2"
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
-readme.workspace = true
+readme = "README.md"
 repository.workspace = true
-description = "Script execution and data model for rattler-build"
+description = "Script execution and sandbox configuration for rattler-build, supporting bash, cmd, python, and other interpreters"
 
 [features]
 default = ["execution"]
@@ -54,3 +54,4 @@ minijinja = { workspace = true, optional = true }
 tokio = { workspace = true, features = ["rt", "macros", "fs"] }
 insta = { workspace = true, features = ["yaml"] }
 serde_yaml = { workspace = true }
+tempfile = { workspace = true }

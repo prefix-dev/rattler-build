@@ -1,5 +1,5 @@
 """
-Progress reporting and callbacks for rattler-build.
+Progress reporting and callbacks for Rattler-Build.
 
 This module provides base classes and implementations for progress reporting
 during recipe rendering and building. You can use the built-in implementations
@@ -128,7 +128,7 @@ class ProgressCallback(Protocol):
         ...
 
 
-class SimpleProgressCallback:
+class SimpleProgressCallback(ProgressCallback):
     """Simple console-based progress callback.
 
     Prints progress updates to the console with simple formatting.
@@ -179,7 +179,7 @@ class SimpleProgressCallback:
         print(f"{prefix}{span_str} {event.message}")
 
 
-class RichProgressCallback:
+class RichProgressCallback(ProgressCallback):
     """Rich-based progress callback with beautiful terminal output.
 
     Automatically creates progress bars for long-running operations by parsing

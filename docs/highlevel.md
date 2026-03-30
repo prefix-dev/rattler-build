@@ -1,16 +1,16 @@
-# What is `rattler-build`?
+# What is Rattler-Build?
 
-`rattler-build` is a tool to build and package software so that it can be
+Rattler-Build is a tool to build and package software so that it can be
 installed on any operating system – with any compatible package manager such as
-`mamba`, `conda`, or `rattler`. We are also intending for `rattler-build` to be
+`mamba`, `conda`, or `rattler`. We are also intending for Rattler-Build to be
 used as a library to drive builds of packages from any other recipe format in
 the future.
 
-### How does `rattler-build` work?
+### How does Rattler-Build work?
 
 Building of packages consists of several steps. It all begins with a
 `recipe.yaml` file that specifies how the package is to be built and what the
-dependencies are. From the recipe file, `rattler-build` executes several steps:
+dependencies are. From the recipe file, Rattler-Build executes several steps:
 
 1. **Rendering**:
 Parse the recipe file and evaluate conditionals, Jinja expressions, and
@@ -70,46 +70,7 @@ string interpolation with Jinja (specifically `minijinja` in our case).
 A simple example of a recipe file for the `zlib` package would look as follows:
 
 ```yaml title="recipe.yaml"
-# variables from the context section can be used in the rest of the recipe
-# in jinja expressions
-context:
-  version: 1.2.13
-
-package:
-  name: zlib
-  version: ${{ version }}
-
-source:
-  url: http://zlib.net/zlib-${{ version }}.tar.gz
-  sha256: b3a24de97a8fdbc835b9833169501030b8977031bcb54b3b3ac13740f846ab30
-
-build:
-  # build numbers can be set arbitrarily
-  number: 0
-  script:
-    # build script to install the package into the $PREFIX (host prefix)
-    - if: unix
-      then:
-      - ./configure --prefix=$PREFIX
-      - make -j$CPU_COUNT
-    - if: win
-      then:
-      - cmake -G "Ninja" -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=%LIBRARY_PREFIX%
-      - ninja install
-
-requirements:
-  build:
-    # compiler is a special function.
-    - ${{ compiler("c") }}
-    # The following two dependencies are only needed on Windows,
-    # and thus conditionally selected
-    - if: win
-      then:
-        - cmake
-        - ninja
-    - if: unix
-      then:
-        - make
+--8<-- "docs/snippets/recipes/zlib.yaml"
 ```
 
 The sections of a recipe are:

@@ -10,19 +10,19 @@ mod output;
 mod package;
 mod parser;
 mod requirements;
-mod source;
+pub mod source;
 mod tests;
 mod types;
 
 pub use about::{About, License};
-pub use build::{BinaryRelocation, Build};
+pub use build::{BinaryRelocation, Build, PythonBuild};
 pub use extra::Extra;
 pub use match_spec::SerializableMatchSpec;
 pub use output::{
     CacheInherit, Inherit, MultiOutputRecipe, Output, PackageOutput, Recipe, RecipeMetadata,
     SingleOutputRecipe, StagingBuild, StagingMetadata, StagingOutput,
 };
-pub use package::{Package, PackageMetadata, PackageName};
+pub use package::{Package, PackageMetadata};
 pub use parser::{
     parse_recipe, parse_recipe_from_source, parse_recipe_or_multi,
     parse_recipe_or_multi_from_source,
@@ -32,7 +32,7 @@ pub use source::Source;
 pub use tests::{PythonVersion, TestType};
 pub use types::{
     Conditional, ConditionalList, ConditionalListOrItem, IncludeExclude, Item, JinjaExpression,
-    JinjaTemplate, ListOrItem, NestedItemList, Value,
+    JinjaTemplate, ListOrItem, NestedItemList, Script, Value,
 };
 
 /// Backwards compatibility alias for Stage0Recipe
@@ -94,6 +94,7 @@ requirements:
         assert!(used_vars.contains(&"c_compiler_version".to_string()));
         assert!(used_vars.contains(&"c_stdlib".to_string()));
         assert!(used_vars.contains(&"c_stdlib_version".to_string()));
+        assert!(used_vars.contains(&"CONDA_BUILD_SYSROOT".to_string()));
         assert!(used_vars.contains(&"abcdef".to_string()));
         assert!(!used_vars.contains(&"foobar".to_string()));
         assert!(used_vars.contains(&"compatible".to_string()));

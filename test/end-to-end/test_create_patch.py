@@ -15,6 +15,7 @@ def test_create_patch_modified_file(rattler_build: RattlerBuild, tmp_path: Path)
     )
 
     result = rattler_build(
+        "debug",
         "create-patch",
         "--directory",
         str(paths["work_dir"]),
@@ -44,6 +45,7 @@ def test_create_patch_new_file(rattler_build: RattlerBuild, tmp_path: Path):
     )
 
     result = rattler_build(
+        "debug",
         "create-patch",
         "--directory",
         str(paths["work_dir"]),
@@ -74,6 +76,7 @@ def test_create_patch_deleted_file(rattler_build: RattlerBuild, tmp_path: Path):
     )
 
     result = rattler_build(
+        "debug",
         "create-patch",
         "--directory",
         str(paths["work_dir"]),
@@ -102,6 +105,7 @@ def test_create_patch_no_changes(rattler_build: RattlerBuild, tmp_path: Path):
     )
 
     result = rattler_build(
+        "debug",
         "create-patch",
         "--directory",
         str(paths["work_dir"]),
@@ -129,6 +133,7 @@ def test_create_patch_custom_output_dir(rattler_build: RattlerBuild, tmp_path: P
     out_dir = tmp_path / "test_create_patch_custom_output_dir" / "patches"
 
     result = rattler_build(
+        "debug",
         "create-patch",
         "--directory",
         str(paths["work_dir"]),
@@ -158,6 +163,7 @@ def test_create_patch_exclude(rattler_build: RattlerBuild, tmp_path: Path):
     )
 
     result = rattler_build(
+        "debug",
         "create-patch",
         "--directory",
         str(paths["work_dir"]),
@@ -192,6 +198,7 @@ def test_create_patch_add_pattern(rattler_build: RattlerBuild, tmp_path: Path):
     )
 
     result = rattler_build(
+        "debug",
         "create-patch",
         "--directory",
         str(paths["work_dir"]),
@@ -231,6 +238,7 @@ def test_create_patch_include_pattern(rattler_build: RattlerBuild, tmp_path: Pat
     )
 
     result = rattler_build(
+        "debug",
         "create-patch",
         "--directory",
         str(paths["work_dir"]),
@@ -264,6 +272,7 @@ def test_create_patch_dry_run(rattler_build: RattlerBuild, tmp_path: Path):
     )
 
     result = rattler_build(
+        "debug",
         "create-patch",
         "--directory",
         str(paths["work_dir"]),
@@ -296,6 +305,7 @@ def test_create_patch_always_prints_colored_diff(
 
     # Run create-patch normally (without --dry-run)
     result = rattler_build(
+        "debug",
         "create-patch",
         "--directory",
         str(paths["work_dir"]),
@@ -330,6 +340,7 @@ def test_create_patch_already_exists_no_overwrite(
     )
 
     result = rattler_build(
+        "debug",
         "create-patch",
         "--directory",
         str(paths["work_dir"]),
@@ -343,6 +354,7 @@ def test_create_patch_already_exists_no_overwrite(
     assert patch_path.exists()
 
     result = rattler_build(
+        "debug",
         "create-patch",
         "--directory",
         str(paths["work_dir"]),
@@ -379,6 +391,7 @@ def test_create_patch_incremental_with_existing(
     # Run create-patch to generate a new incremental patch capturing the change from
     # `hello world` -> `hello universe`.
     result = rattler_build(
+        "debug",
         "create-patch",
         "--directory",
         str(paths["work_dir"]),
@@ -425,6 +438,7 @@ def test_create_patch_nested_subdirectories(
     nested_work.mkdir(parents=True)
     (nested_work / "file.txt").write_text("hello universe\n")
     result = rattler_build(
+        "debug",
         "create-patch",
         "--directory",
         str(work_dir),
@@ -458,6 +472,7 @@ def test_create_patch_skips_binary_files(rattler_build: RattlerBuild, tmp_path: 
     binary_work.write_bytes(b"\x00\xff\x00\xfa")
 
     result = rattler_build(
+        "debug",
         "create-patch",
         "--directory",
         str(work_dir),
@@ -495,6 +510,7 @@ def test_create_patch_binary_file_deletion(rattler_build: RattlerBuild, tmp_path
     deleted_bin.write_bytes(b"\x00\xff\x00\xff")
 
     result = rattler_build(
+        "debug",
         "create-patch",
         "--directory",
         str(work_dir),
@@ -548,6 +564,7 @@ def test_create_patch_incremental_map_strategy(
 
     # Generate patch
     result = rattler_build(
+        "debug",
         "create-patch",
         "--directory",
         str(paths["work_dir"]),
@@ -685,6 +702,7 @@ def test_create_patch_real_world_xtensor(rattler_build: RattlerBuild, tmp_path: 
     recipe_output_dir.mkdir(exist_ok=True)
 
     result = rattler_build(
+        "debug",
         "create-patch",
         "--directory",
         str(work_dir),

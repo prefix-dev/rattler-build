@@ -1,7 +1,7 @@
 """
 Stage1 - Evaluated recipe types ready for building.
 
-This module provides Python bindings for rattler-build's stage1 types,
+This module provides Python bindings for Rattler-Build's stage1 types,
 which represent the fully evaluated recipe with all Jinja templates resolved
 and conditionals evaluated.
 """

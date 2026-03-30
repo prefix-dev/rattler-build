@@ -1,10 +1,10 @@
 [build-system]
-requires = ["maturin~=1.2.1"]
+requires = ["maturin~=1.12.0"]
 build-backend = "maturin"
 
 [project]
 name = "py-rattler-build"
-version = "0.48.0"
+version = "0.61.2"
 requires-python = ">=3.10"
 description = "The fastest way to build conda packages programatically"
 readme = "README.md"

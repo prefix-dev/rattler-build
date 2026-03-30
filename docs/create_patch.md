@@ -2,7 +2,7 @@
 
 When packaging software, you often need to make small source code changes – fixing a typo, applying a bug fix, or adapting build scripts. Instead of maintaining a fork of the upstream project, you can create patch files that are applied during the build process.
 
-`rattler-build` provides a streamlined workflow for creating patches using the `debug` and `create-patch` commands.
+Rattler-Build provides a streamlined workflow for creating patches using the `debug` and `create-patch` commands.
 
 ## How it works
 
@@ -11,15 +11,16 @@ The `debug` command sets up a build environment and downloads sources without ru
 ## Basic workflow
 
 ```bash
-# Set up debug environment (downloads sources, no build)
-rattler-build debug --recipe recipe.yaml
+# Set up debug environment and enter the debug shell
+rattler-build debug setup --recipe recipe.yaml
+rattler-build debug shell
 
-# Edit files in the work directory
-cd output/bld/rattler-build_<package>_*/work
+# You're now in the work directory with the build environment sourced.
+# Edit files directly:
 vim some_file.c
 
-# Generate patch
-rattler-build create-patch --directory . --name fix-typo
+# Generate patch (from inside the debug shell, the directories are auto-detected)
+rattler-build create-patch --name fix-typo
 
 # Add to recipe
 ```

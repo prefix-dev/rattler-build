@@ -48,6 +48,7 @@ theme:
     - content.code.copy
     - content.action.edit
     - content.code.annotate
+    - content.tooltips
     # - content.code.select Sponsor only
     - navigation.instant
     - navigation.instant.progress
@@ -61,8 +62,11 @@ extra_css:
 
 markdown_extensions:
   - admonition
+  - abbr
   - def_list
   - footnotes
+  - attr_list
+  - pymdownx.extra
   - pymdownx.tasklist:
       custom_checkbox: true
   - pymdownx.highlight:
@@ -81,7 +85,6 @@ markdown_extensions:
       custom_fences:
         - name: mermaid
           class: mermaid
-          format: !!python/name:pymdownx.superfences.fence_code_format
 
 extra:
   homepage: https://rattler-build.prefix.dev
@@ -159,20 +162,24 @@ nav:
           - py-rattler-build/reference/recipe_generation.md
           - py-rattler-build/reference/progress.md
           - py-rattler-build/reference/package_assembler.md
+          - py-rattler-build/reference/debug.md
       - Tutorials:
           - py-rattler-build/tutorials/recipe_rendering_basics.md
           - py-rattler-build/tutorials/multi_output_and_staging.md
           - py-rattler-build/tutorials/inspecting_built_packages.md
           - py-rattler-build/tutorials/package_assembly.md
+          - py-rattler-build/tutorials/debug_session.md
 
   - References:
       - Recipe file: reference/recipe_file.md
-      - CLI: reference/cli.md
+      - Multi-Output Recipes: reference/multi_output.md
+      - CLI: reference/cli/rattler-build.md
       - Jinja: reference/jinja.md
       - Rattler Index: rattler_index.md
 
 plugins:
-  - search
+  - search:
+      separator: '[\s\u200b\-_,:!=\[\]()"`/]+|\.(?!\d)|&[lg]t;|(?!\b)(?=[A-Z][a-z])'
   - social:
       enabled: true
       cards_layout_dir: docs/layouts

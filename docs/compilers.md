@@ -33,7 +33,7 @@ variant config.
 
 ## Cross-compilation
 
-Cross-compilation is supported by `rattler-build` and the compiler template
+Cross-compilation is supported by Rattler-Build and the compiler template
 function is part of what makes it possible. When you want to cross-compile from
 `linux-64` to `linux-aarch64` (i.e. intel to ARM), you can pass `--target-platform
 linux-aarch64` to the `rattler-build` command. This will cause the compiler
@@ -52,7 +52,7 @@ those are packages that we want to link against.
 
 ```yaml
 # packages that need to run at build time (cmake, gcc, autotools, etc.)
-# in the platform that rattler-build is executed on (the build_platform)
+# in the platform that Rattler-Build is executed on (the build_platform)
 build:
   - cmake
   - ${{ compiler('c') }}
@@ -62,3 +62,17 @@ host:
   - libcurl
   - openssl
 ```
+
+### Builtin codesigning for macOS cross-compilation
+
+When cross-compiling **to** macOS from a non-macOS host (e.g. Linux), the
+system `codesign` tool is not available. In this case you can enable the
+built-in ad-hoc codesigning by setting the `RATTLER_BUILD_BUILTIN_CODESIGN`
+environment variable:
+
+```bash
+RATTLER_BUILD_BUILTIN_CODESIGN=1 rattler-build build --target-platform osx-arm64
+```
+
+This uses a pure-Rust implementation to ad-hoc sign Mach-O binaries after
+relinking, removing the dependency on Apple's `codesign` utility.

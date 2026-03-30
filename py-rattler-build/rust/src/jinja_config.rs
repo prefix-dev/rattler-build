@@ -12,7 +12,7 @@ use rattler_build_jinja::{JinjaConfig, NormalizedKey, UndefinedBehavior, Variabl
 use rattler_conda_types::Platform;
 
 /// Python wrapper for JinjaConfig
-#[pyclass(name = "PyJinjaConfig")]
+#[pyclass(name = "PyJinjaConfig", from_py_object)]
 #[derive(Clone)]
 pub struct PyJinjaConfig {
     pub(crate) inner: JinjaConfig,

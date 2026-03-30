@@ -15,6 +15,7 @@ install = "cargo install --path . --locked"
 test-end-to-end = { cmd = "pytest test/end-to-end --snapshot-warn-unused --snapshot-details --numprocesses=auto --durations=0", depends-on = [
   "build-release",
 ] }
+test-end-to-end-ci = "pytest test/end-to-end --snapshot-warn-unused --snapshot-details --numprocesses=auto --durations=0 -v"
 test = "cargo test --workspace --all-targets"
 test-slow = "cargo test --release --workspace --all-targets"
 test-patch-extra = "cargo test --features patch-test-extra"
@@ -22,11 +23,30 @@ test-all = { depends-on = ["test-slow", "test-end-to-end"] }
 install-as = { cmd = "python scripts/install.py", depends-on = [
   "build-release",
 ], description = "Install release build to a custom location" }
-test-ci = "cargo test --release -p rust-tests"
-generate-cli-docs = "mkdir -p src/bin && cp docs/generator/* src/bin && cargo add clap-markdown --git https://github.com/ruben-arts/clap-markdown --branch main && cargo run --bin generate-cli-docs --features generate-cli-docs > docs/reference/cli.md && cargo rm clap-markdown && rm -rf src/bin"
+generate-cli-docs = "cargo run --manifest-path crates/rattler_build_docs/Cargo.toml"
 generate-test-data = "cargo r --release --bin patch-apply-gen-test-data"
 update-snapshots = "pytest test/end-to-end --snapshot-update"
 check-native-tls = "python scripts/check-native-tls.py"
+# Playground tasks are in the "playground" environment/feature (see below)
+
+# Expects `rustup` with target `wasm32-unknown-unknown` to be installed on the host system
+[feature.playground.dependencies]
+python = ">=3.12,<4"
+clang = ">=21.1.8,<23"
+livereload = ">=2.7,<3"
+wasm-pack = ">=0.14.0,<0.15"
+
+[feature.playground.tasks]
+playground-build = { cmd = "python scripts/build_playground.py", description = "Build the WASM playground", inputs = [
+  "crates/**",
+  "scripts/build_playground.py",
+  "Cargo.lock",
+], outputs = [
+  "deploy/*",
+] }
+playground-serve = { cmd = "python scripts/serve_playground.py", depends-on = [
+  "playground-build",
+], description = "Serve the playground with live reload on source changes" }
 
 [feature.docs.tasks]
 download-font = "bash docs/layouts/download-font-to-cache.sh"
@@ -39,41 +59,52 @@ convert-notebooks = { cmd = "jupyter nbconvert --execute --to markdown py-rattle
 ], outputs = [
   "docs/py-rattler-build/tutorials/*.md",
 ] }
+validate-recipes = "python docs/scripts/validate_recipes.py"
 build-docs = { cmd = "mkdocs build --strict", depends-on = [
   "download-font",
   "convert-notebooks",
+  "validate-recipes",
 ] }
 docs = { cmd = "mkdocs serve", depends-on = [
   "download-font",
   "convert-notebooks",
+  "validate-recipes",
 ] }
 deploy-latest = { cmd = "mike deploy --push --update-aliases $RELEASE_VERSION latest", depends-on = [
   "download-font",
   "convert-notebooks",
+  "validate-recipes",
 ] }
 deploy-dev = { cmd = "mike deploy --push dev devel", depends-on = [
   "download-font",
   "convert-notebooks",
+  "validate-recipes",
 ] }
 
 [dependencies]
-openssl = "3.*"
-rust = ">=1.89.0,<1.90"
-rust-src = ">=1.89.0,<1.90"
+openssl = ">=3.6.1,<4"
+rust = ">=1.94.0,<1.95"
+rust-src = ">=1.94.0,<2"
+sccache = ">=0.14.0,<0.15"
 compilers = ">=1.11.0,<2"
-libssh2 = "1.11.0.*"
-pkg-config = "0.29.2.*"
-cmake = "3.27.6.*"
-make = "4.3.*"
-perl = "5.32.1.*"
-pytest = "7.4.2.*"
-pytest-xdist = ">=3.6.1,<4"
-pyyaml = ">=6.0.1,<6.1"
-conda-package-handling = "2.2.0.*"
-requests = ">=2.32.2,<2.33"
-syrupy = "4.6.*"
-boto3 = "*"
+libssh2 = ">=1.11.1,<2"
+pkg-config = ">=0.29.2,<0.30"
+cmake = ">=4.2.3,<5"
+make = ">=4.4.1,<5"
+perl = ">=5.32.1,<5.33"
+pytest = ">=8.4.2,<9"
+pytest-xdist = ">=3.8.0,<4"
+pyyaml = ">=6.0.3,<7"
+conda-package-handling = ">=2.4.0,<3"
+requests = ">=2.32.5,<3"
+syrupy = ">=5.1.0,<6"
+boto3 = ">=1.42.66,<2"
 
+[activation.env]
+RUSTC_WRAPPER = "sccache"
+# Use cmake to build aws-lc-sys, because conda's CFLAGS inject -O2 which
+# overrides the -O0 required by jitterentropy-base.c, causing a build failure.
+AWS_LC_SYS_CMAKE_BUILDER = "1"
 
 [feature.lint.dependencies]
 actionlint = ">=1.7.4,<2"
@@ -83,6 +114,7 @@ ruff = ">=0.14.7,<0.15"
 shellcheck = ">=0.10.0,<0.11"
 taplo = ">=0.9.1,<0.10"
 typos = ">=1.23.1,<2"
+zizmor = ">=1.18.0,<2"
 nbstripout = ">=0.8.2,<0.9"
 
 [feature.lint.tasks]
@@ -99,9 +131,14 @@ ruff-lint = "ruff check --fix --exit-non-zero-on-fix --force-exclude"
 toml-format = { cmd = "taplo fmt", env = { RUST_LOG = "warn" } }
 toml-lint = "taplo lint --verbose **/pixi.toml"
 typos = "typos --force-exclude"
+zizmor = { cmd = "zizmor --quiet --min-severity=low .github/", description = "Security audit GitHub Actions" }
 
 [feature.pre-commit.dependencies]
 lefthook = ">=2.0.11,<3"
+sccache = ">=0.12,<0.13"
+
+[feature.pre-commit.activation.env]
+RUSTC_WRAPPER = "sccache"
 
 [feature.pre-commit.tasks]
 lefthook = { cmd = "lefthook", description = "Run lefthook" }
@@ -115,11 +152,14 @@ pre-commit-install = "lefthook install"
 pre-commit-install-minimal = "lefthook install pre-commit"
 
 [feature.dev.dependencies]
-tbump = "*"
+tbump = ">=6.9.0,<7"
+git-cliff = ">=2.12.0,<3"
 
 [feature.dev.tasks]
 # Bump version by running `pixi run bump NEW_VERSION`
 bump = "tbump --only-patch"
+bump-changelog = { cmd = "python scripts/bump_changelog.py", description = "Update changelog with unreleased changes" }
+release = { cmd = "python scripts/release.py", description = "Bump version and update lock files" }
 
 [feature.packaging.dependencies]
 python = ">=3.13,<3.15"
@@ -133,8 +173,7 @@ RUSTC_WRAPPER = "sccache"
 build-package = "python scripts/build_package.py"
 upload-package = "python scripts/upload_package.py"
 
-
-[target.linux-64.dependencies]
+[target.linux.dependencies]
 clang = ">=18.1.8,<19.0"
 mold = ">=2.33.0,<3.0"
 patchelf = ">=0.17.2,<0.18"
@@ -145,15 +184,17 @@ patchelf = ">=0.18.0,<0.19"
 [target.osx-arm64.dependencies]
 patchelf = ">=0.18.0,<0.19"
 
-[target.linux-64.activation]
+[target.linux.activation]
 scripts = ["scripts/activate.sh"]
-[target.osx-arm64.activation]
+
+[target.osx.activation]
 scripts = ["scripts/activate.sh"]
-[target.win-64.activation]
+[target.win.activation]
 scripts = ["scripts/activate.bat"]
 
 [feature.docs.dependencies]
 cairosvg = ">=2.8.2,<3"
+click = "==8.2.1"                                  # Pin click because of https://github.com/mkdocs/mkdocs/issues/4032
 mike = ">=2.1.3,<3"
 mkdocs = ">=1.6.1,<2"
 mkdocs-material = ">=9.7.0,<10"
@@ -165,14 +206,35 @@ py-rattler-build = { path = "./py-rattler-build" }
 nbconvert = ">=7.16,<8"
 ipykernel = ">=6.29,<7"
 
+[feature.release.dependencies]
+python = ">=3.14.3,<3.15"
+git-cliff = ">=2.12.0,<3"
+release-plz = ">=0.3.157,<0.4"
+rust = ">=1.94.0,<1.95"
+7zip = ">=26.0,<27"
+httpx = ">=0.28.1,<0.29"
+
+[feature.release.tasks]
+extract-version = { cmd = "python scripts/extract_version.py", description = "Extract version from Cargo.toml" }
+release-plz-pr = { cmd = "python scripts/release_plz_pr.py", description = "Create release PR and sync py-rattler-build Cargo.lock" }
+release-plz-release = { cmd = "python scripts/release_plz_release.py", description = "Publish crates and create git tags" }
+build-options = { cmd = "python scripts/build_options.py", description = "Determine cargo build/test options for a target" }
+package-binary = { cmd = "python scripts/package_binary.py", description = "Package release binary into archive and stage for upload" }
+create-tag = { cmd = "python scripts/create_tag.py", description = "Create and push a git tag idempotently" }
+sign-macos = { cmd = "python scripts/sign_macos.py", description = "Sign and notarize macOS binaries" }
+sign-windows-extract = { cmd = "python scripts/sign_windows.py extract", description = "Extract Windows executables for signing" }
+sign-windows-repackage = { cmd = "python scripts/sign_windows.py repackage", description = "Repackage signed Windows executables" }
+save-attestation = { cmd = "python scripts/save_attestation.py", description = "Save attestation bundle" }
+create-release = { cmd = "python scripts/create_release.py", description = "Create GitHub release with all artifacts" }
+
 [environments]
-default = { features = [
-  "dev",
-], solve-group = "default" } # Using same solve group to keep the environment consistent in versions used and improving cache hits
+default = { features = ["dev"], solve-group = "default" }
 docs = { features = ["docs"], no-default-feature = true }
 lint = { features = ["lint"], solve-group = "default" }
 pre-commit = { features = ["pre-commit"], no-default-feature = true }
 packaging = { features = ["packaging"], no-default-feature = true }
+playground = { features = ["playground"], no-default-feature = true }
+release = { features = ["release"], no-default-feature = true }
 
 # pixi build
 [package]
@@ -186,5 +248,11 @@ channels = [
   "https://prefix.dev/conda-forge",
 ]
 
+[package.build-dependencies]
+cmake = ">=4.3.0, <5"
+
 [package.build.config]
 compilers = ["rust", "c"]
+# Use cmake to build aws-lc-sys, because conda's CFLAGS inject -O2 which
+# overrides the -O0 required by jitterentropy-base.c, causing a build failure.
+env = { AWS_LC_SYS_CMAKE_BUILDER = "1" }

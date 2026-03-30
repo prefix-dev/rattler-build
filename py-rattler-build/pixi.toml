@@ -16,17 +16,22 @@ version = "*"
 [package.build.config]
 compilers = ["rust"]
 extra-input-globs = ["../src", "../crates"]
+# Use cmake to build aws-lc-sys, because conda's CFLAGS inject -O2 which
+# overrides the -O0 required by jitterentropy-base.c, causing a build failure.
+env = { AWS_LC_SYS_CMAKE_BUILDER = "1" }
 
 [package.host-dependencies]
 python = "*"
-maturin = "~=1.2.2"
+maturin = "~=1.12.0"
 
 [package.target.linux.build-dependencies]
 patchelf = "~=0.17.2"
+cmake = ">=4,<5"
+make = ">=4,<5"
 
 [feature.lint.dependencies]
 # we need rust for cargo-fmt and clippy
-rust = ">=1.89.0,<1.90"
+rust = ">=1.93.1,<1.94"
 ruff = ">=0.3.3,<0.4"
 
 [feature.lint.tasks]
@@ -77,4 +82,8 @@ lint = { features = ["lint"] }
 
 [dependencies]
 requests = ">=2.32.3,<2.33"
+sccache = ">=0.12,<0.13"
 types-requests = ">=2.32.0.20240602,<2.32.1"
+
+[activation.env]
+RUSTC_WRAPPER = "sccache"

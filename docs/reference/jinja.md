@@ -1,6 +1,6 @@
 # Jinja
 
-`rattler-build` comes with a couple of useful [Jinja](https://jinja.palletsprojects.com)
+Rattler-Build comes with a couple of useful [Jinja](https://jinja.palletsprojects.com)
 functions and filters that can be used in the recipe.
 
 ## Functions
@@ -42,7 +42,7 @@ Note that the final output will still contain the `target_platform`, so that the
 full compiler will read `clang_linux-64 9.0` when compiling with
 `--target-platform linux-64`.
 
-`rattler-build` defines some default compilers for the following languages
+Rattler-Build defines some default compilers for the following languages
 (inherited from `conda-build`):
 
 - `c`: `gcc` on Linux, `clang` on `osx` and `vs2022` on Windows
@@ -89,10 +89,11 @@ resolution).
 
 The pin functions take the following three arguments:
 
-- `lower_bound` (default: `"x.x.x.x.x.x"`): The lower bound pin expression to be
-  used. When set to `None`, no lower bound is set.
-- `upper_bound` (default: `"x"`): The maximum pin to be used. When set to
-  `None`, no upper bound is set.
+1. The package name.
+2. `lower_bound=...` (default: `"x.x.x.x.x.x"`): The lower bound pin expression
+   to be used. When set to `None`, no lower bound is set.
+3. `upper_bound=...` (default: `"x"`): The maximum pin to be used. When set to
+   `None`, no upper bound is set.
 
 The lower bound and upper bound can either be a "pin expression" (only `x` and
 `.` are allowed) or a hard-coded version string.
@@ -109,22 +110,11 @@ then incrementing the version will set that letter to `a`, e.g. `9e` will become
 `10a`, and `1.1.1j` will become `1.1.2a`. In this case, also no `0a0` is
 appended to the end.
 
-Sometimes you want to strongly connect your outputs. This can be achieved with
-the following input:
+Sometimes you want to strongly connect your outputs. This can be achieved by
+passing the following argument instead of `lower_bound` and `upper_bound`:
 
 - `exact=True` (default: `False`): This will pin the version exactly to the
   version of the output, incl. the build string.
-
-To override the lower or upper bound with a hard-coded value, you can use the
-following input:
-
-- `lower_bound` (default: `None`): This will override the lower bound with the
-  given value.
-- `upper_bound` (default: `None`): This will override the upper bound with the
-  given value.
-
-Both `lower_bound` and `upper_bound` expect a valid version string (e.g.
-`1.2.3`).
 
 To add an build-string matching expression, you can use the `build` argument:
 
@@ -262,7 +252,7 @@ You can also check for the existence of an environment variable:
 ## Tests
 
 You can write tests using minijinja to check whether objects have certain properties.
-The syntax for a filter is `{{ variable is test_name }}`.
+The syntax for a test is `${{ variable is test_name }}`.
 
 - `undefined`: Check whether a variable is undefined.
 - `defined`: Check whether a variable is defined.
@@ -278,39 +268,39 @@ The syntax for a filter is `{{ variable is test_name }}`.
 - `string`: Check whether a variable is a string.
 - `sequence`: Check whether a variable is a sequence.
 - `boolean`: Check whether a variable is a boolean.
-- `startingwith`: Check whether a variable is starting with another string: `{{ python is startingwith('3.12') }}`
-- `endingwith`: Check whether a variable is starting with another string: `{{ python is endingwith('.*') }}`
+- `startingwith`: Check whether a variable is starting with another string: `${{ python is startingwith('3.12') }}`
+- `endingwith`: Check whether a variable is starting with another string: `${{ python is endingwith('.*') }}`
 
 ## Filters
 
 A feature of `jinja` is called "filters". Filters are functions that can be
 applied to variables in a template expression.
 
-The syntax for a filter is `{{ variable | filter_name }}`. A filter can also
+The syntax for a filter is `${{ variable | filter_name }}`. A filter can also
 take arguments, such as `... | replace('foo', 'bar')`.
 
 The following Jinja filters are available, taken from the upstream `minijinja`
 library:
 
-- `replace`: replace a string with another string (e.g. `"{{ 'foo' | replace('oo', 'aa') }}"` will return `"faa"`)
-- `lower`: convert a string to lowercase (e.g. `"{{ 'FOO' | lower }}"` will return `"foo"`)
-- `upper`: convert a string to uppercase (e.g. `"{{ 'foo' | upper }}"` will
-return `"FOO"`) - `int`: convert a string to an integer (e.g. `"{{ '42' | int }}"` will return `42`)
-- `abs`: return the absolute value of a number (e.g. `"{{ -42 | abs }}"` will return `42`)
-- `bool`: convert a value to a boolean (e.g. `"{{ 'foo' | bool }}"` will return `true`)
-- `default`: return a default value if the value is falsy (e.g. `"{{ '' | default('foo') }}"` will return `"foo"`)
-- `first`: return the first element of a list (e.g. `"{{ [1, 2, 3] | first }}"`
-will return `1`) - `last`: return the last element of a list (e.g. `"{{ [1, 2, 3] | last }}"` will return `3`)
-- `length`: return the length of a list (e.g. `"{{ [1, 2, 3] | length }}"` will return `3`)
-- `list`: convert a string to a list (e.g. `"{{ 'foo' | list }}"` will return `['f', 'o', 'o']`)
-- `join`: join a list with a separator (e.g. `"{{ [1, 2, 3] | join('.') }}"` will return `"1.2.3"`)
-- `min`: return the minimum value of a list (e.g. `"{{ [1, 2, 3] | min }}"` will return `1`)
-- `max`: return the maximum value of a list (e.g. `"{{ [1, 2, 3] | max }}"` will return `3`)
-- `reverse`: reverse a list (e.g. `"{{ [1, 2, 3] | reverse }}"` will return `[3, 2, 1]`)
-- `sort`: sort a list (e.g. `"{{ [3, 1, 2] | sort }}"` will return `[1, 2, 3]`)
-- `trim`: remove leading and trailing whitespace from a string (e.g. `"{{ ' foo ' | trim }}"` will return `"foo"`)
-- `unique`: remove duplicates from a list (e.g. `"{{ [1, 2, 1, 3] | unique }}"` will return `[1, 2, 3]`)
-- `split`: split a string into a list (e.g. `"{{ '1.2.3' | split('.') | list }}"` will return `['1', '2', '3']`). By default, splits on whitespace.
+- `replace`: replace a string with another string (e.g. `"${{ 'foo' | replace('oo', 'aa') }}"` will return `"faa"`)
+- `lower`: convert a string to lowercase (e.g. `"${{ 'FOO' | lower }}"` will return `"foo"`)
+- `upper`: convert a string to uppercase (e.g. `"${{ 'foo' | upper }}"` will return `"FOO"`)
+- `int`: convert a string to an integer (e.g. `"${{ '42' | int }}"` will return `42`)
+- `abs`: return the absolute value of a number (e.g. `"${{ -42 | abs }}"` will return `42`)
+- `bool`: convert a value to a boolean (e.g. `"${{ 'foo' | bool }}"` will return `true`)
+- `default`: return a default value if the value is falsy (e.g. `"${{ '' | default('foo') }}"` will return `"foo"`)
+- `first`: return the first element of a list (e.g. `"${{ [1, 2, 3] | first }}"` will return `1`)
+- `last`: return the last element of a list (e.g. `"${{ [1, 2, 3] | last }}"` will return `3`)
+- `length`: return the length of a list (e.g. `"${{ [1, 2, 3] | length }}"` will return `3`)
+- `list`: convert a string to a list (e.g. `"${{ 'foo' | list }}"` will return `['f', 'o', 'o']`)
+- `join`: join a list with a separator (e.g. `"${{ [1, 2, 3] | join('.') }}"` will return `"1.2.3"`)
+- `min`: return the minimum value of a list (e.g. `"${{ [1, 2, 3] | min }}"` will return `1`)
+- `max`: return the maximum value of a list (e.g. `"${{ [1, 2, 3] | max }}"` will return `3`)
+- `reverse`: reverse a list (e.g. `"${{ [1, 2, 3] | reverse }}"` will return `[3, 2, 1]`)
+- `sort`: sort a list (e.g. `"${{ [3, 1, 2] | sort }}"` will return `[1, 2, 3]`)
+- `trim`: remove leading and trailing whitespace from a string (e.g. `"${{ ' foo ' | trim }}"` will return `"foo"`)
+- `unique`: remove duplicates from a list (e.g. `"${{ [1, 2, 1, 3] | unique }}"` will return `[1, 2, 3]`)
+- `split`: split a string into a list (e.g. `"${{ '1.2.3' | split('.') | list }}"` will return `['1', '2', '3']`). By default, splits on whitespace.
 
 ??? "Removed filters"
 

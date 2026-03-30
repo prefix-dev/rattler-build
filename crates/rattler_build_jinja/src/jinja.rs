@@ -1,4 +1,5 @@
 //! Module for types and functions related to minijinja setup for recipes.
+#[cfg(not(target_arch = "wasm32"))]
 use fs_err as fs;
 use indexmap::IndexMap;
 use minijinja::{
@@ -7,6 +8,7 @@ use minijinja::{
     value::{Kwargs, Object},
 };
 use rattler_build_types::{NormalizedKey, Pin, PinArgs};
+#[cfg(not(target_arch = "wasm32"))]
 use std::io::Read;
 use std::sync::{Arc, Mutex};
 use std::{
@@ -44,7 +46,7 @@ const KNOWN_FUNCTIONS: &[&str] = &[
     "hash",
 ];
 
-/// Configuration for Jinja template rendering in rattler-build
+/// Configuration for Jinja template rendering in Rattler-Build
 #[derive(Debug, Clone)]
 pub struct JinjaConfig {
     /// The target platform for the build
@@ -59,7 +61,7 @@ pub struct JinjaConfig {
     pub experimental: bool,
     /// Path to the recipe file (for relative path resolution in load_from_file)
     pub recipe_path: Option<PathBuf>,
-    /// Undefined behavior for minijinja (defaults to SemiStrict)
+    /// Undefined behavior for minijinja (defaults to Strict)
     pub undefined_behavior: UndefinedBehavior,
 }
 
@@ -73,7 +75,7 @@ impl Default for JinjaConfig {
             variant: BTreeMap::new(),
             experimental: false,
             recipe_path: None,
-            undefined_behavior: UndefinedBehavior::SemiStrict,
+            undefined_behavior: UndefinedBehavior::Strict,
         }
     }
 }
@@ -81,24 +83,21 @@ impl Default for JinjaConfig {
 /// A wrapper around the context that tracks variable access
 ///
 /// This allows us to know which variables were actually used during template rendering,
-/// which is important for understanding which variables are used and which are undefined.
+/// which is important for understanding which variant variables are used.
 #[derive(Debug, Clone)]
 struct TrackingContext {
     context: BTreeMap<String, Value>,
     accessed_variables: Arc<Mutex<HashSet<String>>>,
-    undefined_variables: Arc<Mutex<HashSet<String>>>,
 }
 
 impl TrackingContext {
     fn new(
         context: BTreeMap<String, Value>,
         accessed_variables: Arc<Mutex<HashSet<String>>>,
-        undefined_variables: Arc<Mutex<HashSet<String>>>,
     ) -> Self {
         Self {
             context,
             accessed_variables,
-            undefined_variables,
         }
     }
 }
@@ -112,17 +111,7 @@ impl Object for TrackingContext {
             accessed.insert(key_str.to_string());
         }
 
-        // Get the value from the context
-        match self.context.get(key_str) {
-            Some(v) => Some(v.clone()),
-            None => {
-                // Track that this variable was undefined
-                if let Ok(mut undefined) = self.undefined_variables.lock() {
-                    undefined.insert(key_str.to_string());
-                }
-                None
-            }
-        }
+        self.context.get(key_str).cloned()
     }
 }
 
@@ -162,15 +151,12 @@ pub struct Jinja {
     context: BTreeMap<String, Value>,
     /// Set of variables that were accessed during template rendering
     accessed_variables: Arc<Mutex<HashSet<String>>>,
-    /// Set of variables that were accessed but undefined
-    undefined_variables: Arc<Mutex<HashSet<String>>>,
 }
 
 impl Jinja {
     /// Create a new Jinja instance with the given configuration
     pub fn new(config: JinjaConfig) -> Self {
         let accessed_variables = Arc::new(Mutex::new(HashSet::new()));
-        let undefined_variables = Arc::new(Mutex::new(HashSet::new()));
         let env = set_jinja(&config, accessed_variables.clone());
         let mut context = BTreeMap::new();
 
@@ -188,24 +174,15 @@ impl Jinja {
             Value::from(config.host_platform.to_string()),
         );
 
-        // Add common platform shortcuts based on the host platform
-        // (the platform where the package will run)
+        // Add cross-family platform shortcut
         context.insert(
             "unix".to_string(),
             Value::from(config.host_platform.is_unix()),
         );
-        context.insert(
-            "linux".to_string(),
-            Value::from(config.host_platform.is_linux()),
-        );
-        context.insert(
-            "osx".to_string(),
-            Value::from(config.host_platform.is_osx()),
-        );
-        context.insert(
-            "win".to_string(),
-            Value::from(config.host_platform.is_windows()),
-        );
+
+        // Derive the host platform's family name (e.g., "linux" from "linux-64",
+        // "emscripten" from "emscripten-wasm32")
+        let host_family = config.host_platform.only_platform();
 
         // Add architecture aliases (e.g., "x86_64", "aarch64", "ppc64le")
         // All known architectures are defined, with only the host platform's architecture being true
@@ -214,16 +191,27 @@ impl Jinja {
             context.insert(arch.to_string(), Value::from(current_arch == Some(arch)));
         }
 
-        // Add platform aliases (e.g., "linux64", "osx64", "win64")
-        // These are the platform string with "-" removed (e.g., "linux-64" -> "linux64")
-        // All known platforms get an alias, with only the current host_platform being true
+        let mut seen_families = HashSet::new();
         for platform in Platform::iter() {
             // Skip noarch and unknown platforms
             if matches!(platform, Platform::NoArch | Platform::Unknown) {
                 continue;
             }
-            let alias = platform.to_string().replace('-', "");
+
+            // Add platform aliases (e.g., "linux64", "osx64", "emscriptenwasm32")
+            // These are the platform string with "-" removed
+            let platform_str = platform.to_string();
+            let alias = platform_str.replace('-', "");
             context.insert(alias, Value::from(platform == config.host_platform));
+
+            // Add platform family selectors (e.g., "linux", "osx", "win", "emscripten", "wasi")
+            // derived from platform names by extracting the part before the architecture suffix.
+            // This automatically supports new platforms added to rattler_conda_types.
+            if let Some(family) = platform.only_platform()
+                && seen_families.insert(family.to_string())
+            {
+                context.insert(family.to_string(), Value::from(Some(family) == host_family));
+            }
         }
 
         // Add variant variables to context
@@ -235,7 +223,6 @@ impl Jinja {
             env,
             context,
             accessed_variables,
-            undefined_variables,
         }
     }
 
@@ -277,11 +264,8 @@ impl Jinja {
     /// a TrackingContext object wrapper.
     pub fn render_str(&self, template: &str) -> Result<String, minijinja::Error> {
         // Create a TrackingContext that wraps our context
-        let tracking_context = TrackingContext::new(
-            self.context.clone(),
-            self.accessed_variables.clone(),
-            self.undefined_variables.clone(),
-        );
+        let tracking_context =
+            TrackingContext::new(self.context.clone(), self.accessed_variables.clone());
 
         // Render with the tracking context as a minijinja Object
         // The Value::from_object wraps it in an Arc internally
@@ -291,15 +275,12 @@ impl Jinja {
 
     /// Render, compile and evaluate a expr string with the current context.
     ///
-    /// This will track accessed and undefined variables during evaluation using
+    /// This will track accessed variables during evaluation using
     /// a TrackingContext object wrapper.
     pub fn eval(&self, str: &str) -> Result<Value, minijinja::Error> {
         // Create a TrackingContext that wraps our context
-        let tracking_context = TrackingContext::new(
-            self.context.clone(),
-            self.accessed_variables.clone(),
-            self.undefined_variables.clone(),
-        );
+        let tracking_context =
+            TrackingContext::new(self.context.clone(), self.accessed_variables.clone());
 
         let expr = self.env.compile_expression(str)?;
         expr.eval(Value::from_object(tracking_context))
@@ -332,40 +313,10 @@ impl Jinja {
             .unwrap_or_default()
     }
 
-    /// Get the set of variables that were accessed but undefined
-    pub fn undefined_variables(&self) -> HashSet<String> {
-        self.undefined_variables
-            .lock()
-            .map(|undefined| undefined.clone())
-            .unwrap_or_default()
-    }
-
-    /// Get the set of variables that were accessed but undefined,
-    /// excluding known Jinja function names that are registered in the environment.
-    ///
-    /// This is useful for error reporting because functions like `compiler`, `pin_subpackage`,
-    /// etc. are looked up in the context first (where they appear as "undefined"), but are
-    /// then resolved from the environment.
-    pub fn undefined_variables_excluding_functions(&self) -> HashSet<String> {
-        self.undefined_variables
-            .lock()
-            .map(|undefined| {
-                undefined
-                    .iter()
-                    .filter(|name| !KNOWN_FUNCTIONS.contains(&name.as_str()))
-                    .cloned()
-                    .collect()
-            })
-            .unwrap_or_default()
-    }
-
-    /// Clear the accessed and undefined variables trackers
+    /// Clear the accessed variables tracker
     pub fn clear_tracking(&self) {
         if let Ok(mut accessed) = self.accessed_variables.lock() {
             accessed.clear();
-        }
-        if let Ok(mut undefined) = self.undefined_variables.lock() {
-            undefined.clear();
         }
     }
 }
@@ -518,9 +469,12 @@ fn compiler_stdlib_eval(
     let variant_key_version = NormalizedKey(format!("{lang}_{prefix}_version")).normalize();
 
     // Track that we're accessing these variant keys
+    // Also track CONDA_BUILD_SYSROOT since different sysroot paths should
+    // produce different package hashes (matching conda-build behavior)
     if let Ok(mut accessed) = accessed_variables.lock() {
         accessed.insert(variant_key.clone());
         accessed.insert(variant_key_version.clone());
+        accessed.insert("CONDA_BUILD_SYSROOT".to_string());
     }
 
     let default_fn = if prefix == "compiler" {
@@ -642,13 +596,141 @@ fn parse_platform(platform: &str) -> Result<Platform, minijinja::Error> {
 }
 
 lazy_static::lazy_static! {
-    /// The syntax config for MiniJinja / rattler-build
+    /// The syntax config for MiniJinja / Rattler-Build
     pub static ref SYNTAX_CONFIG: SyntaxConfig = SyntaxConfig::builder()
         .block_delimiters("{%", "%}")
         .variable_delimiters("${{", "}}")
         .comment_delimiters("{#", "#}")
         .build()
         .unwrap();
+}
+
+/// Check if the experimental feature is enabled (used by IO function stubs).
+fn check_experimental(experimental: bool) -> Result<(), minijinja::Error> {
+    if !experimental {
+        return Err(minijinja::Error::new(
+            minijinja::ErrorKind::InvalidOperation,
+            "Experimental feature: provide the `--experimental` flag to enable this feature",
+        ));
+    }
+    Ok(())
+}
+
+/// Register platform-specific IO functions (load_from_file, git) into the Jinja environment.
+///
+/// On native targets this registers the real implementations; on WASM it registers
+/// stubs that return clear error messages.
+#[cfg(not(target_arch = "wasm32"))]
+fn register_io_functions(env: &mut Environment, experimental: bool, recipe_path: Option<PathBuf>) {
+    #[derive(Debug, PartialEq, Eq, Clone, Copy)]
+    enum FileFormat {
+        Yaml,
+        Json,
+        Toml,
+        Unknown,
+    }
+
+    fn get_file_format(file_path: &std::path::Path) -> FileFormat {
+        file_path
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .map(|ext| match ext.to_lowercase().as_str() {
+                "yaml" | "yml" => FileFormat::Yaml,
+                "json" => FileFormat::Json,
+                "toml" => FileFormat::Toml,
+                _ => FileFormat::Unknown,
+            })
+            .unwrap_or(FileFormat::Unknown)
+    }
+
+    fn handle_file_error(e: std::io::Error, file_path: &std::path::Path) -> minijinja::Error {
+        minijinja::Error::new(
+            minijinja::ErrorKind::UndefinedError,
+            format!("Failed to open file '{}': {}", file_path.display(), e),
+        )
+    }
+
+    fn handle_read_error(e: std::io::Error, file_path: &std::path::Path) -> minijinja::Error {
+        minijinja::Error::new(
+            minijinja::ErrorKind::UndefinedError,
+            format!("Failed to read file '{}': {}", file_path.display(), e),
+        )
+    }
+
+    fn handle_deserialize_error(e: impl std::fmt::Display) -> minijinja::Error {
+        minijinja::Error::new(minijinja::ErrorKind::CannotDeserialize, e.to_string())
+    }
+
+    fn read_and_parse_file(
+        file_path: &std::path::Path,
+    ) -> Result<minijinja::Value, minijinja::Error> {
+        let file = fs::File::open(file_path).map_err(|e| handle_file_error(e, file_path))?;
+        let mut reader = std::io::BufReader::new(file);
+
+        match get_file_format(file_path) {
+            FileFormat::Yaml => serde_yaml::from_reader(reader).map_err(handle_deserialize_error),
+            FileFormat::Json => serde_json::from_reader(reader).map_err(handle_deserialize_error),
+            FileFormat::Toml => {
+                let mut content = String::new();
+                reader
+                    .read_to_string(&mut content)
+                    .map_err(|e| handle_read_error(e, file_path))?;
+                toml::from_str(&content).map_err(handle_deserialize_error)
+            }
+            FileFormat::Unknown => {
+                let mut content = String::new();
+                reader
+                    .read_to_string(&mut content)
+                    .map_err(|e| handle_read_error(e, file_path))?;
+                Ok(Value::from(content))
+            }
+        }
+    }
+
+    let recipe_dir = recipe_path
+        .as_ref()
+        .and_then(|p| p.parent().map(|p| p.to_path_buf()));
+
+    env.add_function("load_from_file", move |path: String| {
+        check_experimental(experimental)?;
+
+        if let Some(recipe_path) = recipe_path.as_ref()
+            && let Some(parent) = recipe_path.parent()
+        {
+            let relative_path = parent.join(&path);
+            if let Ok(value) = read_and_parse_file(&relative_path) {
+                return Ok(value);
+            }
+        }
+
+        let file_path = std::path::Path::new(&path);
+        read_and_parse_file(file_path)
+    });
+
+    env.add_global(
+        "git",
+        Value::from_object(crate::git::Git {
+            experimental,
+            recipe_dir,
+        }),
+    );
+}
+
+/// WASM stub: registers error-returning stubs for IO functions.
+#[cfg(target_arch = "wasm32")]
+fn register_io_functions(env: &mut Environment, experimental: bool, _recipe_path: Option<PathBuf>) {
+    env.add_function(
+        "load_from_file",
+        move |_path: String| -> Result<Value, minijinja::Error> {
+            check_experimental(experimental)?;
+            Err(minijinja::Error::new(
+                minijinja::ErrorKind::InvalidOperation,
+                "load_from_file is not available in WASM",
+            ))
+        },
+    );
+
+    env.add_global("git", Value::from_object(crate::git::Git { experimental }));
 }
 
 fn set_jinja(
@@ -819,107 +901,10 @@ fn set_jinja(
         Ok(parse_platform(platform)?.is_unix())
     });
 
-    #[derive(Debug, PartialEq, Eq, Clone, Copy)]
-    enum FileFormat {
-        Yaml,
-        Json,
-        Toml,
-        Unknown,
-    }
-
-    // Helper function to determine the file format based on the file extension
-    fn get_file_format(file_path: &std::path::Path) -> FileFormat {
-        file_path
-            .extension()
-            .and_then(|ext| ext.to_str())
-            .map(|ext| match ext.to_lowercase().as_str() {
-                "yaml" | "yml" => FileFormat::Yaml,
-                "json" => FileFormat::Json,
-                "toml" => FileFormat::Toml,
-                _ => FileFormat::Unknown,
-            })
-            .unwrap_or(FileFormat::Unknown)
-    }
-
-    // Helper function to handle file errors
-    fn handle_file_error(e: std::io::Error, file_path: &std::path::Path) -> minijinja::Error {
-        minijinja::Error::new(
-            minijinja::ErrorKind::UndefinedError,
-            format!("Failed to open file '{}': {}", file_path.display(), e),
-        )
-    }
-
-    // Helper function to handle file reading errors
-    fn handle_read_error(e: std::io::Error, file_path: &std::path::Path) -> minijinja::Error {
-        minijinja::Error::new(
-            minijinja::ErrorKind::UndefinedError,
-            format!("Failed to read file '{}': {}", file_path.display(), e),
-        )
-    }
-
-    // Helper function to handle deserialization errors
-    fn handle_deserialize_error(e: impl std::fmt::Display) -> minijinja::Error {
-        minijinja::Error::new(minijinja::ErrorKind::CannotDeserialize, e.to_string())
-    }
-
-    // Read and parse the file based on its format
-    fn read_and_parse_file(
-        file_path: &std::path::Path,
-    ) -> Result<minijinja::Value, minijinja::Error> {
-        let file = fs::File::open(file_path).map_err(|e| handle_file_error(e, file_path))?;
-        let mut reader = std::io::BufReader::new(file);
-
-        match get_file_format(file_path) {
-            FileFormat::Yaml => serde_yaml::from_reader(reader).map_err(handle_deserialize_error),
-            FileFormat::Json => serde_json::from_reader(reader).map_err(handle_deserialize_error),
-            FileFormat::Toml => {
-                let mut content = String::new();
-                reader
-                    .read_to_string(&mut content)
-                    .map_err(|e| handle_read_error(e, file_path))?;
-                toml::from_str(&content).map_err(handle_deserialize_error)
-            }
-            FileFormat::Unknown => {
-                let mut content = String::new();
-                reader
-                    .read_to_string(&mut content)
-                    .map_err(|e| handle_read_error(e, file_path))?;
-                Ok(Value::from(content))
-            }
-        }
-    }
-    // Check if the experimental feature is enabled
-    fn check_experimental(experimental: bool) -> Result<(), minijinja::Error> {
-        if !experimental {
-            return Err(minijinja::Error::new(
-                minijinja::ErrorKind::InvalidOperation,
-                "Experimental feature: provide the `--experimental` flag to enable this feature",
-            ));
-        }
-        Ok(())
-    }
-
-    env.add_function("load_from_file", move |path: String| {
-        check_experimental(experimental)?;
-
-        if let Some(recipe_path) = recipe_path.as_ref()
-            && let Some(parent) = recipe_path.parent()
-        {
-            let relative_path = parent.join(&path);
-            if let Ok(value) = read_and_parse_file(&relative_path) {
-                return Ok(value);
-            }
-        }
-
-        let file_path = std::path::Path::new(&path);
-        read_and_parse_file(file_path)
-    });
+    register_io_functions(&mut env, experimental, recipe_path);
 
     // Add env object
     env.add_global("env", Value::from_object(crate::env::Env));
-
-    // Add git object (experimental)
-    env.add_global("git", Value::from_object(crate::git::Git { experimental }));
 
     env
 }
@@ -1058,6 +1043,71 @@ mod tests {
                 "invalid operation: Experimental feature: provide the `--experimental` flag to enable this feature (in <expression>:1)",
             );
         });
+    }
+
+    #[test]
+    // git version is too old in cross container for aarch64
+    #[cfg(not(all(
+        any(target_arch = "aarch64", target_arch = "powerpc64"),
+        target_os = "linux"
+    )))]
+    fn eval_git_relative_path() {
+        // Create a temp directory with:
+        //   <tempdir>/repo/   -- a git repo with a tag
+        //   <tempdir>/recipe/ -- a "recipe" directory
+        // Then use a relative path "../repo" from the recipe directory.
+        let tempdir = tempfile::tempdir().unwrap();
+        let base = tempdir.path();
+
+        let repo_dir = base.join("repo");
+        let recipe_dir = base.join("recipe");
+        fs::create_dir_all(&repo_dir).unwrap();
+        fs::create_dir_all(&recipe_dir).unwrap();
+
+        create_repo_with_tag(&repo_dir, "v2.3.0").expect("Failed to create git repo");
+
+        let recipe_file = recipe_dir.join("recipe.yaml");
+        fs::write(&recipe_file, "").unwrap();
+
+        let options = JinjaConfig {
+            target_platform: Platform::Linux64,
+            build_platform: Platform::Linux64,
+            host_platform: Platform::Linux64,
+            experimental: true,
+            recipe_path: Some(recipe_file),
+            ..Default::default()
+        };
+        let jinja = Jinja::new(options);
+
+        // Test latest_tag with relative path
+        assert_eq!(
+            jinja
+                .eval("git.latest_tag(\"../repo\")")
+                .expect("relative path latest_tag")
+                .as_str()
+                .unwrap(),
+            "v2.3.0"
+        );
+
+        // Test head_rev with relative path
+        let head = jinja
+            .eval("git.head_rev(\"../repo\")")
+            .expect("relative path head_rev");
+        assert!(
+            head.as_str().unwrap().len() == 40,
+            "expected a 40-char SHA, got {:?}",
+            head.as_str()
+        );
+
+        // Test latest_tag_rev matches head_rev (single commit repo)
+        assert_eq!(
+            jinja
+                .eval("git.latest_tag_rev(\"../repo\")")
+                .expect("relative path latest_tag_rev")
+                .as_str()
+                .unwrap(),
+            head.as_str().unwrap()
+        );
     }
 
     #[test]
@@ -1712,53 +1762,23 @@ mod tests {
         assert_eq!(accessed.len(), 2);
         assert!(accessed.contains("name"));
         assert!(accessed.contains("version"));
-
-        // No undefined variables
-        assert_eq!(jinja.undefined_variables().len(), 0);
     }
 
     #[test]
-    fn test_undefined_variable_tracking() {
+    fn test_undefined_variable_errors_in_strict() {
         let mut jinja = Jinja::new(Default::default());
         jinja
             .context_mut()
             .insert("name".to_string(), Value::from("foo"));
         // Note: "version" is NOT defined
 
-        // Set strict undefined behavior
-        jinja
-            .env_mut()
-            .set_undefined_behavior(minijinja::UndefinedBehavior::Strict);
-
-        // Try to render a template with undefined variable
+        // Strict is the default — using undefined variable in output should error
         let result = jinja.render_str("${{ name }}-${{ version }}");
         assert!(result.is_err());
 
-        // Check that both variables were accessed
+        // Check that "name" was accessed (version lookup triggers the error before tracking)
         let accessed = jinja.accessed_variables();
-        assert_eq!(accessed.len(), 2);
         assert!(accessed.contains("name"));
-        assert!(accessed.contains("version"));
-
-        // Check that only "version" is undefined
-        let undefined = jinja.undefined_variables();
-        assert_eq!(undefined.len(), 1);
-        assert!(undefined.contains("version"));
-    }
-
-    #[test]
-    fn test_multiple_undefined_variables_tracking() {
-        let jinja = Jinja::new(Default::default());
-        // No variables defined
-
-        // Try to render a template with multiple undefined variables
-        let result = jinja.render_str("${{ platform }} for ${{ arch }}");
-        assert!(result.is_err());
-
-        // Both undefined variables should be tracked
-        let undefined = jinja.undefined_variables();
-        assert_eq!(undefined.len(), 1);
-        assert!(undefined.contains("platform"));
     }
 
     #[test]
@@ -1779,7 +1799,6 @@ mod tests {
 
         // Variables should be cleared
         assert!(jinja.accessed_variables().is_empty());
-        assert!(jinja.undefined_variables().is_empty());
     }
 
     #[test]

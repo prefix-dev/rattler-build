@@ -6,7 +6,12 @@ from helpers import RattlerBuild
 
 def test_debug_basic(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, capfd):
     rattler_build(
-        "debug", "--recipe", str(recipes / "debug_test"), "--output-dir", str(tmp_path)
+        "debug",
+        "setup",
+        "--recipe",
+        str(recipes / "debug_test"),
+        "--output-dir",
+        str(tmp_path),
     )
 
     out, err = capfd.readouterr()
@@ -32,6 +37,7 @@ def test_debug_multiple_outputs(
     with pytest.raises(Exception):
         rattler_build(
             "debug",
+            "setup",
             "--recipe",
             str(recipes / "debug-multiple-outputs"),
             "--output-dir",
@@ -41,6 +47,7 @@ def test_debug_multiple_outputs(
     # should work with --output-name for output1
     rattler_build(
         "debug",
+        "setup",
         "--recipe",
         str(recipes / "debug-multiple-outputs"),
         "--output-dir",
@@ -73,6 +80,7 @@ def test_debug_multiple_outputs(
     # test output2 as well
     rattler_build(
         "debug",
+        "setup",
         "--recipe",
         str(recipes / "debug-multiple-outputs"),
         "--output-dir",
@@ -99,6 +107,7 @@ def test_debug_multiple_outputs(
     with pytest.raises(Exception):
         rattler_build(
             "debug",
+            "setup",
             "--recipe",
             str(recipes / "debug-multiple-outputs"),
             "--output-dir",

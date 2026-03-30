@@ -91,7 +91,7 @@ pub struct MultiOutputRecipe {
 pub struct RecipeMetadata {
     /// Package name (optional - can be omitted if only used for grouping outputs)
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub name: Option<Value<crate::stage0::package::PackageName>>,
+    pub name: Option<Value<rattler_conda_types::SourcePackageName>>,
 
     /// Version (optional - can be inherited by each output from their package metadata)
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -249,6 +249,21 @@ impl Recipe {
 }
 
 impl SingleOutputRecipe {
+    /// Create a new single-output recipe with the given package, defaulting all other fields
+    pub fn new(package: Package) -> Self {
+        Self {
+            schema_version: Some(1),
+            context: IndexMap::new(),
+            package,
+            build: Build::default(),
+            requirements: Requirements::default(),
+            about: About::default(),
+            extra: crate::stage0::extra::Extra::default(),
+            source: ConditionalList::default(),
+            tests: ConditionalList::default(),
+        }
+    }
+
     /// Get all used variables in this single-output recipe
     pub fn used_variables(&self) -> Vec<String> {
         let SingleOutputRecipe {

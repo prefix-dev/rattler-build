@@ -44,7 +44,7 @@ To make this easier, certain shortcut env vars are available on Windows: `%LIBRA
 
 The _default interpreter_ for build scripts on Windows is `cmd.exe` which has a quite clunky syntax and execution model.
 
-It will, for example, skip over errors if you do not manually insert `if %ERRORLEVEL% neq 0 exit 1` after each statement. If the build script is a list of commands, then rattler-build will automatically inject this after each list item. If you pass in a complete build script or file, you will have to do this manually to recognize issues in command execution early on.
+It will, for example, skip over errors if you do not manually insert `if %ERRORLEVEL% neq 0 exit 1` after each statement. If the build script is a list of commands, then Rattler-Build will automatically inject this after each list item. If you pass in a complete build script or file, you will have to do this manually to recognize issues in command execution early on.
 
 ### Using Powershell
 
@@ -57,18 +57,18 @@ build:
     script: ...
 ```
 
-Or save your build script as `build.ps1` (which will automatically use powershell based on the file ending), rattler-build will choose it automatically on Windows if `build.bat` is absent.
+Or save your build script as `build.ps1` (which will automatically use powershell based on the file ending), Rattler-Build will choose it automatically on Windows if `build.bat` is absent.
 
-rattler-build relies on `$PSNativeCommandUseErrorActionPreference`, which is only available in PowerShell 7.4+. If your PowerShell is not new enough, it will skip over errors from native
+Rattler-Build relies on `$PSNativeCommandUseErrorActionPreference`, which is only available in PowerShell 7.4+. If your PowerShell is not new enough, it will skip over errors from native
 command and you have to check `$?` or `$LASTEXITCODE` manually like in `cmd.exe`.
 
-rattler-build also creates normal variable copies of environment variables, you can use them if you feel `Env:` prefix is tedious, so you can write
+Rattler-Build also creates normal variable copies of environment variables, you can use them if you feel `Env:` prefix is tedious, so you can write
 
 ```ps1 title="build.ps1"
 cmake -S . B build -DCMAKE_INSTALL_PREFIX=$LIBRARY_PREFIX # same as $Env:LIBRARY_PREFIX
 ```
 
-All these variables are strings, because rattler-build just copies them, so variables with value `'True'` will not be `$true` in current implementation.
+All these variables are strings, because Rattler-Build just copies them, so variables with value `'True'` will not be `$true` in current implementation.
 
 ### Using `Bash` on Windows
 

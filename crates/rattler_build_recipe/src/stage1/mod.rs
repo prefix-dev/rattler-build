@@ -52,8 +52,6 @@ pub struct EvaluationContext {
     jinja_config: JinjaConfig,
     /// Set of variables that were actually accessed during evaluation (tracked via thread-safe interior mutability)
     accessed_variables: Arc<Mutex<HashSet<String>>>,
-    /// Set of variables that were accessed but undefined (tracked via thread-safe interior mutability)
-    undefined_variables: Arc<Mutex<HashSet<String>>>,
     /// OS environment variable keys that can be overridden by variant configuration.
     /// These should be included in the used_variant even if not directly accessed during evaluation.
     os_env_var_keys: HashSet<String>,
@@ -65,7 +63,6 @@ impl Default for EvaluationContext {
             variables: IndexMap::new(),
             jinja_config: JinjaConfig::default(),
             accessed_variables: Arc::new(Mutex::new(HashSet::new())),
-            undefined_variables: Arc::new(Mutex::new(HashSet::new())),
             os_env_var_keys: HashSet::new(),
         }
     }
@@ -104,7 +101,6 @@ impl EvaluationContext {
                 .collect(),
             jinja_config: JinjaConfig::default(),
             accessed_variables: Arc::new(Mutex::new(HashSet::new())),
-            undefined_variables: Arc::new(Mutex::new(HashSet::new())),
             os_env_var_keys: HashSet::new(),
         }
     }
@@ -115,7 +111,6 @@ impl EvaluationContext {
             variables,
             jinja_config: JinjaConfig::default(),
             accessed_variables: Arc::new(Mutex::new(HashSet::new())),
-            undefined_variables: Arc::new(Mutex::new(HashSet::new())),
             os_env_var_keys: HashSet::new(),
         }
     }
@@ -130,7 +125,6 @@ impl EvaluationContext {
             variables,
             jinja_config,
             accessed_variables: Arc::new(Mutex::new(HashSet::new())),
-            undefined_variables: Arc::new(Mutex::new(HashSet::new())),
             os_env_var_keys: HashSet::new(),
         }
     }
@@ -145,7 +139,6 @@ impl EvaluationContext {
             variables,
             jinja_config,
             accessed_variables: Arc::new(Mutex::new(HashSet::new())),
-            undefined_variables: Arc::new(Mutex::new(HashSet::new())),
             os_env_var_keys,
         }
     }
@@ -159,7 +152,6 @@ impl EvaluationContext {
                 .collect(),
             jinja_config,
             accessed_variables: Arc::new(Mutex::new(HashSet::new())),
-            undefined_variables: Arc::new(Mutex::new(HashSet::new())),
             os_env_var_keys: HashSet::new(),
         }
     }
@@ -210,13 +202,6 @@ impl EvaluationContext {
         }
     }
 
-    /// Track that a variable was accessed but undefined
-    pub(crate) fn track_undefined(&self, key: &str) {
-        if let Ok(mut undefined) = self.undefined_variables.lock() {
-            undefined.insert(key.to_string());
-        }
-    }
-
     /// Get the set of variables that were accessed during evaluation
     pub fn accessed_variables(&self) -> HashSet<String> {
         self.accessed_variables
@@ -225,21 +210,10 @@ impl EvaluationContext {
             .unwrap_or_default()
     }
 
-    /// Get the set of variables that were accessed but undefined
-    pub fn undefined_variables(&self) -> HashSet<String> {
-        self.undefined_variables
-            .lock()
-            .map(|undefined| undefined.clone())
-            .unwrap_or_default()
-    }
-
     /// Clear the accessed variables tracker
     pub fn clear_accessed(&self) {
         if let Ok(mut accessed) = self.accessed_variables.lock() {
             accessed.clear();
-        }
-        if let Ok(mut undefined) = self.undefined_variables.lock() {
-            undefined.clear();
         }
     }
 

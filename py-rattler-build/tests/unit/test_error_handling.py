@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from rattler_build import RattlerBuildError, RecipeParseError, Stage0Recipe
+from rattler_build import BuildError, RattlerBuildError, RecipeParseError, Stage0Recipe
 
 
 def test_from_dict_missing_required_field() -> None:
@@ -110,21 +110,29 @@ outputs:
     recipe = Stage0Recipe.from_yaml(recipe_yaml)
     output_dir = tmp_path / "output"
 
-    # Expect a RattlerBuildError with helpful message
-    with pytest.raises(RattlerBuildError) as exc_info:
+    # Expect a BuildError (subclass of RattlerBuildError) with structured log
+    with pytest.raises(BuildError) as exc_info:
         recipe.run_build(output_dir=output_dir)
 
-    error_msg = str(exc_info.value)
+    err = exc_info.value
 
-    # The error should mention:
-    # 1. That the command failed
-    # 2. The command that failed (ech)
-    # 3. Some context about what went wrong (exit code, stderr, etc.)
+    # BuildError should also be catchable as RattlerBuildError
+    assert isinstance(err, RattlerBuildError)
 
-    # Check for the failed command in the error message
-    assert "ech" in error_msg, f"Error message doesn't mention the failed command 'ech': {error_msg}"
+    # str(error) shows just the error message, not the full build log
+    error_msg = str(err)
+    assert "Script failed" in error_msg
+    assert "Build log" not in error_msg
+    assert "ech" not in error_msg
 
-    # Check for some indication of what went wrong (exit code or error details)
-    assert any(keyword in error_msg.lower() for keyword in ["exit", "status", "code", "not found", "stderr"]), (
-        f"Error message doesn't contain error details like exit code or stderr: {error_msg}"
-    )
+    # The .message attribute contains the error message
+    assert hasattr(err, "message")
+    assert "Script failed" in err.message
+
+    # The .log attribute contains the captured build log as list[str]
+    assert hasattr(err, "log")
+    assert isinstance(err.log, list)
+
+    # The log should contain build details including the failed command
+    log_text = "\n".join(err.log)
+    assert "ech" in log_text, f"Build log doesn't mention the failed command 'ech': {log_text}"

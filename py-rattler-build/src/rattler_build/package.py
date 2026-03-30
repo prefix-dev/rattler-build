@@ -1,4 +1,4 @@
-"""Package inspection and testing API for rattler-build.
+"""Package inspection and testing API for Rattler-Build.
 
 This module provides functionality to load and inspect conda packages (.conda or .tar.bz2),
 examine their metadata and embedded tests, and run tests against them.
@@ -39,6 +39,8 @@ from rattler_build._rattler_build import _package
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+
+    from rattler_build.progress import ProgressCallback
 
 # Type alias for test union
 PackageTestType = Union[
@@ -223,14 +225,13 @@ class Package:
         *,
         channel: "Sequence[str] | None" = None,
         channel_priority: Literal["disabled", "strict", "flexible"] | None = None,
-        debug: bool = False,
         auth_file: str | Path | None = None,
         allow_insecure_host: "Sequence[str] | None" = None,
         compression_threads: int | None = None,
         use_bz2: bool = True,
         use_zstd: bool = True,
-        use_jlap: bool = False,
         use_sharded: bool = True,
+        progress_callback: "ProgressCallback | None" = None,
     ) -> "TestResult":
         """Run a specific test by index.
 
@@ -238,14 +239,13 @@ class Package:
             index: Index of the test to run (0-based)
             channel: List of channels to use for dependencies
             channel_priority: Channel priority ("disabled", "strict", or "flexible")
-            debug: Enable debug mode (keeps test environment)
             auth_file: Path to authentication file
             allow_insecure_host: List of hosts to allow insecure connections
             compression_threads: Number of compression threads
             use_bz2: Enable bz2 repodata
             use_zstd: Enable zstd repodata
-            use_jlap: Enable JLAP incremental repodata
             use_sharded: Enable sharded repodata
+            progress_callback: Optional callback for streaming log output in real-time
 
         Returns:
             TestResult with success status and output
@@ -265,14 +265,13 @@ class Package:
                 index,
                 channel=list(channel) if channel else None,
                 channel_priority=channel_priority,
-                debug=debug,
                 auth_file=str(auth_file) if auth_file else None,
                 allow_insecure_host=list(allow_insecure_host) if allow_insecure_host else None,
                 compression_threads=compression_threads,
                 use_bz2=use_bz2,
                 use_zstd=use_zstd,
-                use_jlap=use_jlap,
                 use_sharded=use_sharded,
+                progress_callback=progress_callback,
             )
         )
 
@@ -281,28 +280,26 @@ class Package:
         *,
         channel: "Sequence[str] | None" = None,
         channel_priority: Literal["disabled", "strict", "flexible"] | None = None,
-        debug: bool = False,
         auth_file: str | Path | None = None,
         allow_insecure_host: "Sequence[str] | None" = None,
         compression_threads: int | None = None,
         use_bz2: bool = True,
         use_zstd: bool = True,
-        use_jlap: bool = False,
         use_sharded: bool = True,
+        progress_callback: "ProgressCallback | None" = None,
     ) -> list["TestResult"]:
         """Run all tests in the package.
 
         Args:
             channel: List of channels to use for dependencies
             channel_priority: Channel priority ("disabled", "strict", or "flexible")
-            debug: Enable debug mode (keeps test environment)
             auth_file: Path to authentication file
             allow_insecure_host: List of hosts to allow insecure connections
             compression_threads: Number of compression threads
             use_bz2: Enable bz2 repodata
             use_zstd: Enable zstd repodata
-            use_jlap: Enable JLAP incremental repodata
             use_sharded: Enable sharded repodata
+            progress_callback: Optional callback for streaming log output in real-time
 
         Returns:
             List of TestResult objects, one per test
@@ -313,6 +310,13 @@ class Package:
             for r in results:
                 status = "PASS" if r.success else "FAIL"
                 print(f"Test {r.test_index}: {status}")
+
+            # With streaming output:
+            from rattler_build.progress import SimpleProgressCallback
+            results = pkg.run_tests(
+                channel=["conda-forge"],
+                progress_callback=SimpleProgressCallback(),
+            )
             ```
         """
         return [
@@ -320,14 +324,13 @@ class Package:
             for r in self._inner.run_tests(
                 channel=list(channel) if channel else None,
                 channel_priority=channel_priority,
-                debug=debug,
                 auth_file=str(auth_file) if auth_file else None,
                 allow_insecure_host=list(allow_insecure_host) if allow_insecure_host else None,
                 compression_threads=compression_threads,
                 use_bz2=use_bz2,
                 use_zstd=use_zstd,
-                use_jlap=use_jlap,
                 use_sharded=use_sharded,
+                progress_callback=progress_callback,
             )
         ]
 
@@ -341,7 +344,6 @@ class Package:
         allow_insecure_host: "Sequence[str] | None" = None,
         use_bz2: bool = True,
         use_zstd: bool = True,
-        use_jlap: bool = False,
         use_sharded: bool = True,
     ) -> "RebuildResult":
         """Rebuild this package from its embedded recipe.
@@ -359,7 +361,6 @@ class Package:
             allow_insecure_host: List of hosts to allow insecure connections
             use_bz2: Enable bz2 repodata (default: True)
             use_zstd: Enable zstd repodata (default: True)
-            use_jlap: Enable JLAP incremental repodata (default: False)
             use_sharded: Enable sharded repodata (default: True)
 
         Returns:
@@ -393,7 +394,6 @@ class Package:
                 allow_insecure_host=list(allow_insecure_host) if allow_insecure_host else None,
                 use_bz2=use_bz2,
                 use_zstd=use_zstd,
-                use_jlap=use_jlap,
                 use_sharded=use_sharded,
             )
         )

@@ -1,5 +1,6 @@
 from rattler_build._rattler_build import (
     AuthError,
+    BuildError,
     ChannelError,
     ChannelPriorityError,
     IoError,
@@ -55,13 +56,19 @@ from rattler_build.tool_config import PlatformConfig, ToolConfiguration
 from rattler_build.upload import (
     upload_package_to_anaconda,
     upload_package_to_artifactory,
+    upload_package_to_cloudsmith,
     upload_package_to_prefix,
     upload_package_to_quetz,
     upload_packages_to_conda_forge,
 )
+from rattler_build.debug import DebugPaths, DebugSession, ScriptResult
 from rattler_build.variant_config import VariantConfig
 
 __all__ = [
+    # Debug
+    "DebugSession",
+    "DebugPaths",
+    "ScriptResult",
     # Core API
     "rattler_build_version",
     "build_recipes",
@@ -77,6 +84,7 @@ __all__ = [
     "upload_package_to_artifactory",
     "upload_package_to_prefix",
     "upload_package_to_anaconda",
+    "upload_package_to_cloudsmith",
     "upload_packages_to_conda_forge",
     # Recipe generation
     "generate_pypi_recipe",
@@ -113,6 +121,7 @@ __all__ = [
     "RebuildResult",
     # Exceptions
     "RattlerBuildError",
+    "BuildError",
     "AuthError",
     "ChannelError",
     "ChannelPriorityError",
@@ -128,5 +137,5 @@ __all__ = [
 
 
 def rattler_build_version() -> str:
-    """Get the version of the rattler-build package"""
+    """Get the version of the Rattler-Build package"""
     return get_rattler_build_version_py()

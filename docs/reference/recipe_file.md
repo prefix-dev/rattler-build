@@ -1,6 +1,6 @@
 # The recipe spec
 
-`rattler-build` implements a new recipe spec, different from the traditional
+Rattler-Build implements a new recipe spec, different from the traditional
 "`meta.yaml`" file used in `conda-build`. A recipe has to be stored as a
 `recipe.yaml` file.
 
@@ -18,7 +18,7 @@ The reason for a new spec are:
   and more)
 - remove any need for recursive parsing & solving
 - finally, the initial implementation in `boa` relied on `conda-build`;
-  `rattler-build` removes any dependency on Python or `conda-build` and
+  Rattler-Build removes any dependency on Python or `conda-build` and
   reimplements everything in Rust
 
 ## Major differences from `conda-build`
@@ -81,57 +81,7 @@ Examples
 --------
 
 ```yaml title="recipe.yaml"
-# this sets up "context variables" (in this case name and version) that
-# can later be used in Jinja expressions
-context:
-  version: 1.1.0
-  name: imagesize
-
-# top level package information (name and version)
-package:
-  name: ${{ name }}
-  version: ${{ version }}
-
-# location to get the source from
-source:
-  url: https://pypi.io/packages/source/${{ name[0] }}/${{ name }}/${{ name }}-${{ version }}.tar.gz
-  sha256: f3832918bc3c66617f92e35f5d70729187676313caa60c187eb0f28b8fe5e3b5
-
-# build number (should be incremented if a new build is made, but version is not incrementing)
-build:
-  number: 1
-  script: python -m pip install .
-
-# the requirements at build and runtime
-requirements:
-  host:
-    - python
-    - pip
-  run:
-    - python
-
-# tests to validate that the package works as expected
-tests:
-  - python:
-      imports:
-        - imagesize
-
-# information about the package
-about:
-  homepage: https://github.com/shibukawa/imagesize_py
-  license: MIT
-  summary: 'Getting image size from png/jpeg/jpeg2000/gif file'
-  description: |
-    This module analyzes jpeg/jpeg2000/png/gif image header and
-    return image size.
-  repository: https://github.com/shibukawa/imagesize_py
-  documentation: https://pypi.python.org/pypi/imagesize
-
-# the below is conda-forge specific!
-extra:
-  recipe-maintainers:
-    - somemaintainer
-
+--8<-- "docs/snippets/recipes/imagesize.yaml"
 ```
 
 
@@ -176,14 +126,39 @@ of the work folder.
 
 ##### Specifying a file name
 
-For URL and local paths you can specify a file name. If the source is an archive and a file name is set, automatic extraction is disabled.
+For URL and local path sources, `file_name` renames the downloaded file in the work directory.
+The primary use case is giving a clean name to pre-built binaries whose URL path segments are not
+descriptive:
 
 ```yaml
 source:
-  url: https://pypi.python.org/packages/source/b/bsdiff4/bsdiff4-1.1.4.tar.gz
-  # will put the file in the work directory as `bsdiff4-1.1.4.tar.gz`
-  file_name: bsdiff4-1.1.4.tar.gz
+  url: https://github.com/owner/project/releases/download/v1.0.0/project-v1.0.0-linux-amd64
+  sha256: <sha256>
+  file_name: project  # rename to a clean, platform-independent name
 ```
+
+!!! warning "Setting `file_name` disables automatic archive extraction"
+    When `file_name` is set on an archive source (`.tar.gz`, `.zip`, `.7z`, etc.), the archive is
+    **not extracted** — it is placed in the work directory as-is under the given name.
+    This is true even if `file_name` is set to the same name the archive would have had by default:
+
+    ```yaml
+    source:
+      url: https://pypi.python.org/packages/source/b/bsdiff4/bsdiff4-1.1.4.tar.gz
+      sha256: 5a022ff4c1d1de87232b1c70bde50afbb98212fd246be4a867d8737173cf1f8f
+      # The archive is NOT extracted — it is placed as bsdiff4-1.1.4.tar.gz in the work directory
+      file_name: bsdiff4-1.1.4.tar.gz
+    ```
+
+    To download an archive and have it extracted automatically (the default behaviour), omit
+    `file_name`:
+
+    ```yaml
+    source:
+      url: https://pypi.python.org/packages/source/b/bsdiff4/bsdiff4-1.1.4.tar.gz
+      sha256: 5a022ff4c1d1de87232b1c70bde50afbb98212fd246be4a867d8737173cf1f8f
+      # file_name is not set — the archive is extracted into the work directory
+    ```
 
 #### Source from `git`
 
@@ -246,7 +221,7 @@ source:
   lfs: true # note: defaults to false
 ```
 
-By default, rattler-build will recursively initialize and update all git
+By default, Rattler-Build will recursively initialize and update all git
 submodules. For repositories with large or numerous submodules that aren't needed
 for the build, you can disable this by setting `submodules: false`:
 
@@ -289,7 +264,7 @@ source is copied to the work directory before building.
 ```
 
 By default, all files in the local path that are ignored by `git` are also ignored
-by `rattler-build`. You can disable this behavior by setting `use_gitignore` to
+by Rattler-Build. You can disable this behavior by setting `use_gitignore` to
 `false`.
 
 #### Patches
@@ -307,8 +282,8 @@ Patches may optionally be applied to the source.
 
 #### Destination path
 
-Within `rattler-build`'s work directory, you may specify a particular folder to
-place the source into. `rattler-build` will always drop you into the same folder
+Within Rattler-Build's work directory, you may specify a particular folder to
+place the source into. Rattler-Build will always drop you into the same folder
 (`[build folder]/work`), but it's up to you whether you want your source extracted
 into that folder, or nested deeper. This feature is particularly useful when dealing
 with multiple sources, but can apply to recipes with single sources as well.
@@ -318,6 +293,34 @@ source:
   #[source information here]
   target_directory: my-destination/folder
 ```
+
+#### Attestation verification (experimental)
+
+!!! note
+    This feature requires the `--experimental` flag.
+
+For URL sources, you can specify an `attestation` block to verify that the downloaded archive
+was built by an expected publisher using [Sigstore](https://sigstore.dev) attestations.
+
+```yaml
+source:
+  url: https://files.pythonhosted.org/packages/.../flask-3.1.1.tar.gz
+  sha256: "..."
+  attestation:
+    publishers:
+      - github:pallets/flask
+```
+
+The attestation config has the following fields:
+
+- **`publishers`** - A list of publisher identities in `github:owner/repo` format. At least one
+  publisher must match for verification to succeed.
+- **`bundle_url`** (optional) - URL to the Sigstore bundle file. For PyPI sources, this is
+  automatically derived from the PyPI attestation API. For GitHub releases, use the pattern
+  `https://github.com/{owner}/{repo}/releases/download/{tag}/{filename}.sigstore.json`.
+
+See the [Sigstore source attestation documentation](../sigstore.md#source-attestation-verification)
+for more details and examples.
 
 #### Source from multiple sources
 
@@ -383,7 +386,7 @@ Recursive globbing using `**` is also supported.
 
 The build number should be incremented for new builds of the same version. The
 number defaults to `0`. The build string cannot contain "`-`". The string defaults
-to the default `rattler-build` build string plus the build number.
+to the default Rattler-Build build string plus the build number.
 
 ```yaml
 build:
@@ -403,7 +406,7 @@ build:
 
 ### Script
 
-By default, `rattler-build` uses a `build.sh` file on Unix (macOS and Linux) and a
+By default, Rattler-Build uses a `build.sh` file on Unix (macOS and Linux) and a
 `build.bat` file on Windows, if they exist in the same folder as the `recipe.yaml`
 file. With the script parameter you can either supply a different filename or
 write out short build scripts. You may need to use selectors to use different
@@ -428,7 +431,7 @@ Please see [Build script](../build_script.md) for more information.
 
 ### Skipping builds
 
-Lists conditions under which `rattler-build` should skip the build of this recipe.
+Lists conditions under which Rattler-Build should skip the build of this recipe.
 Particularly useful for defining recipes that are platform-specific. By default,
 a build is never skipped.
 
@@ -517,7 +520,7 @@ build:
 
 #### Version independent (ABI3) packages
 
-Since rattler-build 0.35.0 and [CEP 20](https://github.com/conda/ceps/blob/main/cep-0020.md)
+Since Rattler-Build 0.35.0 and [CEP 20](https://github.com/conda/ceps/blob/main/cep-0020.md)
 you can create version-independent Python packages that still contain compiled code.
 
 ABI3 packages support building a native Python extension using a specific Python
@@ -530,6 +533,73 @@ build:
   python:
     version_independent: true  # defaults to false
 ```
+
+### Post-processing
+
+Applies regex-based text replacements to files in the package during the packaging phase. Each entry specifies a set of files to match and a regex substitution
+to apply.
+
+```yaml title="recipe.yaml"
+build:
+  post_process:
+    - files:
+        - "bin/*"
+      regex: "/old/path"
+      replacement: "/new/path"
+    - files:
+        - "**/*.cmake"
+        - "**/*.pc"
+      regex: "/home/builder"
+      replacement: "$PREFIX"
+```
+
+Each `post_process` entry has the following fields:
+
+- **`files`** (required) — A list of glob patterns selecting which files to
+  process. Supports `include`/`exclude` mappings and `if`/`then`/`else`
+  conditionals.
+- **`regex`** (required) — A regular expression pattern to match within each
+  selected file.
+- **`replacement`** (required) — The replacement string. Supports regex capture
+  group references (e.g. `$1`, `${name}`).
+
+All three fields are required for each entry.
+
+#### Conditional post-processing
+
+`post_process` entries support `if`/`then`/`else` conditionals, including
+nesting:
+
+```yaml title="recipe.yaml"
+build:
+  post_process:
+    - if: unix
+      then:
+        - files:
+            - "lib/**/*.la"
+          regex: "/build/prefix"
+          replacement: "$PREFIX"
+    - files:
+        - "**/*.txt"
+      regex: "old_name"
+      replacement: "new_name"
+```
+
+In the example above, the `.la` file replacement runs only on Unix, while the
+`.txt` replacement runs unconditionally.
+
+#### Behavior
+
+- Post-processing runs during packaging, **after** relocation and Python
+  post-processing, but **before** linking checks.
+- Files are read as UTF-8 text using Rust’s read_to_string. If a matched file is not valid UTF-8, the build will fail.
+- The regex uses `replace_all` semantics from Rust's `regex` crate: all non-overlapping matches in a file are replaced.
+- Steps are applied sequentially. Later entries see the results of earlier ones.
+
+#### Output inheritance
+
+In multi-output recipes, each output inherits the top-level `post_process` if
+the output does not define its own. If an output defines its own `post_process`, it fully overrides the top-level list. No merging is performed.
 
 ## Include build recipe
 
@@ -734,7 +804,7 @@ Using a runtime dependency name:
 
 ## Tests section
 
-`rattler-build` supports four different types of tests. The "script test" installs
+Rattler-Build supports four different types of tests. The "script test" installs
 the package and runs a list of commands. The "Python test" attempts to import a
 list of Python modules and runs `pip check`. The "downstream test" runs the tests
 of a downstream package that reverse depends on the package being built. And lastly,
@@ -964,6 +1034,9 @@ tests:
 
 ## Outputs section
 
+!!! tip
+    For a complete guide including staging outputs and examples, see [Multi-Output Recipes](multi_output.md).
+
 Explicitly specifies packaging steps. This section supports multiple outputs, as
 well as different package output types. The format is a list of mappings.
 
@@ -1068,6 +1141,122 @@ Due to the variant config file, this will build two versions of `libtest`. We
 will also build two versions of `test`, one that depends on `libtest (openssl
 1)` and one that depends on `libtest (openssl 3)`.
 
+### Staging outputs
+
+!!!note
+
+    Staging outputs are an experimental feature. You need to pass the
+    `--experimental` flag or set `RATTLER_BUILD_EXPERIMENTAL=true` to use them.
+    See the [staging outputs guide](../multiple_output_cache.md) for a full
+    walkthrough.
+
+A staging output builds code once and caches the results. Other package outputs
+can **inherit** from a staging cache to receive the built files directly in
+their `$PREFIX` without rebuilding. Staging outputs do **not** produce package
+artifacts themselves.
+
+```yaml
+outputs:
+  - staging:
+      name: my-staging-cache   # required, follows package name rules
+    source:                     # optional, additional sources
+      - url: https://example.com/src.tar.gz
+        sha256: abc123...
+    requirements:
+      build:                    # build-time dependencies
+        - ${{ compiler('c') }}
+        - cmake
+      host:                     # host dependencies
+        - zlib
+      ignore_run_exports:       # optional, filter run exports at the staging level
+        from_package:
+          - zlib
+    build:
+      script:                   # build script (only field allowed under build)
+        - cmake -B build
+        - cmake --build build --target install
+```
+
+The `staging:` output supports:
+
+- `staging.name` — required, the cache name that inheriting packages reference
+- `source` — optional source sections (in addition to top-level sources)
+- `requirements` — `build`, `host`, and `ignore_run_exports` (no `run` requirements)
+- `build.script` — the build script to execute
+
+#### Inheriting from staging
+
+Package outputs use the `inherit:` key to receive files from a staging cache.
+Two forms are supported:
+
+```yaml
+outputs:
+  - staging:
+      name: my-build
+    build:
+      script:
+        - make install
+
+  # Short form — inherits all files and run exports
+  - package:
+      name: mylib
+    inherit: my-build
+    build:
+      files:
+        - lib/**
+
+  # Extended form — control run exports inheritance
+  - package:
+      name: mylib-dev
+    inherit:
+      from: my-build
+      run_exports: false   # do not inherit run exports from staging deps
+    build:
+      files:
+        - include/**
+```
+
+When a package inherits from staging:
+
+1. The staging cache's prefix files are copied into the package's `$PREFIX`
+2. The staging cache's work directory is restored (allowing incremental builds)
+3. Run exports from staging dependencies are added to the package's run
+   requirements (unless `run_exports: false` is set)
+4. The `files` globs select which subset of the inherited files end up in the
+   final package
+
+#### Top-level inheritance
+
+In recipes that have both a top-level `build:` section and staging outputs,
+package outputs can choose to inherit from the top-level build instead of from
+staging by setting `inherit: null`:
+
+```yaml
+build:
+  script:
+    - echo "top-level" > $PREFIX/share/data.txt
+
+outputs:
+  - staging:
+      name: compile-stage
+    build:
+      script:
+        - echo "compiled" > $PREFIX/lib/compiled.so
+
+  - package:
+      name: compiled-pkg
+    inherit: compile-stage       # gets files from staging
+    build:
+      files:
+        - lib/**
+
+  - package:
+      name: data-pkg
+    inherit: null                # gets files from top-level build
+    build:
+      files:
+        - share/**
+```
 
 ## About section
 
@@ -1125,7 +1314,7 @@ form.
 
 ## Templating with Jinja
 
-`rattler-build` supports limited Jinja templating in the `recipe.yaml` file.
+Rattler-Build supports limited Jinja templating in the `recipe.yaml` file.
 
 You can set up Jinja variables in the `context` section:
 
@@ -1157,7 +1346,7 @@ tests:
 
 Jinja has built-in support for some common string manipulations.
 
-In rattler-build, complex Jinja is completely disallowed as we try to produce
+In Rattler-Build, complex Jinja is completely disallowed as we try to produce
 YAML that is valid at all times. So you should not use any `{% if ... %}` or
 similar Jinja constructs that produce invalid YAML. Furthermore, instead of
 plain double curly brackets Jinja statements need to be prefixed by `$`, e.g.
@@ -1178,18 +1367,20 @@ Jinja templates are evaluated during the build process.
 To retrieve a fully rendered `recipe.yaml`, use the `` command.
 -->
 
-#### Additional Jinja2 functionality in rattler-build
+#### Additional Jinja2 functionality in Rattler-Build
 
 Besides the default Jinja2 functionality, additional Jinja functions are
-available during the `rattler-build` process: `pin_compatible`, `pin_subpackage`,
-and `compiler`.
+available during the Rattler-Build process: `pin_compatible`, `pin_subpackage`,
+`compiler` and `stdlib`.
 
-The compiler function takes `c`, `cxx`, `fortran` and other values as argument
+The `compiler` function takes `c`, `cxx`, `fortran` and other values as argument
 and automatically selects the right (cross-)compiler for the target platform.
+Similarly, `stdlib` function selects the right standard library dependencies.
 
 ```
 build:
   - ${{ compiler('c') }}
+  - ${{ stdlib('c') }}
 ```
 
 The `pin_subpackage` function pins another package produced by the recipe with
@@ -1200,7 +1391,7 @@ specified rules.
 
 #### Pin expressions
 
-`rattler-build` knows pin expressions. A pin expression can have a `lower_bound`,
+Rattler-Build knows pin expressions. A pin expression can have a `lower_bound`,
 `upper_bound` and `exact` value. A `upper_bound` and `lower_bound` are specified with a
 string containing only `x` and `.`, e.g. `upper_bound="x.x.x"` would signify to pin
 the given package to `<1.2.3` (if the package version is `1.2.2`, for example).
@@ -1249,7 +1440,7 @@ requirements:
     - numpy
   run:
     # this will export `numpy >=1.11,<2`, instead of the stricter `1.11` pin
-    - ${{ pin_compatible('numpy', min_pin='x.x', upper_bound='x') }}
+    - ${{ pin_compatible('numpy', lower_bound='x.x', upper_bound='x') }}
 ```
 
 #### The env Jinja functions
@@ -1345,9 +1536,9 @@ source:
 A selector is a valid Python statement that is executed. You can read more about
 them in the ["Selectors in recipes" chapter](../selectors.md).
 
-The use of the Python version selectors, `py27`, `py34`, etc. is discouraged in
-favor of the more general comparison operators. Additional selectors in this
-series will not be added to `conda-build`.
+Note that `conda-build`'s Python version selectors (`py27`, `py34`, etc.) are
+not supported in `rattler-build`. Use the more general comparison operators
+instead.
 
 Because the selector is any valid Python expression, complicated logic is
 possible:
@@ -1385,7 +1576,7 @@ tests:
 ## Experimental features
 
 !!! warning
-    These are experimental features of `rattler-build` and may change or go away completely.
+    These are experimental features of Rattler-Build and may change or go away completely.
 
 ### Jinja functions
 

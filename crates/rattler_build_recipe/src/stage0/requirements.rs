@@ -105,8 +105,7 @@ impl Requirements {
                         // A spec is "free" if it has no version and no build constraints
                         if matchspec.version.is_none()
                             && matchspec.build.is_none()
-                            && let Some(name) = &matchspec.name
-                            && let Some(pkg_name) = extract_name(name)
+                            && let Some(pkg_name) = extract_name(&matchspec.name)
                         {
                             specs.push(pkg_name);
                         }
@@ -262,7 +261,10 @@ mod tests {
 
         assert!(!req.is_empty());
         let vars = req.used_variables();
-        assert_eq!(vars, vec!["c_compiler", "c_compiler_version"]);
+        assert_eq!(
+            vars,
+            vec!["CONDA_BUILD_SYSROOT", "c_compiler", "c_compiler_version"]
+        );
     }
 
     #[test]

@@ -1,4 +1,4 @@
-/// End-to-end test using a real tests.yaml file rendered by old rattler-build
+/// End-to-end test using a real tests.yaml file rendered by old Rattler-Build
 /// This ensures our parsing is backwards compatible with existing packages
 #[cfg(test)]
 mod test {

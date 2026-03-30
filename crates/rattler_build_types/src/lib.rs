@@ -1,3 +1,6 @@
+//! Common types shared across rattler-build crates, including glob matching,
+//! version pinning, and variant configuration keys.
+
 pub mod glob;
 mod pin;
 pub mod variant_config;

@@ -20,7 +20,7 @@ requirements:
     - pip 23.3.2.*
     - setuptools 68.*
   run:
-    - python
+    - python >=3.11
 
 about:
   homepage: https://github.com/uiri/toml

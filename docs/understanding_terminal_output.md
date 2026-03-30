@@ -1,6 +1,6 @@
 # Understanding the terminal output
 
-When you build a recipe with rattler-build, a lot of information is printed on the terminal. Some of that information uses short codes that we are explaining here.
+When you build a recipe with Rattler-Build, a lot of information is printed on the terminal. Some of that information uses short codes that we are explaining here.
 
 Let's look at the logs together!
 
@@ -46,11 +46,9 @@ You can [read more about variants here](variants.md).
 In this next section, the source code is fetched. The source is first downloaded to a cache directory located under the "output" directory (by default `./output/src_cache`, but you can change the output directory. From the cache it is copied into the `$SRC_DIR`, which is a temporary directory used during the build (in our case `/Users/wolfv/Programs/rattler-build/output/bld/rattler-build_curl_1764660286/work`). The `rattler-build_curl_1764660286` is the build folder that is created for this particular build (the `176...` is a timestamp). 
 
 ```
- │ ╭─ Resolving environments
- │ │ 
- │ │ Resolving build environment:
+ │ ╭─ Resolving build environment
  │ │   Platform: osx-arm64 [__unix=0=0, __osx=15.6=0, __archspec=1=m2]
- │ │   Channels: 
+ │ │   Channels:
  │ │    - file:///Users/wolfv/Programs/rattler-build/output/
  │ │    - conda-forge
  │ │   Specs:
@@ -59,66 +57,32 @@ In this next section, the source code is fetched. The source is first downloaded
  │ │    - perl
  │ │    - pkg-config
  │ │    - libtool
- │ │ 
+ │ │
  │ │ ╭─────────────────────────┬─────────────┬─────────────────────┬─────────────┬─────────────╮
  │ │ │ Package                 ┆ Version     ┆ Build               ┆ Channel     ┆        Size │
  │ │ ╞═════════════════════════╪═════════════╪═════════════════════╪═════════════╪═════════════╡
  │ │ │ bzip2                   ┆ 1.0.8       ┆ hd037594_8          ┆ conda-forge ┆  122.13 KiB │
  │ │ │ ca-certificates         ┆ 2025.11.12  ┆ hbd8a1cb_0          ┆ conda-forge ┆  148.86 KiB │
- │ │ │ cctools_impl_osx-arm64  ┆ 1030.6.3    ┆ llvm21_1_haddd2d4_1 ┆ conda-forge ┆  730.35 KiB │
- │ │ │ cctools_osx-arm64       ┆ 1030.6.3    ┆ llvm21_1_h6d92914_1 ┆ conda-forge ┆   22.26 KiB │
- │ │ │ clang                   ┆ 21.1.6      ┆ default_hf9bcbb7_0  ┆ conda-forge ┆   24.39 KiB │
- │ │ │ clang-21                ┆ 21.1.6      ┆ default_h489deba_0  ┆ conda-forge ┆  807.97 KiB │
- │ │ │ clang_impl_osx-arm64    ┆ 21.1.6      ┆ hdbf2fcc_26         ┆ conda-forge ┆   17.52 KiB │
- │ │ │ clang_osx-arm64         ┆ 21.1.6      ┆ h07b0088_26         ┆ conda-forge ┆   20.12 KiB │
- │ │ │ compiler-rt             ┆ 21.1.6      ┆ hce30654_0          ┆ conda-forge ┆   15.62 KiB │
- │ │ │ compiler-rt21           ┆ 21.1.6      ┆ h855ad52_0          ┆ conda-forge ┆   96.03 KiB │
- │ │ │ compiler-rt21_osx-arm64 ┆ 21.1.6      ┆ h2514db7_0          ┆ conda-forge ┆   10.31 MiB │
- │ │ │ ld64                    ┆ 956.6       ┆ llvm21_1_h5d6df6c_1 ┆ conda-forge ┆   20.66 KiB │
- │ │ │ ld64_osx-arm64          ┆ 956.6       ┆ llvm21_1_hde6573c_1 ┆ conda-forge ┆ 1013.34 KiB │
- │ │ │ libclang-cpp21.1        ┆ 21.1.6      ┆ default_h73dfc95_0  ┆ conda-forge ┆   13.04 MiB │
- │ │ │ libcxx                  ┆ 21.1.6      ┆ hf598326_0          ┆ conda-forge ┆  556.47 KiB │
- │ │ │ libffi                  ┆ 3.5.2       ┆ he5f378a_0          ┆ conda-forge ┆   39.31 KiB │
- │ │ │ libglib                 ┆ 2.86.2      ┆ hfe11c1f_1          ┆ conda-forge ┆    3.47 MiB │
- │ │ │ libiconv                ┆ 1.18        ┆ h23cfdf5_2          ┆ conda-forge ┆  732.79 KiB │
- │ │ │ libintl                 ┆ 0.25.1      ┆ h493aca8_0          ┆ conda-forge ┆   88.83 KiB │
- │ │ │ libllvm21               ┆ 21.1.6      ┆ h8e0c9ce_0          ┆ conda-forge ┆   28.04 MiB │
- │ │ │ libltdl                 ┆ 2.4.3a      ┆ h286801f_0          ┆ conda-forge ┆   36.45 KiB │
- │ │ │ liblzma                 ┆ 5.8.1       ┆ h39f12f2_2          ┆ conda-forge ┆   90.12 KiB │
- │ │ │ libtool                 ┆ 2.5.4       ┆ h286801f_0          ┆ conda-forge ┆  404.96 KiB │
- │ │ │ libxml2                 ┆ 2.15.1      ┆ hba2cd1d_0          ┆ conda-forge ┆   39.66 KiB │
- │ │ │ libxml2-16              ┆ 2.15.1      ┆ h8eac4d7_0          ┆ conda-forge ┆  453.31 KiB │
- │ │ │ libzlib                 ┆ 1.3.1       ┆ h8359307_2          ┆ conda-forge ┆   45.35 KiB │
- │ │ │ llvm-openmp             ┆ 21.1.6      ┆ h4a912ad_0          ┆ conda-forge ┆  279.50 KiB │
- │ │ │ llvm-tools              ┆ 21.1.6      ┆ h855ad52_0          ┆ conda-forge ┆   86.46 KiB │
- │ │ │ llvm-tools-21           ┆ 21.1.6      ┆ h91fd4e7_0          ┆ conda-forge ┆   17.42 MiB │
- │ │ │ make                    ┆ 4.4.1       ┆ hc9fafa5_2          ┆ conda-forge ┆  267.62 KiB │
- │ │ │ ncurses                 ┆ 6.5         ┆ h5e97a16_3          ┆ conda-forge ┆  778.35 KiB │
- │ │ │ openssl                 ┆ 3.6.0       ┆ h5503f6c_0          ┆ conda-forge ┆    2.96 MiB │
- │ │ │ pcre2                   ┆ 10.47       ┆ h30297fc_0          ┆ conda-forge ┆  830.30 KiB │
- │ │ │ perl                    ┆ 5.32.1      ┆ 7_h4614cfb_perl5    ┆ conda-forge ┆   13.77 MiB │
- │ │ │ pkg-config              ┆ 0.29.2      ┆ hde07d2e_1009       ┆ conda-forge ┆   48.56 KiB │
- │ │ │ sdkroot_env_osx-arm64   ┆ 14.5        ┆ hfa17104_3          ┆ conda-forge ┆    8.58 KiB │
- │ │ │ sigtool                 ┆ 0.1.3       ┆ h44b9a77_0          ┆ conda-forge ┆  205.34 KiB │
- │ │ │ tapi                    ┆ 1600.0.11.8 ┆ h997e182_0          ┆ conda-forge ┆  195.02 KiB │
+ │ │ │ ...                     ┆             ┆                     ┆             ┆             │
  │ │ │ zstd                    ┆ 1.5.7       ┆ hd0aec43_5          ┆ conda-forge ┆  380.61 KiB │
  │ │ ╰─────────────────────────┴─────────────┴─────────────────────┴─────────────┴─────────────╯
- │ │ 
- │ │ Resolving host environment:
+ │ ╰─────────────────── (took 1 second)
+ │
+ │ ╭─ Resolving host environment
  │ │   Platform: osx-arm64 [__unix=0=0, __osx=15.6=0, __archspec=1=m2]
- │ │   Channels: 
+ │ │   Channels:
  │ │    - file:///Users/wolfv/Programs/rattler-build/output/
  │ │    - conda-forge
  │ │   Specs:
  │ │    - zlib
- │ │ 
+ │ │
  │ │ ╭─────────┬─────────┬────────────┬─────────────┬───────────╮
  │ │ │ Package ┆ Version ┆ Build      ┆ Channel     ┆      Size │
  │ │ ╞═════════╪═════════╪════════════╪═════════════╪═══════════╡
  │ │ │ libzlib ┆ 1.3.1   ┆ h8359307_2 ┆ conda-forge ┆ 45.35 KiB │
  │ │ │ zlib    ┆ 1.3.1   ┆ h8359307_2 ┆ conda-forge ┆ 75.79 KiB │
  │ │ ╰─────────┴─────────┴────────────┴─────────────┴───────────╯
- │ │ 
+ │ │
  │ │ Finalized run dependencies (curl-8.0.1-h60d57d3_0):
  │ │ ╭──────────────────┬─────────────────────────────────────╮
  │ │ │ Name             ┆ Spec                                │
@@ -126,7 +90,6 @@ In this next section, the source code is fetched. The source is first downloaded
  │ │ │ Run dependencies ┆                                     │
  │ │ │ libzlib          ┆ >=1.3.1,<2.0a0 (RE of [host: zlib]) │
  │ │ ╰──────────────────┴─────────────────────────────────────╯
- │ │
  │ ╰─────────────────── (took 1 second)
 ```
 
@@ -137,11 +100,13 @@ For the resolution of the host and build environments, the variants are also tak
 In the next step, the build and host environments are installed. The build environment goes to a folder called `build_env`, and the host environment to a folder called `host_env_placehold_placehold...`. The host environment is referenced by `$PREFIX`, and is where we install the new files to.
 
 ```
- │ Installing build environment
- │ ✔ Successfully updated the build environment
- │ 
- │ Installing host environment
- │ ✔ Successfully updated the host environment
+ │ ╭─ Installing build environment
+ │ │ ✔ Successfully updated the build environment
+ │ ╰─────────────────── (took 2 seconds)
+ │
+ │ ╭─ Installing host environment
+ │ │ ✔ Successfully updated the host environment
+ │ ╰─────────────────── (took 1 second)
 ```
 
 ## Running the build script
@@ -491,8 +456,9 @@ Now, with the package completed, the tests can run!
  │ │ libzlib ┆ 1.3.1   ┆ h8359307_2 ┆ conda-forge ┆  45.35 KiB │
  │ ╰─────────┴─────────┴────────────┴─────────────┴────────────╯
  │ 
- │ Installing test environment
- │ ✔ Successfully updated the test environment
+ │ ╭─ Installing test environment
+ │ │ ✔ Successfully updated the test environment
+ │ ╰─────────────────── (took 1 second)
  │ Testing commands:
  │ curl 8.0.1 (aarch64-apple-darwin20.0.0) libcurl/8.0.1 SecureTransport zlib/1.3.1
  │ Release-Date: 2023-03-20

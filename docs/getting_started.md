@@ -1,34 +1,13 @@
 # Getting started
 
-This tutorial walks you through building and publishing your first conda package with `rattler-build`.
+This tutorial walks you through building and publishing your first conda package with Rattler-Build.
 
 ## Creating a recipe
 
 A recipe is a YAML file that describes how to build a package. Create a file called `recipe.yaml`:
 
 ```yaml title="recipe.yaml"
-context:
-  version: "1.0.0"
-
-package:
-  name: hello-world
-  version: ${{ version }}
-
-build:
-  number: 0
-  script:
-    - mkdir -p $PREFIX/bin
-    - echo '#!/bin/bash' > $PREFIX/bin/hello
-    - echo 'echo "Hello, World!"' >> $PREFIX/bin/hello
-    - chmod +x $PREFIX/bin/hello
-
-tests:
-  - script:
-      - hello
-
-about:
-  summary: A simple hello world package
-  license: MIT
+--8<-- "docs/snippets/recipes/hello-world.yaml"
 ```
 
 This recipe creates a simple shell script that prints "Hello, World!".
@@ -88,10 +67,11 @@ rattler-build build -m variants.yaml
 
 ### Debugging failed builds
 
-When a build fails, use `debug-shell` to enter an interactive shell in the build environment:
+When a build fails, the build directory is preserved automatically. Open a debug
+shell to investigate:
 
 ```bash
-rattler-build debug-shell
+rattler-build debug shell
 ```
 
 This opens a shell with:
@@ -310,7 +290,7 @@ jobs:
 | `build-args` | Additional arguments for `rattler-build build` | |
 | `upload-artifact` | Upload built packages as artifacts | `true` |
 | `artifact-name` | Name for the artifact (use with matrix builds) | `package` |
-| `rattler-build-version` | Version of rattler-build to use | latest |
+| `rattler-build-version` | Version of Rattler-Build to use | latest |
 
 ## Next steps
 

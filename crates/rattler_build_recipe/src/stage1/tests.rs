@@ -6,7 +6,7 @@ use crate::stage1::Dependency;
 use super::GlobVec;
 
 /// Python version specification for tests (evaluated)
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum PythonVersion {
     /// A single python version
@@ -14,6 +14,7 @@ pub enum PythonVersion {
     /// Multiple python versions
     Multiple(Vec<String>),
     /// No python version specified (use default)
+    #[default]
     None,
 }
 
@@ -21,12 +22,6 @@ impl PythonVersion {
     /// Check if the python version is none
     pub fn is_none(&self) -> bool {
         matches!(self, PythonVersion::None)
-    }
-}
-
-impl Default for PythonVersion {
-    fn default() -> Self {
-        Self::None
     }
 }
 

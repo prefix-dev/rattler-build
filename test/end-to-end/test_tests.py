@@ -20,16 +20,6 @@ def test_perl_tests(
     assert snapshot == content
 
 
-def test_r_tests(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot):
-    rattler_build.build(recipes / "r-test", tmp_path)
-    pkg = get_extracted_package(tmp_path, "r-test")
-
-    assert (pkg / "info" / "tests" / "tests.yaml").exists()
-    content = (pkg / "info" / "tests" / "tests.yaml").read_text()
-
-    assert snapshot == content
-
-
 def test_source_files_copied_to_test(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
@@ -41,6 +31,33 @@ def test_source_files_copied_to_test(
     assert (
         pkg / "etc" / "conda" / "test-files" / "test-source-files" / "0" / "data.txt"
     ).exists()
+
+
+@pytest.mark.skipif(os.name == "nt", reason="recipe uses build.sh (unix only)")
+def test_conditional_script_empty(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot
+):
+    """Test that a conditional test script evaluating to empty does not fall back to build.sh."""
+    rattler_build.build(
+        recipes / "test-conditional-script-empty",
+        tmp_path,
+        extra_args=["--test=skip"],
+    )
+    pkg = get_extracted_package(tmp_path, "test-conditional-script-empty")
+
+    assert (pkg / "info" / "tests" / "tests.yaml").exists()
+    content = (pkg / "info" / "tests" / "tests.yaml").read_text()
+
+    # The test script must not contain the build script content
+    assert "Hello" not in content
+    assert snapshot == content
+
+
+def test_env_vars_in_test_scripts(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Test that variant env vars, platform vars, and CONDA_BUILD are set in test scripts (issue #1317)."""
+    rattler_build.build(recipes / "test-env-vars-in-tests", tmp_path)
 
 
 @pytest.mark.skipif(

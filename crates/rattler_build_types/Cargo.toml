@@ -1,11 +1,12 @@
 [package]
 name = "rattler_build_types"
-version = "0.1.0"
+version = "0.1.4"
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Common types for rattler-build crates"
+readme = "README.md"
+description = "Common types shared across rattler-build crates, including glob matching, version pinning, and variant configuration keys"
 
 [features]
 

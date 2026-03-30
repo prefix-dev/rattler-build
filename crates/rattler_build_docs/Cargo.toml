@@ -1,0 +1,17 @@
+[package]
+name = "rattler_build_docs"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+readme = "README.md"
+description = "CLI documentation generator for rattler-build, producing markdown files from clap command definitions"
+publish = false
+
+[dependencies]
+clap = { workspace = true }
+fs-err = { workspace = true }
+itertools = { workspace = true }
+rattler-build = { path = "../..", features = ["recipe-generation"] }
+rattler_conda_types = { workspace = true }

@@ -61,12 +61,8 @@ impl Dependency {
     /// Works for all dependency types including unresolved pins.
     /// Note: For Spec dependencies, only returns the name if it's an exact match.
     pub fn name(&self) -> Option<&PackageName> {
-        use rattler_conda_types::PackageNameMatcher;
         match self {
-            Dependency::Spec(spec) => spec.name.as_ref().and_then(|matcher| match matcher {
-                PackageNameMatcher::Exact(name) => Some(name),
-                _ => None,
-            }),
+            Dependency::Spec(spec) => spec.name.as_exact(),
             Dependency::PinSubpackage(pin) => Some(&pin.pin_subpackage.name),
             Dependency::PinCompatible(pin) => Some(&pin.pin_compatible.name),
         }
@@ -299,7 +295,6 @@ impl Requirements {
 
     /// Get the free specs of the rendered dependencies (any MatchSpec without pins)
     pub fn free_specs(&self) -> Vec<PackageName> {
-        use rattler_conda_types::PackageNameMatcher;
         self.build
             .iter()
             .chain(self.host.iter())
@@ -307,10 +302,7 @@ impl Requirements {
                 Dependency::Spec(spec) => {
                     if is_free_matchspec(spec.as_ref()) {
                         // is_free_matchspec ensures name is Some
-                        spec.name.clone().and_then(|matcher| match matcher {
-                            PackageNameMatcher::Exact(name) => Some(name),
-                            _ => None,
-                        })
+                        spec.name.clone().into_exact()
                     } else {
                         None
                     }
