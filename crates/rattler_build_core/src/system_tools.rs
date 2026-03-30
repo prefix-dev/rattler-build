@@ -217,15 +217,19 @@ impl SystemTools {
 impl Serialize for SystemTools {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let used_tools = self.used_tools.lock().unwrap();
-        // +2 for the build_tool structured key and the flat compat key
-        let mut map = serializer.serialize_map(Some(used_tools.len() + 2))?;
+        let is_rattler_build = self.build_tool.name == "rattler-build";
 
-        // Emit the structured build_tool key
-        map.serialize_entry("build_tool", &self.build_tool)?;
+        // rattler-build: only the flat key; other tools: structured build_tool key + flat compat key
+        let extra_entries = if is_rattler_build { 1 } else { 2 };
+        let mut map = serializer.serialize_map(Some(used_tools.len() + extra_entries))?;
 
-        // Collect remaining tools into a BTreeMap for deterministic ordering
+        if !is_rattler_build {
+            // Emit the structured build_tool key for non-rattler-build tools
+            map.serialize_entry("build_tool", &self.build_tool)?;
+        }
+
+        // Collect all flat entries into a BTreeMap for deterministic ordering
         let mut ordered_tools = BTreeMap::new();
-        // Flat compat key: "rattler-build": "0.1.0" or "pixi-build-rust": "0.1.0"
         ordered_tools.insert(
             self.build_tool.name.clone(),
             self.build_tool.version.clone(),
@@ -325,6 +329,36 @@ mod tests {
         insta::assert_snapshot!(json);
 
         let deserialized: SystemTools = serde_json::from_str(&json).unwrap();
+        assert!(
+            deserialized
+                .used_tools
+                .lock()
+                .unwrap()
+                .contains_key(&Tool::Patchelf)
+        );
+    }
+
+    #[test]
+    fn test_serialize_non_rattler_build_tool() {
+        let mut used_tools = HashMap::new();
+        used_tools.insert(Tool::Patchelf, "1.0.0".to_string());
+
+        let system_tool = SystemTools {
+            build_tool: BuildToolInfo {
+                name: "pixi-build-rust".to_string(),
+                version: "0.1.0".to_string(),
+            },
+            used_tools: Arc::new(Mutex::new(used_tools)),
+            found_tools: Arc::new(Mutex::new(HashMap::new())),
+            build_prefix: None,
+        };
+
+        let json = serde_json::to_string_pretty(&system_tool).unwrap();
+        insta::assert_snapshot!(json);
+
+        let deserialized: SystemTools = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.build_tool.name, "pixi-build-rust");
+        assert_eq!(deserialized.build_tool.version, "0.1.0");
         assert!(
             deserialized
                 .used_tools
