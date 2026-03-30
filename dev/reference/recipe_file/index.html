@@ -4770,11 +4770,13 @@ To retrieve a fully rendered `recipe.yaml`, use the `` command.
 <h4 id="additional-jinja2-functionality-in-rattler-build">Additional Jinja2 functionality in Rattler-Build<a class="headerlink" href="#additional-jinja2-functionality-in-rattler-build" title="Permanent link">#</a></h4>
 <p>Besides the default Jinja2 functionality, additional Jinja functions are
 available during the Rattler-Build process: <code>pin_compatible</code>, <code>pin_subpackage</code>,
-and <code>compiler</code>.</p>
-<p>The compiler function takes <code>c</code>, <code>cxx</code>, <code>fortran</code> and other values as argument
-and automatically selects the right (cross-)compiler for the target platform.</p>
+<code>compiler</code> and <code>stdlib</code>.</p>
+<p>The <code>compiler</code> function takes <code>c</code>, <code>cxx</code>, <code>fortran</code> and other values as argument
+and automatically selects the right (cross-)compiler for the target platform.
+Similarly, <code>stdlib</code> function selects the right standard library dependencies.</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-72-1"><a id="__codelineno-72-1" name="__codelineno-72-1" href="#__codelineno-72-1"></a>build:
 </span><span id="__span-72-2"><a id="__codelineno-72-2" name="__codelineno-72-2" href="#__codelineno-72-2"></a>  - ${{ compiler(&#39;c&#39;) }}
+</span><span id="__span-72-3"><a id="__codelineno-72-3" name="__codelineno-72-3" href="#__codelineno-72-3"></a>  - ${{ stdlib(&#39;c&#39;) }}
 </span></code></pre></div>
 <p>The <code>pin_subpackage</code> function pins another package produced by the recipe with
 the supplied parameters.</p>
@@ -4817,7 +4819,7 @@ variant file (if the pinning from the variant file needs customization).</p>
 </span><span id="__span-74-4"><a id="__codelineno-74-4" name="__codelineno-74-4" href="#__codelineno-74-4"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">numpy</span>
 </span><span id="__span-74-5"><a id="__codelineno-74-5" name="__codelineno-74-5" href="#__codelineno-74-5"></a><span class="w">  </span><span class="nt">run</span><span class="p">:</span>
 </span><span id="__span-74-6"><a id="__codelineno-74-6" name="__codelineno-74-6" href="#__codelineno-74-6"></a><span class="w">    </span><span class="c1"># this will export `numpy &gt;=1.11,&lt;2`, instead of the stricter `1.11` pin</span>
-</span><span id="__span-74-7"><a id="__codelineno-74-7" name="__codelineno-74-7" href="#__codelineno-74-7"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ pin_compatible(&#39;numpy&#39;, min_pin=&#39;x.x&#39;, upper_bound=&#39;x&#39;) }}</span>
+</span><span id="__span-74-7"><a id="__codelineno-74-7" name="__codelineno-74-7" href="#__codelineno-74-7"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ pin_compatible(&#39;numpy&#39;, lower_bound=&#39;x.x&#39;, upper_bound=&#39;x&#39;) }}</span>
 </span></code></pre></div>
 <h4 id="the-env-jinja-functions">The env Jinja functions<a class="headerlink" href="#the-env-jinja-functions" title="Permanent link">#</a></h4>
 <p>You can access the environment variables set outside the build script using the

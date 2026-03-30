@@ -3076,12 +3076,13 @@ variables <code>&lt;lang&gt;_stdlib</code> and <code>&lt;lang&gt;_stdlib_version
 <p>A pin is created based on the version input (from a subpackage or a package
 resolution).</p>
 <p>The pin functions take the following three arguments:</p>
-<ul>
-<li><code>lower_bound</code> (default: <code>"x.x.x.x.x.x"</code>): The lower bound pin expression to be
-  used. When set to <code>None</code>, no lower bound is set.</li>
-<li><code>upper_bound</code> (default: <code>"x"</code>): The maximum pin to be used. When set to
-  <code>None</code>, no upper bound is set.</li>
-</ul>
+<ol>
+<li>The package name.</li>
+<li><code>lower_bound=...</code> (default: <code>"x.x.x.x.x.x"</code>): The lower bound pin expression
+   to be used. When set to <code>None</code>, no lower bound is set.</li>
+<li><code>upper_bound=...</code> (default: <code>"x"</code>): The maximum pin to be used. When set to
+   <code>None</code>, no upper bound is set.</li>
+</ol>
 <p>The lower bound and upper bound can either be a "pin expression" (only <code>x</code> and
 <code>.</code> are allowed) or a hard-coded version string.</p>
 <p>A "pin expression" is applied to the version input to create the lower and upper
@@ -3094,22 +3095,12 @@ any alpha versions from being selected.</p>
 then incrementing the version will set that letter to <code>a</code>, e.g. <code>9e</code> will become
 <code>10a</code>, and <code>1.1.1j</code> will become <code>1.1.2a</code>. In this case, also no <code>0a0</code> is
 appended to the end.</p>
-<p>Sometimes you want to strongly connect your outputs. This can be achieved with
-the following input:</p>
+<p>Sometimes you want to strongly connect your outputs. This can be achieved by
+passing the following argument instead of <code>lower_bound</code> and <code>upper_bound</code>:</p>
 <ul>
 <li><code>exact=True</code> (default: <code>False</code>): This will pin the version exactly to the
   version of the output, incl. the build string.</li>
 </ul>
-<p>To override the lower or upper bound with a hard-coded value, you can use the
-following input:</p>
-<ul>
-<li><code>lower_bound</code> (default: <code>None</code>): This will override the lower bound with the
-  given value.</li>
-<li><code>upper_bound</code> (default: <code>None</code>): This will override the upper bound with the
-  given value.</li>
-</ul>
-<p>Both <code>lower_bound</code> and <code>upper_bound</code> expect a valid version string (e.g.
-<code>1.2.3</code>).</p>
 <p>To add an build-string matching expression, you can use the <code>build</code> argument:</p>
 <ul>
 <li><code>build</code> (default: <code>None</code>): This will add a build string matching expression to
