@@ -1663,6 +1663,20 @@ def test_cycle_detection(rattler_build: RattlerBuild, recipes: Path, tmp_path: P
     assert "Cycle detected in recipe outputs: bazbus, foobar" in stdout
 
 
+def test_sibling_run_dep_ordering(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Test that outputs with plain run deps on sibling outputs are built in the right order.
+
+    repro-wrapper has a run dep on repro-runtime but is listed first in the recipe.
+    The build should succeed because repro-runtime must be built before repro-wrapper's
+    test environment is solved.
+    """
+    rattler_build.build(
+        recipes / "race-condition" / "recipe-sibling-run-dep.yaml", tmp_path
+    )
+
+
 def test_python_min_render(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
 ):
