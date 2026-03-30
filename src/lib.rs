@@ -560,7 +560,7 @@ pub async fn get_build_output(
             finalized_sources: None,
             finalized_cache_dependencies: None,
             finalized_cache_sources: None,
-            system_tools: SystemTools::new(),
+            system_tools: SystemTools::new("rattler-build", env!("CARGO_PKG_VERSION")),
             build_summary: Arc::new(Mutex::new(BuildSummary::default())),
             extra_meta: Some(
                 build_data
@@ -1068,6 +1068,13 @@ pub async fn rebuild_package_core(
         fs::read_to_string(temp_dir.join("rendered_recipe.yaml")).into_diagnostic()?;
 
     let mut output: Output = serde_yaml::from_str(&rendered_recipe).into_diagnostic()?;
+
+    let current_build_tool = system_tools::BuildToolInfo {
+        name: "rattler-build".to_string(),
+        version: env!("CARGO_PKG_VERSION").to_string(),
+    };
+    output.system_tools.warn_if_changed(&current_build_tool);
+    output.system_tools = SystemTools::new("rattler-build", env!("CARGO_PKG_VERSION"));
 
     // set recipe dir to the temp folder
     output.build_configuration.directories.recipe_dir = temp_dir;

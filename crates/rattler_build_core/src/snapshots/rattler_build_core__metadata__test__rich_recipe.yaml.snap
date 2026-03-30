@@ -1,5 +1,5 @@
 ---
-source: src/metadata.rs
+source: crates/rattler_build_core/src/metadata.rs
 expression: output
 ---
 recipe:
