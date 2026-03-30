@@ -156,8 +156,7 @@ impl Relinker for Dylib {
                 let exec_dir = encoded_prefix.join("bin");
                 let resolved = to_lexical_absolute(lib_without_exec, &exec_dir);
                 if resolved.exists() {
-                    let resolved_library_path =
-                        Some(resolved.canonicalize().unwrap_or(resolved));
+                    let resolved_library_path = Some(resolved.canonicalize().unwrap_or(resolved));
                     resolved_libraries.insert(lib.clone(), resolved_library_path);
                 }
             } else if lib.is_absolute() {
