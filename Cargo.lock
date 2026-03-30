@@ -4753,7 +4753,7 @@ dependencies = [
 
 [[package]]
 name = "rattler-build"
-version = "0.61.2"
+version = "0.61.3"
 dependencies = [
  "anyhow",
  "chrono",
