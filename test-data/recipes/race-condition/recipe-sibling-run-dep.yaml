@@ -12,31 +12,20 @@ outputs:
   - package:
       name: repro-wrapper
     build:
-      noarch: python
+      # this has to be noarch: generic
+      noarch: generic
       script: echo "wrapper built"
     requirements:
-      host:
-        - python >=3.10
-        - pip
       run:
-        - python >=3.10
         - repro-runtime ==${{ version }}
     tests:
-      - python:
-          pip_check: true
-          imports:
-            - sys
+      - script:
+          - echo "test ran"
 
   - package:
       name: repro-runtime
     build:
       script: echo "runtime built"
-    requirements:
-      host:
-        - python >=3.10
-      run:
-        - python >=3.10
     tests:
-      - python:
-          imports:
-            - sys
+      - script:
+          - echo "test ran"
