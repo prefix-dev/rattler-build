@@ -775,7 +775,7 @@ mod tests {
             change_dylib: HashMap::default(),
         };
 
-        let system_tools = SystemTools::default();
+        let system_tools = SystemTools::new("rattler-build", "0.0.0");
         super::install_name_tool(&binary_path, &changes, &system_tools)?;
 
         let rpaths = Dylib::new(&binary_path)?.rpaths;
@@ -817,7 +817,11 @@ mod tests {
             change_dylib: HashMap::default(),
         };
 
-        install_name_tool(&binary_path, &changes, &SystemTools::default())?;
+        install_name_tool(
+            &binary_path,
+            &changes,
+            &SystemTools::new("rattler-build", "0.0.0"),
+        )?;
 
         let object = Dylib::new(&binary_path)?;
         assert!(object.rpaths.is_empty());
@@ -829,7 +833,11 @@ mod tests {
             change_dylib: HashMap::default(),
         };
 
-        install_name_tool(&binary_path, &changes, &SystemTools::default())?;
+        install_name_tool(
+            &binary_path,
+            &changes,
+            &SystemTools::new("rattler-build", "0.0.0"),
+        )?;
 
         let object = Dylib::new(&binary_path)?;
         assert_eq!(vec![expected_rpath], object.rpaths);
@@ -887,7 +895,11 @@ mod tests {
             change_dylib: HashMap::default(),
         };
 
-        install_name_tool(&binary_path, &changes, &SystemTools::default())?;
+        install_name_tool(
+            &binary_path,
+            &changes,
+            &SystemTools::new("rattler-build", "0.0.0"),
+        )?;
 
         let object = Dylib::new(&binary_path)?;
         assert!(object.rpaths == vec![PathBuf::from("@loader_path/../lib")]);
@@ -903,7 +915,7 @@ mod tests {
                     &encoded_prefix,
                     &[],
                     &GlobVec::default(),
-                    &SystemTools::default(),
+                    &SystemTools::new("rattler-build", "0.0.0"),
                 )
                 .unwrap();
         });
@@ -1001,7 +1013,7 @@ mod tests {
                     tmp_prefix,
                     &["lib/".to_string()],
                     &GlobVec::default(),
-                    &SystemTools::default(),
+                    &SystemTools::new("rattler-build", "0.0.0"),
                 )
                 .unwrap();
         });
@@ -1044,7 +1056,11 @@ mod tests {
             change_dylib: HashMap::default(),
         };
 
-        install_name_tool(&binary_path, &changes, &SystemTools::default())?;
+        install_name_tool(
+            &binary_path,
+            &changes,
+            &SystemTools::new("rattler-build", "0.0.0"),
+        )?;
 
         let object = Dylib::new(&binary_path)?;
         assert_eq!(

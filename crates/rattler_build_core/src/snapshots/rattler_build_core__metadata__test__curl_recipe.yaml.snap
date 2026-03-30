@@ -1,5 +1,6 @@
 ---
-source: src/metadata.rs
+source: crates/rattler_build_core/src/metadata.rs
+assertion_line: 95
 expression: output
 ---
 recipe:
@@ -642,4 +643,7 @@ finalized_dependencies:
     constraints: []
 finalized_sources: ~
 system_tools:
+  build_tool:
+    name: rattler-build
+    version: 0.12.1
   rattler-build: 0.12.1
