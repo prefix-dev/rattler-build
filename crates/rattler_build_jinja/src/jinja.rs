@@ -763,30 +763,29 @@ fn set_jinja(
     );
 
     env.add_function("match", |a: &Value, spec: &str| {
-        if let Some(variant) = a.as_str() {
-            // check if version matches spec
-            let (version, _) = variant.split_once(' ').unwrap_or((variant, ""));
-            // remove trailing .* or *
-            let version = version.trim_end_matches(".*").trim_end_matches('*');
-
-            let version = Version::from_str(version).map_err(|e| {
-                minijinja::Error::new(
-                    minijinja::ErrorKind::CannotDeserialize,
-                    format!("Failed to deserialize `version`: {}", e),
-                )
-            })?;
-            let version_spec =
-                VersionSpec::from_str(spec, ParseStrictness::Strict).map_err(|e| {
-                    minijinja::Error::new(
-                        minijinja::ErrorKind::SyntaxError,
-                        format!("Bad syntax for `spec`: {}", e),
-                    )
-                })?;
-            Ok(version_spec.matches(&version))
-        } else {
+        if a.is_undefined() || a.is_none() {
             // if a is undefined, we are currently searching for all variants and thus return true
-            Ok(true)
+            return Ok(true);
         }
+        let variant = a.to_string();
+        // check if version matches spec
+        let (version, _) = variant.split_once(' ').unwrap_or((&variant, ""));
+        // remove trailing .* or *
+        let version = version.trim_end_matches(".*").trim_end_matches('*');
+
+        let version = Version::from_str(version).map_err(|e| {
+            minijinja::Error::new(
+                minijinja::ErrorKind::CannotDeserialize,
+                format!("Failed to deserialize `version`: {}", e),
+            )
+        })?;
+        let version_spec = VersionSpec::from_str(spec, ParseStrictness::Strict).map_err(|e| {
+            minijinja::Error::new(
+                minijinja::ErrorKind::SyntaxError,
+                format!("Bad syntax for `spec`: {}", e),
+            )
+        })?;
+        Ok(version_spec.matches(&version))
     });
 
     let variant_clone = variant.clone();
