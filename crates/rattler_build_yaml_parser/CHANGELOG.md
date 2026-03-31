@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.5](https://github.com/prefix-dev/rattler-build/compare/rattler_build_yaml_parser-v0.1.4...rattler_build_yaml_parser-v0.1.5) - 2026-03-31
+
+### Other
+
+- updated the following local packages: rattler_build_jinja
+
 ## [0.1.4](https://github.com/prefix-dev/rattler-build/compare/rattler_build_yaml_parser-v0.1.3...rattler_build_yaml_parser-v0.1.4) - 2026-03-25
 
 ### Other
