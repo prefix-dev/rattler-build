@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.61.4] - 2026-03-31
+
+### Documentation
+
+- Fix create-patch command references by @Hofer-Julian in [#2393](https://github.com/prefix-dev/rattler-build/pull/2393)
+
+
+### Fixed
+
+- Skip empty command tests during packaging by @Hofer-Julian in [#2390](https://github.com/prefix-dev/rattler-build/pull/2390)
+- Resolve pin_subpackage in py-rattler-build multi-output builds by @Hofer-Julian in [#2389](https://github.com/prefix-dev/rattler-build/pull/2389)
+- Stop running lefthook in parallel by @Hofer-Julian in [#2387](https://github.com/prefix-dev/rattler-build/pull/2387)
+
+
+
 ## [0.61.3] - 2026-03-30
 ### ✨ Highlights
 
