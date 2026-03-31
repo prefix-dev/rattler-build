@@ -252,7 +252,10 @@ class Stage0Recipe(ABC):
         # Render the recipe using the wrapper
         rendered = _render.render_recipe(self._wrapper, variant_config_inner, render_config_inner)
 
-        return [RenderedVariant(r, self._recipe_path) for r in rendered]
+        variants = [RenderedVariant(r, self._recipe_path) for r in rendered]
+        for variant in variants:
+            variant._siblings = variants
+        return variants
 
     def run_build(
         self,
