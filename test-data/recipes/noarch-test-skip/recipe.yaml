@@ -1,0 +1,25 @@
+package:
+  name: noarch-test-skip
+  version: "1.0.0"
+
+build:
+  noarch: generic
+  number: 0
+  script:
+    - if: unix
+      then:
+        - echo "hello" > $PREFIX/hello.txt
+      else:
+        - echo hello > %PREFIX%\hello.txt
+
+requirements:
+  run:
+    - if: build_win
+      then: __win
+      else: __unix
+
+tests:
+  - script:
+      - if: not build_win
+        then:
+          - test -f $PREFIX/hello.txt
