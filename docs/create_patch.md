@@ -20,7 +20,7 @@ rattler-build debug shell
 vim some_file.c
 
 # Generate patch (from inside the debug shell, the directories are auto-detected)
-rattler-build create-patch --name fix-typo
+rattler-build debug create-patch --name fix-typo
 
 # Add to recipe
 ```
@@ -37,10 +37,13 @@ source:
 
 The `create-patch` command supports the following options:
 
-- `--directory <DIR>` - Work directory containing the modified sources (required)
+- `--directory <DIR>` - Directory where we want to create the patch (default: current directory)
 - `--name <NAME>` - Patch filename without .patch extension (default: "changes")
+- `--overwrite` - Whether to overwrite the patch file if it already exists
 - `--patch-dir <DIR>` - Directory to write the patch file (default: recipe directory)
 - `--exclude <PATTERNS>` - Files to exclude from the patch (comma-separated glob patterns)
+- `--add <ADD>` - Include new files matching these glob patterns (e.g., "*.txt", "src/**/*.rs")
+- `--include <INCLUDE>` - Only include modified files matching these glob patterns (e.g., "*.c", "src/**/*.rs") (default: all modified files are included)
 - `--dry-run` - Preview changes without creating a file
 
 ## Examples
@@ -48,21 +51,21 @@ The `create-patch` command supports the following options:
 Generate a patch with a custom name:
 
 ```bash
-rattler-build create-patch --directory work/ --name fix-build-system
+rattler-build debug create-patch --directory work/ --name fix-build-system
 ```
 
 Preview changes before creating the patch:
 
 ```bash
-rattler-build create-patch --directory work/ --dry-run
+rattler-build debug create-patch --directory work/ --dry-run
 ```
 
 Create a patch in a dedicated patches folder:
 
 ```bash
-rattler-build create-patch --directory work/ \
-                           --name fix-compilation \
-                           --patch-dir patches/
+rattler-build debug create-patch --directory work/ \
+                                 --name fix-compilation \
+                                 --patch-dir patches/
 ```
 
 ## Supported source types
