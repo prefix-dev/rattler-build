@@ -1,8 +1,16 @@
 import os
+import sys
 from pathlib import Path
 
 import pytest
 from helpers import RattlerBuild
+
+
+def pytest_configure(config):
+    # On Windows, use a short absolute path to avoid hitting the cmd.exe
+    # line-length limit during VS compiler activation (vcvars64.bat).
+    if sys.platform == "win32":
+        config.option.basetemp = Path("C:/bld")
 from syrupy.extensions.json import JSONSnapshotExtension
 
 
