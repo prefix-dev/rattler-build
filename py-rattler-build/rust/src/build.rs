@@ -89,11 +89,12 @@ pub(crate) fn output_from_rendered_variant(
     no_include_recipe: bool,
     recipe_path: Option<&Path>,
     exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
+    extra_subpackages: BTreeMap<rattler_conda_types::PackageName, PackageIdentifier>,
 ) -> Result<Output, RattlerBuildError> {
     let timestamp = chrono::Utc::now();
     let virtual_package_override = rattler_virtual_packages::VirtualPackageOverrides::from_env();
 
-    let mut subpackages = BTreeMap::new();
+    let mut subpackages = extra_subpackages;
 
     let recipe = &rendered_variant.inner.recipe;
     subpackages.insert(
@@ -221,6 +222,7 @@ pub fn build_rendered_variant_py(
     package_format: Option<String>,
     no_include_recipe: bool,
     exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
+    sibling_variants: Vec<render::PyRenderedVariant>,
 ) -> PyResult<BuildResultPy> {
     let tool_config = tool_config.inner;
 
@@ -236,6 +238,22 @@ pub fn build_rendered_variant_py(
         })
         .collect::<Result<_, _>>()?;
 
+    // Build subpackages map from sibling variants (for multi-output pin_subpackage support)
+    let mut extra_subpackages = BTreeMap::new();
+    for sibling in &sibling_variants {
+        let sibling_recipe = &sibling.inner.recipe;
+        if let Some(build_string) = sibling_recipe.build.string.as_resolved() {
+            extra_subpackages.insert(
+                sibling_recipe.package.name.clone(),
+                PackageIdentifier {
+                    name: sibling_recipe.package.name.clone(),
+                    version: sibling_recipe.package.version.clone(),
+                    build_string: build_string.to_string(),
+                },
+            );
+        }
+    }
+
     let output = output_from_rendered_variant(
         &rendered_variant,
         &tool_config,
@@ -246,6 +264,7 @@ pub fn build_rendered_variant_py(
         no_include_recipe,
         recipe_path.as_deref(),
         exclude_newer,
+        extra_subpackages,
     )?;
 
     // Capture start time for build duration calculation

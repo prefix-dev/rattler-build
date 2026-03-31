@@ -259,6 +259,7 @@ class RenderedVariant:
         """Create a RenderedVariant from the Rust object."""
         self._inner = inner
         self._recipe_path = recipe_path
+        self._siblings: list[RenderedVariant] = []
 
     @property
     def recipe_path(self) -> Path:
@@ -336,6 +337,10 @@ class RenderedVariant:
         to go back through the Stage0 recipe.  The recipe path is taken from
         this variant automatically (set during :meth:`Stage0Recipe.render`).
 
+        For multi-output recipes, sibling variants are automatically known
+        from the :meth:`~Stage0Recipe.render` call and used to resolve
+        ``pin_subpackage`` dependencies between outputs.
+
         Args:
             tool_config: ToolConfiguration to use for the build. If None, uses defaults.
             output_dir: Directory to store the built package.
@@ -359,6 +364,10 @@ class RenderedVariant:
             # Build just the first variant (output goes to <recipe_dir>/output)
             result = rendered[0].run_build()
             print(f"Built package: {result.packages[0]}")
+
+            # Multi-output recipes with pin_subpackage work automatically
+            for variant in rendered:
+                variant.run_build()
             ```
         """
         # Use default ToolConfiguration if not provided
@@ -370,6 +379,8 @@ class RenderedVariant:
             output_dir = self._recipe_path.parent / "output"
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
+
+        rust_siblings = [v._inner for v in self._siblings]
 
         # Build this single variant
         rust_result = build_rendered_variant_py(
@@ -383,6 +394,7 @@ class RenderedVariant:
             package_format=package_format,
             no_include_recipe=no_include_recipe,
             exclude_newer=exclude_newer,
+            sibling_variants=rust_siblings,
         )
 
         # Convert Rust BuildResult to Python BuildResult

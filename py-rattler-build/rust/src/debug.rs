@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::str::FromStr;
 
@@ -283,9 +284,10 @@ pub fn create_debug_session_py(
         &channels_named,
         no_build_id,
         None,
-        true, // no_include_recipe
-        None, // recipe_path
-        None, // exclude_newer
+        true,            // no_include_recipe
+        None,            // recipe_path
+        None,            // exclude_newer
+        BTreeMap::new(), // extra_subpackages
     )?;
 
     // Run setup with log capture
