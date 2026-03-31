@@ -2992,4 +2992,47 @@ outputs:
             "All outputs should be skipped on Windows"
         );
     }
+
+    #[test]
+    fn test_match_with_integer_variant_values() {
+        // Regression: YAML integer values (unquoted `14` vs `"14"`) passed to match()
+        // were not recognized, causing match() to always return true and skip all builds.
+        let recipe_yaml = r#"
+package:
+  name: test
+  version: "1.0.0"
+
+requirements:
+  host:
+    - postgresql
+
+build:
+  skip:
+    - match(postgresql, "<=16")
+"#;
+
+        let variant_yaml = r#"
+postgresql:
+  - 16
+  - 17
+"#;
+
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config =
+            VariantConfig::from_yaml_str(variant_yaml).expect("Failed to parse variant config");
+
+        let rendered =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, RenderConfig::new())
+                .unwrap_or_else(|e| panic!("Failed to render: {e:?}"));
+
+        let skip_flags: Vec<_> = rendered
+            .iter()
+            .map(|r| {
+                let pg = r.variant.get(&"postgresql".into()).unwrap().to_string();
+                (pg, r.recipe.build.skip)
+            })
+            .collect();
+        // postgresql 16 should be skipped (<=16), 17 should build
+        assert_eq!(skip_flags, vec![("16".into(), true), ("17".into(), false)]);
+    }
 }
