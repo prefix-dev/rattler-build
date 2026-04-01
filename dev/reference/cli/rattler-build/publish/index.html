@@ -2945,12 +2945,6 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <dd>Exclude packages newer than this date from the solver, in RFC3339 format (e.g. 2024-03-15T12:00:00Z)</dd>
 </dl>
 </li>
-<li>
-<dl>
-<dt><a id="arg---build-num" href="#arg---build-num"><code>--build-num &lt;BUILD_NUM&gt;</code></a></dt>
-<dd>Override the build number for all outputs (defaults to the build number in the recipe)</dd>
-</dl>
-</li>
 </ul>
 <h2 id="publishing">Publishing<a class="headerlink" href="#publishing" title="Permanent link">#</a></h2>
 <ul>
@@ -2965,6 +2959,12 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <dl>
 <dt><a id="arg---build-number" href="#arg---build-number"><code>--build-number &lt;BUILD_NUMBER&gt;</code></a></dt>
 <dd>Override the build number for all outputs. Use an absolute value (e.g., <code>--build-number=12</code>) or a relative bump (e.g., <code>--build-number=+1</code>). When using a relative bump, the highest build number from the target channel is used as the base</dd>
+</dl>
+</li>
+<li>
+<dl>
+<dt><a id="arg---build-string-prefix" href="#arg---build-string-prefix"><code>--build-string-prefix &lt;BUILD_STRING_PREFIX&gt;</code></a></dt>
+<dd>Prefix to prepend to the auto-generated build string (e.g. <code>--build-string-prefix my_prefix</code> produces <code>my_prefix_h1234_0</code>)</dd>
 </dl>
 </li>
 <li>

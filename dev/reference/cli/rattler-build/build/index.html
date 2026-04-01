@@ -2841,6 +2841,18 @@
 <ul>
 <li>
 <dl>
+<dt><a id="arg---build-num" href="#arg---build-num"><code>--build-num &lt;BUILD_NUM&gt;</code></a></dt>
+<dd>Override the build number for all outputs (defaults to the build number in the recipe)</dd>
+</dl>
+</li>
+<li>
+<dl>
+<dt><a id="arg---build-string-prefix" href="#arg---build-string-prefix"><code>--build-string-prefix &lt;BUILD_STRING_PREFIX&gt;</code></a></dt>
+<dd>Prefix to prepend to the auto-generated build string (e.g. <code>--build-string-prefix my_prefix</code> produces <code>my_prefix_h1234_0</code>)</dd>
+</dl>
+</li>
+<li>
+<dl>
 <dt><a id="arg---package-format" href="#arg---package-format"><code>--package-format &lt;PACKAGE_FORMAT&gt;</code></a></dt>
 <dd>The package format to use for the build. Can be one of <code>tar-bz2</code> or
 <code>conda</code>. You can also add a compression level to the package format,
@@ -2910,12 +2922,6 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <dl>
 <dt><a id="arg---exclude-newer" href="#arg---exclude-newer"><code>--exclude-newer &lt;EXCLUDE_NEWER&gt;</code></a></dt>
 <dd>Exclude packages newer than this date from the solver, in RFC3339 format (e.g. 2024-03-15T12:00:00Z)</dd>
-</dl>
-</li>
-<li>
-<dl>
-<dt><a id="arg---build-num" href="#arg---build-num"><code>--build-num &lt;BUILD_NUM&gt;</code></a></dt>
-<dd>Override the build number for all outputs (defaults to the build number in the recipe)</dd>
 </dl>
 </li>
 </ul>

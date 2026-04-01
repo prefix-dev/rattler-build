@@ -2912,7 +2912,7 @@ environments, and creates the build script — all without running the actual bu
 </span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>
 </span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Work directory:  </span><span class="si">{</span><span class="n">session</span><span class="o">.</span><span class="n">work_dir</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </span></code></pre></div>
-<div class="language-text highlight"><pre><span></span><code>Work directory:  /tmp/rattler_build_f79388a965edd111/output/bld/rattler-build_debug-demo/work
+<div class="language-text highlight"><pre><span></span><code>Work directory:  /tmp/rattler_build_a646134612e9b89f/output/bld/rattler-build_debug-demo/work
 </code></pre></div>
 <h2 id="read-the-build-script">Read the Build Script<a class="headerlink" href="#read-the-build-script" title="Permanent link">#</a></h2>
 <p>Before running, inspect the generated build script:</p>
@@ -2928,7 +2928,7 @@ environments, and creates the build script — all without running the actual bu
 set -e
 ## Start of bash preamble
 if [ -z ${CONDA_BUILD+x} ]; then
-    source &quot;/tmp/rattler_build_f79388a965edd111/output/bld/rattler-build_debug-demo/work/build_env.sh&quot;
+    source &quot;/tmp/rattler_build_a646134612e9b89f/output/bld/rattler-build_debug-demo/work/build_env.sh&quot;
 fi
 ## End of preamble
 
@@ -2961,7 +2961,7 @@ Stderr:
 + set -e
 + &#39;[&#39; -z x &#39;]&#39;
 + echo &#39;Hello from the build script!&#39;
-+ mkdir -p /tmp/rattler_build_f79388a965edd111/output/bld/rattler-build_debug-demo/host_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_plac/bin
++ mkdir -p /tmp/rattler_build_a646134612e9b89f/output/bld/rattler-build_debug-demo/host_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_plac/bin
 + echo &#39;hello from debug-demo&#39;
 </code></pre></div>
 <h2 id="iterate-modify-and-re-run">Iterate — Modify and Re-run<a class="headerlink" href="#iterate-modify-and-re-run" title="Permanent link">#</a></h2>
