@@ -111,7 +111,7 @@ pub struct RenderConfig {
     pub build_string_prefix: Option<String>,
     /// An optional build number override.
     /// When set, this replaces the build number from the recipe.
-    pub build_number: Option<u64>,
+    pub build_number_override: Option<u64>,
 }
 
 impl Default for RenderConfig {
@@ -125,7 +125,7 @@ impl Default for RenderConfig {
             host_platform: rattler_conda_types::Platform::current(),
             os_env_var_keys: HashSet::new(),
             build_string_prefix: None,
-            build_number: None,
+            build_number_override: None,
         }
     }
 }
@@ -191,8 +191,8 @@ impl RenderConfig {
     }
 
     /// Override the build number from the recipe.
-    pub fn with_build_number(mut self, build_number: u64) -> Self {
-        self.build_number = Some(build_number);
+    pub fn with_build_number_override(mut self, build_number: u64) -> Self {
+        self.build_number_override = Some(build_number);
         self
     }
 }
@@ -1053,7 +1053,7 @@ fn finalize_build_string_single(
         let eval_ctx = EvaluationContext::from_variables(variables);
 
         // Apply the build number override if provided.
-        if let Some(bn) = config.build_number {
+        if let Some(bn) = config.build_number_override {
             result.recipe.build.number = Some(bn);
         }
 
@@ -3209,7 +3209,7 @@ build:
         let rendered_override = render_recipe_with_variant_config(
             &stage0_recipe,
             &variant_config,
-            RenderConfig::new().with_build_number(42),
+            RenderConfig::new().with_build_number_override(42),
         )
         .unwrap();
         assert_eq!(rendered_override[0].recipe.build.number, Some(42));
@@ -3256,7 +3256,7 @@ package:
         let rendered_override = render_recipe_with_variant_config(
             &stage0_recipe,
             &variant_config,
-            RenderConfig::new().with_build_number(7),
+            RenderConfig::new().with_build_number_override(7),
         )
         .unwrap();
         assert_eq!(rendered_override[0].recipe.build.number, Some(7));

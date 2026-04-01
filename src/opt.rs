@@ -28,12 +28,29 @@ use crate::{
 #[cfg(feature = "recipe-generation")]
 use rattler_build_recipe_generator::GenerateRecipeOpts;
 
+/// Build-only options that are not shared with the publish command.
+#[derive(Parser, Clone)]
+pub struct BuildOnlyOpts {
+    /// Override the build number for all outputs (defaults to the build number in the recipe)
+    #[arg(long, help_heading = "Modifying result")]
+    pub build_num: Option<u64>,
+
+    /// Prefix to prepend to the auto-generated build string
+    /// (e.g. `--build-string-prefix my_prefix` produces `my_prefix_h1234_0`)
+    #[arg(long, help_heading = "Modifying result")]
+    pub build_string_prefix: Option<String>,
+
+    #[allow(missing_docs)]
+    #[clap(flatten)]
+    pub build: BuildOpts,
+}
+
 /// Application subcommands.
 #[derive(Parser)]
 #[allow(clippy::large_enum_variant)]
 pub enum SubCommands {
     /// Build a package from a recipe
-    Build(BuildOpts),
+    Build(BuildOnlyOpts),
 
     /// Publish packages to a channel.
     /// This command builds packages from recipes (or uses already built packages),
@@ -687,10 +704,6 @@ pub struct BuildOpts {
     /// Exclude packages newer than this date from the solver, in RFC3339 format (e.g. 2024-03-15T12:00:00Z)
     #[arg(long, help_heading = "Modifying result", value_parser = parse_datetime)]
     pub exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
-
-    /// Override the build number for all outputs (defaults to the build number in the recipe)
-    #[arg(long, help_heading = "Modifying result")]
-    pub build_num: Option<u64>,
 }
 
 /// Publish options for the `publish` command.
@@ -726,6 +739,11 @@ pub struct PublishOpts {
     /// When using a relative bump, the highest build number from the target channel is used as the base.
     #[arg(long, help_heading = "Publishing")]
     pub build_number: Option<String>,
+
+    /// Prefix to prepend to the auto-generated build string
+    /// (e.g. `--build-string-prefix my_prefix` produces `my_prefix_h1234_0`)
+    #[arg(long, help_heading = "Publishing")]
+    pub build_string_prefix: Option<String>,
 
     /// Force upload even if the package already exists (not recommended - may break lockfiles).
     /// Only works with S3, filesystem, Anaconda.org, and prefix.dev channels.
@@ -826,6 +844,9 @@ impl PublishData {
 
         build_opts.channels = channels;
 
+        let mut build_data = BuildData::from_opts_and_config(build_opts, config);
+        build_data.build_string_prefix = opts.build_string_prefix;
+
         Self {
             to: opts.to,
             build_number: opts.build_number,
@@ -833,7 +854,7 @@ impl PublishData {
             generate_attestation: opts.generate_attestation,
             package_files,
             recipe_paths,
-            build: BuildData::from_opts_and_config(build_opts, config),
+            build: build_data,
         }
     }
 }
@@ -870,6 +891,7 @@ pub struct BuildData {
     pub allow_absolute_license_paths: bool,
     pub exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
     pub build_num_override: Option<u64>,
+    pub build_string_prefix: Option<String>,
     pub markdown_summary: Option<PathBuf>,
 }
 
@@ -905,6 +927,7 @@ impl BuildData {
         allow_absolute_license_paths: bool,
         exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
         build_num_override: Option<u64>,
+        build_string_prefix: Option<String>,
         markdown_summary: Option<PathBuf>,
     ) -> Self {
         Self {
@@ -944,6 +967,7 @@ impl BuildData {
             allow_absolute_license_paths,
             exclude_newer,
             build_num_override,
+            build_string_prefix,
             markdown_summary,
         }
     }
@@ -993,7 +1017,8 @@ impl BuildData {
             opts.allow_symlinks_on_windows,
             opts.allow_absolute_license_paths,
             opts.exclude_newer,
-            opts.build_num,
+            None, // build_num_override — set by caller (BuildOnlyOpts or PublishOpts)
+            None, // build_string_prefix — set by caller (BuildOnlyOpts or PublishOpts)
             opts.markdown_summary,
         )
     }

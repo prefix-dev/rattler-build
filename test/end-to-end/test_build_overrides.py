@@ -62,7 +62,9 @@ def _write_recipe(tmp_path: Path, content: str) -> Path:
     return recipe_dir
 
 
-def _render(rattler_build: RattlerBuild, tmp_path: Path, recipe_dir: Path, extra_args=None):
+def _render(
+    rattler_build: RattlerBuild, tmp_path: Path, recipe_dir: Path, extra_args=None
+):
     return rattler_build.render(recipe_dir, tmp_path, extra_args=extra_args)
 
 
@@ -72,7 +74,9 @@ def _render(rattler_build: RattlerBuild, tmp_path: Path, recipe_dir: Path, extra
 def test_build_num_overrides_recipe(rattler_build: RattlerBuild, tmp_path: Path):
     """--build-num overrides the build number defined in the recipe."""
     recipe_dir = _write_recipe(tmp_path, RECIPE_WITH_BUILD_NUMBER)
-    output = _render(rattler_build, tmp_path, recipe_dir, extra_args=["--build-num", "42"])
+    output = _render(
+        rattler_build, tmp_path, recipe_dir, extra_args=["--build-num", "42"]
+    )
 
     assert len(output) == 1
     recipe = output[0]["recipe"]
@@ -83,17 +87,23 @@ def test_build_num_overrides_recipe(rattler_build: RattlerBuild, tmp_path: Path)
 def test_build_num_overrides_default(rattler_build: RattlerBuild, tmp_path: Path):
     """--build-num works when the recipe uses the default build number (0)."""
     recipe_dir = _write_recipe(tmp_path, SIMPLE_RECIPE)
-    output = _render(rattler_build, tmp_path, recipe_dir, extra_args=["--build-num", "7"])
+    output = _render(
+        rattler_build, tmp_path, recipe_dir, extra_args=["--build-num", "7"]
+    )
 
     recipe = output[0]["recipe"]
     assert recipe["build"]["number"] == 7
     assert recipe["build"]["string"].endswith("_7")
 
 
-def test_build_num_with_custom_build_string(rattler_build: RattlerBuild, tmp_path: Path):
+def test_build_num_with_custom_build_string(
+    rattler_build: RattlerBuild, tmp_path: Path
+):
     """--build-num works with a custom build string template."""
     recipe_dir = _write_recipe(tmp_path, RECIPE_WITH_CUSTOM_BUILD_STRING)
-    output = _render(rattler_build, tmp_path, recipe_dir, extra_args=["--build-num", "99"])
+    output = _render(
+        rattler_build, tmp_path, recipe_dir, extra_args=["--build-num", "99"]
+    )
 
     recipe = output[0]["recipe"]
     assert recipe["build"]["number"] == 99
@@ -127,7 +137,9 @@ def test_build_string_prefix(rattler_build: RattlerBuild, tmp_path: Path):
     """--build-string-prefix prepends a prefix to the default build string."""
     recipe_dir = _write_recipe(tmp_path, SIMPLE_RECIPE)
     output = _render(
-        rattler_build, tmp_path, recipe_dir,
+        rattler_build,
+        tmp_path,
+        recipe_dir,
         extra_args=["--build-string-prefix", "myprefix"],
     )
 
@@ -158,12 +170,16 @@ def test_build_string_prefix_with_variants(rattler_build: RattlerBuild, tmp_path
     assert len(build_strings) == 2, "variants should produce distinct build strings"
 
 
-def test_build_string_prefix_absent_gives_default(rattler_build: RattlerBuild, tmp_path: Path):
+def test_build_string_prefix_absent_gives_default(
+    rattler_build: RattlerBuild, tmp_path: Path
+):
     """Without --build-string-prefix the build string has no extra prefix."""
     recipe_dir = _write_recipe(tmp_path, SIMPLE_RECIPE)
 
     with_prefix = _render(
-        rattler_build, tmp_path, recipe_dir,
+        rattler_build,
+        tmp_path,
+        recipe_dir,
         extra_args=["--build-string-prefix", "pfx"],
     )
     without_prefix = _render(rattler_build, tmp_path, recipe_dir)
@@ -184,7 +200,9 @@ def test_build_num_and_prefix_combined(rattler_build: RattlerBuild, tmp_path: Pa
     """--build-num and --build-string-prefix work together."""
     recipe_dir = _write_recipe(tmp_path, SIMPLE_RECIPE)
     output = _render(
-        rattler_build, tmp_path, recipe_dir,
+        rattler_build,
+        tmp_path,
+        recipe_dir,
         extra_args=["--build-num", "10", "--build-string-prefix", "release"],
     )
 
