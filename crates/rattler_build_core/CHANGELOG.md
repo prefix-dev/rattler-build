@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.3](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.2...rattler_build_core-v0.2.3) - 2026-03-31
+
+### Fixed
+
+- skip empty command tests during packaging ([#2390](https://github.com/prefix-dev/rattler-build/pull/2390))
+- "built with" metadata ([#2377](https://github.com/prefix-dev/rattler-build/pull/2377))
+- reindex all platform subdirs in build_reindexed_channels ([#2383](https://github.com/prefix-dev/rattler-build/pull/2383))
+- set variant and platform env vars in test scripts ([#2365](https://github.com/prefix-dev/rattler-build/pull/2365))
+
+### Other
+
+- Fix obsolete `min_pin` and `max_pin` references ([#2380](https://github.com/prefix-dev/rattler-build/pull/2380))
+
 ## [0.2.2](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.1...rattler_build_core-v0.2.2) - 2026-03-25
 
 ### Added

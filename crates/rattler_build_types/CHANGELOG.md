@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.5](https://github.com/prefix-dev/rattler-build/compare/rattler_build_types-v0.1.4...rattler_build_types-v0.1.5) - 2026-03-31
+
+### Other
+
+- Fix obsolete `min_pin` and `max_pin` references ([#2380](https://github.com/prefix-dev/rattler-build/pull/2380))
+
 ## [0.1.4](https://github.com/prefix-dev/rattler-build/compare/rattler_build_types-v0.1.3...rattler_build_types-v0.1.4) - 2026-03-25
 
 ### Other
