@@ -5865,6 +5865,9 @@ and is used automatically by :meth:<code>run_build</code>.</p>
 <p>This method builds a single rendered variant directly without needing
 to go back through the Stage0 recipe.  The recipe path is taken from
 this variant automatically (set during :meth:<code>Stage0Recipe.render</code>).</p>
+<p>For multi-output recipes, sibling variants are automatically known
+from the :meth:<code>~Stage0Recipe.render</code> call and used to resolve
+<code>pin_subpackage</code> dependencies between outputs.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -6043,6 +6046,10 @@ Defaults to <code>&lt;recipe_dir&gt;/output</code>.</p>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="c1"># Build just the first variant (output goes to &lt;recipe_dir&gt;/output)</span>
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="n">result</span> <span class="o">=</span> <span class="n">rendered</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">run_build</span><span class="p">()</span>
 </span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Built package: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">packages</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="c1"># Multi-output recipes with pin_subpackage work automatically</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="k">for</span> <span class="n">variant</span> <span class="ow">in</span> <span class="n">rendered</span><span class="p">:</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="n">variant</span><span class="o">.</span><span class="n">run_build</span><span class="p">()</span>
 </span></code></pre></div>
 </details>
 

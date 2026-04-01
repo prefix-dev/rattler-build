@@ -2814,9 +2814,9 @@
 
 <h1 id="creating-patches">Creating patches<a class="headerlink" href="#creating-patches" title="Permanent link">#</a></h1>
 <p>When packaging software, you often need to make small source code changes – fixing a typo, applying a bug fix, or adapting build scripts. Instead of maintaining a fork of the upstream project, you can create patch files that are applied during the build process.</p>
-<p>Rattler-Build provides a streamlined workflow for creating patches using the <code>debug</code> and <code>create-patch</code> commands.</p>
+<p>Rattler-Build provides a streamlined workflow for creating patches using the <code>debug</code> subcommands.</p>
 <h2 id="how-it-works">How it works<a class="headerlink" href="#how-it-works" title="Permanent link">#</a></h2>
-<p>The <code>debug</code> command sets up a build environment and downloads sources without running the actual build script. This gives you a clean workspace to make changes. The <code>create-patch</code> command then compares your modified files against the original sources and generates a unified diff patch.</p>
+<p>The <code>debug setup</code> command sets up a build environment and downloads sources without running the actual build script. This gives you a clean workspace to make changes. The <code>debug create-patch</code> command then compares your modified files against the original sources and generates a unified diff patch.</p>
 <h2 id="basic-workflow">Basic workflow<a class="headerlink" href="#basic-workflow" title="Permanent link">#</a></h2>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># Set up debug environment and enter the debug shell</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>rattler-build<span class="w"> </span>debug<span class="w"> </span>setup<span class="w"> </span>--recipe<span class="w"> </span>recipe.yaml
@@ -2827,7 +2827,7 @@
 </span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>vim<span class="w"> </span>some_file.c
 </span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>
 </span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="c1"># Generate patch (from inside the debug shell, the directories are auto-detected)</span>
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>rattler-build<span class="w"> </span>create-patch<span class="w"> </span>--name<span class="w"> </span>fix-typo
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>rattler-build<span class="w"> </span>debug<span class="w"> </span>create-patch<span class="w"> </span>--name<span class="w"> </span>fix-typo
 </span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>
 </span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="c1"># Add to recipe</span>
 </span></code></pre></div>
@@ -2838,7 +2838,7 @@
 </span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">fix-typo.patch</span>
 </span></code></pre></div>
 <h2 id="command-options">Command options<a class="headerlink" href="#command-options" title="Permanent link">#</a></h2>
-<p>The <code>create-patch</code> command supports the following options:</p>
+<p>The <code>debug create-patch</code> command supports the following options:</p>
 <ul>
 <li><code>--directory &lt;DIR&gt;</code> - Work directory containing the modified sources (required)</li>
 <li><code>--name &lt;NAME&gt;</code> - Patch filename without .patch extension (default: "changes")</li>
@@ -2848,18 +2848,18 @@
 </ul>
 <h2 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">#</a></h2>
 <p>Generate a patch with a custom name:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>rattler-build<span class="w"> </span>create-patch<span class="w"> </span>--directory<span class="w"> </span>work/<span class="w"> </span>--name<span class="w"> </span>fix-build-system
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>rattler-build<span class="w"> </span>debug<span class="w"> </span>create-patch<span class="w"> </span>--directory<span class="w"> </span>work/<span class="w"> </span>--name<span class="w"> </span>fix-build-system
 </span></code></pre></div>
 <p>Preview changes before creating the patch:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>rattler-build<span class="w"> </span>create-patch<span class="w"> </span>--directory<span class="w"> </span>work/<span class="w"> </span>--dry-run
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>rattler-build<span class="w"> </span>debug<span class="w"> </span>create-patch<span class="w"> </span>--directory<span class="w"> </span>work/<span class="w"> </span>--dry-run
 </span></code></pre></div>
 <p>Create a patch in a dedicated patches folder:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>rattler-build<span class="w"> </span>create-patch<span class="w"> </span>--directory<span class="w"> </span>work/<span class="w"> </span><span class="se">\</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>rattler-build<span class="w"> </span>debug<span class="w"> </span>create-patch<span class="w"> </span>--directory<span class="w"> </span>work/<span class="w"> </span><span class="se">\</span>
 </span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">                           </span>--name<span class="w"> </span>fix-compilation<span class="w"> </span><span class="se">\</span>
 </span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">                           </span>--patch-dir<span class="w"> </span>patches/
 </span></code></pre></div>
 <h2 id="supported-source-types">Supported source types<a class="headerlink" href="#supported-source-types" title="Permanent link">#</a></h2>
-<p>Currently, the <code>create-patch</code> command supports:</p>
+<p>Currently, the <code>debug create-patch</code> command supports:</p>
 <ul>
 <li><strong>URL sources</strong> - Creates patches for extracted archives (tar.gz, zip, etc.)</li>
 <li><strong>Git sources</strong> - ⚠️ Not yet implemented</li>
