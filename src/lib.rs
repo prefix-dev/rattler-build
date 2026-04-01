@@ -92,10 +92,7 @@ fn find_variants(
     variant_config: &VariantConfig,
     recipe_path: &std::path::Path,
     recipe_content: &str,
-    target_platform: Platform,
-    build_platform: Platform,
-    host_platform: Platform,
-    experimental: bool,
+    render_config: RenderConfig,
 ) -> Result<FoundVariants, miette::Error> {
     // Parse the recipe
     let source = rattler_build_recipe::source_code::Source::from_string(
@@ -116,21 +113,7 @@ fn find_variants(
         stage0::Recipe::SingleOutput(_) => None,
     };
 
-    // Get OS environment variable keys that can be overridden by variant config
-    // We use an empty prefix path since we just need the keys, not the values
-    let os_env_var_keys = env_vars::os_vars(&std::path::PathBuf::new(), &host_platform)
-        .keys()
-        .cloned()
-        .collect();
-
-    // Build render config with platform information, experimental flag, and recipe path
-    let render_config = RenderConfig::new()
-        .with_target_platform(target_platform)
-        .with_build_platform(build_platform)
-        .with_host_platform(host_platform)
-        .with_experimental(experimental)
-        .with_recipe_path(recipe_path)
-        .with_os_env_var_keys(os_env_var_keys);
+    let target_platform = render_config.target_platform;
 
     // Render with variant config (handles both single and multi-output recipes)
     let rendered_variants =
@@ -391,18 +374,28 @@ pub async fn get_build_output(
         variant_config.variants.insert(normalized_key, variables);
     }
 
+    // Get OS environment variable keys that can be overridden by variant config
+    let os_env_var_keys = env_vars::os_vars(&std::path::PathBuf::new(), &build_data.host_platform)
+        .keys()
+        .cloned()
+        .collect();
+
+    let render_config = RenderConfig {
+        target_platform: build_data.target_platform,
+        build_platform: build_data.build_platform,
+        host_platform: build_data.host_platform,
+        experimental: build_data.common.experimental,
+        recipe_path: Some(recipe_path.to_path_buf()),
+        os_env_var_keys,
+        build_number_override: build_data.build_num_override,
+        build_string_prefix: build_data.build_string_prefix.clone(),
+        ..RenderConfig::default()
+    };
+
     let FoundVariants {
         outputs: outputs_and_variants,
         recipe_name,
-    } = find_variants(
-        &variant_config,
-        recipe_path,
-        &recipe_content,
-        build_data.target_platform,
-        build_data.build_platform,
-        build_data.host_platform,
-        build_data.common.experimental,
-    )?;
+    } = find_variants(&variant_config, recipe_path, &recipe_content, render_config)?;
 
     tracing::info!("Found {} variants\n", outputs_and_variants.len());
     for discovered_output in &outputs_and_variants {
@@ -573,35 +566,6 @@ pub async fn get_build_output(
         };
 
         outputs.push(output);
-    }
-
-    // Override build numbers if --build-num was specified
-    if let Some(build_num_override) = build_data.build_num_override {
-        tracing::info!(
-            "Overriding build number to {} for all outputs",
-            build_num_override
-        );
-        for output in &mut outputs {
-            // Update the build number
-            output.recipe.build.number = Some(build_num_override);
-
-            // Extract the hash from the current build string and recompute with new build number
-            // Build string format is: {hash}_{build_number}
-            let current_build_string = output
-                .recipe
-                .build
-                .string
-                .as_resolved()
-                .expect("Build string should be resolved at this point");
-
-            // Split on last '_' to separate hash from build number
-            // TODO should we fail if we do not have a "standard" build string with build number at the end?
-            if let Some(last_underscore) = current_build_string.rfind('_') {
-                let hash_part = &current_build_string[..last_underscore];
-                let new_build_string = format!("{}_{}", hash_part, build_num_override);
-                output.recipe.build.string = BuildString::Resolved(new_build_string);
-            }
-        }
     }
 
     Ok(outputs)
@@ -1575,6 +1539,7 @@ pub async fn debug_recipe(
         allow_absolute_license_paths: false,
         exclude_newer: None,
         build_num_override: None,
+        build_string_prefix: None,
         markdown_summary: None,
     };
 

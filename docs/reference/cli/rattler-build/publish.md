@@ -100,8 +100,6 @@ e.g. `tar-bz2:<number>` (from 1 to 9) or `conda:<number>` (from -7 to
 :  Allow symlinks in packages on Windows (defaults to false - symlinks are forbidden on Windows)
 - <a id="arg---exclude-newer" href="#arg---exclude-newer">`--exclude-newer <EXCLUDE_NEWER>`</a>
 :  Exclude packages newer than this date from the solver, in RFC3339 format (e.g. 2024-03-15T12:00:00Z)
-- <a id="arg---build-num" href="#arg---build-num">`--build-num <BUILD_NUM>`</a>
-:  Override the build number for all outputs (defaults to the build number in the recipe)
 
 ## Publishing
 - <a id="arg---to" href="#arg---to">`--to <TO>`</a>
@@ -109,6 +107,8 @@ e.g. `tar-bz2:<number>` (from 1 to 9) or `conda:<number>` (from -7 to
 <br>**required**: `true`
 - <a id="arg---build-number" href="#arg---build-number">`--build-number <BUILD_NUMBER>`</a>
 :  Override the build number for all outputs. Use an absolute value (e.g., `--build-number=12`) or a relative bump (e.g., `--build-number=+1`). When using a relative bump, the highest build number from the target channel is used as the base
+- <a id="arg---build-string-prefix" href="#arg---build-string-prefix">`--build-string-prefix <BUILD_STRING_PREFIX>`</a>
+:  Prefix to prepend to the auto-generated build string (e.g. `--build-string-prefix my_prefix` produces `my_prefix_h1234_0`)
 - <a id="arg---force" href="#arg---force">`--force`</a>
 :  Force upload even if the package already exists (not recommended - may break lockfiles). Only works with S3, filesystem, Anaconda.org, and prefix.dev channels
 - <a id="arg---generate-attestation" href="#arg---generate-attestation">`--generate-attestation`</a>

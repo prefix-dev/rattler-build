@@ -176,10 +176,12 @@ async fn async_main() -> miette::Result<()> {
             print_completions(shell, &mut cmd);
             Ok(())
         }
-        Some(SubCommands::Build(build_args)) => {
-            let recipes = build_args.recipes.clone();
-            let recipe_dir = build_args.recipe_dir.clone();
-            let build_data = BuildData::from_opts_and_config(build_args, config);
+        Some(SubCommands::Build(build_only)) => {
+            let recipes = build_only.build.recipes.clone();
+            let recipe_dir = build_only.build.recipe_dir.clone();
+            let mut build_data = BuildData::from_opts_and_config(build_only.build, config);
+            build_data.build_num_override = build_only.build_num;
+            build_data.build_string_prefix = build_only.build_string_prefix;
 
             // Get all recipe paths and keep tempdir alive until end of the function
             let (recipe_paths, _temp_dir) = recipe_paths(recipes, recipe_dir.as_ref())?;

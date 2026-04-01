@@ -25,8 +25,9 @@ pub struct PyRenderConfig {
 #[pymethods]
 impl PyRenderConfig {
     /// Create a new render configuration with default settings
+    #[allow(clippy::too_many_arguments)]
     #[new]
-    #[pyo3(signature = (target_platform=None, build_platform=None, host_platform=None, experimental=false, recipe_path=None, extra_context=None))]
+    #[pyo3(signature = (target_platform=None, build_platform=None, host_platform=None, experimental=false, recipe_path=None, extra_context=None, build_string_prefix=None, build_number_override=None))]
     fn new(
         target_platform: Option<String>,
         build_platform: Option<String>,
@@ -34,6 +35,8 @@ impl PyRenderConfig {
         experimental: bool,
         recipe_path: Option<PathBuf>,
         extra_context: Option<Bound<'_, PyDict>>,
+        build_string_prefix: Option<String>,
+        build_number_override: Option<u64>,
     ) -> PyResult<Self> {
         let target_platform = target_platform
             .map(|p| p.parse::<Platform>())
@@ -83,6 +86,8 @@ impl PyRenderConfig {
                 build_platform,
                 host_platform,
                 os_env_var_keys,
+                build_string_prefix,
+                build_number_override,
             },
         })
     }

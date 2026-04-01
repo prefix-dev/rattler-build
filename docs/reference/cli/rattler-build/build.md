@@ -65,6 +65,10 @@ rattler-build build [OPTIONS]
 :  Continue building even if (one) of the packages fails to build. This is useful when building many packages with `--recipe-dir`.`
 
 ## Modifying result
+- <a id="arg---build-num" href="#arg---build-num">`--build-num <BUILD_NUM>`</a>
+:  Override the build number for all outputs (defaults to the build number in the recipe)
+- <a id="arg---build-string-prefix" href="#arg---build-string-prefix">`--build-string-prefix <BUILD_STRING_PREFIX>`</a>
+:  Prefix to prepend to the auto-generated build string (e.g. `--build-string-prefix my_prefix` produces `my_prefix_h1234_0`)
 - <a id="arg---package-format" href="#arg---package-format">`--package-format <PACKAGE_FORMAT>`</a>
 :  The package format to use for the build. Can be one of `tar-bz2` or
 `conda`. You can also add a compression level to the package format,
@@ -94,8 +98,6 @@ e.g. `tar-bz2:<number>` (from 1 to 9) or `conda:<number>` (from -7 to
 :  Allow symlinks in packages on Windows (defaults to false - symlinks are forbidden on Windows)
 - <a id="arg---exclude-newer" href="#arg---exclude-newer">`--exclude-newer <EXCLUDE_NEWER>`</a>
 :  Exclude packages newer than this date from the solver, in RFC3339 format (e.g. 2024-03-15T12:00:00Z)
-- <a id="arg---build-num" href="#arg---build-num">`--build-num <BUILD_NUM>`</a>
-:  Override the build number for all outputs (defaults to the build number in the recipe)
 
 ## Sandbox arguments
 - <a id="arg---sandbox" href="#arg---sandbox">`--sandbox`</a>
