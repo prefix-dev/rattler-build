@@ -678,7 +678,7 @@ should be found in the build prefix.
 The `build` and `host` prefixes are always separate when both are defined, or when
 `${{ compiler() }}` Jinja2 functions are used. The only time that `build` and `host`
 are merged is when the `host` section is absent, and no `${{ compiler() }}` Jinja2
-functions are used in `meta.yaml`.
+functions are used in `recipe.yaml`.
 
 ### Run
 
