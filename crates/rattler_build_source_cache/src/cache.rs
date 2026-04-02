@@ -126,7 +126,7 @@ impl SourceCache {
 
         // Handle submodules if needed (defaults to true)
         if source.submodules {
-            self.git_submodule_update(&repo_path).await?;
+            self.git_submodule_update(&repo_path, &source.url).await?;
         }
 
         // Handle LFS if needed
@@ -163,22 +163,106 @@ impl SourceCache {
     }
 
     /// Initialize and recursively update git submodules
-    async fn git_submodule_update(&self, repo_path: &Path) -> Result<(), CacheError> {
+    async fn git_submodule_update(
+        &self,
+        repo_path: &Path,
+        source_url: &url::Url,
+    ) -> Result<(), CacheError> {
+        // The checkout's origin remote points to the local bare cache
+        // database (set by `git clone --local`). Submodules with relative
+        // URLs would be resolved against that local path and fail.
+        //
+        // We resolve relative submodule URLs against the source URL
+        // and write the absolute URLs into the repo config.
+        self.resolve_submodule_urls(repo_path, source_url).await?;
+
         let output = tokio::process::Command::new("git")
             .current_dir(repo_path)
+            .args(["-c", "protocol.file.allow=always"])
             .arg("submodule")
             .arg("update")
             .arg("--init")
             .arg("--recursive")
             .output()
             .await
-            .map_err(|e| CacheError::Git(format!("Failed to update git submodules: {}", e)))?;
+            .map_err(|e| CacheError::Git(format!("failed to update git submodules: {}", e)))?;
 
         if !output.status.success() {
             return Err(CacheError::Git(format!(
-                "Git submodule update failed: {}",
+                "git submodule update failed: {}",
                 String::from_utf8_lossy(&output.stderr)
             )));
+        }
+
+        Ok(())
+    }
+
+    /// Resolve relative submodule URLs against the Ssource URL.
+    ///
+    /// Reads `.gitmodules`, finds entries with relative URLs (`./` or `../`),
+    /// resolves them against `source_url`, and writes the absolute URL into
+    /// the repo-level git config so that `git submodule update` uses it.
+    async fn resolve_submodule_urls(
+        &self,
+        repo_path: &Path,
+        source_url: &url::Url,
+    ) -> Result<(), CacheError> {
+        let gitmodules_path = repo_path.join(".gitmodules");
+        if !gitmodules_path.exists() {
+            return Ok(());
+        }
+
+        // List all submodule URLs from .gitmodules
+        let output = tokio::process::Command::new("git")
+            .current_dir(repo_path)
+            .args([
+                "config",
+                "--file",
+                ".gitmodules",
+                "--get-regexp",
+                r"submodule\..*\.url",
+            ])
+            .output()
+            .await
+            .map_err(|e| CacheError::Git(format!("failed to read .gitmodules: {}", e)))?;
+
+        if !output.status.success() {
+            // No submodule entries — nothing to resolve
+            return Ok(());
+        }
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        for line in stdout.lines() {
+            // Each line is: submodule.<name>.url <url>
+            let Some((key, submodule_url)) = line.split_once(' ') else {
+                continue;
+            };
+
+            if !submodule_url.starts_with("./") && !submodule_url.starts_with("../") {
+                continue;
+            }
+
+            let resolved = resolve_relative_url(source_url, submodule_url)?;
+
+            // Write the resolved URL into the repo config (not .gitmodules).
+            // `git submodule update --init` reads from the repo config,
+            // falling back to .gitmodules only for `submodule init`.
+            let output = tokio::process::Command::new("git")
+                .current_dir(repo_path)
+                .args(["config", key, &resolved])
+                .output()
+                .await
+                .map_err(|e| {
+                    CacheError::Git(format!("failed to set submodule url for {}: {}", key, e))
+                })?;
+
+            if !output.status.success() {
+                return Err(CacheError::Git(format!(
+                    "failed to set submodule url for {}: {}",
+                    key,
+                    String::from_utf8_lossy(&output.stderr)
+                )));
+            }
         }
 
         Ok(())
@@ -675,6 +759,31 @@ pub struct CacheStats {
 
 // Helper functions
 
+/// Resolve a relative submodule URL against a base URL.
+///
+/// This mirrors Cargo's `absolute_submodule_url`: if the base URL is
+/// parseable (http, https, file, ssh, etc.) we use `Url::join` which
+/// handles `../` normalization. The base URL gets a trailing `/`
+/// appended to its path so that `join` resolves relative to the
+/// directory rather than replacing the last path segment.
+fn resolve_relative_url(base: &url::Url, relative: &str) -> Result<String, CacheError> {
+    let mut base = base.clone();
+
+    // Ensure the base path ends with `/` so `join` treats it as a directory.
+    if !base.path().ends_with('/') {
+        base.set_path(&format!("{}/", base.path()));
+    }
+
+    let resolved = base.join(relative).map_err(|e| {
+        CacheError::Git(format!(
+            "failed to resolve submodule url '{}': {}",
+            relative, e
+        ))
+    })?;
+
+    Ok(resolved.to_string())
+}
+
 pub(crate) fn extract_filename_from_header(header_value: &str) -> Option<String> {
     for part in header_value.split(';') {
         let part = part.trim();
@@ -861,5 +970,29 @@ mod tests {
         assert!(is_archive("test.zip"));
         assert!(is_archive("test.7z"));
         assert!(!is_archive("test.txt"));
+    }
+
+    #[test]
+    fn test_resolve_relative_url() {
+        let base = url::Url::parse("https://github.com/org/main.git").unwrap();
+
+        // ../sibling.git resolves to sibling repo in same org
+        assert_eq!(
+            resolve_relative_url(&base, "../sibling.git").unwrap(),
+            "https://github.com/org/sibling.git"
+        );
+
+        // ./child.git resolves relative to the repo
+        assert_eq!(
+            resolve_relative_url(&base, "./child.git").unwrap(),
+            "https://github.com/org/main.git/child.git"
+        );
+
+        // file:// URLs work too
+        let file_base = url::Url::parse("file:///repos/main.git").unwrap();
+        assert_eq!(
+            resolve_relative_url(&file_base, "../sub.git").unwrap(),
+            "file:///repos/sub.git"
+        );
     }
 }
