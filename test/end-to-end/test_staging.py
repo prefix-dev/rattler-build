@@ -614,6 +614,34 @@ def test_staging_run_exports_ignore_by_name(
     )
 
 
+def test_staging_overlinking(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Test that overlinking checks pass for staging outputs via library name map.
+
+    When a package inherits from a staging cache, the staging cache's host
+    dependencies (e.g. zlib) are not installed in the host prefix during the
+    overlinking check of the inheriting package. The fix captures a library name
+    map at staging build time and uses it as a fallback in the overlinking check.
+
+    This test compiles a small C program that links against libz, packages it
+    via a staging output with overlinking_behavior: error, and verifies the
+    build succeeds (i.e. libz.so.1 is correctly attributed to zlib via the
+    staging library name map).
+    """
+    rattler_build.build(
+        recipes / "staging/staging-overlinking",
+        tmp_path,
+        extra_args=["--experimental"],
+    )
+
+    pkg = get_extracted_package(tmp_path, "staging-overlinking-test")
+    if platform.system() == "Windows":
+        assert (pkg / "bin/test_zlib.exe").exists()
+    else:
+        assert (pkg / "bin/test_zlib").exists()
+
+
 if __name__ == "__main__":
     # Allow running individual tests
     pytest.main([__file__, "-v"])

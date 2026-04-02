@@ -1,0 +1,54 @@
+# Test case: Overlinking check with staging outputs
+#
+# When a package inherits from a staging cache, the staging cache's host
+# dependencies (like zlib) are not installed in the prefix during the
+# overlinking check. The staging library name map must be used as a fallback
+# to resolve libraries to their providing packages.
+
+schema_version: 1
+
+recipe:
+  name: staging-overlinking-test
+  version: "1.0.0"
+
+build:
+  number: 0
+  dynamic_linking:
+    overlinking_behavior: error
+    missing_dso_allowlist:
+      - "libc*"
+
+outputs:
+  - staging:
+      name: compile-stage
+    requirements:
+      build:
+        - ${{ compiler('c') }}
+      host:
+        - zlib
+    build:
+      script:
+        - if: unix
+          then: |
+            cat > test_zlib.c << 'EOF'
+            #include <zlib.h>
+            #include <stdio.h>
+            int main() {
+                printf("zlib version: %s\n", zlibVersion());
+                return 0;
+            }
+            EOF
+            mkdir -p $PREFIX/bin
+            $CC $CFLAGS $LDFLAGS test_zlib.c -lz -o $PREFIX/bin/test_zlib
+        - if: win
+          then: |
+            echo int main() { return 0; } > test_zlib.c
+            mkdir %PREFIX%\bin
+            cl test_zlib.c /Fe%PREFIX%\bin\test_zlib.exe
+
+  - package:
+      name: staging-overlinking-test
+    inherit: compile-stage
+    build:
+      files:
+        - bin/**
