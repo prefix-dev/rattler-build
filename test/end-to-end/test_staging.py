@@ -253,7 +253,7 @@ def test_staging_with_variants(
 
 
 def test_multiple_staging_caches(
-    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, clean_path_on_win32
 ):
     """Test multiple independent staging outputs in one recipe.
 
@@ -327,7 +327,7 @@ def test_multiple_staging_caches(
 
 
 def test_staging_with_top_level_inherit(
-    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, clean_path_on_win32
 ):
     """Test mix of staging inheritance and top-level inheritance."""
     rattler_build.build(
@@ -397,7 +397,7 @@ def test_staging_work_dir_cache(
 
 
 def test_staging_complex_deps(
-    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, clean_path_on_win32
 ):
     """Test complex dependency scenarios with staging."""
     rattler_build.build(

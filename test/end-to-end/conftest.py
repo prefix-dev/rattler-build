@@ -7,13 +7,27 @@ from helpers import RattlerBuild
 from syrupy.extensions.json import JSONSnapshotExtension
 
 
+@pytest.fixture
+def clean_path_on_win32():
+    # On Windows, clear path to avoid hitting the cmd.exe
+    # line-length limit during VS compiler activation (vcvars64.bat).
+    if sys.platform == "win32":
+        original_path = os.environ.get("PATH", "")
+        try:
+            os.environ["PATH"] = ""
+            yield
+        finally:
+            os.environ["PATH"] = original_path
+
+
+
+
 def pytest_configure(config):
     # On Windows, use a short absolute path to avoid hitting the cmd.exe
     # line-length limit during VS compiler activation (vcvars64.bat).
     if sys.platform == "win32":
         worker_id = os.environ.get("PYTEST_XDIST_WORKER", "bld").replace("gw", "")
         config.option.basetemp = Path(f"C:/{worker_id}")
-        os.environ["PATH"] = ""
 
 
 @pytest.fixture
