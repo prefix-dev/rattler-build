@@ -375,10 +375,14 @@ pub async fn get_build_output(
     }
 
     // Get OS environment variable keys that can be overridden by variant config
-    let os_env_var_keys = env_vars::os_vars(&std::path::PathBuf::new(), &build_data.host_platform)
-        .keys()
-        .cloned()
-        .collect();
+    let os_env_var_keys = env_vars::os_vars(
+        &std::path::PathBuf::new(),
+        &build_data.host_platform,
+        build_data.env_isolation,
+    )
+    .keys()
+    .cloned()
+    .collect();
 
     let render_config = RenderConfig {
         target_platform: build_data.target_platform,
