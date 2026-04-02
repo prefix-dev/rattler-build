@@ -18,6 +18,8 @@ def clean_path_on_win32():
             yield
         finally:
             os.environ["PATH"] = original_path
+    else:
+        yield
 
 
 def pytest_configure(config):
