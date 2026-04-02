@@ -20,8 +20,6 @@ def clean_path_on_win32():
             os.environ["PATH"] = original_path
 
 
-
-
 def pytest_configure(config):
     # On Windows, use a short absolute path to avoid hitting the cmd.exe
     # line-length limit during VS compiler activation (vcvars64.bat).
