@@ -56,7 +56,49 @@ fn normalize_backup_paths(
     (original_path, modified_path)
 }
 
-fn parse_patch(patch: &Patch<[u8]>) -> HashSet<PathBuf> {
+/// Extract all file paths from a patch that should be used for strip level detection.
+/// Only includes files that already exist (i.e., are being modified or deleted),
+/// not files being newly created from /dev/null.
+fn parse_patch_existing_files(patch: &Patch<[u8]>) -> HashSet<PathBuf> {
+    let mut affected_files = HashSet::new();
+
+    for diff in patch {
+        let original_path = diff
+            .original()
+            .and_then(|p| std::str::from_utf8(p).ok())
+            .map(PathBuf::from);
+
+        let modified_path = diff
+            .modified()
+            .and_then(|p| std::str::from_utf8(p).ok())
+            .map(PathBuf::from);
+
+        let (normalized_orig, normalized_mod) =
+            normalize_backup_paths(original_path, modified_path);
+
+        // Only include files that the patch modifies or deletes. These already
+        // exist in the work directory, so they are reliable for strip level
+        // guessing. New files (original is None or /dev/null) don't exist yet,
+        // so a coincidental match at a different strip level would be incorrect.
+        let modifies_existing_file = normalized_orig
+            .as_ref()
+            .is_some_and(|p| p != Path::new("/dev/null"));
+
+        if modifies_existing_file {
+            if let Some(path) = normalized_orig {
+                affected_files.insert(path);
+            }
+            if let Some(path) = normalized_mod {
+                affected_files.insert(path);
+            }
+        }
+    }
+
+    affected_files
+}
+
+/// Extract all file paths mentioned in a patch (both new and existing files).
+fn parse_patch_all_files(patch: &Patch<[u8]>) -> HashSet<PathBuf> {
     let mut affected_files = HashSet::new();
 
     for diff in patch {
@@ -128,31 +170,37 @@ fn apply(base_image: &[u8], diff: &Diff<'_, [u8]>) -> Result<Vec<u8>, ApplyError
 // successfully applied, or returns and error if no such number could
 // be determined.
 fn guess_strip_level(patch: &Patch<[u8]>, work_dir: &Path) -> Result<usize, SourceError> {
-    let patched_files = parse_patch(patch);
+    // Only use files that the patch modifies/deletes (not newly created from /dev/null)
+    // for strip level detection. New files don't exist yet in the work directory,
+    // so using them would risk false matches at incorrect strip levels.
+    let existing_files = parse_patch_existing_files(patch);
 
-    let max_components = patched_files
-        .iter()
-        .map(|p| p.components().count())
-        .max()
-        .unwrap_or(0);
+    if !existing_files.is_empty() {
+        let max_components = existing_files
+            .iter()
+            .map(|p| p.components().count())
+            .max()
+            .unwrap_or(0);
 
-    for strip_level in 0..max_components {
-        // We check for _any_ path existing here. Sometimes patches reference
-        // files that are deleted (e.g. `foobar.orig`) and thus it's more robust to look for
-        // the first match in the affected files.
-        let any_paths_exist = patched_files.iter().any(|p| {
-            let path: PathBuf = p.components().skip(strip_level).collect();
-            // Skip empty paths - they can falsely match the work_dir itself
-            !path.as_os_str().is_empty() && work_dir.join(path).exists()
-        });
-        if any_paths_exist {
-            return Ok(strip_level);
+        for strip_level in 0..max_components {
+            // We check for _any_ path existing here. Sometimes patches reference
+            // files that are deleted (e.g. `foobar.orig`) and thus it's more robust
+            // to look for the first match in the affected files.
+            let any_paths_exist = existing_files.iter().any(|p| {
+                let path: PathBuf = p.components().skip(strip_level).collect();
+                // Skip empty paths - they can falsely match the work_dir itself
+                !path.as_os_str().is_empty() && work_dir.join(path).exists()
+            });
+            if any_paths_exist {
+                return Ok(strip_level);
+            }
         }
     }
 
     // No existing files matched (e.g. all files are new from /dev/null).
     // Check if paths have git-style a/b prefixes, which need strip level 1.
-    let has_ab_prefix = patched_files.iter().any(|p| {
+    let all_files = parse_patch_all_files(patch);
+    let has_ab_prefix = all_files.iter().any(|p| {
         p.components()
             .next()
             .and_then(|c| c.as_os_str().to_str())
@@ -432,7 +480,7 @@ mod tests {
             fs_err::read(patches_dir.join("test.patch")).expect("Could not read file contents");
         let patch = patch_from_bytes(&patch_file_content).expect("Failed to parse patch file");
 
-        let patched_paths = parse_patch(&patch);
+        let patched_paths = parse_patch_all_files(&patch);
         assert_eq!(patched_paths.len(), 1);
         assert!(patched_paths.contains(&PathBuf::from("text.md")));
 
@@ -440,7 +488,7 @@ mod tests {
             fs_err::read(patches_dir.join("0001-increase-minimum-cmake-version.patch"))
                 .expect("Could not read file contents");
         let patch = patch_from_bytes(&patch_file_content).expect("Failed to parse patch file");
-        let patched_paths = parse_patch(&patch);
+        let patched_paths = parse_patch_all_files(&patch);
         assert_eq!(patched_paths.len(), 1);
         assert!(patched_paths.contains(&PathBuf::from("CMakeLists.txt")));
     }
@@ -574,7 +622,7 @@ mod tests {
 
         // Let's also test what the old 'all' logic would have found
         // (This is what the function used to do before the PR)
-        let patched_files = parse_patch(&patch);
+        let patched_files = parse_patch_all_files(&patch);
         let max_components = patched_files
             .iter()
             .map(|p| p.components().count())
@@ -937,5 +985,65 @@ index 0000000..638dd9c
         let content = fs_err::read_to_string(&pyproject).unwrap();
         assert!(content.contains("[build-system]"));
         assert!(content.contains("setuptools"));
+    }
+
+    #[test]
+    fn test_git_format_patch_new_file_in_subdirectory_issue_2396() {
+        // Regression test for https://github.com/prefix-dev/rattler-build/discussions/2396
+        // A git format-patch creating a new file in a subdirectory (python/__init__.py)
+        // must create it in the correct subdirectory, not at the work root.
+        //
+        // The bug: when the source already has an __init__.py at the root,
+        // guess_strip_level finds it at strip_level=1 (stripping "python/" from
+        // "python/__init__.py" yields "__init__.py" which exists), so it returns 1.
+        // Then custom_patch_stripped_paths strips "python/" and the file is created
+        // at __init__.py instead of python/__init__.py.
+        let (tempdir, _) = setup_patch_test_dir();
+
+        let patch_content =
+            b"From faf9fb6712febcc4d868e8c5a7009ea564950cfe Mon Sep 17 00:00:00 2001
+From: Test User <test@example.com>
+Date: Tue, 31 Mar 2026 22:45:11 -0700
+Subject: [PATCH 3/3] add init.py
+
+---
+ python/__init__.py | 1 +
+ 1 file changed, 1 insertion(+)
+ create mode 100644 python/__init__.py
+
+diff --git a/python/__init__.py b/python/__init__.py
+new file mode 100644
+index 0000000..0f283b0
+--- /dev/null
++++ b/python/__init__.py
+@@ -0,0 +1 @@
++# ensure package
+--
+2.45.2
+";
+
+        let work_dir = tempdir.path().join("workdir");
+        let patches_dir = tempdir.path().join("patches");
+
+        // Simulate source code that already has an __init__.py at root level
+        fs_err::write(work_dir.join("__init__.py"), b"# root init").unwrap();
+
+        fs_err::write(patches_dir.join("add_init_py.patch"), patch_content).unwrap();
+
+        let result = apply_patches(
+            &[PathBuf::from("add_init_py.patch")],
+            &work_dir,
+            &patches_dir,
+            apply_patch_custom,
+        );
+        assert!(result.is_ok(), "Patch should not error: {:?}", result.err());
+
+        let init_py = work_dir.join("python/__init__.py");
+        assert!(
+            init_py.exists(),
+            "python/__init__.py should be created in the subdirectory, not at the work root"
+        );
+        let content = fs_err::read_to_string(&init_py).unwrap();
+        assert!(content.contains("# ensure package"));
     }
 }
