@@ -13,6 +13,7 @@ def pytest_configure(config):
     if sys.platform == "win32":
         worker_id = os.environ.get("PYTEST_XDIST_WORKER", "bld").replace("gw", "")
         config.option.basetemp = Path(f"C:/{worker_id}")
+        os.environ["PATH"] = ""
 
 
 @pytest.fixture
