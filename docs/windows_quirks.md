@@ -209,5 +209,3 @@ To reduce the risk of hitting these limits, keep build paths as **short as possi
 - `--output-dir` is short
 - `CARGO_TARGET_DIR` is short
 - `CARGO_HOME` is short
-
-Keeping these paths short helps avoid Windows command length and PATH expansion limits during toolchain activation and compilation.
