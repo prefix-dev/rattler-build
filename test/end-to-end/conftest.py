@@ -11,7 +11,7 @@ def pytest_configure(config):
     # On Windows, use a short absolute path to avoid hitting the cmd.exe
     # line-length limit during VS compiler activation (vcvars64.bat).
     if sys.platform == "win32":
-        worker_id = os.environ.get("PYTEST_XDIST_WORKER", "bld")
+        worker_id = os.environ.get("PYTEST_XDIST_WORKER", "bld").replace("gw", "")
         config.option.basetemp = Path(f"C:/{worker_id}")
 
 
