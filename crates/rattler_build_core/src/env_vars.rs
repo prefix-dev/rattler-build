@@ -386,9 +386,22 @@ pub fn vars(output: &Output, build_state: &str) -> HashMap<String, Option<String
     let timestamp_epoch_secs = output.build_configuration.timestamp.timestamp();
     insert!(vars, "SOURCE_DATE_EPOCH", timestamp_epoch_secs);
 
-    // Normalized environment variables for reproducible builds (unix-only, strict mode)
+    // Normalized environment variables for reproducible builds
     let env_isolation = output.build_configuration.env_isolation;
-    if !output.host_platform().platform.is_windows() {
+    if output.host_platform().platform.is_windows() {
+        match env_isolation {
+            EnvironmentIsolation::Strict => {
+                // Point USERPROFILE at the work directory so that tools like
+                // setuptools/distutils can resolve a home directory without
+                // leaking host paths.
+                insert!(vars, "USERPROFILE", directories.work_dir.to_string_lossy());
+            }
+            EnvironmentIsolation::CondaBuild => {
+                vars.insert("USERPROFILE".to_string(), std::env::var("USERPROFILE").ok());
+            }
+            EnvironmentIsolation::None => {}
+        }
+    } else {
         match env_isolation {
             EnvironmentIsolation::Strict => {
                 insert!(vars, "HOME", directories.work_dir.to_string_lossy());

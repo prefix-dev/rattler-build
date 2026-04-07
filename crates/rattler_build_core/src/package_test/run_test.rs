@@ -172,7 +172,15 @@ impl Tests {
 
         let platform = Platform::current();
         let mut env_vars = env_vars::os_vars(environment, &platform, config.env_isolation);
-        env_vars.retain(|key, _| key != ShellEnum::default().path_var(&platform));
+        // Only strip PATH when inheriting the full host environment (`None`),
+        // because the activation script will set it up and the host PATH is
+        // redundantly inherited. With `Strict`/`CondaBuild` isolation the
+        // subprocess starts from `env_clear()`, so PATH in env_vars is the
+        // *only* source of PATH – removing it leaves the subprocess without
+        // any PATH at all (e.g. `chcp` is not found on Windows).
+        if config.env_isolation == EnvironmentIsolation::None {
+            env_vars.retain(|key, _| key != ShellEnum::default().path_var(&platform));
+        }
         env_vars.extend(env_vars::test_vars(
             target_platform,
             build_platform,
@@ -984,7 +992,9 @@ async fn run_commands_test(
 
     let platform = Platform::current();
     let mut env_vars = env_vars::os_vars(&run_prefix, &platform, config.env_isolation);
-    env_vars.retain(|key, _| key != ShellEnum::default().path_var(&platform));
+    if config.env_isolation == EnvironmentIsolation::None {
+        env_vars.retain(|key, _| key != ShellEnum::default().path_var(&platform));
+    }
     env_vars.extend(env_vars::test_vars(
         target_platform,
         build_platform,
