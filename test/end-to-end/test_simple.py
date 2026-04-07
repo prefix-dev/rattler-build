@@ -3184,10 +3184,16 @@ def test_target_platform_in_variant_config_warning(
 def test_c_compilation(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     rattler_build.build(recipes / "c_compilation", tmp_path)
     pkg = get_extracted_package(tmp_path, "c_compilation")
-    assert (pkg / "bin/hello").exists()
+    if platform.system() == "Windows":
+        assert (pkg / "bin/hello.exe").exists()
+    else:
+        assert (pkg / "bin/hello").exists()
 
 
 def test_rust_compilation(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     rattler_build.build(recipes / "rust_compilation", tmp_path)
     pkg = get_extracted_package(tmp_path, "rust_compilation")
-    assert (pkg / "bin/hello-rust").exists()
+    if platform.system() == "Windows":
+        assert (pkg / "bin/hello-rust.exe").exists()
+    else:
+        assert (pkg / "bin/hello-rust").exists()

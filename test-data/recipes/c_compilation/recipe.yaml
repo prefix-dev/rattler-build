@@ -14,6 +14,7 @@ build:
       - if: win
         then: |
           copy %RECIPE_DIR%\hello.c .
+          if not exist %PREFIX%\bin mkdir %PREFIX%\bin
           cl.exe hello.c /Fe:%PREFIX%\bin\hello.exe
 
 requirements:

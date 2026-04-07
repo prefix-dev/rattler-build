@@ -780,11 +780,14 @@ async fn run_python_test_inner(
         ..Script::default()
     };
 
+    let platform = Platform::current();
+    let test_env_vars = env_vars::os_vars(&test_prefix, &platform, config.env_isolation);
+
     let test_dir = prefix.join("test");
     fs::create_dir_all(&test_dir)?;
     script
         .run_script(
-            Default::default(),
+            test_env_vars.clone(),
             &test_dir,
             path,
             &test_prefix,
@@ -808,7 +811,7 @@ async fn run_python_test_inner(
         };
         script
             .run_script(
-                Default::default(),
+                test_env_vars,
                 path,
                 path,
                 &test_prefix,
@@ -887,11 +890,14 @@ async fn run_perl_test(
         ..Script::default()
     };
 
+    let platform = Platform::current();
+    let test_env_vars = env_vars::os_vars(&test_prefix, &platform, config.env_isolation);
+
     let test_folder = prefix.join("test_files");
     fs::create_dir_all(&test_folder)?;
     script
         .run_script(
-            Default::default(),
+            test_env_vars,
             &test_folder,
             path,
             &test_prefix,
@@ -1205,11 +1211,14 @@ async fn run_r_test(
         ..Script::default()
     };
 
+    let platform = Platform::current();
+    let test_env_vars = env_vars::os_vars(&test_prefix, &platform, config.env_isolation);
+
     let test_folder = prefix.join("test_files");
     fs::create_dir_all(&test_folder)?;
     script
         .run_script(
-            Default::default(),
+            test_env_vars,
             &test_folder,
             path,
             &test_prefix,
@@ -1283,11 +1292,14 @@ async fn run_ruby_test(
         ..Script::default()
     };
 
+    let platform = Platform::current();
+    let test_env_vars = env_vars::os_vars(&test_prefix, &platform, config.env_isolation);
+
     let test_folder = prefix.join("test_files");
     fs::create_dir_all(&test_folder)?;
     script
         .run_script(
-            Default::default(),
+            test_env_vars,
             &test_folder,
             path,
             &test_prefix,
