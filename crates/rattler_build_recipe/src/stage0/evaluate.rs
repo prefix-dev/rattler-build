@@ -897,6 +897,7 @@ pub(crate) fn is_free_matchspec(spec: &rattler_conda_types::MatchSpec) -> bool {
         license,
         condition,
         track_features,
+        license_family,
     } = spec;
 
     name.as_exact().is_some()
@@ -912,6 +913,7 @@ pub(crate) fn is_free_matchspec(spec: &rattler_conda_types::MatchSpec) -> bool {
         && extras.is_none()
         && url.is_none()
         && license.is_none()
+        && license_family.is_none()
         && condition.is_none()
         && track_features.is_none()
 }
