@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.6](https://github.com/prefix-dev/rattler-build/compare/rattler_build_recipe-v0.1.5...rattler_build_recipe-v0.1.6) - 2026-04-13
+
+### Added
+
+- Allow for build_string_prefix passed into packages ([#2384](https://github.com/prefix-dev/rattler-build/pull/2384))
+
+### Fixed
+
+- reset origin URL and sync submodules before update ([#2401](https://github.com/prefix-dev/rattler-build/pull/2401))
+- integers in skip/match conditions from variants.yaml ([#2395](https://github.com/prefix-dev/rattler-build/pull/2395))
+
 ## [0.1.5](https://github.com/prefix-dev/rattler-build/compare/rattler_build_recipe-v0.1.4...rattler_build_recipe-v0.1.5) - 2026-03-31
 
 ### Other

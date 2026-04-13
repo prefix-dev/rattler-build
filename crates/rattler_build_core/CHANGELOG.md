@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.4](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.3...rattler_build_core-v0.2.4) - 2026-04-13
+
+### Added
+
+- enforce clean build environment with configurable isolation modes ([#2372](https://github.com/prefix-dev/rattler-build/pull/2372))
+
+### Fixed
+
+- resolve overlinking false positives for staging outputs ([#2402](https://github.com/prefix-dev/rattler-build/pull/2402))
+- exclude new files from strip level guessing in patch application ([#2400](https://github.com/prefix-dev/rattler-build/pull/2400))
+
 ## [0.2.3](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.2...rattler_build_core-v0.2.3) - 2026-03-31
 
 ### Fixed
