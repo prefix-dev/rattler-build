@@ -4898,16 +4898,15 @@ build:
 
     #[test]
     fn test_default_filter_with_undefined_fallback() {
-        // `foo | default(bar)` — both foo and bar are undefined.
-        // Ideally this should error because `bar` is itself undefined, but minijinja
-        // doesn't propagate the error from the fallback argument. Parked for now.
+        // `foo | default(bar)` - both foo and bar are undefined. The fallback
+        // argument must itself be defined, so this errors in Strict mode.
         let ctx = EvaluationContext::new();
 
         let result = render_template_to_variable(r#"${{ foo | default(bar) }}"#, &ctx, None);
 
         assert!(
-            result.is_ok(),
-            "minijinja doesn't error on undefined fallback in default filter (known bug)"
+            result.is_err(),
+            "undefined fallback argument to default filter must error in Strict mode"
         );
     }
 
@@ -5027,28 +5026,21 @@ package:
     }
 
     #[test]
-    fn test_strict_undefined_in_concatenation_does_not_error() {
-        // `~` operator stringifies undefined to "" without going through emit,
-        // so Strict mode does not catch this.
+    fn test_strict_undefined_in_concatenation_errors() {
+        // `~` operator on undefined values errors in Strict mode.
         let ctx = EvaluationContext::new();
         let r = render_template("${{ x ~ y }}", &ctx, None);
-        assert!(
-            r.is_ok(),
-            "concat of undefined does not error in Strict: {:?}",
-            r.err()
-        );
+        assert!(r.is_err(), "concat of undefined must error in Strict mode");
     }
 
     #[test]
-    fn test_strict_undefined_in_comparison_does_not_error() {
-        // `==` on undefined values doesn't go through emit,
-        // so Strict mode does not catch this.
+    fn test_strict_undefined_in_comparison_errors() {
+        // `==` on undefined values errors in Strict mode.
         let ctx = EvaluationContext::new();
         let r = render_template(r#"${{ x == "foo" }}"#, &ctx, None);
         assert!(
-            r.is_ok(),
-            "comparison with undefined does not error in Strict: {:?}",
-            r.err()
+            r.is_err(),
+            "comparison with undefined must error in Strict mode"
         );
     }
 
