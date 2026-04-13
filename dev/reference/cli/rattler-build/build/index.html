@@ -2882,6 +2882,13 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 </li>
 <li>
 <dl>
+<dt><a id="arg---env-isolation" href="#arg---env-isolation"><code>--env-isolation &lt;ENV_ISOLATION&gt;</code></a></dt>
+<dd>Environment isolation mode for build scripts. <code>strict</code> (default): clean environment with normalized locale, HOME, USER etc. <code>conda-build</code>: match conda-build behavior (forward CFLAGS, LDFLAGS, LANG, HOME etc.) <code>none</code>: inherit the entire host environment
+<br><strong>default</strong>: <code>strict</code></dd>
+</dl>
+</li>
+<li>
+<dl>
 <dt><a id="arg---output-dir" href="#arg---output-dir"><code>--output-dir &lt;OUTPUT_DIR&gt;</code></a></dt>
 <dd>Output directory for build artifacts.
 <br><strong>env</strong>: <code>CONDA_BLD_PATH</code></dd>

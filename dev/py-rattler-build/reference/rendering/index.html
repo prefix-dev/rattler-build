@@ -5856,7 +5856,8 @@ and is used automatically by :meth:<code>run_build</code>.</p>
 </span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">package_format</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
 </span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">no_include_recipe</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
 </span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">exclude_newer</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="p">)</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="n">env_isolation</span><span class="o">=</span><span class="n">EnvironmentIsolation</span><span class="o">.</span><span class="n">STRICT</span><span class="p">,</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="p">)</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">
@@ -6008,6 +6009,22 @@ Defaults to <code>&lt;recipe_dir&gt;/output</code>.</p>
             </td>
             <td>
                   <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>env_isolation</code>
+            </td>
+            <td>
+                  <code><span title="rattler_build._rattler_build.EnvironmentIsolation">EnvironmentIsolation</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Environment isolation mode. Defaults to <code>EnvironmentIsolation.STRICT</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code><span title="rattler_build._rattler_build.EnvironmentIsolation.STRICT">STRICT</span></code>
             </td>
           </tr>
       </tbody>
