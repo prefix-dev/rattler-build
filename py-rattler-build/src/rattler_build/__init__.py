@@ -3,6 +3,7 @@ from rattler_build._rattler_build import (
     BuildError,
     ChannelError,
     ChannelPriorityError,
+    EnvironmentIsolation,
     IoError,
     JsonError,
     PackageFormatError,
@@ -91,7 +92,8 @@ __all__ = [
     "generate_cran_recipe",
     "generate_cpan_recipe",
     "generate_luarocks_recipe",
-    # Configuration
+    # Build configuration
+    "EnvironmentIsolation",
     "BuildResult",
     "JinjaConfig",
     "VariantConfig",

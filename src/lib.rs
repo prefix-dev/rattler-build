@@ -375,10 +375,14 @@ pub async fn get_build_output(
     }
 
     // Get OS environment variable keys that can be overridden by variant config
-    let os_env_var_keys = env_vars::os_vars(&std::path::PathBuf::new(), &build_data.host_platform)
-        .keys()
-        .cloned()
-        .collect();
+    let os_env_var_keys = env_vars::os_vars(
+        &std::path::PathBuf::new(),
+        &build_data.host_platform,
+        build_data.env_isolation,
+    )
+    .keys()
+    .cloned()
+    .collect();
 
     let render_config = RenderConfig {
         target_platform: build_data.target_platform,
@@ -546,6 +550,7 @@ pub async fn get_build_output(
                 ),
                 store_recipe: !build_data.no_include_recipe,
                 force_colors: build_data.color_build_log && console::colors_enabled(),
+                env_isolation: build_data.env_isolation,
                 sandbox_config: build_data.sandbox_configuration.clone(),
                 exclude_newer: build_data.exclude_newer,
             },
@@ -753,6 +758,7 @@ pub async fn run_build_from_args(
                         test_index: None,
                         output_dir: output.build_configuration.directories.output_dir.clone(),
                         exclude_newer: output.build_configuration.exclude_newer,
+                        env_isolation: output.build_configuration.env_isolation,
                     },
                     None,
                 )
@@ -914,6 +920,7 @@ pub async fn run_test(
         tool_configuration: tool_config,
         output_dir: test_data.common.output_dir,
         exclude_newer: None,
+        env_isolation: rattler_build_script::EnvironmentIsolation::default(),
     };
 
     let package_name = package_file
@@ -1530,6 +1537,7 @@ pub async fn debug_recipe(
         io_concurrency_limit: num_cpus::get(),
         no_include_recipe: false,
         color_build_log: true,
+        env_isolation: rattler_build_script::EnvironmentIsolation::default(),
         skip_existing: SkipExisting::None,
         noarch_build_platform: None,
         extra_meta: None,

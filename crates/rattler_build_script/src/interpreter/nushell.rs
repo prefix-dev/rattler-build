@@ -124,6 +124,9 @@ impl Interpreter for NuShellInterpreter {
             &cmd_args,
             &args.work_dir,
             &args.replacements("$((var))"),
+            &args.env_vars,
+            &args.secrets,
+            args.env_isolation,
             None,
         )
         .await?;

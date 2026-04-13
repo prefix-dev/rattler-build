@@ -12,7 +12,7 @@ use rattler_build_recipe::stage1::{
     TestType,
     tests::{CommandsTest, DownstreamTest, PerlTest, PythonTest, PythonVersion, RTest, RubyTest},
 };
-use rattler_build_script::{Script, ScriptContent};
+use rattler_build_script::{EnvironmentIsolation, Script, ScriptContent};
 use rattler_build_types::NormalizedKey;
 use rattler_conda_types::{
     Channel, ChannelUrl, MatchSpec, ParseStrictness, Platform,
@@ -171,8 +171,16 @@ impl Tests {
             .unwrap_or(target_platform);
 
         let platform = Platform::current();
-        let mut env_vars = env_vars::os_vars(environment, &platform);
-        env_vars.retain(|key, _| key != ShellEnum::default().path_var(&platform));
+        let mut env_vars = env_vars::os_vars(environment, &platform, config.env_isolation);
+        // Only strip PATH when inheriting the full host environment (`None`),
+        // because the activation script will set it up and the host PATH is
+        // redundantly inherited. With `Strict`/`CondaBuild` isolation the
+        // subprocess starts from `env_clear()`, so PATH in env_vars is the
+        // *only* source of PATH – removing it leaves the subprocess without
+        // any PATH at all (e.g. `chcp` is not found on Windows).
+        if config.env_isolation == EnvironmentIsolation::None {
+            env_vars.retain(|key, _| key != ShellEnum::default().path_var(&platform));
+        }
         env_vars.extend(env_vars::test_vars(
             target_platform,
             build_platform,
@@ -215,6 +223,7 @@ impl Tests {
                         None,
                         None::<fn(&str) -> Result<String, String>>,
                         None,
+                        config.env_isolation,
                     )
                     .await
                     .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -235,6 +244,7 @@ impl Tests {
                         None,
                         None::<fn(&str) -> Result<String, String>>,
                         None,
+                        config.env_isolation,
                     )
                     .await
                     .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -305,6 +315,8 @@ pub struct TestConfiguration {
     pub output_dir: PathBuf,
     /// Exclude packages newer than this date from the solver
     pub exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
+    /// The environment isolation mode for test scripts
+    pub env_isolation: EnvironmentIsolation,
 }
 
 fn env_vars_from_package(index_json: &IndexJson) -> HashMap<String, String> {
@@ -768,17 +780,21 @@ async fn run_python_test_inner(
         ..Script::default()
     };
 
+    let platform = Platform::current();
+    let test_env_vars = env_vars::os_vars(&test_prefix, &platform, config.env_isolation);
+
     let test_dir = prefix.join("test");
     fs::create_dir_all(&test_dir)?;
     script
         .run_script(
-            Default::default(),
+            test_env_vars.clone(),
             &test_dir,
             path,
             &test_prefix,
             None,
             None::<fn(&str) -> Result<String, String>>,
             None,
+            config.env_isolation,
         )
         .await
         .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -795,13 +811,14 @@ async fn run_python_test_inner(
         };
         script
             .run_script(
-                Default::default(),
+                test_env_vars,
                 path,
                 path,
                 &test_prefix,
                 None,
                 None::<fn(&str) -> Result<String, String>>,
                 None,
+                config.env_isolation,
             )
             .await
             .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -873,17 +890,21 @@ async fn run_perl_test(
         ..Script::default()
     };
 
+    let platform = Platform::current();
+    let test_env_vars = env_vars::os_vars(&test_prefix, &platform, config.env_isolation);
+
     let test_folder = prefix.join("test_files");
     fs::create_dir_all(&test_folder)?;
     script
         .run_script(
-            Default::default(),
+            test_env_vars,
             &test_folder,
             path,
             &test_prefix,
             None,
             None::<fn(&str) -> Result<String, String>>,
             None,
+            config.env_isolation,
         )
         .await
         .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -976,8 +997,10 @@ async fn run_commands_test(
         .unwrap_or(target_platform);
 
     let platform = Platform::current();
-    let mut env_vars = env_vars::os_vars(&run_prefix, &platform);
-    env_vars.retain(|key, _| key != ShellEnum::default().path_var(&platform));
+    let mut env_vars = env_vars::os_vars(&run_prefix, &platform, config.env_isolation);
+    if config.env_isolation == EnvironmentIsolation::None {
+        env_vars.retain(|key, _| key != ShellEnum::default().path_var(&platform));
+    }
     env_vars.extend(env_vars::test_vars(
         target_platform,
         build_platform,
@@ -1015,6 +1038,7 @@ async fn run_commands_test(
             build_prefix.as_ref(),
             None::<fn(&str) -> Result<String, String>>,
             None,
+            config.env_isolation,
         )
         .await
         .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -1187,17 +1211,21 @@ async fn run_r_test(
         ..Script::default()
     };
 
+    let platform = Platform::current();
+    let test_env_vars = env_vars::os_vars(&test_prefix, &platform, config.env_isolation);
+
     let test_folder = prefix.join("test_files");
     fs::create_dir_all(&test_folder)?;
     script
         .run_script(
-            Default::default(),
+            test_env_vars,
             &test_folder,
             path,
             &test_prefix,
             None,
             None::<fn(&str) -> Result<String, String>>,
             None,
+            config.env_isolation,
         )
         .await
         .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -1264,17 +1292,21 @@ async fn run_ruby_test(
         ..Script::default()
     };
 
+    let platform = Platform::current();
+    let test_env_vars = env_vars::os_vars(&test_prefix, &platform, config.env_isolation);
+
     let test_folder = prefix.join("test_files");
     fs::create_dir_all(&test_folder)?;
     script
         .run_script(
-            Default::default(),
+            test_env_vars,
             &test_folder,
             path,
             &test_prefix,
             None,
             None::<fn(&str) -> Result<String, String>>,
             None,
+            config.env_isolation,
         )
         .await
         .map_err(|e| TestError::TestFailed(e.to_string()))?;

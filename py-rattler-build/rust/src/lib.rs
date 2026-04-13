@@ -20,7 +20,7 @@ mod tracing_subscriber;
 mod upload;
 mod variant_config;
 
-use build::BuildResultPy;
+use build::{BuildResultPy, PyEnvironmentIsolation};
 use error::RattlerBuildError;
 use jinja_config::PyJinjaConfig;
 
@@ -67,6 +67,7 @@ fn rattler_build<'py>(_py: Python<'py>, m: Bound<'py, PyModule>) -> PyResult<()>
     m.add_function(wrap_pyfunction!(upload::upload_packages_to_conda_forge_py, &m).unwrap())?;
     m.add_class::<PyJinjaConfig>()?;
     m.add_class::<BuildResultPy>()?;
+    m.add_class::<PyEnvironmentIsolation>()?;
 
     // Register all submodules
     stage0::register_stage0_module(_py, &m)?;

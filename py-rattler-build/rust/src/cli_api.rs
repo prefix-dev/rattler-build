@@ -12,6 +12,7 @@ use ::rattler_build::{
 };
 use clap::ValueEnum;
 use pyo3::prelude::*;
+use rattler_build_script::EnvironmentIsolation;
 use rattler_conda_types::{NamedChannelOrUrl, Platform};
 use rattler_config::config::{ConfigBase, build::PackageFormatAndCompression};
 
@@ -132,6 +133,7 @@ pub fn build_recipes_py(
         noarch_build_platform,
         None, // extra meta
         None, // sandbox configuration
+        EnvironmentIsolation::default(),
         ContinueOnFailure::from(continue_on_failure),
         error_prefix_in_binary,
         allow_symlinks_on_windows,

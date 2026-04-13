@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use std::{collections::HashMap, env};
 
 use rattler_build_jinja::Variable;
+use rattler_build_script::EnvironmentIsolation;
 use rattler_build_types::NormalizedKey;
 use rattler_conda_types::{Platform, RepoDataRecord};
 use std::collections::BTreeMap;
@@ -192,13 +193,16 @@ pub fn language_vars(output: &Output) -> HashMap<String, Option<String>> {
 /// Variables:
 /// - CPU_COUNT: Number of CPUs
 /// - SHLIB_EXT: Shared library extension for platform (e.g. Linux -> .so, Windows -> .dll, macOS -> .dylib)
+/// - LANG: Normalized to C.UTF-8 in strict mode, forwarded from host otherwise
+/// - LC_ALL: Normalized to C.UTF-8 in strict mode, forwarded from host otherwise
 ///
 /// Forwards the following environment variables:
 /// - PATH: Path where executables are found
-/// - LANG: Language (e.g. en_US.UTF-8)
-/// - LC_ALL: Language (e.g. en_US.UTF-8)
-/// - MAKEFLAGS: Make flags (e.g. -j4)
-pub fn os_vars(prefix: &Path, platform: &Platform) -> HashMap<String, Option<String>> {
+pub fn os_vars(
+    prefix: &Path,
+    platform: &Platform,
+    env_isolation: EnvironmentIsolation,
+) -> HashMap<String, Option<String>> {
     let mut vars = HashMap::new();
 
     let path_var = if platform.is_windows() {
@@ -212,9 +216,20 @@ pub fn os_vars(prefix: &Path, platform: &Platform) -> HashMap<String, Option<Str
         "CPU_COUNT",
         env::var("CPU_COUNT").unwrap_or_else(|_| num_cpus::get().to_string())
     );
-    vars.insert("LANG".to_string(), env::var("LANG").ok());
-    vars.insert("LC_ALL".to_string(), env::var("LC_ALL").ok());
-    vars.insert("MAKEFLAGS".to_string(), env::var("MAKEFLAGS").ok());
+
+    match env_isolation {
+        EnvironmentIsolation::Strict => {
+            // Normalize locale for reproducible builds
+            insert!(vars, "LANG", "C.UTF-8");
+            insert!(vars, "LC_ALL", "C.UTF-8");
+        }
+        EnvironmentIsolation::CondaBuild | EnvironmentIsolation::None => {
+            // Forward locale from host (conda-build behavior)
+            vars.insert("LANG".to_string(), env::var("LANG").ok());
+            vars.insert("LC_ALL".to_string(), env::var("LC_ALL").ok());
+            vars.insert("MAKEFLAGS".to_string(), env::var("MAKEFLAGS").ok());
+        }
+    }
 
     let shlib_ext = if platform.is_windows() {
         ".dll"
@@ -234,7 +249,11 @@ pub fn os_vars(prefix: &Path, platform: &Platform) -> HashMap<String, Option<Str
     } else if platform.is_osx() {
         vars.extend(macos::env::default_env_vars(prefix, platform));
     } else if platform.is_linux() {
-        vars.extend(linux::env::default_env_vars(prefix, platform));
+        vars.extend(linux::env::default_env_vars(
+            prefix,
+            platform,
+            env_isolation,
+        ));
     }
 
     vars
@@ -366,6 +385,43 @@ pub fn vars(output: &Output, build_state: &str) -> HashMap<String, Option<String
     // this value will be taken from the previous package for rebuild purposes
     let timestamp_epoch_secs = output.build_configuration.timestamp.timestamp();
     insert!(vars, "SOURCE_DATE_EPOCH", timestamp_epoch_secs);
+
+    // Normalized environment variables for reproducible builds
+    let env_isolation = output.build_configuration.env_isolation;
+    if output.host_platform().platform.is_windows() {
+        match env_isolation {
+            EnvironmentIsolation::Strict => {
+                // Point USERPROFILE at the work directory so that tools like
+                // setuptools/distutils can resolve a home directory without
+                // leaking host paths.
+                insert!(vars, "USERPROFILE", directories.work_dir.to_string_lossy());
+            }
+            EnvironmentIsolation::CondaBuild => {
+                vars.insert("USERPROFILE".to_string(), std::env::var("USERPROFILE").ok());
+            }
+            EnvironmentIsolation::None => {}
+        }
+    } else {
+        match env_isolation {
+            EnvironmentIsolation::Strict => {
+                insert!(vars, "HOME", directories.work_dir.to_string_lossy());
+                insert!(vars, "USER", "rattler");
+                insert!(vars, "SHELL", "/bin/bash");
+                insert!(vars, "EDITOR", "/bin/false");
+                insert!(vars, "TERM", "xterm-256color");
+            }
+            EnvironmentIsolation::CondaBuild => {
+                // conda-build forwards HOME from host
+                vars.insert(
+                    "HOME".to_string(),
+                    Some(std::env::var("HOME").unwrap_or_else(|_| "UNKNOWN".to_string())),
+                );
+            }
+            EnvironmentIsolation::None => {
+                // No normalization; HOME will be inherited from host process
+            }
+        }
+    }
 
     vars
 }

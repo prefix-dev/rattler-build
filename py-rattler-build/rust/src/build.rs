@@ -8,6 +8,7 @@ use ::rattler_build::{
 };
 use pyo3::prelude::*;
 use rattler_build_recipe::stage1::HashInfo;
+use rattler_build_script::EnvironmentIsolation;
 use rattler_build_types::NormalizedKey;
 use rattler_conda_types::{ChannelUrl, NamedChannelOrUrl, Platform};
 use rattler_config::config::build::PackageFormatAndCompression;
@@ -22,6 +23,36 @@ use crate::render;
 use crate::run_async_task;
 use crate::tool_config;
 use crate::tracing_subscriber;
+
+/// Controls how the build subprocess environment is constructed.
+///
+/// - ``STRICT`` (default): Clean environment with only explicitly set build
+///   variables and a minimal passthrough whitelist (SSL certs, SSH agent,
+///   proxies). Maximum reproducibility.
+/// - ``CONDA_BUILD``: Match conda-build behavior — forward CFLAGS, CXXFLAGS,
+///   LDFLAGS, MAKEFLAGS, LANG, LC_ALL, and HOME from the host.
+/// - ``NONE``: Inherit the entire host environment. Least reproducible but
+///   useful for debugging.
+#[pyclass(name = "EnvironmentIsolation", eq, eq_int, from_py_object)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PyEnvironmentIsolation {
+    #[pyo3(name = "STRICT")]
+    Strict,
+    #[pyo3(name = "CONDA_BUILD")]
+    CondaBuild,
+    #[pyo3(name = "NONE")]
+    None,
+}
+
+impl From<PyEnvironmentIsolation> for EnvironmentIsolation {
+    fn from(value: PyEnvironmentIsolation) -> Self {
+        match value {
+            PyEnvironmentIsolation::Strict => EnvironmentIsolation::Strict,
+            PyEnvironmentIsolation::CondaBuild => EnvironmentIsolation::CondaBuild,
+            PyEnvironmentIsolation::None => EnvironmentIsolation::None,
+        }
+    }
+}
 
 /// Result of a successful package build
 #[pyclass(name = "BuildResult", from_py_object)]
@@ -89,6 +120,7 @@ pub(crate) fn output_from_rendered_variant(
     no_include_recipe: bool,
     recipe_path: Option<&Path>,
     exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
+    env_isolation: EnvironmentIsolation,
     extra_subpackages: BTreeMap<rattler_conda_types::PackageName, PackageIdentifier>,
 ) -> Result<Output, RattlerBuildError> {
     let timestamp = chrono::Utc::now();
@@ -189,6 +221,7 @@ pub(crate) fn output_from_rendered_variant(
             ),
             store_recipe: !effective_no_include_recipe,
             force_colors: false,
+            env_isolation,
             sandbox_config: None,
             exclude_newer,
         },
@@ -223,6 +256,7 @@ pub fn build_rendered_variant_py(
     package_format: Option<String>,
     no_include_recipe: bool,
     exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
+    env_isolation: PyEnvironmentIsolation,
     sibling_variants: Vec<render::PyRenderedVariant>,
 ) -> PyResult<BuildResultPy> {
     let tool_config = tool_config.inner;
@@ -231,6 +265,8 @@ pub fn build_rendered_variant_py(
         .map(|p| PackageFormatAndCompression::from_str(&p))
         .transpose()
         .map_err(|e| RattlerBuildError::PackageFormat(e.to_string()))?;
+
+    let env_isolation: EnvironmentIsolation = env_isolation.into();
 
     let channels: Vec<NamedChannelOrUrl> = channels
         .iter()
@@ -265,6 +301,7 @@ pub fn build_rendered_variant_py(
         no_include_recipe,
         recipe_path.as_deref(),
         exclude_newer,
+        env_isolation,
         extra_subpackages,
     )?;
 
