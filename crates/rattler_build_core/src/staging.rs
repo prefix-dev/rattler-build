@@ -22,6 +22,7 @@ use crate::{
     env_vars,
     metadata::{Output, build_reindexed_channels},
     packaging::Files,
+    post_process::package_nature::{LibraryNameMap, PrefixInfo},
     render::resolved_dependencies::{
         FinalizedDependencies, RunExportsDownload, install_environments, resolve_dependencies,
     },
@@ -71,6 +72,13 @@ pub struct StagingCacheMetadata {
 
     /// The variant configuration that was used
     pub variant: BTreeMap<NormalizedKey, Variable>,
+
+    /// Mapping from shared library filenames to the package that provides them.
+    /// Captured at staging build time while conda-meta is still present, used
+    /// during overlinking checks as a fallback when these packages are not
+    /// physically installed in the host prefix.
+    #[serde(default)]
+    pub library_name_map: LibraryNameMap,
 }
 
 impl Output {
@@ -140,7 +148,8 @@ impl Output {
     /// 2. If yes, restore the cached files to the prefix
     /// 3. If no, build the staging cache and save it
     ///
-    /// Returns the finalized dependencies and sources from the staging cache
+    /// Returns the finalized dependencies, sources, and library name map from
+    /// the staging cache.
     pub async fn build_or_restore_staging_cache(
         &self,
         staging: &StagingCache,
@@ -149,6 +158,7 @@ impl Output {
         (
             FinalizedDependencies,
             Vec<rattler_build_recipe::stage1::Source>,
+            LibraryNameMap,
         ),
         miette::Error,
     > {
@@ -215,6 +225,7 @@ impl Output {
         (
             FinalizedDependencies,
             Vec<rattler_build_recipe::stage1::Source>,
+            LibraryNameMap,
         ),
         miette::Error,
     > {
@@ -251,6 +262,13 @@ impl Output {
         install_environments(self, &finalized_dependencies, tool_configuration)
             .await
             .into_diagnostic()?;
+
+        // Capture the library name map while conda-meta still exists in the
+        // prefix. This maps shared library filenames to their providing
+        // packages so overlinking checks can attribute libraries even after
+        // the staging cache's host deps are no longer installed.
+        let prefix_info = PrefixInfo::from_prefix(self.prefix()).into_diagnostic()?;
+        let library_name_map = LibraryNameMap::from_prefix_info(&prefix_info);
 
         // Run the build script
         let target_platform = self.build_configuration.target_platform;
@@ -374,6 +392,7 @@ impl Output {
             work_dir_files: copied_work_dir.copied_paths().to_vec(),
             prefix: self.prefix().to_path_buf(),
             variant: staging.used_variant.clone(),
+            library_name_map: library_name_map.clone(),
         };
 
         let metadata_json = serde_json::to_string_pretty(&metadata).into_diagnostic()?;
@@ -385,7 +404,7 @@ impl Output {
             metadata.work_dir_files.len()
         );
 
-        Ok((finalized_dependencies, finalized_sources))
+        Ok((finalized_dependencies, finalized_sources, library_name_map))
     }
 
     /// Restore a staging cache from disk
@@ -397,6 +416,7 @@ impl Output {
         (
             FinalizedDependencies,
             Vec<rattler_build_recipe::stage1::Source>,
+            LibraryNameMap,
         ),
         miette::Error,
     > {
@@ -436,7 +456,11 @@ impl Output {
             metadata.name
         );
 
-        Ok((metadata.finalized_dependencies, metadata.finalized_sources))
+        Ok((
+            metadata.finalized_dependencies,
+            metadata.finalized_sources,
+            metadata.library_name_map,
+        ))
     }
 
     /// Process all staging caches for this output
@@ -451,6 +475,7 @@ impl Output {
         Option<(
             FinalizedDependencies,
             Vec<rattler_build_recipe::stage1::Source>,
+            LibraryNameMap,
         )>,
         miette::Error,
     > {
@@ -467,7 +492,7 @@ impl Output {
                 "Building or restoring staging cache: {}",
                 staging_cache.name
             );
-            let (_deps, _sources) = self
+            let (_deps, _sources, _lib_map) = self
                 .build_or_restore_staging_cache(staging_cache, tool_configuration)
                 .await?;
         }
@@ -488,11 +513,11 @@ impl Output {
                 })?;
 
             // Get or build the cache
-            let (deps, sources) = self
+            let (deps, sources, lib_map) = self
                 .build_or_restore_staging_cache(staging, tool_configuration)
                 .await?;
 
-            Ok(Some((deps, sources)))
+            Ok(Some((deps, sources, lib_map)))
         } else {
             Ok(None)
         }

@@ -553,6 +553,7 @@ pub async fn get_build_output(
             finalized_sources: None,
             finalized_cache_dependencies: None,
             finalized_cache_sources: None,
+            staging_library_name_map: None,
             system_tools: SystemTools::new("rattler-build", env!("CARGO_PKG_VERSION")),
             build_summary: Arc::new(Mutex::new(BuildSummary::default())),
             extra_meta: Some(
