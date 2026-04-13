@@ -52,23 +52,23 @@ flate2 = "1.1.9"
 fs-err = "3.3.0"
 futures = "0.3.32"
 globset = "0.4.18"
-indexmap = "2.13.0"
+indexmap = "2.13.1"
 indicatif = "0.18.4"
 insta = "1.46.3"
 itertools = "0.14.0"
 hex = "0.4.3"
 libc = "0.2"
-md-5 = "0.10"
+md-5 = "0.11"
 lazy_static = "1.5.0"
 miette = "7.6.0"
-minijinja = { version = "2.18.0", features = [
+minijinja = { version = "2.19.0", features = [
   "unstable_machinery",
   "custom_syntax",
 ] }
 regex = "1.12.3"
 reqwest = { version = "0.12.28", default-features = false, features = ["json"] }
 reqwest-middleware = { version = "0.4.2", features = ["json"] }
-reqwest-retry = "0.8.0"
+reqwest-retry = "0.9.1"
 retry-policies = "0.5.1"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
@@ -81,7 +81,7 @@ strum = "0.28.0"
 tar = "0.4.44"
 tempfile = "3.27.0"
 thiserror = "2.0.18"
-tokio = { version = "1.50.0", features = ["rt", "macros"] }
+tokio = { version = "1.51.0", features = ["rt", "macros"] }
 tokio-util = { version = "0.7.18", features = ["codec", "compat"] }
 toml = "1.0.7"
 tracing = "0.1.44"
@@ -97,7 +97,7 @@ pathdiff = "0.2.3"
 marked-yaml = "0.8.0"
 rstest = "0.26.1"
 petgraph = { version = "0.8.3", default-features = false }
-sha1 = { version = "0.10.6" }
+sha1 = { version = "0.11.0" }
 lzma-rust2 = { version = "0.16", features = ["xz"] }
 line-ending = "1.5.1"
 anyhow = "1.0.102"
