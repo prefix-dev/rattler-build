@@ -167,16 +167,16 @@ rattler_menuinst = "0.2.55"
 
 # Internal rattler-build crates
 rattler_build_allocator = { path = "crates/rattler_build_allocator", version = "=0.1.1" }
-rattler_build_core = { path = "crates/rattler_build_core", version = "=0.2.3", default-features = false }
-rattler_build_jinja = { path = "crates/rattler_build_jinja", version = "=0.1.5" }
-rattler_build_networking = { path = "crates/rattler_build_networking", version = "=0.1.4" }
-rattler_build_recipe = { path = "crates/rattler_build_recipe", version = "=0.1.5" }
-rattler_build_recipe_generator = { path = "crates/rattler_build_recipe_generator", version = "=0.1.4", default-features = false }
-rattler_build_script = { path = "crates/rattler_build_script", version = "=0.2.2", default-features = false }
-rattler_build_source_cache = { path = "crates/rattler_build_source_cache", version = "=0.1.4", default-features = false }
-rattler_build_types = { path = "crates/rattler_build_types", version = "=0.1.5" }
-rattler_build_variant_config = { path = "crates/rattler_build_variant_config", version = "=0.1.5" }
-rattler_build_yaml_parser = { path = "crates/rattler_build_yaml_parser", version = "=0.1.5" }
+rattler_build_core = { path = "crates/rattler_build_core", version = "=0.2.4", default-features = false }
+rattler_build_jinja = { path = "crates/rattler_build_jinja", version = "=0.1.6" }
+rattler_build_networking = { path = "crates/rattler_build_networking", version = "=0.1.5" }
+rattler_build_recipe = { path = "crates/rattler_build_recipe", version = "=0.1.6" }
+rattler_build_recipe_generator = { path = "crates/rattler_build_recipe_generator", version = "=0.1.5", default-features = false }
+rattler_build_script = { path = "crates/rattler_build_script", version = "=0.2.3", default-features = false }
+rattler_build_source_cache = { path = "crates/rattler_build_source_cache", version = "=0.1.5", default-features = false }
+rattler_build_types = { path = "crates/rattler_build_types", version = "=0.1.6" }
+rattler_build_variant_config = { path = "crates/rattler_build_variant_config", version = "=0.1.6" }
+rattler_build_yaml_parser = { path = "crates/rattler_build_yaml_parser", version = "=0.1.6" }
 
 [features]
 default = ['rustls-tls', 'recipe-generation', 's3', 'sigstore']
