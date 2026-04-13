@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.62.0] - 2026-04-13
+### ✨ Highlights
+
+The biggest change of this release is that we now clean environment variables before executing the build script.
+This makes build scripts more reproducible and also matches what conda-build is doing.
+However, we went for a more strict approach than conda-build since we also re-map the home directory to the working directory.
+Both the CLI and Python API allow to opt for the conda-build behaviour or no environment variable isolation instead.
+With the CLI a new flag `--env-isolation` is available which takes `strict` (default), `conda-build` or `none` as option. 
+
+
+### Added
+
+- Allow for build_string_prefix passed into packages by @hunger in [#2384](https://github.com/prefix-dev/rattler-build/pull/2384)
+- Enforce clean build environment with configurable isolation modes by @Hofer-Julian in [#2372](https://github.com/prefix-dev/rattler-build/pull/2372)
+
+
+### Documentation
+
+- Fix meta.yaml leftover by @salim-b in [#2398](https://github.com/prefix-dev/rattler-build/pull/2398)
+- Mention skill-forge in building your own forge section by @pavelzw in [#2409](https://github.com/prefix-dev/rattler-build/pull/2409)
+
+
+### Fixed
+
+- Integers in skip/match conditions from variants.yaml by @wolfv in [#2395](https://github.com/prefix-dev/rattler-build/pull/2395)
+- Exclude new files from strip level guessing in patch application by @Hofer-Julian in [#2400](https://github.com/prefix-dev/rattler-build/pull/2400)
+- Reset origin URL and sync submodules before update by @Hofer-Julian in [#2401](https://github.com/prefix-dev/rattler-build/pull/2401)
+- Bump zip by @lucascolley in [#2405](https://github.com/prefix-dev/rattler-build/pull/2405)
+- Resolve overlinking false positives for staging outputs by @Hofer-Julian in [#2402](https://github.com/prefix-dev/rattler-build/pull/2402)
+
+
+### New Contributors
+* @salim-b made their first contribution in [#2398](https://github.com/prefix-dev/rattler-build/pull/2398)
+
 ## [0.61.4] - 2026-03-31
 
 ### Documentation
