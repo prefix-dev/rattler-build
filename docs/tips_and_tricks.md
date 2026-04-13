@@ -41,7 +41,8 @@ your choice. We have a number of example repositories for "custom" forges:
 - [rust-forge](https://github.com/wolfv/rust-forge): This repository builds a
   number of Rust packages for Windows, macOS and Linux on top of Github Actions.
 - [r-forge](https://github.com/wolfv/r-forge): The same idea, but for `R`
-  packages
+  packages.
+- [skill-forge](https://github.com/pavelzw/skill-forge): This repository builds a number of coding agent skills that you can install using [pixi-skills](https://pavel.pink/blog/pixi-skills).
 
 ### Directory structure
 
