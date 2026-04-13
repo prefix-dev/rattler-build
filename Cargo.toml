@@ -58,7 +58,7 @@ insta = "1.46.3"
 itertools = "0.14.0"
 hex = "0.4.3"
 libc = "0.2"
-md-5 = "0.10"
+md-5 = "0.11"
 lazy_static = "1.5.0"
 miette = "7.6.0"
 minijinja = { version = "2.18.0", features = [
@@ -68,7 +68,7 @@ minijinja = { version = "2.18.0", features = [
 regex = "1.12.3"
 reqwest = { version = "0.12.28", default-features = false, features = ["json"] }
 reqwest-middleware = { version = "0.4.2", features = ["json"] }
-reqwest-retry = "0.8.0"
+reqwest-retry = "0.9.1"
 retry-policies = "0.5.1"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
@@ -97,7 +97,7 @@ pathdiff = "0.2.3"
 marked-yaml = "0.8.0"
 rstest = "0.26.1"
 petgraph = { version = "0.8.3", default-features = false }
-sha1 = { version = "0.10.6" }
+sha1 = { version = "0.11.0" }
 lzma-rust2 = { version = "0.16", features = ["xz"] }
 line-ending = "1.5.1"
 anyhow = "1.0.102"
