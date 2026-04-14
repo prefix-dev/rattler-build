@@ -49,6 +49,16 @@ def main() -> None:
     tag: str = args.tag
     assets_dir: Path = args.assets_dir
 
+    # Aggregate all per-asset .sha256 files into a single sha256.sum
+    aggregate = assets_dir / "sha256.sum"
+    checksum_files = sorted(f for f in assets_dir.glob("*.sha256") if f.is_file())
+    if checksum_files:
+        lines = []
+        for cf in checksum_files:
+            lines.append(cf.read_text().strip())
+        aggregate.write_text("\n".join(lines) + "\n")
+        print(f"Wrote {aggregate.name} with {len(checksum_files)} entries")
+
     # Collect asset files
     assets = sorted(f for f in assets_dir.iterdir() if f.is_file())
     if not assets:
