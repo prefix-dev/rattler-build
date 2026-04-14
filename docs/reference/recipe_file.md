@@ -48,6 +48,9 @@ The reason for a new spec are:
 
 The recipe spec has the following parts:
 
+- [x] `schema_version`: optional integer identifying the recipe schema
+  version. Only `1` is currently accepted; omit this field to default to
+  schema version 1.
 - [x] `context`: to set up variables that can later be used in Jinja string
   interpolation
 - [x] `package`: defines name, version etc. of the top-level package
@@ -58,6 +61,8 @@ The recipe spec has the following parts:
 - [x] `tests`: defines tests for the top-level package
 - [x] `outputs`: a recipe can have multiple outputs. Each output can and should
   have a `package`, `requirements` and `test` section
+- [x] `about`: package metadata such as homepage, license and description
+- [x] `extra`: free-form metadata that rattler-build does not interpret
 
 ## Spec reference
 
@@ -396,13 +401,39 @@ build:
 
 #### Dynamic linking
 
-This section contains settings for the shared libraries and executables.
+This section contains settings for the shared libraries and executables on
+Linux and macOS.
 
 ```yaml
 build:
   dynamic_linking:
-    rpath_allowlist: ["/usr/lib/**"]
+    rpaths:
+      - lib/
+    binary_relocation: true
+    rpath_allowlist:
+      - /usr/lib/**
+    missing_dso_allowlist:
+      - "**/libcuda.so*"
+    overdepending_behavior: error
+    overlinking_behavior: error
 ```
+
+Fields (all optional):
+
+- **`rpaths`** - List of RPATH entries to set on ELF and Mach-O binaries.
+  Defaults to `["lib/"]`.
+- **`binary_relocation`** - Controls which binaries get their prefixes
+  rewritten during installation. Accepts `true` (all binaries, default),
+  `false` (none) or a list of glob patterns to include.
+- **`rpath_allowlist`** - Glob patterns of RPATH entries that may point
+  outside the package prefix without triggering an overlinking warning.
+- **`missing_dso_allowlist`** - Glob patterns of dynamic libraries that are
+  allowed to be missing from the host environment without failing the
+  overlinking check.
+- **`overdepending_behavior`** - What to do when a declared dependency is not
+  actually linked. One of `ignore` or `error`.
+- **`overlinking_behavior`** - What to do when a binary links against a
+  library that is not a declared dependency. One of `ignore` or `error`.
 
 ### Script
 
@@ -426,8 +457,90 @@ build:
         - echo "unix"
 ```
 
-There are many other configurable settings, such as environment variables and secrets.
-Please see [Build script](../build_script.md) for more information.
+#### Script object form
+
+For anything beyond a bare command list, `script` can be written as a mapping
+with the following fields (all optional):
+
+- **`content`** - Inline commands to execute. Equivalent to passing a string
+  or list directly as `script:`. Accepts a string, a list of strings, or
+  `if`/`then`/`else` conditionals. Mutually exclusive with `file`.
+- **`file`** - Path to an external script file (relative to the recipe
+  directory). If the filename has no extension, the platform-appropriate
+  extension is appended (`.sh` on Unix, `.bat` on Windows). Mutually exclusive
+  with `content`.
+- **`env`** - Mapping of environment variables to set for the script. Values
+  can be hard-coded strings or Jinja expressions, and `env.get(...)` can be
+  used to forward variables from the outer environment with an optional
+  default.
+- **`secrets`** - List of environment variable names whose values should be
+  forwarded from the outer environment but masked in logs and stripped from
+  the rendered recipe. The variables must already be set in the environment
+  running `rattler-build`.
+- **`interpreter`** - Explicit interpreter to run `content` with. Supported
+  values are `bash` (default on Unix), `cmd.exe` (default on Windows), `nu`
+  (nushell), `python`, `perl`, `rscript`, `ruby` and `node`/`nodejs`. When
+  unset, the interpreter is auto-detected from the script's file extension
+  (`.sh`, `.bat`, `.nu`, `.py`, `.pl`, `.r`, `.rb`, `.js`).
+
+  !!! warning "Non-default interpreters need a build dependency"
+      Only `bash` and `cmd.exe` are assumed to exist on the build machine.
+      Every other interpreter must be added to `requirements.build` (or
+      otherwise be available on `PATH`) so the build environment actually
+      has it. For example, `interpreter: nu` requires `nushell` in
+      `requirements.build`; `interpreter: python` requires `python`;
+      `interpreter: node` requires `nodejs`, and so on.
+- **`cwd`** - Working directory for the script, relative to the build work
+  directory. Defaults to the work directory itself.
+
+```yaml title="recipe.yaml"
+build:
+  script:
+    content:
+      - python -m pip install . -vv --no-deps --no-build-isolation
+    env:
+      # Hard-coded value
+      USE_SYSTEM_DEPS: "on"
+      # Forwarded from the outer environment with a default
+      CMAKE_ARGS: ${{ env.get("CMAKE_ARGS", default="") }}
+    secrets:
+      # Masked in logs; must be exported in the outer environment
+      - GITHUB_TOKEN
+    interpreter: bash
+```
+
+Using an external script file:
+
+```yaml title="recipe.yaml"
+build:
+  script:
+    file: build/install.py
+    interpreter: python
+    env:
+      USE_SYSTEM_DEPS: "on"
+
+requirements:
+  build:
+    # `python` is the interpreter, so it must be available in the build env
+    - python
+```
+
+Selecting `nushell` with the required build dependency:
+
+```yaml title="recipe.yaml"
+build:
+  script:
+    interpreter: nu
+    content: |
+      echo "Hello from nushell!"
+
+requirements:
+  build:
+    - nushell
+```
+
+See [Build script](../build_script.md) for more examples and the full
+behaviour of environment variables, secrets, and interpreters.
 
 ### Skipping builds
 
@@ -534,6 +647,28 @@ build:
     version_independent: true  # defaults to false
 ```
 
+#### Other `build.python` options
+
+- **`skip_pyc_compilation`** - List of glob patterns of Python files that
+  should be skipped when pre-compiling `.pyc` files during the build. Only
+  relevant for non-`noarch` Python packages.
+- **`use_python_app_entrypoint`** - When set to `true`, generates entry points
+  that launch through the `python.app` wrapper on macOS. Useful for GUI
+  applications that need access to the main event loop.
+- **`site_packages_path`** - Overrides the relative `site-packages` directory
+  that the `python` package itself exports. Only meaningful when building the
+  `python` package.
+
+```yaml
+build:
+  python:
+    entry_points:
+      - mytool = mytool.cli:main
+    skip_pyc_compilation:
+      - "mypkg/vendored/**"
+    use_python_app_entrypoint: true
+```
+
 ### Post-processing
 
 Applies regex-based text replacements to files in the package during the packaging phase. Each entry specifies a set of files to match and a regex substitution
@@ -601,6 +736,99 @@ In the example above, the `.la` file replacement runs only on Unix, while the
 In multi-output recipes, each output inherits the top-level `post_process` if
 the output does not define its own. If an output defines its own `post_process`, it fully overrides the top-level list. No merging is performed.
 
+### Always include / copy files
+
+By default, `rattler-build` packages only files that the build script creates
+in the host prefix. The `always_include_files` and `always_copy_files` keys
+override this on a per-glob basis:
+
+- **`always_include_files`** - Glob patterns of files to add to the package
+  even if they were already present in the host environment before the
+  build ran. Useful when the build replaces a file that another dependency
+  installed.
+- **`always_copy_files`** - Glob patterns of files that should be copied
+  rather than hard-linked into the install prefix. Use this for files the
+  build script mutates in place, so mutations in one package do not leak
+  into other environments sharing the same package cache.
+
+```yaml
+build:
+  always_include_files:
+    - bin/my-tool
+  always_copy_files:
+    - share/my-tool/config.yaml
+```
+
+### Merge build and host environments
+
+By default, `build` and `host` are separate prefixes so that cross-compilation
+works correctly. For recipes that do not cross-compile, setting
+`merge_build_and_host_envs: true` merges the two environments into a single
+prefix, matching the behaviour of legacy `conda-build` recipes that don't
+distinguish between `build` and `host`.
+
+```yaml
+build:
+  merge_build_and_host_envs: true
+```
+
+### Prefix detection
+
+Controls how `rattler-build` finds and rewrites the build prefix inside
+packaged files so that installed packages work from any install location.
+
+```yaml
+build:
+  prefix_detection:
+    # Files that should always be treated as text or binary regardless of
+    # auto-detection
+    force_file_type:
+      text:
+        - bin/*.py
+      binary:
+        - lib/**/*.so
+    # Files that should be skipped entirely during prefix replacement
+    # (true = skip all, false = skip none, list = glob patterns)
+    ignore:
+      - share/doc/**
+    # Skip prefix detection in binary files (Unix only)
+    ignore_binary_files: false
+```
+
+- **`force_file_type.text`** / **`force_file_type.binary`** - Glob patterns
+  that force specific files to be treated as text or binary during prefix
+  detection, overriding the automatic heuristics.
+- **`ignore`** - Either a boolean or a list of glob patterns. `true` skips
+  prefix replacement for all files, `false` (default) enables it for all,
+  and a list skips only the matching files.
+- **`ignore_binary_files`** - Skip prefix replacement in binary files (Unix
+  only). Binary relocation is still handled separately under
+  `dynamic_linking`.
+
+### Variant configuration
+
+The `variant` key controls how the build participates in the variant matrix
+derived from `variant_config.yaml` and `pin_subpackage(..., exact=True)`.
+
+```yaml
+build:
+  variant:
+    use_keys:
+      - numpy
+    ignore_keys:
+      - python
+    down_prioritize_variant: -1
+```
+
+- **`use_keys`** - Variant keys that must be part of this build's variant
+  matrix even if they are not referenced elsewhere in the recipe.
+- **`ignore_keys`** - Variant keys that should be stripped from this
+  build's variant even if they are referenced. Packages built with
+  `ignore_keys` will not get a separate output per value of that key.
+- **`down_prioritize_variant`** - Integer priority offset applied to this
+  variant during solving. Negative values make the variant less preferred
+  when multiple variants satisfy a dependency.
+
 ## Include build recipe
 
 The recipe and rendered `recipe.yaml` file are included in
@@ -608,9 +836,8 @@ the `package_metadata` by default. You can disable this by passing
 `--no-include-recipe` on the command line.
 
 !!! note
-    There are many more options in the build section. These additional options control
-    how variants are computed, prefix replacements, and more.
-    See the [full build options](../build_options.md) for more information.
+    See the [full build options](../build_options.md) guide for longer-form
+    explanations and examples of the build keys documented above.
 
 
 ## Requirements section
@@ -760,6 +987,30 @@ For `gcc` this would look like this:
 
 `weak` exports will only be implicitly added as runtime requirement, if the package is a host dependency.
 `strong` exports will be added for both build and host dependencies.
+
+In addition to `weak` and `strong`, the `run_exports` mapping supports the
+following keys:
+
+- **`weak_constraints`** - Like `weak`, but the exported specs are added to
+  the downstream package's `run_constraints` rather than its `run`
+  requirements.
+- **`strong_constraints`** - Same as `weak_constraints`, but applies to
+  both build and host dependencies.
+- **`noarch`** - Run exports that are only added for downstream `noarch`
+  packages. Useful when a package ships architecture-specific builds but
+  wants to pin differently for pure-Python consumers.
+
+```yaml title="recipe.yaml"
+  requirements:
+    run_exports:
+      strong:
+        - ${{ pin_subpackage('libfoo', exact=True) }}
+      weak_constraints:
+        - foo-plugin >=2
+      noarch:
+        - python >=3.9
+```
+
 In the following example you can see the implicitly added runtime dependencies.
 
 ```yaml title="recipe.yaml of some package using gcc and zlib"
@@ -964,6 +1215,26 @@ Internally this will write a small R script that imports the modules:
 
 ```r
 library(knitr)
+```
+
+### Ruby tests
+
+For this test type you can list a set of Ruby modules or gems that need to be
+loadable. The test will fail if any of them cannot be required.
+
+```yaml
+tests:
+  - ruby:
+      requires:
+        - json
+        - rspec
+```
+
+Internally this will write a small Ruby script that `require`s each module:
+
+```ruby
+require 'json'
+require 'rspec'
 ```
 
 ### Check for package contents
@@ -1277,6 +1548,19 @@ about:
 
 1.  Only the SPDX specifiers are allowed, more info here: [SPDX](https://spdx.org/licenses/)
     If you want another license type `LicenseRef-<YOUR-LICENSE>` can be used, e.g. `license: LicenseRef-Proprietary`
+
+The full list of accepted `about` keys:
+
+- **`homepage`** - Project homepage URL.
+- **`repository`** - Source repository URL.
+- **`documentation`** - Documentation URL.
+- **`license`** - SPDX license expression (see note above).
+- **`license_file`** - License file(s) to include in the package (see below).
+- **`license_family`** - Coarse license family (e.g. `MIT`, `Apache`, `GPL`).
+  Deprecated and kept only for compatibility with legacy `conda-build`
+  recipes; prefer setting a precise SPDX expression in `license`.
+- **`summary`** - One-line description of the package.
+- **`description`** - Longer free-form description.
 
 ### License file
 
