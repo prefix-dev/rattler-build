@@ -218,6 +218,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      actions: write
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: prefix-dev/setup-pixi@1b2de7f3351f171c8b4dfeb558c639cb58ed4ec0 # v0.9.5
@@ -225,8 +226,15 @@ jobs:
           environments: release
       - name: Create and push tag
         run: pixi run -e release create-tag --tag ${NEEDS_PREPARE_OUTPUTS_TAG}
-
         env:
+          NEEDS_PREPARE_OUTPUTS_TAG: ${{ needs.prepare.outputs.tag }}
+
+      # Tag pushes made via GITHUB_TOKEN do not trigger downstream workflows,
+      # so dispatch the docs deploy explicitly.
+      - name: Trigger docs deploy
+        run: gh workflow run docs.yml --ref main --field tag=${NEEDS_PREPARE_OUTPUTS_TAG}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NEEDS_PREPARE_OUTPUTS_TAG: ${{ needs.prepare.outputs.tag }}
 
   # Create GitHub release with all signed artifacts
