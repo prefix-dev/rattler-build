@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.62.1] - 2026-04-15
+### ✨ Highlights
+
+Fix macOS signing and notarisation of release artifacts
+
+
+### Documentation
+
+- Document release process by @Hofer-Julian in [#2415](https://github.com/prefix-dev/rattler-build/pull/2415)
+- Extend recipe reference by @Hofer-Julian in [#2416](https://github.com/prefix-dev/rattler-build/pull/2416)
+
+
+### Fixed
+
+- Fix zizmor ref-version-mismatch warnings in python-build.yml by @Hofer-Julian in [#2417](https://github.com/prefix-dev/rattler-build/pull/2417)
+- Fix macOs signing, add sha file and move back to tar.gz by @Hofer-Julian in [#2418](https://github.com/prefix-dev/rattler-build/pull/2418)
+
+
+
 ## [0.62.0] - 2026-04-13
 ### ✨ Highlights
 
