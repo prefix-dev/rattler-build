@@ -170,14 +170,20 @@ impl Tests {
             .map(|p| p.platform)
             .unwrap_or(target_platform);
 
+        let tmp_dir = tempfile::tempdir()?;
+
+        // copy all test files to a temporary directory and set it as the working
+        // directory
+        CopyDir::new(cwd, tmp_dir.path()).run().map_err(|e| {
+            TestError::IoError(std::io::Error::other(format!(
+                "Failed to copy test files: {}",
+                e
+            )))
+        })?;
+
         let platform = Platform::current();
-        let mut env_vars = env_vars::os_vars(environment, &platform, config.env_isolation);
-        // Only strip PATH when inheriting the full host environment (`None`),
-        // because the activation script will set it up and the host PATH is
-        // redundantly inherited. With `Strict`/`CondaBuild` isolation the
-        // subprocess starts from `env_clear()`, so PATH in env_vars is the
-        // *only* source of PATH – removing it leaves the subprocess without
-        // any PATH at all (e.g. `chcp` is not found on Windows).
+        let mut env_vars =
+            env_vars::os_vars(environment, &platform, config.env_isolation, tmp_dir.path());
         if config.env_isolation == EnvironmentIsolation::None {
             env_vars.retain(|key, _| key != ShellEnum::default().path_var(&platform));
         }
@@ -196,16 +202,6 @@ impl Tests {
             "PREFIX".to_string(),
             Some(environment.to_string_lossy().to_string()),
         );
-        let tmp_dir = tempfile::tempdir()?;
-
-        // copy all test files to a temporary directory and set it as the working
-        // directory
-        CopyDir::new(cwd, tmp_dir.path()).run().map_err(|e| {
-            TestError::IoError(std::io::Error::other(format!(
-                "Failed to copy test files: {}",
-                e
-            )))
-        })?;
 
         match self {
             Tests::Commands(path) => {
@@ -781,10 +777,10 @@ async fn run_python_test_inner(
     };
 
     let platform = Platform::current();
-    let test_env_vars = env_vars::os_vars(&test_prefix, &platform, config.env_isolation);
-
     let test_dir = prefix.join("test");
     fs::create_dir_all(&test_dir)?;
+    let test_env_vars = env_vars::os_vars(&test_prefix, &platform, config.env_isolation, &test_dir);
+
     script
         .run_script(
             test_env_vars.clone(),
@@ -890,11 +886,13 @@ async fn run_perl_test(
         ..Script::default()
     };
 
-    let platform = Platform::current();
-    let test_env_vars = env_vars::os_vars(&test_prefix, &platform, config.env_isolation);
-
     let test_folder = prefix.join("test_files");
     fs::create_dir_all(&test_folder)?;
+
+    let platform = Platform::current();
+    let test_env_vars =
+        env_vars::os_vars(&test_prefix, &platform, config.env_isolation, &test_folder);
+
     script
         .run_script(
             test_env_vars,
@@ -996,8 +994,18 @@ async fn run_commands_test(
         .map(|p| p.platform)
         .unwrap_or(target_platform);
 
+    // copy all test files to a temporary directory and set it as the working
+    // directory
+    let test_dir = test_directory.join("test");
+    CopyDir::new(path, &test_dir).run().map_err(|e| {
+        TestError::IoError(std::io::Error::other(format!(
+            "Failed to copy test files: {}",
+            e
+        )))
+    })?;
+
     let platform = Platform::current();
-    let mut env_vars = env_vars::os_vars(&run_prefix, &platform, config.env_isolation);
+    let mut env_vars = env_vars::os_vars(&run_prefix, &platform, config.env_isolation, &test_dir);
     if config.env_isolation == EnvironmentIsolation::None {
         env_vars.retain(|key, _| key != ShellEnum::default().path_var(&platform));
     }
@@ -1016,16 +1024,6 @@ async fn run_commands_test(
         "PREFIX".to_string(),
         Some(run_prefix.to_string_lossy().to_string()),
     );
-
-    // copy all test files to a temporary directory and set it as the working
-    // directory
-    let test_dir = test_directory.join("test");
-    CopyDir::new(path, &test_dir).run().map_err(|e| {
-        TestError::IoError(std::io::Error::other(format!(
-            "Failed to copy test files: {}",
-            e
-        )))
-    })?;
 
     tracing::info!("Testing commands:");
     commands_test
@@ -1211,11 +1209,13 @@ async fn run_r_test(
         ..Script::default()
     };
 
-    let platform = Platform::current();
-    let test_env_vars = env_vars::os_vars(&test_prefix, &platform, config.env_isolation);
-
     let test_folder = prefix.join("test_files");
     fs::create_dir_all(&test_folder)?;
+
+    let platform = Platform::current();
+    let test_env_vars =
+        env_vars::os_vars(&test_prefix, &platform, config.env_isolation, &test_folder);
+
     script
         .run_script(
             test_env_vars,
@@ -1292,11 +1292,13 @@ async fn run_ruby_test(
         ..Script::default()
     };
 
-    let platform = Platform::current();
-    let test_env_vars = env_vars::os_vars(&test_prefix, &platform, config.env_isolation);
-
     let test_folder = prefix.join("test_files");
     fs::create_dir_all(&test_folder)?;
+
+    let platform = Platform::current();
+    let test_env_vars =
+        env_vars::os_vars(&test_prefix, &platform, config.env_isolation, &test_folder);
+
     script
         .run_script(
             test_env_vars,

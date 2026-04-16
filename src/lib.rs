@@ -379,6 +379,7 @@ pub async fn get_build_output(
         &std::path::PathBuf::new(),
         &build_data.host_platform,
         build_data.env_isolation,
+        &std::path::PathBuf::new(),
     )
     .keys()
     .cloned()

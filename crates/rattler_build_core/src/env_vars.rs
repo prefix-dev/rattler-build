@@ -200,12 +200,13 @@ pub fn language_vars(output: &Output) -> HashMap<String, Option<String>> {
 /// - PATH: Path where executables are found
 pub fn os_vars(
     prefix: &Path,
-    platform: &Platform,
+    target_platform: &Platform,
     env_isolation: EnvironmentIsolation,
+    work_dir: &Path,
 ) -> HashMap<String, Option<String>> {
     let mut vars = HashMap::new();
 
-    let path_var = if platform.is_windows() {
+    let path_var = if target_platform.is_windows() {
         "Path"
     } else {
         "PATH"
@@ -231,11 +232,11 @@ pub fn os_vars(
         }
     }
 
-    let shlib_ext = if platform.is_windows() {
+    let shlib_ext = if target_platform.is_windows() {
         ".dll"
-    } else if platform.is_osx() {
+    } else if target_platform.is_osx() {
         ".dylib"
-    } else if platform.is_linux() {
+    } else if target_platform.is_linux() {
         ".so"
     } else {
         ".not_implemented"
@@ -244,16 +245,46 @@ pub fn os_vars(
     insert!(vars, "SHLIB_EXT", shlib_ext);
     vars.insert(path_var.to_string(), env::var(path_var).ok());
 
-    if platform.is_windows() {
-        vars.extend(windows::env::default_env_vars(prefix, platform));
-    } else if platform.is_osx() {
-        vars.extend(macos::env::default_env_vars(prefix, platform));
-    } else if platform.is_linux() {
+    if target_platform.is_windows() {
+        vars.extend(windows::env::default_env_vars(prefix, target_platform));
+    } else if target_platform.is_osx() {
+        vars.extend(macos::env::default_env_vars(prefix, target_platform));
+    } else if target_platform.is_linux() {
         vars.extend(linux::env::default_env_vars(
             prefix,
-            platform,
+            target_platform,
             env_isolation,
         ));
+    }
+
+    let build_platform = Platform::current();
+    if build_platform.is_windows() {
+        match env_isolation {
+            EnvironmentIsolation::Strict => {
+                insert!(vars, "USERPROFILE", work_dir.to_string_lossy());
+            }
+            EnvironmentIsolation::CondaBuild => {
+                vars.insert("USERPROFILE".to_string(), env::var("USERPROFILE").ok());
+            }
+            EnvironmentIsolation::None => {}
+        }
+    } else {
+        match env_isolation {
+            EnvironmentIsolation::Strict => {
+                insert!(vars, "HOME", work_dir.to_string_lossy());
+                insert!(vars, "USER", "rattler");
+                insert!(vars, "SHELL", "/bin/bash");
+                insert!(vars, "EDITOR", "/bin/false");
+                insert!(vars, "TERM", "xterm-256color");
+            }
+            EnvironmentIsolation::CondaBuild => {
+                vars.insert(
+                    "HOME".to_string(),
+                    Some(env::var("HOME").unwrap_or_else(|_| "UNKNOWN".to_string())),
+                );
+            }
+            EnvironmentIsolation::None => {}
+        }
     }
 
     vars
@@ -385,43 +416,6 @@ pub fn vars(output: &Output, build_state: &str) -> HashMap<String, Option<String
     // this value will be taken from the previous package for rebuild purposes
     let timestamp_epoch_secs = output.build_configuration.timestamp.timestamp();
     insert!(vars, "SOURCE_DATE_EPOCH", timestamp_epoch_secs);
-
-    // Normalized environment variables for reproducible builds
-    let env_isolation = output.build_configuration.env_isolation;
-    if output.host_platform().platform.is_windows() {
-        match env_isolation {
-            EnvironmentIsolation::Strict => {
-                // Point USERPROFILE at the work directory so that tools like
-                // setuptools/distutils can resolve a home directory without
-                // leaking host paths.
-                insert!(vars, "USERPROFILE", directories.work_dir.to_string_lossy());
-            }
-            EnvironmentIsolation::CondaBuild => {
-                vars.insert("USERPROFILE".to_string(), std::env::var("USERPROFILE").ok());
-            }
-            EnvironmentIsolation::None => {}
-        }
-    } else {
-        match env_isolation {
-            EnvironmentIsolation::Strict => {
-                insert!(vars, "HOME", directories.work_dir.to_string_lossy());
-                insert!(vars, "USER", "rattler");
-                insert!(vars, "SHELL", "/bin/bash");
-                insert!(vars, "EDITOR", "/bin/false");
-                insert!(vars, "TERM", "xterm-256color");
-            }
-            EnvironmentIsolation::CondaBuild => {
-                // conda-build forwards HOME from host
-                vars.insert(
-                    "HOME".to_string(),
-                    Some(std::env::var("HOME").unwrap_or_else(|_| "UNKNOWN".to_string())),
-                );
-            }
-            EnvironmentIsolation::None => {
-                // No normalization; HOME will be inherited from host process
-            }
-        }
-    }
 
     vars
 }

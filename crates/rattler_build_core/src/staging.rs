@@ -277,6 +277,7 @@ impl Output {
             self.prefix(),
             &target_platform,
             self.build_configuration.env_isolation,
+            &self.build_configuration.directories.work_dir,
         ));
 
         // Create Jinja context
