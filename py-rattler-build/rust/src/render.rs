@@ -77,6 +77,7 @@ impl PyRenderConfig {
             &std::path::PathBuf::new(),
             &host_platform,
             EnvironmentIsolation::default(),
+            &std::path::PathBuf::new(),
         )
         .keys()
         .cloned()

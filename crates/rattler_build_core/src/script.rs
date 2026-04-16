@@ -37,6 +37,7 @@ impl Output {
             &host_prefix,
             &target_platform,
             env_isolation,
+            &self.build_configuration.directories.work_dir,
         ));
         env_vars.extend(env_vars::env_vars_from_variant(self.variant()));
 
