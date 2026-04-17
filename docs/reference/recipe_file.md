@@ -1416,8 +1416,6 @@ will also build two versions of `test`, one that depends on `libtest (openssl
 
 !!!note
 
-    Staging outputs are an experimental feature. You need to pass the
-    `--experimental` flag or set `RATTLER_BUILD_EXPERIMENTAL=true` to use them.
     See the [staging outputs guide](../multiple_output_cache.md) for a full
     walkthrough.
 

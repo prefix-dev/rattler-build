@@ -175,8 +175,7 @@ def test_render_recipe_with_staging(test_data_dir: Path) -> None:
     recipe_yaml = recipe_path.read_text()
     recipe = Stage0Recipe.from_yaml(recipe_yaml)
     variant_config = VariantConfig()
-    render_config = RenderConfig(platform=PlatformConfig(experimental=True))
-    rendered = recipe.render(variant_config, render_config)
+    rendered = recipe.render(variant_config)
     assert len(rendered) == 2
     assert isinstance(rendered[0], RenderedVariant)
 
@@ -219,9 +218,8 @@ def test_render_recipe_from_path(test_data_dir: Path) -> None:
     recipe_path = test_data_dir / "recipes" / "with-staging.yaml"
     recipe = Stage0Recipe.from_file(recipe_path)
     variant_config = VariantConfig()
-    render_config = RenderConfig(platform=PlatformConfig(experimental=True))
 
-    rendered = recipe.render(variant_config, render_config)
+    rendered = recipe.render(variant_config)
 
     assert len(rendered) == 2
     assert rendered[0].recipe.package.name == "mixed-compiled"
