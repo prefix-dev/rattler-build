@@ -490,8 +490,10 @@ with the following fields (all optional):
       has it. For example, `interpreter: nu` requires `nushell` in
       `requirements.build`; `interpreter: python` requires `python`;
       `interpreter: node` requires `nodejs`, and so on.
-- **`cwd`** - Working directory for the script, relative to the build work
-  directory. Defaults to the work directory itself.
+
+- **`cwd`** - Working directory for the script, relative to the
+  `[build folder]/work` directory. Defaults to the `[build folder]/work`
+  directory itself.
 
 ```yaml title="recipe.yaml"
 build:
