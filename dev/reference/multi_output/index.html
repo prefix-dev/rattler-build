@@ -2613,15 +2613,15 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#staging-outputs-experimental" class="md-nav__link">
+  <a href="#staging-outputs" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Staging Outputs (Experimental)
+        Staging Outputs
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Staging Outputs (Experimental)">
+    <nav class="md-nav" aria-label="Staging Outputs">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -2872,15 +2872,15 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#staging-outputs-experimental" class="md-nav__link">
+  <a href="#staging-outputs" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Staging Outputs (Experimental)
+        Staging Outputs
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Staging Outputs (Experimental)">
+    <nav class="md-nav" aria-label="Staging Outputs">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -3109,12 +3109,7 @@ multi-output recipes. Each output must define its own <code>package:</code> and
 </span><span id="__span-3-22"><a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a><span class="w">    </span><span class="nt">about</span><span class="p">:</span>
 </span><span id="__span-3-23"><a id="__codelineno-3-23" name="__codelineno-3-23" href="#__codelineno-3-23"></a><span class="w">      </span><span class="nt">license</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Apache-2.0</span><span class="w">  </span><span class="c1"># overrides inherited license</span>
 </span></code></pre></div>
-<h2 id="staging-outputs-experimental">Staging Outputs (Experimental)<a class="headerlink" href="#staging-outputs-experimental" title="Permanent link">#</a></h2>
-<div class="admonition warning">
-<p class="admonition-title">Warning</p>
-<p>Staging outputs require the <code>--experimental</code> flag:
-<code>rattler-build build --experimental -r recipe.yaml</code></p>
-</div>
+<h2 id="staging-outputs">Staging Outputs<a class="headerlink" href="#staging-outputs" title="Permanent link">#</a></h2>
 <p>A staging output compiles code once and caches the result. Package outputs then
 inherit from the staging cache and select subsets of the built files. This avoids
 rebuilding the same source for each package.</p>

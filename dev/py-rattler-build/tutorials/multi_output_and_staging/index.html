@@ -2931,7 +2931,7 @@ Package: myproject-tools 2.0.0
 </span></code></pre></div>
 <div class="language-text highlight"><pre><span></span><code>Building Example 1 packages...
 ============================================================
-Recipe path: /tmp/rattler_build_vv3doeev/recipe.yaml
+Recipe path: /tmp/rattler_build_bjpilv03/recipe.yaml
 
 Building variant 1/2
   Package: myproject-lib
@@ -2939,8 +2939,10 @@ Building variant 1/2
   Build string: hb0f4dca_0
 
 
-  Build complete in 1.54s!
-  Package: /tmp/rattler_build_vv3doeev/output/linux-64/myproject-lib-2.0.0-hb0f4dca_0.conda
+  Build complete in 1.44s!
+
+
+  Package: /tmp/rattler_build_bjpilv03/output/linux-64/myproject-lib-2.0.0-hb0f4dca_0.conda
   Variant: {&#39;target_platform&#39;: &#39;linux-64&#39;}
   Build log: 54 messages captured
 
@@ -2948,17 +2950,15 @@ Building variant 2/2
   Package: myproject-tools
   Version: 2.0.0
   Build string: hb0f4dca_0
-
-
-  Build complete in 1.50s!
-  Package: /tmp/rattler_build_vv3doeev/output/linux-64/myproject-tools-2.0.0-hb0f4dca_0.conda
+  Build complete in 1.44s!
+  Package: /tmp/rattler_build_bjpilv03/output/linux-64/myproject-tools-2.0.0-hb0f4dca_0.conda
   Variant: {&#39;target_platform&#39;: &#39;linux-64&#39;}
   Build log: 59 messages captured
 
 ============================================================
 Example 1 builds completed successfully!
 
-Built packages are available in: /tmp/rattler_build_vv3doeev/output
+Built packages are available in: /tmp/rattler_build_bjpilv03/output
 </code></pre></div>
 <h2 id="example-2-staging-outputs-shared-build-artifacts">Example 2: Staging Outputs - Shared Build Artifacts<a class="headerlink" href="#example-2-staging-outputs-shared-build-artifacts" title="Permanent link">#</a></h2>
 <p>Staging is different from regular dependencies (Example 1). A staging output runs its build script once, then <strong>copies its files directly into each inheriting package's prefix</strong>. Since these are "new" files in the prefix, they will be included in the final package.</p>
@@ -3045,28 +3045,26 @@ Built packages are available in: /tmp/rattler_build_vv3doeev/output
 </span><span id="__span-3-76"><a id="__codelineno-3-76" name="__codelineno-3-76" href="#__codelineno-3-76"></a>
 </span><span id="__span-3-77"><a id="__codelineno-3-77" name="__codelineno-3-77" href="#__codelineno-3-77"></a><span class="c1"># Render the recipe</span>
 </span><span id="__span-3-78"><a id="__codelineno-3-78" name="__codelineno-3-78" href="#__codelineno-3-78"></a><span class="n">staging_variants</span> <span class="o">=</span> <span class="n">VariantConfig</span><span class="p">()</span>
-</span><span id="__span-3-79"><a id="__codelineno-3-79" name="__codelineno-3-79" href="#__codelineno-3-79"></a><span class="n">platform_config</span> <span class="o">=</span> <span class="n">PlatformConfig</span><span class="p">(</span><span class="n">experimental</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>  <span class="c1"># Staging is still experimental</span>
-</span><span id="__span-3-80"><a id="__codelineno-3-80" name="__codelineno-3-80" href="#__codelineno-3-80"></a><span class="n">staging_render</span> <span class="o">=</span> <span class="n">RenderConfig</span><span class="p">(</span><span class="n">platform</span><span class="o">=</span><span class="n">platform_config</span><span class="p">)</span>
-</span><span id="__span-3-81"><a id="__codelineno-3-81" name="__codelineno-3-81" href="#__codelineno-3-81"></a><span class="n">staging_results</span> <span class="o">=</span> <span class="n">staging_recipe</span><span class="o">.</span><span class="n">render</span><span class="p">(</span><span class="n">staging_variants</span><span class="p">,</span> <span class="n">staging_render</span><span class="p">)</span>
-</span><span id="__span-3-82"><a id="__codelineno-3-82" name="__codelineno-3-82" href="#__codelineno-3-82"></a>
-</span><span id="__span-3-83"><a id="__codelineno-3-83" name="__codelineno-3-83" href="#__codelineno-3-83"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Rendered </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">staging_results</span><span class="p">)</span><span class="si">}</span><span class="s2"> package(s)&quot;</span><span class="p">)</span>
-</span><span id="__span-3-84"><a id="__codelineno-3-84" name="__codelineno-3-84" href="#__codelineno-3-84"></a><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;(Staging outputs don&#39;t produce packages)&quot;</span><span class="p">)</span>
-</span><span id="__span-3-85"><a id="__codelineno-3-85" name="__codelineno-3-85" href="#__codelineno-3-85"></a><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;=&quot;</span> <span class="o">*</span> <span class="mi">60</span><span class="p">)</span>
-</span><span id="__span-3-86"><a id="__codelineno-3-86" name="__codelineno-3-86" href="#__codelineno-3-86"></a>
-</span><span id="__span-3-87"><a id="__codelineno-3-87" name="__codelineno-3-87" href="#__codelineno-3-87"></a><span class="k">for</span> <span class="n">rendered</span> <span class="ow">in</span> <span class="n">staging_results</span><span class="p">:</span>
-</span><span id="__span-3-88"><a id="__codelineno-3-88" name="__codelineno-3-88" href="#__codelineno-3-88"></a>    <span class="n">stage1</span> <span class="o">=</span> <span class="n">rendered</span><span class="o">.</span><span class="n">recipe</span>
-</span><span id="__span-3-89"><a id="__codelineno-3-89" name="__codelineno-3-89" href="#__codelineno-3-89"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="si">{</span><span class="n">stage1</span><span class="o">.</span><span class="n">package</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">stage1</span><span class="o">.</span><span class="n">package</span><span class="o">.</span><span class="n">version</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-</span><span id="__span-3-90"><a id="__codelineno-3-90" name="__codelineno-3-90" href="#__codelineno-3-90"></a>
-</span><span id="__span-3-91"><a id="__codelineno-3-91" name="__codelineno-3-91" href="#__codelineno-3-91"></a>    <span class="c1"># Check for staging caches</span>
-</span><span id="__span-3-92"><a id="__codelineno-3-92" name="__codelineno-3-92" href="#__codelineno-3-92"></a>    <span class="k">if</span> <span class="n">stage1</span><span class="o">.</span><span class="n">staging_caches</span><span class="p">:</span>
-</span><span id="__span-3-93"><a id="__codelineno-3-93" name="__codelineno-3-93" href="#__codelineno-3-93"></a>        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   Uses </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">stage1</span><span class="o">.</span><span class="n">staging_caches</span><span class="p">)</span><span class="si">}</span><span class="s2"> staging cache(s):&quot;</span><span class="p">)</span>
-</span><span id="__span-3-94"><a id="__codelineno-3-94" name="__codelineno-3-94" href="#__codelineno-3-94"></a>        <span class="k">for</span> <span class="n">cache</span> <span class="ow">in</span> <span class="n">stage1</span><span class="o">.</span><span class="n">staging_caches</span><span class="p">:</span>
-</span><span id="__span-3-95"><a id="__codelineno-3-95" name="__codelineno-3-95" href="#__codelineno-3-95"></a>            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;     - </span><span class="si">{</span><span class="n">cache</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-</span><span id="__span-3-96"><a id="__codelineno-3-96" name="__codelineno-3-96" href="#__codelineno-3-96"></a>            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;       Build script: </span><span class="si">{</span><span class="n">cache</span><span class="o">.</span><span class="n">build</span><span class="o">.</span><span class="n">script</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-</span><span id="__span-3-97"><a id="__codelineno-3-97" name="__codelineno-3-97" href="#__codelineno-3-97"></a>
-</span><span id="__span-3-98"><a id="__codelineno-3-98" name="__codelineno-3-98" href="#__codelineno-3-98"></a>    <span class="c1"># Check inheritance</span>
-</span><span id="__span-3-99"><a id="__codelineno-3-99" name="__codelineno-3-99" href="#__codelineno-3-99"></a>    <span class="k">if</span> <span class="n">stage1</span><span class="o">.</span><span class="n">inherits_from</span><span class="p">:</span>
-</span><span id="__span-3-100"><a id="__codelineno-3-100" name="__codelineno-3-100" href="#__codelineno-3-100"></a>        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   Inherits from: </span><span class="si">{</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">stage1</span><span class="o">.</span><span class="n">inherits_from</span><span class="p">,</span><span class="w"> </span><span class="n">indent</span><span class="o">=</span><span class="mi">6</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span><span id="__span-3-79"><a id="__codelineno-3-79" name="__codelineno-3-79" href="#__codelineno-3-79"></a><span class="n">staging_results</span> <span class="o">=</span> <span class="n">staging_recipe</span><span class="o">.</span><span class="n">render</span><span class="p">(</span><span class="n">staging_variants</span><span class="p">)</span>
+</span><span id="__span-3-80"><a id="__codelineno-3-80" name="__codelineno-3-80" href="#__codelineno-3-80"></a>
+</span><span id="__span-3-81"><a id="__codelineno-3-81" name="__codelineno-3-81" href="#__codelineno-3-81"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Rendered </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">staging_results</span><span class="p">)</span><span class="si">}</span><span class="s2"> package(s)&quot;</span><span class="p">)</span>
+</span><span id="__span-3-82"><a id="__codelineno-3-82" name="__codelineno-3-82" href="#__codelineno-3-82"></a><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;(Staging outputs don&#39;t produce packages)&quot;</span><span class="p">)</span>
+</span><span id="__span-3-83"><a id="__codelineno-3-83" name="__codelineno-3-83" href="#__codelineno-3-83"></a><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;=&quot;</span> <span class="o">*</span> <span class="mi">60</span><span class="p">)</span>
+</span><span id="__span-3-84"><a id="__codelineno-3-84" name="__codelineno-3-84" href="#__codelineno-3-84"></a>
+</span><span id="__span-3-85"><a id="__codelineno-3-85" name="__codelineno-3-85" href="#__codelineno-3-85"></a><span class="k">for</span> <span class="n">rendered</span> <span class="ow">in</span> <span class="n">staging_results</span><span class="p">:</span>
+</span><span id="__span-3-86"><a id="__codelineno-3-86" name="__codelineno-3-86" href="#__codelineno-3-86"></a>    <span class="n">stage1</span> <span class="o">=</span> <span class="n">rendered</span><span class="o">.</span><span class="n">recipe</span>
+</span><span id="__span-3-87"><a id="__codelineno-3-87" name="__codelineno-3-87" href="#__codelineno-3-87"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="si">{</span><span class="n">stage1</span><span class="o">.</span><span class="n">package</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">stage1</span><span class="o">.</span><span class="n">package</span><span class="o">.</span><span class="n">version</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span><span id="__span-3-88"><a id="__codelineno-3-88" name="__codelineno-3-88" href="#__codelineno-3-88"></a>
+</span><span id="__span-3-89"><a id="__codelineno-3-89" name="__codelineno-3-89" href="#__codelineno-3-89"></a>    <span class="c1"># Check for staging caches</span>
+</span><span id="__span-3-90"><a id="__codelineno-3-90" name="__codelineno-3-90" href="#__codelineno-3-90"></a>    <span class="k">if</span> <span class="n">stage1</span><span class="o">.</span><span class="n">staging_caches</span><span class="p">:</span>
+</span><span id="__span-3-91"><a id="__codelineno-3-91" name="__codelineno-3-91" href="#__codelineno-3-91"></a>        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   Uses </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">stage1</span><span class="o">.</span><span class="n">staging_caches</span><span class="p">)</span><span class="si">}</span><span class="s2"> staging cache(s):&quot;</span><span class="p">)</span>
+</span><span id="__span-3-92"><a id="__codelineno-3-92" name="__codelineno-3-92" href="#__codelineno-3-92"></a>        <span class="k">for</span> <span class="n">cache</span> <span class="ow">in</span> <span class="n">stage1</span><span class="o">.</span><span class="n">staging_caches</span><span class="p">:</span>
+</span><span id="__span-3-93"><a id="__codelineno-3-93" name="__codelineno-3-93" href="#__codelineno-3-93"></a>            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;     - </span><span class="si">{</span><span class="n">cache</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span><span id="__span-3-94"><a id="__codelineno-3-94" name="__codelineno-3-94" href="#__codelineno-3-94"></a>            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;       Build script: </span><span class="si">{</span><span class="n">cache</span><span class="o">.</span><span class="n">build</span><span class="o">.</span><span class="n">script</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span><span id="__span-3-95"><a id="__codelineno-3-95" name="__codelineno-3-95" href="#__codelineno-3-95"></a>
+</span><span id="__span-3-96"><a id="__codelineno-3-96" name="__codelineno-3-96" href="#__codelineno-3-96"></a>    <span class="c1"># Check inheritance</span>
+</span><span id="__span-3-97"><a id="__codelineno-3-97" name="__codelineno-3-97" href="#__codelineno-3-97"></a>    <span class="k">if</span> <span class="n">stage1</span><span class="o">.</span><span class="n">inherits_from</span><span class="p">:</span>
+</span><span id="__span-3-98"><a id="__codelineno-3-98" name="__codelineno-3-98" href="#__codelineno-3-98"></a>        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;   Inherits from: </span><span class="si">{</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">stage1</span><span class="o">.</span><span class="n">inherits_from</span><span class="p">,</span><span class="w"> </span><span class="n">indent</span><span class="o">=</span><span class="mi">6</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </span></code></pre></div>
 <div class="language-text highlight"><pre><span></span><code>Recipe with Staging Output
 ============================================================
@@ -3135,7 +3133,7 @@ compiled-project-cli 1.5.0
 </span></code></pre></div>
 <div class="language-text highlight"><pre><span></span><code>Building Example 2 packages (with staging)...
 ============================================================
-Recipe path: /tmp/rattler_build_tm014gqd/recipe.yaml
+Recipe path: /tmp/rattler_build_soa34ljj/recipe.yaml
 
 Building variant 1/2
   Package: compiled-project-python
@@ -3144,8 +3142,8 @@ Building variant 1/2
   Staging caches: [&#39;shared-build&#39;]
 
 
-  Build complete in 1.57s!
-  Package: /tmp/rattler_build_tm014gqd/output/linux-64/compiled-project-python-1.5.0-hb0f4dca_0.conda
+  Build complete in 1.50s!
+  Package: /tmp/rattler_build_soa34ljj/output/linux-64/compiled-project-python-1.5.0-hb0f4dca_0.conda
   Variant: {&#39;target_platform&#39;: &#39;linux-64&#39;}
   Build log: 71 messages captured
 
@@ -3156,15 +3154,15 @@ Building variant 2/2
   Staging caches: [&#39;shared-build&#39;]
 
 
-  Build complete in 1.59s!
-  Package: /tmp/rattler_build_tm014gqd/output/linux-64/compiled-project-cli-1.5.0-hb0f4dca_0.conda
+  Build complete in 1.51s!
+  Package: /tmp/rattler_build_soa34ljj/output/linux-64/compiled-project-cli-1.5.0-hb0f4dca_0.conda
   Variant: {&#39;target_platform&#39;: &#39;linux-64&#39;}
   Build log: 74 messages captured
 
 ============================================================
 Example 2 builds completed successfully!
 
-Built packages are available in: /tmp/rattler_build_tm014gqd/output
+Built packages are available in: /tmp/rattler_build_soa34ljj/output
 </code></pre></div>
 <h2 id="summary">Summary<a class="headerlink" href="#summary" title="Permanent link">#</a></h2>
 <p>In this tutorial, you learned about multi-output recipes and staging:</p>
