@@ -16,9 +16,7 @@ from helpers import (
 
 def test_basic_staging(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     """Test basic staging output with multiple package outputs inheriting from it."""
-    rattler_build.build(
-        recipes / "staging/basic-staging.yaml", tmp_path, extra_args=["--experimental"]
-    )
+    rattler_build.build(recipes / "staging/basic-staging.yaml", tmp_path)
 
     # Both package outputs should be built
     pkg1 = get_extracted_package(tmp_path, "foo-split-1")
@@ -434,9 +432,7 @@ def test_staging_render_only(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
     """Test that rendering works correctly with staging outputs."""
-    rendered = rattler_build.render(
-        recipes / "staging/basic-staging.yaml", tmp_path, extra_args=["--experimental"]
-    )
+    rendered = rattler_build.render(recipes / "staging/basic-staging.yaml", tmp_path)
 
     # Should have 2 outputs (foo-split-1 and foo-othersplit)
     assert len(rendered) == 2
@@ -453,9 +449,7 @@ def test_staging_hash_includes_variant(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
     """Test that staging cache hash includes variant information."""
-    rendered = rattler_build.render(
-        recipes / "staging/basic-staging.yaml", tmp_path, extra_args=["--experimental"]
-    )
+    rendered = rattler_build.render(recipes / "staging/basic-staging.yaml", tmp_path)
 
     # Check that used_variant is set for staging caches
     for output in rendered:
@@ -487,7 +481,7 @@ def test_staging_different_platforms(
     rattler_build.build(
         recipes / "staging/basic-staging.yaml",
         tmp_path,
-        extra_args=["--experimental", "--target-platform", target_platform],
+        extra_args=["--target-platform", target_platform],
     )
 
     pkg1 = get_extracted_package(tmp_path, "foo-split-1")
@@ -499,9 +493,7 @@ def test_staging_with_tests(rattler_build: RattlerBuild, recipes: Path, tmp_path
     # The basic-staging.yaml includes tests that run 'cat $PREFIX/foo.txt'
     # This verifies the staging cache files are available during tests
 
-    rattler_build.build(
-        recipes / "staging/basic-staging.yaml", tmp_path, extra_args=["--experimental"]
-    )
+    rattler_build.build(recipes / "staging/basic-staging.yaml", tmp_path)
 
     # If tests failed, the build would have failed
     # Just verify the packages were created
