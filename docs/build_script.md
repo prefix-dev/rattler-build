@@ -22,6 +22,11 @@ list of string commands. Any commands you put there must be able to run on every
 platform for which you build. For example, you can't use the `cp` command
 because `cmd.exe` won't understand it on Windows.
 
+Note: auto-discovery of `build.sh`/`build.bat` only applies to single-output
+recipes. In a multi-output recipe, outputs never pick up these files
+implicitly; set `build.script` explicitly (either on the individual output or
+on the top-level `build:` block) if you want a build script to run.
+
 `build.sh` is run with `bash` and `build.bat` is run with `cmd.exe`.
 
 ```yaml title="recipe.yaml"

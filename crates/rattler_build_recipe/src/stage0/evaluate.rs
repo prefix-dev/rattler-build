@@ -26,6 +26,7 @@ use std::{
 };
 
 use indexmap::IndexMap;
+use rattler_build_script::ScriptContent;
 use rattler_build_types::NormalizedKey;
 use rattler_conda_types::{
     MatchSpec, NoArchType, PackageName, PackageNameMatcher, ParseStrictness, VersionWithSource,
@@ -2880,6 +2881,16 @@ fn evaluate_package_output_to_recipe(
         output_build
     };
 
+    // Multi-output recipes do not auto-discover `build.sh`/`build.bat`: a single
+    // shared build script is almost never what each output wants (e.g. noarch
+    // metapackages alongside a compiled main output). An unset script is treated
+    // as a no-op; users must set `build.script` explicitly on the output or
+    // top-level to run anything.
+    let mut build = build;
+    if build.script.content.is_default() {
+        build.script.content = ScriptContent::Commands(Vec::new());
+    }
+
     // Check if this output is skipped (already eagerly evaluated during Build::evaluate).
     // If skipped, return a minimal recipe early - this is like an outer `if: ...` conditional.
     // We skip evaluating requirements, tests, sources, etc. to avoid errors from
@@ -3254,10 +3265,12 @@ impl Evaluate for crate::stage0::MultiOutputRecipe {
 mod tests {
     use minijinja::UndefinedBehavior;
     use rattler_build_jinja::{JinjaConfig, Variable};
+    use rattler_build_script::ScriptContent;
 
     use super::*;
     use crate::stage0::{
         self,
+        parser::parse_recipe_or_multi_from_source,
         types::{Conditional, ConditionalList, Item, JinjaTemplate, NestedItemList, Value},
     };
 
@@ -4313,7 +4326,13 @@ outputs:
                 // Build section: should inherit dynamic_linking but NOT script
                 assert!(!cache_output.build.dynamic_linking.is_default()); // Inherited from top-level
                 assert!(!cache_output.build.dynamic_linking.rpaths.is_empty()); // Inherited from top-level
-                assert!(cache_output.build.script.is_default()); // NOT inherited (cache has its own script)
+                // Cache-inherited outputs don't pick up the top-level script, and
+                // multi-output outputs never auto-discover `build.sh`/`build.bat`,
+                // so the resolved script is an explicit no-op.
+                assert_eq!(
+                    cache_output.build.script.content,
+                    ScriptContent::Commands(Vec::new())
+                );
 
                 // Second output: inherits from top-level
                 let toplevel_output = &recipes[1];
@@ -4332,6 +4351,46 @@ outputs:
                 // Build section: should inherit everything including script
                 assert!(!toplevel_output.build.dynamic_linking.is_default()); // Inherited
                 assert!(!toplevel_output.build.script.is_default()); // Inherited (top-level has script)
+            }
+            _ => panic!("Expected MultiOutputRecipe"),
+        }
+    }
+
+    #[test]
+    fn test_multi_output_does_not_default_to_build_sh() {
+        // Outputs without an explicit `build.script` in a multi-output recipe
+        // must resolve to an empty command list, not to `Default` (which would
+        // trigger `build.sh`/`build.bat` auto-discovery at execution time).
+        let recipe_yaml = r#"
+schema_version: 1
+
+recipe:
+  name: myproject
+  version: 1.0.0
+
+outputs:
+  - package:
+      name: myproject-main
+  - package:
+      name: myproject-meta
+    build:
+      noarch: generic
+"#;
+
+        let parsed = parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        match parsed {
+            stage0::Recipe::MultiOutput(multi) => {
+                let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
+                let recipes = multi.evaluate(&ctx).unwrap();
+                assert_eq!(recipes.len(), 2);
+                for recipe in &recipes {
+                    assert_eq!(
+                        recipe.build.script.content,
+                        ScriptContent::Commands(Vec::new()),
+                        "multi-output recipe must not default script to build.sh/build.bat (output: {})",
+                        recipe.package.name.as_normalized()
+                    );
+                }
             }
             _ => panic!("Expected MultiOutputRecipe"),
         }
