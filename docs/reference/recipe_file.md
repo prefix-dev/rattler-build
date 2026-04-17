@@ -482,16 +482,19 @@ with the following fields (all optional):
   (nushell), `python`, `perl`, `rscript`, `ruby` and `node`/`nodejs`. When
   unset, the interpreter is auto-detected from the script's file extension
   (`.sh`, `.bat`, `.nu`, `.py`, `.pl`, `.r`, `.rb`, `.js`).
+- **`cwd`** - Working directory for the script, relative to the
+  `[build folder]/work` directory. Defaults to the `[build folder]/work`
+  directory itself.
 
-  !!! warning "Non-default interpreters need a build dependency"
-      Only `bash` and `cmd.exe` are assumed to exist on the build machine.
-      Every other interpreter must be added to `requirements.build` (or
-      otherwise be available on `PATH`) so the build environment actually
-      has it. For example, `interpreter: nu` requires `nushell` in
-      `requirements.build`; `interpreter: python` requires `python`;
-      `interpreter: node` requires `nodejs`, and so on.
-- **`cwd`** - Working directory for the script, relative to the build work
-  directory. Defaults to the work directory itself.
+!!! warning "Non-default interpreters need a build dependency"
+
+    Only `bash` and `cmd.exe` are assumed to exist on the build machine.
+    Every other interpreter must be added to `requirements.build` (or
+    otherwise be available on `PATH`) so the build environment actually
+    has it. For example:
+     - `interpreter: nu` requires `nushell` in `requirements.build`
+     - `interpreter: python` requires `python`
+     - `interpreter: node` requires `nodejs`
 
 ```yaml title="recipe.yaml"
 build:
