@@ -91,6 +91,9 @@ pub trait Interpreter {
         for (k, v) in args.env_vars.iter() {
             shell_script.set_env_var(k, v)?;
         }
+        // Re-entrancy marker: this way the preamble sources this file
+        // once and nested shells skip re-sourcing it.
+        shell_script.set_env_var("CONDA_BUILD", "1")?;
         let host_prefix_activator =
             Activator::from_path(&args.run_prefix, shell_type, args.execution_platform)?;
 

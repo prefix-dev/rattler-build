@@ -314,7 +314,6 @@ fn force_color_vars() -> HashMap<String, Option<String>> {
 pub fn vars(output: &Output, build_state: &str) -> HashMap<String, Option<String>> {
     let mut vars = HashMap::new();
 
-    insert!(vars, "CONDA_BUILD", "1");
     insert!(vars, "PYTHONNOUSERSITE", "1");
 
     if let Some((_, host_arch)) = output.host_platform().platform.to_string().rsplit_once('-') {
@@ -431,7 +430,6 @@ pub fn test_vars(
 ) -> HashMap<String, Option<String>> {
     let mut vars = HashMap::new();
 
-    insert!(vars, "CONDA_BUILD", "1");
     insert!(vars, "CONDA_BUILD_STATE", "TEST");
     insert!(vars, "SUBDIR", target_platform.to_string());
     insert!(vars, "target_platform", target_platform.to_string());

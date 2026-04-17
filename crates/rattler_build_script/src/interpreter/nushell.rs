@@ -89,6 +89,9 @@ impl Interpreter for NuShellInterpreter {
         for (k, v) in activation_variables.iter() {
             shell_script.set_env_var(k, v).unwrap();
         }
+        // Re-entrancy marker: this way the preamble sources this file
+        // once and nested shells skip re-sourcing it.
+        shell_script.set_env_var("CONDA_BUILD", "1").unwrap();
         let script = shell_script
             .contents()
             .expect("failed to construct shell script");
