@@ -228,10 +228,6 @@ pub async fn run_build(
         }
     }
 
-    if !tool_configuration.no_clean {
-        directories.clean().into_diagnostic()?;
-    }
-
     drop(enter);
 
     if !tool_configuration.no_clean {
