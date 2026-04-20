@@ -2919,6 +2919,10 @@ key in your <code>recipe.yaml</code>, with each value being either a string comm
 list of string commands. Any commands you put there must be able to run on every
 platform for which you build. For example, you can't use the <code>cp</code> command
 because <code>cmd.exe</code> won't understand it on Windows.</p>
+<p>Note: auto-discovery of <code>build.sh</code>/<code>build.bat</code> only applies to single-output
+recipes. In a multi-output recipe, outputs never pick up these files
+implicitly; set <code>build.script</code> explicitly (either on the individual output or
+on the top-level <code>build:</code> block) if you want a build script to run.</p>
 <p><code>build.sh</code> is run with <code>bash</code> and <code>build.bat</code> is run with <code>cmd.exe</code>.</p>
 <div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">build</span><span class="p">:</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">script</span><span class="p">:</span>

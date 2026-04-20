@@ -4200,16 +4200,20 @@ with the following fields (all optional):</p>
   (nushell), <code>python</code>, <code>perl</code>, <code>rscript</code>, <code>ruby</code> and <code>node</code>/<code>nodejs</code>. When
   unset, the interpreter is auto-detected from the script's file extension
   (<code>.sh</code>, <code>.bat</code>, <code>.nu</code>, <code>.py</code>, <code>.pl</code>, <code>.r</code>, <code>.rb</code>, <code>.js</code>).</li>
+<li><strong><code>cwd</code></strong> - Working directory for the script, relative to the
+  <code>[build folder]/work</code> directory. Defaults to the <code>[build folder]/work</code>
+  directory itself.</li>
 </ul>
-<p>!!! warning "Non-default interpreters need a build dependency"
-      Only <code>bash</code> and <code>cmd.exe</code> are assumed to exist on the build machine.
-      Every other interpreter must be added to <code>requirements.build</code> (or
-      otherwise be available on <code>PATH</code>) so the build environment actually
-      has it. For example, <code>interpreter: nu</code> requires <code>nushell</code> in
-      <code>requirements.build</code>; <code>interpreter: python</code> requires <code>python</code>;
-      <code>interpreter: node</code> requires <code>nodejs</code>, and so on.
-- <strong><code>cwd</code></strong> - Working directory for the script, relative to the build work
-  directory. Defaults to the work directory itself.</p>
+<div class="admonition warning">
+<p class="admonition-title">Non-default interpreters need a build dependency</p>
+<p>Only <code>bash</code> and <code>cmd.exe</code> are assumed to exist on the build machine.
+Every other interpreter must be added to <code>requirements.build</code> (or
+otherwise be available on <code>PATH</code>) so the build environment actually
+has it. For example:
+ - <code>interpreter: nu</code> requires <code>nushell</code> in <code>requirements.build</code>
+ - <code>interpreter: python</code> requires <code>python</code>
+ - <code>interpreter: node</code> requires <code>nodejs</code></p>
+</div>
 <div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-26-1"><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a><span class="nt">build</span><span class="p">:</span>
 </span><span id="__span-26-2"><a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a><span class="w">  </span><span class="nt">script</span><span class="p">:</span>
 </span><span id="__span-26-3"><a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a><span class="w">    </span><span class="nt">content</span><span class="p">:</span>
