@@ -2,6 +2,7 @@
 
 use crate::sandbox::SandboxConfiguration;
 use crate::script::{Script, ScriptContent};
+use fs_err as fs;
 use futures::TryStreamExt;
 use indexmap::IndexMap;
 use itertools::Itertools;
@@ -293,7 +294,7 @@ impl Script {
             ScriptContent::Default => {
                 let recipe_file = self.find_file(recipe_dir, extensions, Path::new("build"));
                 if let Some(recipe_file) = recipe_file {
-                    match fs_err::read_to_string(&recipe_file) {
+                    match fs::read_to_string(&recipe_file) {
                         Err(e) => Err(e),
                         Ok(content) => Ok(ResolvedScriptContents::Path(recipe_file, content)),
                     }
@@ -306,7 +307,7 @@ impl Script {
             ScriptContent::Path(path) => {
                 let recipe_file = self.find_file(recipe_dir, extensions, path);
                 if let Some(recipe_file) = recipe_file {
-                    match fs_err::read_to_string(&recipe_file) {
+                    match fs::read_to_string(&recipe_file) {
                         Err(e) => Err(e),
                         Ok(content) => Ok(ResolvedScriptContents::Path(recipe_file, content)),
                     }
@@ -326,7 +327,7 @@ impl Script {
                 } else {
                     let resolved_path = self.find_file(recipe_dir, extensions, Path::new(path));
                     if let Some(resolved_path) = resolved_path {
-                        match fs_err::read_to_string(&resolved_path) {
+                        match fs::read_to_string(&resolved_path) {
                             Err(e) => Err(e),
                             Ok(content) => Ok(ResolvedScriptContents::Path(resolved_path, content)),
                         }
@@ -556,6 +557,35 @@ const PLATFORM_PASSTHROUGH_ENV_VARS: &[&str] = &[
 #[cfg(not(any(target_os = "windows", target_os = "macos")))]
 const PLATFORM_PASSTHROUGH_ENV_VARS: &[&str] = &[];
 
+/// Configures the subprocess environment for the given isolation mode.
+fn configure_subprocess_env(
+    command: &mut tokio::process::Command,
+    env_vars: &IndexMap<String, String>,
+    secrets: &IndexMap<String, String>,
+    env_isolation: EnvironmentIsolation,
+) {
+    match env_isolation {
+        EnvironmentIsolation::Strict | EnvironmentIsolation::CondaBuild => {
+            command.env_clear();
+
+            for var in PASSTHROUGH_ENV_VARS
+                .iter()
+                .chain(PLATFORM_PASSTHROUGH_ENV_VARS)
+            {
+                if let Ok(value) = std::env::var(var) {
+                    command.env(var, value);
+                }
+            }
+
+            command.envs(env_vars);
+            command.envs(secrets.iter());
+        }
+        EnvironmentIsolation::None => {
+            command.envs(env_vars);
+        }
+    }
+}
+
 /// Spawns a process and replaces the given strings in the output with the given replacements.
 /// This is used to replace the host prefix with $PREFIX and the build prefix with $BUILD_PREFIX
 pub async fn run_process_with_replacements(
@@ -602,36 +632,7 @@ pub async fn run_process_with_replacements(
         tokio::process::Command::new(args[0])
     };
 
-    match env_isolation {
-        EnvironmentIsolation::Strict | EnvironmentIsolation::CondaBuild => {
-            // Start with a clean environment for reproducible builds.
-            command.env_clear();
-
-            // Pass through whitelisted host environment variables
-            for var in PASSTHROUGH_ENV_VARS
-                .iter()
-                .chain(PLATFORM_PASSTHROUGH_ENV_VARS)
-            {
-                if let Ok(value) = std::env::var(var) {
-                    command.env(var, value);
-                }
-            }
-
-            // Apply build environment variables (PATH, HOME, PREFIX, etc.)
-            // but exclude CONDA_BUILD so that the preamble in conda_build.sh
-            // will source the activation script (build_env.sh), which also
-            // runs package activation scripts (e.g., compiler setup for $CC).
-            command.envs(env_vars.iter().filter(|(k, _)| k.as_str() != "CONDA_BUILD"));
-
-            // Inject secrets so build scripts can access them (output masking
-            // is handled by the replacements map).
-            command.envs(secrets.iter());
-        }
-        EnvironmentIsolation::None => {
-            // Inherit full host environment, then overlay build variables
-            command.envs(env_vars);
-        }
-    }
+    configure_subprocess_env(&mut command, env_vars, secrets, env_isolation);
 
     command
         .current_dir(cwd)
@@ -721,6 +722,57 @@ pub async fn run_process_with_replacements(
 mod tests {
     use super::*;
     use tokio_util::bytes::BytesMut;
+
+    /// `CONDA_BUILD=1` must live inside the sourced activation script so that
+    /// nested shells inherit it while the outer subprocess starts without it.
+    #[test]
+    fn test_conda_build_marker_written_into_build_env_script() {
+        use crate::interpreter::BashInterpreter;
+        use rattler_shell::shell;
+
+        let tmp = tempfile::tempdir().unwrap();
+        let prefix = tmp.path().join("prefix");
+        fs_err::create_dir_all(&prefix).unwrap();
+
+        let args = ExecutionArgs {
+            script: ResolvedScriptContents::Inline(String::new()),
+            env_vars: IndexMap::new(),
+            secrets: IndexMap::new(),
+            execution_platform: Platform::current(),
+            build_prefix: None,
+            run_prefix: prefix,
+            work_dir: tmp.path().to_path_buf(),
+            sandbox_config: None,
+            env_isolation: EnvironmentIsolation::None,
+        };
+
+        let script = BashInterpreter.get_script(&args, shell::Bash).unwrap();
+        assert!(
+            script.contains("CONDA_BUILD") && script.contains("1"),
+            "build_env.sh must set CONDA_BUILD=1 for nested-shell re-entrancy, got:\n{script}"
+        );
+    }
+
+    /// The outer subprocess must start without `CONDA_BUILD` set, otherwise
+    /// the preamble skips sourcing the activation script.
+    #[test]
+    fn test_conda_build_not_leaked_to_subprocess_in_none_mode() {
+        let env_vars = IndexMap::new();
+        let secrets = IndexMap::new();
+
+        let mut command = tokio::process::Command::new("true");
+        configure_subprocess_env(
+            &mut command,
+            &env_vars,
+            &secrets,
+            EnvironmentIsolation::None,
+        );
+
+        assert!(
+            !command.as_std().get_envs().any(|(k, _)| k == "CONDA_BUILD"),
+            "CONDA_BUILD must not be set on the outer subprocess"
+        );
+    }
 
     #[test]
     fn test_cmd_errorlevel_injected() {
@@ -903,8 +955,8 @@ mod tests {
         use crate::script::{Script, ScriptContent};
 
         let dir = tempfile::tempdir().unwrap();
-        fs_err::write(dir.path().join("test-script.sh"), "#!/bin/bash\necho hello").unwrap();
-        fs_err::write(dir.path().join("test-script.bat"), "@echo off\necho hello").unwrap();
+        fs::write(dir.path().join("test-script.sh"), "#!/bin/bash\necho hello").unwrap();
+        fs::write(dir.path().join("test-script.bat"), "@echo off\necho hello").unwrap();
 
         let resolve = |content: ScriptContent, exts: &[&str]| -> PathBuf {
             let script = Script {
