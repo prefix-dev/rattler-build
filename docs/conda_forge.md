@@ -83,7 +83,7 @@ Ensure your recipe includes all required metadata:
 The PR template includes a checklist. Key items:
 
 - [ ] License file is included in the package
-- [ ] Recipe builds on all target platforms
+- [ ] Recipe builds on all host platforms
 - [ ] Tests are included and pass
 - [ ] Recipe follows conda-forge guidelines
 - [ ] You've added yourself as a maintainer

@@ -15,10 +15,10 @@ This example shows how to repackage the `linkerd` binary. The `linkerd` binary i
 
 !!! note
 
-    To repackage the `linkerd` package on `osx-arm64` for `linux-64`, you can pass the `--target-platform` argument to `rattler-build`:
+    To repackage the `linkerd` package on `osx-arm64` for `linux-64`, you can pass the `--host-platform` argument to `rattler-build`:
 
     ```bash
-    rattler-build build --target-platform linux-64 linkerd
+    rattler-build build --host-platform linux-64 linkerd
     ```
 
 ## Adding system requirements
