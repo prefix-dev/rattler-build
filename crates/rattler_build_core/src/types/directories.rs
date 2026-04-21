@@ -213,10 +213,7 @@ impl Directories {
             // delete path in `remove_dir_all_force` creates new sibling trash
             // dirs (`.{name}.pending-rm-{nanos}`), and we don't want the
             // iterator to pick them up and process them recursively.
-            let folders: Vec<_> = self
-                .build_dir
-                .read_dir()?
-                .collect::<Result<_, _>>()?;
+            let folders: Vec<_> = self.build_dir.read_dir()?.collect::<Result<_, _>>()?;
             for folder in folders {
                 let path = folder.path();
 
