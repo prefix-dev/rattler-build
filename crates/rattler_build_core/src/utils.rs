@@ -238,8 +238,9 @@ fn pending_removal_path(path: &Path) -> PathBuf {
     parent.join(format!(".{base}.pending-rm-{unique}"))
 }
 
-/// Strip any `.pending-rm-{digits}` suffixes and a single leading `.` that
-/// `pending_removal_path` may have added on a previous attempt.
+/// Strip any `.pending-rm-{digits}` suffixes and the matching leading `.`
+/// that `pending_removal_path` prepended alongside each suffix on previous
+/// attempts, so repeated renames don't drift the recovered base name.
 #[cfg(windows)]
 fn strip_pending_rm(name: &str) -> &str {
     const MARKER: &str = ".pending-rm-";
@@ -248,11 +249,12 @@ fn strip_pending_rm(name: &str) -> &str {
         let tail = &stripped[idx + MARKER.len()..];
         if !tail.is_empty() && tail.bytes().all(|b| b.is_ascii_digit()) {
             stripped = &stripped[..idx];
+            stripped = stripped.strip_prefix('.').unwrap_or(stripped);
         } else {
             break;
         }
     }
-    stripped.strip_prefix('.').unwrap_or(stripped)
+    stripped
 }
 
 /// Make the path and any children writable by adjusting permissions.
