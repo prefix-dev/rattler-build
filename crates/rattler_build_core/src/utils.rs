@@ -337,7 +337,7 @@ mod tests {
         );
         assert_eq!(
             strip_pending_rm(".work.pending-rm-123.pending-rm-notdigits"),
-            "work.pending-rm-123.pending-rm-notdigits"
+            ".work.pending-rm-123.pending-rm-notdigits"
         );
     }
 
