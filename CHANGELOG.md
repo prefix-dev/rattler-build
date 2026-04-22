@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.63.0] - 2026-04-22
+### ✨ Highlights
+
+The staging output is no longer experimental! 🎉
+
+> [!WARNING]
+> Multi-output recipes no longer auto-discover `build.sh` / `build.bat` files. Each output must now explicitly reference its build script. To preserve current behavior use `script: build` (which auto-selects `.sh` or `.bat`) in the output.
+
+### Added
+
+- Remove experimental guard for staging outputs by @Hofer-Julian in [#2432](https://github.com/prefix-dev/rattler-build/pull/2432)
+
+
+### Documentation
+
+- Fix warning syntax and more tweaks by @salim-b in [#2435](https://github.com/prefix-dev/rattler-build/pull/2435)
+
+
+### Fixed
+
+- Fix zizmor lint by @Hofer-Julian in [#2434](https://github.com/prefix-dev/rattler-build/pull/2434)
+- Set CONDA_BUILD env var in build_env.sh to fix env-isolation none by @Hofer-Julian in [#2433](https://github.com/prefix-dev/rattler-build/pull/2433)
+- Disable build file auto-discovery for multi-output recipes by @Hofer-Julian in [#2436](https://github.com/prefix-dev/rattler-build/pull/2436)
+- Prevent stacking of pending-rm suffixes on Windows cleanup by @wolfv in [#2439](https://github.com/prefix-dev/rattler-build/pull/2439)
+
+
+
 ## [0.62.2] - 2026-04-16
 ### ✨ Highlights
 
