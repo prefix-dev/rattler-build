@@ -1298,6 +1298,25 @@ def test_channel_specific(rattler_build: RattlerBuild, recipes: Path, tmp_path: 
             assert d["channel"] == "https://conda.anaconda.org/quantstack/"
 
 
+def test_channel_specific_with_sources(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(
+        recipes / "channel_specific_with_sources/recipe.yaml",
+        tmp_path,
+    )
+    pkg = get_extracted_package(tmp_path, "channel_specific_with_sources")
+
+    assert (pkg / "info/recipe/rendered_recipe.yaml").exists()
+    # load yaml
+    text = (pkg / "info/recipe/rendered_recipe.yaml").read_text()
+    rendered_recipe = yaml.safe_load(text)
+    print(text)
+    deps = rendered_recipe["finalized_dependencies"]["host"]["resolved"]
+
+    for d in deps:
+        if d["name"] == "r-dwls":
+            assert d["channel"] == "https://conda.anaconda.org/bioconda/"
+
+
 def test_run_exports_from(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
 ):
