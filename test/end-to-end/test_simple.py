@@ -1298,7 +1298,9 @@ def test_channel_specific(rattler_build: RattlerBuild, recipes: Path, tmp_path: 
             assert d["channel"] == "https://conda.anaconda.org/quantstack/"
 
 
-def test_channel_specific_with_sources(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+def test_channel_specific_with_sources(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
     rattler_build.build(
         recipes / "channel_specific_with_sources/recipe.yaml",
         tmp_path,
