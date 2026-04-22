@@ -262,6 +262,13 @@ pub fn os_vars(
         match env_isolation {
             EnvironmentIsolation::Strict => {
                 insert!(vars, "USERPROFILE", work_dir.to_string_lossy());
+                // Mirror what we do for HOME on Unix: set APPDATA and LOCALAPPDATA to
+                // local paths within the work directory so that tools relying on them
+                // (e.g. via the dirs crate) don't fail in stripped test environments.
+                let appdata = work_dir.join("AppData").join("Roaming");
+                let localappdata = work_dir.join("AppData").join("Local");
+                insert!(vars, "APPDATA", appdata.to_string_lossy());
+                insert!(vars, "LOCALAPPDATA", localappdata.to_string_lossy());
             }
             EnvironmentIsolation::CondaBuild => {
                 vars.insert("USERPROFILE".to_string(), env::var("USERPROFILE").ok());

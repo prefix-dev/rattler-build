@@ -430,7 +430,12 @@ impl ConfigurationBuilder {
     /// Construct a [`Configuration`] from the builder.
     pub fn finish(self) -> Configuration {
         let cache_dir = self.cache_dir.unwrap_or_else(|| {
-            rattler_cache::default_cache_dir().expect("failed to determine default cache directory")
+            rattler_cache::default_cache_dir().unwrap_or_else(|_| {
+                // On Windows the dirs crate uses SHGetKnownFolderPath which can fail when
+                // APPDATA/LOCALAPPDATA are stripped (e.g. in conda feedstock test environments).
+                // Fall back to the system temp directory so the process doesn't panic.
+                std::env::temp_dir().join("rattler-build")
+            })
         });
         let client = self.client.unwrap_or_default();
         let package_cache = PackageCache::new(cache_dir.join(rattler_cache::PACKAGE_CACHE_DIR));
