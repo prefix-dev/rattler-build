@@ -22,7 +22,10 @@ use crate::{
     env_vars,
     metadata::{Output, build_reindexed_channels},
     packaging::Files,
-    post_process::package_nature::{LibraryNameMap, PrefixInfo},
+    post_process::{
+        checks::extract_linux_sysroot_lib_names,
+        package_nature::{LibraryNameMap, PrefixInfo},
+    },
     render::resolved_dependencies::{
         FinalizedDependencies, RunExportsDownload, install_environments, resolve_dependencies,
     },
@@ -79,6 +82,14 @@ pub struct StagingCacheMetadata {
     /// physically installed in the host prefix.
     #[serde(default)]
     pub library_name_map: LibraryNameMap,
+
+    /// Shared library file names (e.g. `libc.so.6`) from the sysroot package
+    /// installed in the staging cache's build environment. Captured here so
+    /// that inheriting outputs can treat them as system libraries during
+    /// overlinking checks even though the staging cache's build prefix is not
+    /// restored for inheriting outputs.
+    #[serde(default)]
+    pub build_system_libs: Vec<String>,
 }
 
 impl Output {
@@ -148,8 +159,9 @@ impl Output {
     /// 2. If yes, restore the cached files to the prefix
     /// 3. If no, build the staging cache and save it
     ///
-    /// Returns the finalized dependencies, sources, and library name map from
-    /// the staging cache.
+    /// Returns the finalized dependencies, sources, library name map, and
+    /// sysroot system library names captured from the staging cache's build
+    /// prefix.
     pub async fn build_or_restore_staging_cache(
         &self,
         staging: &StagingCache,
@@ -159,6 +171,7 @@ impl Output {
             FinalizedDependencies,
             Vec<rattler_build_recipe::stage1::Source>,
             LibraryNameMap,
+            Vec<String>,
         ),
         miette::Error,
     > {
@@ -226,6 +239,7 @@ impl Output {
             FinalizedDependencies,
             Vec<rattler_build_recipe::stage1::Source>,
             LibraryNameMap,
+            Vec<String>,
         ),
         miette::Error,
     > {
@@ -269,6 +283,18 @@ impl Output {
         // the staging cache's host deps are no longer installed.
         let prefix_info = PrefixInfo::from_prefix(self.prefix()).into_diagnostic()?;
         let library_name_map = LibraryNameMap::from_prefix_info(&prefix_info);
+
+        // Capture sysroot library file names from the staging cache's build
+        // environment. The build prefix is not restored for inheriting
+        // outputs, so we snapshot the sysroot DSO names here and attach them
+        // to the cache metadata. `find_system_libs` uses this list so that
+        // libraries like `libc.so.6` are recognised as system libs when the
+        // inheriting output does not declare its own compiler/sysroot build
+        // dependency.
+        let build_system_libs = extract_linux_sysroot_lib_names(
+            &self.build_configuration.directories.build_prefix,
+            self.build_configuration.target_platform,
+        );
 
         // Run the build script
         let target_platform = self.build_configuration.target_platform;
@@ -399,6 +425,7 @@ impl Output {
             prefix: self.prefix().to_path_buf(),
             variant: staging.used_variant.clone(),
             library_name_map: library_name_map.clone(),
+            build_system_libs: build_system_libs.clone(),
         };
 
         let metadata_json = serde_json::to_string_pretty(&metadata).into_diagnostic()?;
@@ -410,7 +437,12 @@ impl Output {
             metadata.work_dir_files.len()
         );
 
-        Ok((finalized_dependencies, finalized_sources, library_name_map))
+        Ok((
+            finalized_dependencies,
+            finalized_sources,
+            library_name_map,
+            build_system_libs,
+        ))
     }
 
     /// Restore a staging cache from disk
@@ -423,6 +455,7 @@ impl Output {
             FinalizedDependencies,
             Vec<rattler_build_recipe::stage1::Source>,
             LibraryNameMap,
+            Vec<String>,
         ),
         miette::Error,
     > {
@@ -466,6 +499,7 @@ impl Output {
             metadata.finalized_dependencies,
             metadata.finalized_sources,
             metadata.library_name_map,
+            metadata.build_system_libs,
         ))
     }
 
@@ -482,6 +516,7 @@ impl Output {
             FinalizedDependencies,
             Vec<rattler_build_recipe::stage1::Source>,
             LibraryNameMap,
+            Vec<String>,
         )>,
         miette::Error,
     > {
@@ -498,7 +533,7 @@ impl Output {
                 "Building or restoring staging cache: {}",
                 staging_cache.name
             );
-            let (_deps, _sources, _lib_map) = self
+            let (_deps, _sources, _lib_map, _sys_libs) = self
                 .build_or_restore_staging_cache(staging_cache, tool_configuration)
                 .await?;
         }
@@ -519,11 +554,11 @@ impl Output {
                 })?;
 
             // Get or build the cache
-            let (deps, sources, lib_map) = self
+            let (deps, sources, lib_map, sys_libs) = self
                 .build_or_restore_staging_cache(staging, tool_configuration)
                 .await?;
 
-            Ok(Some((deps, sources, lib_map)))
+            Ok(Some((deps, sources, lib_map, sys_libs)))
         } else {
             Ok(None)
         }

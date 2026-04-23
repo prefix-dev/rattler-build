@@ -67,6 +67,14 @@ pub struct BuildOutput {
     /// physically installed in the host prefix.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub staging_library_name_map: Option<LibraryNameMap>,
+
+    /// Shared library file names (e.g. `libc.so.6`, `libpthread.so.0`) from
+    /// the sysroot package installed in the staging cache's build environment.
+    /// Propagated to inheriting outputs so `find_system_libs` recognises them
+    /// as system libraries even when the inheriting output does not declare a
+    /// compiler/sysroot build dependency of its own.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub staging_build_system_libs: Vec<String>,
 }
 
 impl BuildOutput {

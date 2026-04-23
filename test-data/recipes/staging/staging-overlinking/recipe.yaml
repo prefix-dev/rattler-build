@@ -1,9 +1,17 @@
 # Test case: Overlinking check with staging outputs
 #
-# When a package inherits from a staging cache, the staging cache's host
-# dependencies (like zlib) are not installed in the prefix during the
-# overlinking check. The staging library name map must be used as a fallback
-# to resolve libraries to their providing packages.
+# When a package inherits from a staging cache, two classes of dependencies
+# are not installed in the child's prefix during the overlinking check:
+#
+# 1. The staging cache's host dependencies (like `zlib`) — resolved via the
+#    staging library name map.
+# 2. The staging cache's build dependencies that provide system libraries
+#    (like `sysroot_linux-64`, which provides `libc.so.6`, `libpthread.so.0`)
+#    — resolved via the sysroot library names captured from the staging
+#    cache's build prefix.
+#
+# This test intentionally does NOT use `missing_dso_allowlist` so both paths
+# are exercised end-to-end.
 
 schema_version: 1
 
@@ -15,8 +23,6 @@ build:
   number: 0
   dynamic_linking:
     overlinking_behavior: error
-    missing_dso_allowlist:
-      - "libc*"
 
 outputs:
   - staging:

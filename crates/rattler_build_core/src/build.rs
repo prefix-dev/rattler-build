@@ -136,12 +136,14 @@ pub async fn run_build(
     // This will build or restore staging caches and return their dependencies/sources if inherited
     let staging_result = output.process_staging_caches(tool_configuration).await?;
 
-    // If we inherit from a staging cache, store its dependencies, sources, and
-    // library name map for overlinking checks
-    if let Some((deps, sources, library_name_map)) = staging_result {
+    // If we inherit from a staging cache, store its dependencies, sources,
+    // library name map, and captured sysroot system lib names for overlinking
+    // checks.
+    if let Some((deps, sources, library_name_map, build_system_libs)) = staging_result {
         output.finalized_cache_dependencies = Some(deps);
         output.finalized_cache_sources = Some(sources);
         output.staging_library_name_map = Some(library_name_map);
+        output.staging_build_system_libs = build_system_libs;
     }
 
     // Fetch sources for this output

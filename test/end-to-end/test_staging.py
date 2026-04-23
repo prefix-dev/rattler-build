@@ -611,15 +611,21 @@ def test_staging_overlinking(
 ):
     """Test that overlinking checks pass for staging outputs via library name map.
 
-    When a package inherits from a staging cache, the staging cache's host
-    dependencies (e.g. zlib) are not installed in the host prefix during the
-    overlinking check of the inheriting package. The fix captures a library name
-    map at staging build time and uses it as a fallback in the overlinking check.
+    When a package inherits from a staging cache, two classes of dependencies
+    are not installed in the child's prefix during the overlinking check:
 
-    This test compiles a small C program that links against libz, packages it
-    via a staging output with overlinking_behavior: error, and verifies the
-    build succeeds (i.e. libz.so.1 is correctly attributed to zlib via the
-    staging library name map).
+    1. The staging cache's host deps (e.g. zlib) — resolved via the staging
+       library name map captured from the staging cache's host prefix.
+    2. The staging cache's build deps that provide system libraries (e.g.
+       sysroot_linux-64 supplying libc.so.6 and libpthread.so.0) — resolved
+       via sysroot library names captured from the staging cache's build
+       prefix.
+
+    This test compiles a small C program that links against libz and libc,
+    packages it via a staging output with `overlinking_behavior: error` and no
+    `missing_dso_allowlist`, and verifies the build succeeds — i.e. both
+    libz.so.1 (host dep) and libc.so.6 / libpthread.so.0 (system libs from
+    the staging cache's build prefix) are correctly attributed.
     """
     rattler_build.build(
         recipes / "staging/staging-overlinking",

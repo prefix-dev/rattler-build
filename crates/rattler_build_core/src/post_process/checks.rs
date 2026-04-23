@@ -450,46 +450,80 @@ fn add_windows_system_libs(
     Ok(())
 }
 
+/// Extract shared library file names from a `sysroot_<target_platform>`
+/// package installed in the given build prefix. Returns an empty vector if no
+/// matching sysroot package is present.
+///
+/// This is the same data that `add_linux_system_libs` normally looks up from
+/// the current build environment. It is factored out so it can also be
+/// captured at staging-cache build time (before the build prefix is torn
+/// down) and re-used by outputs that inherit from the cache without
+/// re-declaring the compiler/sysroot themselves.
+pub(crate) fn extract_linux_sysroot_lib_names(
+    build_prefix: &Path,
+    target_platform: Platform,
+) -> Vec<String> {
+    let conda_meta = build_prefix.join("conda-meta");
+    let Ok(entries) = fs_err::read_dir(&conda_meta) else {
+        return Vec::new();
+    };
+
+    let sysroot_prefix = format!("sysroot_{}", target_platform);
+    let so_glob = match Glob::new("*.so*") {
+        Ok(g) => g.compile_matcher(),
+        Err(_) => return Vec::new(),
+    };
+
+    for entry in entries.filter_map(|e| e.ok()) {
+        let path = entry.path();
+        if path.extension().and_then(|e| e.to_str()) != Some("json") {
+            continue;
+        }
+        let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else {
+            continue;
+        };
+        if !stem.starts_with(&sysroot_prefix) {
+            continue;
+        }
+        let Ok(record) = PrefixRecord::from_path(&path) else {
+            continue;
+        };
+        return record
+            .files
+            .iter()
+            .filter_map(|file| {
+                let file_name = file.file_name()?;
+                so_glob
+                    .is_match(file_name)
+                    .then(|| file_name.to_string_lossy().to_string())
+            })
+            .collect();
+    }
+
+    Vec::new()
+}
+
 fn add_linux_system_libs(
     output: &Output,
     system_libs: &mut GlobSetBuilder,
 ) -> Result<(), globset::Error> {
-    if let Some(sysroot_package) = output
-        .finalized_dependencies
-        .clone()
-        .expect("failed to get the finalized dependencies")
-        .build
-        .and_then(|deps| {
-            deps.resolved.into_iter().find(|v| {
-                v.identifier.identifier.name.starts_with(&format!(
-                    "sysroot_{}",
-                    output.build_configuration.target_platform
-                ))
-            })
-        })
-    {
-        let prefix_record_name = format!(
-            "conda-meta/{}-{}-{}.json",
-            sysroot_package.package_record.name.as_normalized(),
-            sysroot_package.package_record.version,
-            sysroot_package.package_record.build
-        );
-
-        let sysroot_path = output
-            .build_configuration
-            .directories
-            .build_prefix
-            .join(prefix_record_name);
-        let record = PrefixRecord::from_path(sysroot_path).unwrap();
-        let so_glob = Glob::new("*.so*")?.compile_matcher();
-        for file in record.files {
-            if let Some(file_name) = file.file_name()
-                && so_glob.is_match(file_name)
-            {
-                system_libs.add(Glob::new(&file_name.to_string_lossy())?);
-            }
-        }
+    let lib_names = extract_linux_sysroot_lib_names(
+        &output.build_configuration.directories.build_prefix,
+        output.build_configuration.target_platform,
+    );
+    for name in lib_names {
+        system_libs.add(Glob::new(&name)?);
     }
+
+    // If the output inherits from a staging cache, also include system library
+    // names captured from the staging cache's build environment. The staging
+    // cache's build prefix is not restored for inheriting outputs, so libraries
+    // like `libc.so.6` and `libpthread.so.0` from its sysroot package would
+    // otherwise trigger overlinking errors.
+    for name in &output.staging_build_system_libs {
+        system_libs.add(Glob::new(name)?);
+    }
+
     Ok(())
 }
 
@@ -753,6 +787,29 @@ pub fn perform_linking_checks(
 mod tests {
     use super::*;
     use fs_err;
+
+    #[test]
+    fn test_extract_linux_sysroot_lib_names_missing_prefix() {
+        let tmp = tempfile::tempdir().unwrap();
+        // No conda-meta directory at all — should return empty, not panic.
+        let names = extract_linux_sysroot_lib_names(tmp.path(), Platform::Linux64);
+        assert!(names.is_empty());
+    }
+
+    #[test]
+    fn test_extract_linux_sysroot_lib_names_no_sysroot_package() {
+        let tmp = tempfile::tempdir().unwrap();
+        fs_err::create_dir_all(tmp.path().join("conda-meta")).unwrap();
+        // Irrelevant conda-meta entry — the sysroot lookup should still
+        // return empty.
+        fs_err::write(
+            tmp.path().join("conda-meta/some-other-pkg-1.0-0.json"),
+            "{}",
+        )
+        .unwrap();
+        let names = extract_linux_sysroot_lib_names(tmp.path(), Platform::Linux64);
+        assert!(names.is_empty());
+    }
 
     #[test]
     fn test_extract_tbd_install_names() {
