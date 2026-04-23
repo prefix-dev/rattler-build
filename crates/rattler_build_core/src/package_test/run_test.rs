@@ -1026,6 +1026,7 @@ async fn run_commands_test(
     );
 
     tracing::info!("Testing commands:");
+
     commands_test
         .script
         .run_script(
