@@ -279,6 +279,11 @@ impl Output {
             self.build_configuration.env_isolation,
             &self.build_configuration.directories.work_dir,
         ));
+        env_vars.extend(env_vars::env_vars_from_variant(self.variant()));
+
+        // Override PKG_NAME with the staging cache name so the script sees the
+        // staging cache identity rather than the inheriting output's name.
+        env_vars.insert("PKG_NAME".to_string(), Some(staging.name.clone()));
 
         // Create Jinja context
         let selector_config = self.build_configuration.selector_config();
