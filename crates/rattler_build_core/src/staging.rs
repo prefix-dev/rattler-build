@@ -284,7 +284,13 @@ impl Output {
         // A staging cache does not produce a package, so the PKG_* vars
         // (which would otherwise carry the inheriting output's identity) are
         // misleading here.
-        for key in ["PKG_NAME", "PKG_VERSION", "PKG_BUILDNUM", "PKG_BUILD_STRING", "PKG_HASH"] {
+        for key in [
+            "PKG_NAME",
+            "PKG_VERSION",
+            "PKG_BUILDNUM",
+            "PKG_BUILD_STRING",
+            "PKG_HASH",
+        ] {
             env_vars.remove(key);
         }
 
