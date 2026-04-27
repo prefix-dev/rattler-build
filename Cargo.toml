@@ -44,7 +44,7 @@ async-recursion = "1.1.1"
 async-trait = "0.1"
 bzip2 = "0.6.1"
 chrono = "0.4.44"
-clap = { version = "4.6.0", features = ["derive"] }
+clap = { version = "4.6.1", features = ["derive"] }
 dashmap = "6.1"
 dunce = "1.0.5"
 console = { version = "0.16.3", features = ["windows-console-colors"] }
@@ -58,7 +58,7 @@ insta = "1.46.3"
 itertools = "0.14.0"
 hex = "0.4.3"
 libc = "0.2"
-md-5 = "0.10"
+md-5 = "0.11"
 lazy_static = "1.5.0"
 miette = "7.6.0"
 minijinja = { version = "2.18.0", features = [
@@ -68,7 +68,7 @@ minijinja = { version = "2.18.0", features = [
 regex = "1.12.3"
 reqwest = { version = "0.12.28", default-features = false, features = ["json"] }
 reqwest-middleware = { version = "0.4.2", features = ["json"] }
-reqwest-retry = "0.8.0"
+reqwest-retry = "0.9.1"
 retry-policies = "0.5.1"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
@@ -81,7 +81,7 @@ strum = "0.28.0"
 tar = "0.4.44"
 tempfile = "3.27.0"
 thiserror = "2.0.18"
-tokio = { version = "1.50.0", features = ["rt", "macros"] }
+tokio = { version = "1.52.1", features = ["rt", "macros"] }
 tokio-util = { version = "0.7.18", features = ["codec", "compat"] }
 toml = "1.0.7"
 tracing = "0.1.44"
@@ -97,14 +97,14 @@ pathdiff = "0.2.3"
 marked-yaml = "0.8.0"
 rstest = "0.26.1"
 petgraph = { version = "0.8.3", default-features = false }
-sha1 = { version = "0.10.6" }
+sha1 = { version = "0.11.0" }
 lzma-rust2 = { version = "0.16", features = ["xz"] }
 line-ending = "1.5.1"
 anyhow = "1.0.102"
 content_inspector = "0.2.4"
 memchr = "2.8.0"
 memmap2 = "0.9.10"
-rayon = "1.11.0"
+rayon = "1.12.0"
 serial_test = "3.4.0"
 unicode-normalization = "0.1.25"
 
