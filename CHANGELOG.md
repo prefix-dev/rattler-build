@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.63.1] - 2026-04-27
+### ✨ Highlights
+
+
+
+### Fixed
+
+- Use force directory removal to handle Windows file locks by @wolfv in [#2444](https://github.com/prefix-dev/rattler-build/pull/2444)
+- Remove PKG_* environment variables in staging cache, set variant values by @wolfv in [#2449](https://github.com/prefix-dev/rattler-build/pull/2449)
+
+
+
 ## [0.63.0] - 2026-04-22
 ### ✨ Highlights
 
