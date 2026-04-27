@@ -27,6 +27,7 @@ use crate::{
         FinalizedDependencies, RunExportsDownload, install_environments, resolve_dependencies,
     },
     source::{copy_dir::CopyDir, fetch_sources},
+    utils::remove_dir_all_force,
 };
 
 /// Error type for staging cache operations
@@ -195,7 +196,7 @@ impl Output {
                                 e
                             );
                             // Remove corrupted cache and rebuild
-                            fs::remove_dir_all(&cache_dir).into_diagnostic()?;
+                            remove_dir_all_force(&cache_dir).into_diagnostic()?;
                         }
                     },
                     Err(e) => {
@@ -204,7 +205,7 @@ impl Output {
                             metadata_path.display(),
                             e
                         );
-                        fs::remove_dir_all(&cache_dir).into_diagnostic()?;
+                        remove_dir_all_force(&cache_dir).into_diagnostic()?;
                     }
                 }
             }
@@ -430,16 +431,20 @@ impl Output {
         let work_dir_cache = cache_dir.join("work_dir");
 
         // IMPORTANT: Clean the prefix directory before restoring from cache
-        // The prefix may already have files from dependency installation or previous builds
+        // The prefix may already have files from dependency installation or previous builds.
+        // Use `remove_dir_all_force` so Windows can rename-before-delete when a
+        // lingering handle (antivirus, indexer, build tool) would otherwise
+        // cause `remove_dir_all` to fail with "Access is denied" (os error 5).
         if self.prefix().exists() {
             tracing::debug!("Removing existing prefix before cache restoration");
-            fs::remove_dir_all(self.prefix()).into_diagnostic()?;
+            remove_dir_all_force(self.prefix()).into_diagnostic()?;
         }
 
         // Clean the work directory as well
         if self.build_configuration.directories.work_dir.exists() {
             tracing::debug!("Removing existing work directory before cache restoration");
-            fs::remove_dir_all(&self.build_configuration.directories.work_dir).into_diagnostic()?;
+            remove_dir_all_force(&self.build_configuration.directories.work_dir)
+                .into_diagnostic()?;
         }
 
         // Restore prefix files
