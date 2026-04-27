@@ -45,6 +45,7 @@ use crate::{
             PrefixDetection as Stage0PrefixDetection, PrefixIgnore as Stage0PrefixIgnore,
             PythonBuild as Stage0PythonBuild, VariantKeyUsage as Stage0VariantKeyUsage,
         },
+        match_spec::matchspec_parse_options,
         requirements::{
             IgnoreRunExports as Stage0IgnoreRunExports, RunExports as Stage0RunExports,
         },
@@ -581,6 +582,47 @@ pub fn evaluate_string_list(
     evaluate_string_list_items(list.as_slice(), context)
 }
 
+/// Evaluate V3 package flags.
+fn evaluate_flag_list(
+    list: &ConditionalList<rattler_conda_types::Flag>,
+    context: &EvaluationContext,
+) -> Result<Vec<rattler_conda_types::Flag>, ParseError> {
+    let flags = evaluate_conditional_list(list.as_slice(), context, |value, ctx| {
+        if let Some(flag) = value.as_concrete() {
+            Ok(Some(flag.clone()))
+        } else if let Some(template) = value.as_template() {
+            let rendered = render_template(template.source(), ctx, value.span())?;
+            if rendered.is_empty() {
+                Ok(None)
+            } else {
+                rendered.parse().map(Some).map_err(|e| {
+                    ParseError::invalid_value(
+                        "flag",
+                        format!("Invalid package flag '{}': {}", rendered, e),
+                        value.span().copied().unwrap_or_else(Span::new_blank),
+                    )
+                })
+            }
+        } else {
+            unreachable!("Value must be either concrete or template")
+        }
+    })?;
+
+    if !flags.is_empty() && !context.v3() {
+        return Err(ParseError::invalid_value(
+            "build.flags",
+            "package flags require the --v3 flag",
+            list.as_slice()
+                .first()
+                .and_then(|item| item.as_value())
+                .and_then(|value| value.span().copied())
+                .unwrap_or_else(Span::new_blank),
+        ));
+    }
+
+    Ok(flags)
+}
+
 /// Evaluate skip expressions as Jinja boolean expressions
 ///
 /// Skip values are Jinja expressions like `is_abi3`, `not unix`, etc.
@@ -894,6 +936,7 @@ pub(crate) fn is_free_matchspec(spec: &rattler_conda_types::MatchSpec) -> bool {
         sha256,
         file_name,
         extras,
+        flags,
         url,
         license,
         condition,
@@ -912,6 +955,7 @@ pub(crate) fn is_free_matchspec(spec: &rattler_conda_types::MatchSpec) -> bool {
         && sha256.is_none()
         && file_name.is_none()
         && extras.is_none()
+        && flags.is_none()
         && url.is_none()
         && license.is_none()
         && license_family.is_none()
@@ -941,6 +985,7 @@ pub fn evaluate_dependency_list(
 ) -> Result<Vec<crate::stage1::Dependency>, ParseError> {
     evaluate_conditional_list(list.as_slice(), context, |value, ctx| {
         if let Some(match_spec) = value.as_concrete() {
+            ensure_matchspec_v3_allowed(&match_spec.0, ctx, value.span())?;
             Ok(Some(Dependency::Spec(Box::new(match_spec.0.clone()))))
         } else if let Some(template) = value.as_template() {
             let s = render_template(template.source(), ctx, value.span())?;
@@ -951,7 +996,7 @@ pub fn evaluate_dependency_list(
             }
 
             let span_opt = value.span().copied();
-            let dep = parse_dependency_string(&s, &span_opt)?;
+            let dep = parse_dependency_string(&s, &span_opt, ctx.v3())?;
             Ok(Some(dep))
         } else {
             unreachable!("Value must be either concrete or template")
@@ -959,10 +1004,32 @@ pub fn evaluate_dependency_list(
     })
 }
 
+fn ensure_matchspec_v3_allowed(
+    spec: &MatchSpec,
+    context: &EvaluationContext,
+    span: Option<&Span>,
+) -> Result<(), ParseError> {
+    if !context.v3()
+        && spec.required_repodata_revision() == rattler_conda_types::RepodataRevision::V3
+    {
+        return Err(ParseError::invalid_value(
+            "match spec",
+            format!("V3 MatchSpec syntax requires the --v3 flag: '{}'", spec),
+            span.copied().unwrap_or_else(Span::new_blank),
+        ));
+    }
+
+    Ok(())
+}
+
 /// Parse a dependency string into a Dependency
 ///
 /// Handles both JSON pin expressions and regular MatchSpec strings
-fn parse_dependency_string(s: &str, span: &Option<Span>) -> Result<Dependency, ParseError> {
+fn parse_dependency_string(
+    s: &str,
+    span: &Option<Span>,
+    v3: bool,
+) -> Result<Dependency, ParseError> {
     let span = (*span).unwrap_or_else(Span::new_blank);
 
     // Check if it's a JSON dictionary (pin_subpackage or pin_compatible)
@@ -977,13 +1044,14 @@ fn parse_dependency_string(s: &str, span: &Option<Span>) -> Result<Dependency, P
         })
     } else {
         // It's a regular MatchSpec string
-        let spec = MatchSpec::from_str(s, ParseStrictness::Strict).map_err(|e| {
-            ParseError::invalid_value(
-                "match spec",
-                format!("Invalid match spec '{}': {}", s, e),
-                span,
-            )
-        })?;
+        let spec = MatchSpec::from_str(s, matchspec_parse_options(ParseStrictness::Strict, v3))
+            .map_err(|e| {
+                ParseError::invalid_value(
+                    "match spec",
+                    format!("Invalid match spec '{}': {}", s, e),
+                    span,
+                )
+            })?;
         Ok(Dependency::Spec(Box::new(spec)))
     }
 }
@@ -1451,11 +1519,26 @@ impl Evaluate for Stage0Requirements {
     type Output = Stage1Requirements;
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
+        if !self.extras.is_empty() && !context.v3() {
+            return Err(ParseError::invalid_value(
+                "requirements.extras",
+                "optional dependency groups require the --v3 flag",
+                Span::new_blank(),
+            ));
+        }
+
+        let extras = self
+            .extras
+            .iter()
+            .map(|(name, deps)| Ok((name.clone(), evaluate_dependency_list(deps, context)?)))
+            .collect::<Result<_, ParseError>>()?;
+
         Ok(Stage1Requirements {
             build: evaluate_dependency_list(&self.build, context)?,
             host: evaluate_dependency_list(&self.host, context)?,
             run: evaluate_dependency_list(&self.run, context)?,
             run_constraints: evaluate_dependency_list(&self.run_constraints, context)?,
+            extras,
             run_exports: self.run_exports.evaluate(context)?,
             ignore_run_exports: self.ignore_run_exports.evaluate(context)?,
         })
@@ -1824,6 +1907,9 @@ impl Evaluate for Stage0Build {
         // This tracks accessed variables for proper variant hash computation
         let skip = evaluate_skip_list(&self.skip, context)?;
 
+        // Evaluate V3 package flags.
+        let flags = evaluate_flag_list(&self.flags, context)?;
+
         // Evaluate python configuration
         let python = self.python.evaluate(context)?;
 
@@ -1894,6 +1980,7 @@ impl Evaluate for Stage0Build {
             string,
             script,
             noarch,
+            flags,
             python,
             skip,
             always_copy_files,
@@ -2654,6 +2741,13 @@ fn merge_stage1_build(
     // Noarch: inherit from top-level if not set in output
     let noarch = output.noarch.or(toplevel.noarch);
 
+    // V3 package flags: use output if not empty, otherwise inherit from top-level
+    let flags = if output.flags.is_empty() {
+        toplevel.flags
+    } else {
+        output.flags
+    };
+
     // Python: use output if not default, otherwise inherit from top-level
     let python = if output.python.is_default() {
         toplevel.python
@@ -2722,6 +2816,7 @@ fn merge_stage1_build(
         number,
         string,
         noarch,
+        flags,
         python,
         skip,
         always_copy_files,

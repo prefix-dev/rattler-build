@@ -14,8 +14,7 @@ use crate::{
             StagingBuild, StagingMetadata, StagingOutput,
         },
         parser::{
-            get_span, parse_about, parse_build, parse_extra, parse_requirements, parse_source,
-            parse_tests,
+            ParseConfig, get_span, parse_about, parse_build, parse_extra, parse_source, parse_tests,
         },
     },
 };
@@ -25,6 +24,7 @@ use crate::{
 /// Multi-output recipes have an "outputs" section and use "recipe" instead of "package"
 pub fn parse_multi_output_recipe(
     mapping: &marked_yaml::types::MarkedMappingNode,
+    config: ParseConfig,
 ) -> ParseResult<MultiOutputRecipe> {
     // Parse optional schema_version
     let schema_version = if let Some(schema_node) = mapping.get("schema_version") {
@@ -109,7 +109,7 @@ pub fn parse_multi_output_recipe(
     let outputs_node = mapping.get("outputs").ok_or_else(|| {
         ParseError::missing_field("outputs", get_span(&MarkedNode::Mapping(mapping.clone())))
     })?;
-    let outputs = parse_outputs(outputs_node)?;
+    let outputs = parse_outputs(outputs_node, config)?;
 
     // Validate: at least one output required
     if outputs.is_empty() {
@@ -200,7 +200,7 @@ fn parse_recipe_metadata(yaml: &MarkedNode) -> ParseResult<RecipeMetadata> {
 }
 
 /// Parse outputs section (list of staging and package outputs)
-fn parse_outputs(yaml: &MarkedNode) -> ParseResult<Vec<Output>> {
+fn parse_outputs(yaml: &MarkedNode, config: ParseConfig) -> ParseResult<Vec<Output>> {
     let sequence = yaml.as_sequence().ok_or_else(|| {
         ParseError::expected_type("sequence", "non-sequence", get_span(yaml))
             .with_message("outputs must be a list")
@@ -216,9 +216,13 @@ fn parse_outputs(yaml: &MarkedNode) -> ParseResult<Vec<Output>> {
 
         // Determine output type by checking which key is present
         if mapping.get("staging").is_some() {
-            outputs.push(Output::Staging(Box::new(parse_staging_output(mapping)?)));
+            outputs.push(Output::Staging(Box::new(parse_staging_output(
+                mapping, config,
+            )?)));
         } else if mapping.get("package").is_some() {
-            outputs.push(Output::Package(Box::new(parse_package_output(mapping)?)));
+            outputs.push(Output::Package(Box::new(parse_package_output(
+                mapping, config,
+            )?)));
         } else {
             return Err(ParseError::invalid_value(
                 "output",
@@ -235,6 +239,7 @@ fn parse_outputs(yaml: &MarkedNode) -> ParseResult<Vec<Output>> {
 /// Parse a staging output
 fn parse_staging_output(
     mapping: &marked_yaml::types::MarkedMappingNode,
+    config: ParseConfig,
 ) -> ParseResult<StagingOutput> {
     // Parse staging metadata (required)
     let staging_node = mapping.get("staging").ok_or_else(|| {
@@ -251,7 +256,7 @@ fn parse_staging_output(
 
     // Parse optional requirements (only build/host/ignore_run_exports allowed)
     let requirements = if let Some(req_node) = mapping.get("requirements") {
-        parse_staging_requirements(req_node)?
+        parse_staging_requirements(req_node, config)?
     } else {
         Requirements::default()
     };
@@ -315,7 +320,7 @@ fn parse_staging_metadata(yaml: &MarkedNode) -> ParseResult<StagingMetadata> {
 }
 
 /// Parse staging requirements (only build/host/ignore_run_exports allowed)
-fn parse_staging_requirements(yaml: &MarkedNode) -> ParseResult<Requirements> {
+fn parse_staging_requirements(yaml: &MarkedNode, config: ParseConfig) -> ParseResult<Requirements> {
     let mapping = yaml.as_mapping().ok_or_else(|| {
         ParseError::expected_type("mapping", "non-mapping", get_span(yaml))
             .with_message("requirements must be a mapping")
@@ -343,7 +348,7 @@ fn parse_staging_requirements(yaml: &MarkedNode) -> ParseResult<Requirements> {
     )?;
 
     // Parse using the regular parse_requirements function
-    parse_requirements(yaml)
+    super::requirements::parse_requirements_with_config(yaml, config)
 }
 
 /// Parse staging build (only script allowed)
@@ -429,6 +434,7 @@ fn parse_package_metadata(yaml: &MarkedNode) -> ParseResult<crate::stage0::Packa
 /// Parse a package output
 fn parse_package_output(
     mapping: &marked_yaml::types::MarkedMappingNode,
+    config: ParseConfig,
 ) -> ParseResult<PackageOutput> {
     // Parse package metadata (required)
     let package_node = mapping.get("package").ok_or_else(|| {
@@ -452,7 +458,7 @@ fn parse_package_output(
 
     // Parse optional requirements
     let requirements = if let Some(req_node) = mapping.get("requirements") {
-        parse_requirements(req_node)?
+        super::requirements::parse_requirements_with_config(req_node, config)?
     } else {
         crate::stage0::Requirements::default()
     };

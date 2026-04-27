@@ -19,7 +19,7 @@ use rattler_conda_types::{
     compression_level::CompressionLevel,
     package::{CondaArchiveIdentifier, IndexJson, PackageFile},
 };
-use rattler_index::{IndexFsConfig, index_fs};
+use rattler_index::{IndexFsConfig, PackageRevisionAssignment, index_fs};
 use rattler_package_streaming::write::write_conda_package;
 use rattler_shell::{
     activation::ActivationError,
@@ -445,6 +445,8 @@ pub async fn run_test(
         repodata_patch: None,
         write_zst: false,
         write_shards: false,
+        repodata_revisions: Vec::new(),
+        package_revision_assignment: PackageRevisionAssignment::default(),
         force: false,
         max_parallel: num_cpus::get_physical(),
         multi_progress: None,

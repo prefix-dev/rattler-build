@@ -29,12 +29,13 @@ impl PyRenderConfig {
     /// Create a new render configuration with default settings
     #[allow(clippy::too_many_arguments)]
     #[new]
-    #[pyo3(signature = (target_platform=None, build_platform=None, host_platform=None, experimental=false, recipe_path=None, extra_context=None, build_string_prefix=None, build_number_override=None))]
+    #[pyo3(signature = (target_platform=None, build_platform=None, host_platform=None, experimental=false, v3=false, recipe_path=None, extra_context=None, build_string_prefix=None, build_number_override=None))]
     fn new(
         target_platform: Option<String>,
         build_platform: Option<String>,
         host_platform: Option<String>,
         experimental: bool,
+        v3: bool,
         recipe_path: Option<PathBuf>,
         extra_context: Option<Bound<'_, PyDict>>,
         build_string_prefix: Option<String>,
@@ -87,6 +88,7 @@ impl PyRenderConfig {
             inner: RustRenderConfig {
                 extra_context,
                 experimental,
+                v3,
                 recipe_path,
                 target_platform,
                 build_platform,
@@ -136,6 +138,11 @@ impl PyRenderConfig {
         self.inner.experimental
     }
 
+    /// Get whether V3 recipe fields and MatchSpec syntax are enabled
+    fn v3(&self) -> bool {
+        self.inner.v3
+    }
+
     /// Get the recipe path
     fn recipe_path(&self) -> Option<PathBuf> {
         self.inner.recipe_path.clone()
@@ -143,11 +150,12 @@ impl PyRenderConfig {
 
     fn __repr__(&self) -> String {
         format!(
-            "RenderConfig(target_platform='{}', build_platform='{}', host_platform='{}', experimental={})",
+            "RenderConfig(target_platform='{}', build_platform='{}', host_platform='{}', experimental={}, v3={})",
             self.inner.target_platform,
             self.inner.build_platform,
             self.inner.host_platform,
-            self.inner.experimental
+            self.inner.experimental,
+            self.inner.v3
         )
     }
 }

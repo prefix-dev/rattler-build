@@ -224,6 +224,7 @@ pub(crate) fn output_from_rendered_variant(
             env_isolation,
             sandbox_config: None,
             exclude_newer,
+            v3: false,
         },
         finalized_dependencies: None,
         finalized_sources: None,

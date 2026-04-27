@@ -24,8 +24,10 @@ pub use output::{
 };
 pub use package::{Package, PackageMetadata};
 pub use parser::{
-    parse_recipe, parse_recipe_from_source, parse_recipe_or_multi,
-    parse_recipe_or_multi_from_source,
+    ParseConfig, parse_recipe, parse_recipe_from_source, parse_recipe_from_source_with_config,
+    parse_recipe_or_multi, parse_recipe_or_multi_from_source,
+    parse_recipe_or_multi_from_source_with_config, parse_recipe_or_multi_with_config,
+    parse_recipe_with_config,
 };
 pub use requirements::Requirements;
 pub use source::Source;

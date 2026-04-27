@@ -8,7 +8,7 @@ use rattler_conda_types::{
     compression_level::CompressionLevel,
     package::{CondaArchiveType, PathsJson},
 };
-use rattler_index::{IndexFsConfig, index_fs};
+use rattler_index::{IndexFsConfig, PackageRevisionAssignment, index_fs};
 use rattler_repodata_gateway::{CacheClearMode, SubdirSelection};
 use rattler_virtual_packages::{
     DetectVirtualPackageError, VirtualPackageOverrides, VirtualPackages,
@@ -167,6 +167,8 @@ pub async fn build_reindexed_channels(
         repodata_patch: None,
         write_zst: false,
         write_shards: false,
+        repodata_revisions: Vec::new(),
+        package_revision_assignment: PackageRevisionAssignment::default(),
         force: false,
         max_parallel: num_cpus::get_physical(),
         multi_progress: None,

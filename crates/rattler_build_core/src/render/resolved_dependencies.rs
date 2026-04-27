@@ -1,6 +1,6 @@
 use std::{
     borrow::Cow,
-    collections::HashMap,
+    collections::{BTreeMap, HashMap},
     fmt::{Display, Formatter},
     sync::Arc,
 };
@@ -235,6 +235,8 @@ pub struct FinalizedRunDependencies {
     pub depends: Vec<DependencyInfo>,
     #[serde(default)]
     pub constraints: Vec<DependencyInfo>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub extra_depends: BTreeMap<String, Vec<DependencyInfo>>,
     #[serde(default, skip_serializing_if = "RunExportsJson::is_empty")]
     pub run_exports: RunExportsJson,
 }
@@ -1021,6 +1023,22 @@ pub(crate) async fn resolve_dependencies(
 
     let rendered_run_exports = render_run_exports(output, &compatibility_specs)?;
 
+    let extra_depends = requirements
+        .extras
+        .iter()
+        .map(|(name, deps)| {
+            Ok((
+                name.clone(),
+                apply_variant(
+                    deps,
+                    &output.build_configuration,
+                    &compatibility_specs,
+                    false,
+                )?,
+            ))
+        })
+        .collect::<Result<BTreeMap<_, _>, ResolveError>>()?;
+
     let mut host_run_exports = HashMap::new();
 
     // Grab the host run exports from the cache
@@ -1049,6 +1067,7 @@ pub(crate) async fn resolve_dependencies(
     let run_specs = FinalizedRunDependencies {
         depends,
         constraints,
+        extra_depends,
         run_exports: rendered_run_exports,
     };
 
