@@ -38,6 +38,7 @@ mod test {
                     constrains: vec![],
                     depends: vec![],
                     features: None,
+                    flags: Vec::new(),
                     legacy_bz2_md5: None,
                     legacy_bz2_size: None,
                     license: Some("MIT".into()),

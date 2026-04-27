@@ -365,11 +365,11 @@ pub fn assemble_package_py(
         constrains: constrains.unwrap_or_default(),
         noarch: noarch_type,
         track_features: Vec::new(),
+        flags: Vec::new(),
         features: None,
         python_site_packages_path: None,
         purls: None,
         experimental_extra_depends: Default::default(),
-        flags: Vec::new(),
         repodata_revision: None,
     };
     builder = builder.with_index(index);

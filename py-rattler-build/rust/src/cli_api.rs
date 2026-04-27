@@ -66,6 +66,7 @@ pub fn build_recipes_py(
     let common = CommonData::new(
         output_dir,
         false,
+        false,
         auth_file.map(|a| a.into()),
         config,
         channel_priority,
@@ -172,6 +173,7 @@ pub fn test_package_py(
     let config = ConfigBase::<()>::default();
     let common = CommonData::new(
         None,
+        false,
         false,
         auth_file,
         config,

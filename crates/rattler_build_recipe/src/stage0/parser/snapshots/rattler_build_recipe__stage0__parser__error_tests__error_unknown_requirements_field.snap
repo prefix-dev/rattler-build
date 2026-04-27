@@ -10,5 +10,5 @@ expression: error_with_source
    ·      ╰── invalid value for 'requirements': unknown field 'install'
  9 │     - python
    ╰────
-  help: valid fields are: build, host, run, run_constraints, run_exports,
-        ignore_run_exports
+  help: valid fields are: build, host, run, run_constraints, extras,
+        run_exports, ignore_run_exports

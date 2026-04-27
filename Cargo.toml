@@ -133,36 +133,36 @@ tracing-test = "0.2.6"
 # rattler crates
 # Rattler crates
 rattler_conda_types = { version = "0.45.0", default-features = false }
-rattler_digest = { version = "1.2.3", default-features = false, features = [
+rattler_digest = { version = "1.2.4", default-features = false, features = [
   "serde",
 ] }
-rattler_networking = { version = "0.26.8", default-features = false }
-rattler_package_streaming = { version = "0.24.8", default-features = false }
-rattler_shell = { version = "0.26.8", default-features = false, features = [
+rattler_networking = { version = "0.26.10", default-features = false }
+rattler_package_streaming = { version = "0.24.10", default-features = false }
+rattler_shell = { version = "0.26.10", default-features = false, features = [
   "sysinfo",
 ] }
 rattler_git = { version = "0.1.1" }
 rattler_prefix_guard = { version = "0.1.0" }
 
-rattler_config = { version = "0.3.8" }
-rattler = { version = "0.40.5", default-features = false, features = [
+rattler_config = { version = "0.3.10" }
+rattler = { version = "0.40.7", default-features = false, features = [
   "cli-tools",
   "indicatif",
 ] }
-rattler_cache = { version = "0.6.20", default-features = false }
+rattler_cache = { version = "0.6.22", default-features = false }
 rattler_index = { version = "0.28.0", default-features = false }
-rattler_upload = { version = "0.5.6", default-features = false }
-rattler_s3 = { version = "0.1.31" }
-rattler_redaction = { version = "0.1.13", default-features = false }
-rattler_repodata_gateway = { version = "0.27.5", default-features = false, features = [
+rattler_upload = { version = "0.5.8", default-features = false }
+rattler_s3 = { version = "0.1.33" }
+rattler_redaction = { version = "0.1.14", default-features = false }
+rattler_repodata_gateway = { version = "0.27.7", default-features = false, features = [
   "gateway",
 ] }
 rattler_solve = { version = "6.0.0", default-features = false, features = [
   "resolvo",
   "serde",
 ] }
-rattler_virtual_packages = { version = "2.3.17", default-features = false }
-rattler_menuinst = "0.2.55"
+rattler_virtual_packages = { version = "2.3.19", default-features = false }
+rattler_menuinst = "0.2.57"
 
 
 # Internal rattler-build crates
@@ -289,19 +289,3 @@ pretty_assertions = { workspace = true }
 [[bench]]
 name = "parse_file"
 harness = false
-
-[patch.crates-io]
-# rattler = { git = "https://github.com/conda/rattler", branch = "main" }
-# rattler_sandbox = { git = "https://github.com/conda/rattler", branch = "main" }
-# rattler_cache = { git = "https://github.com/conda/rattler", branch = "main" }
-# rattler_conda_types = { git = "https://github.com/conda/rattler", branch = "main" }
-# rattler_digest = { git = "https://github.com/conda/rattler", branch = "main" }
-# rattler_index = { git = "https://github.com/conda/rattler", branch = "main" }
-# rattler_networking = { git = "https://github.com/conda/rattler", branch = "main" }
-# rattler_repodata_gateway = { git = "https://github.com/conda/rattler", branch = "main" }
-# rattler_shell = { git = "https://github.com/conda/rattler", branch = "main" }
-# rattler_solve = { git = "https://github.com/conda/rattler", branch = "main" }
-# rattler_redaction = { git = "https://github.com/conda/rattler", branch = "main" }
-# rattler_virtual_packages = { git = "https://github.com/conda/rattler", branch = "main" }
-# rattler_package_streaming = { git = "https://github.com/conda/rattler", branch = "main" }
-# rattler_menuinst = { git = "https://github.com/conda/rattler", branch = "main" }

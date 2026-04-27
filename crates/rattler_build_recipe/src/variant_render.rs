@@ -93,6 +93,8 @@ pub struct RenderConfig {
     pub extra_context: IndexMap<String, Variable>,
     /// Whether experimental features are enabled
     pub experimental: bool,
+    /// Whether V3 recipe fields and MatchSpec syntax are enabled
+    pub v3: bool,
     /// Path to the recipe file (for relative path resolution in Jinja functions)
     pub recipe_path: Option<PathBuf>,
     /// Target platform for the build
@@ -119,6 +121,7 @@ impl Default for RenderConfig {
         Self {
             extra_context: IndexMap::new(),
             experimental: false,
+            v3: false,
             recipe_path: None,
             target_platform: rattler_conda_types::Platform::current(),
             build_platform: rattler_conda_types::Platform::current(),
@@ -145,6 +148,12 @@ impl RenderConfig {
     /// Enable experimental features
     pub fn with_experimental(mut self, experimental: bool) -> Self {
         self.experimental = experimental;
+        self
+    }
+
+    /// Enable V3 recipe fields and MatchSpec syntax
+    pub fn with_v3(mut self, v3: bool) -> Self {
+        self.v3 = v3;
         self
     }
 
@@ -904,10 +913,11 @@ fn build_evaluation_context(
     // NOTE: Do NOT call with_context() here - that will be done by Stage0Recipe::evaluate()
     // Calling it here would cause double-evaluation of context templates, leading to bugs
     // where e.g., `mpi: ${{ mpi ~ "foobar" }}` would evaluate to "blafoobarfoobar" instead of "blafoobar"
-    Ok(EvaluationContext::with_variables_config_and_os_env_keys(
+    Ok(EvaluationContext::with_variables_config_os_env_keys_and_v3(
         context_map,
         jinja_config,
         config.os_env_var_keys.clone(),
+        config.v3,
     ))
 }
 
@@ -932,7 +942,8 @@ fn render_with_empty_combinations(
     let empty_variant = BTreeMap::new();
     let jinja_config = create_jinja_config(config, &empty_variant);
     let context =
-        EvaluationContext::with_variables_and_config(config.extra_context.clone(), jinja_config);
+        EvaluationContext::with_variables_and_config(config.extra_context.clone(), jinja_config)
+            .with_v3(config.v3);
 
     // Evaluate the recipe
     let outputs = evaluate_recipe(stage0_recipe, &context)?;
@@ -1207,7 +1218,10 @@ pub fn render_recipe_with_variants(
     let yaml_content = fs_err::read_to_string(recipe_path)
         .map_err(|e| ParseError::io_error(recipe_path.to_path_buf(), e))?;
 
-    let stage0_recipe = stage0::parse_recipe_or_multi_from_source(&yaml_content)?;
+    let stage0_recipe = stage0::parse_recipe_or_multi_from_source_with_config(
+        &yaml_content,
+        stage0::ParseConfig { v3: config.v3 },
+    )?;
 
     // Load variant configuration
     let variant_config =
@@ -1501,6 +1515,82 @@ python:
 
         // Should create variants based on free spec "python"
         assert_eq!(rendered.len(), 2);
+    }
+
+    #[test]
+    fn test_render_v3_matchspec_requires_render_config() {
+        let recipe_yaml = r#"
+package:
+  name: test-pkg
+  version: "1.0.0"
+
+requirements:
+  run:
+    - 'foo[extras=[bar]]'
+"#;
+
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source_with_config(
+            recipe_yaml,
+            stage0::ParseConfig { v3: true },
+        )
+        .unwrap();
+        let variant_config = VariantConfig::default();
+
+        let err =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, RenderConfig::new())
+                .unwrap_err();
+        assert!(err.to_string().contains("--v3"));
+
+        let rendered = render_recipe_with_variant_config(
+            &stage0_recipe,
+            &variant_config,
+            RenderConfig::new().with_v3(true),
+        )
+        .unwrap();
+        assert_eq!(rendered.len(), 1);
+        assert_eq!(
+            rendered[0].recipe.requirements.run[0].to_string(),
+            "foo[extras=[bar]]"
+        );
+    }
+
+    #[test]
+    fn test_render_v3_recipe_fields_require_render_config() {
+        let recipe_yaml = r#"
+package:
+  name: test-pkg
+  version: "1.0.0"
+
+build:
+  flags:
+    - cuda
+
+requirements:
+  extras:
+    dev:
+      - pytest
+"#;
+
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config = VariantConfig::default();
+
+        let err =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, RenderConfig::new())
+                .unwrap_err();
+        assert!(err.to_string().contains("--v3"));
+
+        let rendered = render_recipe_with_variant_config(
+            &stage0_recipe,
+            &variant_config,
+            RenderConfig::new().with_v3(true),
+        )
+        .unwrap();
+        assert_eq!(rendered.len(), 1);
+        assert_eq!(rendered[0].recipe.build.flags[0].as_str(), "cuda");
+        assert_eq!(
+            rendered[0].recipe.requirements.extras["dev"][0].to_string(),
+            "pytest"
+        );
     }
 
     #[test]

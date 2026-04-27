@@ -55,6 +55,8 @@ pub struct EvaluationContext {
     /// OS environment variable keys that can be overridden by variant configuration.
     /// These should be included in the used_variant even if not directly accessed during evaluation.
     os_env_var_keys: HashSet<String>,
+    /// Whether V3 MatchSpec syntax and recipe fields are enabled.
+    v3: bool,
 }
 
 impl Default for EvaluationContext {
@@ -64,6 +66,7 @@ impl Default for EvaluationContext {
             jinja_config: JinjaConfig::default(),
             accessed_variables: Arc::new(Mutex::new(HashSet::new())),
             os_env_var_keys: HashSet::new(),
+            v3: false,
         }
     }
 }
@@ -102,6 +105,7 @@ impl EvaluationContext {
             jinja_config: JinjaConfig::default(),
             accessed_variables: Arc::new(Mutex::new(HashSet::new())),
             os_env_var_keys: HashSet::new(),
+            v3: false,
         }
     }
 
@@ -112,6 +116,7 @@ impl EvaluationContext {
             jinja_config: JinjaConfig::default(),
             accessed_variables: Arc::new(Mutex::new(HashSet::new())),
             os_env_var_keys: HashSet::new(),
+            v3: false,
         }
     }
 
@@ -126,6 +131,7 @@ impl EvaluationContext {
             jinja_config,
             accessed_variables: Arc::new(Mutex::new(HashSet::new())),
             os_env_var_keys: HashSet::new(),
+            v3: false,
         }
     }
 
@@ -135,11 +141,27 @@ impl EvaluationContext {
         jinja_config: JinjaConfig,
         os_env_var_keys: HashSet<String>,
     ) -> Self {
+        Self::with_variables_config_os_env_keys_and_v3(
+            variables,
+            jinja_config,
+            os_env_var_keys,
+            false,
+        )
+    }
+
+    /// Create an evaluation context with variables, config, OS env var keys, and V3 support.
+    pub fn with_variables_config_os_env_keys_and_v3(
+        variables: IndexMap<String, Variable>,
+        jinja_config: JinjaConfig,
+        os_env_var_keys: HashSet<String>,
+        v3: bool,
+    ) -> Self {
         Self {
             variables,
             jinja_config,
             accessed_variables: Arc::new(Mutex::new(HashSet::new())),
             os_env_var_keys,
+            v3,
         }
     }
 
@@ -153,6 +175,7 @@ impl EvaluationContext {
             jinja_config,
             accessed_variables: Arc::new(Mutex::new(HashSet::new())),
             os_env_var_keys: HashSet::new(),
+            v3: false,
         }
     }
 
@@ -164,6 +187,17 @@ impl EvaluationContext {
     /// Get the OS environment variable keys
     pub fn os_env_var_keys(&self) -> &HashSet<String> {
         &self.os_env_var_keys
+    }
+
+    /// Returns whether V3 MatchSpec syntax and recipe fields are enabled.
+    pub fn v3(&self) -> bool {
+        self.v3
+    }
+
+    /// Enable or disable V3 support on this context.
+    pub fn with_v3(mut self, v3: bool) -> Self {
+        self.v3 = v3;
+        self
     }
 
     /// Check if a variable exists in the context
