@@ -280,6 +280,20 @@ impl Output {
             self.build_configuration.env_isolation,
             &self.build_configuration.directories.work_dir,
         ));
+        env_vars.extend(env_vars::env_vars_from_variant(self.variant()));
+
+        // A staging cache does not produce a package, so the PKG_* vars
+        // (which would otherwise carry the inheriting output's identity) are
+        // misleading here.
+        for key in [
+            "PKG_NAME",
+            "PKG_VERSION",
+            "PKG_BUILDNUM",
+            "PKG_BUILD_STRING",
+            "PKG_HASH",
+        ] {
+            env_vars.remove(key);
+        }
 
         // Create Jinja context
         let selector_config = self.build_configuration.selector_config();
