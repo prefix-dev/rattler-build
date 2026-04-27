@@ -281,9 +281,12 @@ impl Output {
         ));
         env_vars.extend(env_vars::env_vars_from_variant(self.variant()));
 
-        // Override PKG_NAME with the staging cache name so the script sees the
-        // staging cache identity rather than the inheriting output's name.
-        env_vars.insert("PKG_NAME".to_string(), Some(staging.name.clone()));
+        // A staging cache does not produce a package, so the PKG_* vars
+        // (which would otherwise carry the inheriting output's identity) are
+        // misleading here.
+        for key in ["PKG_NAME", "PKG_VERSION", "PKG_BUILDNUM", "PKG_BUILD_STRING", "PKG_HASH"] {
+            env_vars.remove(key);
+        }
 
         // Create Jinja context
         let selector_config = self.build_configuration.selector_config();
