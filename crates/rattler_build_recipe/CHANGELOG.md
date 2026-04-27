@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.7](https://github.com/prefix-dev/rattler-build/compare/rattler_build_recipe-v0.1.6...rattler_build_recipe-v0.1.7) - 2026-04-27
+
+### Added
+
+- remove experimental guard for staging outputs ([#2432](https://github.com/prefix-dev/rattler-build/pull/2432))
+
+### Fixed
+
+- disable build file auto-discovery for multi-output recipes ([#2436](https://github.com/prefix-dev/rattler-build/pull/2436))
+
 ## [0.1.6](https://github.com/prefix-dev/rattler-build/compare/rattler_build_recipe-v0.1.5...rattler_build_recipe-v0.1.6) - 2026-04-13
 
 ### Added

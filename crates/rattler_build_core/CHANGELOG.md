@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.5](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.4...rattler_build_core-v0.2.5) - 2026-04-27
+
+### Fixed
+
+- remove PKG_* environment variables in staging cache, set variant values ([#2449](https://github.com/prefix-dev/rattler-build/pull/2449))
+- use force directory removal to handle Windows file locks ([#2444](https://github.com/prefix-dev/rattler-build/pull/2444))
+- prevent stacking of pending-rm suffixes on Windows cleanup ([#2439](https://github.com/prefix-dev/rattler-build/pull/2439))
+- set CONDA_BUILD env var in build_env.sh to fix env-isolation none ([#2433](https://github.com/prefix-dev/rattler-build/pull/2433))
+- include default env vars also in test environment ([#2425](https://github.com/prefix-dev/rattler-build/pull/2425))
+
 ## [0.2.4](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.3...rattler_build_core-v0.2.4) - 2026-04-13
 
 ### Added
