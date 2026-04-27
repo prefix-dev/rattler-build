@@ -4697,7 +4697,7 @@ dependencies = [
 
 [[package]]
 name = "rattler_build_core"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "anyhow",
  "arwen-codesign",
@@ -4811,7 +4811,7 @@ dependencies = [
 
 [[package]]
 name = "rattler_build_package"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "chrono",
  "content_inspector",
@@ -4839,7 +4839,7 @@ dependencies = [
 
 [[package]]
 name = "rattler_build_recipe"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "fs-err",
  "globset",
@@ -4900,7 +4900,7 @@ dependencies = [
 
 [[package]]
 name = "rattler_build_script"
-version = "0.2.3"
+version = "0.2.4"
 dependencies = [
  "clap",
  "console",
