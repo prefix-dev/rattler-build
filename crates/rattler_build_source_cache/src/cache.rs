@@ -772,7 +772,7 @@ fn tar_unpack_error(context: &str, e: std::io::Error) -> CacheError {
             hint: Extracting this archive failed on Windows. The archive may contain symbolic \
             links, which require Developer Mode or administrator privileges to create. \
             Please enable Developer Mode in: \
-            Settings > System > For developers > Developer Mode, then retry the build."
+            Developer settings > Developer Mode, then retry the build."
         ));
     }
     CacheError::ExtractionError(format!("{context}: {e}"))
