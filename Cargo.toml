@@ -291,21 +291,21 @@ name = "parse_file"
 harness = false
 
 [patch.crates-io]
-rattler = { git = "https://github.com/wolfv/rattler", branch = "cep-simplified-variant-selection" }
-rattler_cache = { git = "https://github.com/wolfv/rattler", branch = "cep-simplified-variant-selection" }
-rattler_conda_types = { git = "https://github.com/wolfv/rattler", branch = "cep-simplified-variant-selection" }
-rattler_digest = { git = "https://github.com/wolfv/rattler", branch = "cep-simplified-variant-selection" }
-rattler_index = { git = "https://github.com/wolfv/rattler", branch = "cep-simplified-variant-selection" }
-rattler_networking = { git = "https://github.com/wolfv/rattler", branch = "cep-simplified-variant-selection" }
-rattler_repodata_gateway = { git = "https://github.com/wolfv/rattler", branch = "cep-simplified-variant-selection" }
-rattler_shell = { git = "https://github.com/wolfv/rattler", branch = "cep-simplified-variant-selection" }
-rattler_solve = { git = "https://github.com/wolfv/rattler", branch = "cep-simplified-variant-selection" }
-rattler_redaction = { git = "https://github.com/wolfv/rattler", branch = "cep-simplified-variant-selection" }
-rattler_virtual_packages = { git = "https://github.com/wolfv/rattler", branch = "cep-simplified-variant-selection" }
-rattler_package_streaming = { git = "https://github.com/wolfv/rattler", branch = "cep-simplified-variant-selection" }
-rattler_menuinst = { git = "https://github.com/wolfv/rattler", branch = "cep-simplified-variant-selection" }
-rattler_git = { git = "https://github.com/wolfv/rattler", branch = "cep-simplified-variant-selection" }
-rattler_prefix_guard = { git = "https://github.com/wolfv/rattler", branch = "cep-simplified-variant-selection" }
-rattler_config = { git = "https://github.com/wolfv/rattler", branch = "cep-simplified-variant-selection" }
-rattler_upload = { git = "https://github.com/wolfv/rattler", branch = "cep-simplified-variant-selection" }
-rattler_s3 = { git = "https://github.com/wolfv/rattler", branch = "cep-simplified-variant-selection" }
+rattler = { git = "https://github.com/conda/rattler", branch = "main" }
+rattler_cache = { git = "https://github.com/conda/rattler", branch = "main" }
+rattler_conda_types = { git = "https://github.com/conda/rattler", branch = "main" }
+rattler_digest = { git = "https://github.com/conda/rattler", branch = "main" }
+rattler_index = { git = "https://github.com/conda/rattler", branch = "main" }
+rattler_networking = { git = "https://github.com/conda/rattler", branch = "main" }
+rattler_repodata_gateway = { git = "https://github.com/conda/rattler", branch = "main" }
+rattler_shell = { git = "https://github.com/conda/rattler", branch = "main" }
+rattler_solve = { git = "https://github.com/conda/rattler", branch = "main" }
+rattler_redaction = { git = "https://github.com/conda/rattler", branch = "main" }
+rattler_virtual_packages = { git = "https://github.com/conda/rattler", branch = "main" }
+rattler_package_streaming = { git = "https://github.com/conda/rattler", branch = "main" }
+rattler_menuinst = { git = "https://github.com/conda/rattler", branch = "main" }
+rattler_git = { git = "https://github.com/conda/rattler", branch = "main" }
+rattler_prefix_guard = { git = "https://github.com/conda/rattler", branch = "main" }
+rattler_config = { git = "https://github.com/conda/rattler", branch = "main" }
+rattler_upload = { git = "https://github.com/conda/rattler", branch = "main" }
+rattler_s3 = { git = "https://github.com/conda/rattler", branch = "main" }

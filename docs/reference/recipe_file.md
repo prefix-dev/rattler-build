@@ -435,6 +435,39 @@ Fields (all optional):
 - **`overlinking_behavior`** - What to do when a binary links against a
   library that is not a declared dependency. One of `ignore` or `error`.
 
+#### Package variant flags (V3, beta)
+
+!!! warning "Beta — opt in with `--v3`"
+    This field is part of the V3 repodata revision and is only accepted when
+    Rattler-Build is invoked with `--v3`. Without the flag, recipes that set
+    `build.flags` fail to evaluate. See [V3 packages](../v3.md) for
+    background and a complete description.
+
+Variant flags are short lowercase tags that describe a *variant* of the
+package (e.g. `cuda`, `blas:openblas`). They are written into the package's
+`index.json` and can be matched downstream with the V3 `flags=[…]`
+`MatchSpec` key.
+
+```yaml
+build:
+  flags:
+    - cuda
+    - blas:openblas
+```
+
+A flag must match the regex `^[a-z0-9_]+(:[a-z0-9_]+)?$` — lowercase ASCII,
+digits and underscores, optionally with a single `:`-separated suffix. The
+list is conditional and templated like other recipe lists, and any flag that
+depends on a Jinja variable participates in variant hashing:
+
+```yaml
+build:
+  flags:
+    - if: cuda_compiler_version != "None"
+      then: cuda
+    - blas:${{ blas_impl }}
+```
+
 ### Script
 
 By default, Rattler-Build uses a `build.sh` file on Unix (macOS and Linux) and a
@@ -851,6 +884,22 @@ are included automatically.
 Versions for requirements must follow the `conda`/`mamba` match specification. See
 `build-version-spec`.
 
+!!! note "V3 `MatchSpec` keys (beta — opt in with `--v3`)"
+    When Rattler-Build is invoked with `--v3`, dependency strings everywhere
+    in this section (`build`, `host`, `run`, `run_constraints`, `extras`,
+    `run_exports`) accept three additional bracket keys:
+
+    - `flags=[…]` — match by package variant flag (`pytorch[flags=[cuda]]`,
+      `numpy[flags=[blas:*]]`).
+    - `when="…"` — only include the dependency when the embedded predicate
+      is satisfied (`scipy[when="python >=3.10"]`). Replaces the deprecated
+      `; if` syntax.
+    - `extras=[…]` — pull in optional dependency groups declared by the
+      producing package (`mypkg[extras=[plot]]`).
+
+    Without `--v3` these keys are rejected at parse time. See
+    [V3 packages](../v3.md) for the full description.
+
 ### Build
 
 Tools required to build the package.
@@ -958,6 +1007,42 @@ This is the version bound consistent with CentOS 6. Software built against glibc
 2.12 will be compatible with CentOS 6. This `run_constraints` dependency helps
 `mamba`, `conda` or `pixi` tell the user that a given package can't be installed if their system
 glibc version is too old.
+
+### Optional dependencies / extras (V3, beta)
+
+!!! warning "Beta — opt in with `--v3`"
+    `requirements.extras` is part of the V3 repodata revision and is only
+    accepted when Rattler-Build is invoked with `--v3`. Without the flag,
+    recipes that declare an `extras` mapping fail to evaluate. See
+    [V3 packages](../v3.md) for background.
+
+`extras` is a mapping from a group name to a list of dependencies that are
+*not* installed by default. Consumers opt in via the V3 `extras=[…]`
+`MatchSpec` key. This mirrors the optional-dependencies idea from
+`pyproject.toml`.
+
+```yaml
+requirements:
+  run:
+    - python >=3.10
+  extras:
+    plot:
+      - matplotlib >=3.8
+    full:
+      - matplotlib >=3.8
+      - pandas >=2
+```
+
+A downstream recipe can then pull a group in by name:
+
+```yaml
+requirements:
+  run:
+    - mypkg[extras=[plot]]
+```
+
+In the built package, optional groups are written into
+`index.json::experimental_extra_depends`.
 
 ### Run exports
 

@@ -1337,7 +1337,7 @@ dependencies = [
 [[package]]
 name = "coalesced_map"
 version = "0.1.2"
-source = "git+https://github.com/wolfv/rattler?branch=cep-simplified-variant-selection#13cc9adfd507114cfe96d4ca27e4ed52400bb39f"
+source = "git+https://github.com/conda/rattler?branch=main#d800817f6632c6d6c00e87f5dcda0226e87a3239"
 dependencies = [
  "dashmap",
  "tokio",
@@ -2188,7 +2188,7 @@ checksum = "28dea519a9695b9977216879a3ebfddf92f1c08c05d984f8996aecd6ecdc811d"
 [[package]]
 name = "file_url"
 version = "0.2.8"
-source = "git+https://github.com/wolfv/rattler?branch=cep-simplified-variant-selection#13cc9adfd507114cfe96d4ca27e4ed52400bb39f"
+source = "git+https://github.com/conda/rattler?branch=main#d800817f6632c6d6c00e87f5dcda0226e87a3239"
 dependencies = [
  "itertools 0.14.0",
  "percent-encoding",
@@ -4182,7 +4182,7 @@ dependencies = [
 [[package]]
 name = "path_resolver"
 version = "0.2.7"
-source = "git+https://github.com/wolfv/rattler?branch=cep-simplified-variant-selection#13cc9adfd507114cfe96d4ca27e4ed52400bb39f"
+source = "git+https://github.com/conda/rattler?branch=main#d800817f6632c6d6c00e87f5dcda0226e87a3239"
 dependencies = [
  "ahash",
  "fs-err",
@@ -4697,7 +4697,7 @@ dependencies = [
 [[package]]
 name = "rattler"
 version = "0.40.6"
-source = "git+https://github.com/wolfv/rattler?branch=cep-simplified-variant-selection#13cc9adfd507114cfe96d4ca27e4ed52400bb39f"
+source = "git+https://github.com/conda/rattler?branch=main#d800817f6632c6d6c00e87f5dcda0226e87a3239"
 dependencies = [
  "anyhow",
  "clap",
@@ -5159,7 +5159,7 @@ dependencies = [
 [[package]]
 name = "rattler_cache"
 version = "0.6.21"
-source = "git+https://github.com/wolfv/rattler?branch=cep-simplified-variant-selection#13cc9adfd507114cfe96d4ca27e4ed52400bb39f"
+source = "git+https://github.com/conda/rattler?branch=main#d800817f6632c6d6c00e87f5dcda0226e87a3239"
 dependencies = [
  "ahash",
  "anyhow",
@@ -5191,7 +5191,7 @@ dependencies = [
 [[package]]
 name = "rattler_conda_types"
 version = "0.44.6"
-source = "git+https://github.com/wolfv/rattler?branch=cep-simplified-variant-selection#13cc9adfd507114cfe96d4ca27e4ed52400bb39f"
+source = "git+https://github.com/conda/rattler?branch=main#d800817f6632c6d6c00e87f5dcda0226e87a3239"
 dependencies = [
  "ahash",
  "chrono",
@@ -5233,7 +5233,7 @@ dependencies = [
 [[package]]
 name = "rattler_config"
 version = "0.3.9"
-source = "git+https://github.com/wolfv/rattler?branch=cep-simplified-variant-selection#13cc9adfd507114cfe96d4ca27e4ed52400bb39f"
+source = "git+https://github.com/conda/rattler?branch=main#d800817f6632c6d6c00e87f5dcda0226e87a3239"
 dependencies = [
  "console",
  "fs-err",
@@ -5250,7 +5250,7 @@ dependencies = [
 [[package]]
 name = "rattler_digest"
 version = "1.2.3"
-source = "git+https://github.com/wolfv/rattler?branch=cep-simplified-variant-selection#13cc9adfd507114cfe96d4ca27e4ed52400bb39f"
+source = "git+https://github.com/conda/rattler?branch=main#d800817f6632c6d6c00e87f5dcda0226e87a3239"
 dependencies = [
  "blake2",
  "digest",
@@ -5268,7 +5268,7 @@ dependencies = [
 [[package]]
 name = "rattler_git"
 version = "0.1.1"
-source = "git+https://github.com/wolfv/rattler?branch=cep-simplified-variant-selection#13cc9adfd507114cfe96d4ca27e4ed52400bb39f"
+source = "git+https://github.com/conda/rattler?branch=main#d800817f6632c6d6c00e87f5dcda0226e87a3239"
 dependencies = [
  "dashmap",
  "dunce",
@@ -5288,7 +5288,7 @@ dependencies = [
 [[package]]
 name = "rattler_index"
 version = "0.27.23"
-source = "git+https://github.com/wolfv/rattler?branch=cep-simplified-variant-selection#13cc9adfd507114cfe96d4ca27e4ed52400bb39f"
+source = "git+https://github.com/conda/rattler?branch=main#d800817f6632c6d6c00e87f5dcda0226e87a3239"
 dependencies = [
  "ahash",
  "anyhow",
@@ -5325,7 +5325,7 @@ dependencies = [
 [[package]]
 name = "rattler_macros"
 version = "1.0.12"
-source = "git+https://github.com/wolfv/rattler?branch=cep-simplified-variant-selection#13cc9adfd507114cfe96d4ca27e4ed52400bb39f"
+source = "git+https://github.com/conda/rattler?branch=main#d800817f6632c6d6c00e87f5dcda0226e87a3239"
 dependencies = [
  "quote",
  "syn",
@@ -5334,7 +5334,7 @@ dependencies = [
 [[package]]
 name = "rattler_menuinst"
 version = "0.2.56"
-source = "git+https://github.com/wolfv/rattler?branch=cep-simplified-variant-selection#13cc9adfd507114cfe96d4ca27e4ed52400bb39f"
+source = "git+https://github.com/conda/rattler?branch=main#d800817f6632c6d6c00e87f5dcda0226e87a3239"
 dependencies = [
  "chrono",
  "configparser",
@@ -5364,7 +5364,7 @@ dependencies = [
 [[package]]
 name = "rattler_networking"
 version = "0.26.9"
-source = "git+https://github.com/wolfv/rattler?branch=cep-simplified-variant-selection#13cc9adfd507114cfe96d4ca27e4ed52400bb39f"
+source = "git+https://github.com/conda/rattler?branch=main#d800817f6632c6d6c00e87f5dcda0226e87a3239"
 dependencies = [
  "anyhow",
  "async-once-cell",
@@ -5395,7 +5395,7 @@ dependencies = [
 [[package]]
 name = "rattler_package_streaming"
 version = "0.24.9"
-source = "git+https://github.com/wolfv/rattler?branch=cep-simplified-variant-selection#13cc9adfd507114cfe96d4ca27e4ed52400bb39f"
+source = "git+https://github.com/conda/rattler?branch=main#d800817f6632c6d6c00e87f5dcda0226e87a3239"
 dependencies = [
  "astral-tokio-tar",
  "astral_async_zip",
@@ -5433,7 +5433,7 @@ dependencies = [
 [[package]]
 name = "rattler_prefix_guard"
 version = "0.1.0"
-source = "git+https://github.com/wolfv/rattler?branch=cep-simplified-variant-selection#13cc9adfd507114cfe96d4ca27e4ed52400bb39f"
+source = "git+https://github.com/conda/rattler?branch=main#d800817f6632c6d6c00e87f5dcda0226e87a3239"
 dependencies = [
  "fs-err",
  "libc",
@@ -5446,7 +5446,7 @@ dependencies = [
 [[package]]
 name = "rattler_pty"
 version = "0.2.9"
-source = "git+https://github.com/wolfv/rattler?branch=cep-simplified-variant-selection#13cc9adfd507114cfe96d4ca27e4ed52400bb39f"
+source = "git+https://github.com/conda/rattler?branch=main#d800817f6632c6d6c00e87f5dcda0226e87a3239"
 dependencies = [
  "libc",
  "nix 0.30.1",
@@ -5457,7 +5457,7 @@ dependencies = [
 [[package]]
 name = "rattler_redaction"
 version = "0.1.13"
-source = "git+https://github.com/wolfv/rattler?branch=cep-simplified-variant-selection#13cc9adfd507114cfe96d4ca27e4ed52400bb39f"
+source = "git+https://github.com/conda/rattler?branch=main#d800817f6632c6d6c00e87f5dcda0226e87a3239"
 dependencies = [
  "reqwest 0.12.28",
  "reqwest-middleware",
@@ -5467,7 +5467,7 @@ dependencies = [
 [[package]]
 name = "rattler_repodata_gateway"
 version = "0.27.6"
-source = "git+https://github.com/wolfv/rattler?branch=cep-simplified-variant-selection#13cc9adfd507114cfe96d4ca27e4ed52400bb39f"
+source = "git+https://github.com/conda/rattler?branch=main#d800817f6632c6d6c00e87f5dcda0226e87a3239"
 dependencies = [
  "ahash",
  "anyhow",
@@ -5529,7 +5529,7 @@ dependencies = [
 [[package]]
 name = "rattler_s3"
 version = "0.1.32"
-source = "git+https://github.com/wolfv/rattler?branch=cep-simplified-variant-selection#13cc9adfd507114cfe96d4ca27e4ed52400bb39f"
+source = "git+https://github.com/conda/rattler?branch=main#d800817f6632c6d6c00e87f5dcda0226e87a3239"
 dependencies = [
  "aws-config",
  "aws-credential-types",
@@ -5545,7 +5545,7 @@ dependencies = [
 [[package]]
 name = "rattler_shell"
 version = "0.26.9"
-source = "git+https://github.com/wolfv/rattler?branch=cep-simplified-variant-selection#13cc9adfd507114cfe96d4ca27e4ed52400bb39f"
+source = "git+https://github.com/conda/rattler?branch=main#d800817f6632c6d6c00e87f5dcda0226e87a3239"
 dependencies = [
  "anyhow",
  "enum_dispatch",
@@ -5566,7 +5566,7 @@ dependencies = [
 [[package]]
 name = "rattler_solve"
 version = "5.2.2"
-source = "git+https://github.com/wolfv/rattler?branch=cep-simplified-variant-selection#13cc9adfd507114cfe96d4ca27e4ed52400bb39f"
+source = "git+https://github.com/conda/rattler?branch=main#d800817f6632c6d6c00e87f5dcda0226e87a3239"
 dependencies = [
  "chrono",
  "futures",
@@ -5584,7 +5584,7 @@ dependencies = [
 [[package]]
 name = "rattler_upload"
 version = "0.5.7"
-source = "git+https://github.com/wolfv/rattler?branch=cep-simplified-variant-selection#13cc9adfd507114cfe96d4ca27e4ed52400bb39f"
+source = "git+https://github.com/conda/rattler?branch=main#d800817f6632c6d6c00e87f5dcda0226e87a3239"
 dependencies = [
  "base64 0.22.1",
  "clap",
@@ -5620,7 +5620,7 @@ dependencies = [
 [[package]]
 name = "rattler_virtual_packages"
 version = "2.3.18"
-source = "git+https://github.com/wolfv/rattler?branch=cep-simplified-variant-selection#13cc9adfd507114cfe96d4ca27e4ed52400bb39f"
+source = "git+https://github.com/conda/rattler?branch=main#d800817f6632c6d6c00e87f5dcda0226e87a3239"
 dependencies = [
  "archspec",
  "libloading",
@@ -6973,7 +6973,7 @@ checksum = "bbbb5d9659141646ae647b42fe094daf6c6192d1620870b449d9557f748b2daa"
 [[package]]
 name = "simple_spawn_blocking"
 version = "1.1.0"
-source = "git+https://github.com/wolfv/rattler?branch=cep-simplified-variant-selection#13cc9adfd507114cfe96d4ca27e4ed52400bb39f"
+source = "git+https://github.com/conda/rattler?branch=main#d800817f6632c6d6c00e87f5dcda0226e87a3239"
 dependencies = [
  "tokio",
 ]
