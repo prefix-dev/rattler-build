@@ -1879,7 +1879,9 @@ def test_relink_rpath(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
     rattler_build.build(recipes / "test-relink", tmp_path)
 
 
-def test_ignore_run_exports(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+def test_ignore_run_exports(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, clean_path_on_win32
+):
     rattler_build.build(
         recipes / "test-parsing/recipe_ignore_run_exports.yaml",
         tmp_path,
@@ -1897,7 +1899,7 @@ def test_ignore_run_exports(rattler_build: RattlerBuild, recipes: Path, tmp_path
     elif current_subdir.startswith("osx"):
         expected_compiler = f"clangxx_{current_subdir}"
     elif current_subdir.startswith("win"):
-        expected_compiler = f"vs2017_{current_subdir}"
+        expected_compiler = f"vs2022_{current_subdir}"
     else:
         pytest.fail(f"Unsupported platform for compiler check: {current_subdir}")
 

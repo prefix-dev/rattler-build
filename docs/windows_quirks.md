@@ -136,9 +136,9 @@ The MinGW C++ and Fortran compilers are **not ABI-compatible** with the default 
 
 | Use MinGW when...                                  | Use MSVC when...                               |
 | -------------------------------------------------- | ---------------------------------------------- |
-| Porting Unix/Linux software with GCC-specific code  | Building native Windows applications           |
+| Porting Unix/Linux software with GCC-specific code | Building native Windows applications           |
 | The project uses GNU autotools extensively         | Integrating with other MSVC-compiled libraries |
-| You need GCC-specific compiler extensions           | Maximum compatibility with Windows ecosystem   |
+| You need GCC-specific compiler extensions          | Maximum compatibility with Windows ecosystem   |
 | Building Fortran code (simpler than Flang setup)   | Performance-critical Windows applications      |
 | Building R packages (requires MingW64)             |                                                |
 
@@ -195,3 +195,17 @@ The `clang-cl` frontend is particularly useful when:
 - The build system expects MSVC-style compiler flags
 - You're integrating with existing MSVC-compiled libraries
 
+## Windows PATH length issues
+
+When building on Windows, you may encounter failures caused by the **command line or `PATH` length limit**. This commonly happens in the following situations:
+
+- Activating a **Visual Studio toolchain** (for example `vs2022`) whose activation scripts include `.bat` files such as `vcvars64.bat`.
+- Building **Rust crates that contain C or C++ code**, which require the MSVC toolchain during compilation.
+
+In these cases, the activation scripts and compiler environment setup may produce extremely long command lines or `PATH` values, which can exceed the limits of `cmd.exe` or Windows environment handling. This can result in errors such as failed activation, truncated PATH values, or build failures.
+
+To reduce the risk of hitting these limits, keep build paths as **short as possible**. Recommended practices:
+
+- `--output-dir` is short
+- `CARGO_TARGET_DIR` is short
+- `CARGO_HOME` is short
