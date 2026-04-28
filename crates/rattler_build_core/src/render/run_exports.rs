@@ -2,7 +2,8 @@ use std::collections::HashMap;
 
 use rattler_build_recipe::stage1::requirements::IgnoreRunExports;
 use rattler_conda_types::{
-    MatchSpec, PackageName, ParseMatchSpecError, ParseStrictness, package::RunExportsJson,
+    MatchSpec, PackageName, ParseMatchSpecError, ParseMatchSpecOptions, RepodataRevision,
+    package::RunExportsJson,
 };
 
 use super::resolved_dependencies::{DependencyInfo, RunExportDependency};
@@ -32,7 +33,12 @@ pub fn filter_run_exports(
         strings
             .iter()
             // We have to parse these as lenient as they come from packages
-            .map(|s| MatchSpec::from_str(s, ParseStrictness::Lenient))
+            .map(|s| {
+                MatchSpec::from_str(
+                    s,
+                    ParseMatchSpecOptions::lenient().with_repodata_revision(RepodataRevision::V3),
+                )
+            })
             .filter_map(|result| match result {
                 Ok(spec) => {
                     let should_include = match spec.name.as_exact() {

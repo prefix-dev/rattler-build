@@ -421,6 +421,10 @@ pub struct CommonOpts {
     #[arg(long, env = "RATTLER_BUILD_EXPERIMENTAL")]
     pub experimental: bool,
 
+    /// Enable V3 recipe fields and MatchSpec syntax
+    #[arg(long)]
+    pub v3: bool,
+
     /// List of hosts for which SSL certificate verification should be skipped
     #[arg(long, value_delimiter = ',')]
     pub allow_insecure_host: Option<Vec<String>>,
@@ -439,6 +443,7 @@ pub struct CommonOpts {
 pub struct CommonData {
     pub output_dir: PathBuf,
     pub experimental: bool,
+    pub v3: bool,
     pub auth_file: Option<PathBuf>,
     pub channel_priority: ChannelPriority,
     #[cfg(feature = "s3")]
@@ -456,6 +461,7 @@ impl CommonData {
     pub fn new(
         output_dir: Option<PathBuf>,
         experimental: bool,
+        v3: bool,
         auth_file: Option<PathBuf>,
         config: ConfigBase<()>,
         channel_priority: Option<ChannelPriority>,
@@ -499,6 +505,7 @@ impl CommonData {
         Self {
             output_dir: output_dir.unwrap_or_else(|| PathBuf::from("./output")),
             experimental,
+            v3,
             auth_file,
             #[cfg(feature = "s3")]
             s3_config,
@@ -516,6 +523,7 @@ impl CommonData {
         Self::new(
             value.output_dir,
             value.experimental,
+            value.v3,
             value.auth_file,
             config,
             value.channel_priority.map(|c| c.value),

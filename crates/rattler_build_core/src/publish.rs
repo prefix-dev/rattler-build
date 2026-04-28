@@ -4,7 +4,7 @@ use miette::IntoDiagnostic;
 use rattler_conda_types::{
     Channel, ChannelUrl, MatchSpec, NamedChannelOrUrl, PackageName, Platform,
 };
-use rattler_index::{IndexFsConfig, index_fs};
+use rattler_index::{IndexFsConfig, PackageRevisionAssignment, index_fs};
 use rattler_repodata_gateway::{CacheClearMode, Gateway, SubdirSelection};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -435,6 +435,8 @@ async fn upload_to_s3(
             repodata_patch: None,
             write_zst: true,
             write_shards: true,
+            repodata_revisions: Vec::new(),
+            package_revision_assignment: PackageRevisionAssignment::default(),
             force: false,
             max_parallel: num_cpus::get_physical(),
             multi_progress: None,
@@ -727,6 +729,8 @@ async fn upload_to_local_filesystem(
             repodata_patch: None,
             write_zst: true,
             write_shards: true,
+            repodata_revisions: Vec::new(),
+            package_revision_assignment: PackageRevisionAssignment::default(),
             force: false,
             max_parallel: num_cpus::get_physical(),
             multi_progress: None,

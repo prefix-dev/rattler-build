@@ -356,6 +356,7 @@ impl PyPackage {
         let common = CommonData::new(
             output_dir,
             false,
+            false,
             auth_file,
             config,
             None, // channel_priority
@@ -509,6 +510,7 @@ impl PyPackage {
         let config = ConfigBase::<()>::default();
         let common = CommonData::new(
             None,
+            false,
             false,
             auth_file,
             config,

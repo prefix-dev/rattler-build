@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use itertools::Itertools as _;
-use rattler_conda_types::{NoArchType, package::EntryPoint};
+use rattler_conda_types::{Flag, NoArchType, package::EntryPoint};
 use serde::{Deserialize, Serialize};
 
 use crate::stage0::types::{ConditionalList, IncludeExclude, Item, Script, Value};
@@ -42,6 +42,10 @@ pub struct Build {
     /// Noarch type - python or generic
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub noarch: Option<Value<NoArchType>>,
+
+    /// V3 package variant flags.
+    #[serde(default, skip_serializing_if = "ConditionalList::is_empty")]
+    pub flags: ConditionalList<Flag>,
 
     /// Python-specific configuration
     #[serde(default)]
@@ -91,6 +95,7 @@ impl Default for Build {
             string: None,
             script: Script::default(),
             noarch: None,
+            flags: ConditionalList::default(),
             python: PythonBuild::default(),
             skip: ConditionalList::default(),
             always_copy_files: ConditionalList::default(),
@@ -271,6 +276,7 @@ impl Build {
             string,
             script,
             noarch,
+            flags,
             python,
             skip,
             always_copy_files,
@@ -298,6 +304,8 @@ impl Build {
         if let Some(noarch) = noarch {
             vars.extend(noarch.used_variables());
         }
+
+        vars.extend(flags.used_variables());
 
         // Skip values are Jinja boolean expressions (not templates with ${{ }})
         // We need to parse them as expressions to extract variable names
