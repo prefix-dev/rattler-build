@@ -721,10 +721,9 @@ fn is_windows_developer_mode_enabled() -> bool {
         HKEY, HKEY_LOCAL_MACHINE, KEY_READ, RegCloseKey, RegOpenKeyExW, RegQueryValueExW,
     };
 
-    let sub_key: Vec<u16> =
-        "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\AppModelUnlock\0"
-            .encode_utf16()
-            .collect();
+    let sub_key: Vec<u16> = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\AppModelUnlock\0"
+        .encode_utf16()
+        .collect();
     let value_name: Vec<u16> = "AllowDevelopmentWithoutDevLicense\0"
         .encode_utf16()
         .collect();
@@ -738,11 +737,11 @@ fn is_windows_developer_mode_enabled() -> bool {
         // returns a non-ERROR_SUCCESS code and we bail out early.
         let mut hkey: HKEY = std::ptr::null_mut();
         let result = RegOpenKeyExW(
-            HKEY_LOCAL_MACHINE,               // HKLM
-            sub_key.as_ptr(),                 // \SOFTWARE\...\AppModelUnlock
+            HKEY_LOCAL_MACHINE, // HKLM
+            sub_key.as_ptr(),   // \SOFTWARE\...\AppModelUnlock
             0,
-            KEY_READ,                         // read-only access
-            std::ptr::addr_of_mut!(hkey),     // out: handle to the opened key
+            KEY_READ,                     // read-only access
+            std::ptr::addr_of_mut!(hkey), // out: handle to the opened key
         );
         if result != ERROR_SUCCESS {
             return false;
@@ -759,11 +758,11 @@ fn is_windows_developer_mode_enabled() -> bool {
 
         let result = RegQueryValueExW(
             hkey,
-            value_name.as_ptr(),                     // "AllowDevelopmentWithoutDevLicense"
-            std::ptr::null(),                        // reserved, always null
-            &mut reg_type,                           // out: value type (REG_DWORD = 4)
+            value_name.as_ptr(), // "AllowDevelopmentWithoutDevLicense"
+            std::ptr::null(),    // reserved, always null
+            &mut reg_type,       // out: value type (REG_DWORD = 4)
             std::ptr::addr_of_mut!(data) as *mut u8, // out: raw bytes of the value
-            &mut data_size,                          // in/out: buffer size in bytes
+            &mut data_size,      // in/out: buffer size in bytes
         );
 
         // Step 3 - Close the handle.
