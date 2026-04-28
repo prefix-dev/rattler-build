@@ -778,7 +778,7 @@ fn tar_unpack_error(context: &str, e: std::io::Error) -> CacheError {
     CacheError::ExtractionError(format!("{context}: {e}"))
 }
 
-fn extract_tar(archive: &Path, target: &Path) -> Result<(), CacheError> {
+pub(crate) fn extract_tar(archive: &Path, target: &Path) -> Result<(), CacheError> {
     let file = fs_err::File::open(archive)
         .map_err(|e| CacheError::ExtractionError(format!("Failed to open archive: {}", e)))?;
 
