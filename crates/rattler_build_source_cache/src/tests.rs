@@ -365,9 +365,9 @@ mod source_cache_tests {
 
     /// On Windows without Developer Mode the extraction of a symlink-containing
     /// archive should fail with a hint about enabling Developer Mode.
-    /// On Windows with Developer Mode enabled, or on other OSes, the extraction
-    /// succeeds (or fails without the hint).
+    /// On Windows with Developer Mode enabled the extraction succeeds.
     #[test]
+    #[cfg(target_os = "windows")]
     fn test_symlink_extraction_error_message() {
         use crate::cache::extract_tar;
 
@@ -383,8 +383,6 @@ mod source_cache_tests {
                 // Symlinks extracted fine — Developer Mode is on (or not Windows)
             }
             Err(CacheError::ExtractionError(msg)) => {
-                // On Windows without Developer Mode the hint must be present
-                #[cfg(target_os = "windows")]
                 assert!(
                     msg.contains("Developer Mode"),
                     "Expected Developer Mode hint in error message, got: {msg}"
