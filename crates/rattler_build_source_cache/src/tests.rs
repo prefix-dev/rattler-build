@@ -345,6 +345,7 @@ mod source_cache_tests {
     }
 
     /// Creates a minimal `.tar.gz` at `dest` containing a single symlink entry.
+    #[cfg(target_os = "windows")]
     fn make_tar_gz_with_symlink(dest: &std::path::Path) {
         use flate2::{Compression, write::GzEncoder};
 
