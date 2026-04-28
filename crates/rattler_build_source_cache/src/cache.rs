@@ -729,35 +729,47 @@ fn is_windows_developer_mode_enabled() -> bool {
         .encode_utf16()
         .collect();
 
-    // SAFETY: We call standard Windows registry APIs with valid, null-terminated UTF-16
-    // strings and correctly sized output buffers.
+    // The three steps below are equivalent to running:
+    //   reg query "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock" /v AllowDevelopmentWithoutDevLicense
     unsafe {
+        // Step 1 - Open the key (equivalent to the path argument of `reg query`).
+        // RegOpenKeyExW returns a handle (`hkey`) to the opened key, analogous to
+        // a file descriptor. On failure (key missing, no permission, etc.) it
+        // returns a non-ERROR_SUCCESS code and we bail out early.
         let mut hkey: HKEY = std::ptr::null_mut();
         let result = RegOpenKeyExW(
-            HKEY_LOCAL_MACHINE,
-            sub_key.as_ptr(),
+            HKEY_LOCAL_MACHINE,               // HKLM
+            sub_key.as_ptr(),                 // \SOFTWARE\...\AppModelUnlock
             0,
-            KEY_READ,
-            std::ptr::addr_of_mut!(hkey),
+            KEY_READ,                         // read-only access
+            std::ptr::addr_of_mut!(hkey),     // out: handle to the opened key
         );
         if result != ERROR_SUCCESS {
             return false;
         }
 
+        // Step 2 - Read the value (equivalent to `/v AllowDevelopmentWithoutDevLicense`).
+        // Windows writes the raw bytes of the REG_DWORD value directly into `data`,
+        // so after this call `data` holds the integer stored in the registry:
+        //   0x1 -> Developer Mode ON
+        //   0x0 -> Developer Mode OFF (or key absent)
         let mut data: u32 = 0;
         let mut data_size = std::mem::size_of::<u32>() as u32;
         let mut reg_type: u32 = 0;
 
         let result = RegQueryValueExW(
             hkey,
-            value_name.as_ptr(),
-            std::ptr::null(),
-            &mut reg_type,
-            std::ptr::addr_of_mut!(data) as *mut u8,
-            &mut data_size,
+            value_name.as_ptr(),                     // "AllowDevelopmentWithoutDevLicense"
+            std::ptr::null(),                        // reserved, always null
+            &mut reg_type,                           // out: value type (REG_DWORD = 4)
+            std::ptr::addr_of_mut!(data) as *mut u8, // out: raw bytes of the value
+            &mut data_size,                          // in/out: buffer size in bytes
         );
+
+        // Step 3 - Close the handle.
         RegCloseKey(hkey);
 
+        // Step 4 - Check the result: success + data == 1 (0x1) means enabled.
         result == ERROR_SUCCESS && data == 1
     }
 }
