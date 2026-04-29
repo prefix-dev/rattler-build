@@ -3188,6 +3188,18 @@ impl Evaluate for crate::stage0::MultiOutputRecipe {
                         let cache_name =
                             evaluate_string_value(cache_name_value, &context_with_vars)?;
                         if let Some(cache) = staging_caches.get(&cache_name) {
+                            // Merge the staging cache's used_variant so that
+                            // variant keys it implicitly tracks (e.g.
+                            // CONDA_BUILD_SYSROOT brought in by
+                            // compiler()/stdlib()) participate in this
+                            // output's hash and env. Existing entries in the
+                            // output's used_variant take precedence.
+                            for (k, v) in &cache.used_variant {
+                                recipe
+                                    .used_variant
+                                    .entry(k.clone())
+                                    .or_insert_with(|| v.clone());
+                            }
                             recipe.staging_caches = vec![cache.clone()];
                             recipe.inherits_from =
                                 Some(crate::stage1::InheritsFrom::new(cache_name));
@@ -3218,6 +3230,15 @@ impl Evaluate for crate::stage0::MultiOutputRecipe {
                         let cache_name =
                             evaluate_string_value(&cache_inherit.from, &context_with_vars)?;
                         if let Some(cache) = staging_caches.get(&cache_name) {
+                            // See CacheName branch: merge the staging cache's
+                            // used_variant so that implicitly tracked keys
+                            // participate in the inheritor's hash and env.
+                            for (k, v) in &cache.used_variant {
+                                recipe
+                                    .used_variant
+                                    .entry(k.clone())
+                                    .or_insert_with(|| v.clone());
+                            }
                             recipe.staging_caches = vec![cache.clone()];
                             recipe.inherits_from =
                                 Some(crate::stage1::InheritsFrom::with_run_exports(
