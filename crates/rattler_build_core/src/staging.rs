@@ -280,7 +280,11 @@ impl Output {
             self.build_configuration.env_isolation,
             &self.build_configuration.directories.work_dir,
         ));
-        env_vars.extend(env_vars::env_vars_from_variant(self.variant()));
+        // Use the staging cache's own used_variant rather than the inheriting
+        // output's: the staging cache is shared across all inheritors, and the
+        // inheriting output may not directly reference variant keys (like
+        // CONDA_BUILD_SYSROOT) that the staging cache's compilers depend on.
+        env_vars.extend(env_vars::env_vars_from_variant(&staging.used_variant));
 
         // A staging cache does not produce a package, so the PKG_* vars
         // (which would otherwise carry the inheriting output's identity) are
