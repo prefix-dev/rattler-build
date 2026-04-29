@@ -711,77 +711,54 @@ pub fn is_tarball(file_name: &str) -> bool {
     .any(|ext| file_name.ends_with(ext))
 }
 
-/// On Windows, checks whether Developer Mode is enabled by reading the registry key
-/// `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock`.
-/// Returns `false` if the check cannot be performed or the key does not indicate enabled.
+/// Returns `true` if the I/O error is caused by insufficient privilege to create a symbolic
+/// link.
+///
+/// On Windows, `CreateSymbolicLinkW` returns `ERROR_PRIVILEGE_NOT_HELD` (1314 / 0x522) when
+/// the caller does not hold `SeCreateSymbolicLinkPrivilege` and Developer Mode is disabled.
+#[cfg(target_os = "windows")]
+fn is_symlink_error(e: &std::io::Error) -> bool {
+    e.raw_os_error() == Some(1314) // ERROR_PRIVILEGE_NOT_HELD
+}
+
+/// On Windows, checks whether Developer Mode is enabled by querying the registry via the
+/// built-in `reg` command.  Returns `false` if the query fails or the value is not `0x1`.
+///
+/// Equivalent to:
+///   reg query "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock"
+///             /v AllowDevelopmentWithoutDevLicense
 #[cfg(target_os = "windows")]
 fn is_windows_developer_mode_enabled() -> bool {
-    use windows_sys::Win32::Foundation::ERROR_SUCCESS;
-    use windows_sys::Win32::System::Registry::{
-        HKEY, HKEY_LOCAL_MACHINE, KEY_READ, RegCloseKey, RegOpenKeyExW, RegQueryValueExW,
-    };
+    let output = std::process::Command::new("reg")
+        .args([
+            "query",
+            r"HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock",
+            "/v",
+            "AllowDevelopmentWithoutDevLicense",
+        ])
+        .output();
 
-    let sub_key: Vec<u16> = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\AppModelUnlock\0"
-        .encode_utf16()
-        .collect();
-    let value_name: Vec<u16> = "AllowDevelopmentWithoutDevLicense\0"
-        .encode_utf16()
-        .collect();
-
-    // The three steps below are equivalent to running:
-    //   reg query "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock" /v AllowDevelopmentWithoutDevLicense
-    unsafe {
-        // Step 1 - Open the key (equivalent to the path argument of `reg query`).
-        // RegOpenKeyExW returns a handle (`hkey`) to the opened key, analogous to
-        // a file descriptor. On failure (key missing, no permission, etc.) it
-        // returns a non-ERROR_SUCCESS code and we bail out early.
-        let mut hkey: HKEY = std::ptr::null_mut();
-        let result = RegOpenKeyExW(
-            HKEY_LOCAL_MACHINE, // HKLM
-            sub_key.as_ptr(),   // \SOFTWARE\...\AppModelUnlock
-            0,
-            KEY_READ,                     // read-only access
-            std::ptr::addr_of_mut!(hkey), // out: handle to the opened key
-        );
-        if result != ERROR_SUCCESS {
-            return false;
+    match output {
+        Ok(out) if out.status.success() => {
+            // A successful query prints a line containing the value, e.g.:
+            //   AllowDevelopmentWithoutDevLicense    REG_DWORD    0x1
+            // A value of 0x1 means Developer Mode is enabled.
+            String::from_utf8_lossy(&out.stdout).contains("0x1")
         }
-
-        // Step 2 - Read the value (equivalent to `/v AllowDevelopmentWithoutDevLicense`).
-        // Windows writes the raw bytes of the REG_DWORD value directly into `data`,
-        // so after this call `data` holds the integer stored in the registry:
-        //   0x1 -> Developer Mode ON
-        //   0x0 -> Developer Mode OFF (or key absent)
-        let mut data: u32 = 0;
-        let mut data_size = std::mem::size_of::<u32>() as u32;
-        let mut reg_type: u32 = 0;
-
-        let result = RegQueryValueExW(
-            hkey,
-            value_name.as_ptr(), // "AllowDevelopmentWithoutDevLicense"
-            std::ptr::null(),    // reserved, always null
-            &mut reg_type,       // out: value type (REG_DWORD = 4)
-            std::ptr::addr_of_mut!(data) as *mut u8, // out: raw bytes of the value
-            &mut data_size,      // in/out: buffer size in bytes
-        );
-
-        // Step 3 - Close the handle.
-        RegCloseKey(hkey);
-
-        // Step 4 - Check the result: success + data == 1 (0x1) means enabled.
-        result == ERROR_SUCCESS && data == 1
+        _ => false,
     }
 }
 
-/// Wraps a tar unpack error, appending a Windows Developer Mode hint when on Windows and
-/// Developer Mode is detected as disabled.
+/// Wraps a tar unpack error, appending a Windows Developer Mode hint only when:
+/// 1. The error is a symlink-privilege failure (`ERROR_PRIVILEGE_NOT_HELD`), and
+/// 2. Developer Mode is detected as disabled.
 fn tar_unpack_error(context: &str, e: std::io::Error) -> CacheError {
     #[cfg(target_os = "windows")]
-    if !is_windows_developer_mode_enabled() {
+    if is_symlink_error(&e) && !is_windows_developer_mode_enabled() {
         return CacheError::ExtractionError(format!(
             "{context}: {e}\n\n\
-            hint: Extracting this archive failed on Windows. The archive may contain symbolic \
-            links, which require Developer Mode or administrator privileges to create. \
+            hint: Extracting this archive failed because it contains symbolic links, which \
+            require Developer Mode or administrator privileges to create on Windows. \
             Please enable Developer Mode in: \
             Developer settings > Developer Mode, then retry the build."
         ));
