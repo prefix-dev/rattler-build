@@ -711,32 +711,24 @@ pub fn is_tarball(file_name: &str) -> bool {
     .any(|ext| file_name.ends_with(ext))
 }
 
-/// On Windows, checks whether Developer Mode is enabled by querying the registry via the
-/// built-in `reg` command.  Returns `false` if the query fails or the value is not `0x1`.
-///
-/// Equivalent to:
-///   reg query "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock"
-///             /v AllowDevelopmentWithoutDevLicense
+/// On Windows, checks whether Developer Mode is enabled by reading the registry key
+/// `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock` value
+/// `AllowDevelopmentWithoutDevLicense`.
+/// Returns `false` if the key is missing, inaccessible, or the value is not `1`.
 #[cfg(target_os = "windows")]
 fn is_windows_developer_mode_enabled() -> bool {
-    let output = std::process::Command::new("reg")
-        .args([
-            "query",
-            r"HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock",
-            "/v",
-            "AllowDevelopmentWithoutDevLicense",
-        ])
-        .output();
+    use winreg::RegKey;
+    use winreg::enums::HKEY_LOCAL_MACHINE;
 
-    match output {
-        Ok(out) if out.status.success() => {
-            // A successful query prints a line containing the value, e.g.:
-            //   AllowDevelopmentWithoutDevLicense    REG_DWORD    0x1
-            // A value of 0x1 means Developer Mode is enabled.
-            String::from_utf8_lossy(&out.stdout).contains("0x1")
-        }
-        _ => false,
-    }
+    let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
+    let Ok(key) = hklm.open_subkey(r"SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock")
+    else {
+        return false;
+    };
+    let Ok(value): Result<u32, _> = key.get_value("AllowDevelopmentWithoutDevLicense") else {
+        return false;
+    };
+    value == 1
 }
 
 /// Wraps a tar unpack error, appending a Windows Developer Mode hint when on Windows and
