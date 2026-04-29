@@ -720,15 +720,13 @@ fn is_windows_developer_mode_enabled() -> bool {
     use winreg::RegKey;
     use winreg::enums::HKEY_LOCAL_MACHINE;
 
-    let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
-    let Ok(key) = hklm.open_subkey(r"SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock")
-    else {
-        return false;
-    };
-    let Ok(value): Result<u32, _> = key.get_value("AllowDevelopmentWithoutDevLicense") else {
-        return false;
-    };
-    value == 1
+    (|| -> Result<bool, std::io::Error> {
+        let value: u32 = RegKey::predef(HKEY_LOCAL_MACHINE)
+            .open_subkey(r"SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock")?
+            .get_value("AllowDevelopmentWithoutDevLicense")?;
+        Ok(value == 1)
+    })()
+    .unwrap_or(false)
 }
 
 /// Wraps a tar unpack error, appending a Windows Developer Mode hint when on Windows and
