@@ -711,16 +711,6 @@ pub fn is_tarball(file_name: &str) -> bool {
     .any(|ext| file_name.ends_with(ext))
 }
 
-/// Returns `true` if the I/O error is caused by insufficient privilege to create a symbolic
-/// link.
-///
-/// On Windows, `CreateSymbolicLinkW` returns `ERROR_PRIVILEGE_NOT_HELD` (1314 / 0x522) when
-/// the caller does not hold `SeCreateSymbolicLinkPrivilege` and Developer Mode is disabled.
-#[cfg(target_os = "windows")]
-fn is_symlink_error(e: &std::io::Error) -> bool {
-    e.raw_os_error() == Some(1314) // ERROR_PRIVILEGE_NOT_HELD
-}
-
 /// On Windows, checks whether Developer Mode is enabled by querying the registry via the
 /// built-in `reg` command.  Returns `false` if the query fails or the value is not `0x1`.
 ///
@@ -749,16 +739,15 @@ fn is_windows_developer_mode_enabled() -> bool {
     }
 }
 
-/// Wraps a tar unpack error, appending a Windows Developer Mode hint only when:
-/// 1. The error is a symlink-privilege failure (`ERROR_PRIVILEGE_NOT_HELD`), and
-/// 2. Developer Mode is detected as disabled.
+/// Wraps a tar unpack error, appending a Windows Developer Mode hint when on Windows and
+/// Developer Mode is detected as disabled.
 fn tar_unpack_error(context: &str, e: std::io::Error) -> CacheError {
     #[cfg(target_os = "windows")]
-    if is_symlink_error(&e) && !is_windows_developer_mode_enabled() {
+    if !is_windows_developer_mode_enabled() {
         return CacheError::ExtractionError(format!(
             "{context}: {e}\n\n\
-            hint: Extracting this archive failed because it contains symbolic links, which \
-            require Developer Mode or administrator privileges to create on Windows. \
+            hint: Extracting this archive failed on Windows. The archive may contain symbolic \
+            links, which require Developer Mode or administrator privileges to create. \
             Please enable Developer Mode in: \
             Developer settings > Developer Mode, then retry the build."
         ));
