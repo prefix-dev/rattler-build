@@ -39,6 +39,20 @@ impl Output {
             env_isolation,
             &self.build_configuration.directories.work_dir,
         ));
+        // If this output inherits from a staging cache, propagate the cache's
+        // used_variant first so that variant keys it implicitly depends on
+        // (e.g. CONDA_BUILD_SYSROOT brought in by compiler()/stdlib()) reach
+        // the script env. The output's own used_variant is applied after and
+        // takes precedence on any overlap.
+        if let Some(inherits) = &self.recipe.inherits_from
+            && let Some(staging) = self
+                .recipe
+                .staging_caches
+                .iter()
+                .find(|s| s.name == inherits.cache_name)
+        {
+            env_vars.extend(env_vars::env_vars_from_variant(&staging.used_variant));
+        }
         env_vars.extend(env_vars::env_vars_from_variant(self.variant()));
 
         let jinja_renderer = self.jinja_renderer();
