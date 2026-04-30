@@ -171,6 +171,8 @@ impl IndexJsonBuilder {
             python_site_packages_path: None,
             purls: None,
             experimental_extra_depends: Default::default(),
+            flags: Vec::new(),
+            repodata_revision: None,
         })
     }
 }

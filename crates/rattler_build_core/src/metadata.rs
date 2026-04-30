@@ -58,6 +58,7 @@ mod test {
                     run_exports: None,
                     python_site_packages_path: None,
                     experimental_extra_depends: Default::default(),
+                    flags: Vec::new(),
                 },
                 identifier: "test-1.2.3-h123.tar.bz2".parse().unwrap(),
                 url: Url::from_str("https://test.com/test/linux-64/test-1.2.3-h123.tar.bz2")
