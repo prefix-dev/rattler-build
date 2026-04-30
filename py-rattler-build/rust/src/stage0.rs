@@ -21,11 +21,9 @@ impl PyStage0Recipe {
     #[staticmethod]
     #[pyo3(signature = (yaml, v3=false))]
     fn from_yaml(yaml: &str, v3: bool) -> PyResult<Self> {
-        let recipe = stage0::parse_recipe_or_multi_from_source_with_config(
-            yaml,
-            stage0::ParseConfig { v3 },
-        )
-            .map_err(|e| RattlerBuildError::RecipeParse(format!("{}", e)))?;
+        let recipe =
+            stage0::parse_recipe_or_multi_from_source_with_config(yaml, stage0::ParseConfig { v3 })
+                .map_err(|e| RattlerBuildError::RecipeParse(format!("{}", e)))?;
         Ok(PyStage0Recipe { inner: recipe })
     }
 
@@ -49,7 +47,7 @@ impl PyStage0Recipe {
             &json_string,
             stage0::ParseConfig { v3 },
         )
-            .map_err(|e| RattlerBuildError::RecipeParse(format!("{}", e)))?;
+        .map_err(|e| RattlerBuildError::RecipeParse(format!("{}", e)))?;
 
         Ok(PyStage0Recipe { inner: recipe })
     }
