@@ -172,13 +172,18 @@ pub fn reqwest_client_from_auth_storage(
     mirror_middleware_config: HashMap<Url, Vec<mirror_middleware::Mirror>>,
     allow_insecure_host: Option<Vec<String>>,
 ) -> Result<rattler_build_networking::BaseClient, AuthenticationStorageError> {
-    let auth_storage = get_auth_store(auth_file)?;
-
     let builder = rattler_build_networking::BaseClient::builder()
         .user_agent(APP_USER_AGENT)
         .timeout(5 * 60)
-        .insecure_hosts(allow_insecure_host.unwrap_or_default())
-        .with_authentication(auth_storage);
+        .insecure_hosts(allow_insecure_host.unwrap_or_default());
+
+    // Defer auth storage construction (which activates the keyring on
+    // macOS) until the client is actually used. When an auth file is
+    // explicitly provided, validate it eagerly so a bad path errors here.
+    let builder = match auth_file {
+        Some(path) => builder.with_authentication(get_auth_store(Some(path))?),
+        None => builder.with_lazy_authentication(|| get_auth_store(None)),
+    };
     #[cfg(feature = "s3")]
     let builder = builder.with_s3(s3_middleware_config);
     Ok(builder.with_mirrors(mirror_middleware_config).build())
