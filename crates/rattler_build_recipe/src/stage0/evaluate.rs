@@ -899,6 +899,7 @@ pub(crate) fn is_free_matchspec(spec: &rattler_conda_types::MatchSpec) -> bool {
         condition,
         track_features,
         license_family,
+        flags,
     } = spec;
 
     name.as_exact().is_some()
@@ -917,6 +918,7 @@ pub(crate) fn is_free_matchspec(spec: &rattler_conda_types::MatchSpec) -> bool {
         && license_family.is_none()
         && condition.is_none()
         && track_features.is_none()
+        && flags.is_none()
 }
 /// Evaluate a ConditionalList<SerializableMatchSpec> into Vec<Dependency>
 ///

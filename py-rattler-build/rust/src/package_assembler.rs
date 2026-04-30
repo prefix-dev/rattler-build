@@ -369,6 +369,8 @@ pub fn assemble_package_py(
         python_site_packages_path: None,
         purls: None,
         experimental_extra_depends: Default::default(),
+        flags: Vec::new(),
+        repodata_revision: None,
     };
     builder = builder.with_index(index);
 
