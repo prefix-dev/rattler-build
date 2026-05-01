@@ -13,6 +13,9 @@ import zstandard
 from helpers import RattlerBuild, get_extracted_package, get_package
 
 
+V3_RECIPES = Path(__file__).parent.parent.parent / "test-data" / "v3-recipes"
+
+
 def _package_record_name(package: Path) -> str:
     if package.name.endswith(".tar.bz2"):
         return package.name[: -len(".tar.bz2")]
@@ -158,12 +161,12 @@ def assert_legacy_index_json(index_json: dict[str, Any]) -> None:
 
 
 def test_v3_build_writes_v3_index_json(
-    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+    rattler_build: RattlerBuild, tmp_path: Path
 ):
     output_dir = tmp_path / "output"
 
     rattler_build.build(
-        recipes / "v3-index-shape",
+        V3_RECIPES / "v3-index-shape",
         output_dir,
         extra_args=["--v3", "--test=skip"],
     )
@@ -174,14 +177,14 @@ def test_v3_build_writes_v3_index_json(
 
 
 def test_v3_local_publish_writes_v3_repodata_and_shards(
-    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+    rattler_build: RattlerBuild, tmp_path: Path
 ):
     output_dir = tmp_path / "output"
     channel_dir = tmp_path / "channel"
 
     rattler_build(
         "publish",
-        str(recipes / "v3-index-shape"),
+        str(V3_RECIPES / "v3-index-shape"),
         "--to",
         str(channel_dir),
         "--output-dir",
@@ -264,13 +267,12 @@ def test_legacy_build_keeps_legacy_index_json(
 )
 def test_v3_fields_are_rejected_without_opt_in(
     rattler_build: RattlerBuild,
-    recipes: Path,
     tmp_path: Path,
     recipe_name: str,
     expected: str,
 ):
     args = rattler_build.build_args(
-        recipes / recipe_name,
+        V3_RECIPES / recipe_name,
         tmp_path / "output",
         extra_args=["--test=skip"],
     )
