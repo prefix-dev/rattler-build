@@ -3188,6 +3188,18 @@ impl Evaluate for crate::stage0::MultiOutputRecipe {
                         let cache_name =
                             evaluate_string_value(cache_name_value, &context_with_vars)?;
                         if let Some(cache) = staging_caches.get(&cache_name) {
+                            // Merge the staging cache's used_variant so that
+                            // variant keys it implicitly tracks (e.g.
+                            // CONDA_BUILD_SYSROOT brought in by
+                            // compiler()/stdlib()) participate in this
+                            // output's hash and env. Existing entries in the
+                            // output's used_variant take precedence.
+                            for (k, v) in &cache.used_variant {
+                                recipe
+                                    .used_variant
+                                    .entry(k.clone())
+                                    .or_insert_with(|| v.clone());
+                            }
                             recipe.staging_caches = vec![cache.clone()];
                             recipe.inherits_from =
                                 Some(crate::stage1::InheritsFrom::new(cache_name));
@@ -3218,6 +3230,15 @@ impl Evaluate for crate::stage0::MultiOutputRecipe {
                         let cache_name =
                             evaluate_string_value(&cache_inherit.from, &context_with_vars)?;
                         if let Some(cache) = staging_caches.get(&cache_name) {
+                            // See CacheName branch: merge the staging cache's
+                            // used_variant so that implicitly tracked keys
+                            // participate in the inheritor's hash and env.
+                            for (k, v) in &cache.used_variant {
+                                recipe
+                                    .used_variant
+                                    .entry(k.clone())
+                                    .or_insert_with(|| v.clone());
+                            }
                             recipe.staging_caches = vec![cache.clone()];
                             recipe.inherits_from =
                                 Some(crate::stage1::InheritsFrom::with_run_exports(
@@ -3735,6 +3756,112 @@ outputs:
                 assert!(!staging_cache.requirements.build.is_empty()); // Should have gcc, cmake
                 assert!(!staging_cache.requirements.host.is_empty()); // Should have zlib
                 assert!(staging_cache.requirements.run.is_empty()); // Staging has no run requirements
+            }
+            _ => panic!("Expected MultiOutputRecipe"),
+        }
+    }
+
+    #[test]
+    fn test_staging_cache_used_variant_is_merged_into_inheriting_outputs() {
+        use crate::stage0::parser::parse_recipe_or_multi_from_source;
+
+        let recipe_yaml = r#"
+schema_version: 1
+
+recipe:
+  name: myproject
+  version: 1.0.0
+
+outputs:
+  - staging:
+      name: build-cache
+    build:
+      script:
+        - echo ${{ staging_only }}
+
+  - package:
+      name: short-inherit
+      version: 1.0.0
+    inherit: build-cache
+
+  - package:
+      name: options-inherit
+      version: 1.0.0
+    inherit:
+      from: build-cache
+      run_exports: false
+
+  - package:
+      name: top-level-inherit
+      version: 1.0.0
+    inherit: null
+"#;
+
+        let parsed = parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+
+        match parsed {
+            stage0::Recipe::MultiOutput(multi) => {
+                let mut variant = IndexMap::new();
+                variant.insert(
+                    "target_platform".to_string(),
+                    Variable::from_string("linux-64"),
+                );
+                variant.insert(
+                    "staging_only".to_string(),
+                    Variable::from_string("from-staging"),
+                );
+
+                let jinja_variant: BTreeMap<NormalizedKey, Variable> = variant
+                    .iter()
+                    .map(|(k, v)| (NormalizedKey::from(k.as_str()), v.clone()))
+                    .collect();
+                let jinja_config = JinjaConfig {
+                    target_platform: rattler_conda_types::Platform::Linux64,
+                    build_platform: rattler_conda_types::Platform::Linux64,
+                    host_platform: rattler_conda_types::Platform::Linux64,
+                    variant: jinja_variant,
+                    ..Default::default()
+                };
+                let ctx = EvaluationContext::with_variables_and_config(variant, jinja_config);
+
+                let recipes = multi.evaluate(&ctx).unwrap();
+                assert_eq!(recipes.len(), 3);
+
+                let staging_only = NormalizedKey::from("staging_only");
+
+                let short_inherit = &recipes[0];
+                assert_eq!(short_inherit.package.name.as_normalized(), "short-inherit");
+                assert_eq!(short_inherit.staging_caches.len(), 1);
+                assert_eq!(
+                    short_inherit.staging_caches[0]
+                        .used_variant
+                        .get(&staging_only),
+                    Some(&Variable::from_string("from-staging"))
+                );
+                assert_eq!(
+                    short_inherit.used_variant.get(&staging_only),
+                    Some(&Variable::from_string("from-staging"))
+                );
+
+                let options_inherit = &recipes[1];
+                assert_eq!(
+                    options_inherit.package.name.as_normalized(),
+                    "options-inherit"
+                );
+                assert_eq!(
+                    options_inherit.used_variant.get(&staging_only),
+                    Some(&Variable::from_string("from-staging"))
+                );
+
+                let top_level_inherit = &recipes[2];
+                assert_eq!(
+                    top_level_inherit.package.name.as_normalized(),
+                    "top-level-inherit"
+                );
+                assert!(
+                    !top_level_inherit.used_variant.contains_key(&staging_only),
+                    "staging-only variant keys should not leak to outputs that do not inherit the cache"
+                );
             }
             _ => panic!("Expected MultiOutputRecipe"),
         }
