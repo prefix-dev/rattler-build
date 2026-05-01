@@ -150,7 +150,7 @@ def assert_v3_index_json(index_json: dict[str, Any]) -> None:
         "full": ["pandas >=2", "rich[extras=[jupyter]]"],
         "plot": ["matplotlib >=3.8"],
     }
-    assert "scipy[when=\"python >=3.10\"]" in index_json["depends"]
+    assert 'scipy[when="python >=3.10"]' in index_json["depends"]
     assert "blas-provider[flags=[blas:*]]" in index_json["depends"]
 
 
@@ -160,9 +160,7 @@ def assert_legacy_index_json(index_json: dict[str, Any]) -> None:
     assert "extra_depends" not in index_json
 
 
-def test_v3_build_writes_v3_index_json(
-    rattler_build: RattlerBuild, tmp_path: Path
-):
+def test_v3_build_writes_v3_index_json(rattler_build: RattlerBuild, tmp_path: Path):
     output_dir = tmp_path / "output"
 
     rattler_build.build(
@@ -211,7 +209,7 @@ def test_v3_local_publish_writes_v3_repodata_and_shards(
     record = repodata["v3"][v3_submap][package_record_name]
     assert record["flags"] == ["cuda", "blas:openblas"]
     assert record["extra_depends"] == index_json["extra_depends"]
-    assert "scipy[when=\"python >=3.10\"]" in record["depends"]
+    assert 'scipy[when="python >=3.10"]' in record["depends"]
 
     shard_index_path = channel_dir / subdir / "repodata_shards.msgpack.zst"
     assert shard_index_path.exists()
@@ -221,9 +219,7 @@ def test_v3_local_publish_writes_v3_repodata_and_shards(
     assert "v3-index-shape" in shard_index["shards"]
 
     digest = shard_index["shards"]["v3-index-shape"].hex()
-    shard = _msgpack_load_zst(
-        channel_dir / subdir / "shards" / f"{digest}.msgpack.zst"
-    )
+    shard = _msgpack_load_zst(channel_dir / subdir / "shards" / f"{digest}.msgpack.zst")
     shard_record = shard["v3"][v3_submap][package_record_name]
     assert shard_record["flags"] == record["flags"]
     assert shard_record["extra_depends"] == record["extra_depends"]
