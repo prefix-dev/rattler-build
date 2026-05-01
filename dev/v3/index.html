@@ -8,27 +8,31 @@
       
       
       
-        <link rel="canonical" href="https://rattler-build.prefix.dev/dev/reference/cli/rattler-build/auth/login/">
+        <link rel="canonical" href="https://rattler-build.prefix.dev/dev/v3/">
       
       
+        <link rel="prev" href="../experimental_features/">
+      
+      
+        <link rel="next" href="../multiple_output_cache/">
       
       
         
       
       
-      <link rel="icon" href="../../../../../assets/favicon.png">
+      <link rel="icon" href="../assets/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.2">
     
     
       
-        <title>rattler-build auth login - Rattler-Build</title>
+        <title>V3 packages (beta) - Rattler-Build</title>
       
     
     
-      <link rel="stylesheet" href="../../../../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
       
         
-        <link rel="stylesheet" href="../../../../../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -47,11 +51,11 @@
       
     
     
-      <link rel="stylesheet" href="../../../../../assets/_mkdocstrings.css">
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
     
-      <link rel="stylesheet" href="../../../../../stylesheets/extra.css">
+      <link rel="stylesheet" href="../stylesheets/extra.css">
     
-    <script>__md_scope=new URL("../../../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -59,15 +63,15 @@
     
   
 <meta property="og:type" content="website" />
-<meta property="og:title" content="rattler-build auth login - Rattler-Build" />
-<meta property="og:image" content="https://rattler-build.prefix.dev/dev/assets/images/social/reference/cli/rattler-build/auth/login.png" />
+<meta property="og:title" content="V3 packages (beta) - Rattler-Build" />
+<meta property="og:image" content="https://rattler-build.prefix.dev/dev/assets/images/social/v3.png" />
 <meta property="og:image:type" content="image/png" />
 <meta property="og:image:width" content="1200" />
 <meta property="og:image:height" content="630" />
-<meta property="og:url" content="https://rattler-build.prefix.dev/dev/reference/cli/rattler-build/auth/login/" />
+<meta property="og:url" content="https://rattler-build.prefix.dev/dev/v3/" />
 <meta property="twitter:card" content="summary_large_image" />
-<meta property="twitter:title" content="rattler-build auth login - Rattler-Build" />
-<meta property="twitter:image" content="https://rattler-build.prefix.dev/dev/assets/images/social/reference/cli/rattler-build/auth/login.png" />
+<meta property="twitter:title" content="V3 packages (beta) - Rattler-Build" />
+<meta property="twitter:image" content="https://rattler-build.prefix.dev/dev/assets/images/social/v3.png" />
 </head>
   
   
@@ -87,7 +91,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#rattler-build-auth-login" class="md-skip">
+        <a href="#v3-packages-beta" class="md-skip">
           Skip to content
         </a>
       
@@ -109,7 +113,7 @@
   <nav class="md-header__inner md-grid" aria-label="Header">
     <a href="https://rattler-build.prefix.dev" title="Rattler-Build" class="md-header__button md-logo" aria-label="Rattler-Build" data-md-component="logo">
       
-  <img src="../../../../../assets/rattler-build-logo-no-padding.svg" alt="logo">
+  <img src="../assets/rattler-build-logo-no-padding.svg" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -126,7 +130,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              rattler-build auth login
+              V3 packages (beta)
             
           </span>
         </div>
@@ -254,7 +258,7 @@
   <label class="md-nav__title" for="__drawer">
     <a href="https://rattler-build.prefix.dev" title="Rattler-Build" class="md-nav__button md-logo" aria-label="Rattler-Build" data-md-component="logo">
       
-  <img src="../../../../../assets/rattler-build-logo-no-padding.svg" alt="logo">
+  <img src="../assets/rattler-build-logo-no-padding.svg" alt="logo">
 
     </a>
     Rattler-Build
@@ -281,7 +285,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../.." class="md-nav__link">
+      <a href=".." class="md-nav__link">
         
   
   
@@ -308,7 +312,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../../getting_started/" class="md-nav__link">
+      <a href="../getting_started/" class="md-nav__link">
         
   
   
@@ -335,7 +339,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../../highlevel/" class="md-nav__link">
+      <a href="../highlevel/" class="md-nav__link">
         
   
   
@@ -362,7 +366,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../../understanding_terminal_output/" class="md-nav__link">
+      <a href="../understanding_terminal_output/" class="md-nav__link">
         
   
   
@@ -425,7 +429,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../../../../tutorials/" class="md-nav__link ">
+            <a href="../tutorials/" class="md-nav__link ">
               
   
   
@@ -469,7 +473,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../../tutorials/python/" class="md-nav__link">
+      <a href="../tutorials/python/" class="md-nav__link">
         
   
   
@@ -497,7 +501,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../../tutorials/cpp/" class="md-nav__link">
+      <a href="../tutorials/cpp/" class="md-nav__link">
         
   
   
@@ -525,7 +529,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../../tutorials/javascript/" class="md-nav__link">
+      <a href="../tutorials/javascript/" class="md-nav__link">
         
   
   
@@ -553,7 +557,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../../tutorials/rust/" class="md-nav__link">
+      <a href="../tutorials/rust/" class="md-nav__link">
         
   
   
@@ -581,7 +585,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../../tutorials/go/" class="md-nav__link">
+      <a href="../tutorials/go/" class="md-nav__link">
         
   
   
@@ -609,7 +613,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../../tutorials/perl/" class="md-nav__link">
+      <a href="../tutorials/perl/" class="md-nav__link">
         
   
   
@@ -637,7 +641,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../../tutorials/r/" class="md-nav__link">
+      <a href="../tutorials/r/" class="md-nav__link">
         
   
   
@@ -665,7 +669,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../../tutorials/repackaging/" class="md-nav__link">
+      <a href="../tutorials/repackaging/" class="md-nav__link">
         
   
   
@@ -693,7 +697,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../../converting_from_conda_build/" class="md-nav__link">
+      <a href="../converting_from_conda_build/" class="md-nav__link">
         
   
   
@@ -725,8 +729,10 @@
       
   
   
+    
   
   
+  
     
     
       
@@ -766,11 +772,11 @@
     
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
         
           
           <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
@@ -791,7 +797,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_6">
             <span class="md-nav__icon md-icon"></span>
             
@@ -809,7 +815,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../../build_options/" class="md-nav__link">
+      <a href="../build_options/" class="md-nav__link">
         
   
   
@@ -837,7 +843,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../../selectors/" class="md-nav__link">
+      <a href="../selectors/" class="md-nav__link">
         
   
   
@@ -865,7 +871,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../../build_script/" class="md-nav__link">
+      <a href="../build_script/" class="md-nav__link">
         
   
   
@@ -893,7 +899,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../../variants/" class="md-nav__link">
+      <a href="../variants/" class="md-nav__link">
         
   
   
@@ -921,7 +927,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../../config/" class="md-nav__link">
+      <a href="../config/" class="md-nav__link">
         
   
   
@@ -949,7 +955,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../../compilers/" class="md-nav__link">
+      <a href="../compilers/" class="md-nav__link">
         
   
   
@@ -977,7 +983,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../../experimental_features/" class="md-nav__link">
+      <a href="../experimental_features/" class="md-nav__link">
         
   
   
@@ -1002,10 +1008,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../../../../v3/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    V3 packages (beta)
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1021,6 +1054,109 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#opting-in" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Opting in
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-v3-adds" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What V3 adds
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What V3 adds">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#buildflags-package-variant-flags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        build.flags — package variant flags
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#requirementsextras-optional-dependency-groups" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        requirements.extras — optional dependency groups
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#richer-matchspec-syntax" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Richer MatchSpec syntax
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-ends-up-in-indexjson" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What ends up in index.json
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#compatibility-notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Compatibility notes
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1033,7 +1169,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../../multiple_output_cache/" class="md-nav__link">
+      <a href="../multiple_output_cache/" class="md-nav__link">
         
   
   
@@ -1061,7 +1197,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../../sandbox/" class="md-nav__link">
+      <a href="../sandbox/" class="md-nav__link">
         
   
   
@@ -1089,7 +1225,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../../recipe_generation/" class="md-nav__link">
+      <a href="../recipe_generation/" class="md-nav__link">
         
   
   
@@ -1117,7 +1253,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../../bump_recipe/" class="md-nav__link">
+      <a href="../bump_recipe/" class="md-nav__link">
         
   
   
@@ -1145,7 +1281,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../../create_patch/" class="md-nav__link">
+      <a href="../create_patch/" class="md-nav__link">
         
   
   
@@ -1173,7 +1309,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../../debugging_builds/" class="md-nav__link">
+      <a href="../debugging_builds/" class="md-nav__link">
         
   
   
@@ -1201,7 +1337,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../../tips_and_tricks/" class="md-nav__link">
+      <a href="../tips_and_tricks/" class="md-nav__link">
         
   
   
@@ -1229,7 +1365,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../../windows_quirks/" class="md-nav__link">
+      <a href="../windows_quirks/" class="md-nav__link">
         
   
   
@@ -1317,7 +1453,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../../testing/" class="md-nav__link">
+      <a href="../testing/" class="md-nav__link">
         
   
   
@@ -1345,7 +1481,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../../rebuild/" class="md-nav__link">
+      <a href="../rebuild/" class="md-nav__link">
         
   
   
@@ -1439,7 +1575,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../../authentication_and_upload/" class="md-nav__link">
+      <a href="../authentication_and_upload/" class="md-nav__link">
         
   
   
@@ -1467,7 +1603,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../../publish/" class="md-nav__link">
+      <a href="../publish/" class="md-nav__link">
         
   
   
@@ -1495,7 +1631,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../../sigstore/" class="md-nav__link">
+      <a href="../sigstore/" class="md-nav__link">
         
   
   
@@ -1523,7 +1659,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../../conda_forge/" class="md-nav__link">
+      <a href="../conda_forge/" class="md-nav__link">
         
   
   
@@ -1551,7 +1687,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../../automatic_linting/" class="md-nav__link">
+      <a href="../automatic_linting/" class="md-nav__link">
         
   
   
@@ -1643,7 +1779,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../../package_spec/" class="md-nav__link">
+      <a href="../package_spec/" class="md-nav__link">
         
   
   
@@ -1671,7 +1807,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../../special_files/" class="md-nav__link">
+      <a href="../special_files/" class="md-nav__link">
         
   
   
@@ -1699,7 +1835,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../../internals/" class="md-nav__link">
+      <a href="../internals/" class="md-nav__link">
         
   
   
@@ -1727,7 +1863,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../../system_integration/" class="md-nav__link">
+      <a href="../system_integration/" class="md-nav__link">
         
   
   
@@ -1855,7 +1991,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../../../../py-rattler-build/reference/" class="md-nav__link ">
+            <a href="../py-rattler-build/reference/" class="md-nav__link ">
               
   
   
@@ -1899,7 +2035,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../../py-rattler-build/reference/recipe/" class="md-nav__link">
+      <a href="../py-rattler-build/reference/recipe/" class="md-nav__link">
         
   
   
@@ -1927,7 +2063,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../../py-rattler-build/reference/rendering/" class="md-nav__link">
+      <a href="../py-rattler-build/reference/rendering/" class="md-nav__link">
         
   
   
@@ -1955,7 +2091,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../../py-rattler-build/reference/configuration/" class="md-nav__link">
+      <a href="../py-rattler-build/reference/configuration/" class="md-nav__link">
         
   
   
@@ -1983,7 +2119,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../../py-rattler-build/reference/package/" class="md-nav__link">
+      <a href="../py-rattler-build/reference/package/" class="md-nav__link">
         
   
   
@@ -2011,7 +2147,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../../py-rattler-build/reference/build_result/" class="md-nav__link">
+      <a href="../py-rattler-build/reference/build_result/" class="md-nav__link">
         
   
   
@@ -2039,7 +2175,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../../py-rattler-build/reference/upload/" class="md-nav__link">
+      <a href="../py-rattler-build/reference/upload/" class="md-nav__link">
         
   
   
@@ -2067,7 +2203,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../../py-rattler-build/reference/exceptions/" class="md-nav__link">
+      <a href="../py-rattler-build/reference/exceptions/" class="md-nav__link">
         
   
   
@@ -2095,7 +2231,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../../py-rattler-build/reference/recipe_generation/" class="md-nav__link">
+      <a href="../py-rattler-build/reference/recipe_generation/" class="md-nav__link">
         
   
   
@@ -2123,7 +2259,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../../py-rattler-build/reference/progress/" class="md-nav__link">
+      <a href="../py-rattler-build/reference/progress/" class="md-nav__link">
         
   
   
@@ -2151,7 +2287,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../../py-rattler-build/reference/package_assembler/" class="md-nav__link">
+      <a href="../py-rattler-build/reference/package_assembler/" class="md-nav__link">
         
   
   
@@ -2179,7 +2315,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../../py-rattler-build/reference/debug/" class="md-nav__link">
+      <a href="../py-rattler-build/reference/debug/" class="md-nav__link">
         
   
   
@@ -2274,7 +2410,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../../py-rattler-build/tutorials/recipe_rendering_basics/" class="md-nav__link">
+      <a href="../py-rattler-build/tutorials/recipe_rendering_basics/" class="md-nav__link">
         
   
   
@@ -2302,7 +2438,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../../py-rattler-build/tutorials/multi_output_and_staging/" class="md-nav__link">
+      <a href="../py-rattler-build/tutorials/multi_output_and_staging/" class="md-nav__link">
         
   
   
@@ -2330,7 +2466,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../../py-rattler-build/tutorials/inspecting_built_packages/" class="md-nav__link">
+      <a href="../py-rattler-build/tutorials/inspecting_built_packages/" class="md-nav__link">
         
   
   
@@ -2358,7 +2494,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../../py-rattler-build/tutorials/package_assembly/" class="md-nav__link">
+      <a href="../py-rattler-build/tutorials/package_assembly/" class="md-nav__link">
         
   
   
@@ -2386,7 +2522,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../../py-rattler-build/tutorials/debug_session/" class="md-nav__link">
+      <a href="../py-rattler-build/tutorials/debug_session/" class="md-nav__link">
         
   
   
@@ -2488,7 +2624,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../recipe_file/" class="md-nav__link">
+      <a href="../reference/recipe_file/" class="md-nav__link">
         
   
   
@@ -2516,7 +2652,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../multi_output/" class="md-nav__link">
+      <a href="../reference/multi_output/" class="md-nav__link">
         
   
   
@@ -2544,7 +2680,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../" class="md-nav__link">
+      <a href="../reference/cli/rattler-build/" class="md-nav__link">
         
   
   
@@ -2572,7 +2708,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../jinja/" class="md-nav__link">
+      <a href="../reference/jinja/" class="md-nav__link">
         
   
   
@@ -2600,7 +2736,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../../rattler_index/" class="md-nav__link">
+      <a href="../rattler_index/" class="md-nav__link">
         
   
   
@@ -2655,10 +2791,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#usage" class="md-nav__link">
+  <a href="#opting-in" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Usage
+        Opting in
       
     </span>
   </a>
@@ -2666,10 +2802,60 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#arguments" class="md-nav__link">
+  <a href="#what-v3-adds" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Arguments
+        What V3 adds
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What V3 adds">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#buildflags-package-variant-flags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        build.flags — package variant flags
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#requirementsextras-optional-dependency-groups" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        requirements.extras — optional dependency groups
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#richer-matchspec-syntax" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Richer MatchSpec syntax
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-ends-up-in-indexjson" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What ends up in index.json
       
     </span>
   </a>
@@ -2677,32 +2863,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#oauthoidc-authentication" class="md-nav__link">
+  <a href="#compatibility-notes" class="md-nav__link">
     <span class="md-ellipsis">
       
-        OAuth/OIDC Authentication
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#s3-authentication" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        S3 Authentication
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#token-basic-authentication" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Token / Basic Authentication
+        Compatibility notes
       
     </span>
   </a>
@@ -2726,7 +2890,7 @@
 
 
   
-    <a href="https://github.com/prefix-dev/rattler-build/edit/main/docs/reference/cli/rattler-build/auth/login.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+    <a href="https://github.com/prefix-dev/rattler-build/edit/main/docs/v3.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.71 7.04c.39-.39.39-1.04 0-1.41l-2.34-2.34c-.37-.39-1.02-.39-1.41 0l-1.84 1.83 3.75 3.75M3 17.25V21h3.75L17.81 9.93l-3.75-3.75z"/></svg>
     </a>
@@ -2734,110 +2898,154 @@
   
 
 
-<!--- This file is autogenerated. Do not edit manually! -->
-<h1 id="rattler-build-auth-login"><a href="../../">rattler-build</a> <a href="../">auth</a> login<a class="headerlink" href="#rattler-build-auth-login" title="Permanent link">#</a></h1>
-<p>Store authentication information for a given host</p>
-<h2 id="usage">Usage<a class="headerlink" href="#usage" title="Permanent link">#</a></h2>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>rattler-build auth login [OPTIONS] &lt;HOST&gt;
+<h1 id="v3-packages-beta">V3 packages (beta)<a class="headerlink" href="#v3-packages-beta" title="Permanent link">#</a></h1>
+<div class="admonition warning">
+<p class="admonition-title">Beta feature</p>
+<p>V3 is an opt-in preview of the next conda repodata revision. The on-disk
+metadata format, recipe fields and <code>MatchSpec</code> syntax described here may
+still change. Do not publish V3 packages to channels that are consumed by
+older clients without first verifying that the consuming tools understand
+V3 records.</p>
+</div>
+<p>V3 is a new revision of the conda repodata format. It extends the existing
+package record with two new fields and adds a richer <code>MatchSpec</code> bracket
+syntax that lets you express conditional, optional and variant-tagged
+dependencies. Rattler-Build can produce V3 packages and parse V3 recipes,
+but only when the feature is explicitly enabled.</p>
+<h2 id="opting-in">Opting in<a class="headerlink" href="#opting-in" title="Permanent link">#</a></h2>
+<p>V3 is gated behind a single flag. There are two ways to turn it on:</p>
+<ul>
+<li>
+<p>Pass <code>--v3</code> on the command line:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>rattler-build<span class="w"> </span>build<span class="w"> </span>--v3<span class="w"> </span>--recipe<span class="w"> </span>recipe.yaml
 </span></code></pre></div>
-<h2 id="arguments">Arguments<a class="headerlink" href="#arguments" title="Permanent link">#</a></h2>
-<ul>
+</li>
 <li>
-<dl>
-<dt><a id="arg-\<HOST>" href="#arg-\<HOST>"><code>&lt;HOST&gt;</code></a></dt>
-<dd>The host to authenticate with (e.g. prefix.dev)
-<br><strong>required</strong>: <code>true</code></dd>
-</dl>
+<p>Or use the equivalent option from the Python bindings / library API
+  (<code>CommonData::new(..., v3: true, ...)</code>, <code>RenderConfig::new().with_v3(true)</code>,
+  <code>ParseConfig { v3: true }</code>).</p>
 </li>
 </ul>
-<h2 id="oauthoidc-authentication">OAuth/OIDC Authentication<a class="headerlink" href="#oauthoidc-authentication" title="Permanent link">#</a></h2>
+<p>When the flag is <strong>off</strong> (the default), Rattler-Build behaves exactly like
+before:</p>
 <ul>
-<li>
-<dl>
-<dt><a id="arg---oauth" href="#arg---oauth"><code>--oauth</code></a></dt>
-<dd>Use OAuth/OIDC authentication</dd>
-</dl>
-</li>
-<li>
-<dl>
-<dt><a id="arg---oauth-issuer-url" href="#arg---oauth-issuer-url"><code>--oauth-issuer-url &lt;OAUTH_ISSUER_URL&gt;</code></a></dt>
-<dd>OIDC issuer URL (defaults to <a href="https://{host">https://{host</a>})</dd>
-</dl>
-</li>
-<li>
-<dl>
-<dt><a id="arg---oauth-client-id" href="#arg---oauth-client-id"><code>--oauth-client-id &lt;OAUTH_CLIENT_ID&gt;</code></a></dt>
-<dd>OAuth client ID (defaults to "rattler")</dd>
-</dl>
-</li>
-<li>
-<dl>
-<dt><a id="arg---oauth-client-secret" href="#arg---oauth-client-secret"><code>--oauth-client-secret &lt;OAUTH_CLIENT_SECRET&gt;</code></a></dt>
-<dd>OAuth client secret (for confidential clients)</dd>
-</dl>
-</li>
-<li>
-<dl>
-<dt><a id="arg---oauth-flow" href="#arg---oauth-flow"><code>--oauth-flow &lt;OAUTH_FLOW&gt;</code></a></dt>
-<dd>OAuth flow: auto (default), auth-code, device-code
-<br><strong>options</strong>: <code>auto</code>, <code>auth-code</code>, <code>device-code</code></dd>
-</dl>
-</li>
-<li>
-<dl>
-<dt><a id="arg---oauth-scope" href="#arg---oauth-scope"><code>--oauth-scope &lt;OAUTH_SCOPES&gt;</code></a></dt>
-<dd>Additional OAuth scopes to request (repeatable)
-<br>May be provided more than once.</dd>
-</dl>
-</li>
+<li>Recipes that use V3-only fields (<code>build.flags</code>, <code>requirements.extras</code>) fail
+  to evaluate with an error pointing at <code>--v3</code>.</li>
+<li><code>MatchSpec</code> strings that use V3-only bracket keys (<code>flags=[…]</code>,
+  <code>extras=[…]</code>, <code>when="…"</code>) fail to parse with the same error.</li>
+<li>Built packages get the legacy <code>index.json</code> shape — there is no
+  <code>repodata_revision</code> field and no <code>flags</code> array.</li>
 </ul>
-<h2 id="s3-authentication">S3 Authentication<a class="headerlink" href="#s3-authentication" title="Permanent link">#</a></h2>
+<p>When the flag is <strong>on</strong>:</p>
 <ul>
-<li>
-<dl>
-<dt><a id="arg---s3-access-key-id" href="#arg---s3-access-key-id"><code>--s3-access-key-id &lt;S3_ACCESS_KEY_ID&gt;</code></a></dt>
-<dd>The S3 access key ID</dd>
-</dl>
-</li>
-<li>
-<dl>
-<dt><a id="arg---s3-secret-access-key" href="#arg---s3-secret-access-key"><code>--s3-secret-access-key &lt;S3_SECRET_ACCESS_KEY&gt;</code></a></dt>
-<dd>The S3 secret access key</dd>
-</dl>
-</li>
-<li>
-<dl>
-<dt><a id="arg---s3-session-token" href="#arg---s3-session-token"><code>--s3-session-token &lt;S3_SESSION_TOKEN&gt;</code></a></dt>
-<dd>The S3 session token</dd>
-</dl>
-</li>
+<li>The new recipe fields are accepted and round-tripped through Stage 0/Stage 1
+  evaluation.</li>
+<li>V3 <code>MatchSpec</code> syntax is parsed everywhere a dependency string is allowed
+  (<code>requirements.{build,host,run,run_constraints,extras}</code>, <code>run_exports</code>).</li>
+<li>Built packages are tagged with <code>repodata_revision: 3</code> in <code>index.json</code> and
+  carry their declared variant flags in a top-level <code>flags</code> array. Optional
+  dependency groups are written into the <code>extra_depends</code> mapping.</li>
 </ul>
-<h2 id="token-basic-authentication">Token / Basic Authentication<a class="headerlink" href="#token-basic-authentication" title="Permanent link">#</a></h2>
+<h2 id="what-v3-adds">What V3 adds<a class="headerlink" href="#what-v3-adds" title="Permanent link">#</a></h2>
+<h3 id="buildflags-package-variant-flags"><code>build.flags</code> — package variant flags<a class="headerlink" href="#buildflags-package-variant-flags" title="Permanent link">#</a></h3>
+<p>Flags are short lowercase tags that describe a <em>variant</em> of a package — the
+canonical examples are <code>cuda</code>, <code>blas:openblas</code>, <code>mpi:mpich</code>. They are stored
+on the package record and can be matched by downstream specs (see below).</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">flags</span><span class="p">:</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cuda</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">blas:openblas</span>
+</span></code></pre></div>
+<p>A flag must match <code>^[a-z0-9_]+(:[a-z0-9_]+)?$</code> — i.e. lowercase ASCII,
+digits and underscores, optionally with a single <code>:</code>-separated suffix.
+Flags are conditional and templated like other recipe lists, so this is
+valid:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="nt">flags</span><span class="p">:</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cuda_compiler_version != &quot;None&quot;</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">      </span><span class="nt">then</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cuda</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">blas:${{ blas_impl }}</span>
+</span></code></pre></div>
+<p>Flags that depend on a Jinja variable participate in variant hashing, so
+each flag combination produces its own build hash.</p>
+<h3 id="requirementsextras-optional-dependency-groups"><code>requirements.extras</code> — optional dependency groups<a class="headerlink" href="#requirementsextras-optional-dependency-groups" title="Permanent link">#</a></h3>
+<p><code>extras</code> is a mapping from a group name to a list of dependencies. The group
+is <em>not</em> installed by default — consumers opt in via the <code>extras=[…]</code>
+<code>MatchSpec</code> bracket key. This mirrors the "optional dependencies" idea from
+<code>pyproject.toml</code>.</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">requirements</span><span class="p">:</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nt">run</span><span class="p">:</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python &gt;=3.10</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span><span class="nt">extras</span><span class="p">:</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">    </span><span class="nt">plot</span><span class="p">:</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">matplotlib &gt;=3.8</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">    </span><span class="nt">full</span><span class="p">:</span>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">matplotlib &gt;=3.8</span>
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pandas &gt;=2</span>
+</span></code></pre></div>
+<p>A consumer that wants the <code>plot</code> group writes:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">requirements</span><span class="p">:</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="nt">run</span><span class="p">:</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mypkg[extras=[plot]]</span>
+</span></code></pre></div>
+<p>In the built package, optional groups land in
+<code>index.json::extra_depends</code>.</p>
+<h3 id="richer-matchspec-syntax">Richer <code>MatchSpec</code> syntax<a class="headerlink" href="#richer-matchspec-syntax" title="Permanent link">#</a></h3>
+<p>V3 extends the bracket form of <code>MatchSpec</code> with three new keys. They can be
+combined with the existing keys (<code>version=…</code>, <code>build=…</code>, <code>channel=…</code>, …).</p>
+<h4 id="flags-match-by-variant-flag"><code>flags=[…]</code> — match by variant flag<a class="headerlink" href="#flags-match-by-variant-flag" title="Permanent link">#</a></h4>
+<p>Selects builds whose <code>flags</code> array contains the listed entries. A <code>*</code>
+suffix is a glob over the second segment.</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nt">requirements</span><span class="p">:</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="nt">run</span><span class="p">:</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pytorch[flags=[cuda]]</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">numpy[flags=[blas:*]]</span><span class="w">          </span><span class="c1"># any BLAS flavour</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mamba[flags=[cuda, blas:openblas]]</span>
+</span></code></pre></div>
+<h4 id="when-conditional-dependencies"><code>when="…"</code> — conditional dependencies<a class="headerlink" href="#when-conditional-dependencies" title="Permanent link">#</a></h4>
+<p>A spec with <code>when="…"</code> is only included when the embedded predicate is
+satisfied by the rest of the resolved environment. This replaces the old
+<code>; if</code> syntax (which is now deprecated).</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nt">requirements</span><span class="p">:</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="nt">run</span><span class="p">:</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">scipy[when=&quot;python &gt;=3.10&quot;]</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">numpy &gt;=2.0[when=&quot;python &gt;=3.10 and __linux&quot;]</span>
+</span></code></pre></div>
+<p>The predicate is itself a small spec language and supports <code>and</code>, <code>or</code>,
+<code>not</code>, parentheses, virtual packages (<code>__linux</code>, <code>__glibc</code>, …) and nested
+<code>MatchSpec</code>s.</p>
+<h4 id="extras-pull-in-optional-groups"><code>extras=[…]</code> — pull in optional groups<a class="headerlink" href="#extras-pull-in-optional-groups" title="Permanent link">#</a></h4>
+<p>Already shown above — uses the group names declared by the producing
+package's <code>requirements.extras</code>.</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nt">requirements</span><span class="p">:</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="nt">run</span><span class="p">:</span>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mypkg[extras=[plot, full]]</span>
+</span></code></pre></div>
+<h2 id="what-ends-up-in-indexjson">What ends up in <code>index.json</code><a class="headerlink" href="#what-ends-up-in-indexjson" title="Permanent link">#</a></h2>
+<p>A V3 build writes (in addition to the existing fields):</p>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="p">{</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span><span class="nt">&quot;repodata_revision&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">  </span><span class="nt">&quot;flags&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;cuda&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;blas:openblas&quot;</span><span class="p">],</span>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">  </span><span class="nt">&quot;extra_depends&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">    </span><span class="nt">&quot;plot&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;matplotlib &gt;=3.8&quot;</span><span class="p">]</span>
+</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">  </span><span class="p">}</span>
+</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="p">}</span>
+</span></code></pre></div>
+<p><code>flags</code> and <code>extra_depends</code> are omitted when empty. The <code>repodata_revision</code>
+field is the signal that downstream tools should use the V3 parser; it is
+only written when the build was run with <code>--v3</code>.</p>
+<h2 id="compatibility-notes">Compatibility notes<a class="headerlink" href="#compatibility-notes" title="Permanent link">#</a></h2>
 <ul>
-<li>
-<dl>
-<dt><a id="arg---token" href="#arg---token"><code>--token &lt;TOKEN&gt;</code></a></dt>
-<dd>The token to use (for authentication with prefix.dev)</dd>
-</dl>
-</li>
-<li>
-<dl>
-<dt><a id="arg---username" href="#arg---username"><code>--username &lt;USERNAME&gt;</code></a></dt>
-<dd>The username to use (for basic HTTP authentication)</dd>
-</dl>
-</li>
-<li>
-<dl>
-<dt><a id="arg---password" href="#arg---password"><code>--password &lt;PASSWORD&gt;</code></a></dt>
-<dd>The password to use (for basic HTTP authentication)</dd>
-</dl>
-</li>
-<li>
-<dl>
-<dt><a id="arg---conda-token" href="#arg---conda-token"><code>--conda-token &lt;CONDA_TOKEN&gt;</code></a></dt>
-<dd>The token to use on anaconda.org / quetz authentication</dd>
-</dl>
-</li>
+<li>V3 packages are still valid <code>.conda</code> archives — they only differ in
+  metadata. Older clients that ignore unknown fields will still install
+  the base package, but will silently miss conditional dependencies,
+  flag-based selection and optional groups.</li>
+<li>Consuming a V3 package correctly requires a resolver that understands
+  V3 (recent <code>rattler</code> / <code>pixi</code> / <code>conda</code> versions). Check your toolchain
+  before publishing.</li>
+<li>Mixing V3 syntax in a recipe without passing <code>--v3</code> is always an error —
+  it never silently downgrades.</li>
 </ul>
 
 
@@ -2845,9 +3053,6 @@
 
 
 
-
-  
-  
 
 
 
@@ -2899,6 +3104,60 @@
     <!-- Link to previous and/or next page -->
     
       
+        
+        <nav
+          class="md-footer__inner md-grid"
+          aria-label="Footer"
+          
+        >
+
+          <!-- Link to previous page -->
+          
+            
+            <a
+              href="../experimental_features/"
+              class="md-footer__link md-footer__link--prev"
+              aria-label="Previous: Experimental features"
+            >
+              <div class="md-footer__button md-icon">
+                
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+              </div>
+              <div class="md-footer__title">
+                <span class="md-footer__direction">
+                  Previous
+                </span>
+                <div class="md-ellipsis">
+                  Experimental features
+                </div>
+              </div>
+            </a>
+          
+
+          <!-- Link to next page -->
+          
+            
+            <a
+              href="../multiple_output_cache/"
+              class="md-footer__link md-footer__link--next"
+              aria-label="Next: Multiple output cache"
+            >
+              <div class="md-footer__title">
+                <span class="md-footer__direction">
+                  Next
+                </span>
+                <div class="md-ellipsis">
+                  Multiple output cache
+                </div>
+              </div>
+              <div class="md-footer__button md-icon">
+                
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+              </div>
+            </a>
+          
+        </nav>
+      
     
 
     <!-- Further information -->
@@ -2914,8 +3173,8 @@
         <!-- prefix logo -->
         <div class="md-footer-meta__item md-footer-meta__item--prefix-logo">
             <a href="https://prefix.dev" target="_blank">
-                <img class="prefix-logo prefix-logo__dark" src="../../../../../assets/logo_dark.svg" alt="">
-                <img class="prefix-logo prefix-logo__light" src="../../../../../assets/logo_light.svg" alt="">
+                <img class="prefix-logo prefix-logo__dark" src="../assets/logo_dark.svg" alt="">
+                <img class="prefix-logo prefix-logo__light" src="../assets/logo_light.svg" alt="">
             </a>
         </div>
 
@@ -2987,10 +3246,10 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../../../../..", "features": ["content.tabs.link", "content.code.copy", "content.action.edit", "content.code.annotate", "content.tooltips", "navigation.instant", "navigation.instant.progress", "navigation.tracking", "navigation.indexes", "navigation.top", "navigation.footer"], "search": "../../../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["content.tabs.link", "content.code.copy", "content.action.edit", "content.code.annotate", "content.tooltips", "navigation.instant", "navigation.instant.progress", "navigation.tracking", "navigation.indexes", "navigation.top", "navigation.footer"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
-      <script src="../../../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
       
     
   </body>
