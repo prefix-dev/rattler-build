@@ -192,6 +192,7 @@ async fn download_attestation_bundle(
 ) -> Result<String, CacheError> {
     let response = client
         .for_host(url)
+        .client()
         .get(url.clone())
         .send()
         .await

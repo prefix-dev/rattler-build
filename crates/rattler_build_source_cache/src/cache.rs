@@ -107,7 +107,7 @@ impl SourceCache {
             .git_resolver
             .fetch(
                 git_url.clone(),
-                self.client.get_client().clone(),
+                self.client.get_client().client().clone(),
                 git_cache,
                 None,
                 checkout_options,
@@ -451,7 +451,13 @@ impl SourceCache {
         }
 
         // Download from HTTP/HTTPS - use the appropriate client based on SSL settings
-        let response = self.client.for_host(url).get(url.clone()).send().await?;
+        let response = self
+            .client
+            .for_host(url)
+            .client()
+            .get(url.clone())
+            .send()
+            .await?;
 
         if !response.status().is_success() {
             return Err(CacheError::Download(

@@ -991,6 +991,7 @@ pub async fn rebuild_package_core(
 
             let response = reqwest_client
                 .get_client()
+                .client()
                 .get(url.as_str())
                 .send()
                 .await
