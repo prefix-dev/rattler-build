@@ -167,11 +167,11 @@ impl IndexJsonBuilder {
             constrains: self.constrains,
             noarch: self.noarch,
             track_features: self.track_features,
+            flags: Vec::new(),
             features: None,
             python_site_packages_path: None,
             purls: None,
             experimental_extra_depends: Default::default(),
-            flags: Vec::new(),
             repodata_revision: None,
         })
     }

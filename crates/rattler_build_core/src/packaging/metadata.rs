@@ -15,7 +15,7 @@ use fs_err::File;
 use itertools::Itertools;
 use rattler_build_recipe::stage1::build::PrefixDetection;
 use rattler_conda_types::{
-    ChannelUrl, NoArchType, Platform,
+    ChannelUrl, NoArchType, Platform, RepodataRevision,
     package::{
         AboutJson, FileMode, IndexJson, LinkJson, NoArchLinks, PackageFile, PathType, PathsEntry,
         PathsJson, PrefixPlaceholder, PythonEntryPoints, RunExportsJson,
@@ -390,14 +390,27 @@ impl Output {
                 .map(|dep| dep.spec().to_string())
                 .unique()
                 .collect(),
+            experimental_extra_depends: finalized_dependencies
+                .run
+                .extra_depends
+                .iter()
+                .map(|(name, deps)| {
+                    (
+                        name.clone(),
+                        deps.iter()
+                            .map(|dep| dep.spec().to_string())
+                            .unique()
+                            .collect(),
+                    )
+                })
+                .collect(),
             noarch,
             track_features,
+            flags: recipe.build().flags.clone(),
             features: None,
             python_site_packages_path: recipe.build().python.site_packages_path.clone(),
             purls: None,
-            experimental_extra_depends: Default::default(),
-            flags: Vec::new(),
-            repodata_revision: None,
+            repodata_revision: self.build_configuration.v3.then_some(RepodataRevision::V3),
         })
     }
 

@@ -130,6 +130,7 @@ class RenderConfig:
 
     Args:
         platform: Platform configuration (target, build, host platforms, experimental flag)
+        v3: Enable V3 recipe fields and MatchSpec syntax.
         extra_context: Dictionary of extra context variables for Jinja rendering
 
     Example:
@@ -150,15 +151,18 @@ class RenderConfig:
         self,
         platform: PlatformConfig | None = None,
         extra_context: dict[str, ContextValue] | None = None,
+        v3: bool = False,
     ):
         """Create a new render configuration."""
         self.platform = platform
+        self._v3 = v3
         self._extra_context = extra_context
         self._config = _render.RenderConfig(
             target_platform=platform.target_platform if platform else None,
             build_platform=platform.build_platform if platform else None,
             host_platform=platform.host_platform if platform else None,
             experimental=platform.experimental if platform else False,
+            v3=v3,
             recipe_path=None,
             extra_context=extra_context,
         )
@@ -176,9 +180,11 @@ class RenderConfig:
         """
         if render_config is not None:
             platform = render_config.platform
+            v3 = render_config._v3
             extra_context = render_config._extra_context
         else:
             platform = None
+            v3 = False
             extra_context = None
 
         return _render.RenderConfig(
@@ -186,6 +192,7 @@ class RenderConfig:
             build_platform=platform.build_platform if platform else None,
             host_platform=platform.host_platform if platform else None,
             experimental=platform.experimental if platform else False,
+            v3=v3,
             recipe_path=recipe_path,
             extra_context=extra_context,
         )
@@ -225,6 +232,11 @@ class RenderConfig:
         """Get whether experimental features are enabled."""
         return self._config.experimental()
 
+    @property
+    def v3(self) -> bool:
+        """Get whether V3 recipe fields and MatchSpec syntax are enabled."""
+        return self._config.v3()
+
     def __repr__(self) -> str:
         return repr(self._config)
 
@@ -255,10 +267,11 @@ class RenderedVariant:
         ```
     """
 
-    def __init__(self, inner: _render.RenderedVariant, recipe_path: Path):
+    def __init__(self, inner: _render.RenderedVariant, recipe_path: Path, v3: bool = False):
         """Create a RenderedVariant from the Rust object."""
         self._inner = inner
         self._recipe_path = recipe_path
+        self._v3 = v3
         self._siblings: list[RenderedVariant] = []
 
     @property
@@ -398,6 +411,7 @@ class RenderedVariant:
             exclude_newer=exclude_newer,
             env_isolation=env_isolation,
             sibling_variants=rust_siblings,
+            v3=self._v3,
         )
 
         # Convert Rust BuildResult to Python BuildResult

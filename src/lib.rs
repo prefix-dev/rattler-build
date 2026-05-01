@@ -99,8 +99,13 @@ fn find_variants(
         recipe_path.display().to_string(),
         recipe_content.to_string(),
     );
-    let stage0_recipe =
-        rattler_build_recipe::parse_recipe(&source).wrap_err("Failed to parse recipe")?;
+    let stage0_recipe = rattler_build_recipe::parse_recipe_with_config(
+        &source,
+        rattler_build_recipe::stage0::ParseConfig {
+            v3: render_config.v3,
+        },
+    )
+    .wrap_err("Failed to parse recipe")?;
 
     // Extract the top-level recipe name from multi-output recipes (if concrete)
     let recipe_name = match &stage0_recipe {
@@ -390,6 +395,7 @@ pub async fn get_build_output(
         build_platform: build_data.build_platform,
         host_platform: build_data.host_platform,
         experimental: build_data.common.experimental,
+        v3: build_data.common.v3,
         recipe_path: Some(recipe_path.to_path_buf()),
         os_env_var_keys,
         build_number_override: build_data.build_num_override,
@@ -554,6 +560,7 @@ pub async fn get_build_output(
                 env_isolation: build_data.env_isolation,
                 sandbox_config: build_data.sandbox_configuration.clone(),
                 exclude_newer: build_data.exclude_newer,
+                v3: build_data.common.v3,
             },
             finalized_dependencies: None,
             finalized_sources: None,

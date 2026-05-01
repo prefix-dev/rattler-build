@@ -121,6 +121,7 @@ pub(crate) fn output_from_rendered_variant(
     recipe_path: Option<&Path>,
     exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
     env_isolation: EnvironmentIsolation,
+    v3: bool,
     extra_subpackages: BTreeMap<rattler_conda_types::PackageName, PackageIdentifier>,
 ) -> Result<Output, RattlerBuildError> {
     let timestamp = chrono::Utc::now();
@@ -224,6 +225,7 @@ pub(crate) fn output_from_rendered_variant(
             env_isolation,
             sandbox_config: None,
             exclude_newer,
+            v3,
         },
         finalized_dependencies: None,
         finalized_sources: None,
@@ -258,6 +260,7 @@ pub fn build_rendered_variant_py(
     exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
     env_isolation: PyEnvironmentIsolation,
     sibling_variants: Vec<render::PyRenderedVariant>,
+    v3: bool,
 ) -> PyResult<BuildResultPy> {
     let tool_config = tool_config.inner;
 
@@ -302,6 +305,7 @@ pub fn build_rendered_variant_py(
         recipe_path.as_deref(),
         exclude_newer,
         env_isolation,
+        v3,
         extra_subpackages,
     )?;
 

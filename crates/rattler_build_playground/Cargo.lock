@@ -541,9 +541,9 @@ checksum = "37909eebbb50d72f9059c3b6d82c0463f2ff062c9e95845c43a6c9c0355411be"
 
 [[package]]
 name = "file_url"
-version = "0.2.9"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e448c82bdc9801837426d6662fbcd640db05bfc7b861fbd17779f13c90b552b1"
+checksum = "1e546758dbcde9d10c0d3bd8b83adb535b23fa81121cf4dc5c3e7b5907cc8eb8"
 dependencies = [
  "itertools",
  "percent-encoding",
@@ -1353,9 +1353,9 @@ dependencies = [
 
 [[package]]
 name = "rattler_conda_types"
-version = "0.45.0"
+version = "0.46.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6841e5bf2d817bc98a24cf7bb817eaa97feb12e7cd81a02c60d718e5c9e9d8cd"
+checksum = "add942503b3cf8c6f797707762bcf9206709ce1bc001b974860b0313fd002ced"
 dependencies = [
  "ahash",
  "chrono",

@@ -1,16 +1,49 @@
 //! Parser for the Requirements section
 
 use marked_yaml::Node as MarkedNode;
-use rattler_build_yaml_parser::{NodeConverter, ParseMapping, parse_conditional_list};
-use rattler_conda_types::{MatchSpec, PackageName};
+use rattler_build_yaml_parser::{
+    NodeConverter, ParseMapping, parse_conditional_list_with_converter,
+};
+use rattler_conda_types::{MatchSpec, PackageName, ParseStrictness};
 
 use crate::{
     error::{ParseError, ParseResult},
     stage0::{
+        SerializableMatchSpec,
+        parser::ParseConfig,
         parser::helpers::get_span,
         requirements::{IgnoreRunExports, Requirements, RunExports},
     },
 };
+
+struct MatchSpecConverter {
+    v3: bool,
+}
+
+impl NodeConverter<SerializableMatchSpec> for MatchSpecConverter {
+    fn convert_scalar(
+        &self,
+        node: &MarkedNode,
+        field_name: &str,
+    ) -> ParseResult<SerializableMatchSpec> {
+        let scalar = node
+            .as_scalar()
+            .ok_or_else(|| ParseError::expected_type("scalar", "non-scalar", get_span(node)))?;
+
+        SerializableMatchSpec::parse_with_v3(scalar.as_str(), ParseStrictness::Strict, self.v3)
+            .map_err(|e| {
+                let reason = e.to_string();
+                let err = ParseError::invalid_value(field_name, &reason, *scalar.span());
+                if !self.v3 && reason.contains("invalid bracket key") {
+                    err.with_suggestion(
+                        "Enable --v3 to use V3 MatchSpec keys such as extras, flags, or when.",
+                    )
+                } else {
+                    err
+                }
+            })
+    }
+}
 
 /// Parse a Requirements section from YAML
 ///
@@ -29,7 +62,15 @@ use crate::{
 ///   run_constraints:
 ///     - numpy >=1.19
 /// ```
-pub fn parse_requirements(yaml: &MarkedNode) -> ParseResult<Requirements> {
+#[cfg(test)]
+fn parse_requirements(yaml: &MarkedNode) -> ParseResult<Requirements> {
+    parse_requirements_with_config(yaml, ParseConfig::default())
+}
+
+pub(crate) fn parse_requirements_with_config(
+    yaml: &MarkedNode,
+    config: ParseConfig,
+) -> ParseResult<Requirements> {
     // Validate field names first
     yaml.validate_keys(
         "requirements",
@@ -38,26 +79,30 @@ pub fn parse_requirements(yaml: &MarkedNode) -> ParseResult<Requirements> {
             "host",
             "run",
             "run_constraints",
+            "extras",
             "run_exports",
             "ignore_run_exports",
         ],
     )?;
 
     let mut requirements = Requirements::default();
+    let matchspec_converter = MatchSpecConverter { v3: config.v3 };
 
-    if let Some(build) = yaml.try_get_conditional_list("build")? {
+    if let Some(build) = yaml.try_get_conditional_list_with("build", &matchspec_converter)? {
         requirements.build = build;
     }
 
-    if let Some(host) = yaml.try_get_conditional_list("host")? {
+    if let Some(host) = yaml.try_get_conditional_list_with("host", &matchspec_converter)? {
         requirements.host = host;
     }
 
-    if let Some(run) = yaml.try_get_conditional_list("run")? {
+    if let Some(run) = yaml.try_get_conditional_list_with("run", &matchspec_converter)? {
         requirements.run = run;
     }
 
-    if let Some(run_constraints) = yaml.try_get_conditional_list("run_constraints")? {
+    if let Some(run_constraints) =
+        yaml.try_get_conditional_list_with("run_constraints", &matchspec_converter)?
+    {
         requirements.run_constraints = run_constraints;
     }
 
@@ -66,8 +111,12 @@ pub fn parse_requirements(yaml: &MarkedNode) -> ParseResult<Requirements> {
         .as_mapping()
         .ok_or_else(|| ParseError::expected_type("mapping", "non-mapping", get_span(yaml)))?;
 
+    if let Some(extras) = mapping.get("extras") {
+        requirements.extras = parse_extras(extras, &matchspec_converter)?;
+    }
+
     if let Some(run_exports) = mapping.get("run_exports") {
-        requirements.run_exports = parse_run_exports(run_exports)?;
+        requirements.run_exports = parse_run_exports(run_exports, &matchspec_converter)?;
     }
 
     if let Some(ignore_run_exports) = mapping.get("ignore_run_exports") {
@@ -77,15 +126,39 @@ pub fn parse_requirements(yaml: &MarkedNode) -> ParseResult<Requirements> {
     Ok(requirements)
 }
 
+fn parse_extras(
+    yaml: &MarkedNode,
+    converter: &MatchSpecConverter,
+) -> ParseResult<
+    std::collections::BTreeMap<
+        String,
+        rattler_build_yaml_parser::ConditionalList<SerializableMatchSpec>,
+    >,
+> {
+    let mapping = yaml.as_mapping().ok_or_else(|| {
+        ParseError::expected_type("mapping", "non-mapping", get_span(yaml))
+            .with_message("requirements.extras must be a mapping")
+    })?;
+
+    let mut extras = std::collections::BTreeMap::new();
+    for (key_node, value_node) in mapping.iter() {
+        let key = key_node.as_str().to_string();
+        let deps = parse_conditional_list_with_converter(value_node, converter)?;
+        extras.insert(key, deps);
+    }
+
+    Ok(extras)
+}
+
 /// Parse a RunExports section
 ///
 /// Supports two forms:
 /// 1. Direct list (defaults to weak): `run_exports: [pkg1, pkg2]`
 /// 2. Mapping with fields: `run_exports: { strong: [pkg1], weak: [pkg2] }`
-fn parse_run_exports(yaml: &MarkedNode) -> ParseResult<RunExports> {
+fn parse_run_exports(yaml: &MarkedNode, converter: &MatchSpecConverter) -> ParseResult<RunExports> {
     // Check if it's a direct list (defaults to weak)
     if yaml.as_sequence().is_some() {
-        let weak = parse_conditional_list(yaml)?;
+        let weak = parse_conditional_list_with_converter(yaml, converter)?;
         return Ok(RunExports {
             weak,
             ..Default::default()
@@ -106,23 +179,27 @@ fn parse_run_exports(yaml: &MarkedNode) -> ParseResult<RunExports> {
 
     let mut run_exports = RunExports::default();
 
-    if let Some(noarch) = yaml.try_get_conditional_list("noarch")? {
+    if let Some(noarch) = yaml.try_get_conditional_list_with("noarch", converter)? {
         run_exports.noarch = noarch;
     }
 
-    if let Some(strong) = yaml.try_get_conditional_list("strong")? {
+    if let Some(strong) = yaml.try_get_conditional_list_with("strong", converter)? {
         run_exports.strong = strong;
     }
 
-    if let Some(strong_constraints) = yaml.try_get_conditional_list("strong_constraints")? {
+    if let Some(strong_constraints) =
+        yaml.try_get_conditional_list_with("strong_constraints", converter)?
+    {
         run_exports.strong_constraints = strong_constraints;
     }
 
-    if let Some(weak) = yaml.try_get_conditional_list("weak")? {
+    if let Some(weak) = yaml.try_get_conditional_list_with("weak", converter)? {
         run_exports.weak = weak;
     }
 
-    if let Some(weak_constraints) = yaml.try_get_conditional_list("weak_constraints")? {
+    if let Some(weak_constraints) =
+        yaml.try_get_conditional_list_with("weak_constraints", converter)?
+    {
         run_exports.weak_constraints = weak_constraints;
     }
 
@@ -251,6 +328,19 @@ mod tests {
         assert_eq!(reqs.build.len(), 2);
         assert!(reqs.host.is_empty());
         assert!(reqs.run.is_empty());
+    }
+
+    #[test]
+    fn test_parse_v3_matchspec_requires_config() {
+        let yaml_str = r#"
+  run:
+    - 'foo[extras=[bar], flags=[cuda], when="python >=3.11"]'"#;
+        let yaml = parse_yaml_requirements(yaml_str);
+
+        assert!(parse_requirements(&yaml).is_err());
+
+        let reqs = parse_requirements_with_config(&yaml, ParseConfig { v3: true }).unwrap();
+        assert_eq!(reqs.run.len(), 1);
     }
 
     #[test]
