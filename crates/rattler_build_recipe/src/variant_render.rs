@@ -1553,6 +1553,51 @@ outputs:
     }
 
     #[test]
+    fn test_cache_inherited_output_inherits_top_level_build_number_before_build_string() {
+        let recipe_yaml = r#"
+schema_version: 1
+
+recipe:
+  name: multi-pkg
+  version: "1.0.0"
+
+build:
+  number: 1
+
+outputs:
+  - staging:
+      name: build-cache
+    build:
+      script: build
+
+  - package:
+      name: runtime
+    inherit: build-cache
+    build:
+      script: install
+"#;
+
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config = VariantConfig::from_yaml_str("{}").unwrap();
+
+        let rendered =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, RenderConfig::new())
+                .unwrap();
+
+        assert_eq!(rendered.len(), 1);
+
+        let output = &rendered[0].recipe;
+        assert_eq!(output.package.name.as_normalized(), "runtime");
+        assert_eq!(output.build.number, Some(1));
+
+        let build_string = output.build.string.as_resolved().unwrap();
+        assert!(
+            build_string.ends_with("_1"),
+            "cache-inherited output should resolve its build string with the inherited build number, got {build_string}"
+        );
+    }
+
+    #[test]
     fn test_render_multi_output_with_pin_subpackage() {
         let recipe_yaml = r#"
 schema_version: 1

@@ -2859,6 +2859,12 @@ fn evaluate_package_output_to_recipe(
         if output_build.variant.is_default() {
             output_build.variant = toplevel_build.variant;
         }
+        if matches!(output_build.string, BuildString::Default) {
+            output_build.string = toplevel_build.string;
+        }
+        if output_build.number.is_none() {
+            output_build.number = toplevel_build.number;
+        }
         if output_build.noarch.is_none() {
             output_build.noarch = toplevel_build.noarch;
         }
