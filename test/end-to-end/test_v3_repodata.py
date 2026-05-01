@@ -245,23 +245,27 @@ def test_legacy_build_keeps_legacy_index_json(
 
 
 @pytest.mark.parametrize(
-    ("recipe_name", "expected"),
+    ("recipe_name", "expected", "hint"),
     [
         (
             "v3-build-flags-rejected",
             "package flags require the --v3 flag",
+            "Enable --v3 to use build.flags.",
         ),
         (
             "v3-extras-rejected",
             "requirements.extras",
+            "Enable --v3 to use requirements.extras.",
         ),
         (
             "v3-conditional-matchspec-rejected",
             "invalid bracket key: when",
+            "Enable --v3 to use V3 MatchSpec keys",
         ),
         (
             "v3-flags-matchspec-rejected",
             "invalid bracket key: flags",
+            "Enable --v3 to use V3 MatchSpec keys",
         ),
     ],
 )
@@ -270,6 +274,7 @@ def test_v3_fields_are_rejected_without_opt_in(
     tmp_path: Path,
     recipe_name: str,
     expected: str,
+    hint: str,
 ):
     args = rattler_build.build_args(
         V3_RECIPES / recipe_name,
@@ -284,3 +289,4 @@ def test_v3_fields_are_rejected_without_opt_in(
         )
 
     assert expected in str(exc_info.value.output)
+    assert hint in str(exc_info.value.output)

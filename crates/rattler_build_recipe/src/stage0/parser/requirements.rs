@@ -31,7 +31,17 @@ impl NodeConverter<SerializableMatchSpec> for MatchSpecConverter {
             .ok_or_else(|| ParseError::expected_type("scalar", "non-scalar", get_span(node)))?;
 
         SerializableMatchSpec::parse_with_v3(scalar.as_str(), ParseStrictness::Strict, self.v3)
-            .map_err(|e| ParseError::invalid_value(field_name, e.to_string(), *scalar.span()))
+            .map_err(|e| {
+                let reason = e.to_string();
+                let err = ParseError::invalid_value(field_name, &reason, *scalar.span());
+                if !self.v3 && reason.contains("invalid bracket key") {
+                    err.with_suggestion(
+                        "Enable --v3 to use V3 MatchSpec keys such as extras, flags, or when.",
+                    )
+                } else {
+                    err
+                }
+            })
     }
 }
 

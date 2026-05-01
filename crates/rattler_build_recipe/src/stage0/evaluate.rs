@@ -617,7 +617,8 @@ fn evaluate_flag_list(
                 .and_then(|item| item.as_value())
                 .and_then(|value| value.span().copied())
                 .unwrap_or_else(Span::new_blank),
-        ));
+        )
+        .with_suggestion("Enable --v3 to use build.flags."));
     }
 
     Ok(flags)
@@ -1016,7 +1017,8 @@ fn ensure_matchspec_v3_allowed(
             "match spec",
             format!("V3 MatchSpec syntax requires the --v3 flag: '{}'", spec),
             span.copied().unwrap_or_else(Span::new_blank),
-        ));
+        )
+        .with_suggestion("Enable --v3 to use V3 MatchSpec keys such as extras, flags, or when."));
     }
 
     Ok(())
@@ -1524,7 +1526,8 @@ impl Evaluate for Stage0Requirements {
                 "requirements.extras",
                 "optional dependency groups require the --v3 flag",
                 Span::new_blank(),
-            ));
+            )
+            .with_suggestion("Enable --v3 to use requirements.extras."));
         }
 
         let extras = self
