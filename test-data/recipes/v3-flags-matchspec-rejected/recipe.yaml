@@ -1,0 +1,9 @@
+schema_version: 1
+
+package:
+  name: v3-flags-matchspec-rejected
+  version: 1.0.0
+
+requirements:
+  run:
+    - blas-provider[flags=[blas:*]]

@@ -1,0 +1,10 @@
+schema_version: 1
+
+package:
+  name: v3-extras-rejected
+  version: 1.0.0
+
+requirements:
+  extras:
+    plot:
+      - matplotlib >=3.8
