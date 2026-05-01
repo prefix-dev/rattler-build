@@ -35,7 +35,7 @@ tokio = { version = "1.50.0", features = [
   "rt-multi-thread",
   "process",
 ] }
-rattler_conda_types = "0.45.0"
+rattler_conda_types = "0.46.0"
 rattler_config = "0.3.8"
 rattler_networking = { version = "0.26.8" }
 rattler_solve = "6.0.0"
@@ -43,8 +43,8 @@ rattler_virtual_packages = "2.3.17"
 clap = "4.6.0"
 url = "2.5.8"
 chrono = "0.4.44"
-rattler_upload = "0.5.6"
-rattler_package_streaming = { version = "0.24.8", default-features = false }
+rattler_upload = "0.6.0"
+rattler_package_streaming = { version = "0.25.0", default-features = false }
 miette = "7.6.0"
 tempfile = "3.27.0"
 serde_yaml = "0.9"
