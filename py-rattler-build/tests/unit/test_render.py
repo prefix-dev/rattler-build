@@ -2,6 +2,8 @@
 Tests for the render module - converting Stage0 to Stage1 recipes with variants.
 """
 
+import json
+import tarfile
 from pathlib import Path
 
 import pytest
@@ -10,6 +12,7 @@ from inline_snapshot import snapshot
 from rattler_build import (
     PlatformConfig,
     PlatformParseError,
+    RecipeParseError,
     RenderConfig,
     RenderedVariant,
     Stage0Recipe,
@@ -31,6 +34,57 @@ def test_render_config_with_platforms() -> None:
     assert config.target_platform == "linux-64"
     assert config.build_platform == "linux-64"
     assert config.host_platform == "linux-64"
+
+
+def test_render_config_with_v3_enabled() -> None:
+    """Test RenderConfig with V3 recipe fields enabled."""
+    config = RenderConfig(v3=True)
+    assert config.v3 is True
+
+
+def test_v3_python_api_renders_and_builds_v3_index_json(tmp_path: Path) -> None:
+    """Test that the Python API can opt into V3 parsing, rendering, and building."""
+    recipe_yaml = """
+package:
+  name: py-v3-api-test
+  version: 1.0.0
+
+build:
+  noarch: generic
+  flags:
+    - cuda
+
+requirements:
+  run:
+    - python
+    - scipy[when="python >=3.10"]
+  extras:
+    plot:
+      - matplotlib
+"""
+
+    with pytest.raises(RecipeParseError, match="--v3|invalid bracket key"):
+        Stage0Recipe.from_yaml(recipe_yaml)
+
+    recipe = Stage0Recipe.from_yaml(recipe_yaml, v3=True)
+    rendered = recipe.render()
+
+    assert len(rendered) == 1
+    assert rendered[0].recipe.requirements.to_dict()["extras"] == {"plot": ["matplotlib"]}
+
+    result = rendered[0].run_build(
+        output_dir=tmp_path,
+        package_format="tar.bz2",
+        no_include_recipe=True,
+    )
+
+    with tarfile.open(result.packages[0]) as package:
+        index_json = json.load(package.extractfile("info/index.json"))  # type: ignore[arg-type]
+
+    assert index_json["repodata_revision"] == 3
+    assert index_json["flags"] == ["cuda"]
+    assert index_json["extra_depends"] == {"plot": ["matplotlib"]}
+    assert 'scipy[when="python >=3.10"]' in index_json["depends"]
 
 
 def test_render_recipe_with_variants() -> None:

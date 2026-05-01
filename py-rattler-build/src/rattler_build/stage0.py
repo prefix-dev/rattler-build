@@ -45,6 +45,7 @@ class Stage0Recipe(ABC):
     _inner: _stage0.SingleOutputRecipe | _stage0.MultiOutputRecipe
     _wrapper: _stage0.Stage0Recipe
     _recipe_path: Path
+    _v3: bool
 
     @property
     def recipe_path(self) -> Path:
@@ -74,32 +75,37 @@ class Stage0Recipe(ABC):
         return recipe_path
 
     @classmethod
-    def from_yaml(cls, yaml: str, *, recipe_dir: Path | str | None = None) -> Stage0Recipe:
+    def from_yaml(cls, yaml: str, *, recipe_dir: Path | str | None = None, v3: bool = False) -> Stage0Recipe:
         """Parse a recipe from a YAML string.
 
         Args:
             yaml: The YAML recipe content.
             recipe_dir: Directory to write the recipe file into.  When
                 ``None`` (the default) a temporary directory is created.
+            v3: Enable V3 recipe fields and MatchSpec syntax.
 
         Returns:
             SingleOutputRecipe or MultiOutputRecipe depending on the recipe type.
         """
         recipe_path = cls._write_recipe(yaml, recipe_dir)
 
-        wrapper = _stage0.Stage0Recipe.from_yaml(yaml)
+        wrapper = _stage0.Stage0Recipe.from_yaml(yaml, v3=v3)
         if wrapper.is_single_output():
             single_inner = wrapper.as_single_output()
-            return SingleOutputRecipe(single_inner, wrapper, recipe_path)
+            return SingleOutputRecipe(single_inner, wrapper, recipe_path, v3=v3)
         else:
             multi_inner = wrapper.as_multi_output()
-            return MultiOutputRecipe(multi_inner, wrapper, recipe_path)
+            return MultiOutputRecipe(multi_inner, wrapper, recipe_path, v3=v3)
 
     @classmethod
-    def from_file(cls, path: str | Path) -> Stage0Recipe:
+    def from_file(cls, path: str | Path, *, v3: bool = False) -> Stage0Recipe:
         """Parse a recipe from a YAML file.
 
         The file path is used as the recipe path directly — no copy is made.
+
+        Args:
+            path: Path to the recipe file.
+            v3: Enable V3 recipe fields and MatchSpec syntax.
 
         Returns:
             SingleOutputRecipe or MultiOutputRecipe depending on the recipe type.
@@ -108,16 +114,22 @@ class Stage0Recipe(ABC):
         with open(path, encoding="utf-8") as f:
             yaml = f.read()
 
-        wrapper = _stage0.Stage0Recipe.from_yaml(yaml)
+        wrapper = _stage0.Stage0Recipe.from_yaml(yaml, v3=v3)
         if wrapper.is_single_output():
             single_inner = wrapper.as_single_output()
-            return SingleOutputRecipe(single_inner, wrapper, path)
+            return SingleOutputRecipe(single_inner, wrapper, path, v3=v3)
         else:
             multi_inner = wrapper.as_multi_output()
-            return MultiOutputRecipe(multi_inner, wrapper, path)
+            return MultiOutputRecipe(multi_inner, wrapper, path, v3=v3)
 
     @classmethod
-    def from_dict(cls, recipe_dict: dict[str, Any], *, recipe_dir: Path | str | None = None) -> Stage0Recipe:
+    def from_dict(
+        cls,
+        recipe_dict: dict[str, Any],
+        *,
+        recipe_dir: Path | str | None = None,
+        v3: bool = False,
+    ) -> Stage0Recipe:
         """Create a recipe from a Python dictionary.
 
         This method validates the dictionary structure and provides detailed error
@@ -127,6 +139,7 @@ class Stage0Recipe(ABC):
             recipe_dict: Dictionary containing recipe data (must match recipe schema).
             recipe_dir: Directory to write the recipe file into.  When
                 ``None`` (the default) a temporary directory is created.
+            v3: Enable V3 recipe fields and MatchSpec syntax.
 
         Returns:
             SingleOutputRecipe or MultiOutputRecipe depending on the recipe type.
@@ -150,13 +163,13 @@ class Stage0Recipe(ABC):
         """
         recipe_path = cls._write_recipe(json.dumps(recipe_dict, indent=2), recipe_dir)
 
-        wrapper = _stage0.Stage0Recipe.from_dict(recipe_dict)
+        wrapper = _stage0.Stage0Recipe.from_dict(recipe_dict, v3=v3)
         if wrapper.is_single_output():
             single_inner = wrapper.as_single_output()
-            return SingleOutputRecipe(single_inner, wrapper, recipe_path)
+            return SingleOutputRecipe(single_inner, wrapper, recipe_path, v3=v3)
         else:
             multi_inner = wrapper.as_multi_output()
-            return MultiOutputRecipe(multi_inner, wrapper, recipe_path)
+            return MultiOutputRecipe(multi_inner, wrapper, recipe_path, v3=v3)
 
     def as_single_output(self) -> SingleOutputRecipe:
         """
@@ -244,6 +257,9 @@ class Stage0Recipe(ABC):
             variant_config = VariantConfig()
 
         # Build a RenderConfig with the recipe_path injected
+        if render_config is None:
+            render_config = RenderConfig(v3=self._v3)
+
         render_config_inner = RenderConfig._with_recipe_path(render_config, self._recipe_path)
 
         # Unwrap variant_config to get inner Rust object
@@ -252,7 +268,7 @@ class Stage0Recipe(ABC):
         # Render the recipe using the wrapper
         rendered = _render.render_recipe(self._wrapper, variant_config_inner, render_config_inner)
 
-        variants = [RenderedVariant(r, self._recipe_path) for r in rendered]
+        variants = [RenderedVariant(r, self._recipe_path, v3=render_config.v3) for r in rendered]
         for variant in variants:
             variant._siblings = variants
         return variants
@@ -333,10 +349,18 @@ class Stage0Recipe(ABC):
 class SingleOutputRecipe(Stage0Recipe):
     """A single-output recipe at stage0 (parsed, not yet evaluated)."""
 
-    def __init__(self, inner: _stage0.SingleOutputRecipe, wrapper: _stage0.Stage0Recipe, recipe_path: Path):
+    def __init__(
+        self,
+        inner: _stage0.SingleOutputRecipe,
+        wrapper: _stage0.Stage0Recipe,
+        recipe_path: Path,
+        *,
+        v3: bool = False,
+    ):
         self._inner = inner
         self._wrapper = wrapper
         self._recipe_path = recipe_path
+        self._v3 = v3
 
     @property
     def schema_version(self) -> int:
@@ -420,10 +444,18 @@ class StagingOutput:
 class MultiOutputRecipe(Stage0Recipe):
     """A multi-output recipe at stage0 (parsed, not yet evaluated)."""
 
-    def __init__(self, inner: _stage0.MultiOutputRecipe, wrapper: _stage0.Stage0Recipe, recipe_path: Path):
+    def __init__(
+        self,
+        inner: _stage0.MultiOutputRecipe,
+        wrapper: _stage0.Stage0Recipe,
+        recipe_path: Path,
+        *,
+        v3: bool = False,
+    ):
         self._inner = inner
         self._wrapper = wrapper
         self._recipe_path = recipe_path
+        self._v3 = v3
 
     @property
     def schema_version(self) -> int:

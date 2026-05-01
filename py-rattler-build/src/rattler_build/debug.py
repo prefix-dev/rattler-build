@@ -135,6 +135,7 @@ class DebugSession:
             channels=channels,
             no_build_id=no_build_id,
             progress_callback=progress_callback,
+            v3=variant._v3,
         )
         return cls(inner)
 
