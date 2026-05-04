@@ -1608,6 +1608,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Manual attestation with GitHub Actions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#multiple-packages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multiple packages
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -2949,6 +2966,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Manual attestation with GitHub Actions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#multiple-packages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multiple packages
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -3138,22 +3172,49 @@
 <li>The full filename (<code>{name}-{version}-{buildstring}.conda</code>)</li>
 <li>Optionally, the target channel URL (e.g., <code>https://prefix.dev/my-channel</code>)</li>
 </ul>
+<div class="admonition warning">
+<p class="admonition-title">One attestation per package</p>
+<p>Per <a href="https://conda.org/learn/ceps/cep-0027">CEP-27</a>, a Conda publish
+attestation describes exactly <strong>one</strong> <code>.conda</code> artifact — its <code>subject</code>
+contains a single name and digest. If a build produces multiple packages
+(for example a multi-output recipe, or a matrix build across platforms),
+each package needs its own attestation bundle. Tools that accept a glob
+like <code>**/*.conda</code> and emit a single bundle covering all matches do <strong>not</strong>
+produce a CEP-27 compliant attestation, and uploads using such a bundle
+will fail to verify.</p>
+</div>
 <h2 id="automatic-attestation-generation">Automatic attestation generation<a class="headerlink" href="#automatic-attestation-generation" title="Permanent link">#</a></h2>
-<p>The easiest way to create Sigstore attestations is using the <code>--generate-attestation</code> flag when publishing to <a href="https://prefix.dev">prefix.dev</a>:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>rattler-build<span class="w"> </span>publish<span class="w"> </span>./my-recipe.yaml<span class="w"> </span>--to<span class="w"> </span>https://prefix.dev/my-channel<span class="w"> </span>--generate-attestation
+<p>The easiest way to create Sigstore attestations is using the
+<code>--generate-attestation</code> flag. The same flag is available on both
+<code>rattler-build publish</code> (which builds and uploads in one step) and on
+<code>rattler-build upload prefix</code> (which uploads pre-built packages):</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># Build and publish in one go</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>rattler-build<span class="w"> </span>publish<span class="w"> </span>./my-recipe.yaml<span class="w"> </span>--to<span class="w"> </span>https://prefix.dev/my-channel<span class="w"> </span>--generate-attestation
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="c1"># Or upload one or more pre-built packages</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>rattler-build<span class="w"> </span>upload<span class="w"> </span>prefix<span class="w"> </span>-c<span class="w"> </span>my-channel<span class="w"> </span>./output/**/*.conda<span class="w"> </span>--generate-attestation
 </span></code></pre></div>
-<p>This automatically:</p>
+<p>In both cases rattler-build will:</p>
 <ol>
-<li>Builds your package(s) from the recipe</li>
-<li>Creates a Sigstore attestation using the OIDC identity from your CI environment</li>
-<li>Uploads both the package and attestation to prefix.dev</li>
+<li>Take each <code>.conda</code> file individually,</li>
+<li>Mint a fresh OIDC token from the CI runner and create one CEP-27 compliant
+   Sigstore attestation <strong>per package</strong>,</li>
+<li>Upload the package and its bundle to prefix.dev together.</li>
 </ol>
+<p>You do <strong>not</strong> need <code>actions/attest</code>, <code>cosign</code>, or any other external tool
+when you use this flag — rattler-build handles the per-package signing and
+the one-attestation-per-package requirement automatically. This is the
+recommended path for multi-output recipes and matrix builds.</p>
+<p>Pass <code>--store-github-attestation</code> (on <code>upload prefix</code>) to additionally push
+the generated bundle to GitHub's attestation API so it shows up in your
+repository's attestation tab.</p>
 <div class="admonition note">
 <p class="admonition-title">Requirements</p>
 <p>The <code>--generate-attestation</code> flag only works when:</p>
 <ul>
 <li>Uploading to prefix.dev channels</li>
-<li>Using Trusted Publishing (OIDC authentication)</li>
+<li>Using Trusted Publishing (OIDC authentication) — it cannot be combined
+  with an API key</li>
 <li>Running in a supported CI environment (e.g., GitHub Actions)</li>
 </ul>
 </div>
@@ -3184,7 +3245,20 @@
 </span><span id="__span-1-23"><a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a><span class="w">            </span><span class="no">--generate-attestation</span>
 </span></code></pre></div>
 <h2 id="manual-attestation-with-github-actions">Manual attestation with GitHub Actions<a class="headerlink" href="#manual-attestation-with-github-actions" title="Permanent link">#</a></h2>
-<p>If you need more control over the attestation process, you can use GitHub's official attest action to create the attestation separately:</p>
+<div class="admonition tip">
+<p class="admonition-title">Prefer <code>--generate-attestation</code> when possible</p>
+<p>For most users — including multi-package and matrix builds — the
+<code>--generate-attestation</code> flag described above already does everything
+in this section automatically and correctly produces one bundle per
+package. Reach for the manual flow only when you need to customize the
+predicate, sign with an external trust root, or otherwise can't use
+rattler-build's built-in signing.</p>
+</div>
+<p>If you need more control over the attestation process, you can use GitHub's
+official attest action to create the attestation separately. Because each
+attestation must cover exactly one package (see the warning above), the
+attestation and upload steps need to run <strong>once per <code>.conda</code> artifact</strong>.</p>
+<p>The example below builds a single recipe and signs the resulting package:</p>
 <div class="language-yaml highlight"><span class="filename">.github/workflows/build.yml</span><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Package and sign</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
 </span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="nt">on</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">push</span><span class="p p-Indicator">]</span>
@@ -3204,21 +3278,34 @@
 </span><span id="__span-2-17"><a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Build conda package</span>
 </span><span id="__span-2-18"><a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a><span class="w">        </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">prefix-dev/rattler-build-action@v0.2.34</span>
 </span><span id="__span-2-19"><a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a>
-</span><span id="__span-2-20"><a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a><span class="w">      </span><span class="c1"># Use GitHub&#39;s official attest action with the Conda predicate</span>
-</span><span id="__span-2-21"><a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">actions/attest@v1</span>
-</span><span id="__span-2-22"><a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a><span class="w">        </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">attest</span>
-</span><span id="__span-2-23"><a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a><span class="w">        </span><span class="nt">with</span><span class="p">:</span>
-</span><span id="__span-2-24"><a id="__codelineno-2-24" name="__codelineno-2-24" href="#__codelineno-2-24"></a><span class="w">          </span><span class="nt">subject-path</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;**/*.conda&quot;</span>
-</span><span id="__span-2-25"><a id="__codelineno-2-25" name="__codelineno-2-25" href="#__codelineno-2-25"></a><span class="w">          </span><span class="nt">predicate-type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;https://schemas.conda.org/attestations-publish-1.schema.json&quot;</span>
-</span><span id="__span-2-26"><a id="__codelineno-2-26" name="__codelineno-2-26" href="#__codelineno-2-26"></a><span class="w">          </span><span class="nt">predicate</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;{&quot;targetChannel&quot;:</span><span class="nv"> </span><span class="s">&quot;https://prefix.dev/my-channel&quot;}&#39;</span>
-</span><span id="__span-2-27"><a id="__codelineno-2-27" name="__codelineno-2-27" href="#__codelineno-2-27"></a>
-</span><span id="__span-2-28"><a id="__codelineno-2-28" name="__codelineno-2-28" href="#__codelineno-2-28"></a><span class="w">      </span><span class="c1"># Upload with the attestation bundle</span>
-</span><span id="__span-2-29"><a id="__codelineno-2-29" name="__codelineno-2-29" href="#__codelineno-2-29"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Upload the package</span>
-</span><span id="__span-2-30"><a id="__codelineno-2-30" name="__codelineno-2-30" href="#__codelineno-2-30"></a><span class="w">        </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
-</span><span id="__span-2-31"><a id="__codelineno-2-31" name="__codelineno-2-31" href="#__codelineno-2-31"></a><span class="w">          </span><span class="no">rattler-build upload prefix -c my-channel ./output/**/*.conda \</span>
-</span><span id="__span-2-32"><a id="__codelineno-2-32" name="__codelineno-2-32" href="#__codelineno-2-32"></a><span class="w">            </span><span class="no">--attestation ${{ steps.attest.outputs.bundle-path }}</span>
+</span><span id="__span-2-20"><a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a><span class="w">      </span><span class="c1"># Use GitHub&#39;s official attest action with the Conda predicate.</span>
+</span><span id="__span-2-21"><a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a><span class="w">      </span><span class="c1"># `subject-path` MUST point at a single `.conda` file — globs that</span>
+</span><span id="__span-2-22"><a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a><span class="w">      </span><span class="c1"># resolve to more than one file produce a non-compliant bundle.</span>
+</span><span id="__span-2-23"><a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">actions/attest@v1</span>
+</span><span id="__span-2-24"><a id="__codelineno-2-24" name="__codelineno-2-24" href="#__codelineno-2-24"></a><span class="w">        </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">attest</span>
+</span><span id="__span-2-25"><a id="__codelineno-2-25" name="__codelineno-2-25" href="#__codelineno-2-25"></a><span class="w">        </span><span class="nt">with</span><span class="p">:</span>
+</span><span id="__span-2-26"><a id="__codelineno-2-26" name="__codelineno-2-26" href="#__codelineno-2-26"></a><span class="w">          </span><span class="nt">subject-path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">./output/linux-64/my-package-0.1.0-h123_0.conda</span>
+</span><span id="__span-2-27"><a id="__codelineno-2-27" name="__codelineno-2-27" href="#__codelineno-2-27"></a><span class="w">          </span><span class="nt">predicate-type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;https://schemas.conda.org/attestations-publish-1.schema.json&quot;</span>
+</span><span id="__span-2-28"><a id="__codelineno-2-28" name="__codelineno-2-28" href="#__codelineno-2-28"></a><span class="w">          </span><span class="nt">predicate</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;{&quot;targetChannel&quot;:</span><span class="nv"> </span><span class="s">&quot;https://prefix.dev/my-channel&quot;}&#39;</span>
+</span><span id="__span-2-29"><a id="__codelineno-2-29" name="__codelineno-2-29" href="#__codelineno-2-29"></a>
+</span><span id="__span-2-30"><a id="__codelineno-2-30" name="__codelineno-2-30" href="#__codelineno-2-30"></a><span class="w">      </span><span class="c1"># Upload the package together with its attestation bundle</span>
+</span><span id="__span-2-31"><a id="__codelineno-2-31" name="__codelineno-2-31" href="#__codelineno-2-31"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Upload the package</span>
+</span><span id="__span-2-32"><a id="__codelineno-2-32" name="__codelineno-2-32" href="#__codelineno-2-32"></a><span class="w">        </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+</span><span id="__span-2-33"><a id="__codelineno-2-33" name="__codelineno-2-33" href="#__codelineno-2-33"></a><span class="w">          </span><span class="no">rattler-build upload prefix -c my-channel \</span>
+</span><span id="__span-2-34"><a id="__codelineno-2-34" name="__codelineno-2-34" href="#__codelineno-2-34"></a><span class="w">            </span><span class="no">./output/linux-64/my-package-0.1.0-h123_0.conda \</span>
+</span><span id="__span-2-35"><a id="__codelineno-2-35" name="__codelineno-2-35" href="#__codelineno-2-35"></a><span class="w">            </span><span class="no">--attestation ${{ steps.attest.outputs.bundle-path }}</span>
 </span></code></pre></div>
-<p>This approach gives you full control over the attestation creation and allows you to customize the predicate or add additional attestation metadata.</p>
+<h3 id="multiple-packages">Multiple packages<a class="headerlink" href="#multiple-packages" title="Permanent link">#</a></h3>
+<p>If your build produces more than one <code>.conda</code> file (for example a multi-output
+recipe, or several subdirs from a matrix build), <code>actions/attest</code> must be
+invoked <strong>once per package</strong>, with <code>subject-path</code> pointing at exactly that
+single file. There is no built-in way to produce one bundle for several
+packages — that would not match the CEP-27 schema.</p>
+<p>The most common pattern is a <a href="https://docs.github.com/actions/using-jobs/using-a-matrix-for-your-jobs">matrix strategy</a>
+that fans out one job per package, calls <code>actions/attest</code> once per job, and
+then uploads the resulting <code>(package, bundle)</code> pair.</p>
+<p>This approach gives you full control over the attestation creation and allows
+you to customize the predicate or add additional attestation metadata.</p>
 <h2 id="source-attestation-verification">Source attestation verification<a class="headerlink" href="#source-attestation-verification" title="Permanent link">#</a></h2>
 <div class="admonition note">
 <p class="admonition-title">Experimental</p>

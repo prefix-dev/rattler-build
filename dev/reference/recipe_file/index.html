@@ -3985,6 +3985,23 @@ contain patches.</p>
 <p>If an extracted archive contains only 1 folder at its top level, its contents
 will be moved 1 level up, so that the extracted package contents sit in the root
 of the work folder.</p>
+<h5 id="supported-archive-formats">Supported archive formats<a class="headerlink" href="#supported-archive-formats" title="Permanent link">#</a></h5>
+<p>When the URL points to one of the archive formats listed below, the file is
+downloaded to the source cache and automatically extracted into the work
+directory. Detection is based on the file extension only.</p>
+<ul>
+<li><strong>Tar archives</strong>: <code>.tar</code>, <code>.tar.gz</code> (<code>.tgz</code>, <code>.taz</code>), <code>.tar.bz2</code> (<code>.tbz</code>,
+  <code>.tbz2</code>, <code>.tz2</code>), <code>.tar.xz</code> (<code>.txz</code>), <code>.tar.lzma</code> (<code>.tlz</code>), <code>.tar.zst</code>
+  (<code>.tzst</code>), <code>.tar.Z</code> (<code>.taZ</code>), <code>.tar.lz</code>, <code>.tar.lzo</code></li>
+<li><strong>Zip archives</strong>: <code>.zip</code></li>
+<li><strong>7-Zip archives</strong>: <code>.7z</code></li>
+</ul>
+<p>Files with any other extension (for example <code>.rpm</code>, <code>.deb</code>, <code>.dmg</code>,
+<code>.AppImage</code>, single binaries, …) are downloaded and placed in the work
+directory as-is, without extraction. If you need to unpack such a file, install
+the appropriate tooling as a <code>build</code> requirement and extract it from your
+build script. The same applies when <a href="#specifying-a-file-name"><code>file_name</code></a> is
+set on an archive source — extraction is then disabled for that source.</p>
 <h5 id="specifying-a-file-name">Specifying a file name<a class="headerlink" href="#specifying-a-file-name" title="Permanent link">#</a></h5>
 <p>For URL and local path sources, <code>file_name</code> renames the downloaded file in the work directory.
 The primary use case is giving a clean name to pre-built binaries whose URL path segments are not

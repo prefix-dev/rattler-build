@@ -2899,13 +2899,28 @@
 
 
 <h1 id="v3-packages-beta">V3 packages (beta)<a class="headerlink" href="#v3-packages-beta" title="Permanent link">#</a></h1>
-<div class="admonition warning">
-<p class="admonition-title">Beta feature</p>
-<p>V3 is an opt-in preview of the next conda repodata revision. The on-disk
-metadata format, recipe fields and <code>MatchSpec</code> syntax described here may
-still change. Do not publish V3 packages to channels that are consumed by
-older clients without first verifying that the consuming tools understand
-V3 records.</p>
+<div class="admonition danger">
+<p class="admonition-title">Beta — not for production use</p>
+<p>V3 is an <strong>opt-in preview</strong> of the next conda repodata revision and is
+still under active development. The on-disk repodata format, the
+<code>index.json</code> layout, recipe fields (<code>build.flags</code>, <code>requirements.extras</code>,
+…) and the <code>MatchSpec</code> bracket syntax described on this page <strong>can and
+will change in backwards-incompatible ways</strong> before V3 is finalized.
+Concretely, this means:</p>
+<ul>
+<li>Packages built with today's <code>--v3</code> may stop being parseable by a
+  future rattler-build / rattler / pixi without a rebuild.</li>
+<li>The <code>repodata_revision: 3</code> shape is <strong>not stable</strong>; the field name,
+  value, and surrounding schema may all change.</li>
+<li>Recipes using V3-only features may need edits when the syntax
+  stabilizes.</li>
+</ul>
+<p><strong>Do not</strong> publish V3 packages to channels that other users or CI
+systems depend on. Use V3 only for experimentation, prototyping, and
+feedback — and expect to rebuild from source when the format
+stabilizes. Track the discussion in the relevant CEPs and the
+<a href="https://github.com/prefix-dev/rattler-build/issues">rattler-build issue tracker</a>
+before depending on it.</p>
 </div>
 <p>V3 is a new revision of the conda repodata format. It extends the existing
 package record with two new fields and adds a richer <code>MatchSpec</code> bracket

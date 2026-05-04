@@ -3094,24 +3094,24 @@ noted, no variables are inherited from the shell environment in which you invoke
 </dd>
 <dt><code>CMAKE_GENERATOR</code></dt>
 <dd>
-<p>The CMake generator string for the current build
-  environment. On Linux systems, this is always <code>Unix Makefiles</code>. On Windows, it
-  is generated according to the Visual Studio version activated at build time, for
-  example, <code>Visual Studio 9 2008 Win64</code>.</p>
+<p>The CMake generator string for the current build environment. On macOS and
+  Linux this is always <code>Unix Makefiles</code>. Not set on Windows by rattler-build.</p>
 </dd>
-<dt><code>CONDA_BUILD=1</code></dt>
+<dt><code>CONDA_BUILD</code></dt>
 <dd>
-<p>Always set to indicate that the build process is
-  running.</p>
+<p>Always set to <code>1</code> to indicate that the build process is running. Useful
+  for build scripts that need to detect that they are running inside a
+  conda-style build.</p>
 </dd>
 <dt><code>CPU_COUNT</code></dt>
 <dd>
-<p>Represents the number of CPUs on the system.</p>
+<p>The number of CPUs on the system, used by build tools that parallelize.
+  Falls back to the system's logical CPU count if not set.</p>
 </dd>
 <dt><code>SHLIB_EXT</code></dt>
 <dd>
-<p>Denotes the shared library extension specific to the operating
-  system (e.g. <code>.so</code> for Linux, <code>.dylib</code> for macOS, and <code>.dll</code> for Windows).</p>
+<p>The shared library extension specific to the target platform (e.g. <code>.so</code>
+  for Linux, <code>.dylib</code> for macOS, and <code>.dll</code> for Windows).</p>
 </dd>
 <dt><code>HTTP_PROXY</code>, <code>HTTPS_PROXY</code></dt>
 <dd>
@@ -3120,14 +3120,21 @@ noted, no variables are inherited from the shell environment in which you invoke
 </dd>
 <dt><code>LANG</code></dt>
 <dd>
-<p>Inherited from the user's shell environment, defining the system
-  language and locale settings.</p>
+<p>Defines the system language and locale settings. Set to <code>C.UTF-8</code> when
+  running with strict environment isolation; otherwise forwarded from the
+  user's shell environment.</p>
+</dd>
+<dt><code>LC_ALL</code></dt>
+<dd>
+<p>Locale category override. Set to <code>C.UTF-8</code> when running with strict
+  environment isolation; otherwise forwarded from the user's shell environment
+  (only forwarded in <code>conda-build</code> compatibility mode).</p>
 </dd>
 <dt><code>MAKEFLAGS</code></dt>
 <dd>
-<p>Inherited from the user's shell environment. This can be used to
-  set additional arguments for the make command, such as -j2 to utilize 2 CPU
-  cores for building the recipe.</p>
+<p>Forwarded from the user's shell environment in <code>conda-build</code> compatibility
+  mode. Can be used to set additional arguments for <code>make</code>, such as <code>-j2</code> to
+  utilize 2 CPU cores.</p>
 </dd>
 <dt><code>PY_VER</code></dt>
 <dd>
@@ -3141,8 +3148,65 @@ noted, no variables are inherited from the shell environment in which you invoke
 </dd>
 <dt><code>PREFIX</code></dt>
 <dd>
-<p>The build prefix to which the build script should install the
-  software.</p>
+<p>The host prefix into which the build script should install the package's
+  files. This is the environment that contains the package's runtime
+  dependencies (the <code>host</code> requirements). On Windows this is sometimes also
+  referred to as <code>%PREFIX%</code>. Note that for packages without <code>host</code>
+  requirements, <code>PREFIX</code> and <code>BUILD_PREFIX</code> may point at the same environment.</p>
+</dd>
+<dt><code>BUILD_PREFIX</code></dt>
+<dd>
+<p>The build prefix that contains the tools used to build the package (the
+  <code>build</code> requirements, such as compilers, <code>cmake</code>, <code>make</code>, <code>pkg-config</code>,
+  …). It is a separate environment from <code>PREFIX</code> so that build tools do not
+  contaminate the runtime dependencies of the package, which is especially
+  important when cross-compiling. Use <code>BUILD_PREFIX</code> to reference build tools
+  (for example <code>$BUILD_PREFIX/bin/cmake</code>) and <code>PREFIX</code> for files that should
+  end up in the final package.</p>
+</dd>
+<dt><code>BUILD_DIR</code></dt>
+<dd>
+<p>The directory in which the build is executed. This is the parent of
+  <code>SRC_DIR</code> and contains the work directory as well as auxiliary files such
+  as the <code>pip_cache</code> directory.</p>
+</dd>
+<dt><code>CONDA_DEFAULT_ENV</code></dt>
+<dd>
+<p>Set to the host prefix (<code>PREFIX</code>) for compatibility with tools that expect
+  to find an "active" conda environment.</p>
+</dd>
+<dt><code>CONDA_BUILD_STATE</code></dt>
+<dd>
+<p>The current phase of the build process. One of <code>BUILD</code> (during the build
+  script) or <code>TEST</code> (during the test phase). Useful in scripts that are
+  shared between the build and test phases.</p>
+</dd>
+<dt><code>CONDA_BUILD_CROSS_COMPILATION</code></dt>
+<dd>
+<p>Set to <code>1</code> when the build platform and the target platform differ (i.e.
+  the package is being cross-compiled), and <code>0</code> otherwise.</p>
+</dd>
+<dt><code>SUBDIR</code></dt>
+<dd>
+<p>The target subdirectory (platform) for the package being built, e.g.
+  <code>linux-64</code>, <code>osx-arm64</code>, <code>win-64</code> or <code>noarch</code>.</p>
+</dd>
+<dt><code>build_platform</code></dt>
+<dd>
+<p>The native subdirectory of the platform that runs the build (e.g.
+  <code>linux-64</code> on a Linux x86_64 host). This is the platform on which the
+  build tools execute.</p>
+</dd>
+<dt><code>host_platform</code></dt>
+<dd>
+<p>The subdirectory describing the platform that the package's <code>host</code>
+  dependencies are resolved for. Equal to <code>target_platform</code> except for
+  <code>noarch</code> packages, where <code>host_platform</code> is the current build platform.</p>
+</dd>
+<dt><code>target_platform</code></dt>
+<dd>
+<p>The subdirectory describing the platform that the resulting package will
+  run on. Equivalent to <code>SUBDIR</code>.</p>
 </dd>
 <dt><code>PKG_BUILDNUM</code></dt>
 <dd>
@@ -3171,10 +3235,36 @@ noted, no variables are inherited from the shell environment in which you invoke
 <p>The path to the Python executable in the host prefix. Python is
   installed in the host prefix only when it is listed as a host requirement.</p>
 </dd>
+<dt><code>PY3K</code></dt>
+<dd>
+<p><code>1</code> when the host Python is Python 3, <code>0</code> otherwise. Only set when Python
+  is part of the host environment.</p>
+</dd>
 <dt><code>R</code></dt>
 <dd>
 <p>The path to the R executable in the build prefix. R is installed in the
   build prefix only when it is listed as a build requirement.</p>
+</dd>
+<dt><code>R_VER</code></dt>
+<dd>
+<p>The R version (<code>major.minor</code>, e.g. <code>4.3</code>). Only set when R is part of the
+  variant configuration.</p>
+</dd>
+<dt><code>R_USER</code></dt>
+<dd>
+<p>The path to the R user library directory inside the host prefix. Only set
+  when R is part of the variant configuration.</p>
+</dd>
+<dt><code>NPY_VER</code></dt>
+<dd>
+<p>The NumPy version (<code>major.minor</code>, e.g. <code>1.26</code>). Only set when <code>numpy</code> is
+  part of the variant configuration.</p>
+</dd>
+<dt><code>NPY_DISTUTILS_APPEND_FLAGS</code></dt>
+<dd>
+<p>Always set to <code>1</code> when NumPy is part of the variant configuration. See
+  <a href="https://github.com/conda/conda-build/pull/3015">the conda-build PR</a> for
+  background.</p>
 </dd>
 <dt><code>RECIPE_DIR</code></dt>
 <dd>
@@ -3194,15 +3284,48 @@ noted, no variables are inherited from the shell environment in which you invoke
 <dd>
 <p>The location of Python's standard library.</p>
 </dd>
-<dt><code>build_platform</code></dt>
+<dt><code>SOURCE_DATE_EPOCH</code></dt>
 <dd>
-<p>Represents the native subdirectory of the conda executable,
-  indicating the platform for which the build is occurring.</p>
+<p>The Unix timestamp (seconds since the epoch) used as a reproducible build
+  timestamp. Many build tools honor this variable to produce reproducible
+  outputs (see <a href="https://reproducible-builds.org/docs/source-date-epoch/">reproducible-builds.org</a>).
+  rattler-build sets it to the configured build timestamp.</p>
+</dd>
+<dt><code>PYTHONNOUSERSITE</code></dt>
+<dd>
+<p>Always set to <code>1</code> so that the user's site-packages directory is not added
+  to <code>sys.path</code> during the build, ensuring a clean Python environment.</p>
+</dd>
+<dt><code>PYTHONDONTWRITEBYTECODE</code></dt>
+<dd>
+<p>Set to <code>1</code> for <code>noarch: python</code> packages so that no <code>.pyc</code> files are
+  written during the build.</p>
+</dd>
+<dt><code>PIP_NO_BUILD_ISOLATION</code></dt>
+<dd>
+<p>Set to <code>False</code> so that <code>pip</code> does not create its own isolated build
+  environment — rattler-build provides the environment instead.</p>
+</dd>
+<dt><code>PIP_NO_DEPENDENCIES</code></dt>
+<dd>
+<p>Set to <code>True</code> so that <code>pip</code> does not pull in additional dependencies. All
+  dependencies must be specified in the recipe.</p>
+</dd>
+<dt><code>PIP_IGNORE_INSTALLED</code></dt>
+<dd>
+<p>Set to <code>True</code> so that <code>pip</code> ignores already-installed packages and
+  installs the requested package fresh.</p>
+</dd>
+<dt><code>PIP_NO_INDEX</code></dt>
+<dd>
+<p>Set to <code>True</code> so that <code>pip</code> does not query PyPI. All packages must be
+  available locally.</p>
+</dd>
+<dt><code>PIP_CACHE_DIR</code></dt>
+<dd>
+<p>A path inside the work directory used as the <code>pip</code> cache for the build.</p>
 </dd>
 </dl>
-<p>Removed from <code>conda-build</code> are:
-- <code>NPY_VER</code>
-- <code>PY3K</code></p>
 <h4 id="windows">Windows<a class="headerlink" href="#windows" title="Permanent link">#</a></h4>
 <p>Unix-style packages on Windows are built in a special <code>Library</code> directory under
 the build prefix. The environment variables listed in the following table are
@@ -3217,29 +3340,48 @@ defined only on Windows.</p>
 <tbody>
 <tr>
 <td><code>LIBRARY_BIN</code></td>
-<td><code>&lt;build prefix&gt;\Library\bin</code>.</td>
+<td><code>&lt;host prefix&gt;\Library\bin</code>.</td>
 </tr>
 <tr>
 <td><code>LIBRARY_INC</code></td>
-<td><code>&lt;build prefix&gt;\Library\include</code>.</td>
+<td><code>&lt;host prefix&gt;\Library\include</code>.</td>
 </tr>
 <tr>
 <td><code>LIBRARY_LIB</code></td>
-<td><code>&lt;build prefix&gt;\Library\lib</code>.</td>
+<td><code>&lt;host prefix&gt;\Library\lib</code>.</td>
 </tr>
 <tr>
 <td><code>LIBRARY_PREFIX</code></td>
-<td><code>&lt;build prefix&gt;\Library</code>.</td>
+<td><code>&lt;host prefix&gt;\Library</code>.</td>
 </tr>
 <tr>
 <td><code>SCRIPTS</code></td>
-<td><code>&lt;build prefix&gt;\Scripts</code>.</td>
+<td><code>&lt;host prefix&gt;\Scripts</code>.</td>
+</tr>
+<tr>
+<td><code>LIB</code></td>
+<td><code>LIBRARY_LIB</code> prepended to the inherited <code>LIB</code> variable, used by MSVC to find link libraries.</td>
+</tr>
+<tr>
+<td><code>INCLUDE</code></td>
+<td><code>LIBRARY_INC</code> prepended to the inherited <code>INCLUDE</code> variable, used by MSVC to find headers.</td>
+</tr>
+<tr>
+<td><code>CYGWIN_PREFIX</code></td>
+<td>The host prefix translated to a Cygwin-style path, such as <code>/cygdrive/c/path/to/prefix</code>.</td>
+</tr>
+<tr>
+<td><code>BUILD</code></td>
+<td>A target triple of the form <code>&lt;arch&gt;-pc-windows-&lt;msvc_version&gt;</code> (e.g. <code>amd64-pc-windows-19.0.0</code>). Inherited from env if set.</td>
 </tr>
 </tbody>
 </table>
+<p>Additionally, on Windows, any environment variables matching the regular
+expressions <code>^VS[0-9]{2,3}COMNTOOLS$</code> and <code>^VS[0-9]{4}INSTALLDIR$</code> are
+forwarded so that scripts that rely on locating Visual Studio installations
+work as expected.</p>
 <p>Not yet supported in Rattler-Build:</p>
 <ul>
-<li><code>CYGWIN_PREFIX</code></li>
 <li><code>VS_MAJOR</code></li>
 <li><code>VS_VERSION</code></li>
 <li><code>VS_YEAR</code></li>
@@ -3279,7 +3421,6 @@ defined only on Windows.</p>
 <li><code>PROCESSOR_IDENTIFIER</code></li>
 </ul>
 <!--
-| `CYGWIN_PREFIX` | Same as PREFIX, but as a Unix-style path, such as `/cygdrive/c/path/to/prefix`.            |
 | `-------------` | T----------------------------------------------------------------------------------------. |
 | `VS_VERSION`    | The version number of the Visual Studio version activated within the build, such as `9.0`. |
 | `VS_YEAR`       | The release year of the Visual Studio version activated within the build, such as `2008`.  |
@@ -3298,27 +3439,51 @@ macOS and Linux.</p>
 <tbody>
 <tr>
 <td><code>HOME</code></td>
-<td>Standard $HOME environment variable.</td>
+<td>Standard <code>$HOME</code> environment variable. In strict isolation mode this is set to the work directory; in <code>conda-build</code> compatibility mode it is forwarded from the host shell.</td>
 </tr>
 <tr>
 <td><code>PKG_CONFIG_PATH</code></td>
-<td>Path to <code>pkgconfig</code> directory, defaults to `$PREFIX/lib/pkgconfig</td>
+<td>Path to the <code>pkgconfig</code> directory, defaults to <code>$PREFIX/lib/pkgconfig</code>.</td>
 </tr>
 <tr>
 <td><code>SSL_CERT_FILE</code></td>
-<td>Path to <code>SSL_CERT_FILE</code> file.</td>
+<td>Path to the <code>SSL_CERT_FILE</code> file (forwarded from the host environment).</td>
+</tr>
+<tr>
+<td><code>CMAKE_GENERATOR</code></td>
+<td>The CMake generator, set to <code>Unix Makefiles</code> on macOS and Linux.</td>
+</tr>
+<tr>
+<td><code>LC_ALL</code></td>
+<td>Locale category override. Set to <code>C.UTF-8</code> in strict isolation mode; otherwise forwarded from the host environment.</td>
 </tr>
 <tr>
 <td><code>CFLAGS</code></td>
-<td>Empty, can be forwarded from env to set additional arguments to C compiler.</td>
+<td>Empty, can be forwarded from env to set additional arguments to the C compiler. Only forwarded in <code>conda-build</code> compatibility mode.</td>
 </tr>
 <tr>
 <td><code>CXXFLAGS</code></td>
-<td>Same as CFLAGS for C++ compiler.</td>
+<td>Same as <code>CFLAGS</code> for the C++ compiler. Only forwarded in <code>conda-build</code> compatibility mode.</td>
 </tr>
 <tr>
 <td><code>LDFLAGS</code></td>
-<td>Empty, additional flags to be passed to the linker when linking object files into an executable or shared object.</td>
+<td>Empty, additional flags to be passed to the linker when linking object files into an executable or shared object. Only forwarded in <code>conda-build</code> compatibility mode.</td>
+</tr>
+<tr>
+<td><code>USER</code></td>
+<td>Set to <code>rattler</code> in strict isolation mode.</td>
+</tr>
+<tr>
+<td><code>SHELL</code></td>
+<td>Set to <code>/bin/bash</code> in strict isolation mode.</td>
+</tr>
+<tr>
+<td><code>EDITOR</code></td>
+<td>Set to <code>/bin/false</code> in strict isolation mode.</td>
+</tr>
+<tr>
+<td><code>TERM</code></td>
+<td>Set to <code>xterm-256color</code> in strict isolation mode.</td>
 </tr>
 </tbody>
 </table>
@@ -3340,6 +3505,10 @@ macOS.</p>
 <tr>
 <td><code>OSX_ARCH</code></td>
 <td><code>i386</code> or <code>x86_64</code> or <code>arm64</code>, depending on the target platform</td>
+</tr>
+<tr>
+<td><code>BUILD</code></td>
+<td>Target triple, e.g. <code>arm64-apple-darwin20.0.0</code> for <code>osx-arm64</code> or <code>x86_64-apple-darwin13.4.0</code> for <code>osx-64</code>.</td>
 </tr>
 </tbody>
 </table>
