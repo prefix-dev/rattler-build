@@ -129,6 +129,25 @@ If an extracted archive contains only 1 folder at its top level, its contents
 will be moved 1 level up, so that the extracted package contents sit in the root
 of the work folder.
 
+##### Supported archive formats
+
+When the URL points to one of the archive formats listed below, the file is
+downloaded to the source cache and automatically extracted into the work
+directory. Detection is based on the file extension only.
+
+- **Tar archives**: `.tar`, `.tar.gz` (`.tgz`, `.taz`), `.tar.bz2` (`.tbz`,
+  `.tbz2`, `.tz2`), `.tar.xz` (`.txz`), `.tar.lzma` (`.tlz`), `.tar.zst`
+  (`.tzst`), `.tar.Z` (`.taZ`), `.tar.lz`, `.tar.lzo`
+- **Zip archives**: `.zip`
+- **7-Zip archives**: `.7z`
+
+Files with any other extension (for example `.rpm`, `.deb`, `.dmg`,
+`.AppImage`, single binaries, …) are downloaded and placed in the work
+directory as-is, without extraction. If you need to unpack such a file, install
+the appropriate tooling as a `build` requirement and extract it from your
+build script. The same applies when [`file_name`](#specifying-a-file-name) is
+set on an archive source — extraction is then disabled for that source.
+
 ##### Specifying a file name
 
 For URL and local path sources, `file_name` renames the downloaded file in the work directory.
