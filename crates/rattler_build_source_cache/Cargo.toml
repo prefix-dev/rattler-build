@@ -64,5 +64,6 @@ sigstore-trust-root = { version = "0.6.4", default-features = false, optional = 
 sigstore-types = { version = "0.6.4", optional = true }
 
 [dev-dependencies]
+base64 = "0.22"
 tokio = { workspace = true, features = ["rt", "macros", "test-util"] }
 tempfile.workspace = true

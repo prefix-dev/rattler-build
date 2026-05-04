@@ -5069,6 +5069,7 @@ name = "rattler_build_source_cache"
 version = "0.1.5"
 dependencies = [
  "async-trait",
+ "base64 0.22.1",
  "bzip2",
  "chrono",
  "dunce",
