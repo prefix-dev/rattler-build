@@ -21,6 +21,16 @@ The attestation follows [CEP-27](https://conda.org/learn/ceps/cep-0027), which s
 - The full filename (`{name}-{version}-{buildstring}.conda`)
 - Optionally, the target channel URL (e.g., `https://prefix.dev/my-channel`)
 
+!!! warning "One attestation per package"
+    Per [CEP-27](https://conda.org/learn/ceps/cep-0027), a Conda publish
+    attestation describes exactly **one** `.conda` artifact — its `subject`
+    contains a single name and digest. If a build produces multiple packages
+    (for example a multi-output recipe, or a matrix build across platforms),
+    each package needs its own attestation bundle. Tools that accept a glob
+    like `**/*.conda` and emit a single bundle covering all matches do **not**
+    produce a CEP-27 compliant attestation, and uploads using such a bundle
+    will fail to verify.
+
 ## Automatic attestation generation
 
 The easiest way to create Sigstore attestations is using the `--generate-attestation` flag when publishing to [prefix.dev](https://prefix.dev):
@@ -74,7 +84,12 @@ jobs:
 
 ## Manual attestation with GitHub Actions
 
-If you need more control over the attestation process, you can use GitHub's official attest action to create the attestation separately:
+If you need more control over the attestation process, you can use GitHub's
+official attest action to create the attestation separately. Because each
+attestation must cover exactly one package (see the warning above), the
+attestation and upload steps need to run **once per `.conda` artifact**.
+
+The example below builds a single recipe and signs the resulting package:
 
 ```yaml title=".github/workflows/build.yml"
 name: Package and sign
@@ -96,22 +111,38 @@ jobs:
       - name: Build conda package
         uses: prefix-dev/rattler-build-action@v0.2.34
 
-      # Use GitHub's official attest action with the Conda predicate
+      # Use GitHub's official attest action with the Conda predicate.
+      # `subject-path` MUST point at a single `.conda` file — globs that
+      # resolve to more than one file produce a non-compliant bundle.
       - uses: actions/attest@v1
         id: attest
         with:
-          subject-path: "**/*.conda"
+          subject-path: ./output/linux-64/my-package-0.1.0-h123_0.conda
           predicate-type: "https://schemas.conda.org/attestations-publish-1.schema.json"
           predicate: '{"targetChannel": "https://prefix.dev/my-channel"}'
 
-      # Upload with the attestation bundle
+      # Upload the package together with its attestation bundle
       - name: Upload the package
         run: |
-          rattler-build upload prefix -c my-channel ./output/**/*.conda \
+          rattler-build upload prefix -c my-channel \
+            ./output/linux-64/my-package-0.1.0-h123_0.conda \
             --attestation ${{ steps.attest.outputs.bundle-path }}
 ```
 
-This approach gives you full control over the attestation creation and allows you to customize the predicate or add additional attestation metadata.
+### Multiple packages
+
+If your build produces more than one `.conda` file (for example a multi-output
+recipe, or several subdirs from a matrix build), `actions/attest` must be
+invoked **once per package**, with `subject-path` pointing at exactly that
+single file. There is no built-in way to produce one bundle for several
+packages — that would not match the CEP-27 schema.
+
+The most common pattern is a [matrix strategy](https://docs.github.com/actions/using-jobs/using-a-matrix-for-your-jobs)
+that fans out one job per package, calls `actions/attest` once per job, and
+then uploads the resulting `(package, bundle)` pair.
+
+This approach gives you full control over the attestation creation and allows
+you to customize the predicate or add additional attestation metadata.
 
 ## Source attestation verification
 
