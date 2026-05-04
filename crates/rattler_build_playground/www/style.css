@@ -85,6 +85,27 @@ html, body {
   border-color: var(--accent);
 }
 
+.v3-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.v3-toggle input {
+  margin: 0;
+  cursor: pointer;
+  accent-color: var(--accent);
+}
+
+.v3-toggle small {
+  opacity: 0.7;
+  font-size: 11px;
+}
+
 .tab-group {
   display: flex;
   gap: 2px;

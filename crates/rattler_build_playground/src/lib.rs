@@ -6,7 +6,7 @@ use arborium::theme::builtin;
 use indexmap::IndexMap;
 use rattler_build_jinja::{JinjaConfig, Variable};
 use rattler_build_recipe::{
-    stage0::{self, Recipe},
+    stage0::{self, ParseConfig, Recipe},
     stage1::{Evaluate, EvaluationContext},
     variant_render::{RenderConfig, render_recipe_with_variant_config},
 };
@@ -77,10 +77,13 @@ pub fn highlight_source_yaml(source: &str) -> String {
 
 /// Parse a recipe YAML string to Stage 0 (preserving templates and conditionals).
 ///
+/// When `v3` is true, V3-only recipe fields (`build.flags`,
+/// `requirements.extras`) and the V3 `MatchSpec` bracket syntax are accepted.
+///
 /// Returns a JSON string: `{ "ok": true, "result_html": "..." }` or `{ "ok": false, "error": {...} }`
 #[wasm_bindgen]
-pub fn parse_recipe(yaml_source: &str) -> String {
-    match stage0::parse_recipe_or_multi_from_source(yaml_source) {
+pub fn parse_recipe(yaml_source: &str, v3: bool) -> String {
+    match stage0::parse_recipe_or_multi_from_source_with_config(yaml_source, ParseConfig { v3 }) {
         Ok(recipe) => match highlight_yaml(&recipe) {
             Ok(html) => ok_html(&html),
             Err(e) => error_json(&e, None, None),
@@ -94,15 +97,23 @@ pub fn parse_recipe(yaml_source: &str) -> String {
 /// - `yaml_source`: The recipe YAML string
 /// - `variables_json`: JSON object mapping variable names to values, e.g. `{"python": "3.11"}`
 /// - `target_platform`: Platform string like "linux-64", "osx-arm64", etc.
+/// - `v3`: When true, accept V3-only recipe fields and `MatchSpec` syntax.
 ///
 /// Returns a JSON string: `{ "ok": true, "result_html": "..." }` or `{ "ok": false, "error": {...} }`
 #[wasm_bindgen]
-pub fn evaluate_recipe(yaml_source: &str, variables_json: &str, target_platform: &str) -> String {
+pub fn evaluate_recipe(
+    yaml_source: &str,
+    variables_json: &str,
+    target_platform: &str,
+    v3: bool,
+) -> String {
     // Parse the recipe to Stage 0
-    let recipe = match stage0::parse_recipe_or_multi_from_source(yaml_source) {
-        Ok(r) => r,
-        Err(e) => return format_parse_error(&e),
-    };
+    let recipe =
+        match stage0::parse_recipe_or_multi_from_source_with_config(yaml_source, ParseConfig { v3 })
+        {
+            Ok(r) => r,
+            Err(e) => return format_parse_error(&e),
+        };
 
     // Parse variables from JSON
     let variables = match parse_variables(variables_json) {
@@ -122,7 +133,8 @@ pub fn evaluate_recipe(yaml_source: &str, variables_json: &str, target_platform:
         ..Default::default()
     };
 
-    let context = EvaluationContext::with_variables_and_config(variables, jinja_config);
+    let context =
+        EvaluationContext::with_variables_and_config(variables, jinja_config).with_v3(v3);
 
     match &recipe {
         Recipe::SingleOutput(r) => {
@@ -167,11 +179,14 @@ pub fn evaluate_recipe(yaml_source: &str, variables_json: &str, target_platform:
 
 /// Get the list of variables used in a recipe (for UI hints).
 ///
+/// When `v3` is true, V3-only recipe fields and `MatchSpec` syntax are
+/// accepted by the parser.
+///
 /// Returns a JSON string with both structured data and highlighted HTML:
 /// `{ "ok": true, "result": [...], "result_html": "..." }` or `{ "ok": false, "error": {...} }`
 #[wasm_bindgen]
-pub fn get_used_variables(yaml_source: &str) -> String {
-    match stage0::parse_recipe_or_multi_from_source(yaml_source) {
+pub fn get_used_variables(yaml_source: &str, v3: bool) -> String {
+    match stage0::parse_recipe_or_multi_from_source_with_config(yaml_source, ParseConfig { v3 }) {
         Ok(recipe) => {
             let vars = match &recipe {
                 Recipe::SingleOutput(r) => r.used_variables(),
@@ -228,6 +243,7 @@ struct VariantSummary {
 /// - `yaml_source`: The recipe YAML string
 /// - `variant_config_yaml`: Variant configuration YAML (e.g. `python:\n  - "3.11"\n  - "3.12"`)
 /// - `target_platform`: Platform string like "linux-64", "osx-arm64", etc.
+/// - `v3`: When true, accept V3-only recipe fields and `MatchSpec` syntax.
 ///
 /// Returns a JSON string with summary cards and highlighted YAML:
 /// `{ "ok": true, "result": { "variants_html": "...", "summary": [...concise...] } }`
@@ -237,12 +253,15 @@ pub fn render_variants(
     variant_config_yaml: &str,
     target_platform: &str,
     variant_format: &str,
+    v3: bool,
 ) -> String {
     // Parse the recipe to Stage 0
-    let stage0_recipe = match stage0::parse_recipe_or_multi_from_source(yaml_source) {
-        Ok(r) => r,
-        Err(e) => return format_parse_error(&e),
-    };
+    let stage0_recipe =
+        match stage0::parse_recipe_or_multi_from_source_with_config(yaml_source, ParseConfig { v3 })
+        {
+            Ok(r) => r,
+            Err(e) => return format_parse_error(&e),
+        };
 
     // Parse platform
     let platform = Platform::from_str(target_platform).unwrap_or(Platform::Linux64);
@@ -271,7 +290,8 @@ pub fn render_variants(
     let render_config = RenderConfig::new()
         .with_target_platform(platform)
         .with_host_platform(platform)
-        .with_build_platform(platform);
+        .with_build_platform(platform)
+        .with_v3(v3);
 
     // Render with variant config
     match render_recipe_with_variant_config(&stage0_recipe, &variant_config, render_config) {

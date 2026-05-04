@@ -96,6 +96,7 @@ const variantsHighlight = document.getElementById('variants-highlight');
 const outputContainer = document.getElementById('output-container');
 const outputBadge = document.getElementById('output-badge');
 const platformSelect = document.getElementById('platform-select');
+const v3Toggle = document.getElementById('v3-toggle');
 const usedVarsEl = document.getElementById('used-vars');
 const loadPinningBtn = document.getElementById('load-pinning-btn');
 
@@ -207,17 +208,18 @@ function update() {
   const yaml = recipeEditor.value;
   const variantYaml = variantsEditor.value || '{}';
   const platform = platformSelect.value;
+  const v3 = v3Toggle.checked;
   const start = performance.now();
 
   try {
     let resultJson;
     if (currentMode === 'stage0') {
-      resultJson = parse_recipe(yaml);
+      resultJson = parse_recipe(yaml, v3);
     } else if (currentMode === 'stage1') {
       const varsJson = first_variant_values(variantYaml);
-      resultJson = evaluate_recipe(yaml, varsJson, platform);
+      resultJson = evaluate_recipe(yaml, varsJson, platform, v3);
     } else if (currentMode === 'variants') {
-      resultJson = render_variants(yaml, variantYaml, platform, variantFormat);
+      resultJson = render_variants(yaml, variantYaml, platform, variantFormat, v3);
     } else {
       throw new Error(`Unknown output mode: ${currentMode}`);
     }
@@ -246,7 +248,7 @@ function update() {
 
   // Update used variables hint
   try {
-    const usedJson = get_used_variables(yaml);
+    const usedJson = get_used_variables(yaml, v3);
     const usedResult = JSON.parse(usedJson);
     if (usedResult.ok && usedResult.result.length > 0) {
       usedVarsEl.innerHTML = html`Used: ${safe(
@@ -265,6 +267,7 @@ function update() {
 // Load saved state or defaults
 recipeEditor.value = localStorage.getItem('playground-recipe') || DEFAULT_RECIPE;
 variantsEditor.value = localStorage.getItem('playground-variants') || DEFAULT_VARIANTS;
+v3Toggle.checked = localStorage.getItem('playground-v3') === '1';
 
 // Tab switching
 document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -323,6 +326,11 @@ variantsEditor.addEventListener('input', () => {
 
 platformSelect.addEventListener('change', () => {
   localStorage.setItem('playground-platform', platformSelect.value);
+  update();
+});
+
+v3Toggle.addEventListener('change', () => {
+  localStorage.setItem('playground-v3', v3Toggle.checked ? '1' : '0');
   update();
 });
 
