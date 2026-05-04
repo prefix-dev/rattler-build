@@ -28,28 +28,44 @@ pub fn summarize_single_patch(
     summarize_patch(&patch, work_dir)
 }
 
-/// Normalizes backup file paths (.orig/.bak) to their actual file paths
-/// Returns (original_path, modified_path) with backup files resolved
+/// Normalizes backup file paths (.orig/.bak) to their actual file paths.
+///
+/// A `--- foo.orig` / `+++ foo` pair can come from two distinct workflows:
+///
+/// 1. In-place edit: the workdir contains `foo`; `.orig` is just a saved
+///    backup left next to the patched copy (the typical output of editing
+///    with `patch -b` or comparing a saved-aside copy against the edited
+///    file). The patch should be applied to `foo` in place.
+///
+/// 2. Source-with-`.orig`: the workdir contains only `foo.orig` (e.g. the
+///    recipe used `file_name: foo.orig` so the original upstream source
+///    landed under that name) and the patch is meant to read from `.orig`
+///    and write the result to `foo`. This matches GNU `patch -p0`'s
+///    behavior, which uses whichever side of the diff exists on disk.
+///
+/// We disambiguate by checking which of the two files actually exists in
+/// the work directory. If the bare-name target exists, we collapse onto
+/// it (case 1). Otherwise the paths are left split so the apply step
+/// reads from `.orig` and writes the bare name (case 2).
 fn normalize_backup_paths(
     original_path: Option<PathBuf>,
     modified_path: Option<PathBuf>,
+    work_dir: &Path,
 ) -> (Option<PathBuf>, Option<PathBuf>) {
     let (Some(orig), Some(modified)) = (&original_path, &modified_path) else {
         return (original_path, modified_path);
     };
 
-    // If paths are the same, no backup normalization needed
     if orig == modified {
         return (original_path, modified_path);
     }
 
-    // Check if original file is a backup of the modified file
     if let (Some(orig_stem), Some(orig_ext)) = (orig.file_stem(), orig.extension())
         && let Some(mod_filename) = modified.file_name()
         && matches!(orig_ext.to_str(), Some("orig" | "bak"))
         && orig_stem == mod_filename
+        && work_dir.join(modified).exists()
     {
-        // Original is a backup of modified file, treat as modifying the actual file
         return (Some(modified.clone()), Some(modified.clone()));
     }
 
@@ -59,6 +75,11 @@ fn normalize_backup_paths(
 /// Extract all file paths from a patch that should be used for strip level detection.
 /// Only includes files that already exist (i.e., are being modified or deleted),
 /// not files being newly created from /dev/null.
+///
+/// Both sides of a `.orig`/bare-name pair are returned (no collapsing here):
+/// strip-level detection uses an "any path exists" check, so leaving both
+/// candidates in the set lets the workflow that ships only `foo.orig` resolve
+/// just as well as the in-place workflow that ships only `foo`.
 fn parse_patch_existing_files(patch: &Patch<[u8]>) -> HashSet<PathBuf> {
     let mut affected_files = HashSet::new();
 
@@ -73,22 +94,19 @@ fn parse_patch_existing_files(patch: &Patch<[u8]>) -> HashSet<PathBuf> {
             .and_then(|p| std::str::from_utf8(p).ok())
             .map(PathBuf::from);
 
-        let (normalized_orig, normalized_mod) =
-            normalize_backup_paths(original_path, modified_path);
-
         // Only include files that the patch modifies or deletes. These already
         // exist in the work directory, so they are reliable for strip level
         // guessing. New files (original is None or /dev/null) don't exist yet,
         // so a coincidental match at a different strip level would be incorrect.
-        let modifies_existing_file = normalized_orig
+        let modifies_existing_file = original_path
             .as_ref()
             .is_some_and(|p| p != Path::new("/dev/null"));
 
         if modifies_existing_file {
-            if let Some(path) = normalized_orig {
+            if let Some(path) = original_path {
                 affected_files.insert(path);
             }
-            if let Some(path) = normalized_mod {
+            if let Some(path) = modified_path {
                 affected_files.insert(path);
             }
         }
@@ -112,13 +130,10 @@ fn parse_patch_all_files(patch: &Patch<[u8]>) -> HashSet<PathBuf> {
             .and_then(|p| std::str::from_utf8(p).ok())
             .map(PathBuf::from);
 
-        let (normalized_orig, normalized_mod) =
-            normalize_backup_paths(original_path, modified_path);
-
-        if let Some(path) = normalized_orig {
+        if let Some(path) = original_path {
             affected_files.insert(path);
         }
-        if let Some(path) = normalized_mod {
+        if let Some(path) = modified_path {
             affected_files.insert(path);
         }
     }
@@ -217,6 +232,7 @@ fn guess_strip_level(patch: &Patch<[u8]>, work_dir: &Path) -> Result<usize, Sour
 fn custom_patch_stripped_paths(
     diff: &Diff<'_, [u8]>,
     strip_level: usize,
+    work_dir: &Path,
 ) -> (Option<PathBuf>, Option<PathBuf>) {
     let strip_path = |path_bytes: &[u8]| -> Option<PathBuf> {
         std::str::from_utf8(path_bytes).ok().and_then(|p| {
@@ -232,7 +248,7 @@ fn custom_patch_stripped_paths(
     let original_path = diff.original().and_then(strip_path);
     let modified_path = diff.modified().and_then(strip_path);
 
-    normalize_backup_paths(original_path, modified_path)
+    normalize_backup_paths(original_path, modified_path, work_dir)
 }
 
 fn write_patch_content(content: &[u8], path: &Path) -> Result<(), SourceError> {
@@ -343,7 +359,7 @@ pub fn apply_patch_custom(work_dir: &Path, patch_file_path: &Path) -> Result<(),
     let strip_level = guess_strip_level(&patch, work_dir)?;
 
     for diff in patch {
-        let file_paths = custom_patch_stripped_paths(&diff, strip_level);
+        let file_paths = custom_patch_stripped_paths(&diff, strip_level, work_dir);
         let absolute_file_paths = (
             file_paths.0.map(|o| work_dir.join(&o)),
             file_paths.1.map(|m| work_dir.join(&m)),
@@ -427,7 +443,7 @@ pub fn summarize_patch(diff: &Patch<[u8]>, work_dir: &Path) -> Result<PatchStats
     let mut stats = PatchStats::default();
     let strip_level = guess_strip_level(diff, work_dir)?;
     for hunk in diff {
-        let (orig_path, mod_path) = custom_patch_stripped_paths(hunk, strip_level);
+        let (orig_path, mod_path) = custom_patch_stripped_paths(hunk, strip_level, work_dir);
         match (orig_path, mod_path) {
             // Both original and modified exist: record original (prefix stripped) as changed file
             (Some(orig), Some(_mod)) => stats.changed.push(orig),
@@ -537,6 +553,48 @@ mod tests {
         let text_md = tempdir.path().join("workdir/text.md");
         let text_md = fs_err::read_to_string(&text_md).unwrap();
         assert!(text_md.contains("Oh, wow, I was patched! Thank you soooo much!"));
+    }
+
+    #[test]
+    fn test_apply_patches_with_orig_only_source() {
+        // Regression test for https://github.com/conda/conda-launchers/pull/18
+        // (and the corresponding rattler-build issue): when the workdir holds
+        // only `<file>.orig` (e.g. because the recipe used
+        // `file_name: launcher.c.orig` to name the downloaded source), a patch
+        // with `--- launcher.c.orig` / `+++ launcher.c` must read from the
+        // `.orig`, apply the diff, write the result to `launcher.c`, and
+        // remove the `.orig`. This mirrors GNU `patch -p0`'s behavior for the
+        // same input.
+        let (tempdir, _) = setup_patch_test_dir();
+
+        // Sanity: the fixture ships only the `.orig`, no bare-name file.
+        let work_dir = tempdir.path().join("workdir");
+        assert!(work_dir.join("launcher.c.orig").exists());
+        assert!(!work_dir.join("launcher.c").exists());
+
+        apply_patches(
+            &[PathBuf::from("conda_launcher.patch")],
+            &work_dir,
+            &tempdir.path().join("patches"),
+            apply_patch_custom,
+        )
+        .expect("patch should apply when only the .orig source is present");
+
+        let patched = work_dir.join("launcher.c");
+        assert!(patched.exists(), "patched file should land at the +++ name");
+        let content = fs_err::read_to_string(&patched).unwrap();
+        assert!(
+            content.contains("Anaconda/Setuptools variant"),
+            "patched content should be present: {content}",
+        );
+        assert!(
+            content.contains("EXIT_SUCCESS"),
+            "patched content should be present: {content}",
+        );
+        assert!(
+            !work_dir.join("launcher.c.orig").exists(),
+            "the .orig source should be consumed (matches GNU patch -p0 behavior)",
+        );
     }
 
     #[test]
@@ -674,38 +732,52 @@ mod tests {
 
     #[test]
     fn test_backup_file_logic_edge_cases() {
-        // Test edge cases in the backup file handling logic
+        // Workdir holds the bare-name file → collapse onto it (in-place edit).
+        let work_dir = TempDir::new().unwrap();
+        fs_err::write(work_dir.path().join("file.txt"), b"original line\n").unwrap();
+
         let patch_content = b"--- a/file.txt.orig\t2021-12-27 12:22:09.000000000 -0800\n+++ a/file.txt\t2021-12-27 12:22:14.000000000 -0800\n@@ -1 +1,2 @@\n original line\n+new line\n";
-
         let patch = patch_from_bytes(patch_content).unwrap();
         let diff = patch.into_iter().next().unwrap();
 
-        // Test the backup file logic
         // strip_level=0 because flickzeug already strips a/b prefixes
-        let paths = custom_patch_stripped_paths(&diff, 0);
-
-        // Should treat this as modifying file.txt in place
+        let paths = custom_patch_stripped_paths(&diff, 0, work_dir.path());
         assert_eq!(paths.0, Some(PathBuf::from("file.txt")));
         assert_eq!(paths.1, Some(PathBuf::from("file.txt")));
 
-        // Test .bak extension
+        // Same with .bak extension.
         let patch_content = b"--- a/file.txt.bak\t2021-12-27 12:22:09.000000000 -0800\n+++ a/file.txt\t2021-12-27 12:22:14.000000000 -0800\n@@ -1 +1,2 @@\n original line\n+new line\n";
-
         let patch = patch_from_bytes(patch_content).unwrap();
         let diff = patch.into_iter().next().unwrap();
 
-        let paths = custom_patch_stripped_paths(&diff, 0);
+        let paths = custom_patch_stripped_paths(&diff, 0, work_dir.path());
         assert_eq!(paths.0, Some(PathBuf::from("file.txt")));
         assert_eq!(paths.1, Some(PathBuf::from("file.txt")));
 
-        // Test case where backup file logic should NOT apply
-        let patch_content = b"--- a/different.txt.orig\t2021-12-27 12:22:09.000000000 -0800\n+++ a/file.txt\t2021-12-27 12:22:14.000000000 -0800\n@@ -1 +1,2 @@\n original line\n+new line\n";
+        // Workdir holds only the `.orig` source → leave paths split so the
+        // apply step reads from `.orig` and writes the bare name.
+        let orig_only_dir = TempDir::new().unwrap();
+        fs_err::write(
+            orig_only_dir.path().join("file.txt.orig"),
+            b"original line\n",
+        )
+        .unwrap();
 
+        let patch_content = b"--- a/file.txt.orig\t2021-12-27 12:22:09.000000000 -0800\n+++ a/file.txt\t2021-12-27 12:22:14.000000000 -0800\n@@ -1 +1,2 @@\n original line\n+new line\n";
         let patch = patch_from_bytes(patch_content).unwrap();
         let diff = patch.into_iter().next().unwrap();
 
-        let paths = custom_patch_stripped_paths(&diff, 0);
-        // Should NOT apply backup logic because different.txt.orig is not a backup of file.txt
+        let paths = custom_patch_stripped_paths(&diff, 0, orig_only_dir.path());
+        assert_eq!(paths.0, Some(PathBuf::from("file.txt.orig")));
+        assert_eq!(paths.1, Some(PathBuf::from("file.txt")));
+
+        // Filename mismatch: backup-collapse must never apply when the
+        // `.orig` stem doesn't match the bare-name file.
+        let patch_content = b"--- a/different.txt.orig\t2021-12-27 12:22:09.000000000 -0800\n+++ a/file.txt\t2021-12-27 12:22:14.000000000 -0800\n@@ -1 +1,2 @@\n original line\n+new line\n";
+        let patch = patch_from_bytes(patch_content).unwrap();
+        let diff = patch.into_iter().next().unwrap();
+
+        let paths = custom_patch_stripped_paths(&diff, 0, work_dir.path());
         assert_eq!(paths.0, Some(PathBuf::from("different.txt.orig")));
         assert_eq!(paths.1, Some(PathBuf::from("file.txt")));
     }
