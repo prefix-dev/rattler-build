@@ -154,7 +154,7 @@ rattler_index = { version = "0.28.0", default-features = false }
 rattler_upload = { version = "0.6.0", default-features = false }
 rattler_s3 = { version = "0.1.31" }
 rattler_redaction = { version = "0.1.13", default-features = false }
-rattler_repodata_gateway = { version = "0.28.0", default-features = false, features = [
+rattler_repodata_gateway = { version = "0.28.1", default-features = false, features = [
   "gateway",
 ] }
 rattler_solve = { version = "6.0.0", default-features = false, features = [
