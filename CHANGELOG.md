@@ -5,6 +5,61 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.64.0] - 2026-05-04
+### ✨ Highlights
+
+We added _experimental_ support for v3 packages, which means you can define extras, conditional dependencies and flags.
+
+- `extras`: define optional dependency groups, a well known concept from PyPI
+- `when`: define conditions under which dependencies should appear (e.g. `foo[when="python>=3.10"])
+- `flags`: make variants easy to select by adding `flags` to your variant output, e.g. `foo[flags=['blas', 'cuda']]`
+
+Example recipe:
+
+```yaml
+package:
+  name: v3-explore
+  version: 0.1.0
+
+build:
+  flags:
+    - ${{ "cuda" if cuda else "blas" }}
+    - "release"
+
+requirements:
+  run:
+    - python
+    # pull in scipy only when `python >=3.10`
+    - scipy [when="python >=3.10"]
+
+  extras:
+    scipy:
+      - numpy
+```
+
+### Added
+
+- V3 packages by @wolfv in [#2452](https://github.com/prefix-dev/rattler-build/pull/2452)
+
+
+### Documentation
+
+- Outdated variants examples by @schuylermartin45 in [#2459](https://github.com/prefix-dev/rattler-build/pull/2459)
+- Improve docs for env vars, source archive types, attestations, v3 by @wolfv in [#2464](https://github.com/prefix-dev/rattler-build/pull/2464)
+
+
+### Fixed
+
+- Variant tracking and env vars for staging cache inheritance by @wolfv in [#2455](https://github.com/prefix-dev/rattler-build/pull/2455)
+- Inherit build number for cache outputs by @wolfv in [#2460](https://github.com/prefix-dev/rattler-build/pull/2460)
+
+
+### Performance
+
+- Lazily initialize the `BaseClient` by @baszalmstra in [#2456](https://github.com/prefix-dev/rattler-build/pull/2456)
+
+
+
 ## [0.63.1] - 2026-04-27
 ### ✨ Highlights
 
