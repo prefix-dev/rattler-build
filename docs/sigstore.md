@@ -33,23 +33,41 @@ The attestation follows [CEP-27](https://conda.org/learn/ceps/cep-0027), which s
 
 ## Automatic attestation generation
 
-The easiest way to create Sigstore attestations is using the `--generate-attestation` flag when publishing to [prefix.dev](https://prefix.dev):
+The easiest way to create Sigstore attestations is using the
+`--generate-attestation` flag. The same flag is available on both
+`rattler-build publish` (which builds and uploads in one step) and on
+`rattler-build upload prefix` (which uploads pre-built packages):
 
 ```bash
+# Build and publish in one go
 rattler-build publish ./my-recipe.yaml --to https://prefix.dev/my-channel --generate-attestation
+
+# Or upload one or more pre-built packages
+rattler-build upload prefix -c my-channel ./output/**/*.conda --generate-attestation
 ```
 
-This automatically:
+In both cases rattler-build will:
 
-1. Builds your package(s) from the recipe
-2. Creates a Sigstore attestation using the OIDC identity from your CI environment
-3. Uploads both the package and attestation to prefix.dev
+1. Take each `.conda` file individually,
+2. Mint a fresh OIDC token from the CI runner and create one CEP-27 compliant
+   Sigstore attestation **per package**,
+3. Upload the package and its bundle to prefix.dev together.
+
+You do **not** need `actions/attest`, `cosign`, or any other external tool
+when you use this flag — rattler-build handles the per-package signing and
+the one-attestation-per-package requirement automatically. This is the
+recommended path for multi-output recipes and matrix builds.
+
+Pass `--store-github-attestation` (on `upload prefix`) to additionally push
+the generated bundle to GitHub's attestation API so it shows up in your
+repository's attestation tab.
 
 !!! note "Requirements"
     The `--generate-attestation` flag only works when:
 
     - Uploading to prefix.dev channels
-    - Using Trusted Publishing (OIDC authentication)
+    - Using Trusted Publishing (OIDC authentication) — it cannot be combined
+      with an API key
     - Running in a supported CI environment (e.g., GitHub Actions)
 
 ### GitHub Actions example
@@ -83,6 +101,14 @@ jobs:
 ```
 
 ## Manual attestation with GitHub Actions
+
+!!! tip "Prefer `--generate-attestation` when possible"
+    For most users — including multi-package and matrix builds — the
+    `--generate-attestation` flag described above already does everything
+    in this section automatically and correctly produces one bundle per
+    package. Reach for the manual flow only when you need to customize the
+    predicate, sign with an external trust root, or otherwise can't use
+    rattler-build's built-in signing.
 
 If you need more control over the attestation process, you can use GitHub's
 official attest action to create the attestation separately. Because each
