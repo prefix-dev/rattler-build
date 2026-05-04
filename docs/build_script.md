@@ -198,24 +198,24 @@ noted, no variables are inherited from the shell environment in which you invoke
 
 `CMAKE_GENERATOR`
 
-: The CMake generator string for the current build
-  environment. On Linux systems, this is always `Unix Makefiles`. On Windows, it
-  is generated according to the Visual Studio version activated at build time, for
-  example, `Visual Studio 9 2008 Win64`.
+: The CMake generator string for the current build environment. On macOS and
+  Linux this is always `Unix Makefiles`. Not set on Windows by rattler-build.
 
-`CONDA_BUILD=1`
+`CONDA_BUILD`
 
-: Always set to indicate that the build process is
-  running.
+: Always set to `1` to indicate that the build process is running. Useful
+  for build scripts that need to detect that they are running inside a
+  conda-style build.
 
 `CPU_COUNT`
 
-: Represents the number of CPUs on the system.
+: The number of CPUs on the system, used by build tools that parallelize.
+  Falls back to the system's logical CPU count if not set.
 
 `SHLIB_EXT`
 
-: Denotes the shared library extension specific to the operating
-  system (e.g. `.so` for Linux, `.dylib` for macOS, and `.dll` for Windows).
+: The shared library extension specific to the target platform (e.g. `.so`
+  for Linux, `.dylib` for macOS, and `.dll` for Windows).
 
 `HTTP_PROXY`, `HTTPS_PROXY`
 
@@ -224,14 +224,21 @@ noted, no variables are inherited from the shell environment in which you invoke
 
 `LANG`
 
-: Inherited from the user's shell environment, defining the system
-  language and locale settings.
+: Defines the system language and locale settings. Set to `C.UTF-8` when
+  running with strict environment isolation; otherwise forwarded from the
+  user's shell environment.
+
+`LC_ALL`
+
+: Locale category override. Set to `C.UTF-8` when running with strict
+  environment isolation; otherwise forwarded from the user's shell environment
+  (only forwarded in `conda-build` compatibility mode).
 
 `MAKEFLAGS`
 
-: Inherited from the user's shell environment. This can be used to
-  set additional arguments for the make command, such as -j2 to utilize 2 CPU
-  cores for building the recipe.
+: Forwarded from the user's shell environment in `conda-build` compatibility
+  mode. Can be used to set additional arguments for `make`, such as `-j2` to
+  utilize 2 CPU cores.
 
 `PY_VER`
 
@@ -245,8 +252,65 @@ noted, no variables are inherited from the shell environment in which you invoke
 
 `PREFIX`
 
-: The build prefix to which the build script should install the
-  software.
+: The host prefix into which the build script should install the package's
+  files. This is the environment that contains the package's runtime
+  dependencies (the `host` requirements). On Windows this is sometimes also
+  referred to as `%PREFIX%`. Note that for packages without `host`
+  requirements, `PREFIX` and `BUILD_PREFIX` may point at the same environment.
+
+`BUILD_PREFIX`
+
+: The build prefix that contains the tools used to build the package (the
+  `build` requirements, such as compilers, `cmake`, `make`, `pkg-config`,
+  …). It is a separate environment from `PREFIX` so that build tools do not
+  contaminate the runtime dependencies of the package, which is especially
+  important when cross-compiling. Use `BUILD_PREFIX` to reference build tools
+  (for example `$BUILD_PREFIX/bin/cmake`) and `PREFIX` for files that should
+  end up in the final package.
+
+`BUILD_DIR`
+
+: The directory in which the build is executed. This is the parent of
+  `SRC_DIR` and contains the work directory as well as auxiliary files such
+  as the `pip_cache` directory.
+
+`CONDA_DEFAULT_ENV`
+
+: Set to the host prefix (`PREFIX`) for compatibility with tools that expect
+  to find an "active" conda environment.
+
+`CONDA_BUILD_STATE`
+
+: The current phase of the build process. One of `BUILD` (during the build
+  script) or `TEST` (during the test phase). Useful in scripts that are
+  shared between the build and test phases.
+
+`CONDA_BUILD_CROSS_COMPILATION`
+
+: Set to `1` when the build platform and the target platform differ (i.e.
+  the package is being cross-compiled), and `0` otherwise.
+
+`SUBDIR`
+
+: The target subdirectory (platform) for the package being built, e.g.
+  `linux-64`, `osx-arm64`, `win-64` or `noarch`.
+
+`build_platform`
+
+: The native subdirectory of the platform that runs the build (e.g.
+  `linux-64` on a Linux x86_64 host). This is the platform on which the
+  build tools execute.
+
+`host_platform`
+
+: The subdirectory describing the platform that the package's `host`
+  dependencies are resolved for. Equal to `target_platform` except for
+  `noarch` packages, where `host_platform` is the current build platform.
+
+`target_platform`
+
+: The subdirectory describing the platform that the resulting package will
+  run on. Equivalent to `SUBDIR`.
 
 `PKG_BUILDNUM`
 
@@ -275,10 +339,36 @@ noted, no variables are inherited from the shell environment in which you invoke
 : The path to the Python executable in the host prefix. Python is
   installed in the host prefix only when it is listed as a host requirement.
 
+`PY3K`
+
+: `1` when the host Python is Python 3, `0` otherwise. Only set when Python
+  is part of the host environment.
+
 `R`
 
 : The path to the R executable in the build prefix. R is installed in the
   build prefix only when it is listed as a build requirement.
+
+`R_VER`
+
+: The R version (`major.minor`, e.g. `4.3`). Only set when R is part of the
+  variant configuration.
+
+`R_USER`
+
+: The path to the R user library directory inside the host prefix. Only set
+  when R is part of the variant configuration.
+
+`NPY_VER`
+
+: The NumPy version (`major.minor`, e.g. `1.26`). Only set when `numpy` is
+  part of the variant configuration.
+
+`NPY_DISTUTILS_APPEND_FLAGS`
+
+: Always set to `1` when NumPy is part of the variant configuration. See
+  [the conda-build PR](https://github.com/conda/conda-build/pull/3015) for
+  background.
 
 `RECIPE_DIR`
 
@@ -298,15 +388,46 @@ noted, no variables are inherited from the shell environment in which you invoke
 
 : The location of Python's standard library.
 
-`build_platform`
+`SOURCE_DATE_EPOCH`
 
-: Represents the native subdirectory of the conda executable,
-  indicating the platform for which the build is occurring.
+: The Unix timestamp (seconds since the epoch) used as a reproducible build
+  timestamp. Many build tools honor this variable to produce reproducible
+  outputs (see [reproducible-builds.org](https://reproducible-builds.org/docs/source-date-epoch/)).
+  rattler-build sets it to the configured build timestamp.
 
+`PYTHONNOUSERSITE`
 
-Removed from `conda-build` are:
-- `NPY_VER`
-- `PY3K`
+: Always set to `1` so that the user's site-packages directory is not added
+  to `sys.path` during the build, ensuring a clean Python environment.
+
+`PYTHONDONTWRITEBYTECODE`
+
+: Set to `1` for `noarch: python` packages so that no `.pyc` files are
+  written during the build.
+
+`PIP_NO_BUILD_ISOLATION`
+
+: Set to `False` so that `pip` does not create its own isolated build
+  environment — rattler-build provides the environment instead.
+
+`PIP_NO_DEPENDENCIES`
+
+: Set to `True` so that `pip` does not pull in additional dependencies. All
+  dependencies must be specified in the recipe.
+
+`PIP_IGNORE_INSTALLED`
+
+: Set to `True` so that `pip` ignores already-installed packages and
+  installs the requested package fresh.
+
+`PIP_NO_INDEX`
+
+: Set to `True` so that `pip` does not query PyPI. All packages must be
+  available locally.
+
+`PIP_CACHE_DIR`
+
+: A path inside the work directory used as the `pip` cache for the build.
 
 #### Windows
 
@@ -315,17 +436,25 @@ the build prefix. The environment variables listed in the following table are
 defined only on Windows.
 
 
-| Variable         | Description                       |
-| ---------------- | --------------------------------- |
-| `LIBRARY_BIN`    | `<build prefix>\Library\bin`.     |
-| `LIBRARY_INC`    | `<build prefix>\Library\include`. |
-| `LIBRARY_LIB`    | `<build prefix>\Library\lib`.     |
-| `LIBRARY_PREFIX` | `<build prefix>\Library`.         |
-| `SCRIPTS`        | `<build prefix>\Scripts`.         |
+| Variable         | Description                                                                                                                  |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `LIBRARY_BIN`    | `<host prefix>\Library\bin`.                                                                                                 |
+| `LIBRARY_INC`    | `<host prefix>\Library\include`.                                                                                             |
+| `LIBRARY_LIB`    | `<host prefix>\Library\lib`.                                                                                                 |
+| `LIBRARY_PREFIX` | `<host prefix>\Library`.                                                                                                     |
+| `SCRIPTS`        | `<host prefix>\Scripts`.                                                                                                     |
+| `LIB`            | `LIBRARY_LIB` prepended to the inherited `LIB` variable, used by MSVC to find link libraries.                                |
+| `INCLUDE`        | `LIBRARY_INC` prepended to the inherited `INCLUDE` variable, used by MSVC to find headers.                                   |
+| `CYGWIN_PREFIX`  | The host prefix translated to a Cygwin-style path, such as `/cygdrive/c/path/to/prefix`.                                     |
+| `BUILD`          | A target triple of the form `<arch>-pc-windows-<msvc_version>` (e.g. `amd64-pc-windows-19.0.0`). Inherited from env if set.  |
+
+Additionally, on Windows, any environment variables matching the regular
+expressions `^VS[0-9]{2,3}COMNTOOLS$` and `^VS[0-9]{4}INSTALLDIR$` are
+forwarded so that scripts that rely on locating Visual Studio installations
+work as expected.
 
 Not yet supported in Rattler-Build:
 
-- `CYGWIN_PREFIX`
 - `VS_MAJOR`
 - `VS_VERSION`
 - `VS_YEAR`
@@ -366,7 +495,6 @@ Additionally, the following variables are forwarded from the environment:
 
 
 <!--
-| `CYGWIN_PREFIX` | Same as PREFIX, but as a Unix-style path, such as `/cygdrive/c/path/to/prefix`.            |
 | `-------------` | T----------------------------------------------------------------------------------------. |
 | `VS_VERSION`    | The version number of the Visual Studio version activated within the build, such as `9.0`. |
 | `VS_YEAR`       | The release year of the Visual Studio version activated within the build, such as `2008`.  |
@@ -377,14 +505,20 @@ Additionally, the following variables are forwarded from the environment:
 The environment variables listed in the following table are defined only on
 macOS and Linux.
 
-| Variable          | Description                                                                                                       |
-| ----------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `HOME`            | Standard $HOME environment variable.                                                                              |
-| `PKG_CONFIG_PATH` | Path to `pkgconfig` directory, defaults to `$PREFIX/lib/pkgconfig                                                 |
-| `SSL_CERT_FILE`   | Path to `SSL_CERT_FILE` file.                                                                                     |
-| `CFLAGS`          | Empty, can be forwarded from env to set additional arguments to C compiler.                                       |
-| `CXXFLAGS`        | Same as CFLAGS for C++ compiler.                                                                                  |
-| `LDFLAGS`         | Empty, additional flags to be passed to the linker when linking object files into an executable or shared object. |
+| Variable          | Description                                                                                                                                                                                                            |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `HOME`            | Standard `$HOME` environment variable. In strict isolation mode this is set to the work directory; in `conda-build` compatibility mode it is forwarded from the host shell.                                            |
+| `PKG_CONFIG_PATH` | Path to the `pkgconfig` directory, defaults to `$PREFIX/lib/pkgconfig`.                                                                                                                                                |
+| `SSL_CERT_FILE`   | Path to the `SSL_CERT_FILE` file (forwarded from the host environment).                                                                                                                                                |
+| `CMAKE_GENERATOR` | The CMake generator, set to `Unix Makefiles` on macOS and Linux.                                                                                                                                                       |
+| `LC_ALL`          | Locale category override. Set to `C.UTF-8` in strict isolation mode; otherwise forwarded from the host environment.                                                                                                    |
+| `CFLAGS`          | Empty, can be forwarded from env to set additional arguments to the C compiler. Only forwarded in `conda-build` compatibility mode.                                                                                    |
+| `CXXFLAGS`        | Same as `CFLAGS` for the C++ compiler. Only forwarded in `conda-build` compatibility mode.                                                                                                                             |
+| `LDFLAGS`         | Empty, additional flags to be passed to the linker when linking object files into an executable or shared object. Only forwarded in `conda-build` compatibility mode.                                                  |
+| `USER`            | Set to `rattler` in strict isolation mode.                                                                                                                                                                             |
+| `SHELL`           | Set to `/bin/bash` in strict isolation mode.                                                                                                                                                                           |
+| `EDITOR`          | Set to `/bin/false` in strict isolation mode.                                                                                                                                                                          |
+| `TERM`            | Set to `xterm-256color` in strict isolation mode.                                                                                                                                                                      |
 
 
 #### macOS
@@ -396,6 +530,7 @@ macOS.
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | `MACOSX_DEPLOYMENT_TARGET` | Same as the Anaconda Python macOS deployment target. Currently `10.9` for intel 32- and 64bit macOS, and 11.0 for arm64. |
 | `OSX_ARCH`                 | `i386` or `x86_64` or `arm64`, depending on the target platform                                                          |
+| `BUILD`                    | Target triple, e.g. `arm64-apple-darwin20.0.0` for `osx-arm64` or `x86_64-apple-darwin13.4.0` for `osx-64`.              |
 
 #### Linux
 
