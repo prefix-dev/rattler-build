@@ -59,4 +59,5 @@ jobs:
       - name: Upload package
         run: pixi run --environment=packaging upload-package
       - name: Show sccache stats
-        run: pixi run --environment=packaging sccache --stop-server
+        run: pixi run --environment=packaging sccache --stop-server || true
+        continue-on-error: true
