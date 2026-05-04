@@ -1,10 +1,21 @@
 //! Integration tests for rattler_build_package
 
+use std::path::Path;
+
 use fs_err as fs;
 use rattler_build_package::{
     AboutJsonBuilder, ArchiveType, IndexJsonBuilder, PackageBuilder, PackageConfig,
 };
 use rattler_conda_types::{PackageName, Platform, VersionWithSource};
+use rattler_package_streaming::read::extract_tar_bz2;
+
+/// Helper to extract a .tar.bz2 package and return the extraction directory.
+fn extract_package(package_path: &Path) -> tempfile::TempDir {
+    let extract_dir = tempfile::tempdir().expect("failed to create temp dir for extraction");
+    let file = std::fs::File::open(package_path).expect("failed to open package");
+    extract_tar_bz2(file, extract_dir.path()).expect("failed to extract tar.bz2 package");
+    extract_dir
+}
 
 #[cfg(feature = "recipe")]
 use rattler_build_recipe::stage1::{About, Build, Extra, Package, Recipe, Requirements};
@@ -294,6 +305,7 @@ fn test_package_with_license_and_test_files() -> Result<(), Box<dyn std::error::
 
     let config = PackageConfig {
         compression_level: 1,
+        archive_type: ArchiveType::TarBz2,
         ..Default::default()
     };
 
@@ -307,8 +319,33 @@ fn test_package_with_license_and_test_files() -> Result<(), Box<dyn std::error::
     assert!(output.path.exists());
     assert_eq!(output.identifier, "test-with-extras-1.0.0-0");
 
-    // TODO: Verify license and test files are in the archive
-    // This would require extracting and inspecting the archive
+    // Verify license and test files are in the archive by extracting it
+    let extract_dir = extract_package(&output.path);
+    let extracted = extract_dir.path();
+
+    // License file should be in info/licenses/
+    let extracted_license = extracted.join("info/licenses/LICENSE.txt");
+    assert!(
+        extracted_license.exists(),
+        "License file should exist at info/licenses/LICENSE.txt in the archive"
+    );
+    assert_eq!(
+        fs::read_to_string(&extracted_license)?,
+        "MIT License\n\nCopyright...",
+        "License file contents should match"
+    );
+
+    // Test file should be in info/
+    let extracted_test = extracted.join("info/run_test.py");
+    assert!(
+        extracted_test.exists(),
+        "Test file should exist at info/run_test.py in the archive"
+    );
+    assert_eq!(
+        fs::read_to_string(&extracted_test)?,
+        "import app\nassert True",
+        "Test file contents should match"
+    );
 
     Ok(())
 }
@@ -343,6 +380,7 @@ fn test_package_with_recipe_files() -> Result<(), Box<dyn std::error::Error>> {
     let config = PackageConfig {
         compression_level: 1,
         store_recipe: true, // Enable recipe storage
+        archive_type: ArchiveType::TarBz2,
         ..Default::default()
     };
 
@@ -355,7 +393,45 @@ fn test_package_with_recipe_files() -> Result<(), Box<dyn std::error::Error>> {
     assert!(output.path.exists());
     assert_eq!(output.identifier, "test-with-recipe-3.0.0-h123_0");
 
-    // TODO: Verify recipe files are in info/recipe/ directory in the archive
+    // Verify recipe files are in info/recipe/ directory in the archive
+    let extract_dir = extract_package(&output.path);
+    let extracted = extract_dir.path();
+
+    // recipe.yaml should be in info/recipe/
+    let extracted_recipe = extracted.join("info/recipe/recipe.yaml");
+    assert!(
+        extracted_recipe.exists(),
+        "Recipe file should exist at info/recipe/recipe.yaml in the archive"
+    );
+    assert_eq!(
+        fs::read_to_string(&extracted_recipe)?,
+        "package:\n  name: test",
+        "Recipe file contents should match"
+    );
+
+    // build.sh should be in info/recipe/
+    let extracted_build_sh = extracted.join("info/recipe/build.sh");
+    assert!(
+        extracted_build_sh.exists(),
+        "Build script should exist at info/recipe/build.sh in the archive"
+    );
+    assert_eq!(
+        fs::read_to_string(&extracted_build_sh)?,
+        "#!/bin/bash\necho building",
+        "Build script contents should match"
+    );
+
+    // Subdirectory files should be preserved: patches/fix.patch
+    let extracted_patch = extracted.join("info/recipe/patches/fix.patch");
+    assert!(
+        extracted_patch.exists(),
+        "Patch file should exist at info/recipe/patches/fix.patch in the archive"
+    );
+    assert_eq!(
+        fs::read_to_string(&extracted_patch)?,
+        "--- a/file\n+++ b/file",
+        "Patch file contents should match"
+    );
 
     Ok(())
 }
