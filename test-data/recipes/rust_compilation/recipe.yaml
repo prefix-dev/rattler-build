@@ -1,0 +1,27 @@
+package:
+  name: rust_compilation
+  version: 0.1.0
+
+build:
+  number: 0
+  script:
+    content:
+      - if: unix
+        then: |
+          mkdir -p $PREFIX/bin
+          rustc $RECIPE_DIR/main.rs -o $PREFIX/bin/hello-rust
+      - if: win
+        then: |
+          mkdir %PREFIX%\bin
+          rustc %RECIPE_DIR%\main.rs -o %PREFIX%\bin\hello-rust.exe
+
+requirements:
+  build:
+    - rust
+
+tests:
+  - script:
+      - if: unix
+        then: hello-rust
+      - if: win
+        then: hello-rust.exe

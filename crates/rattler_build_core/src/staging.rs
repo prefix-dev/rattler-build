@@ -22,10 +22,12 @@ use crate::{
     env_vars,
     metadata::{Output, build_reindexed_channels},
     packaging::Files,
+    post_process::package_nature::{LibraryNameMap, PrefixInfo},
     render::resolved_dependencies::{
         FinalizedDependencies, RunExportsDownload, install_environments, resolve_dependencies,
     },
     source::{copy_dir::CopyDir, fetch_sources},
+    utils::remove_dir_all_force,
 };
 
 /// Error type for staging cache operations
@@ -71,6 +73,13 @@ pub struct StagingCacheMetadata {
 
     /// The variant configuration that was used
     pub variant: BTreeMap<NormalizedKey, Variable>,
+
+    /// Mapping from shared library filenames to the package that provides them.
+    /// Captured at staging build time while conda-meta is still present, used
+    /// during overlinking checks as a fallback when these packages are not
+    /// physically installed in the host prefix.
+    #[serde(default)]
+    pub library_name_map: LibraryNameMap,
 }
 
 impl Output {
@@ -140,7 +149,8 @@ impl Output {
     /// 2. If yes, restore the cached files to the prefix
     /// 3. If no, build the staging cache and save it
     ///
-    /// Returns the finalized dependencies and sources from the staging cache
+    /// Returns the finalized dependencies, sources, and library name map from
+    /// the staging cache.
     pub async fn build_or_restore_staging_cache(
         &self,
         staging: &StagingCache,
@@ -149,6 +159,7 @@ impl Output {
         (
             FinalizedDependencies,
             Vec<rattler_build_recipe::stage1::Source>,
+            LibraryNameMap,
         ),
         miette::Error,
     > {
@@ -185,7 +196,7 @@ impl Output {
                                 e
                             );
                             // Remove corrupted cache and rebuild
-                            fs::remove_dir_all(&cache_dir).into_diagnostic()?;
+                            remove_dir_all_force(&cache_dir).into_diagnostic()?;
                         }
                     },
                     Err(e) => {
@@ -194,7 +205,7 @@ impl Output {
                             metadata_path.display(),
                             e
                         );
-                        fs::remove_dir_all(&cache_dir).into_diagnostic()?;
+                        remove_dir_all_force(&cache_dir).into_diagnostic()?;
                     }
                 }
             }
@@ -215,6 +226,7 @@ impl Output {
         (
             FinalizedDependencies,
             Vec<rattler_build_recipe::stage1::Source>,
+            LibraryNameMap,
         ),
         miette::Error,
     > {
@@ -252,10 +264,40 @@ impl Output {
             .await
             .into_diagnostic()?;
 
+        // Capture the library name map while conda-meta still exists in the
+        // prefix. This maps shared library filenames to their providing
+        // packages so overlinking checks can attribute libraries even after
+        // the staging cache's host deps are no longer installed.
+        let prefix_info = PrefixInfo::from_prefix(self.prefix()).into_diagnostic()?;
+        let library_name_map = LibraryNameMap::from_prefix_info(&prefix_info);
+
         // Run the build script
         let target_platform = self.build_configuration.target_platform;
         let mut env_vars = env_vars::vars(self, "BUILD");
-        env_vars.extend(env_vars::os_vars(self.prefix(), &target_platform));
+        env_vars.extend(env_vars::os_vars(
+            self.prefix(),
+            &target_platform,
+            self.build_configuration.env_isolation,
+            &self.build_configuration.directories.work_dir,
+        ));
+        // Use the staging cache's own used_variant rather than the inheriting
+        // output's: the staging cache is shared across all inheritors, and the
+        // inheriting output may not directly reference variant keys (like
+        // CONDA_BUILD_SYSROOT) that the staging cache's compilers depend on.
+        env_vars.extend(env_vars::env_vars_from_variant(&staging.used_variant));
+
+        // A staging cache does not produce a package, so the PKG_* vars
+        // (which would otherwise carry the inheriting output's identity) are
+        // misleading here.
+        for key in [
+            "PKG_NAME",
+            "PKG_VERSION",
+            "PKG_BUILDNUM",
+            "PKG_BUILD_STRING",
+            "PKG_HASH",
+        ] {
+            env_vars.remove(key);
+        }
 
         // Create Jinja context
         let selector_config = self.build_configuration.selector_config();
@@ -296,6 +338,7 @@ impl Output {
                 build_prefix,
                 Some(jinja_renderer),
                 self.build_configuration.sandbox_config(),
+                self.build_configuration.env_isolation,
             )
             .await
             .into_diagnostic()?;
@@ -374,6 +417,7 @@ impl Output {
             work_dir_files: copied_work_dir.copied_paths().to_vec(),
             prefix: self.prefix().to_path_buf(),
             variant: staging.used_variant.clone(),
+            library_name_map: library_name_map.clone(),
         };
 
         let metadata_json = serde_json::to_string_pretty(&metadata).into_diagnostic()?;
@@ -385,7 +429,7 @@ impl Output {
             metadata.work_dir_files.len()
         );
 
-        Ok((finalized_dependencies, finalized_sources))
+        Ok((finalized_dependencies, finalized_sources, library_name_map))
     }
 
     /// Restore a staging cache from disk
@@ -397,6 +441,7 @@ impl Output {
         (
             FinalizedDependencies,
             Vec<rattler_build_recipe::stage1::Source>,
+            LibraryNameMap,
         ),
         miette::Error,
     > {
@@ -404,16 +449,20 @@ impl Output {
         let work_dir_cache = cache_dir.join("work_dir");
 
         // IMPORTANT: Clean the prefix directory before restoring from cache
-        // The prefix may already have files from dependency installation or previous builds
+        // The prefix may already have files from dependency installation or previous builds.
+        // Use `remove_dir_all_force` so Windows can rename-before-delete when a
+        // lingering handle (antivirus, indexer, build tool) would otherwise
+        // cause `remove_dir_all` to fail with "Access is denied" (os error 5).
         if self.prefix().exists() {
             tracing::debug!("Removing existing prefix before cache restoration");
-            fs::remove_dir_all(self.prefix()).into_diagnostic()?;
+            remove_dir_all_force(self.prefix()).into_diagnostic()?;
         }
 
         // Clean the work directory as well
         if self.build_configuration.directories.work_dir.exists() {
             tracing::debug!("Removing existing work directory before cache restoration");
-            fs::remove_dir_all(&self.build_configuration.directories.work_dir).into_diagnostic()?;
+            remove_dir_all_force(&self.build_configuration.directories.work_dir)
+                .into_diagnostic()?;
         }
 
         // Restore prefix files
@@ -436,7 +485,11 @@ impl Output {
             metadata.name
         );
 
-        Ok((metadata.finalized_dependencies, metadata.finalized_sources))
+        Ok((
+            metadata.finalized_dependencies,
+            metadata.finalized_sources,
+            metadata.library_name_map,
+        ))
     }
 
     /// Process all staging caches for this output
@@ -451,6 +504,7 @@ impl Output {
         Option<(
             FinalizedDependencies,
             Vec<rattler_build_recipe::stage1::Source>,
+            LibraryNameMap,
         )>,
         miette::Error,
     > {
@@ -467,7 +521,7 @@ impl Output {
                 "Building or restoring staging cache: {}",
                 staging_cache.name
             );
-            let (_deps, _sources) = self
+            let (_deps, _sources, _lib_map) = self
                 .build_or_restore_staging_cache(staging_cache, tool_configuration)
                 .await?;
         }
@@ -488,11 +542,11 @@ impl Output {
                 })?;
 
             // Get or build the cache
-            let (deps, sources) = self
+            let (deps, sources, lib_map) = self
                 .build_or_restore_staging_cache(staging, tool_configuration)
                 .await?;
 
-            Ok(Some((deps, sources)))
+            Ok(Some((deps, sources, lib_map)))
         } else {
             Ok(None)
         }

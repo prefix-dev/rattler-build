@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from rattler_build import stage1
-from rattler_build._rattler_build import build_rendered_variant_py
+from rattler_build._rattler_build import EnvironmentIsolation, build_rendered_variant_py
 from rattler_build._rattler_build import render as _render
 from rattler_build.build_result import BuildResult
 from rattler_build.tool_config import PlatformConfig, ToolConfiguration
@@ -130,6 +130,7 @@ class RenderConfig:
 
     Args:
         platform: Platform configuration (target, build, host platforms, experimental flag)
+        v3: Enable V3 recipe fields and MatchSpec syntax.
         extra_context: Dictionary of extra context variables for Jinja rendering
 
     Example:
@@ -150,15 +151,18 @@ class RenderConfig:
         self,
         platform: PlatformConfig | None = None,
         extra_context: dict[str, ContextValue] | None = None,
+        v3: bool = False,
     ):
         """Create a new render configuration."""
         self.platform = platform
+        self._v3 = v3
         self._extra_context = extra_context
         self._config = _render.RenderConfig(
             target_platform=platform.target_platform if platform else None,
             build_platform=platform.build_platform if platform else None,
             host_platform=platform.host_platform if platform else None,
             experimental=platform.experimental if platform else False,
+            v3=v3,
             recipe_path=None,
             extra_context=extra_context,
         )
@@ -176,9 +180,11 @@ class RenderConfig:
         """
         if render_config is not None:
             platform = render_config.platform
+            v3 = render_config._v3
             extra_context = render_config._extra_context
         else:
             platform = None
+            v3 = False
             extra_context = None
 
         return _render.RenderConfig(
@@ -186,6 +192,7 @@ class RenderConfig:
             build_platform=platform.build_platform if platform else None,
             host_platform=platform.host_platform if platform else None,
             experimental=platform.experimental if platform else False,
+            v3=v3,
             recipe_path=recipe_path,
             extra_context=extra_context,
         )
@@ -225,6 +232,11 @@ class RenderConfig:
         """Get whether experimental features are enabled."""
         return self._config.experimental()
 
+    @property
+    def v3(self) -> bool:
+        """Get whether V3 recipe fields and MatchSpec syntax are enabled."""
+        return self._config.v3()
+
     def __repr__(self) -> str:
         return repr(self._config)
 
@@ -255,10 +267,12 @@ class RenderedVariant:
         ```
     """
 
-    def __init__(self, inner: _render.RenderedVariant, recipe_path: Path):
+    def __init__(self, inner: _render.RenderedVariant, recipe_path: Path, v3: bool = False):
         """Create a RenderedVariant from the Rust object."""
         self._inner = inner
         self._recipe_path = recipe_path
+        self._v3 = v3
+        self._siblings: list[RenderedVariant] = []
 
     @property
     def recipe_path(self) -> Path:
@@ -329,12 +343,17 @@ class RenderedVariant:
         package_format: str | None = None,
         no_include_recipe: bool = False,
         exclude_newer: datetime | None = None,
+        env_isolation: EnvironmentIsolation = EnvironmentIsolation.STRICT,
     ) -> BuildResult:
         """Build this rendered variant.
 
         This method builds a single rendered variant directly without needing
         to go back through the Stage0 recipe.  The recipe path is taken from
         this variant automatically (set during :meth:`Stage0Recipe.render`).
+
+        For multi-output recipes, sibling variants are automatically known
+        from the :meth:`~Stage0Recipe.render` call and used to resolve
+        ``pin_subpackage`` dependencies between outputs.
 
         Args:
             tool_config: ToolConfiguration to use for the build. If None, uses defaults.
@@ -346,6 +365,7 @@ class RenderedVariant:
             package_format: Package format ("conda" or "tar.bz2").
             no_include_recipe: Don't include recipe in the output package.
             exclude_newer: Exclude packages newer than this timestamp.
+            env_isolation: Environment isolation mode. Defaults to ``EnvironmentIsolation.STRICT``.
 
         Returns:
             BuildResult: Information about the built package including paths, metadata, and timing.
@@ -359,6 +379,10 @@ class RenderedVariant:
             # Build just the first variant (output goes to <recipe_dir>/output)
             result = rendered[0].run_build()
             print(f"Built package: {result.packages[0]}")
+
+            # Multi-output recipes with pin_subpackage work automatically
+            for variant in rendered:
+                variant.run_build()
             ```
         """
         # Use default ToolConfiguration if not provided
@@ -370,6 +394,8 @@ class RenderedVariant:
             output_dir = self._recipe_path.parent / "output"
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
+
+        rust_siblings = [v._inner for v in self._siblings]
 
         # Build this single variant
         rust_result = build_rendered_variant_py(
@@ -383,6 +409,9 @@ class RenderedVariant:
             package_format=package_format,
             no_include_recipe=no_include_recipe,
             exclude_newer=exclude_newer,
+            env_isolation=env_isolation,
+            sibling_variants=rust_siblings,
+            v3=self._v3,
         )
 
         # Convert Rust BuildResult to Python BuildResult
@@ -403,6 +432,7 @@ def build_rendered_variants(
     package_format: str | None = None,
     no_include_recipe: bool = False,
     exclude_newer: datetime | None = None,
+    env_isolation: EnvironmentIsolation = EnvironmentIsolation.STRICT,
 ) -> list[BuildResult]:
     """Build multiple rendered variants.
 
@@ -422,6 +452,7 @@ def build_rendered_variants(
         package_format: Package format ("conda" or "tar.bz2").
         no_include_recipe: Don't include recipe in the output package.
         exclude_newer: Exclude packages newer than this timestamp.
+        env_isolation: Environment isolation mode. Defaults to ``EnvironmentIsolation.STRICT``.
 
     Returns:
         list[BuildResult]: List of build results, one per variant built.
@@ -461,6 +492,7 @@ def build_rendered_variants(
             package_format=package_format,
             no_include_recipe=no_include_recipe,
             exclude_newer=exclude_newer,
+            env_isolation=env_isolation,
         )
         results.append(result)
 

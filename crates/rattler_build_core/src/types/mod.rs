@@ -152,24 +152,23 @@ pub async fn build_reindexed_channels(
     let output_channel = Channel::from_directory(output_dir);
 
     // Clear the repodata gateway of any cached values for the output channel.
+    // Clear all subdirs so that packages from other platforms (e.g. a linux-64
+    // dependency of a noarch package) are visible after reindexing.
     tool_configuration.repodata_gateway.clear_repodata_cache(
         &output_channel,
-        SubdirSelection::Some(
-            [build_configuration.target_platform]
-                .iter()
-                .map(ToString::to_string)
-                .collect(),
-        ),
+        SubdirSelection::All,
         // In memory is enough because this is a "file" channel
         CacheClearMode::InMemoryOnly,
     )?;
 
     let index_config = IndexFsConfig {
         channel: output_dir.clone(),
-        target_platform: Some(build_configuration.target_platform),
+        target_platform: None,
         repodata_patch: None,
         write_zst: false,
         write_shards: false,
+        repodata_revisions: Vec::new(),
+        package_revision_assignment: Default::default(),
         force: false,
         max_parallel: num_cpus::get_physical(),
         multi_progress: None,

@@ -26,6 +26,7 @@ use std::{
 };
 
 use indexmap::IndexMap;
+use rattler_build_script::ScriptContent;
 use rattler_build_types::NormalizedKey;
 use rattler_conda_types::{
     MatchSpec, NoArchType, PackageName, PackageNameMatcher, ParseStrictness, VersionWithSource,
@@ -44,6 +45,7 @@ use crate::{
             PrefixDetection as Stage0PrefixDetection, PrefixIgnore as Stage0PrefixIgnore,
             PythonBuild as Stage0PythonBuild, VariantKeyUsage as Stage0VariantKeyUsage,
         },
+        match_spec::matchspec_parse_options,
         requirements::{
             IgnoreRunExports as Stage0IgnoreRunExports, RunExports as Stage0RunExports,
         },
@@ -580,6 +582,48 @@ pub fn evaluate_string_list(
     evaluate_string_list_items(list.as_slice(), context)
 }
 
+/// Evaluate V3 package flags.
+fn evaluate_flag_list(
+    list: &ConditionalList<rattler_conda_types::Flag>,
+    context: &EvaluationContext,
+) -> Result<Vec<rattler_conda_types::Flag>, ParseError> {
+    let flags = evaluate_conditional_list(list.as_slice(), context, |value, ctx| {
+        if let Some(flag) = value.as_concrete() {
+            Ok(Some(flag.clone()))
+        } else if let Some(template) = value.as_template() {
+            let rendered = render_template(template.source(), ctx, value.span())?;
+            if rendered.is_empty() {
+                Ok(None)
+            } else {
+                rendered.parse().map(Some).map_err(|e| {
+                    ParseError::invalid_value(
+                        "flag",
+                        format!("Invalid package flag '{}': {}", rendered, e),
+                        value.span().copied().unwrap_or_else(Span::new_blank),
+                    )
+                })
+            }
+        } else {
+            unreachable!("Value must be either concrete or template")
+        }
+    })?;
+
+    if !flags.is_empty() && !context.v3() {
+        return Err(ParseError::invalid_value(
+            "build.flags",
+            "package flags require the --v3 flag",
+            list.as_slice()
+                .first()
+                .and_then(|item| item.as_value())
+                .and_then(|value| value.span().copied())
+                .unwrap_or_else(Span::new_blank),
+        )
+        .with_suggestion("Enable --v3 to use build.flags."));
+    }
+
+    Ok(flags)
+}
+
 /// Evaluate skip expressions as Jinja boolean expressions
 ///
 /// Skip values are Jinja expressions like `is_abi3`, `not unix`, etc.
@@ -893,10 +937,12 @@ pub(crate) fn is_free_matchspec(spec: &rattler_conda_types::MatchSpec) -> bool {
         sha256,
         file_name,
         extras,
+        flags,
         url,
         license,
         condition,
         track_features,
+        license_family,
     } = spec;
 
     name.as_exact().is_some()
@@ -910,8 +956,10 @@ pub(crate) fn is_free_matchspec(spec: &rattler_conda_types::MatchSpec) -> bool {
         && sha256.is_none()
         && file_name.is_none()
         && extras.is_none()
+        && flags.is_none()
         && url.is_none()
         && license.is_none()
+        && license_family.is_none()
         && condition.is_none()
         && track_features.is_none()
 }
@@ -938,6 +986,7 @@ pub fn evaluate_dependency_list(
 ) -> Result<Vec<crate::stage1::Dependency>, ParseError> {
     evaluate_conditional_list(list.as_slice(), context, |value, ctx| {
         if let Some(match_spec) = value.as_concrete() {
+            ensure_matchspec_v3_allowed(&match_spec.0, ctx, value.span())?;
             Ok(Some(Dependency::Spec(Box::new(match_spec.0.clone()))))
         } else if let Some(template) = value.as_template() {
             let s = render_template(template.source(), ctx, value.span())?;
@@ -948,7 +997,7 @@ pub fn evaluate_dependency_list(
             }
 
             let span_opt = value.span().copied();
-            let dep = parse_dependency_string(&s, &span_opt)?;
+            let dep = parse_dependency_string(&s, &span_opt, ctx.v3())?;
             Ok(Some(dep))
         } else {
             unreachable!("Value must be either concrete or template")
@@ -956,10 +1005,33 @@ pub fn evaluate_dependency_list(
     })
 }
 
+fn ensure_matchspec_v3_allowed(
+    spec: &MatchSpec,
+    context: &EvaluationContext,
+    span: Option<&Span>,
+) -> Result<(), ParseError> {
+    if !context.v3()
+        && spec.required_repodata_revision() == rattler_conda_types::RepodataRevision::V3
+    {
+        return Err(ParseError::invalid_value(
+            "match spec",
+            format!("V3 MatchSpec syntax requires the --v3 flag: '{}'", spec),
+            span.copied().unwrap_or_else(Span::new_blank),
+        )
+        .with_suggestion("Enable --v3 to use V3 MatchSpec keys such as extras, flags, or when."));
+    }
+
+    Ok(())
+}
+
 /// Parse a dependency string into a Dependency
 ///
 /// Handles both JSON pin expressions and regular MatchSpec strings
-fn parse_dependency_string(s: &str, span: &Option<Span>) -> Result<Dependency, ParseError> {
+fn parse_dependency_string(
+    s: &str,
+    span: &Option<Span>,
+    v3: bool,
+) -> Result<Dependency, ParseError> {
     let span = (*span).unwrap_or_else(Span::new_blank);
 
     // Check if it's a JSON dictionary (pin_subpackage or pin_compatible)
@@ -974,13 +1046,14 @@ fn parse_dependency_string(s: &str, span: &Option<Span>) -> Result<Dependency, P
         })
     } else {
         // It's a regular MatchSpec string
-        let spec = MatchSpec::from_str(s, ParseStrictness::Strict).map_err(|e| {
-            ParseError::invalid_value(
-                "match spec",
-                format!("Invalid match spec '{}': {}", s, e),
-                span,
-            )
-        })?;
+        let spec = MatchSpec::from_str(s, matchspec_parse_options(ParseStrictness::Strict, v3))
+            .map_err(|e| {
+                ParseError::invalid_value(
+                    "match spec",
+                    format!("Invalid match spec '{}': {}", s, e),
+                    span,
+                )
+            })?;
         Ok(Dependency::Spec(Box::new(spec)))
     }
 }
@@ -1448,11 +1521,27 @@ impl Evaluate for Stage0Requirements {
     type Output = Stage1Requirements;
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
+        if !self.extras.is_empty() && !context.v3() {
+            return Err(ParseError::invalid_value(
+                "requirements.extras",
+                "optional dependency groups require the --v3 flag",
+                Span::new_blank(),
+            )
+            .with_suggestion("Enable --v3 to use requirements.extras."));
+        }
+
+        let extras = self
+            .extras
+            .iter()
+            .map(|(name, deps)| Ok((name.clone(), evaluate_dependency_list(deps, context)?)))
+            .collect::<Result<_, ParseError>>()?;
+
         Ok(Stage1Requirements {
             build: evaluate_dependency_list(&self.build, context)?,
             host: evaluate_dependency_list(&self.host, context)?,
             run: evaluate_dependency_list(&self.run, context)?,
             run_constraints: evaluate_dependency_list(&self.run_constraints, context)?,
+            extras,
             run_exports: self.run_exports.evaluate(context)?,
             ignore_run_exports: self.ignore_run_exports.evaluate(context)?,
         })
@@ -1821,6 +1910,9 @@ impl Evaluate for Stage0Build {
         // This tracks accessed variables for proper variant hash computation
         let skip = evaluate_skip_list(&self.skip, context)?;
 
+        // Evaluate V3 package flags.
+        let flags = evaluate_flag_list(&self.flags, context)?;
+
         // Evaluate python configuration
         let python = self.python.evaluate(context)?;
 
@@ -1891,6 +1983,7 @@ impl Evaluate for Stage0Build {
             string,
             script,
             noarch,
+            flags,
             python,
             skip,
             always_copy_files,
@@ -2651,6 +2744,13 @@ fn merge_stage1_build(
     // Noarch: inherit from top-level if not set in output
     let noarch = output.noarch.or(toplevel.noarch);
 
+    // V3 package flags: use output if not empty, otherwise inherit from top-level
+    let flags = if output.flags.is_empty() {
+        toplevel.flags
+    } else {
+        output.flags
+    };
+
     // Python: use output if not default, otherwise inherit from top-level
     let python = if output.python.is_default() {
         toplevel.python
@@ -2719,6 +2819,7 @@ fn merge_stage1_build(
         number,
         string,
         noarch,
+        flags,
         python,
         skip,
         always_copy_files,
@@ -2854,6 +2955,12 @@ fn evaluate_package_output_to_recipe(
         if output_build.variant.is_default() {
             output_build.variant = toplevel_build.variant;
         }
+        if matches!(output_build.string, BuildString::Default) {
+            output_build.string = toplevel_build.string;
+        }
+        if output_build.number.is_none() {
+            output_build.number = toplevel_build.number;
+        }
         if output_build.noarch.is_none() {
             output_build.noarch = toplevel_build.noarch;
         }
@@ -2877,6 +2984,16 @@ fn evaluate_package_output_to_recipe(
 
         output_build
     };
+
+    // Multi-output recipes do not auto-discover `build.sh`/`build.bat`: a single
+    // shared build script is almost never what each output wants (e.g. noarch
+    // metapackages alongside a compiled main output). An unset script is treated
+    // as a no-op; users must set `build.script` explicitly on the output or
+    // top-level to run anything.
+    let mut build = build;
+    if build.script.content.is_default() {
+        build.script.content = ScriptContent::Commands(Vec::new());
+    }
 
     // Check if this output is skipped (already eagerly evaluated during Build::evaluate).
     // If skipped, return a minimal recipe early - this is like an outer `if: ...` conditional.
@@ -3173,6 +3290,18 @@ impl Evaluate for crate::stage0::MultiOutputRecipe {
                         let cache_name =
                             evaluate_string_value(cache_name_value, &context_with_vars)?;
                         if let Some(cache) = staging_caches.get(&cache_name) {
+                            // Merge the staging cache's used_variant so that
+                            // variant keys it implicitly tracks (e.g.
+                            // CONDA_BUILD_SYSROOT brought in by
+                            // compiler()/stdlib()) participate in this
+                            // output's hash and env. Existing entries in the
+                            // output's used_variant take precedence.
+                            for (k, v) in &cache.used_variant {
+                                recipe
+                                    .used_variant
+                                    .entry(k.clone())
+                                    .or_insert_with(|| v.clone());
+                            }
                             recipe.staging_caches = vec![cache.clone()];
                             recipe.inherits_from =
                                 Some(crate::stage1::InheritsFrom::new(cache_name));
@@ -3203,6 +3332,15 @@ impl Evaluate for crate::stage0::MultiOutputRecipe {
                         let cache_name =
                             evaluate_string_value(&cache_inherit.from, &context_with_vars)?;
                         if let Some(cache) = staging_caches.get(&cache_name) {
+                            // See CacheName branch: merge the staging cache's
+                            // used_variant so that implicitly tracked keys
+                            // participate in the inheritor's hash and env.
+                            for (k, v) in &cache.used_variant {
+                                recipe
+                                    .used_variant
+                                    .entry(k.clone())
+                                    .or_insert_with(|| v.clone());
+                            }
                             recipe.staging_caches = vec![cache.clone()];
                             recipe.inherits_from =
                                 Some(crate::stage1::InheritsFrom::with_run_exports(
@@ -3252,10 +3390,12 @@ impl Evaluate for crate::stage0::MultiOutputRecipe {
 mod tests {
     use minijinja::UndefinedBehavior;
     use rattler_build_jinja::{JinjaConfig, Variable};
+    use rattler_build_script::ScriptContent;
 
     use super::*;
     use crate::stage0::{
         self,
+        parser::parse_recipe_or_multi_from_source,
         types::{Conditional, ConditionalList, Item, JinjaTemplate, NestedItemList, Value},
     };
 
@@ -3718,6 +3858,112 @@ outputs:
                 assert!(!staging_cache.requirements.build.is_empty()); // Should have gcc, cmake
                 assert!(!staging_cache.requirements.host.is_empty()); // Should have zlib
                 assert!(staging_cache.requirements.run.is_empty()); // Staging has no run requirements
+            }
+            _ => panic!("Expected MultiOutputRecipe"),
+        }
+    }
+
+    #[test]
+    fn test_staging_cache_used_variant_is_merged_into_inheriting_outputs() {
+        use crate::stage0::parser::parse_recipe_or_multi_from_source;
+
+        let recipe_yaml = r#"
+schema_version: 1
+
+recipe:
+  name: myproject
+  version: 1.0.0
+
+outputs:
+  - staging:
+      name: build-cache
+    build:
+      script:
+        - echo ${{ staging_only }}
+
+  - package:
+      name: short-inherit
+      version: 1.0.0
+    inherit: build-cache
+
+  - package:
+      name: options-inherit
+      version: 1.0.0
+    inherit:
+      from: build-cache
+      run_exports: false
+
+  - package:
+      name: top-level-inherit
+      version: 1.0.0
+    inherit: null
+"#;
+
+        let parsed = parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+
+        match parsed {
+            stage0::Recipe::MultiOutput(multi) => {
+                let mut variant = IndexMap::new();
+                variant.insert(
+                    "target_platform".to_string(),
+                    Variable::from_string("linux-64"),
+                );
+                variant.insert(
+                    "staging_only".to_string(),
+                    Variable::from_string("from-staging"),
+                );
+
+                let jinja_variant: BTreeMap<NormalizedKey, Variable> = variant
+                    .iter()
+                    .map(|(k, v)| (NormalizedKey::from(k.as_str()), v.clone()))
+                    .collect();
+                let jinja_config = JinjaConfig {
+                    target_platform: rattler_conda_types::Platform::Linux64,
+                    build_platform: rattler_conda_types::Platform::Linux64,
+                    host_platform: rattler_conda_types::Platform::Linux64,
+                    variant: jinja_variant,
+                    ..Default::default()
+                };
+                let ctx = EvaluationContext::with_variables_and_config(variant, jinja_config);
+
+                let recipes = multi.evaluate(&ctx).unwrap();
+                assert_eq!(recipes.len(), 3);
+
+                let staging_only = NormalizedKey::from("staging_only");
+
+                let short_inherit = &recipes[0];
+                assert_eq!(short_inherit.package.name.as_normalized(), "short-inherit");
+                assert_eq!(short_inherit.staging_caches.len(), 1);
+                assert_eq!(
+                    short_inherit.staging_caches[0]
+                        .used_variant
+                        .get(&staging_only),
+                    Some(&Variable::from_string("from-staging"))
+                );
+                assert_eq!(
+                    short_inherit.used_variant.get(&staging_only),
+                    Some(&Variable::from_string("from-staging"))
+                );
+
+                let options_inherit = &recipes[1];
+                assert_eq!(
+                    options_inherit.package.name.as_normalized(),
+                    "options-inherit"
+                );
+                assert_eq!(
+                    options_inherit.used_variant.get(&staging_only),
+                    Some(&Variable::from_string("from-staging"))
+                );
+
+                let top_level_inherit = &recipes[2];
+                assert_eq!(
+                    top_level_inherit.package.name.as_normalized(),
+                    "top-level-inherit"
+                );
+                assert!(
+                    !top_level_inherit.used_variant.contains_key(&staging_only),
+                    "staging-only variant keys should not leak to outputs that do not inherit the cache"
+                );
             }
             _ => panic!("Expected MultiOutputRecipe"),
         }
@@ -4311,7 +4557,13 @@ outputs:
                 // Build section: should inherit dynamic_linking but NOT script
                 assert!(!cache_output.build.dynamic_linking.is_default()); // Inherited from top-level
                 assert!(!cache_output.build.dynamic_linking.rpaths.is_empty()); // Inherited from top-level
-                assert!(cache_output.build.script.is_default()); // NOT inherited (cache has its own script)
+                // Cache-inherited outputs don't pick up the top-level script, and
+                // multi-output outputs never auto-discover `build.sh`/`build.bat`,
+                // so the resolved script is an explicit no-op.
+                assert_eq!(
+                    cache_output.build.script.content,
+                    ScriptContent::Commands(Vec::new())
+                );
 
                 // Second output: inherits from top-level
                 let toplevel_output = &recipes[1];
@@ -4330,6 +4582,46 @@ outputs:
                 // Build section: should inherit everything including script
                 assert!(!toplevel_output.build.dynamic_linking.is_default()); // Inherited
                 assert!(!toplevel_output.build.script.is_default()); // Inherited (top-level has script)
+            }
+            _ => panic!("Expected MultiOutputRecipe"),
+        }
+    }
+
+    #[test]
+    fn test_multi_output_does_not_default_to_build_sh() {
+        // Outputs without an explicit `build.script` in a multi-output recipe
+        // must resolve to an empty command list, not to `Default` (which would
+        // trigger `build.sh`/`build.bat` auto-discovery at execution time).
+        let recipe_yaml = r#"
+schema_version: 1
+
+recipe:
+  name: myproject
+  version: 1.0.0
+
+outputs:
+  - package:
+      name: myproject-main
+  - package:
+      name: myproject-meta
+    build:
+      noarch: generic
+"#;
+
+        let parsed = parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        match parsed {
+            stage0::Recipe::MultiOutput(multi) => {
+                let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
+                let recipes = multi.evaluate(&ctx).unwrap();
+                assert_eq!(recipes.len(), 2);
+                for recipe in &recipes {
+                    assert_eq!(
+                        recipe.build.script.content,
+                        ScriptContent::Commands(Vec::new()),
+                        "multi-output recipe must not default script to build.sh/build.bat (output: {})",
+                        recipe.package.name.as_normalized()
+                    );
+                }
             }
             _ => panic!("Expected MultiOutputRecipe"),
         }
@@ -4896,16 +5188,15 @@ build:
 
     #[test]
     fn test_default_filter_with_undefined_fallback() {
-        // `foo | default(bar)` — both foo and bar are undefined.
-        // Ideally this should error because `bar` is itself undefined, but minijinja
-        // doesn't propagate the error from the fallback argument. Parked for now.
+        // `foo | default(bar)` - both foo and bar are undefined. The fallback
+        // argument must itself be defined, so this errors in Strict mode.
         let ctx = EvaluationContext::new();
 
         let result = render_template_to_variable(r#"${{ foo | default(bar) }}"#, &ctx, None);
 
         assert!(
-            result.is_ok(),
-            "minijinja doesn't error on undefined fallback in default filter (known bug)"
+            result.is_err(),
+            "undefined fallback argument to default filter must error in Strict mode"
         );
     }
 
@@ -5025,28 +5316,21 @@ package:
     }
 
     #[test]
-    fn test_strict_undefined_in_concatenation_does_not_error() {
-        // `~` operator stringifies undefined to "" without going through emit,
-        // so Strict mode does not catch this.
+    fn test_strict_undefined_in_concatenation_errors() {
+        // `~` operator on undefined values errors in Strict mode.
         let ctx = EvaluationContext::new();
         let r = render_template("${{ x ~ y }}", &ctx, None);
-        assert!(
-            r.is_ok(),
-            "concat of undefined does not error in Strict: {:?}",
-            r.err()
-        );
+        assert!(r.is_err(), "concat of undefined must error in Strict mode");
     }
 
     #[test]
-    fn test_strict_undefined_in_comparison_does_not_error() {
-        // `==` on undefined values doesn't go through emit,
-        // so Strict mode does not catch this.
+    fn test_strict_undefined_in_comparison_errors() {
+        // `==` on undefined values errors in Strict mode.
         let ctx = EvaluationContext::new();
         let r = render_template(r#"${{ x == "foo" }}"#, &ctx, None);
         assert!(
-            r.is_ok(),
-            "comparison with undefined does not error in Strict: {:?}",
-            r.err()
+            r.is_err(),
+            "comparison with undefined must error in Strict mode"
         );
     }
 

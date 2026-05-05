@@ -16,9 +16,7 @@ from helpers import (
 
 def test_basic_staging(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     """Test basic staging output with multiple package outputs inheriting from it."""
-    rattler_build.build(
-        recipes / "staging/basic-staging.yaml", tmp_path, extra_args=["--experimental"]
-    )
+    rattler_build.build(recipes / "staging/basic-staging.yaml", tmp_path)
 
     # Both package outputs should be built
     pkg1 = get_extracted_package(tmp_path, "foo-split-1")
@@ -434,9 +432,7 @@ def test_staging_render_only(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
     """Test that rendering works correctly with staging outputs."""
-    rendered = rattler_build.render(
-        recipes / "staging/basic-staging.yaml", tmp_path, extra_args=["--experimental"]
-    )
+    rendered = rattler_build.render(recipes / "staging/basic-staging.yaml", tmp_path)
 
     # Should have 2 outputs (foo-split-1 and foo-othersplit)
     assert len(rendered) == 2
@@ -453,9 +449,7 @@ def test_staging_hash_includes_variant(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
     """Test that staging cache hash includes variant information."""
-    rendered = rattler_build.render(
-        recipes / "staging/basic-staging.yaml", tmp_path, extra_args=["--experimental"]
-    )
+    rendered = rattler_build.render(recipes / "staging/basic-staging.yaml", tmp_path)
 
     # Check that used_variant is set for staging caches
     for output in rendered:
@@ -487,7 +481,7 @@ def test_staging_different_platforms(
     rattler_build.build(
         recipes / "staging/basic-staging.yaml",
         tmp_path,
-        extra_args=["--experimental", "--target-platform", target_platform],
+        extra_args=["--target-platform", target_platform],
     )
 
     pkg1 = get_extracted_package(tmp_path, "foo-split-1")
@@ -499,9 +493,7 @@ def test_staging_with_tests(rattler_build: RattlerBuild, recipes: Path, tmp_path
     # The basic-staging.yaml includes tests that run 'cat $PREFIX/foo.txt'
     # This verifies the staging cache files are available during tests
 
-    rattler_build.build(
-        recipes / "staging/basic-staging.yaml", tmp_path, extra_args=["--experimental"]
-    )
+    rattler_build.build(recipes / "staging/basic-staging.yaml", tmp_path)
 
     # If tests failed, the build would have failed
     # Just verify the packages were created
@@ -612,6 +604,34 @@ def test_staging_run_exports_ignore_by_name(
     assert not any("normal-run-exports" in dep for dep in depends), (
         f"normal-run-exports should be ignored but found in {depends}"
     )
+
+
+def test_staging_overlinking(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Test that overlinking checks pass for staging outputs via library name map.
+
+    When a package inherits from a staging cache, the staging cache's host
+    dependencies (e.g. zlib) are not installed in the host prefix during the
+    overlinking check of the inheriting package. The fix captures a library name
+    map at staging build time and uses it as a fallback in the overlinking check.
+
+    This test compiles a small C program that links against libz, packages it
+    via a staging output with overlinking_behavior: error, and verifies the
+    build succeeds (i.e. libz.so.1 is correctly attributed to zlib via the
+    staging library name map).
+    """
+    rattler_build.build(
+        recipes / "staging/staging-overlinking",
+        tmp_path,
+        extra_args=["--experimental"],
+    )
+
+    pkg = get_extracted_package(tmp_path, "staging-overlinking-test")
+    if platform.system() == "Windows":
+        assert (pkg / "bin/test_zlib.exe").exists()
+    else:
+        assert (pkg / "bin/test_zlib").exists()
 
 
 if __name__ == "__main__":

@@ -1,0 +1,16 @@
+package:
+  name: secret_passthrough
+  version: 0.1.0
+
+build:
+  script:
+    secrets:
+      - BUILD_SECRET
+    content:
+      - if: unix
+        then:
+          - mkdir -p $PREFIX/secret_check
+          - echo "$BUILD_SECRET" > $PREFIX/secret_check/value.txt
+        else:
+          - mkdir %PREFIX%\secret_check
+          - echo %BUILD_SECRET%> %PREFIX%\secret_check\value.txt

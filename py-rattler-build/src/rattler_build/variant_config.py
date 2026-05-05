@@ -115,9 +115,10 @@ class VariantConfig:
 
         Example:
             ```python
-            from rattler_build import JinjaConfig
+            from rattler_build import JinjaConfig, PlatformConfig
 
-            jinja_config = JinjaConfig(target_platform="linux-64")
+            platform_config = PlatformConfig(target_platform="linux-64")
+            jinja_config = JinjaConfig(platform=platform_config)
             config = VariantConfig.from_file_with_context("variants.yaml", jinja_config)
             ```
         """
@@ -142,9 +143,10 @@ class VariantConfig:
 
         Example:
             ```python
-            from rattler_build import JinjaConfig
+            from rattler_build import JinjaConfig, PlatformConfig
 
-            jinja_config = JinjaConfig(target_platform="linux-64")
+            platform_config = PlatformConfig(target_platform="linux-64")
+            jinja_config = JinjaConfig(platform=platform_config)
             config = VariantConfig.from_conda_build_config("conda_build_config.yaml", jinja_config)
             ```
         """
@@ -197,9 +199,10 @@ class VariantConfig:
 
         Example:
             ```python
-            from rattler_build import JinjaConfig
+            from rattler_build import JinjaConfig, PlatformConfig
 
-            jinja_config = JinjaConfig(target_platform="linux-64")
+            platform_config = PlatformConfig(target_platform="linux-64")
+            jinja_config = JinjaConfig(platform=platform_config)
             config = VariantConfig.from_files_with_context(
                 ["base_variants.yaml", "conda_build_config.yaml"],
                 jinja_config,
@@ -280,7 +283,7 @@ class VariantConfig:
 
         Example:
             ```python
-            from rattler_build import JinjaConfig
+            from rattler_build import JinjaConfig, PlatformConfig
 
             yaml_str = '''
             c_compiler:
@@ -289,7 +292,8 @@ class VariantConfig:
               - if: win
                 then: msvc
             '''
-            jinja_config = JinjaConfig(target_platform="linux-64")
+            platform_config = PlatformConfig(target_platform="linux-64")
+            jinja_config = JinjaConfig(platform=platform_config)
             config = VariantConfig.from_yaml_with_context(yaml_str, jinja_config)
             ```
         """

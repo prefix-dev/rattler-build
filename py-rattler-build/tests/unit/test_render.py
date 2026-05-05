@@ -2,6 +2,8 @@
 Tests for the render module - converting Stage0 to Stage1 recipes with variants.
 """
 
+import json
+import tarfile
 from pathlib import Path
 
 import pytest
@@ -10,6 +12,7 @@ from inline_snapshot import snapshot
 from rattler_build import (
     PlatformConfig,
     PlatformParseError,
+    RecipeParseError,
     RenderConfig,
     RenderedVariant,
     Stage0Recipe,
@@ -31,6 +34,57 @@ def test_render_config_with_platforms() -> None:
     assert config.target_platform == "linux-64"
     assert config.build_platform == "linux-64"
     assert config.host_platform == "linux-64"
+
+
+def test_render_config_with_v3_enabled() -> None:
+    """Test RenderConfig with V3 recipe fields enabled."""
+    config = RenderConfig(v3=True)
+    assert config.v3 is True
+
+
+def test_v3_python_api_renders_and_builds_v3_index_json(tmp_path: Path) -> None:
+    """Test that the Python API can opt into V3 parsing, rendering, and building."""
+    recipe_yaml = """
+package:
+  name: py-v3-api-test
+  version: 1.0.0
+
+build:
+  noarch: generic
+  flags:
+    - cuda
+
+requirements:
+  run:
+    - python
+    - scipy[when="python >=3.10"]
+  extras:
+    plot:
+      - matplotlib
+"""
+
+    with pytest.raises(RecipeParseError, match="--v3|invalid bracket key"):
+        Stage0Recipe.from_yaml(recipe_yaml)
+
+    recipe = Stage0Recipe.from_yaml(recipe_yaml, v3=True)
+    rendered = recipe.render()
+
+    assert len(rendered) == 1
+    assert rendered[0].recipe.requirements.to_dict()["extras"] == {"plot": ["matplotlib"]}
+
+    result = rendered[0].run_build(
+        output_dir=tmp_path,
+        package_format="tar.bz2",
+        no_include_recipe=True,
+    )
+
+    with tarfile.open(result.packages[0]) as package:
+        index_json = json.load(package.extractfile("info/index.json"))  # type: ignore[arg-type]
+
+    assert index_json["repodata_revision"] == 3
+    assert index_json["flags"] == ["cuda"]
+    assert index_json["extra_depends"] == {"plot": ["matplotlib"]}
+    assert 'scipy[when="python >=3.10"]' in index_json["depends"]
 
 
 def test_render_recipe_with_variants() -> None:
@@ -175,8 +229,7 @@ def test_render_recipe_with_staging(test_data_dir: Path) -> None:
     recipe_yaml = recipe_path.read_text()
     recipe = Stage0Recipe.from_yaml(recipe_yaml)
     variant_config = VariantConfig()
-    render_config = RenderConfig(platform=PlatformConfig(experimental=True))
-    rendered = recipe.render(variant_config, render_config)
+    rendered = recipe.render(variant_config)
     assert len(rendered) == 2
     assert isinstance(rendered[0], RenderedVariant)
 
@@ -219,9 +272,8 @@ def test_render_recipe_from_path(test_data_dir: Path) -> None:
     recipe_path = test_data_dir / "recipes" / "with-staging.yaml"
     recipe = Stage0Recipe.from_file(recipe_path)
     variant_config = VariantConfig()
-    render_config = RenderConfig(platform=PlatformConfig(experimental=True))
 
-    rendered = recipe.render(variant_config, render_config)
+    rendered = recipe.render(variant_config)
 
     assert len(rendered) == 2
     assert rendered[0].recipe.package.name == "mixed-compiled"
@@ -277,3 +329,49 @@ build:
 
     result = rendered[0].run_build(output_dir=tmp_path, exclude_newer=exclude_newer)
     assert result.name == "datetime-test"
+
+
+def test_run_build_multi_output_pin_subpackage(tmp_path: Path) -> None:
+    """Test that multi-output recipes with pin_subpackage build correctly.
+
+    Reproducer for https://github.com/prefix-dev/rattler-build/issues/2374:
+    When building multi-output recipes via py-rattler-build, the second output
+    fails with "Could not apply pin_subpackage. The following subpackage is not
+    available" because sibling output information was not passed through.
+    """
+
+    recipe_yaml = """
+schema_version: 1
+
+recipe:
+  version: "0.1.0"
+
+build:
+  number: 0
+
+outputs:
+  - package:
+      name: my-pkg-base
+    build:
+      noarch: generic
+
+  - package:
+      name: my-pkg
+    build:
+      noarch: generic
+    requirements:
+      run:
+        - ${{ pin_subpackage("my-pkg-base", exact=true) }}
+"""
+
+    recipe = Stage0Recipe.from_yaml(recipe_yaml)
+    variant_config = VariantConfig()
+    rendered = recipe.render(variant_config)
+
+    assert len(rendered) == 2
+
+    # Sibling variants are automatically populated from render(),
+    # so pin_subpackage resolution works without any extra arguments.
+    for variant in rendered:
+        result = variant.run_build(output_dir=tmp_path)
+        assert result.name in ("my-pkg-base", "my-pkg")

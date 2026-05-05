@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use dunce::canonicalize;
 
-use crate::utils::remove_dir_all_force;
+use crate::utils::{is_pending_removal, remove_dir_all_force};
 
 /// Builder for creating [`Directories`] with a fluent API.
 #[derive(Debug, Clone)]
@@ -209,16 +209,28 @@ impl Directories {
     /// Remove all directories except for the cache directory
     pub fn clean(&self) -> Result<(), std::io::Error> {
         if self.build_dir.exists() {
-            let folders = self.build_dir.read_dir()?;
+            // Snapshot entries before iterating: on Windows the rename-before-
+            // delete path in `remove_dir_all_force` creates new sibling trash
+            // dirs (`.{name}.pending-rm-{nanos}`), and we don't want the
+            // iterator to pick them up and process them recursively.
+            let folders: Vec<_> = self.build_dir.read_dir()?.collect::<Result<_, _>>()?;
             for folder in folders {
-                let folder = folder?;
+                let path = folder.path();
 
-                if folder.path() == self.cache_dir {
+                if path == self.cache_dir {
+                    continue;
+                }
+
+                // Leave pending-rm trash dirs (from this or a previous run)
+                // alone. Re-cleaning them stacks `.pending-rm-*` suffixes and
+                // can blow past Windows' MAX_PATH, and the underlying files
+                // are still locked by whatever blocked removal originally.
+                if is_pending_removal(&path) {
                     continue;
                 }
 
                 if folder.file_type()?.is_dir() {
-                    remove_dir_all_force(&folder.path())?;
+                    remove_dir_all_force(&path)?;
                 }
             }
         }
@@ -311,6 +323,39 @@ mod tests {
         let f2 = p2.file_name().unwrap();
         let epoch = timestamp.timestamp();
         assert!(f2.eq(format!("rattler-build_name_{epoch}").as_str()));
+    }
+
+    #[test]
+    fn test_clean_skips_pending_rm_dirs() {
+        let tempdir = tempfile::tempdir().unwrap();
+
+        let directories = Directories::builder(
+            "name",
+            &tempdir.path().join("recipe"),
+            &tempdir.path().join("output"),
+            &chrono::Utc::now(),
+        )
+        .build()
+        .unwrap();
+        directories.recreate_directories().unwrap();
+
+        // Simulate a leftover trash dir from a previous rename-before-delete
+        // attempt. `clean()` must leave it alone — attempting to remove it
+        // would stack another `.pending-rm-*` suffix on Windows and waste
+        // retries on files the OS still holds open.
+        let trash = directories
+            .build_dir
+            .join(".work.pending-rm-1776529982099702900");
+        fs::create_dir_all(&trash).unwrap();
+        fs::write(trash.join("locked.txt"), b"content").unwrap();
+
+        directories.clean().unwrap();
+
+        assert!(trash.exists(), "pending-rm trash dir must be preserved");
+        assert!(
+            !directories.work_dir.exists(),
+            "regular work dir should still be cleaned"
+        );
     }
 
     #[test]

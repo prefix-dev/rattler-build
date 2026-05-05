@@ -8,6 +8,7 @@ use ::rattler_build::{
 };
 use pyo3::prelude::*;
 use rattler_build_recipe::stage1::HashInfo;
+use rattler_build_script::EnvironmentIsolation;
 use rattler_build_types::NormalizedKey;
 use rattler_conda_types::{ChannelUrl, NamedChannelOrUrl, Platform};
 use rattler_config::config::build::PackageFormatAndCompression;
@@ -22,6 +23,36 @@ use crate::render;
 use crate::run_async_task;
 use crate::tool_config;
 use crate::tracing_subscriber;
+
+/// Controls how the build subprocess environment is constructed.
+///
+/// - ``STRICT`` (default): Clean environment with only explicitly set build
+///   variables and a minimal passthrough whitelist (SSL certs, SSH agent,
+///   proxies). Maximum reproducibility.
+/// - ``CONDA_BUILD``: Match conda-build behavior — forward CFLAGS, CXXFLAGS,
+///   LDFLAGS, MAKEFLAGS, LANG, LC_ALL, and HOME from the host.
+/// - ``NONE``: Inherit the entire host environment. Least reproducible but
+///   useful for debugging.
+#[pyclass(name = "EnvironmentIsolation", eq, eq_int, from_py_object)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PyEnvironmentIsolation {
+    #[pyo3(name = "STRICT")]
+    Strict,
+    #[pyo3(name = "CONDA_BUILD")]
+    CondaBuild,
+    #[pyo3(name = "NONE")]
+    None,
+}
+
+impl From<PyEnvironmentIsolation> for EnvironmentIsolation {
+    fn from(value: PyEnvironmentIsolation) -> Self {
+        match value {
+            PyEnvironmentIsolation::Strict => EnvironmentIsolation::Strict,
+            PyEnvironmentIsolation::CondaBuild => EnvironmentIsolation::CondaBuild,
+            PyEnvironmentIsolation::None => EnvironmentIsolation::None,
+        }
+    }
+}
 
 /// Result of a successful package build
 #[pyclass(name = "BuildResult", from_py_object)]
@@ -89,11 +120,14 @@ pub(crate) fn output_from_rendered_variant(
     no_include_recipe: bool,
     recipe_path: Option<&Path>,
     exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
+    env_isolation: EnvironmentIsolation,
+    v3: bool,
+    extra_subpackages: BTreeMap<rattler_conda_types::PackageName, PackageIdentifier>,
 ) -> Result<Output, RattlerBuildError> {
     let timestamp = chrono::Utc::now();
     let virtual_package_override = rattler_virtual_packages::VirtualPackageOverrides::from_env();
 
-    let mut subpackages = BTreeMap::new();
+    let mut subpackages = extra_subpackages;
 
     let recipe = &rendered_variant.inner.recipe;
     subpackages.insert(
@@ -188,15 +222,18 @@ pub(crate) fn output_from_rendered_variant(
             ),
             store_recipe: !effective_no_include_recipe,
             force_colors: false,
+            env_isolation,
             sandbox_config: None,
             exclude_newer,
+            v3,
         },
         finalized_dependencies: None,
         finalized_sources: None,
         finalized_cache_dependencies: None,
         finalized_cache_sources: None,
+        staging_library_name_map: None,
         build_summary: Arc::new(Mutex::new(BuildSummary::default())),
-        system_tools: SystemTools::default(),
+        system_tools: SystemTools::new("rattler-build", env!("CARGO_PKG_VERSION")),
         extra_meta: None,
     })
 }
@@ -221,6 +258,9 @@ pub fn build_rendered_variant_py(
     package_format: Option<String>,
     no_include_recipe: bool,
     exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
+    env_isolation: PyEnvironmentIsolation,
+    sibling_variants: Vec<render::PyRenderedVariant>,
+    v3: bool,
 ) -> PyResult<BuildResultPy> {
     let tool_config = tool_config.inner;
 
@@ -229,12 +269,30 @@ pub fn build_rendered_variant_py(
         .transpose()
         .map_err(|e| RattlerBuildError::PackageFormat(e.to_string()))?;
 
+    let env_isolation: EnvironmentIsolation = env_isolation.into();
+
     let channels: Vec<NamedChannelOrUrl> = channels
         .iter()
         .map(|c| {
             NamedChannelOrUrl::from_str(c).map_err(|e| RattlerBuildError::Channel(e.to_string()))
         })
         .collect::<Result<_, _>>()?;
+
+    // Build subpackages map from sibling variants (for multi-output pin_subpackage support)
+    let mut extra_subpackages = BTreeMap::new();
+    for sibling in &sibling_variants {
+        let sibling_recipe = &sibling.inner.recipe;
+        if let Some(build_string) = sibling_recipe.build.string.as_resolved() {
+            extra_subpackages.insert(
+                sibling_recipe.package.name.clone(),
+                PackageIdentifier {
+                    name: sibling_recipe.package.name.clone(),
+                    version: sibling_recipe.package.version.clone(),
+                    build_string: build_string.to_string(),
+                },
+            );
+        }
+    }
 
     let output = output_from_rendered_variant(
         &rendered_variant,
@@ -246,6 +304,9 @@ pub fn build_rendered_variant_py(
         no_include_recipe,
         recipe_path.as_deref(),
         exclude_newer,
+        env_isolation,
+        v3,
+        extra_subpackages,
     )?;
 
     // Capture start time for build duration calculation

@@ -1,4 +1,9 @@
-"""Sign and notarize macOS binaries.
+"""Codesign and notarize a macOS binary in place.
+
+Apple's notarization service does not accept tar.gz archives, so the signed
+binary is submitted inside a temporary zip. Notarization does not modify the
+binary itself - once the submission succeeds, the signed binary on disk is
+ready to be packaged as tar.gz by the subsequent packaging step.
 
 Expects the following environment variables:
     CODESIGN_CERTIFICATE          - Base64-encoded .p12 certificate
@@ -9,7 +14,7 @@ Expects the following environment variables:
     APPLEID_TEAMID                - Apple Developer Team ID
 
 Usage:
-    pixi run -e release sign-macos --artifacts-dir artifacts/
+    pixi run -e release sign-macos --binary target/aarch64-apple-darwin/release/rattler-build
 """
 
 import argparse
@@ -26,12 +31,11 @@ KEYCHAIN_PASSWORD = "release-signing-password"
 
 
 def run(cmd: list[str], **kwargs) -> subprocess.CompletedProcess[str]:
-    print(f"  → {' '.join(cmd)}")
+    print(f"  -> {' '.join(cmd)}")
     return subprocess.run(cmd, check=True, text=True, **kwargs)
 
 
 def setup_keychain(cert_path: Path, cert_password: str) -> None:
-    """Import the signing certificate into a temporary keychain."""
     run(["security", "create-keychain", "-p", KEYCHAIN_PASSWORD, KEYCHAIN_NAME])
     run(["security", "set-keychain-settings", "-lut", "21600", KEYCHAIN_NAME])
     run(["security", "unlock-keychain", "-p", KEYCHAIN_PASSWORD, KEYCHAIN_NAME])
@@ -50,7 +54,6 @@ def setup_keychain(cert_path: Path, cert_password: str) -> None:
         ]
     )
 
-    # Allow codesign to access the keychain without prompt
     run(
         [
             "security",
@@ -64,7 +67,6 @@ def setup_keychain(cert_path: Path, cert_password: str) -> None:
         ]
     )
 
-    # Prepend our keychain to the search list
     result = run(
         ["security", "list-keychains", "-d", "user"],
         capture_output=True,
@@ -76,82 +78,61 @@ def setup_keychain(cert_path: Path, cert_password: str) -> None:
 
 
 def cleanup_keychain() -> None:
-    """Remove the temporary keychain."""
     try:
         run(["security", "delete-keychain", KEYCHAIN_NAME])
     except subprocess.CalledProcessError:
         print("Warning: failed to delete keychain", file=sys.stderr)
 
 
-def sign_zip(archive: Path, identity: str) -> None:
-    """Extract zip, codesign the binary, re-create the zip."""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        tmp = Path(tmpdir)
-
-        # Extract and restore Unix permissions from ZIP metadata
-        with zipfile.ZipFile(archive, "r") as zf:
-            for info in zf.infolist():
-                path = Path(zf.extract(info, tmp))
-                mode = (info.external_attr >> 16) & 0xFFFF
-                if mode:
-                    os.chmod(path, mode)
-
-        # Find the binary (top-level dir contains rattler-build)
-        binaries = list(tmp.rglob("rattler-build"))
-        if not binaries:
-            print(f"  Warning: no rattler-build binary found in {archive.name}")
-            return
-
-        for binary in binaries:
-            print(f"  Signing {binary.relative_to(tmp)}...")
-            run(
-                [
-                    "codesign",
-                    "--force",
-                    "--options",
-                    "runtime",
-                    "--sign",
-                    identity,
-                    str(binary),
-                ]
-            )
-
-        # Re-create zip
-        archive.unlink()
-        with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as zf:
-            for item in sorted(tmp.rglob("*")):
-                if item.is_file():
-                    zf.write(item, item.relative_to(tmp))
-
-
-def notarize_zip(archive: Path, username: str, password: str, team_id: str) -> None:
-    """Submit the zip to Apple notary service."""
-    print(f"  Notarizing {archive.name}...")
+def codesign(binary: Path, identity: str) -> None:
+    print(f"\nSigning {binary}...")
     run(
         [
-            "xcrun",
-            "notarytool",
-            "submit",
-            str(archive),
-            "--apple-id",
-            username,
-            "--password",
-            password,
-            "--team-id",
-            team_id,
-            "--wait",
+            "codesign",
+            "--force",
+            "--options",
+            "runtime",
+            "--sign",
+            identity,
+            str(binary),
         ]
     )
 
 
+def notarize(binary: Path, username: str, password: str, team_id: str) -> None:
+    print(f"\nNotarizing {binary}...")
+    with tempfile.TemporaryDirectory() as tmpdir:
+        archive = Path(tmpdir) / f"{binary.name}.zip"
+        with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as zf:
+            zf.write(binary, arcname=binary.name)
+
+        run(
+            [
+                "xcrun",
+                "notarytool",
+                "submit",
+                str(archive),
+                "--apple-id",
+                username,
+                "--password",
+                password,
+                "--team-id",
+                team_id,
+                "--wait",
+            ]
+        )
+
+
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Sign and notarize macOS binaries")
-    parser.add_argument("--artifacts-dir", required=True, type=Path)
+    parser = argparse.ArgumentParser(description="Codesign and notarize a macOS binary")
+    parser.add_argument("--binary", required=True, type=Path)
     args = parser.parse_args()
 
-    artifacts_dir: Path = args.artifacts_dir
+    binary: Path = args.binary
+    if not binary.is_file():
+        print(f"Error: {binary} is not a file", file=sys.stderr)
+        sys.exit(1)
 
-    # Read environment variables
     cert_b64 = os.environ["CODESIGN_CERTIFICATE"]
     cert_password = os.environ["CODESIGN_CERTIFICATE_PASSWORD"]
     identity = os.environ["CODESIGN_IDENTITY"]
@@ -159,38 +140,20 @@ def main() -> None:
     apple_password = os.environ["APPLEID_PASSWORD"]
     apple_team_id = os.environ["APPLEID_TEAMID"]
 
-    # Find macOS zips
-    archives = sorted(artifacts_dir.glob("*-apple-darwin*.zip"))
-    if not archives:
-        print("No macOS archives found, nothing to sign.")
-        return
-
-    print(f"Found {len(archives)} macOS archive(s) to sign.\n")
-
-    # Write certificate to temp file
     with tempfile.NamedTemporaryFile(suffix=".p12", delete=False) as f:
         f.write(base64.b64decode(cert_b64))
         cert_path = Path(f.name)
 
     try:
-        # Setup keychain
         print("Setting up signing keychain...")
         setup_keychain(cert_path, cert_password)
-
-        # Sign each archive
-        for archive in archives:
-            print(f"\nSigning {archive.name}...")
-            sign_zip(archive, identity)
-
-        # Notarize each archive
-        for archive in archives:
-            notarize_zip(archive, apple_username, apple_password, apple_team_id)
-
+        codesign(binary, identity)
+        notarize(binary, apple_username, apple_password, apple_team_id)
     finally:
         cert_path.unlink(missing_ok=True)
         cleanup_keychain()
 
-    print("\nAll macOS binaries signed and notarized.")
+    print(f"\nSigned and notarized {binary}")
 
 
 if __name__ == "__main__":

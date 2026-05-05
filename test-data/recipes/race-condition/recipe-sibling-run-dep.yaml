@@ -1,0 +1,31 @@
+context:
+  version: "1.0.0"
+
+recipe:
+  name: repro
+  version: ${{ version }}
+
+build:
+  number: 0
+
+outputs:
+  - package:
+      name: repro-wrapper
+    build:
+      # this has to be noarch: generic
+      noarch: generic
+      script: echo "wrapper built"
+    requirements:
+      run:
+        - repro-runtime ==${{ version }}
+    tests:
+      - script:
+          - echo "test ran"
+
+  - package:
+      name: repro-runtime
+    build:
+      script: echo "runtime built"
+    tests:
+      - script:
+          - echo "test ran"

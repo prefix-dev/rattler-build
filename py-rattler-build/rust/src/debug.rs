@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::str::FromStr;
 
@@ -5,6 +6,7 @@ use ::rattler_build::{
     debug as core_debug, metadata::Output, source::create_patch, tool_configuration::Configuration,
 };
 use pyo3::prelude::*;
+use rattler_build_script::EnvironmentIsolation;
 use rattler_conda_types::{ChannelUrl, NamedChannelOrUrl};
 
 use crate::build::output_from_rendered_variant;
@@ -239,7 +241,7 @@ impl PyDebugSession {
 /// installs environments, creates build script) without running the build.
 #[pyfunction]
 #[allow(clippy::too_many_arguments)]
-#[pyo3(signature = (rendered_variant, tool_config=None, output_dir=None, channels=None, no_build_id=true, progress_callback=None))]
+#[pyo3(signature = (rendered_variant, tool_config=None, output_dir=None, channels=None, no_build_id=true, progress_callback=None, v3=false))]
 pub fn create_debug_session_py(
     py: Python<'_>,
     rendered_variant: PyRenderedVariant,
@@ -248,6 +250,7 @@ pub fn create_debug_session_py(
     channels: Option<Vec<String>>,
     no_build_id: bool,
     progress_callback: Option<Py<PyAny>>,
+    v3: bool,
 ) -> PyResult<PyDebugSession> {
     let tool_config = tool_config
         .map(|tc| tc.inner)
@@ -286,6 +289,9 @@ pub fn create_debug_session_py(
         true, // no_include_recipe
         None, // recipe_path
         None, // exclude_newer
+        EnvironmentIsolation::default(),
+        v3,
+        BTreeMap::new(), // extra_subpackages
     )?;
 
     // Run setup with log capture

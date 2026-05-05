@@ -136,6 +136,8 @@ def test_publish_recipe_to_local_channel(
         str(recipes / "globtest"),
         "--to",
         f"file://{channel_dir}",
+        "--output-dir",
+        str(tmp_path / "output"),
     )
 
     # Check that channel was created and has packages
@@ -226,6 +228,8 @@ def test_publish_with_recipe_flag(
         str(recipes / "globtest"),
         "--to",
         f"file://{channel_dir}",
+        "--output-dir",
+        str(tmp_path / "output"),
     )
 
     # Check that channel was created and has packages
@@ -262,6 +266,8 @@ def test_publish_with_recipe_dir_flag(
         str(recipe_dir),
         "--to",
         f"file://{channel_dir}",
+        "--output-dir",
+        str(tmp_path / "output"),
     )
 
     # Check that channel was created and has packages
@@ -295,3 +301,256 @@ def test_publish_recipe_and_recipe_dir_conflict(
 
     # The error message should mention the conflict
     assert "cannot be used with" in str(exc_info.value.output)
+
+
+# -- Helper for publish render-only ------------------------------------------
+
+SIMPLE_RECIPE = """\
+package:
+  name: test-publish-override
+  version: 1.0.0
+
+build:
+  number: 0
+  noarch: generic
+  script: echo "hello"
+"""
+
+RECIPE_WITH_BUILD_NUMBER = """\
+package:
+  name: test-publish-override
+  version: 1.0.0
+
+build:
+  number: 5
+  noarch: generic
+  script: echo "hello"
+"""
+
+
+def _write_recipe(tmp_path: Path, content: str) -> Path:
+    recipe_dir = tmp_path / "recipe"
+    recipe_dir.mkdir()
+    (recipe_dir / "recipe.yaml").write_text(content)
+    return recipe_dir
+
+
+def _publish_render(
+    rattler_build: RattlerBuild,
+    tmp_path: Path,
+    recipe_dir: Path,
+    extra_args: list[str] | None = None,
+):
+    """Run `publish --render-only` and return parsed JSON output."""
+    channel_dir = tmp_path / "channel"
+    args = [
+        "publish",
+        str(recipe_dir),
+        "--to",
+        f"file://{channel_dir}",
+        "--render-only",
+    ]
+    if extra_args:
+        args.extend(extra_args)
+    output = rattler_build(*args)
+    return json.loads(output)
+
+
+# -- --build-number tests (absolute) -----------------------------------------
+
+
+def test_publish_build_number_absolute(rattler_build: RattlerBuild, tmp_path: Path):
+    """--build-number with an absolute value overrides the recipe build number."""
+    recipe_dir = _write_recipe(tmp_path, RECIPE_WITH_BUILD_NUMBER)
+    output = _publish_render(
+        rattler_build,
+        tmp_path,
+        recipe_dir,
+        extra_args=["--build-number", "42"],
+    )
+
+    assert len(output) == 1
+    recipe = output[0]["recipe"]
+    assert recipe["build"]["number"] == 42
+    assert recipe["build"]["string"].endswith("_42")
+
+
+def test_publish_build_number_absolute_overrides_default(
+    rattler_build: RattlerBuild, tmp_path: Path
+):
+    """--build-number with an absolute value works when recipe uses default (0)."""
+    recipe_dir = _write_recipe(tmp_path, SIMPLE_RECIPE)
+    output = _publish_render(
+        rattler_build,
+        tmp_path,
+        recipe_dir,
+        extra_args=["--build-number", "7"],
+    )
+
+    recipe = output[0]["recipe"]
+    assert recipe["build"]["number"] == 7
+    assert recipe["build"]["string"].endswith("_7")
+
+
+# -- --build-number tests (relative) -----------------------------------------
+
+
+def test_publish_build_number_relative_on_empty_channel(
+    rattler_build: RattlerBuild, tmp_path: Path
+):
+    """--build-number=+1 on an empty channel bumps from 0 to 1."""
+    recipe_dir = _write_recipe(tmp_path, SIMPLE_RECIPE)
+    channel_dir = tmp_path / "channel"
+
+    output_text = rattler_build(
+        "publish",
+        str(recipe_dir),
+        "--to",
+        f"file://{channel_dir}",
+        "--build-number",
+        "+1",
+        "--render-only",
+    )
+    output = json.loads(output_text)
+
+    recipe = output[0]["recipe"]
+    assert recipe["build"]["number"] == 1
+    assert recipe["build"]["string"].endswith("_1")
+
+
+def test_publish_build_number_relative_bumps_from_channel(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """--build-number=+1 bumps from the highest build number in the channel."""
+    recipe_dir = _write_recipe(tmp_path, SIMPLE_RECIPE)
+    channel_dir = tmp_path / "channel"
+
+    # First publish with build number 3
+    rattler_build(
+        "publish",
+        str(recipe_dir),
+        "--to",
+        f"file://{channel_dir}",
+        "--build-number",
+        "3",
+        "--output-dir",
+        str(tmp_path / "output"),
+    )
+
+    # Now render with +1 — should bump from 3 to 4
+    output_text = rattler_build(
+        "publish",
+        str(recipe_dir),
+        "--to",
+        f"file://{channel_dir}",
+        "--build-number",
+        "+1",
+        "--render-only",
+    )
+    output = json.loads(output_text)
+
+    recipe = output[0]["recipe"]
+    assert recipe["build"]["number"] == 4
+    assert recipe["build"]["string"].endswith("_4")
+
+
+# -- --build-string-prefix tests ---------------------------------------------
+
+
+def test_publish_build_string_prefix(rattler_build: RattlerBuild, tmp_path: Path):
+    """--build-string-prefix prepends a prefix to the build string in publish."""
+    recipe_dir = _write_recipe(tmp_path, SIMPLE_RECIPE)
+    output = _publish_render(
+        rattler_build,
+        tmp_path,
+        recipe_dir,
+        extra_args=["--build-string-prefix", "release"],
+    )
+
+    bs = output[0]["recipe"]["build"]["string"]
+    assert bs.startswith("release_")
+
+
+def test_publish_build_string_prefix_absent_gives_default(
+    rattler_build: RattlerBuild, tmp_path: Path
+):
+    """Without --build-string-prefix the build string has no extra prefix."""
+    recipe_dir = _write_recipe(tmp_path, SIMPLE_RECIPE)
+
+    with_prefix = _publish_render(
+        rattler_build,
+        tmp_path,
+        recipe_dir,
+        extra_args=["--build-string-prefix", "pfx"],
+    )
+    without_prefix = _publish_render(rattler_build, tmp_path, recipe_dir)
+
+    bs_with = with_prefix[0]["recipe"]["build"]["string"]
+    bs_without = without_prefix[0]["recipe"]["build"]["string"]
+
+    assert bs_with.startswith("pfx_")
+    assert bs_with.endswith(bs_without), (
+        f"prefixed '{bs_with}' should end with default '{bs_without}'"
+    )
+
+
+# -- combined tests -----------------------------------------------------------
+
+
+def test_publish_build_number_and_prefix_combined(
+    rattler_build: RattlerBuild, tmp_path: Path
+):
+    """--build-number and --build-string-prefix work together in publish."""
+    recipe_dir = _write_recipe(tmp_path, SIMPLE_RECIPE)
+    output = _publish_render(
+        rattler_build,
+        tmp_path,
+        recipe_dir,
+        extra_args=["--build-number", "10", "--build-string-prefix", "ci"],
+    )
+
+    recipe = output[0]["recipe"]
+    bs = recipe["build"]["string"]
+    assert recipe["build"]["number"] == 10
+    assert bs.startswith("ci_")
+    assert bs.endswith("_10")
+
+
+def test_publish_build_number_relative_and_prefix_combined(
+    rattler_build: RattlerBuild, tmp_path: Path
+):
+    """--build-number=+1 and --build-string-prefix work together."""
+    recipe_dir = _write_recipe(tmp_path, SIMPLE_RECIPE)
+    channel_dir = tmp_path / "channel"
+
+    # First publish with build number 5
+    rattler_build(
+        "publish",
+        str(recipe_dir),
+        "--to",
+        f"file://{channel_dir}",
+        "--build-number",
+        "5",
+        "--output-dir",
+        str(tmp_path / "output"),
+    )
+
+    # Render with relative bump and prefix
+    output_text = rattler_build(
+        "publish",
+        str(recipe_dir),
+        "--to",
+        f"file://{channel_dir}",
+        "--build-number",
+        "+1",
+        "--build-string-prefix",
+        "nightly",
+        "--render-only",
+    )
+    output = json.loads(output_text)
+
+    recipe = output[0]["recipe"]
+    bs = recipe["build"]["string"]
+    assert recipe["build"]["number"] == 6
+    assert bs.startswith("nightly_")
+    assert bs.endswith("_6")

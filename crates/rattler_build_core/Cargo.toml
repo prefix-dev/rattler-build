@@ -1,6 +1,6 @@
 [package]
 name = "rattler_build_core"
-version = "0.2.2"
+version = "0.2.4"
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -141,7 +141,7 @@ rattler_git = { workspace = true }
 rattler_build_types = { workspace = true }
 rattler_build_jinja = { workspace = true }
 rattler_build_recipe = { workspace = true, features = ["variant-config"] }
-rattler_build_networking = { workspace = true, features = ["middleware"] }
+rattler_build_networking = { workspace = true }
 rattler_build_source_cache = { workspace = true }
 rattler_build_script = { workspace = true, features = ["execution"] }
 

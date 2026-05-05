@@ -40,9 +40,11 @@ def build_recipes(
     allow_absolute_license_paths: bool = False,
     exclude_newer: datetime | None = None,
     build_num: int | None = None,
+    build_string_prefix: str | None = None,
     use_bz2: bool = True,
     use_zstd: bool = True,
     use_sharded: bool = True,
+    v3: bool = False,
 ) -> None:
     """
     Build packages from a list of recipes.
@@ -84,6 +86,7 @@ def build_recipes(
         use_bz2: Allow the use of bzip2 compression when downloading repodata. (default: True)
         use_zstd: Allow the use of zstd compression when downloading repodata. (default: True)
         use_sharded: Allow the use of sharded repodata when downloading repodata. (default: True)
+        v3: Enable V3 recipe fields and MatchSpec syntax. (default: False)
 
     Returns:
         None
@@ -125,9 +128,11 @@ def build_recipes(
         allow_absolute_license_paths,
         exclude_newer,
         build_num,
+        build_string_prefix,
         use_bz2,
         use_zstd,
         use_sharded,
+        v3,
     )
 
 

@@ -29,12 +29,13 @@ update-snapshots = "pytest test/end-to-end --snapshot-update"
 check-native-tls = "python scripts/check-native-tls.py"
 # Playground tasks are in the "playground" environment/feature (see below)
 
-# Expects `rustup` with target `wasm32-unknown-unknown` to be installed on the host system
 [feature.playground.dependencies]
 python = ">=3.12,<4"
 clang = ">=21.1.8,<23"
 livereload = ">=2.7,<3"
 wasm-pack = ">=0.14.0,<0.15"
+rust = ">=1.94.0,<1.95"
+rust-std-wasm32-unknown-unknown = ">=1.94.0,<1.95"
 
 [feature.playground.tasks]
 playground-build = { cmd = "python scripts/build_playground.py", description = "Build the WASM playground", inputs = [
@@ -222,9 +223,7 @@ release-plz-release = { cmd = "python scripts/release_plz_release.py", descripti
 build-options = { cmd = "python scripts/build_options.py", description = "Determine cargo build/test options for a target" }
 package-binary = { cmd = "python scripts/package_binary.py", description = "Package release binary into archive and stage for upload" }
 create-tag = { cmd = "python scripts/create_tag.py", description = "Create and push a git tag idempotently" }
-sign-macos = { cmd = "python scripts/sign_macos.py", description = "Sign and notarize macOS binaries" }
-sign-windows-extract = { cmd = "python scripts/sign_windows.py extract", description = "Extract Windows executables for signing" }
-sign-windows-repackage = { cmd = "python scripts/sign_windows.py repackage", description = "Repackage signed Windows executables" }
+sign-macos = { cmd = "python scripts/sign_macos.py", description = "Codesign and notarize a macOS binary in place" }
 save-attestation = { cmd = "python scripts/save_attestation.py", description = "Save attestation bundle" }
 create-release = { cmd = "python scripts/create_release.py", description = "Create GitHub release with all artifacts" }
 

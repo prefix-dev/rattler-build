@@ -31,8 +31,14 @@ impl Output {
     async fn prepare_build_script(&self) -> Result<ExecutionArgs, std::io::Error> {
         let host_prefix = self.build_configuration.directories.host_prefix.clone();
         let target_platform = self.build_configuration.target_platform;
+        let env_isolation = self.build_configuration.env_isolation;
         let mut env_vars = env_vars::vars(self, "BUILD");
-        env_vars.extend(env_vars::os_vars(&host_prefix, &target_platform));
+        env_vars.extend(env_vars::os_vars(
+            &host_prefix,
+            &target_platform,
+            env_isolation,
+            &self.build_configuration.directories.work_dir,
+        ));
         env_vars.extend(env_vars::env_vars_from_variant(self.variant()));
 
         let jinja_renderer = self.jinja_renderer();
@@ -60,6 +66,7 @@ impl Output {
             execution_platform: Platform::current(),
             work_dir: work_dir.clone(),
             sandbox_config: self.build_configuration.sandbox_config().cloned(),
+            env_isolation,
         })
     }
 
@@ -116,6 +123,7 @@ impl Output {
                 build_prefix,
                 Some(jinja_renderer),
                 self.build_configuration.sandbox_config(),
+                self.build_configuration.env_isolation,
             )
             .await?;
 

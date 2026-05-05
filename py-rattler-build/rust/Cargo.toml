@@ -1,6 +1,6 @@
 [package]
 name = "py-rattler-build"
-version = "0.61.2"
+version = "0.64.1"
 edition = "2024"
 license = "BSD-3-Clause"
 publish = false
@@ -21,6 +21,7 @@ rattler_build_jinja = { path = "../../crates/rattler_build_jinja" }
 rattler_build_types = { path = "../../crates/rattler_build_types" }
 rattler_build_variant_config = { path = "../../crates/rattler_build_variant_config" }
 rattler_build_package = { path = "../../crates/rattler_build_package" }
+rattler_build_script = { path = "../../crates/rattler_build_script" }
 indexmap = "2.13.0"
 pyo3 = { version = "0.28.2", features = [
   "abi3-py38",
@@ -34,16 +35,16 @@ tokio = { version = "1.50.0", features = [
   "rt-multi-thread",
   "process",
 ] }
-rattler_conda_types = "0.44.1"
-rattler_config = "0.3.4"
-rattler_networking = { version = "0.26.4" }
-rattler_solve = "5.0.1"
-rattler_virtual_packages = "2.3.13"
+rattler_conda_types = "0.46.0"
+rattler_config = "0.3.8"
+rattler_networking = { version = "0.26.8" }
+rattler_solve = "6.0.0"
+rattler_virtual_packages = "2.3.19"
 clap = "4.6.0"
 url = "2.5.8"
 chrono = "0.4.44"
-rattler_upload = "0.5.2"
-rattler_package_streaming = { version = "0.24.4", default-features = false }
+rattler_upload = "0.6.0"
+rattler_package_streaming = { version = "0.25.0", default-features = false }
 miette = "7.6.0"
 tempfile = "3.27.0"
 serde_yaml = "0.9"

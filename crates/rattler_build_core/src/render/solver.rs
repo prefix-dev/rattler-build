@@ -106,7 +106,7 @@ pub async fn solve_environment(
         specs: specs.to_vec(),
         channel_priority,
         strategy: solve_strategy,
-        exclude_newer,
+        exclude_newer: exclude_newer.map(Into::into),
         ..SolverTask::from_iter(&repo_data)
     };
 

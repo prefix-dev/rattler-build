@@ -91,14 +91,21 @@ pub trait Interpreter {
         for (k, v) in args.env_vars.iter() {
             shell_script.set_env_var(k, v)?;
         }
+        // Re-entrancy marker: this way the preamble sources this file
+        // once and nested shells skip re-sourcing it.
+        shell_script.set_env_var("CONDA_BUILD", "1")?;
         let host_prefix_activator =
             Activator::from_path(&args.run_prefix, shell_type, args.execution_platform)?;
 
-        let conda_prefix = std::env::var("CONDA_PREFIX").ok().map(|p| p.into());
-
+        // Do not pass the host CONDA_PREFIX to the activation. When
+        // CONDA_PREFIX is set (e.g. running inside a pixi/conda env), the
+        // activator generates deactivation scripts for that environment.
+        // Those deactivation scripts can fail inside the clean build
+        // subprocess (especially on macOS/Windows where compiler
+        // deactivation scripts may reference tools not in the stripped PATH).
         let current_env = std::env::vars().collect::<HashMap<_, _>>();
         let activation_vars = ActivationVariables {
-            conda_prefix,
+            conda_prefix: None,
             path: None,
             path_modification_behavior: PathModificationBehavior::Prepend,
             current_env: current_env.clone(),

@@ -37,7 +37,7 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
-      - uses: prefix-dev/setup-pixi@a0af7a228712d6121d37aba47adf55c1332c9c2e # v0.9.4
+      - uses: prefix-dev/setup-pixi@1b2de7f3351f171c8b4dfeb558c639cb58ed4ec0 # v0.9.5
         with:
           environments: release
       - name: Extract version
@@ -49,6 +49,10 @@ jobs:
     name: Build ${{ matrix.target }}
     needs: prepare
     runs-on: ${{ matrix.os }}
+    environment: ${{ contains(matrix.target, 'pc-windows') && 'release' || '' }}
+    permissions:
+      contents: read
+      id-token: write
     strategy:
       fail-fast: false
       matrix:
@@ -95,12 +99,12 @@ jobs:
           mkdir -p ~/.pixi
           echo 'tool-platform = "win-64"' > ~/.pixi/config.toml
 
-      - uses: prefix-dev/setup-pixi@a0af7a228712d6121d37aba47adf55c1332c9c2e # v0.9.4
+      - uses: prefix-dev/setup-pixi@1b2de7f3351f171c8b4dfeb558c639cb58ed4ec0 # v0.9.5
         with:
           environments: release
 
       - name: Install Rust toolchain
-        uses: actions-rust-lang/setup-rust-toolchain@150fca883cd4034361b621bd4e6a9d34e5143606 # v1.15.4
+        uses: actions-rust-lang/setup-rust-toolchain@2b1f5e9b395427c92ee4e3331786ca3c37afe2d7 # v1.16.0
         with:
           toolchain: "1.93.1"
           target: ${{ matrix.target }}
@@ -116,7 +120,7 @@ jobs:
 
       - name: Install cross
         if: matrix.use-cross
-        uses: taiki-e/install-action@d6e286fa45544157a02d45a43742857ebbc25d12 # v2.68.16
+        uses: taiki-e/install-action@58e862542551f667fa44c8a2a4a1d64ad477c96a # v2.75.17
         with:
           tool: cross
 
@@ -134,39 +138,8 @@ jobs:
           --target=${{ matrix.target }}
           ${{ steps.options.outputs.cargo-build-options }}
 
-      - name: Package binary
-        id: package
-        run: pixi run -e release package-binary --target ${{ matrix.target }}
-
-      - name: Upload archive artifact
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
-        with:
-          name: ${{ steps.package.outputs.prefix }}-${{ steps.package.outputs.pkg-name }}
-          path: staging/
-
-  # macOS code signing and notarization
-  sign-macos:
-    name: Sign macOS binaries
-    needs: build-binaries
-    runs-on: macos-latest
-    strategy:
-      matrix:
-        target:
-          - x86_64-apple-darwin
-          - aarch64-apple-darwin
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          persist-credentials: false
-      - uses: prefix-dev/setup-pixi@a0af7a228712d6121d37aba47adf55c1332c9c2e # v0.9.4
-        with:
-          environments: release
-      - name: Download macOS artifact
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: build-rattler-build-${{ matrix.target }}.zip
-          path: artifacts/
-      - name: Sign and notarize
+      - name: Codesign and notarize macOS binary
+        if: contains(matrix.target, 'apple-darwin')
         env:
           CODESIGN_CERTIFICATE: ${{ secrets.CODESIGN_CERTIFICATE }}
           CODESIGN_CERTIFICATE_PASSWORD: ${{ secrets.CODESIGN_CERTIFICATE_PASSWORD }}
@@ -174,54 +147,27 @@ jobs:
           APPLEID_USERNAME: ${{ secrets.APPLEID_USERNAME }}
           APPLEID_PASSWORD: ${{ secrets.APPLEID_PASSWORD }}
           APPLEID_TEAMID: ${{ vars.APPLEID_TEAMID }}
-        run: pixi run -e release sign-macos --artifacts-dir artifacts/
-      - name: Upload signed artifact
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
-        with:
-          name: release-rattler-build-${{ matrix.target }}.zip
-          path: artifacts/
+        run: >-
+          pixi run -e release sign-macos
+          --binary target/${{ matrix.target }}/release/rattler-build
 
-  # Windows code signing via Azure Trusted Signing
-  sign-windows:
-    name: Sign Windows binaries
-    needs: build-binaries
-    runs-on: windows-latest
-    environment: release
-    permissions:
-      contents: read
-      id-token: write
-    strategy:
-      matrix:
-        include:
-          - target: x86_64-pc-windows-msvc
-          - target: aarch64-pc-windows-msvc
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          persist-credentials: false
-      - name: Configure pixi for win-arm64
-        if: matrix.target == 'aarch64-pc-windows-msvc'
-        shell: bash
-        run: |
-          mkdir -p ~/.pixi
-          echo 'tool-platform = "win-64"' > ~/.pixi/config.toml
-      - uses: prefix-dev/setup-pixi@a0af7a228712d6121d37aba47adf55c1332c9c2e # v0.9.4
-        with:
-          environments: release
-      - name: Download Windows artifact
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: build-rattler-build-${{ matrix.target }}.zip
-          path: artifacts/
       - name: Azure login (OIDC)
+        if: contains(matrix.target, 'pc-windows')
         uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3.0.0
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           allow-no-subscriptions: true
-      - name: Extract executables for signing
-        run: pixi run -e release sign-windows-extract --artifacts-dir artifacts/ --sign-dir ${{ runner.temp }}/to-sign
+
+      - name: Stage Windows binary for signing
+        if: contains(matrix.target, 'pc-windows')
+        shell: bash
+        run: |
+          mkdir -p "${RUNNER_TEMP}/to-sign"
+          cp "target/${{ matrix.target }}/release/rattler-build.exe" "${RUNNER_TEMP}/to-sign/"
+
       - name: Sign with Azure Trusted Signing
+        if: contains(matrix.target, 'pc-windows')
         uses: azure/trusted-signing-action@b443cf8ea4124818d2ea9f043cba29fc3ec47b16 # v1.2.0
         with:
           endpoint: ${{ vars.AZURE_SIGNING_ENDPOINT }}
@@ -232,13 +178,22 @@ jobs:
           file-digest: SHA256
           timestamp-rfc3161: http://timestamp.acs.microsoft.com
           timestamp-digest: SHA256
-      - name: Repackage signed binaries
-        run: pixi run -e release sign-windows-repackage --artifacts-dir artifacts/ --sign-dir ${{ runner.temp }}/to-sign
-      - name: Upload signed artifact
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+
+      - name: Copy signed Windows binary back
+        if: contains(matrix.target, 'pc-windows')
+        shell: bash
+        run: |
+          cp "${RUNNER_TEMP}/to-sign/rattler-build.exe" "target/${{ matrix.target }}/release/rattler-build.exe"
+
+      - name: Package binary
+        id: package
+        run: pixi run -e release package-binary --target ${{ matrix.target }}
+
+      - name: Upload archive artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: release-rattler-build-${{ matrix.target }}.zip
-          path: artifacts/
+          name: release-rattler-build-${{ matrix.target }}
+          path: staging/
 
   # Build Python wheels (reusable workflow)
   build-python-wheels:
@@ -252,26 +207,34 @@ jobs:
   # PHASE 2: Publish (only after ALL Phase 1 jobs succeed)
   # ============================================================
 
-  # Create git tag — only after all builds/signing/attestation/dry-runs pass
+  # Create git tag only after all builds pass
   tag-release:
     name: Tag release
     if: >-
       github.event_name == 'workflow_dispatch' &&
       !inputs.dry-run &&
       github.ref == 'refs/heads/main'
-    needs: [prepare, sign-macos, sign-windows, build-python-wheels]
+    needs: [prepare, build-binaries, build-python-wheels]
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      actions: write
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: prefix-dev/setup-pixi@a0af7a228712d6121d37aba47adf55c1332c9c2e # v0.9.4
+      - uses: prefix-dev/setup-pixi@1b2de7f3351f171c8b4dfeb558c639cb58ed4ec0 # v0.9.5
         with:
           environments: release
       - name: Create and push tag
         run: pixi run -e release create-tag --tag ${NEEDS_PREPARE_OUTPUTS_TAG}
-
         env:
+          NEEDS_PREPARE_OUTPUTS_TAG: ${{ needs.prepare.outputs.tag }}
+
+      # Tag pushes made via GITHUB_TOKEN do not trigger downstream workflows,
+      # so dispatch the docs deploy explicitly.
+      - name: Trigger docs deploy
+        run: gh workflow run docs.yml --ref main --field tag=${NEEDS_PREPARE_OUTPUTS_TAG}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NEEDS_PREPARE_OUTPUTS_TAG: ${{ needs.prepare.outputs.tag }}
 
   # Create GitHub release with all signed artifacts
@@ -286,7 +249,7 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - uses: prefix-dev/setup-pixi@a0af7a228712d6121d37aba47adf55c1332c9c2e # v0.9.4
+      - uses: prefix-dev/setup-pixi@1b2de7f3351f171c8b4dfeb558c639cb58ed4ec0 # v0.9.5
         with:
           environments: release
       - name: Download all release artifacts
@@ -317,7 +280,7 @@ jobs:
           path: dist/
           merge-multiple: true
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@ed0c53931b1dc9bd32cbe73a98c7f6766f8a527e # release/v1
+        uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b # release/v1
         with:
           skip-existing: true
           packages-dir: dist/

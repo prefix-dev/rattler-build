@@ -12,7 +12,7 @@ use rattler_build_recipe::stage1::{
     TestType,
     tests::{CommandsTest, DownstreamTest, PerlTest, PythonTest, PythonVersion, RTest, RubyTest},
 };
-use rattler_build_script::{Script, ScriptContent};
+use rattler_build_script::{EnvironmentIsolation, Script, ScriptContent};
 use rattler_build_types::NormalizedKey;
 use rattler_conda_types::{
     Channel, ChannelUrl, MatchSpec, ParseStrictness, Platform,
@@ -170,9 +170,23 @@ impl Tests {
             .map(|p| p.platform)
             .unwrap_or(target_platform);
 
+        let tmp_dir = tempfile::tempdir()?;
+
+        // copy all test files to a temporary directory and set it as the working
+        // directory
+        CopyDir::new(cwd, tmp_dir.path()).run().map_err(|e| {
+            TestError::IoError(std::io::Error::other(format!(
+                "Failed to copy test files: {}",
+                e
+            )))
+        })?;
+
         let platform = Platform::current();
-        let mut env_vars = env_vars::os_vars(environment, &platform);
-        env_vars.retain(|key, _| key != ShellEnum::default().path_var(&platform));
+        let mut env_vars =
+            env_vars::os_vars(environment, &platform, config.env_isolation, tmp_dir.path());
+        if config.env_isolation == EnvironmentIsolation::None {
+            env_vars.retain(|key, _| key != ShellEnum::default().path_var(&platform));
+        }
         env_vars.extend(env_vars::test_vars(
             target_platform,
             build_platform,
@@ -188,16 +202,6 @@ impl Tests {
             "PREFIX".to_string(),
             Some(environment.to_string_lossy().to_string()),
         );
-        let tmp_dir = tempfile::tempdir()?;
-
-        // copy all test files to a temporary directory and set it as the working
-        // directory
-        CopyDir::new(cwd, tmp_dir.path()).run().map_err(|e| {
-            TestError::IoError(std::io::Error::other(format!(
-                "Failed to copy test files: {}",
-                e
-            )))
-        })?;
 
         match self {
             Tests::Commands(path) => {
@@ -215,6 +219,7 @@ impl Tests {
                         None,
                         None::<fn(&str) -> Result<String, String>>,
                         None,
+                        config.env_isolation,
                     )
                     .await
                     .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -235,6 +240,7 @@ impl Tests {
                         None,
                         None::<fn(&str) -> Result<String, String>>,
                         None,
+                        config.env_isolation,
                     )
                     .await
                     .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -305,6 +311,8 @@ pub struct TestConfiguration {
     pub output_dir: PathBuf,
     /// Exclude packages newer than this date from the solver
     pub exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
+    /// The environment isolation mode for test scripts
+    pub env_isolation: EnvironmentIsolation,
 }
 
 fn env_vars_from_package(index_json: &IndexJson) -> HashMap<String, String> {
@@ -437,6 +445,8 @@ pub async fn run_test(
         repodata_patch: None,
         write_zst: false,
         write_shards: false,
+        repodata_revisions: Vec::new(),
+        package_revision_assignment: Default::default(),
         force: false,
         max_parallel: num_cpus::get_physical(),
         multi_progress: None,
@@ -768,17 +778,21 @@ async fn run_python_test_inner(
         ..Script::default()
     };
 
+    let platform = Platform::current();
     let test_dir = prefix.join("test");
     fs::create_dir_all(&test_dir)?;
+    let test_env_vars = env_vars::os_vars(&test_prefix, &platform, config.env_isolation, &test_dir);
+
     script
         .run_script(
-            Default::default(),
+            test_env_vars.clone(),
             &test_dir,
             path,
             &test_prefix,
             None,
             None::<fn(&str) -> Result<String, String>>,
             None,
+            config.env_isolation,
         )
         .await
         .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -795,13 +809,14 @@ async fn run_python_test_inner(
         };
         script
             .run_script(
-                Default::default(),
+                test_env_vars,
                 path,
                 path,
                 &test_prefix,
                 None,
                 None::<fn(&str) -> Result<String, String>>,
                 None,
+                config.env_isolation,
             )
             .await
             .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -875,15 +890,21 @@ async fn run_perl_test(
 
     let test_folder = prefix.join("test_files");
     fs::create_dir_all(&test_folder)?;
+
+    let platform = Platform::current();
+    let test_env_vars =
+        env_vars::os_vars(&test_prefix, &platform, config.env_isolation, &test_folder);
+
     script
         .run_script(
-            Default::default(),
+            test_env_vars,
             &test_folder,
             path,
             &test_prefix,
             None,
             None::<fn(&str) -> Result<String, String>>,
             None,
+            config.env_isolation,
         )
         .await
         .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -975,9 +996,21 @@ async fn run_commands_test(
         .map(|p| p.platform)
         .unwrap_or(target_platform);
 
+    // copy all test files to a temporary directory and set it as the working
+    // directory
+    let test_dir = test_directory.join("test");
+    CopyDir::new(path, &test_dir).run().map_err(|e| {
+        TestError::IoError(std::io::Error::other(format!(
+            "Failed to copy test files: {}",
+            e
+        )))
+    })?;
+
     let platform = Platform::current();
-    let mut env_vars = env_vars::os_vars(&run_prefix, &platform);
-    env_vars.retain(|key, _| key != ShellEnum::default().path_var(&platform));
+    let mut env_vars = env_vars::os_vars(&run_prefix, &platform, config.env_isolation, &test_dir);
+    if config.env_isolation == EnvironmentIsolation::None {
+        env_vars.retain(|key, _| key != ShellEnum::default().path_var(&platform));
+    }
     env_vars.extend(env_vars::test_vars(
         target_platform,
         build_platform,
@@ -994,16 +1027,6 @@ async fn run_commands_test(
         Some(run_prefix.to_string_lossy().to_string()),
     );
 
-    // copy all test files to a temporary directory and set it as the working
-    // directory
-    let test_dir = test_directory.join("test");
-    CopyDir::new(path, &test_dir).run().map_err(|e| {
-        TestError::IoError(std::io::Error::other(format!(
-            "Failed to copy test files: {}",
-            e
-        )))
-    })?;
-
     tracing::info!("Testing commands:");
     commands_test
         .script
@@ -1015,6 +1038,7 @@ async fn run_commands_test(
             build_prefix.as_ref(),
             None::<fn(&str) -> Result<String, String>>,
             None,
+            config.env_isolation,
         )
         .await
         .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -1189,15 +1213,21 @@ async fn run_r_test(
 
     let test_folder = prefix.join("test_files");
     fs::create_dir_all(&test_folder)?;
+
+    let platform = Platform::current();
+    let test_env_vars =
+        env_vars::os_vars(&test_prefix, &platform, config.env_isolation, &test_folder);
+
     script
         .run_script(
-            Default::default(),
+            test_env_vars,
             &test_folder,
             path,
             &test_prefix,
             None,
             None::<fn(&str) -> Result<String, String>>,
             None,
+            config.env_isolation,
         )
         .await
         .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -1266,15 +1296,21 @@ async fn run_ruby_test(
 
     let test_folder = prefix.join("test_files");
     fs::create_dir_all(&test_folder)?;
+
+    let platform = Platform::current();
+    let test_env_vars =
+        env_vars::os_vars(&test_prefix, &platform, config.env_isolation, &test_folder);
+
     script
         .run_script(
-            Default::default(),
+            test_env_vars,
             &test_folder,
             path,
             &test_prefix,
             None,
             None::<fn(&str) -> Result<String, String>>,
             None,
+            config.env_isolation,
         )
         .await
         .map_err(|e| TestError::TestFailed(e.to_string()))?;

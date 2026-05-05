@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use std::{collections::HashMap, env};
 
 use rattler_build_jinja::Variable;
+use rattler_build_script::EnvironmentIsolation;
 use rattler_build_types::NormalizedKey;
 use rattler_conda_types::{Platform, RepoDataRecord};
 use std::collections::BTreeMap;
@@ -192,16 +193,20 @@ pub fn language_vars(output: &Output) -> HashMap<String, Option<String>> {
 /// Variables:
 /// - CPU_COUNT: Number of CPUs
 /// - SHLIB_EXT: Shared library extension for platform (e.g. Linux -> .so, Windows -> .dll, macOS -> .dylib)
+/// - LANG: Normalized to C.UTF-8 in strict mode, forwarded from host otherwise
+/// - LC_ALL: Normalized to C.UTF-8 in strict mode, forwarded from host otherwise
 ///
 /// Forwards the following environment variables:
 /// - PATH: Path where executables are found
-/// - LANG: Language (e.g. en_US.UTF-8)
-/// - LC_ALL: Language (e.g. en_US.UTF-8)
-/// - MAKEFLAGS: Make flags (e.g. -j4)
-pub fn os_vars(prefix: &Path, platform: &Platform) -> HashMap<String, Option<String>> {
+pub fn os_vars(
+    prefix: &Path,
+    target_platform: &Platform,
+    env_isolation: EnvironmentIsolation,
+    work_dir: &Path,
+) -> HashMap<String, Option<String>> {
     let mut vars = HashMap::new();
 
-    let path_var = if platform.is_windows() {
+    let path_var = if target_platform.is_windows() {
         "Path"
     } else {
         "PATH"
@@ -212,15 +217,26 @@ pub fn os_vars(prefix: &Path, platform: &Platform) -> HashMap<String, Option<Str
         "CPU_COUNT",
         env::var("CPU_COUNT").unwrap_or_else(|_| num_cpus::get().to_string())
     );
-    vars.insert("LANG".to_string(), env::var("LANG").ok());
-    vars.insert("LC_ALL".to_string(), env::var("LC_ALL").ok());
-    vars.insert("MAKEFLAGS".to_string(), env::var("MAKEFLAGS").ok());
 
-    let shlib_ext = if platform.is_windows() {
+    match env_isolation {
+        EnvironmentIsolation::Strict => {
+            // Normalize locale for reproducible builds
+            insert!(vars, "LANG", "C.UTF-8");
+            insert!(vars, "LC_ALL", "C.UTF-8");
+        }
+        EnvironmentIsolation::CondaBuild | EnvironmentIsolation::None => {
+            // Forward locale from host (conda-build behavior)
+            vars.insert("LANG".to_string(), env::var("LANG").ok());
+            vars.insert("LC_ALL".to_string(), env::var("LC_ALL").ok());
+            vars.insert("MAKEFLAGS".to_string(), env::var("MAKEFLAGS").ok());
+        }
+    }
+
+    let shlib_ext = if target_platform.is_windows() {
         ".dll"
-    } else if platform.is_osx() {
+    } else if target_platform.is_osx() {
         ".dylib"
-    } else if platform.is_linux() {
+    } else if target_platform.is_linux() {
         ".so"
     } else {
         ".not_implemented"
@@ -229,12 +245,46 @@ pub fn os_vars(prefix: &Path, platform: &Platform) -> HashMap<String, Option<Str
     insert!(vars, "SHLIB_EXT", shlib_ext);
     vars.insert(path_var.to_string(), env::var(path_var).ok());
 
-    if platform.is_windows() {
-        vars.extend(windows::env::default_env_vars(prefix, platform));
-    } else if platform.is_osx() {
-        vars.extend(macos::env::default_env_vars(prefix, platform));
-    } else if platform.is_linux() {
-        vars.extend(linux::env::default_env_vars(prefix, platform));
+    if target_platform.is_windows() {
+        vars.extend(windows::env::default_env_vars(prefix, target_platform));
+    } else if target_platform.is_osx() {
+        vars.extend(macos::env::default_env_vars(prefix, target_platform));
+    } else if target_platform.is_linux() {
+        vars.extend(linux::env::default_env_vars(
+            prefix,
+            target_platform,
+            env_isolation,
+        ));
+    }
+
+    let build_platform = Platform::current();
+    if build_platform.is_windows() {
+        match env_isolation {
+            EnvironmentIsolation::Strict => {
+                insert!(vars, "USERPROFILE", work_dir.to_string_lossy());
+            }
+            EnvironmentIsolation::CondaBuild => {
+                vars.insert("USERPROFILE".to_string(), env::var("USERPROFILE").ok());
+            }
+            EnvironmentIsolation::None => {}
+        }
+    } else {
+        match env_isolation {
+            EnvironmentIsolation::Strict => {
+                insert!(vars, "HOME", work_dir.to_string_lossy());
+                insert!(vars, "USER", "rattler");
+                insert!(vars, "SHELL", "/bin/bash");
+                insert!(vars, "EDITOR", "/bin/false");
+                insert!(vars, "TERM", "xterm-256color");
+            }
+            EnvironmentIsolation::CondaBuild => {
+                vars.insert(
+                    "HOME".to_string(),
+                    Some(env::var("HOME").unwrap_or_else(|_| "UNKNOWN".to_string())),
+                );
+            }
+            EnvironmentIsolation::None => {}
+        }
     }
 
     vars
@@ -264,7 +314,6 @@ fn force_color_vars() -> HashMap<String, Option<String>> {
 pub fn vars(output: &Output, build_state: &str) -> HashMap<String, Option<String>> {
     let mut vars = HashMap::new();
 
-    insert!(vars, "CONDA_BUILD", "1");
     insert!(vars, "PYTHONNOUSERSITE", "1");
 
     if let Some((_, host_arch)) = output.host_platform().platform.to_string().rsplit_once('-') {
@@ -381,7 +430,6 @@ pub fn test_vars(
 ) -> HashMap<String, Option<String>> {
     let mut vars = HashMap::new();
 
-    insert!(vars, "CONDA_BUILD", "1");
     insert!(vars, "CONDA_BUILD_STATE", "TEST");
     insert!(vars, "SUBDIR", target_platform.to_string());
     insert!(vars, "target_platform", target_platform.to_string());

@@ -28,12 +28,29 @@ use crate::{
 #[cfg(feature = "recipe-generation")]
 use rattler_build_recipe_generator::GenerateRecipeOpts;
 
+/// Build-only options that are not shared with the publish command.
+#[derive(Parser, Clone)]
+pub struct BuildOnlyOpts {
+    /// Override the build number for all outputs (defaults to the build number in the recipe)
+    #[arg(long, help_heading = "Modifying result")]
+    pub build_num: Option<u64>,
+
+    /// Prefix to prepend to the auto-generated build string
+    /// (e.g. `--build-string-prefix my_prefix` produces `my_prefix_h1234_0`)
+    #[arg(long, help_heading = "Modifying result")]
+    pub build_string_prefix: Option<String>,
+
+    #[allow(missing_docs)]
+    #[clap(flatten)]
+    pub build: BuildOpts,
+}
+
 /// Application subcommands.
 #[derive(Parser)]
 #[allow(clippy::large_enum_variant)]
 pub enum SubCommands {
     /// Build a package from a recipe
-    Build(BuildOpts),
+    Build(BuildOnlyOpts),
 
     /// Publish packages to a channel.
     /// This command builds packages from recipes (or uses already built packages),
@@ -404,6 +421,10 @@ pub struct CommonOpts {
     #[arg(long, env = "RATTLER_BUILD_EXPERIMENTAL")]
     pub experimental: bool,
 
+    /// Enable V3 recipe fields and MatchSpec syntax
+    #[arg(long)]
+    pub v3: bool,
+
     /// List of hosts for which SSL certificate verification should be skipped
     #[arg(long, value_delimiter = ',')]
     pub allow_insecure_host: Option<Vec<String>>,
@@ -422,6 +443,7 @@ pub struct CommonOpts {
 pub struct CommonData {
     pub output_dir: PathBuf,
     pub experimental: bool,
+    pub v3: bool,
     pub auth_file: Option<PathBuf>,
     pub channel_priority: ChannelPriority,
     #[cfg(feature = "s3")]
@@ -439,6 +461,7 @@ impl CommonData {
     pub fn new(
         output_dir: Option<PathBuf>,
         experimental: bool,
+        v3: bool,
         auth_file: Option<PathBuf>,
         config: ConfigBase<()>,
         channel_priority: Option<ChannelPriority>,
@@ -482,6 +505,7 @@ impl CommonData {
         Self {
             output_dir: output_dir.unwrap_or_else(|| PathBuf::from("./output")),
             experimental,
+            v3,
             auth_file,
             #[cfg(feature = "s3")]
             s3_config,
@@ -499,6 +523,7 @@ impl CommonData {
         Self::new(
             value.output_dir,
             value.experimental,
+            value.v3,
             value.auth_file,
             config,
             value.channel_priority.map(|c| c.value),
@@ -636,6 +661,13 @@ pub struct BuildOpts {
     #[arg(long, default_value = "true", help_heading = "Modifying result")]
     pub color_build_log: bool,
 
+    /// Environment isolation mode for build scripts.
+    /// `strict` (default): clean environment with normalized locale, HOME, USER etc.
+    /// `conda-build`: match conda-build behavior (forward CFLAGS, LDFLAGS, LANG, HOME etc.)
+    /// `none`: inherit the entire host environment
+    #[arg(long, default_value = "strict", help_heading = "Modifying result")]
+    pub env_isolation: rattler_build_script::EnvironmentIsolation,
+
     #[allow(missing_docs)]
     #[clap(flatten)]
     pub common: CommonOpts,
@@ -687,10 +719,6 @@ pub struct BuildOpts {
     /// Exclude packages newer than this date from the solver, in RFC3339 format (e.g. 2024-03-15T12:00:00Z)
     #[arg(long, help_heading = "Modifying result", value_parser = parse_datetime)]
     pub exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
-
-    /// Override the build number for all outputs (defaults to the build number in the recipe)
-    #[arg(long, help_heading = "Modifying result")]
-    pub build_num: Option<u64>,
 }
 
 /// Publish options for the `publish` command.
@@ -726,6 +754,11 @@ pub struct PublishOpts {
     /// When using a relative bump, the highest build number from the target channel is used as the base.
     #[arg(long, help_heading = "Publishing")]
     pub build_number: Option<String>,
+
+    /// Prefix to prepend to the auto-generated build string
+    /// (e.g. `--build-string-prefix my_prefix` produces `my_prefix_h1234_0`)
+    #[arg(long, help_heading = "Publishing")]
+    pub build_string_prefix: Option<String>,
 
     /// Force upload even if the package already exists (not recommended - may break lockfiles).
     /// Only works with S3, filesystem, Anaconda.org, and prefix.dev channels.
@@ -826,6 +859,9 @@ impl PublishData {
 
         build_opts.channels = channels;
 
+        let mut build_data = BuildData::from_opts_and_config(build_opts, config);
+        build_data.build_string_prefix = opts.build_string_prefix;
+
         Self {
             to: opts.to,
             build_number: opts.build_number,
@@ -833,7 +869,7 @@ impl PublishData {
             generate_attestation: opts.generate_attestation,
             package_files,
             recipe_paths,
-            build: BuildData::from_opts_and_config(build_opts, config),
+            build: build_data,
         }
     }
 }
@@ -859,6 +895,7 @@ pub struct BuildData {
     pub no_include_recipe: bool,
     pub test: TestStrategy,
     pub color_build_log: bool,
+    pub env_isolation: rattler_build_script::EnvironmentIsolation,
     pub common: CommonData,
     pub skip_existing: SkipExisting,
     pub noarch_build_platform: Option<Platform>,
@@ -870,6 +907,7 @@ pub struct BuildData {
     pub allow_absolute_license_paths: bool,
     pub exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
     pub build_num_override: Option<u64>,
+    pub build_string_prefix: Option<String>,
     pub markdown_summary: Option<PathBuf>,
 }
 
@@ -899,12 +937,14 @@ impl BuildData {
         noarch_build_platform: Option<Platform>,
         extra_meta: Option<Vec<(String, Value)>>,
         sandbox_configuration: Option<SandboxConfiguration>,
+        env_isolation: rattler_build_script::EnvironmentIsolation,
         continue_on_failure: ContinueOnFailure,
         error_prefix_in_binary: bool,
         allow_symlinks_on_windows: bool,
         allow_absolute_license_paths: bool,
         exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
         build_num_override: Option<u64>,
+        build_string_prefix: Option<String>,
         markdown_summary: Option<PathBuf>,
     ) -> Self {
         Self {
@@ -933,6 +973,7 @@ impl BuildData {
             no_include_recipe,
             test: test.unwrap_or_default(),
             color_build_log: true,
+            env_isolation,
             common,
             skip_existing: skip_existing.unwrap_or(SkipExisting::None),
             noarch_build_platform,
@@ -944,6 +985,7 @@ impl BuildData {
             allow_absolute_license_paths,
             exclude_newer,
             build_num_override,
+            build_string_prefix,
             markdown_summary,
         }
     }
@@ -988,12 +1030,14 @@ impl BuildData {
             opts.noarch_build_platform,
             opts.extra_meta,
             opts.sandbox_arguments.into(),
+            opts.env_isolation,
             opts.continue_on_failure.into(),
             opts.error_prefix_in_binary,
             opts.allow_symlinks_on_windows,
             opts.allow_absolute_license_paths,
             opts.exclude_newer,
-            opts.build_num,
+            None, // build_num_override — set by caller (BuildOnlyOpts or PublishOpts)
+            None, // build_string_prefix — set by caller (BuildOnlyOpts or PublishOpts)
             opts.markdown_summary,
         )
     }

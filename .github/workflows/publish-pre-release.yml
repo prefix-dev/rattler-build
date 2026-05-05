@@ -42,12 +42,12 @@ jobs:
           Copy-Item D:/a/rattler-build/rattler-build/* ${{ matrix.working-directory }} -Recurse -Force
         working-directory: "D:/"
         if: ${{ matrix.os=='windows-latest' }}
-      - uses: prefix-dev/setup-pixi@a0af7a228712d6121d37aba47adf55c1332c9c2e # v0.9.4
+      - uses: prefix-dev/setup-pixi@1b2de7f3351f171c8b4dfeb558c639cb58ed4ec0 # v0.9.5
         with:
           environments: packaging
           manifest-path: ${{ matrix.working-directory && format('{0}\pixi.toml', matrix.working-directory) || 'pixi.toml' }}
       - name: Configure sccache
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             core.exportVariable('ACTIONS_RESULTS_URL', process.env.ACTIONS_RESULTS_URL || '');
@@ -59,4 +59,5 @@ jobs:
       - name: Upload package
         run: pixi run --environment=packaging upload-package
       - name: Show sccache stats
-        run: pixi run --environment=packaging sccache --stop-server
+        run: pixi run --environment=packaging sccache --stop-server || true
+        continue-on-error: true

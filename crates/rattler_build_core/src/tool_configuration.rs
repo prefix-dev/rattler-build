@@ -10,7 +10,7 @@ use rattler_conda_types::{ChannelConfig, Platform};
 use rattler_networking::s3_middleware;
 use rattler_networking::{
     AuthenticationStorage,
-    authentication_storage::{self, AuthenticationStorageError},
+    authentication_storage::{AuthenticationStorageError, backends::file::FileStorage},
     mirror_middleware,
 };
 use rattler_repodata_gateway::Gateway;
@@ -153,12 +153,10 @@ pub fn get_auth_store(
     match auth_file {
         Some(auth_file) => {
             let mut store = AuthenticationStorage::empty();
-            store.add_backend(Arc::from(
-                authentication_storage::backends::file::FileStorage::from_path(auth_file)?,
-            ));
+            store.add_backend(Arc::from(FileStorage::from_path(auth_file)?));
             Ok(store)
         }
-        None => rattler_networking::AuthenticationStorage::from_env_and_defaults(),
+        None => AuthenticationStorage::from_env_and_defaults(),
     }
 }
 
@@ -172,13 +170,11 @@ pub fn reqwest_client_from_auth_storage(
     mirror_middleware_config: HashMap<Url, Vec<mirror_middleware::Mirror>>,
     allow_insecure_host: Option<Vec<String>>,
 ) -> Result<rattler_build_networking::BaseClient, AuthenticationStorageError> {
-    let auth_storage = get_auth_store(auth_file)?;
-
     let builder = rattler_build_networking::BaseClient::builder()
         .user_agent(APP_USER_AGENT)
         .timeout(5 * 60)
         .insecure_hosts(allow_insecure_host.unwrap_or_default())
-        .with_authentication(auth_storage);
+        .with_auth_file(auth_file)?;
     #[cfg(feature = "s3")]
     let builder = builder.with_s3(s3_middleware_config);
     Ok(builder.with_mirrors(mirror_middleware_config).build())

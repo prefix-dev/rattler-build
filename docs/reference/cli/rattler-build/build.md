@@ -53,6 +53,8 @@ rattler-build build [OPTIONS]
 - <a id="arg---experimental" href="#arg---experimental">`--experimental`</a>
 :  Enable experimental features
 <br>**env**: `RATTLER_BUILD_EXPERIMENTAL`
+- <a id="arg---v3" href="#arg---v3">`--v3`</a>
+:  Enable V3 recipe fields and MatchSpec syntax
 - <a id="arg---allow-insecure-host" href="#arg---allow-insecure-host">`--allow-insecure-host <ALLOW_INSECURE_HOST>`</a>
 :  List of hosts for which SSL certificate verification should be skipped
 <br>May be provided more than once.
@@ -65,6 +67,10 @@ rattler-build build [OPTIONS]
 :  Continue building even if (one) of the packages fails to build. This is useful when building many packages with `--recipe-dir`.`
 
 ## Modifying result
+- <a id="arg---build-num" href="#arg---build-num">`--build-num <BUILD_NUM>`</a>
+:  Override the build number for all outputs (defaults to the build number in the recipe)
+- <a id="arg---build-string-prefix" href="#arg---build-string-prefix">`--build-string-prefix <BUILD_STRING_PREFIX>`</a>
+:  Prefix to prepend to the auto-generated build string (e.g. `--build-string-prefix my_prefix` produces `my_prefix_h1234_0`)
 - <a id="arg---package-format" href="#arg---package-format">`--package-format <PACKAGE_FORMAT>`</a>
 :  The package format to use for the build. Can be one of `tar-bz2` or
 `conda`. You can also add a compression level to the package format,
@@ -78,6 +84,9 @@ e.g. `tar-bz2:<number>` (from 1 to 9) or `conda:<number>` (from -7 to
 - <a id="arg---color-build-log" href="#arg---color-build-log">`--color-build-log`</a>
 :  Don't force colors in the output of the build script
 <br>**default**: `true`
+- <a id="arg---env-isolation" href="#arg---env-isolation">`--env-isolation <ENV_ISOLATION>`</a>
+:  Environment isolation mode for build scripts. `strict` (default): clean environment with normalized locale, HOME, USER etc. `conda-build`: match conda-build behavior (forward CFLAGS, LDFLAGS, LANG, HOME etc.) `none`: inherit the entire host environment
+<br>**default**: `strict`
 - <a id="arg---output-dir" href="#arg---output-dir">`--output-dir <OUTPUT_DIR>`</a>
 :  Output directory for build artifacts.
 <br>**env**: `CONDA_BLD_PATH`
@@ -94,8 +103,6 @@ e.g. `tar-bz2:<number>` (from 1 to 9) or `conda:<number>` (from -7 to
 :  Allow symlinks in packages on Windows (defaults to false - symlinks are forbidden on Windows)
 - <a id="arg---exclude-newer" href="#arg---exclude-newer">`--exclude-newer <EXCLUDE_NEWER>`</a>
 :  Exclude packages newer than this date from the solver, in RFC3339 format (e.g. 2024-03-15T12:00:00Z)
-- <a id="arg---build-num" href="#arg---build-num">`--build-num <BUILD_NUM>`</a>
-:  Override the build number for all outputs (defaults to the build number in the recipe)
 
 ## Sandbox arguments
 - <a id="arg---sandbox" href="#arg---sandbox">`--sandbox`</a>

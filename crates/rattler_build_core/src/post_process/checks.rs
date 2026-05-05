@@ -528,6 +528,7 @@ pub fn perform_linking_checks(
     let system_libs = find_system_libs(output)?;
 
     let prefix_info = PrefixInfo::from_prefix(output.prefix())?;
+    let staging_lib_map = output.staging_library_name_map.as_ref();
 
     let host_dso_packages = host_run_export_dso_packages(output, &prefix_info.package_to_nature);
     tracing::trace!("Host run_export DSO packages: {host_dso_packages:#?}",);
@@ -642,6 +643,26 @@ pub fn perform_linking_checks(
                     "Library {lib:?} is provided by host package '{}' which is not in run dependencies",
                     providing_package.as_normalized()
                 );
+            }
+
+            // Fallback: if the library couldn't be resolved on disk (e.g. from
+            // a staging cache whose host deps are not installed), try to match
+            // it by filename against the cached library name map.
+            if let Some(lib_map) = staging_lib_map
+                && let Some(providing_package) = lib_map.find_package(lib)
+                && run_dependency_names.contains(&providing_package)
+            {
+                tracing::debug!(
+                    "Library {lib:?} matched to '{}' via staging library name map",
+                    providing_package.as_normalized()
+                );
+                link_info.linked_packages.push(LinkedPackage {
+                    name: lib.to_path_buf(),
+                    link_origin: LinkOrigin::ForeignPackage(
+                        providing_package.as_normalized().to_string(),
+                    ),
+                });
+                continue;
             }
 
             // Check if the library is one of the system libraries (i.e. comes from sysroot).

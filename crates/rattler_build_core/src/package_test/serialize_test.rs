@@ -164,6 +164,21 @@ pub(crate) fn write_test_files(
         }
     }
 
+    // Remove command tests that resolved to empty (no script content, no
+    // requirements, no test files). This happens when all commands were
+    // filtered out by conditionals (e.g. `if: not build_win`).
+    tests.retain(|test| {
+        if let TestType::Commands(cmd) = test {
+            let has_content =
+                !matches!(&cmd.script.content, ScriptContent::Command(s) if s.is_empty());
+            let has_requirements = !cmd.requirements.is_empty();
+            let has_files = !cmd.files.is_empty();
+            has_content || has_requirements || has_files
+        } else {
+            true
+        }
+    });
+
     let test_file_dir = tmp_dir_path.join("info/tests");
     fs::create_dir_all(&test_file_dir)?;
 
