@@ -717,7 +717,41 @@ pub fn is_tarball(file_name: &str) -> bool {
     .any(|ext| file_name.ends_with(ext))
 }
 
-fn extract_tar(archive: &Path, target: &Path) -> Result<(), CacheError> {
+/// On Windows, checks whether Developer Mode is enabled by reading the registry key
+/// `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock` value
+/// `AllowDevelopmentWithoutDevLicense`.
+/// Returns `false` if the key is missing, inaccessible, or the value is not `1`.
+#[cfg(target_os = "windows")]
+fn is_windows_developer_mode_enabled() -> bool {
+    use winreg::RegKey;
+    use winreg::enums::HKEY_LOCAL_MACHINE;
+
+    (|| -> Result<bool, std::io::Error> {
+        let value: u32 = RegKey::predef(HKEY_LOCAL_MACHINE)
+            .open_subkey(r"SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock")?
+            .get_value("AllowDevelopmentWithoutDevLicense")?;
+        Ok(value == 1)
+    })()
+    .unwrap_or(false)
+}
+
+/// Wraps a tar unpack error, appending a Windows Developer Mode hint when on Windows and
+/// Developer Mode is detected as disabled.
+fn tar_unpack_error(context: &str, e: std::io::Error) -> CacheError {
+    #[cfg(target_os = "windows")]
+    if !is_windows_developer_mode_enabled() {
+        return CacheError::ExtractionError(format!(
+            "{context}: {e}\n\n\
+            hint: Extracting this archive failed on Windows. The archive may contain symbolic \
+            links, which require Developer Mode or administrator privileges to create. \
+            Please enable Developer Mode in: \
+            Developer settings > Developer Mode, then retry the build."
+        ));
+    }
+    CacheError::ExtractionError(format!("{context}: {e}"))
+}
+
+pub(crate) fn extract_tar(archive: &Path, target: &Path) -> Result<(), CacheError> {
     let file = fs_err::File::open(archive)
         .map_err(|e| CacheError::ExtractionError(format!("Failed to open archive: {}", e)))?;
 
@@ -727,30 +761,30 @@ fn extract_tar(archive: &Path, target: &Path) -> Result<(), CacheError> {
         let mut archive = tar::Archive::new(GzDecoder::new(file));
         archive
             .unpack(target)
-            .map_err(|e| CacheError::ExtractionError(format!("Failed to extract tar.gz: {}", e)))?;
+            .map_err(|e| tar_unpack_error("Failed to extract tar.gz", e))?;
     } else if name.ends_with(".tar.bz2") || name.ends_with(".tbz2") {
         let mut archive = tar::Archive::new(bzip2::read::BzDecoder::new(file));
-        archive.unpack(target).map_err(|e| {
-            CacheError::ExtractionError(format!("Failed to extract tar.bz2: {}", e))
-        })?;
+        archive
+            .unpack(target)
+            .map_err(|e| tar_unpack_error("Failed to extract tar.bz2", e))?;
     } else if name.ends_with(".tar.xz") || name.ends_with(".txz") {
         let mut archive = tar::Archive::new(lzma_rust2::XzReader::new(file, true));
         archive
             .unpack(target)
-            .map_err(|e| CacheError::ExtractionError(format!("Failed to extract tar.xz: {}", e)))?;
+            .map_err(|e| tar_unpack_error("Failed to extract tar.xz", e))?;
     } else if name.ends_with(".tar.zst") {
         let decoder = zstd::stream::read::Decoder::new(file).map_err(|e| {
             CacheError::ExtractionError(format!("Failed to create zstd decoder: {}", e))
         })?;
         let mut archive = tar::Archive::new(decoder);
-        archive.unpack(target).map_err(|e| {
-            CacheError::ExtractionError(format!("Failed to extract tar.zst: {}", e))
-        })?;
+        archive
+            .unpack(target)
+            .map_err(|e| tar_unpack_error("Failed to extract tar.zst", e))?;
     } else {
         let mut archive = tar::Archive::new(file);
         archive
             .unpack(target)
-            .map_err(|e| CacheError::ExtractionError(format!("Failed to extract tar: {}", e)))?;
+            .map_err(|e| tar_unpack_error("Failed to extract tar", e))?;
     }
 
     Ok(())

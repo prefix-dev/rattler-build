@@ -90,6 +90,7 @@ urlencoding = "2.1"
 walkdir = "2.5.0"
 which = "8.0.2"
 windows-sys = "0.61"
+winreg = "0.56"
 zip = { version = "8.5.1", default-features = false, features = ["deflate"] }
 zstd = "0.13.3"
 spdx = "0.13.4"
