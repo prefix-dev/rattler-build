@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.7](https://github.com/prefix-dev/rattler-build/compare/rattler_build_recipe-v0.1.6...rattler_build_recipe-v0.1.7) - 2026-05-05
+
+### Added
+
+- v3 packages ([#2452](https://github.com/prefix-dev/rattler-build/pull/2452))
+- remove experimental guard for staging outputs ([#2432](https://github.com/prefix-dev/rattler-build/pull/2432))
+
+### Fixed
+
+- inherit build number for cache outputs ([#2460](https://github.com/prefix-dev/rattler-build/pull/2460))
+- variant tracking and env vars for staging cache inheritance ([#2455](https://github.com/prefix-dev/rattler-build/pull/2455))
+- disable build file auto-discovery for multi-output recipes ([#2436](https://github.com/prefix-dev/rattler-build/pull/2436))
+
+### Other
+
+- bump rattler dependencies ([#2457](https://github.com/prefix-dev/rattler-build/pull/2457))
+
 ## [0.1.6](https://github.com/prefix-dev/rattler-build/compare/rattler_build_recipe-v0.1.5...rattler_build_recipe-v0.1.6) - 2026-04-13
 
 ### Added

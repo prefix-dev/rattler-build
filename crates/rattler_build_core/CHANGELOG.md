@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.5](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.4...rattler_build_core-v0.2.5) - 2026-05-05
+
+### Added
+
+- add warn when repodata unsupported ([#2472](https://github.com/prefix-dev/rattler-build/pull/2472))
+- v3 packages ([#2452](https://github.com/prefix-dev/rattler-build/pull/2452))
+
+### Fixed
+
+- respect `.orig`-only sources in patch application ([#2470](https://github.com/prefix-dev/rattler-build/pull/2470))
+- variant tracking and env vars for staging cache inheritance ([#2455](https://github.com/prefix-dev/rattler-build/pull/2455))
+- remove PKG_* environment variables in staging cache, set variant values ([#2449](https://github.com/prefix-dev/rattler-build/pull/2449))
+- use force directory removal to handle Windows file locks ([#2444](https://github.com/prefix-dev/rattler-build/pull/2444))
+- prevent stacking of pending-rm suffixes on Windows cleanup ([#2439](https://github.com/prefix-dev/rattler-build/pull/2439))
+- set CONDA_BUILD env var in build_env.sh to fix env-isolation none ([#2433](https://github.com/prefix-dev/rattler-build/pull/2433))
+- include default env vars also in test environment ([#2425](https://github.com/prefix-dev/rattler-build/pull/2425))
+
+### Other
+
+- lazily initialize the `BaseClient` ([#2456](https://github.com/prefix-dev/rattler-build/pull/2456))
+- bump rattler dependencies ([#2457](https://github.com/prefix-dev/rattler-build/pull/2457))
+
 ## [0.2.4](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.3...rattler_build_core-v0.2.4) - 2026-04-13
 
 ### Added
