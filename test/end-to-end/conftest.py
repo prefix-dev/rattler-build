@@ -1,9 +1,25 @@
 import os
+import sys
 from pathlib import Path
 
 import pytest
 from helpers import RattlerBuild
 from syrupy.extensions.json import JSONSnapshotExtension
+
+
+@pytest.fixture
+def clean_path_on_win32():
+    # On Windows, clear path to avoid hitting the cmd.exe
+    # line-length limit during VS compiler activation (vcvars64.bat).
+    if sys.platform == "win32":
+        original_path = os.environ.get("PATH", "")
+        try:
+            os.environ["PATH"] = ""
+            yield
+        finally:
+            os.environ["PATH"] = original_path
+    else:
+        yield
 
 
 @pytest.fixture
