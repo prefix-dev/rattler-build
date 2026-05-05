@@ -607,7 +607,7 @@ def test_staging_run_exports_ignore_by_name(
 
 
 def test_staging_overlinking(
-    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, clean_path_on_win32
 ):
     """Test that overlinking checks pass for staging outputs via library name map.
 

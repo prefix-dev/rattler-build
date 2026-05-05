@@ -3183,7 +3183,9 @@ def test_target_platform_in_variant_config_warning(
     assert "Please use the '--target-platform' command-line flag" in combined
 
 
-def test_c_compilation(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+def test_c_compilation(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, clean_path_on_win32
+):
     rattler_build.build(recipes / "c_compilation", tmp_path)
     pkg = get_extracted_package(tmp_path, "c_compilation")
     if platform.system() == "Windows":
