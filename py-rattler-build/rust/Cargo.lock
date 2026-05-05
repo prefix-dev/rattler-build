@@ -4690,7 +4690,7 @@ dependencies = [
 
 [[package]]
 name = "rattler_build_core"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "anyhow",
  "arwen-codesign",
@@ -4773,7 +4773,7 @@ dependencies = [
 
 [[package]]
 name = "rattler_build_jinja"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "fs-err",
  "indexmap 2.13.0",
@@ -4793,7 +4793,7 @@ dependencies = [
 
 [[package]]
 name = "rattler_build_networking"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "rattler_networking",
  "reqwest 0.12.28",
@@ -4804,7 +4804,7 @@ dependencies = [
 
 [[package]]
 name = "rattler_build_package"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "chrono",
  "content_inspector",
@@ -4832,7 +4832,7 @@ dependencies = [
 
 [[package]]
 name = "rattler_build_recipe"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "fs-err",
  "globset",
@@ -4864,7 +4864,7 @@ dependencies = [
 
 [[package]]
 name = "rattler_build_recipe_generator"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "async-once-cell",
  "async-recursion",
@@ -4893,7 +4893,7 @@ dependencies = [
 
 [[package]]
 name = "rattler_build_script"
-version = "0.2.3"
+version = "0.2.4"
 dependencies = [
  "clap",
  "console",
@@ -4914,7 +4914,7 @@ dependencies = [
 
 [[package]]
 name = "rattler_build_source_cache"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "async-trait",
  "bzip2",
@@ -4953,7 +4953,7 @@ dependencies = [
 
 [[package]]
 name = "rattler_build_types"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "globset",
  "itertools 0.14.0",
@@ -4967,7 +4967,7 @@ dependencies = [
 
 [[package]]
 name = "rattler_build_variant_config"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "fs-err",
  "marked-yaml",
@@ -4986,7 +4986,7 @@ dependencies = [
 
 [[package]]
 name = "rattler_build_yaml_parser"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "marked-yaml",
  "miette",
