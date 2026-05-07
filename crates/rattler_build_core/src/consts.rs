@@ -18,5 +18,7 @@ pub const RATTLER_BUILD_ENABLE_GITHUB_INTEGRATION: &str = "RATTLER_BUILD_ENABLE_
 pub const RATTLER_BUILD_PACKAGE_FILES: &str = "RATTLER_BUILD_PACKAGE_FILES";
 
 /// File name used (under the build directory) for the package files override
-/// list pointed at by [`RATTLER_BUILD_PACKAGE_FILES`].
-pub const PACKAGE_FILES_LIST_NAME: &str = "package_files.txt";
+/// list pointed at by [`RATTLER_BUILD_PACKAGE_FILES`]. The name is dot-prefixed
+/// and namespaced so that build scripts are extremely unlikely to clobber it
+/// by accident.
+pub const PACKAGE_FILES_LIST_NAME: &str = ".rattler-build-package-files";
