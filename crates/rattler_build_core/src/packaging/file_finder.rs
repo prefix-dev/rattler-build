@@ -26,11 +26,12 @@ use rattler_build_recipe::stage1::GlobVec;
 /// `echo path >> $RATTLER_BUILD_PACKAGE_FILES` and similar shell idioms work
 /// reliably.
 pub fn read_package_files_list(path: &Path) -> Result<Option<Vec<PathBuf>>, io::Error> {
-    if !path.exists() {
-        return Ok(None);
-    }
+    let contents = match fs::read_to_string(path) {
+        Ok(contents) => contents,
+        Err(err) if err.kind() == io::ErrorKind::NotFound => return Ok(None),
+        Err(err) => return Err(err),
+    };
 
-    let contents = fs::read_to_string(path)?;
     let paths: Vec<PathBuf> = contents
         .lines()
         .map(|line| line.trim())
@@ -198,16 +199,17 @@ impl Files {
     /// inside `prefix`, or a relative path that will be resolved against
     /// `prefix`.
     ///
-    /// Paths that do not exist on disk, that escape the prefix, or that resolve
-    /// to a directory are skipped (with a warning) so that the caller can keep
-    /// the input file format simple. The set of "old files" (i.e. files
-    /// contributed by the installed host environment) is still computed so
-    /// that downstream packaging logic that depends on it (e.g. the `pyc`
-    /// filter) keeps working.
+    /// Paths that escape the prefix or do not exist on disk cause the build to
+    /// fail. The `files` and `always_include` globs are applied on top of the
+    /// explicit list, mirroring the behaviour of [`Files::from_prefix`]: the
+    /// `files` glob filters the explicit list down, and `always_include`
+    /// scans the prefix to force-include matching files.
     pub fn from_paths(
         prefix: &Path,
         paths: impl IntoIterator<Item = PathBuf>,
-    ) -> Result<Self, io::Error> {
+        always_include: &GlobVec,
+        files: &GlobVec,
+    ) -> Result<Self, PackagingError> {
         let old_files = collect_previous_files(prefix)?;
 
         let mut new_files = HashSet::new();
@@ -218,25 +220,32 @@ impl Files {
                 prefix.join(path)
             };
 
-            // Make sure the path is inside the prefix.
             if resolved.strip_prefix(prefix).is_err() {
-                tracing::warn!(
-                    "Ignoring package file `{}`: not inside the prefix `{}`",
-                    resolved.display(),
-                    prefix.display()
-                );
-                continue;
+                return Err(PackagingError::PackageFileOutsidePrefix(resolved));
             }
 
             if !resolved.exists() {
-                tracing::warn!(
-                    "Ignoring package file `{}`: file does not exist",
-                    resolved.display()
-                );
-                continue;
+                return Err(PackagingError::PackageFileMissing(resolved));
             }
 
             new_files.insert(resolved);
+        }
+
+        if !files.is_empty() {
+            new_files.retain(|f| {
+                files.is_match(f.strip_prefix(prefix).expect("File should be in prefix"))
+            });
+        }
+
+        if !always_include.is_empty() {
+            for file in record_files(prefix)? {
+                let file_without_prefix =
+                    file.strip_prefix(prefix).expect("File should be in prefix");
+                if always_include.is_match(file_without_prefix) {
+                    tracing::info!("Forcing inclusion of file: {:?}", file_without_prefix);
+                    new_files.insert(file);
+                }
+            }
         }
 
         Ok(Files {
@@ -439,7 +448,7 @@ mod test {
     fn test_read_package_files_list_empty() {
         let tempdir = tempfile::TempDir::new().unwrap();
         let path = tempdir.path().join("package_files.txt");
-        std::fs::write(&path, "\n   \n\n").unwrap();
+        fs_err::write(&path, "\n   \n\n").unwrap();
         assert!(read_package_files_list(&path).unwrap().is_none());
     }
 
@@ -447,7 +456,7 @@ mod test {
     fn test_read_package_files_list_paths() {
         let tempdir = tempfile::TempDir::new().unwrap();
         let path = tempdir.path().join("package_files.txt");
-        std::fs::write(&path, "  bin/foo\n\nbin/bar\n/abs/path  \n").unwrap();
+        fs_err::write(&path, "  bin/foo\n\nbin/bar\n/abs/path  \n").unwrap();
         let parsed = read_package_files_list(&path).unwrap().unwrap();
         assert_eq!(
             parsed,
@@ -460,39 +469,112 @@ mod test {
     }
 
     #[test]
-    fn test_files_from_paths_resolves_and_filters() {
+    fn test_files_from_paths_resolves_paths() {
         let tempdir = tempfile::TempDir::new().unwrap();
         let prefix = tempdir.path();
 
-        // Create some files inside the prefix
-        std::fs::create_dir_all(prefix.join("bin")).unwrap();
-        std::fs::write(prefix.join("bin/foo"), b"foo").unwrap();
-        std::fs::write(prefix.join("bin/bar"), b"bar").unwrap();
+        fs_err::create_dir_all(prefix.join("bin")).unwrap();
+        fs_err::write(prefix.join("bin/foo"), b"foo").unwrap();
+        fs_err::write(prefix.join("bin/bar"), b"bar").unwrap();
 
-        // And one outside the prefix
-        let outside = tempfile::TempDir::new().unwrap();
-        let outside_file = outside.path().join("escape.txt");
-        std::fs::write(&outside_file, b"nope").unwrap();
+        let inputs = vec![PathBuf::from("bin/foo"), prefix.join("bin/bar")];
 
-        let inputs = vec![
-            // relative path -> should resolve against prefix
-            PathBuf::from("bin/foo"),
-            // absolute path inside prefix
-            prefix.join("bin/bar"),
-            // path outside the prefix should be skipped
-            outside_file.clone(),
-            // missing path should be skipped
-            prefix.join("bin/missing"),
-        ];
-
-        let files = Files::from_paths(prefix, inputs).unwrap();
+        let files =
+            Files::from_paths(prefix, inputs, &Default::default(), &Default::default()).unwrap();
         let new_files: HashSet<PathBuf> = files.new_files.iter().cloned().collect();
 
         assert_eq!(new_files.len(), 2);
         assert!(new_files.contains(&prefix.join("bin/foo")));
         assert!(new_files.contains(&prefix.join("bin/bar")));
-        assert!(!new_files.contains(&outside_file));
-        assert!(!new_files.contains(&prefix.join("bin/missing")));
         assert_eq!(files.prefix, prefix);
+    }
+
+    #[test]
+    fn test_files_from_paths_outside_prefix_errors() {
+        let tempdir = tempfile::TempDir::new().unwrap();
+        let prefix = tempdir.path();
+
+        let outside = tempfile::TempDir::new().unwrap();
+        let outside_file = outside.path().join("escape.txt");
+        fs_err::write(&outside_file, b"nope").unwrap();
+
+        let err = Files::from_paths(
+            prefix,
+            vec![outside_file],
+            &Default::default(),
+            &Default::default(),
+        )
+        .unwrap_err();
+        assert!(matches!(
+            err,
+            crate::packaging::PackagingError::PackageFileOutsidePrefix(_)
+        ));
+    }
+
+    #[test]
+    fn test_files_from_paths_missing_errors() {
+        let tempdir = tempfile::TempDir::new().unwrap();
+        let prefix = tempdir.path();
+
+        let err = Files::from_paths(
+            prefix,
+            vec![PathBuf::from("bin/missing")],
+            &Default::default(),
+            &Default::default(),
+        )
+        .unwrap_err();
+        assert!(matches!(
+            err,
+            crate::packaging::PackagingError::PackageFileMissing(_)
+        ));
+    }
+
+    #[test]
+    fn test_files_from_paths_applies_files_glob() {
+        use rattler_build_recipe::stage1::GlobVec;
+
+        let tempdir = tempfile::TempDir::new().unwrap();
+        let prefix = tempdir.path();
+        fs_err::create_dir_all(prefix.join("bin")).unwrap();
+        fs_err::write(prefix.join("bin/foo"), b"foo").unwrap();
+        fs_err::write(prefix.join("bin/bar"), b"bar").unwrap();
+
+        let only_foo: GlobVec = serde_yaml::from_str("- bin/foo").unwrap();
+
+        let files = Files::from_paths(
+            prefix,
+            vec![PathBuf::from("bin/foo"), PathBuf::from("bin/bar")],
+            &Default::default(),
+            &only_foo,
+        )
+        .unwrap();
+
+        assert_eq!(files.new_files.len(), 1);
+        assert!(files.new_files.contains(&prefix.join("bin/foo")));
+    }
+
+    #[test]
+    fn test_files_from_paths_applies_always_include_glob() {
+        use rattler_build_recipe::stage1::GlobVec;
+
+        let tempdir = tempfile::TempDir::new().unwrap();
+        let prefix = tempdir.path();
+        fs_err::create_dir_all(prefix.join("bin")).unwrap();
+        fs_err::write(prefix.join("bin/foo"), b"foo").unwrap();
+        fs_err::write(prefix.join("bin/extra"), b"extra").unwrap();
+
+        let always: GlobVec = serde_yaml::from_str("- bin/extra").unwrap();
+
+        let files = Files::from_paths(
+            prefix,
+            vec![PathBuf::from("bin/foo")],
+            &always,
+            &Default::default(),
+        )
+        .unwrap();
+
+        assert_eq!(files.new_files.len(), 2);
+        assert!(files.new_files.contains(&prefix.join("bin/foo")));
+        assert!(files.new_files.contains(&prefix.join("bin/extra")));
     }
 }

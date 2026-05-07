@@ -93,6 +93,12 @@ pub enum PackagingError {
 
     #[error("Invalid MenuInst schema file: {0} - {1}")]
     InvalidMenuInstSchema(PathBuf, serde_json::Error),
+
+    #[error("Package file `{0}` listed in $RATTLER_BUILD_PACKAGE_FILES is not inside the prefix")]
+    PackageFileOutsidePrefix(PathBuf),
+
+    #[error("Package file `{0}` listed in $RATTLER_BUILD_PACKAGE_FILES does not exist")]
+    PackageFileMissing(PathBuf),
 }
 
 /// This function copies the license files to the info/licenses folder.
@@ -879,7 +885,12 @@ impl Output {
                     paths.len(),
                     package_files_list.display()
                 );
-                Files::from_paths(host_prefix, paths)?
+                Files::from_paths(
+                    host_prefix,
+                    paths,
+                    &self.recipe.build().always_include_files,
+                    &self.recipe.build().files,
+                )?
             }
             None => Files::from_prefix(
                 host_prefix,

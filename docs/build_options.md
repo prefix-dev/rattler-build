@@ -100,25 +100,25 @@ build:
 
 ## Override package contents from the build script
 
-By default, the package contents are determined by diffing the host prefix
-before and after the build script runs: every newly created file in `$PREFIX`
-that does not come from an installed host dependency is included.
+By default, the package contents are determined by walking `$PREFIX` and
+removing every file that is recorded as belonging to an installed host
+dependency (read from the `conda-meta` records in the prefix). Whatever
+remains is what ends up in the package.
 
 If you need full control, the build script can write an explicit list of paths
 to the file pointed at by the `$RATTLER_BUILD_PACKAGE_FILES` environment
 variable. When this file is non-empty after the build, its entries are used
-verbatim as the package contents and the default diff is skipped entirely.
-Globs in `build.files` and `build.always_include_files` are not applied in
-this mode, since the script has already declared exactly which files belong to
-the package.
+as the package contents instead of the conda-meta diff. The `build.files` and
+`build.always_include_files` globs still apply on top of that list, so you can
+combine an explicit selection with the usual filtering.
 
 Each line must reference a file rooted in `$PREFIX`:
 
 - an absolute path under `$PREFIX`, or
 - a relative path that is resolved against `$PREFIX`.
 
-Empty lines are ignored, and paths that escape the prefix or do not exist on
-disk are skipped with a warning. The file is appendable, so
+Empty lines are ignored. Paths that escape the prefix or do not exist on disk
+cause the build to fail. The file is appendable, so
 `echo path >> $RATTLER_BUILD_PACKAGE_FILES` works correctly across multiple
 script invocations. If the file is empty or never created, rattler-build
 falls back to the default behavior.
