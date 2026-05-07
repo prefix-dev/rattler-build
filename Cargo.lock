@@ -71,7 +71,7 @@ version = "0.0.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c1daa54020e05aa0b163ee10434fff35a0f18d28a1cafa142bd1290e1abe630e"
 dependencies = [
- "astral-reqwest-middleware",
+ "astral-reqwest-middleware 0.5.1",
  "reqwest 0.13.2",
  "secrecy",
  "serde",
@@ -190,6 +190,21 @@ dependencies = [
 
 [[package]]
 name = "astral-reqwest-middleware"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "638d02e24aeb92f9537897cd1ff82e2bc98fd9ac9575a503e27bb07cdf64d4d7"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "http 1.4.0",
+ "reqwest 0.12.28",
+ "serde",
+ "thiserror 2.0.18",
+ "tower-service",
+]
+
+[[package]]
+name = "astral-reqwest-middleware"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "98e1c6be25cfbf1bb4fea1a9da51bc05d3259a9062df4e53f54e5607895e33c9"
@@ -201,6 +216,27 @@ dependencies = [
  "serde",
  "thiserror 2.0.18",
  "tower-service",
+]
+
+[[package]]
+name = "astral-reqwest-retry"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "78ab210f6cdf8fd3254d47e5ee27ce60ed34a428ff71b4ae9477b1c84b49498c"
+dependencies = [
+ "anyhow",
+ "astral-reqwest-middleware 0.4.2",
+ "async-trait",
+ "futures",
+ "getrandom 0.2.17",
+ "http 1.4.0",
+ "hyper",
+ "reqwest 0.12.28",
+ "retry-policies",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+ "wasmtimer",
 ]
 
 [[package]]
@@ -217,6 +253,26 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "xattr",
+]
+
+[[package]]
+name = "astral_async_http_range_reader"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7ddaca0fbbf0d91103cca7c7611790c65f6eff1d456f7fe6bf565d436dc9b8f3"
+dependencies = [
+ "astral-reqwest-middleware 0.4.2",
+ "bisection",
+ "futures",
+ "http-content-range",
+ "itertools 0.13.0",
+ "memmap2",
+ "reqwest 0.12.28",
+ "thiserror 1.0.69",
+ "tokio",
+ "tokio-stream",
+ "tokio-util",
+ "tracing",
 ]
 
 [[package]]
@@ -418,25 +474,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
-]
-
-[[package]]
-name = "async_http_range_reader"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b24fc9a58e46d228f83fb140b04c5645d19b455a61c300954711ebabfc11c0bd"
-dependencies = [
- "futures",
- "http-content-range",
- "itertools 0.13.0",
- "memmap2",
- "reqwest 0.12.28",
- "reqwest-middleware",
- "thiserror 1.0.69",
- "tokio",
- "tokio-stream",
- "tokio-util",
- "tracing",
 ]
 
 [[package]]
@@ -990,6 +1027,12 @@ name = "base64ct"
 version = "1.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2af50177e190e07a26ab74f8b1efbfe2ef87da2116221318cb1c2e82baf7de06"
+
+[[package]]
+name = "bisection"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "021e079a1bab0ecce6cf4b4b74c0c37afa4a697136eb3b127875c84a8f04a8c3"
 
 [[package]]
 name = "bit-set"
@@ -4692,11 +4735,12 @@ dependencies = [
 
 [[package]]
 name = "rattler"
-version = "0.41.0"
+version = "0.42.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fdf1d4621b3cd023b54ab9f62296c23fc84b29f1d290c9074038e1b9278cd7cb"
+checksum = "9bc96a27d6c39b6d2a22aa4bef52b2cf37077761ecb209f5ebd92657593a7189"
 dependencies = [
  "anyhow",
+ "astral-reqwest-middleware 0.4.2",
  "clap",
  "console",
  "digest",
@@ -4726,7 +4770,6 @@ dependencies = [
  "reflink-copy",
  "regex",
  "reqwest 0.12.28",
- "reqwest-middleware",
  "serde",
  "serde_json",
  "simple_spawn_blocking",
@@ -4815,6 +4858,7 @@ version = "0.2.4"
 dependencies = [
  "anyhow",
  "arwen-codesign",
+ "astral-reqwest-middleware 0.4.2",
  "async-once-cell",
  "async-recursion",
  "chrono",
@@ -4870,7 +4914,6 @@ dependencies = [
  "reflink-copy",
  "regex",
  "reqwest 0.12.28",
- "reqwest-middleware",
  "retry-policies",
  "rstest",
  "scroll",
@@ -4935,10 +4978,10 @@ dependencies = [
 name = "rattler_build_networking"
 version = "0.1.5"
 dependencies = [
+ "astral-reqwest-middleware 0.4.2",
+ "astral-reqwest-retry",
  "rattler_networking",
  "reqwest 0.12.28",
- "reqwest-middleware",
- "reqwest-retry",
  "tokio",
  "url",
 ]
@@ -5068,6 +5111,8 @@ dependencies = [
 name = "rattler_build_source_cache"
 version = "0.1.5"
 dependencies = [
+ "astral-reqwest-middleware 0.4.2",
+ "astral-reqwest-retry",
  "async-trait",
  "bzip2",
  "chrono",
@@ -5083,8 +5128,6 @@ dependencies = [
  "rattler_git",
  "rattler_prefix_guard",
  "reqwest 0.12.28",
- "reqwest-middleware",
- "reqwest-retry",
  "serde",
  "serde_json",
  "sevenz-rust2",
@@ -5155,12 +5198,13 @@ dependencies = [
 
 [[package]]
 name = "rattler_cache"
-version = "0.7.0"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "22602729aa4deeee636d6bc815c01feee1e0e6619c8f8f39001fa93672a2671a"
+checksum = "05fb0beb355779982d60ffaf71d5330e1cafa31c7a5be8bf33c4ca597477cf03"
 dependencies = [
  "ahash",
  "anyhow",
+ "astral-reqwest-middleware 0.4.2",
  "dashmap",
  "digest",
  "dirs",
@@ -5176,7 +5220,6 @@ dependencies = [
  "rattler_redaction",
  "rayon",
  "reqwest 0.12.28",
- "reqwest-middleware",
  "serde_json",
  "simple_spawn_blocking",
  "tempfile",
@@ -5188,9 +5231,9 @@ dependencies = [
 
 [[package]]
 name = "rattler_conda_types"
-version = "0.46.0"
+version = "0.46.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "add942503b3cf8c6f797707762bcf9206709ce1bc001b974860b0313fd002ced"
+checksum = "1ce168319aa4284a026df19b0054bab8609e3447937f43ef1a496b7af6984324"
 dependencies = [
  "ahash",
  "chrono",
@@ -5231,9 +5274,9 @@ dependencies = [
 
 [[package]]
 name = "rattler_config"
-version = "0.3.11"
+version = "0.3.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2d4b1b5301f3fe43a096f1b3cb5e6aaa12af86c6cbefc708e078620f67cc1258"
+checksum = "57fc4ebf96d305f8ae35b112f4a2362ec388f4ac74668b261af8587b44fc9bdb"
 dependencies = [
  "console",
  "fs-err",
@@ -5268,16 +5311,16 @@ dependencies = [
 
 [[package]]
 name = "rattler_git"
-version = "0.1.1"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1225e9333f2930720b5759f70c10a5b6631c580ee67940e6a29fbb8393ccb9cc"
+checksum = "9751120c5ed52b3f3073926c8ef3c503607e6380ef0cb95fdcaaf0252ed8e9f1"
 dependencies = [
+ "astral-reqwest-middleware 0.4.2",
  "dashmap",
  "dunce",
  "fs-err",
  "rattler_prefix_guard",
  "reqwest 0.12.28",
- "reqwest-middleware",
  "serde",
  "thiserror 2.0.18",
  "tokio",
@@ -5289,9 +5332,9 @@ dependencies = [
 
 [[package]]
 name = "rattler_index"
-version = "0.28.1"
+version = "0.28.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6621fb66fd1a0175aca064ccb27d6b3070c133a843a1a6402b32e6616ccdfd6c"
+checksum = "50c631860846fe6f7b5b4be414d914bb7980c95b80074cb570e30b4a52030bff"
 dependencies = [
  "ahash",
  "anyhow",
@@ -5337,9 +5380,9 @@ dependencies = [
 
 [[package]]
 name = "rattler_menuinst"
-version = "0.2.58"
+version = "0.2.59"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eeb673f7069e85cba4774f4546582a9e4e23a6e26bfc89a3cc7880565287976e"
+checksum = "4874d056de91e23bf2c02c827fd8a7557d6e4ba032fdf6800efbe3ea9ff127dd"
 dependencies = [
  "chrono",
  "configparser",
@@ -5368,11 +5411,12 @@ dependencies = [
 
 [[package]]
 name = "rattler_networking"
-version = "0.26.11"
+version = "0.26.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "07edac2226913e2afbbb3e499fdcf2dab9b5ee6d19bcab8fdd3cde49c98bc1e3"
+checksum = "17840c3642ef185ead62f4b7be5672fd6ab6c9ffeb9ce74cb1509d50eecbe96c"
 dependencies = [
  "anyhow",
+ "astral-reqwest-middleware 0.4.2",
  "async-once-cell",
  "async-trait",
  "aws-config",
@@ -5388,7 +5432,6 @@ dependencies = [
  "netrc-rs",
  "rattler_config",
  "reqwest 0.12.28",
- "reqwest-middleware",
  "retry-policies",
  "serde",
  "serde_json",
@@ -5400,15 +5443,16 @@ dependencies = [
 
 [[package]]
 name = "rattler_package_streaming"
-version = "0.25.0"
+version = "0.25.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "090fa9f0e13494294bb02bbcf6f7356c97b4483dd80b5838436aeaafada1f58e"
+checksum = "8321ca30ccd49fed1c000d981a1d0f786f8b365c119b7c8bdd5f0bdbd870f04c"
 dependencies = [
+ "astral-reqwest-middleware 0.4.2",
  "astral-tokio-tar",
+ "astral_async_http_range_reader",
  "astral_async_zip",
  "async-compression",
  "async-spooled-tempfile",
- "async_http_range_reader",
  "bzip2",
  "chrono",
  "fs-err",
@@ -5423,7 +5467,6 @@ dependencies = [
  "rattler_networking",
  "rattler_redaction",
  "reqwest 0.12.28",
- "reqwest-middleware",
  "serde_json",
  "simple_spawn_blocking",
  "tar",
@@ -5465,23 +5508,24 @@ dependencies = [
 
 [[package]]
 name = "rattler_redaction"
-version = "0.1.14"
+version = "0.1.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "222837efcfa358dbb6107a741bb73bfdae75dae19d5e7eb9c869d84a9edd0a9c"
+checksum = "40a5b2b5dc702c69f60fbf9ebf6bfe751854069918b24c48f64873ae31b72b84"
 dependencies = [
+ "astral-reqwest-middleware 0.4.2",
  "reqwest 0.12.28",
- "reqwest-middleware",
  "url",
 ]
 
 [[package]]
 name = "rattler_repodata_gateway"
-version = "0.28.1"
+version = "0.28.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7e0c42da3521a830593bf8849a3f0e40ec96d40b37e54ae771017416d56bf866"
+checksum = "8f6236f9cefc9a3219a2570d32d2250168d314faf2741e9bafd0c2f1feb3b984"
 dependencies = [
  "ahash",
  "anyhow",
+ "astral-reqwest-middleware 0.4.2",
  "async-compression",
  "async-fd-lock",
  "async-trait",
@@ -5516,7 +5560,6 @@ dependencies = [
  "rattler_package_streaming",
  "rattler_redaction",
  "reqwest 0.12.28",
- "reqwest-middleware",
  "retry-policies",
  "rmp-serde",
  "self_cell",
@@ -5539,9 +5582,9 @@ dependencies = [
 
 [[package]]
 name = "rattler_s3"
-version = "0.1.34"
+version = "0.1.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4acde996088b424bd8e7f26cc2d6ab491cb63f3c8a83f43c34bbf3098ac8fbaa"
+checksum = "3b7a29648b1a9d755e94a8fc0eacfe2aafd9f20b8de592627d83218459538c9b"
 dependencies = [
  "aws-config",
  "aws-credential-types",
@@ -5556,9 +5599,9 @@ dependencies = [
 
 [[package]]
 name = "rattler_shell"
-version = "0.26.11"
+version = "0.26.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "058b97f3e59af043dc494bf081ac260b862808b73e31e52985b0a36244080b0b"
+checksum = "88d7bca1c7fd2a6fac62f9716cfcf3967b1360c9a42ad5ab09759f34bba532a7"
 dependencies = [
  "anyhow",
  "enum_dispatch",
@@ -5578,9 +5621,9 @@ dependencies = [
 
 [[package]]
 name = "rattler_solve"
-version = "6.0.1"
+version = "6.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "240d0458274dfc53a32260cbf4b5a30d63c86531bfbe85fc0026c31431a6709d"
+checksum = "6b1b27732702160735cc8e81eccbf42209bd503b6fad471e8215713e97ac00f0"
 dependencies = [
  "chrono",
  "futures",
@@ -5597,10 +5640,12 @@ dependencies = [
 
 [[package]]
 name = "rattler_upload"
-version = "0.6.0"
+version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f361bd71b2284f8d59a628997bc1e48c6b3bee7639575f3993a5946700367022"
+checksum = "95e7d50915a0d37f97b2b353b175e5290c6bf11c8511454f73861c26fb9da487"
 dependencies = [
+ "astral-reqwest-middleware 0.4.2",
+ "astral-reqwest-retry",
  "base64 0.22.1",
  "clap",
  "fs-err",
@@ -5617,8 +5662,6 @@ dependencies = [
  "rattler_s3",
  "rattler_solve",
  "reqwest 0.12.28",
- "reqwest-middleware",
- "reqwest-retry",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -5634,9 +5677,9 @@ dependencies = [
 
 [[package]]
 name = "rattler_virtual_packages"
-version = "2.3.20"
+version = "2.3.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f1a4e6269426860bbb4f7bc7a7909d7d57850e9e5b33abd309dcadb503868e1"
+checksum = "7de0c7bae6b12ebc6ca640e97cc6be1f49609cd716d1af520cba2a7faffcad73"
 dependencies = [
  "archspec",
  "libloading",
@@ -5901,42 +5944,6 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
-]
-
-[[package]]
-name = "reqwest-middleware"
-version = "0.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "57f17d28a6e6acfe1733fe24bcd30774d13bffa4b8a22535b4c8c98423088d4e"
-dependencies = [
- "anyhow",
- "async-trait",
- "http 1.4.0",
- "reqwest 0.12.28",
- "serde",
- "thiserror 1.0.69",
- "tower-service",
-]
-
-[[package]]
-name = "reqwest-retry"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "105747e3a037fe5bf17458d794de91149e575b6183fc72c85623a44abb9683f5"
-dependencies = [
- "anyhow",
- "async-trait",
- "futures",
- "getrandom 0.2.17",
- "http 1.4.0",
- "hyper",
- "reqwest 0.12.28",
- "reqwest-middleware",
- "retry-policies",
- "thiserror 2.0.18",
- "tokio",
- "tracing",
- "wasmtimer",
 ]
 
 [[package]]
