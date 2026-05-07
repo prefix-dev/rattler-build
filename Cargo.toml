@@ -67,8 +67,8 @@ minijinja = { version = "2.18.0", features = [
 ] }
 regex = "1.12.3"
 reqwest = { version = "0.12.28", default-features = false, features = ["json"] }
-reqwest-middleware = { version = "0.4.2", features = ["json"] }
-reqwest-retry = "0.8.0"
+reqwest-middleware = { package = "astral-reqwest-middleware", version = "0.4.2", features = ["json"] }
+reqwest-retry = { package = "astral-reqwest-retry", version = "0.8.0" }
 retry-policies = "0.5.1"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
@@ -145,7 +145,7 @@ rattler_git = { version = "0.1.1" }
 rattler_prefix_guard = { version = "0.1.0" }
 
 rattler_config = { version = "0.3.8" }
-rattler = { version = "0.41.0", default-features = false, features = [
+rattler = { version = "0.42.0", default-features = false, features = [
   "cli-tools",
   "indicatif",
 ] }
