@@ -206,6 +206,14 @@ impl Directories {
         Ok(directories)
     }
 
+    /// Path to the file pointed at by the `RATTLER_BUILD_PACKAGE_FILES`
+    /// environment variable. Build scripts may write paths to this file (one
+    /// per line) to override the default mechanism that determines which files
+    /// end up in the final package.
+    pub fn package_files_list_path(&self) -> PathBuf {
+        self.build_dir.join(crate::consts::PACKAGE_FILES_LIST_NAME)
+    }
+
     /// Remove all directories except for the cache directory
     pub fn clean(&self) -> Result<(), std::io::Error> {
         if self.build_dir.exists() {

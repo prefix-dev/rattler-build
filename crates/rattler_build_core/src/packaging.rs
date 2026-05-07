@@ -22,7 +22,7 @@ use unicode_normalization::UnicodeNormalization;
 mod file_finder;
 mod file_mapper;
 mod metadata;
-pub use file_finder::{Files, TempFiles, content_type, record_files};
+pub use file_finder::{Files, TempFiles, content_type, read_package_files_list, record_files};
 pub use metadata::{contains_prefix_binary, contains_prefix_text, create_prefix_placeholder};
 use tempfile::NamedTempFile;
 
@@ -865,12 +865,29 @@ impl Output {
     ) -> Result<(PathBuf, PathsJson), PackagingError> {
         let span = tracing::info_span!("Packaging new files");
         let _enter = span.enter();
-        let files_after = Files::from_prefix(
-            &self.build_configuration.directories.host_prefix,
-            &self.recipe.build().always_include_files,
-            &self.recipe.build().files,
-            post_install_files,
-        )?;
+
+        let host_prefix = &self.build_configuration.directories.host_prefix;
+        let package_files_list = self
+            .build_configuration
+            .directories
+            .package_files_list_path();
+
+        let files_after = match read_package_files_list(&package_files_list)? {
+            Some(paths) => {
+                tracing::info!(
+                    "Using {} explicit package file(s) from {}",
+                    paths.len(),
+                    package_files_list.display()
+                );
+                Files::from_paths(host_prefix, paths)?
+            }
+            None => Files::from_prefix(
+                host_prefix,
+                &self.recipe.build().always_include_files,
+                &self.recipe.build().files,
+                post_install_files,
+            )?,
+        };
 
         package_conda(self, tool_configuration, &files_after)
     }

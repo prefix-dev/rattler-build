@@ -86,6 +86,19 @@ impl Output {
         let span = tracing::info_span!("Running build script");
         let _enter = span.enter();
 
+        // Reset the package files override list before running the build
+        // script. This ensures that we do not pick up paths from a previous
+        // run if the script does not write to the file this time.
+        let package_files_path = self
+            .build_configuration
+            .directories
+            .package_files_list_path();
+        match fs_err::remove_file(&package_files_path) {
+            Ok(()) => {}
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+            Err(err) => return Err(err.into()),
+        }
+
         let exec_args = self.prepare_build_script().await?;
         let build_prefix = if self.recipe.build().merge_build_and_host_envs {
             None

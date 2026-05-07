@@ -98,6 +98,51 @@ build:
   always_copy_files: list of globs
 ```
 
+## Override package contents from the build script
+
+By default, the package contents are determined by diffing the host prefix
+before and after the build script runs: every newly created file in `$PREFIX`
+that does not come from an installed host dependency is included.
+
+If you need full control, the build script can write an explicit list of paths
+to the file pointed at by the `$RATTLER_BUILD_PACKAGE_FILES` environment
+variable. When this file is non-empty after the build, its entries are used
+verbatim as the package contents and the default diff is skipped entirely.
+Globs in `build.files` and `build.always_include_files` are not applied in
+this mode, since the script has already declared exactly which files belong to
+the package.
+
+Each line must reference a file rooted in `$PREFIX`:
+
+- an absolute path under `$PREFIX`, or
+- a relative path that is resolved against `$PREFIX`.
+
+Empty lines are ignored, and paths that escape the prefix or do not exist on
+disk are skipped with a warning. The file is appendable, so
+`echo path >> $RATTLER_BUILD_PACKAGE_FILES` works correctly across multiple
+script invocations. If the file is empty or never created, rattler-build
+falls back to the default behavior.
+
+```bash title="build.sh"
+mkdir -p $PREFIX/bin
+echo "hello" > $PREFIX/bin/included.sh
+echo "hello" > $PREFIX/bin/excluded.sh
+
+# Only `included.sh` will end up in the package.
+echo "$PREFIX/bin/included.sh" >> $RATTLER_BUILD_PACKAGE_FILES
+# Relative paths are also supported (resolved against $PREFIX):
+# echo "bin/included.sh" >> $RATTLER_BUILD_PACKAGE_FILES
+```
+
+```batch title="build.bat"
+mkdir %PREFIX%\bin
+echo hello > %PREFIX%\bin\included.txt
+echo hello > %PREFIX%\bin\excluded.txt
+
+@rem Only `included.txt` will end up in the package.
+echo %PREFIX%\bin\included.txt >> %RATTLER_BUILD_PACKAGE_FILES%
+```
+
 ## Merge build and host environments
 
 In very rare cases you might want to merge the build and host environments to
