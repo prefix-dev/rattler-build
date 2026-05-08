@@ -3208,6 +3208,18 @@ noted, no variables are inherited from the shell environment in which you invoke
 <p>The subdirectory describing the platform that the resulting package will
   run on. Equivalent to <code>SUBDIR</code>.</p>
 </dd>
+<dt><code>RATTLER_BUILD_PACKAGE_FILES</code></dt>
+<dd>
+<p>Path to a writable file. If the build script writes any paths to this file
+  (one per line), those paths are used as the package contents instead of the
+  default "new files in <code>$PREFIX</code>" diff. Each line must be either an absolute
+  path under <code>$PREFIX</code> or a relative path resolved against <code>$PREFIX</code>. The file
+  is appendable across multiple invocations, so
+  <code>echo path &gt;&gt; $RATTLER_BUILD_PACKAGE_FILES</code> works as expected. If the file
+  is empty or absent, rattler-build falls back to the default behavior. See
+  <a href="../build_options/#override-package-contents-from-the-build-script">Override package contents from the build script</a>
+  in the build options for more details.</p>
+</dd>
 <dt><code>PKG_BUILDNUM</code></dt>
 <dd>
 <p>Indicates the build number of the package currently being built.</p>
