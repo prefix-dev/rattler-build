@@ -88,6 +88,9 @@ from a repository.
 
     # latest commit revision(aka, hash of head commit) in the repo
     git.head_rev(<git_repo_url>)
+
+    # latest tag distance(aka, number of commits between latest tag and head) in the repo
+    git.latest_tag_distance(<git_repo_url>)
     ```
 
 #### Usage
