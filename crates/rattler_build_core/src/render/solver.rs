@@ -251,6 +251,7 @@ pub async fn install_packages(
             &Default::default(),
             &Default::default(),
             None,
+            None,
         )
         .into_diagnostic()?;
 

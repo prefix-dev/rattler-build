@@ -258,11 +258,20 @@ impl Files {
     /// Find all files in the given (host) prefix and remove all previously installed files (based on the PrefixRecord
     /// of the conda environment). If always_include is Some, then all files matching the glob pattern will be included
     /// in the new_files set.
+    ///
+    /// `staging_files`, when provided, contains absolute paths of files that
+    /// were restored from an inherited staging cache. These are *not*
+    /// subtracted from the new-files diff (the staging propagation design
+    /// requires them to appear in the downstream package), but they are
+    /// merged into `old_files` so that `filter_pyc` recognises their `.py`
+    /// sources as pre-existing and can drop stray `.pyc` files generated
+    /// for them during this output's build script.
     pub fn from_prefix(
         prefix: &Path,
         always_include: &GlobVec,
         files: &GlobVec,
         post_install_files: Option<&HashSet<PathBuf>>,
+        staging_files: Option<&HashSet<PathBuf>>,
     ) -> Result<Self, io::Error> {
         if !prefix.exists() {
             return Ok(Files {
@@ -310,6 +319,15 @@ impl Files {
                     difference.insert(file);
                 }
             }
+        }
+
+        // Augment `old_files` with the staging cache's prefix files *after*
+        // the new-files diff has been computed. Staging-restored files must
+        // remain in `new_files` so they propagate into the downstream
+        // package, but filter_pyc needs to see their `.py` sources to drop
+        // stray bytecode that was generated alongside them.
+        if let Some(staging) = staging_files {
+            previous_files.extend(staging.iter().cloned());
         }
 
         Ok(Files {
@@ -576,5 +594,63 @@ mod test {
         assert_eq!(files.new_files.len(), 2);
         assert!(files.new_files.contains(&prefix.join("bin/foo")));
         assert!(files.new_files.contains(&prefix.join("bin/extra")));
+    }
+
+    /// Regression test for issue #2481: when this output inherits from a
+    /// staging cache, `.py` files restored from that cache must be visible
+    /// to filter_pyc as pre-existing sources so that stray `.pyc` files
+    /// generated for them during the build script are filtered out, *but*
+    /// the staging-restored files themselves must still appear in
+    /// `new_files` so they propagate into the downstream package.
+    #[test]
+    fn test_from_prefix_staging_files_seed_old_files_only() {
+        let tempdir = tempfile::TempDir::new().unwrap();
+        let prefix = tempdir.path();
+
+        let py_dir = prefix.join("lib/python3.14/site-packages/_distutils_hack");
+        fs_err::create_dir_all(py_dir.join("__pycache__")).unwrap();
+        let py_file = py_dir.join("__init__.py");
+        fs_err::write(&py_file, b"# distutils hack").unwrap();
+        let pyc_file = py_dir
+            .join("__pycache__")
+            .join("__init__.cpython-314.pyc");
+        fs_err::write(&pyc_file, b"\x00\x00\x00\x00").unwrap();
+
+        // Staging cache contributed the .py file. The .pyc was created by
+        // the build script on top of it (e.g. by a python invocation that
+        // pulled in _distutils_hack via setuptools' .pth file).
+        let mut staging_files = HashSet::new();
+        staging_files.insert(py_file.clone());
+
+        let files = Files::from_prefix(
+            prefix,
+            &Default::default(),
+            &Default::default(),
+            None,
+            Some(&staging_files),
+        )
+        .unwrap();
+
+        // The staging-restored .py must propagate into the downstream
+        // package as a new file.
+        assert!(
+            files.new_files.contains(&py_file),
+            "staging .py should appear in new_files"
+        );
+        // The stray .pyc is in new_files at this point; filter_pyc is
+        // responsible for dropping it, which it can do only because the
+        // .py is in old_files.
+        assert!(
+            files.new_files.contains(&pyc_file),
+            "stray .pyc starts out in new_files"
+        );
+        assert!(
+            files.old_files.contains(&py_file),
+            "staging .py must be in old_files so filter_pyc sees it"
+        );
+        assert!(
+            crate::packaging::file_mapper::filter_pyc(&pyc_file, &files.old_files),
+            "filter_pyc should drop the stray .pyc",
+        );
     }
 }

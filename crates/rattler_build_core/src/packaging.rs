@@ -892,12 +892,19 @@ impl Output {
                     &self.recipe.build().files,
                 )?
             }
-            None => Files::from_prefix(
-                host_prefix,
-                &self.recipe.build().always_include_files,
-                &self.recipe.build().files,
-                post_install_files,
-            )?,
+            None => {
+                let staging_files: Option<HashSet<PathBuf>> = self
+                    .staging_prefix_files
+                    .as_ref()
+                    .map(|files| files.iter().cloned().collect());
+                Files::from_prefix(
+                    host_prefix,
+                    &self.recipe.build().always_include_files,
+                    &self.recipe.build().files,
+                    post_install_files,
+                    staging_files.as_ref(),
+                )?
+            }
         };
 
         package_conda(self, tool_configuration, &files_after)

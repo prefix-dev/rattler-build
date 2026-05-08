@@ -67,6 +67,15 @@ pub struct BuildOutput {
     /// physically installed in the host prefix.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub staging_library_name_map: Option<LibraryNameMap>,
+
+    /// Absolute paths of files that were restored into the host prefix from
+    /// an inherited staging cache. These files existed before this output's
+    /// build script ran and are tracked separately from conda-meta records,
+    /// so packaging logic (notably `filter_pyc`) can recognise their
+    /// `.py` sources as pre-existing when deciding whether a freshly
+    /// generated `.pyc` is legitimate output of this build.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub staging_prefix_files: Option<Vec<std::path::PathBuf>>,
 }
 
 impl BuildOutput {

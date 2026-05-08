@@ -327,6 +327,9 @@ mod test {
         old_files.insert(PathBuf::from("pkg/module.py"));
         old_files.insert(PathBuf::from("pkg/other.py"));
         old_files.insert(PathBuf::from("pkg/nested/deep.py"));
+        old_files.insert(PathBuf::from(
+            "lib/python3.14/site-packages/_distutils_hack/__init__.py",
+        ));
 
         let test_cases = vec![
             // __pycache__ cases
@@ -338,6 +341,12 @@ mod test {
             // Nested paths
             ("pkg/nested/__pycache__/deep.cpython-311.pyc", true),
             ("pkg/nested/deep.pyc", true),
+            // __init__ pycache (issue #2481): pyc generated for a pre-existing
+            // package's __init__.py should be filtered out
+            (
+                "lib/python3.14/site-packages/_distutils_hack/__pycache__/__init__.cpython-314.pyc",
+                true,
+            ),
             // Edge cases
             ("pkg/not_python.txt", false), // non-python files pass through
             ("pkg/__pycache__/invalid", false), // no extension

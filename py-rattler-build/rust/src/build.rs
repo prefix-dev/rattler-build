@@ -232,6 +232,7 @@ pub(crate) fn output_from_rendered_variant(
         finalized_cache_dependencies: None,
         finalized_cache_sources: None,
         staging_library_name_map: None,
+        staging_prefix_files: None,
         build_summary: Arc::new(Mutex::new(BuildSummary::default())),
         system_tools: SystemTools::new("rattler-build", env!("CARGO_PKG_VERSION")),
         extra_meta: None,

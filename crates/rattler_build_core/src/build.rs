@@ -137,11 +137,14 @@ pub async fn run_build(
     let staging_result = output.process_staging_caches(tool_configuration).await?;
 
     // If we inherit from a staging cache, store its dependencies, sources, and
-    // library name map for overlinking checks
-    if let Some((deps, sources, library_name_map)) = staging_result {
+    // library name map for overlinking checks. Also remember which files in
+    // the host prefix originate from the staging cache so packaging can treat
+    // them as pre-existing when filtering stray .pyc files.
+    if let Some((deps, sources, library_name_map, prefix_files)) = staging_result {
         output.finalized_cache_dependencies = Some(deps);
         output.finalized_cache_sources = Some(sources);
         output.staging_library_name_map = Some(library_name_map);
+        output.staging_prefix_files = Some(prefix_files);
     }
 
     // Fetch sources for this output

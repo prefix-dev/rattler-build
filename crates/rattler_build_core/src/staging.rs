@@ -160,6 +160,7 @@ impl Output {
             FinalizedDependencies,
             Vec<rattler_build_recipe::stage1::Source>,
             LibraryNameMap,
+            Vec<PathBuf>,
         ),
         miette::Error,
     > {
@@ -227,6 +228,7 @@ impl Output {
             FinalizedDependencies,
             Vec<rattler_build_recipe::stage1::Source>,
             LibraryNameMap,
+            Vec<PathBuf>,
         ),
         miette::Error,
     > {
@@ -349,6 +351,7 @@ impl Output {
             &staging.build.always_include_files,
             &staging.build.files,
             None,
+            None,
         )
         .into_diagnostic()?;
 
@@ -409,13 +412,16 @@ impl Output {
         .into_diagnostic()?;
 
         // Save metadata
+        let prefix = self.prefix().to_path_buf();
+        let staging_prefix_files: Vec<PathBuf> =
+            copied_files.iter().map(|rel| prefix.join(rel)).collect();
         let metadata = StagingCacheMetadata {
             name: staging.name.clone(),
             finalized_dependencies: finalized_dependencies.clone(),
             finalized_sources: finalized_sources.clone(),
             prefix_files: copied_files,
             work_dir_files: copied_work_dir.copied_paths().to_vec(),
-            prefix: self.prefix().to_path_buf(),
+            prefix: prefix.clone(),
             variant: staging.used_variant.clone(),
             library_name_map: library_name_map.clone(),
         };
@@ -429,7 +435,12 @@ impl Output {
             metadata.work_dir_files.len()
         );
 
-        Ok((finalized_dependencies, finalized_sources, library_name_map))
+        Ok((
+            finalized_dependencies,
+            finalized_sources,
+            library_name_map,
+            staging_prefix_files,
+        ))
     }
 
     /// Restore a staging cache from disk
@@ -442,6 +453,7 @@ impl Output {
             FinalizedDependencies,
             Vec<rattler_build_recipe::stage1::Source>,
             LibraryNameMap,
+            Vec<PathBuf>,
         ),
         miette::Error,
     > {
@@ -485,10 +497,18 @@ impl Output {
             metadata.name
         );
 
+        let prefix = self.prefix().to_path_buf();
+        let staging_prefix_files = metadata
+            .prefix_files
+            .iter()
+            .map(|rel| prefix.join(rel))
+            .collect();
+
         Ok((
             metadata.finalized_dependencies,
             metadata.finalized_sources,
             metadata.library_name_map,
+            staging_prefix_files,
         ))
     }
 
@@ -505,6 +525,7 @@ impl Output {
             FinalizedDependencies,
             Vec<rattler_build_recipe::stage1::Source>,
             LibraryNameMap,
+            Vec<PathBuf>,
         )>,
         miette::Error,
     > {
@@ -521,7 +542,7 @@ impl Output {
                 "Building or restoring staging cache: {}",
                 staging_cache.name
             );
-            let (_deps, _sources, _lib_map) = self
+            let (_deps, _sources, _lib_map, _prefix_files) = self
                 .build_or_restore_staging_cache(staging_cache, tool_configuration)
                 .await?;
         }
@@ -542,11 +563,11 @@ impl Output {
                 })?;
 
             // Get or build the cache
-            let (deps, sources, lib_map) = self
+            let (deps, sources, lib_map, prefix_files) = self
                 .build_or_restore_staging_cache(staging, tool_configuration)
                 .await?;
 
-            Ok(Some((deps, sources, lib_map)))
+            Ok(Some((deps, sources, lib_map, prefix_files)))
         } else {
             Ok(None)
         }

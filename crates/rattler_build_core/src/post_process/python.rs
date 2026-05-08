@@ -122,8 +122,11 @@ pub fn compile_pyc(
         tracing::info!("Compiling {} .py files to .pyc", pyc_files_to_compile.len());
 
         for f in &pyc_files_to_compile {
+            // -B prevents Python from writing .pyc files for modules
+            // imported during interpreter startup (e.g. _distutils_hack via
+            // setuptools' distutils-precedence.pth) into the host prefix.
             let command = Command::new(&python_interpreter)
-                .args(["-Wi", "-m", "py_compile"])
+                .args(["-B", "-Wi", "-m", "py_compile"])
                 .arg(f)
                 .output();
 
