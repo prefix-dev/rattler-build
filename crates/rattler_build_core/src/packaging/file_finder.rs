@@ -14,6 +14,38 @@ use crate::metadata::Output;
 use super::{PackagingError, file_mapper, normalize_path_for_comparison};
 use rattler_build_recipe::stage1::GlobVec;
 
+/// Read the list of paths written by the build script into the file pointed at
+/// by the `RATTLER_BUILD_PACKAGE_FILES` environment variable.
+///
+/// Returns `Ok(None)` if the file does not exist or contains no non-empty
+/// lines (in which case the caller should fall back to the default file
+/// discovery mechanism). Returns `Ok(Some(paths))` if the file exists and
+/// contains at least one path.
+///
+/// Lines are trimmed of whitespace; empty lines are skipped to make
+/// `echo path >> $RATTLER_BUILD_PACKAGE_FILES` and similar shell idioms work
+/// reliably.
+pub fn read_package_files_list(path: &Path) -> Result<Option<Vec<PathBuf>>, io::Error> {
+    let contents = match fs::read_to_string(path) {
+        Ok(contents) => contents,
+        Err(err) if err.kind() == io::ErrorKind::NotFound => return Ok(None),
+        Err(err) => return Err(err),
+    };
+
+    let paths: Vec<PathBuf> = contents
+        .lines()
+        .map(|line| line.trim())
+        .filter(|line| !line.is_empty())
+        .map(PathBuf::from)
+        .collect();
+
+    if paths.is_empty() {
+        Ok(None)
+    } else {
+        Ok(Some(paths))
+    }
+}
+
 /// A wrapper around PathBuf that implements case-insensitive hashing and equality
 /// when the filesystem is case-insensitive
 #[derive(Debug, Clone)]
@@ -87,6 +119,27 @@ pub fn content_type(path: &Path) -> Result<Option<ContentType>, io::Error> {
     Ok(Some(content_inspector::inspect(buffer)))
 }
 
+/// Collect the set of files contributed by packages already installed in the
+/// given prefix. These are the files that should be considered "old" and that
+/// would normally be excluded from the package contents.
+fn collect_previous_files(prefix: &Path) -> Result<HashSet<PathBuf>, io::Error> {
+    if !prefix.exists() || !prefix.join("conda-meta").exists() {
+        return Ok(HashSet::new());
+    }
+
+    let prefix_records: Vec<PrefixRecord> = PrefixRecord::collect_from_prefix(prefix)?;
+    let mut previous_files = prefix_records
+        .into_iter()
+        .fold(HashSet::new(), |mut acc, record| {
+            acc.extend(record.files.iter().map(|f| prefix.join(f)));
+            acc
+        });
+
+    // Also include the existing conda-meta (PrefixRecord) files themselves
+    previous_files.extend(record_files(&prefix.join("conda-meta"))?);
+    Ok(previous_files)
+}
+
 /// This function returns a HashSet of (recursively) all the files in the given directory.
 pub fn record_files(directory: &Path) -> Result<HashSet<PathBuf>, io::Error> {
     let mut res = HashSet::new();
@@ -141,6 +194,67 @@ fn find_new_files(
 }
 
 impl Files {
+    /// Build a [`Files`] struct from an explicit list of paths that should end
+    /// up in the package. Each entry must be either an absolute path that lives
+    /// inside `prefix`, or a relative path that will be resolved against
+    /// `prefix`.
+    ///
+    /// Paths that escape the prefix or do not exist on disk cause the build to
+    /// fail. The `files` and `always_include` globs are applied on top of the
+    /// explicit list, mirroring the behaviour of [`Files::from_prefix`]: the
+    /// `files` glob filters the explicit list down, and `always_include`
+    /// scans the prefix to force-include matching files.
+    pub fn from_paths(
+        prefix: &Path,
+        paths: impl IntoIterator<Item = PathBuf>,
+        always_include: &GlobVec,
+        files: &GlobVec,
+    ) -> Result<Self, PackagingError> {
+        let old_files = collect_previous_files(prefix)?;
+
+        let mut new_files = HashSet::new();
+        for path in paths {
+            let resolved = if path.is_absolute() {
+                path
+            } else {
+                prefix.join(path)
+            };
+
+            if resolved.strip_prefix(prefix).is_err() {
+                return Err(PackagingError::PackageFileOutsidePrefix(resolved));
+            }
+
+            if !resolved.exists() {
+                return Err(PackagingError::PackageFileMissing(resolved));
+            }
+
+            new_files.insert(resolved);
+        }
+
+        if !files.is_empty() {
+            new_files.retain(|f| {
+                files.is_match(f.strip_prefix(prefix).expect("File should be in prefix"))
+            });
+        }
+
+        if !always_include.is_empty() {
+            for file in record_files(prefix)? {
+                let file_without_prefix =
+                    file.strip_prefix(prefix).expect("File should be in prefix");
+                if always_include.is_match(file_without_prefix) {
+                    tracing::info!("Forcing inclusion of file: {:?}", file_without_prefix);
+                    new_files.insert(file);
+                }
+            }
+        }
+
+        Ok(Files {
+            new_files,
+            old_files,
+            prefix: prefix.to_owned(),
+        })
+    }
+
     /// Find all files in the given (host) prefix and remove all previously installed files (based on the PrefixRecord
     /// of the conda environment). If always_include is Some, then all files matching the glob pattern will be included
     /// in the new_files set.
@@ -160,22 +274,7 @@ impl Files {
 
         let fs_is_case_sensitive = check_is_case_sensitive()?;
 
-        let mut previous_files = if prefix.join("conda-meta").exists() {
-            let prefix_records: Vec<PrefixRecord> = PrefixRecord::collect_from_prefix(prefix)?;
-            let mut previous_files =
-                prefix_records
-                    .into_iter()
-                    .fold(HashSet::new(), |mut acc, record| {
-                        acc.extend(record.files.iter().map(|f| prefix.join(f)));
-                        acc
-                    });
-
-            // Also include the existing conda-meta (PrefixRecord) files themselves
-            previous_files.extend(record_files(&prefix.join("conda-meta"))?);
-            previous_files
-        } else {
-            HashSet::new()
-        };
+        let mut previous_files = collect_previous_files(prefix)?;
 
         // If we have a snapshot of files taken after dependency installation,
         // treat those as "already existing" so that post-link script artifacts
@@ -269,7 +368,9 @@ impl TempFiles {
 mod test {
     use std::{collections::HashSet, path::PathBuf};
 
-    use crate::packaging::file_finder::{check_is_case_sensitive, find_new_files};
+    use crate::packaging::file_finder::{
+        Files, check_is_case_sensitive, find_new_files, read_package_files_list,
+    };
 
     #[test]
     fn test_find_new_files_case_sensitive() {
@@ -334,5 +435,146 @@ mod test {
         // We can't assert the specific value since it depends on the filesystem,
         // but we can verify the function doesn't panic and returns a boolean
         let _is_case_sensitive = result.unwrap();
+    }
+
+    #[test]
+    fn test_read_package_files_list_missing() {
+        let tempdir = tempfile::TempDir::new().unwrap();
+        let path = tempdir.path().join("does_not_exist.txt");
+        assert!(read_package_files_list(&path).unwrap().is_none());
+    }
+
+    #[test]
+    fn test_read_package_files_list_empty() {
+        let tempdir = tempfile::TempDir::new().unwrap();
+        let path = tempdir.path().join("package_files.txt");
+        fs_err::write(&path, "\n   \n\n").unwrap();
+        assert!(read_package_files_list(&path).unwrap().is_none());
+    }
+
+    #[test]
+    fn test_read_package_files_list_paths() {
+        let tempdir = tempfile::TempDir::new().unwrap();
+        let path = tempdir.path().join("package_files.txt");
+        fs_err::write(&path, "  bin/foo\n\nbin/bar\n/abs/path  \n").unwrap();
+        let parsed = read_package_files_list(&path).unwrap().unwrap();
+        assert_eq!(
+            parsed,
+            vec![
+                PathBuf::from("bin/foo"),
+                PathBuf::from("bin/bar"),
+                PathBuf::from("/abs/path"),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_files_from_paths_resolves_paths() {
+        let tempdir = tempfile::TempDir::new().unwrap();
+        let prefix = tempdir.path();
+
+        fs_err::create_dir_all(prefix.join("bin")).unwrap();
+        fs_err::write(prefix.join("bin/foo"), b"foo").unwrap();
+        fs_err::write(prefix.join("bin/bar"), b"bar").unwrap();
+
+        let inputs = vec![PathBuf::from("bin/foo"), prefix.join("bin/bar")];
+
+        let files =
+            Files::from_paths(prefix, inputs, &Default::default(), &Default::default()).unwrap();
+        let new_files: HashSet<PathBuf> = files.new_files.iter().cloned().collect();
+
+        assert_eq!(new_files.len(), 2);
+        assert!(new_files.contains(&prefix.join("bin/foo")));
+        assert!(new_files.contains(&prefix.join("bin/bar")));
+        assert_eq!(files.prefix, prefix);
+    }
+
+    #[test]
+    fn test_files_from_paths_outside_prefix_errors() {
+        let tempdir = tempfile::TempDir::new().unwrap();
+        let prefix = tempdir.path();
+
+        let outside = tempfile::TempDir::new().unwrap();
+        let outside_file = outside.path().join("escape.txt");
+        fs_err::write(&outside_file, b"nope").unwrap();
+
+        let err = Files::from_paths(
+            prefix,
+            vec![outside_file],
+            &Default::default(),
+            &Default::default(),
+        )
+        .unwrap_err();
+        assert!(matches!(
+            err,
+            crate::packaging::PackagingError::PackageFileOutsidePrefix(_)
+        ));
+    }
+
+    #[test]
+    fn test_files_from_paths_missing_errors() {
+        let tempdir = tempfile::TempDir::new().unwrap();
+        let prefix = tempdir.path();
+
+        let err = Files::from_paths(
+            prefix,
+            vec![PathBuf::from("bin/missing")],
+            &Default::default(),
+            &Default::default(),
+        )
+        .unwrap_err();
+        assert!(matches!(
+            err,
+            crate::packaging::PackagingError::PackageFileMissing(_)
+        ));
+    }
+
+    #[test]
+    fn test_files_from_paths_applies_files_glob() {
+        use rattler_build_recipe::stage1::GlobVec;
+
+        let tempdir = tempfile::TempDir::new().unwrap();
+        let prefix = tempdir.path();
+        fs_err::create_dir_all(prefix.join("bin")).unwrap();
+        fs_err::write(prefix.join("bin/foo"), b"foo").unwrap();
+        fs_err::write(prefix.join("bin/bar"), b"bar").unwrap();
+
+        let only_foo: GlobVec = serde_yaml::from_str("- bin/foo").unwrap();
+
+        let files = Files::from_paths(
+            prefix,
+            vec![PathBuf::from("bin/foo"), PathBuf::from("bin/bar")],
+            &Default::default(),
+            &only_foo,
+        )
+        .unwrap();
+
+        assert_eq!(files.new_files.len(), 1);
+        assert!(files.new_files.contains(&prefix.join("bin/foo")));
+    }
+
+    #[test]
+    fn test_files_from_paths_applies_always_include_glob() {
+        use rattler_build_recipe::stage1::GlobVec;
+
+        let tempdir = tempfile::TempDir::new().unwrap();
+        let prefix = tempdir.path();
+        fs_err::create_dir_all(prefix.join("bin")).unwrap();
+        fs_err::write(prefix.join("bin/foo"), b"foo").unwrap();
+        fs_err::write(prefix.join("bin/extra"), b"extra").unwrap();
+
+        let always: GlobVec = serde_yaml::from_str("- bin/extra").unwrap();
+
+        let files = Files::from_paths(
+            prefix,
+            vec![PathBuf::from("bin/foo")],
+            &always,
+            &Default::default(),
+        )
+        .unwrap();
+
+        assert_eq!(files.new_files.len(), 2);
+        assert!(files.new_files.contains(&prefix.join("bin/foo")));
+        assert!(files.new_files.contains(&prefix.join("bin/extra")));
     }
 }
