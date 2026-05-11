@@ -7,6 +7,7 @@ use clap::{Parser, ValueEnum, builder::ArgPredicate, crate_version};
 use clap_complete::{Generator, shells};
 use clap_complete_nushell::Nushell;
 use clap_verbosity_flag::{InfoLevel, Verbosity};
+use rattler_build_recipe::BuildStringPrefix;
 use rattler_build_script::{SandboxArguments, SandboxConfiguration};
 use rattler_conda_types::{
     NamedChannelOrUrl, Platform, compression_level::CompressionLevel, package::CondaArchiveType,
@@ -37,8 +38,12 @@ pub struct BuildOnlyOpts {
 
     /// Prefix to prepend to the auto-generated build string
     /// (e.g. `--build-string-prefix my_prefix` produces `my_prefix_h1234_0`)
-    #[arg(long, help_heading = "Modifying result")]
-    pub build_string_prefix: Option<String>,
+    #[arg(
+        long,
+        value_parser = parse_build_string_prefix,
+        help_heading = "Modifying result"
+    )]
+    pub build_string_prefix: Option<BuildStringPrefix>,
 
     #[allow(missing_docs)]
     #[clap(flatten)]
@@ -757,8 +762,12 @@ pub struct PublishOpts {
 
     /// Prefix to prepend to the auto-generated build string
     /// (e.g. `--build-string-prefix my_prefix` produces `my_prefix_h1234_0`)
-    #[arg(long, help_heading = "Publishing")]
-    pub build_string_prefix: Option<String>,
+    #[arg(
+        long,
+        value_parser = parse_build_string_prefix,
+        help_heading = "Publishing",
+    )]
+    pub build_string_prefix: Option<BuildStringPrefix>,
 
     /// Force upload even if the package already exists (not recommended - may break lockfiles).
     /// Only works with S3, filesystem, Anaconda.org, and prefix.dev channels.
@@ -907,7 +916,7 @@ pub struct BuildData {
     pub allow_absolute_license_paths: bool,
     pub exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
     pub build_num_override: Option<u64>,
-    pub build_string_prefix: Option<String>,
+    pub build_string_prefix: Option<BuildStringPrefix>,
     pub markdown_summary: Option<PathBuf>,
 }
 
@@ -944,7 +953,7 @@ impl BuildData {
         allow_absolute_license_paths: bool,
         exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
         build_num_override: Option<u64>,
-        build_string_prefix: Option<String>,
+        build_string_prefix: Option<BuildStringPrefix>,
         markdown_summary: Option<PathBuf>,
     ) -> Self {
         Self {
@@ -1036,8 +1045,8 @@ impl BuildData {
             opts.allow_symlinks_on_windows,
             opts.allow_absolute_license_paths,
             opts.exclude_newer,
-            None, // build_num_override — set by caller (BuildOnlyOpts or PublishOpts)
-            None, // build_string_prefix — set by caller (BuildOnlyOpts or PublishOpts)
+            None, // build_num_override - set by caller (BuildOnlyOpts or PublishOpts)
+            None, // build_string_prefix - set by caller (BuildOnlyOpts or PublishOpts)
             opts.markdown_summary,
         )
     }
@@ -1060,6 +1069,13 @@ fn parse_key_val(s: &str) -> Result<(String, Value), Box<dyn Error + Send + Sync
         .split_once('=')
         .ok_or_else(|| format!("invalid KEY=value: no `=` found in `{}`", s))?;
     Ok((key.to_string(), json!(value)))
+}
+
+/// Parse a `--build-string-prefix` value into a validated `BuildStringPrefix`.
+fn parse_build_string_prefix(
+    s: &str,
+) -> Result<BuildStringPrefix, rattler_build_recipe::variant_render::BuildStringPrefixError> {
+    BuildStringPrefix::try_from(s)
 }
 
 /// Parse variant override (e.g., "python=3.12" or "python=3.12,3.11")

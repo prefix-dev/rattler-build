@@ -4,9 +4,12 @@ use indexmap::IndexMap;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use rattler_build_jinja::Variable;
-use rattler_build_recipe::variant_render::{
-    RenderConfig as RustRenderConfig, RenderedVariant as RustRenderedVariant,
-    render_recipe_with_variant_config,
+use rattler_build_recipe::{
+    BuildStringPrefix,
+    variant_render::{
+        RenderConfig as RustRenderConfig, RenderedVariant as RustRenderedVariant,
+        render_recipe_with_variant_config,
+    },
 };
 use rattler_conda_types::Platform;
 
@@ -70,6 +73,12 @@ impl PyRenderConfig {
                     .collect::<PyResult<IndexMap<String, Variable>>>()
             })
             .transpose()?
+            .unwrap_or_default();
+
+        let build_string_prefix = build_string_prefix
+            .map(BuildStringPrefix::try_from)
+            .transpose()
+            .map_err(|e| RattlerBuildError::Other(e.to_string()))?
             .unwrap_or_default();
 
         // Get OS environment variable keys that can be overridden by variant config
