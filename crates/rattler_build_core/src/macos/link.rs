@@ -118,6 +118,10 @@ impl Relinker for Dylib {
             .map(|rpath| self.resolve_rpath(rpath, prefix, encoded_prefix))
             .collect::<Vec<_>>();
 
+        // get self path in "encoded prefix" for resolving @loader_path
+        let self_path =
+            encoded_prefix.join(self.path.strip_prefix(prefix).expect("dylib not in prefix"));
+
         let mut resolved_libraries = HashMap::new();
         for lib in self.libraries.iter() {
             if lib == &PathBuf::from("@self") {
@@ -134,6 +138,26 @@ impl Relinker for Dylib {
                         resolved_libraries.insert(lib.clone(), resolved_library_path);
                         break;
                     }
+                }
+            } else if let Ok(lib_without_loader) = lib.strip_prefix("@loader_path") {
+                // @loader_path resolves relative to the directory of the binary itself
+                if let Some(library_parent) = self_path.parent() {
+                    let resolved = to_lexical_absolute(lib_without_loader, library_parent);
+                    if resolved.exists() {
+                        let resolved_library_path =
+                            Some(resolved.canonicalize().unwrap_or(resolved));
+                        resolved_libraries.insert(lib.clone(), resolved_library_path);
+                    }
+                }
+            } else if let Ok(lib_without_exec) = lib.strip_prefix("@executable_path") {
+                // @executable_path resolves relative to the main executable directory.
+                // At link-check time we don't know which executable will load this library,
+                // so we use <prefix>/bin as the conventional executable location.
+                let exec_dir = encoded_prefix.join("bin");
+                let resolved = to_lexical_absolute(lib_without_exec, &exec_dir);
+                if resolved.exists() {
+                    let resolved_library_path = Some(resolved.canonicalize().unwrap_or(resolved));
+                    resolved_libraries.insert(lib.clone(), resolved_library_path);
                 }
             } else if lib.is_absolute() {
                 resolved_libraries.insert(lib.clone(), Some(lib.clone()));
