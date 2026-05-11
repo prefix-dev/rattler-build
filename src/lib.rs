@@ -461,6 +461,23 @@ pub async fn get_build_output(
             continue;
         }
 
+        // A recipe may only declare sandbox escapes when the sandbox is enabled
+        // via `--sandbox` or `--sandbox-config` on the CLI.
+        if build_data.sandbox_configuration.is_none()
+            && recipe
+                .build()
+                .script
+                .sandbox
+                .as_ref()
+                .is_some_and(|s| !s.is_empty())
+        {
+            return Err(miette::miette!(
+                "Recipe for `{}` declares a `script.sandbox` block, but the sandbox is not enabled. \
+                 Pass `--sandbox` or `--sandbox-config <path>` to enable it.",
+                recipe.package().name().as_normalized(),
+            ));
+        }
+
         subpackages.insert(
             recipe.package().name().clone(),
             PackageIdentifier {

@@ -179,7 +179,7 @@ async fn async_main() -> miette::Result<()> {
         Some(SubCommands::Build(build_only)) => {
             let recipes = build_only.build.recipes.clone();
             let recipe_dir = build_only.build.recipe_dir.clone();
-            let mut build_data = BuildData::from_opts_and_config(build_only.build, config);
+            let mut build_data = BuildData::from_opts_and_config(build_only.build, config)?;
             build_data.build_num_override = build_only.build_num;
             build_data.build_string_prefix = build_only.build_string_prefix;
 
@@ -198,7 +198,7 @@ async fn async_main() -> miette::Result<()> {
         }
 
         Some(SubCommands::Publish(publish_args)) => {
-            let publish_data = PublishData::from_opts_and_config(publish_args, config);
+            let publish_data = PublishData::from_opts_and_config(publish_args, config)?;
             publish_packages(publish_data, &Some(log_handler)).await
         }
 

@@ -59,6 +59,58 @@ impl<T: ToString + Debug> IncludeExclude<T> {
     }
 }
 
+/// Recipe-declared sandbox escape requests (additive on top of host config)
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+pub struct Sandbox {
+    /// Request network access for this build
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub network: Option<Value<bool>>,
+
+    /// Additional read-only paths
+    #[serde(default, skip_serializing_if = "ConditionalList::is_empty")]
+    pub read: ConditionalList<String>,
+
+    /// Additional read+execute paths
+    #[serde(default, skip_serializing_if = "ConditionalList::is_empty")]
+    pub read_execute: ConditionalList<String>,
+
+    /// Additional read+write paths
+    #[serde(default, skip_serializing_if = "ConditionalList::is_empty")]
+    pub read_write: ConditionalList<String>,
+
+    /// Human-readable reason surfaced in logs
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<Value<String>>,
+}
+
+impl Sandbox {
+    /// Returns true if no escape was requested
+    pub fn is_default(&self) -> bool {
+        self.network.is_none()
+            && self.read.is_empty()
+            && self.read_execute.is_empty()
+            && self.read_write.is_empty()
+            && self.reason.is_none()
+    }
+
+    /// Collect all variables referenced by this sandbox block
+    pub fn used_variables(&self) -> Vec<String> {
+        let mut vars = Vec::new();
+        if let Some(network) = &self.network {
+            vars.extend(network.used_variables());
+        }
+        vars.extend(self.read.used_variables());
+        vars.extend(self.read_execute.used_variables());
+        vars.extend(self.read_write.used_variables());
+        if let Some(reason) = &self.reason {
+            vars.extend(reason.used_variables());
+        }
+        vars.sort();
+        vars.dedup();
+        vars
+    }
+}
+
 /// Build script configuration
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Script {
@@ -86,6 +138,10 @@ pub struct Script {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cwd: Option<Value<String>>,
 
+    /// Recipe-declared sandbox escape requests (additive)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sandbox: Option<Sandbox>,
+
     /// Whether content was explicitly specified via `content:` field
     /// When true, serialization should preserve `{content: ...}` structure
     /// When false, can serialize as plain string if no other options
@@ -102,6 +158,7 @@ impl Default for Script {
             content: None,
             file: None,
             cwd: None,
+            sandbox: None,
             content_explicit: false,
         }
     }
@@ -150,6 +207,7 @@ impl Script {
             && self.cwd.is_none()
             && self.env.is_empty()
             && self.secrets.is_empty()
+            && self.sandbox.as_ref().is_none_or(Sandbox::is_default)
     }
 
     /// Collect all variables used in this script
@@ -161,6 +219,7 @@ impl Script {
             content,
             file,
             cwd,
+            sandbox,
             content_explicit: _,
         } = self;
 
@@ -184,6 +243,10 @@ impl Script {
 
         if let Some(cwd) = cwd {
             vars.extend(cwd.used_variables());
+        }
+
+        if let Some(sandbox) = sandbox {
+            vars.extend(sandbox.used_variables());
         }
 
         vars.sort();
