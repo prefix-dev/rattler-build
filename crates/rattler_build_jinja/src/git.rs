@@ -129,9 +129,6 @@ impl Git {
         Ok(Value::from(result))
     }
 
-    /// Returns the SHA of the most recent tag in `src` (a remote URL) by
-    /// querying `git ls-remote`. Used as a shared helper by `latest_tag_rev`,
-    /// `latest_tag`, and `latest_tag_distance`.
     fn latest_tag_sha_remote(&self, src: &str) -> Result<String, minijinja::Error> {
         get_command_output("git", &["ls-remote", "--tags", "--sort=-v:refname", src])?
             .lines()
@@ -172,9 +169,6 @@ impl Git {
 
     fn latest_tag_distance(&self, src: &str) -> Result<Value, minijinja::Error> {
         if let Some(local_path) = self.resolve_local_path(src) {
-            // rsplitn on "v1.0-rc1-5-gabcdef" -> ["gabcdef", "5", "v1.0-rc1"]
-            // Splitting from the right ensures tag names containing dashes
-            // (e.g. "v1.0-rc1", "v0.18.0-1") don't corrupt the distance field.
             let result = git_command_in_dir(&local_path, &["describe", "--tags", "--long"])?
                 .trim()
                 .rsplitn(3, '-')
