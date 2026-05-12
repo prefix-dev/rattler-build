@@ -3847,7 +3847,7 @@ packages:
   - python >=3.10
   - python_abi 3.10.* *_cp310
   constrains:
-  - __osx >=10.13
+  - __osx >=11.0
   license: BSD-3-Clause
 - conda: .
   name: py-rattler-build
