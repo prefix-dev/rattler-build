@@ -163,12 +163,44 @@ impl Git {
         Ok(Value::from(result))
     }
 
+    fn latest_tag_distance(&self, src: &str) -> Result<Value, minijinja::Error> {
+        if let Some(local_path) = self.resolve_local_path(src) {
+            let result = git_command_in_dir(&local_path, &["describe", "--tags", "--long"])?
+                .trim()
+                .splitn(3, '-')
+                .collect::<Vec<&str>>()[1]
+                .to_string();
+            return Ok(Value::from(result));
+        }
+
+        let tag_rev =
+            get_command_output("git", &["ls-remote", "--tags", "--sort=-v:refname", src])?
+                .lines()
+                .next()
+                .and_then(|s| s.split_ascii_whitespace().nth(0))
+                .ok_or_else(|| {
+                    minijinja::Error::new(
+                        minijinja::ErrorKind::InvalidOperation,
+                        "Failed to get the latest tag".to_string(),
+                    )
+                })?
+                .to_string();
+        let distance = get_command_output(
+            "git",
+            &["rev-list", "--count", &format!("{}..HEAD", tag_rev)],
+        )?
+        .trim()
+        .to_string();
+        Ok(Value::from(distance))
+    }
+
     fn dispatch(&self, name: &str, args: &[Value]) -> Result<Value, minijinja::Error> {
         let (src,) = from_args(args)?;
         match name {
             "head_rev" => self.head_rev(src),
             "latest_tag_rev" => self.latest_tag_rev(src),
             "latest_tag" => self.latest_tag(src),
+            "latest_tag_distance" => self.latest_tag_distance(src),
             name => Err(minijinja::Error::new(
                 minijinja::ErrorKind::UnknownMethod,
                 format!("object has no method named {name}"),

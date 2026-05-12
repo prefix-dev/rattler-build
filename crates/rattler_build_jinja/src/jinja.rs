@@ -1029,9 +1029,17 @@ mod tests {
                     .unwrap()
             );
             assert_eq!(
+                jinja
+                    .eval(&format!("git.latest_tag_distance({:?})", path))
+                    .expect("test 2")
+                    .as_str()
+                    .unwrap(),
+                "0"
+            );
+            assert_eq!(
                 jinja_wo_experimental
                     .eval(&format!("git.latest_tag({:?})", path))
-                    .expect_err("test 2")
+                    .expect_err("test 3")
                     .to_string(),
                 "invalid operation: Experimental feature: provide the `--experimental` flag to enable this feature (in <expression>:1)",
             );
@@ -1100,6 +1108,16 @@ mod tests {
                 .as_str()
                 .unwrap(),
             head.as_str().unwrap()
+        );
+
+        // Test latest_tag_distance with relative path
+        assert_eq!(
+            jinja
+                .eval("git.latest_tag_distance(\"../repo\")")
+                .expect("relative path latest_tag_distance")
+                .as_str()
+                .unwrap(),
+            "0"
         );
     }
 
