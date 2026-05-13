@@ -1085,6 +1085,9 @@ fn finalize_build_string_single(
 /// - All named dependencies from build/host/run requirements
 /// - All pin_subpackage references from run_exports (these reference other outputs
 ///   and create build-order dependencies even though they're not direct build deps)
+/// - All named build/host dependencies of any staging caches the recipe inherits
+///   from (the staging build runs before the output build, so its dependencies
+///   must be built first as well)
 ///
 /// Note: May contain duplicates, which is acceptable for dependency graph construction.
 fn extract_dependency_names(recipe: &Stage1Recipe) -> Vec<rattler_conda_types::PackageName> {
@@ -1115,9 +1118,20 @@ fn extract_dependency_names(recipe: &Stage1Recipe) -> Vec<rattler_conda_types::P
             _ => None,
         });
 
+    // Collect build/host dependencies from inherited staging caches.
+    // A staging cache is built before any output that inherits from it, so its
+    // build-time dependencies on other local recipes must order this recipe
+    // after them in the build graph.
+    let staging_build_host = recipe
+        .staging_caches
+        .iter()
+        .flat_map(|cache| cache.requirements.build_host())
+        .filter_map(|dep| dep.name().cloned());
+
     build_host
         .chain(run_pin_subpackages)
         .chain(run_export_pins)
+        .chain(staging_build_host)
         .collect()
 }
 
@@ -2004,6 +2018,98 @@ outputs:
         assert_eq!(sorted[0].recipe.package.name.as_normalized(), "pkg-a");
         assert_eq!(sorted[1].recipe.package.name.as_normalized(), "pkg-b");
         assert_eq!(sorted[2].recipe.package.name.as_normalized(), "pkg-c");
+    }
+
+    #[test]
+    fn test_topological_sort_staging_cache_cross_recipe_dependency() {
+        // Regression test for https://github.com/prefix-dev/rattler-build/issues/2492
+        //
+        // When two recipes are built together (e.g. via `--recipe-dir`), a
+        // multi-output recipe whose top-level `cache` build depends on another
+        // local recipe must be ordered AFTER that recipe. Previously only
+        // per-output requirements were inspected, so the cache-level dependency
+        // was ignored and the build order ended up alphabetical, which made the
+        // cache build fail with "no candidate for package_c".
+        let recipe_a_yaml = r#"
+schema_version: 1
+
+recipe:
+  name: package_a
+  version: "1.0.0"
+
+outputs:
+  - staging:
+      name: build-cache
+    requirements:
+      host:
+        - package_c
+    build:
+      script:
+        - echo building
+
+  - package:
+      name: package_a_lib
+    inherit: build-cache
+    build:
+      noarch: generic
+
+  - package:
+      name: package_a_tools
+    inherit: build-cache
+    build:
+      noarch: generic
+"#;
+
+        let recipe_c_yaml = r#"
+schema_version: 1
+
+package:
+  name: package_c
+  version: "1.0.0"
+
+build:
+  noarch: generic
+"#;
+
+        let variant_yaml = r#"{}"#;
+
+        let stage0_a = stage0::parse_recipe_or_multi_from_source(recipe_a_yaml).unwrap();
+        let stage0_c = stage0::parse_recipe_or_multi_from_source(recipe_c_yaml).unwrap();
+        let variant_config = VariantConfig::from_yaml_str(variant_yaml).unwrap();
+
+        let mut rendered =
+            render_recipe_with_variant_config(&stage0_a, &variant_config, RenderConfig::new())
+                .unwrap();
+        rendered.extend(
+            render_recipe_with_variant_config(&stage0_c, &variant_config, RenderConfig::new())
+                .unwrap(),
+        );
+
+        // Sanity-check that the staging cache survived rendering on the outputs
+        // of package_a — the fix relies on this.
+        assert!(
+            rendered
+                .iter()
+                .filter(|v| v.recipe.package.name.as_normalized().starts_with("package_a"))
+                .all(|v| !v.recipe.staging_caches.is_empty()),
+            "package_a outputs should carry their staging cache",
+        );
+
+        let sorted = topological_sort_variants(rendered).unwrap();
+        let names: Vec<_> = sorted
+            .iter()
+            .map(|v| v.recipe.package.name.as_normalized().to_string())
+            .collect();
+
+        let pos_c = names.iter().position(|n| n == "package_c").unwrap();
+        let pos_a_lib = names.iter().position(|n| n == "package_a_lib").unwrap();
+        let pos_a_tools = names.iter().position(|n| n == "package_a_tools").unwrap();
+
+        assert!(
+            pos_c < pos_a_lib && pos_c < pos_a_tools,
+            "package_c must be built before package_a outputs, got order: {:?}",
+            names,
+        );
     }
 
     #[test]
