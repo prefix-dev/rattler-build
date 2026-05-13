@@ -119,7 +119,8 @@ impl SystemTools {
         let which = |tool: &str| -> Result<PathBuf, which::Error> {
             if let Some(build_prefix) = &self.build_prefix {
                 let build_prefix_activator =
-                    Activator::from_path(build_prefix, shell::Bash::default(), Platform::current()).unwrap();
+                    Activator::from_path(build_prefix, shell::Bash::default(), Platform::current())
+                        .unwrap();
 
                 let paths = std::env::join_paths(build_prefix_activator.paths).ok();
                 let mut found_tool = which::which_in_global(&tool, paths)?;
