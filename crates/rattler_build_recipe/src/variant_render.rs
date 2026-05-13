@@ -432,8 +432,7 @@ fn build_recipe_graph(
     for (idx, recipe) in recipes.iter().enumerate() {
         let current_name = &recipe.package.name;
 
-        for dep_name in extract_dependency_names_with_sibling_context(recipe, Some(name_to_indices))
-        {
+        for dep_name in extract_dependency_names_with_sibling_context(recipe, name_to_indices) {
             if &dep_name == current_name {
                 continue;
             }
@@ -619,7 +618,7 @@ fn stable_topological_sort(
             // Check all dependencies in requirements (including run deps on sibling outputs)
             for dep_name in extract_dependency_names_with_sibling_context(
                 &variants[idx].recipe,
-                Some(name_to_indices),
+                name_to_indices,
             ) {
                 // Skip self-dependencies
                 if &dep_name == current_name {
@@ -1089,8 +1088,8 @@ fn finalize_build_string_single(
     Ok(())
 }
 
-/// Extract dependency names, optionally including plain run dependencies that reference
-/// sibling outputs in the same recipe.
+/// Extract dependency names, including plain run dependencies that reference sibling
+/// outputs in the same recipe.
 ///
 /// Collects build/host deps, pin_subpackage refs from run/run_exports, and
 /// *exact* pin_subpackage refs from run_constraints (non-exact constraints only
@@ -1099,7 +1098,7 @@ fn finalize_build_string_single(
 /// May contain duplicates, which is fine for graph construction.
 fn extract_dependency_names_with_sibling_context(
     recipe: &Stage1Recipe,
-    sibling_names: Option<&BTreeMap<rattler_conda_types::PackageName, Vec<usize>>>,
+    sibling_names: &BTreeMap<rattler_conda_types::PackageName, Vec<usize>>,
 ) -> Vec<rattler_conda_types::PackageName> {
     let requirements = recipe.requirements();
 
@@ -1138,21 +1137,15 @@ fn extract_dependency_names_with_sibling_context(
     // Collect plain run/run_constraints dependencies that reference sibling outputs.
     // These create build-order dependencies: if output B has a run dep on sibling output A,
     // then A must be built before B (e.g., so B's test environment can install A).
-    let run_sibling_deps: Vec<rattler_conda_types::PackageName> =
-        if let Some(sibling_names) = sibling_names {
-            requirements
-                .run
-                .iter()
-                .chain(requirements.run_constraints.iter())
-                .filter_map(|dep| match dep {
-                    Dependency::Spec(_) => dep.name().cloned(),
-                    _ => None, // pin_subpackage already handled above
-                })
-                .filter(|name| sibling_names.contains_key(name))
-                .collect()
-        } else {
-            Vec::new()
-        };
+    let run_sibling_deps = requirements
+        .run
+        .iter()
+        .chain(requirements.run_constraints.iter())
+        .filter_map(|dep| match dep {
+            Dependency::Spec(_) => dep.name().cloned(),
+            _ => None, // pin_subpackage already handled above
+        })
+        .filter(|name| sibling_names.contains_key(name));
 
     build_host
         .chain(run_pin_subpackages)
