@@ -143,7 +143,7 @@ rattler_package_streaming = { version = "0.26.0", default-features = false }
 rattler_shell = { version = "0.27.0", default-features = false, features = [
   "sysinfo",
 ] }
-rattler_git = { version = "0.1.1" }
+rattler_git = { version = "0.1.3" }
 rattler_prefix_guard = { version = "0.1.0" }
 
 rattler_config = { version = "0.3.8" }
