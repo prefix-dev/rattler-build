@@ -7,12 +7,14 @@ mod cpan;
 mod cran;
 mod luarocks;
 mod pypi;
+mod pyproject;
 mod serialize;
 
 pub use self::cpan::{CpanOpts, generate_cpan_recipe, generate_cpan_recipe_string};
 pub use self::cran::{CranOpts, generate_r_recipe, generate_r_recipe_string};
 pub use self::luarocks::{LuarocksOpts, generate_luarocks_recipe, generate_luarocks_recipe_string};
 pub use self::pypi::{PyPIOpts, generate_pypi_recipe, generate_pypi_recipe_string};
+pub use self::pyproject::{PyprojectOpts, generate_pyproject_recipe, generate_pyproject_recipe_string};
 pub use serialize::write_recipe;
 
 /// The source of the package to generate a recipe for
@@ -30,6 +32,9 @@ pub enum Source {
 
     /// Generate a recipe for a Lua package from LuaRocks
     Luarocks(LuarocksOpts),
+
+    /// Generate a recipe from a local pyproject.toml file
+    Pyproject(PyprojectOpts),
 }
 
 /// Options for generating a recipe
@@ -49,6 +54,7 @@ pub async fn generate_recipe(args: GenerateRecipeOpts) -> miette::Result<()> {
         Source::Cran(opts) => generate_r_recipe(&opts).await?,
         Source::Cpan(opts) => generate_cpan_recipe(&opts).await?,
         Source::Luarocks(opts) => generate_luarocks_recipe(&opts).await?,
+        Source::Pyproject(opts) => generate_pyproject_recipe(&opts).await?,
     }
 
     Ok(())
