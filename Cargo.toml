@@ -214,6 +214,14 @@ serde_json = { workspace = true }
 anyhow = { workspace = true }
 reqwest = { workspace = true, features = ["multipart"] }
 reqwest-middleware = { workspace = true }
+async_http_range_reader = { package = "astral_async_http_range_reader", version = "0.11.0" }
+async_zip = { package = "astral_async_zip", version = "0.0.17", features = [
+  "tokio",
+  "zstd",
+] }
+async-compression = { version = "0.4", features = ["tokio", "zstd"] }
+tokio_tar = { package = "astral-tokio-tar", version = "0.6", default-features = false }
+http = "1"
 tokio = { workspace = true, features = [
   "rt",
   "macros",
@@ -251,7 +259,7 @@ rattler_conda_types = { workspace = true, features = ["rayon"] }
 rattler_digest = { workspace = true }
 rattler_index = { workspace = true }
 rattler_networking = { workspace = true, features = ["rattler_config"] }
-rattler_package_streaming = { workspace = true, default-features = false, features = ["reqwest"] }
+rattler_package_streaming = { workspace = true, default-features = false }
 rattler_repodata_gateway = { workspace = true }
 rattler_upload = { workspace = true }
 rattler_solve = { workspace = true }

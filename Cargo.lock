@@ -4822,6 +4822,10 @@ version = "0.64.1"
 dependencies = [
  "anyhow",
  "astral-reqwest-middleware",
+ "astral-tokio-tar",
+ "astral_async_http_range_reader",
+ "astral_async_zip",
+ "async-compression",
  "chrono",
  "clap",
  "clap-verbosity-flag",
@@ -4835,6 +4839,7 @@ dependencies = [
  "fs-err",
  "futures",
  "globset",
+ "http 1.4.0",
  "ignore",
  "indexmap 2.14.0",
  "insta",
