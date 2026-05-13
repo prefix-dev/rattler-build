@@ -347,15 +347,10 @@ async fn upload_to_s3(
     publish_config: &PublishConfig,
 ) -> miette::Result<()> {
     use rattler_index::{IndexS3Config, ensure_channel_initialized_s3, index_s3};
-    use rattler_networking::s3_middleware;
     use rattler_upload::upload::upload_package_to_s3;
     use std::collections::HashSet;
 
     tracing::info!("Uploading packages to S3 channel: {}", url);
-
-    // Get authentication storage
-    let auth_storage = tool_configuration::get_auth_store(publish_config.auth_file.clone())
-        .map_err(|e| miette::miette!("Failed to get authentication storage: {}", e))?;
 
     // Resolve S3 credentials using config + auth storage, falling back to AWS SDK
     let resolved_credentials = tool_configuration::resolve_s3_credentials(
@@ -365,35 +360,6 @@ async fn upload_to_s3(
     )
     .await
     .into_diagnostic()?;
-
-    // Create S3Credentials from the config if available (for upload_package_to_s3)
-    let bucket_name = url.host_str().unwrap_or_default();
-    let s3_credentials = publish_config
-        .s3_config
-        .get(bucket_name)
-        .and_then(|config| {
-            if let s3_middleware::S3Config::Custom {
-                endpoint_url,
-                region,
-                force_path_style,
-            } = config
-            {
-                Some(rattler_s3::S3Credentials {
-                    endpoint_url: endpoint_url.clone(),
-                    region: region.clone(),
-                    addressing_style: if *force_path_style {
-                        rattler_s3::S3AddressingStyle::Path
-                    } else {
-                        rattler_s3::S3AddressingStyle::VirtualHost
-                    },
-                    access_key_id: None,
-                    secret_access_key: None,
-                    session_token: None,
-                })
-            } else {
-                None
-            }
-        });
 
     // Ensure channel is initialized with noarch/repodata.json
     ensure_channel_initialized_s3(url, &resolved_credentials)
@@ -409,9 +375,8 @@ async fn upload_to_s3(
 
     // Upload packages to S3
     upload_package_to_s3(
-        &auth_storage,
         url.clone(),
-        s3_credentials,
+        resolved_credentials.clone(),
         &package_paths.to_vec(),
         publish_config.force,
     )

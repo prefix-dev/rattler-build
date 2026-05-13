@@ -9,10 +9,10 @@ readme = "README.md"
 description = "Automatic recipe generation for Python (PyPI), R (CRAN), Perl (CPAN), and Lua (LuaRocks) packages"
 
 [features]
-default = ['rustls-tls']
+default = ['rustls']
 cli = ["dep:clap"]
 native-tls = ['reqwest/native-tls']
-rustls-tls = ['reqwest/rustls-tls', 'reqwest/rustls-tls-native-roots']
+rustls = ['reqwest/rustls']
 
 [dependencies]
 clap = { workspace = true, optional = true }

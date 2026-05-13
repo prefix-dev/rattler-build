@@ -2,24 +2,32 @@
 use std::{
     collections::HashMap,
     default::Default,
-    io::{BufReader, Read},
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
-use http_range_client::HttpReader;
+use async_compression::tokio::bufread::ZstdDecoder;
+use async_http_range_reader::{AsyncHttpRangeReader, CheckSupportMethod};
+use async_zip::base::read::seek::ZipFileReader;
+use futures::StreamExt;
+use http::HeaderMap;
 use miette::{Context as _, IntoDiagnostic};
 use rattler_conda_types::{Channel, MatchSpec, ParseStrictness, Platform, RepoDataRecord};
 use rattler_networking::LazyClient;
-use rattler_package_streaming::seek::stream_conda_info;
 use rattler_repodata_gateway::{
     Gateway, fetch,
     sparse::{PackageFormatSelection, SparseRepoData},
 };
-
+use reqwest_middleware::ClientWithMiddleware;
+use tokio::io::AsyncReadExt;
 use tokio::task::JoinSet;
+use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
 use url::Url;
 
 const OUTPUT_PATH: &str = "test-data/conda_forge/recipes/";
+
+// 64KB should be enough for most packages to include the EOCD, Central Directory,
+// and often the entire info archive.
+const DEFAULT_TAIL_SIZE: u64 = 64 * 1024;
 
 // Overview:
 // 1. Get repodata for conda-forge linux-64.
@@ -64,6 +72,7 @@ async fn main() {
         .package_names(PackageFormatSelection::default())
         .map(|n| MatchSpec::from_str(n, ParseStrictness::Lenient).unwrap());
 
+    let http_client = client.client().clone();
     let gateway = Gateway::builder().with_client(client).finish();
 
     let repo_data = gateway
@@ -92,7 +101,11 @@ async fn main() {
     for record in latest_records.into_iter() {
         let recipe_expected_path = PathBuf::from("recipe.yaml");
 
-        record_tasks.spawn(handle_record(record, recipe_expected_path));
+        record_tasks.spawn(handle_record(
+            record,
+            recipe_expected_path,
+            http_client.clone(),
+        ));
     }
 
     let mut successes = 0;
@@ -109,72 +122,119 @@ async fn main() {
     }
 }
 
-async fn handle_record(
-    record: RepoDataRecord,
-    recipe_expected_path: PathBuf,
-) -> miette::Result<String> {
-    let pkg_name = record.package_record.name.as_source();
+/// Stream the `info/` section of a `.conda` archive over HTTP range requests
+/// and return the contents of `info/recipe/recipe.yaml` along with any
+/// `info/recipe/*.patch` files. Returns `Ok(None)` if no recipe.yaml is found.
+async fn fetch_recipe_files_sparse(
+    client: ClientWithMiddleware,
+    url: Url,
+    recipe_filename: &Path,
+) -> miette::Result<Option<(Vec<u8>, Vec<(PathBuf, Vec<u8>)>)>> {
+    let (reader, _) = AsyncHttpRangeReader::new(
+        client,
+        url,
+        CheckSupportMethod::NegativeRangeRequest(DEFAULT_TAIL_SIZE),
+        HeaderMap::default(),
+    )
+    .await
+    .into_diagnostic()?;
 
-    // TODO: Replace with async versions. Currently there is not asyn stream_conda_info.
-    let reader = HttpReader::new(record.url.as_str());
-    let mut sci = stream_conda_info(reader)
-        .into_diagnostic()
-        .with_context(|| format!("{}: can't stream conda info", pkg_name))?;
+    let buf_reader = futures::io::BufReader::new(reader.compat());
+    let mut zip_reader = ZipFileReader::new(buf_reader).await.into_diagnostic()?;
 
-    let entries = sci
+    let (index, _) = zip_reader
+        .file()
         .entries()
-        .into_diagnostic()
-        .with_context(|| format!("{}: could not obtain entries", pkg_name))?;
+        .iter()
+        .enumerate()
+        .find(|(_, e)| {
+            e.filename()
+                .as_str()
+                .is_ok_and(|f| f.starts_with("info-") && f.ends_with(".tar.zst"))
+        })
+        .ok_or_else(|| miette::miette!("no info-*.tar.zst entry in archive"))?;
 
-    let entries = entries.filter_map(|entry| entry.ok());
+    // Prefetch the entire info entry in a single HTTP request.
+    let entry = &zip_reader.file().entries()[index];
+    let offset = entry.header_offset();
+    let size = entry.header_size() + entry.compressed_size();
+    zip_reader
+        .inner_mut()
+        .get_mut()
+        .get_mut()
+        .prefetch(offset..offset + size)
+        .await;
 
-    let mut recipe_entry = None;
-    let mut patch_entries = vec![];
-    for entry in entries.into_iter() {
-        let Ok(path) = entry.path() else {
+    let entry_reader = zip_reader
+        .reader_without_entry(index)
+        .await
+        .into_diagnostic()?;
+    let tokio_reader = entry_reader.compat();
+    let buf_reader = tokio::io::BufReader::new(tokio_reader);
+    let zstd_decoder = ZstdDecoder::new(buf_reader);
+    let mut tar = tokio_tar::Archive::new(zstd_decoder);
+
+    let mut entries = tar.entries().into_diagnostic()?;
+    let mut recipe = None;
+    let mut patches = Vec::new();
+    while let Some(entry) = entries.next().await {
+        let mut entry = entry.into_diagnostic()?;
+        let path = entry.path().into_diagnostic()?.into_owned();
+        let Ok(rel) = path.strip_prefix("info/recipe") else {
             continue;
         };
-        let Ok(path) = path.strip_prefix("info/recipe") else {
-            continue;
-        };
 
-        if path == recipe_expected_path.clone().as_path() {
-            let path = path.to_path_buf();
-            let mut reader = BufReader::new(entry);
-            let mut content = String::new();
-            reader
-                .read_to_string(&mut content)
-                .into_diagnostic()
-                .with_context(|| format!("{}: problem reading recipe.yaml", pkg_name))?;
-            recipe_entry = Some((path, content));
-        } else if path.extension().and_then(|s| s.to_str()) == Some("patch") {
-            let path = path.to_path_buf();
-            let mut reader = BufReader::new(entry);
-            let mut content = String::new();
-            reader
-                .read_to_string(&mut content)
-                .into_diagnostic()
-                .with_context(|| format!("{}: problem reading patch file.", pkg_name))?;
-            patch_entries.push((path, content));
+        if rel == recipe_filename {
+            let size = entry.header().size().into_diagnostic()?;
+            let mut buf = Vec::with_capacity(size as usize);
+            entry.read_to_end(&mut buf).await.into_diagnostic()?;
+            recipe = Some(buf);
+        } else if rel.extension().and_then(|s| s.to_str()) == Some("patch") {
+            let size = entry.header().size().into_diagnostic()?;
+            let mut buf = Vec::with_capacity(size as usize);
+            entry.read_to_end(&mut buf).await.into_diagnostic()?;
+            patches.push((rel.to_path_buf(), buf));
         }
     }
 
-    if recipe_entry.is_none() || patch_entries.is_empty() {
-        return Err(tokio::io::Error::new(
-            tokio::io::ErrorKind::NotFound,
-            "Could not find recipe.yaml and patch files",
-        ))
-        .into_diagnostic()
-        .with_context(|| pkg_name.to_string());
+    Ok(recipe.map(|r| (r, patches)))
+}
+
+async fn handle_record(
+    record: RepoDataRecord,
+    recipe_expected_path: PathBuf,
+    client: ClientWithMiddleware,
+) -> miette::Result<String> {
+    let pkg_name = record.package_record.name.as_source();
+
+    let result = fetch_recipe_files_sparse(client, record.url.clone(), &recipe_expected_path)
+        .await
+        .with_context(|| format!("{}: failed to stream conda info section", pkg_name))?;
+
+    let Some((recipe_bytes, patch_entries)) = result else {
+        return Err(miette::miette!(
+            "{}: no info/recipe/{} found",
+            pkg_name,
+            recipe_expected_path.display()
+        ));
+    };
+
+    if patch_entries.is_empty() {
+        return Err(miette::miette!(
+            "{}: no patch files found alongside recipe.yaml",
+            pkg_name
+        ));
     }
 
-    let mut any_failed = None;
     let package_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join(OUTPUT_PATH)
         .join(pkg_name);
 
-    for (path, content) in recipe_entry.into_iter().chain(patch_entries.into_iter()) {
-        let file_new_path = package_path.join(path);
+    let files = std::iter::once((recipe_expected_path.clone(), recipe_bytes)).chain(patch_entries);
+
+    let mut any_failed = None;
+    for (path, content) in files {
+        let file_new_path = package_path.join(&path);
 
         if let Err(e) = tokio::fs::create_dir_all(file_new_path.parent().unwrap()).await {
             any_failed = Some(

@@ -462,7 +462,9 @@ pub async fn create_build_script(exec_args: ExecutionArgs) -> Result<(), std::io
     let work_dir = &exec_args.work_dir;
 
     if interpreter == "bash" {
-        let script = BashInterpreter.get_script(&exec_args, shell::Bash).unwrap();
+        let script = BashInterpreter
+            .get_script(&exec_args, shell::Bash::default())
+            .unwrap();
         let build_env_path = work_dir.join("build_env.sh");
         let build_script_path = work_dir.join("conda_build.sh");
 
@@ -746,7 +748,9 @@ mod tests {
             env_isolation: EnvironmentIsolation::None,
         };
 
-        let script = BashInterpreter.get_script(&args, shell::Bash).unwrap();
+        let script = BashInterpreter
+            .get_script(&args, shell::Bash::default())
+            .unwrap();
         assert!(
             script.contains("CONDA_BUILD") && script.contains("1"),
             "build_env.sh must set CONDA_BUILD=1 for nested-shell re-entrancy, got:\n{script}"
