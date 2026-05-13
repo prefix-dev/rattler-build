@@ -6,7 +6,7 @@
 
 use std::path::Path;
 
-use sigstore_trust_root::TrustedRoot;
+use sigstore_trust_root::{SIGSTORE_PRODUCTION_TRUSTED_ROOT, TrustedRoot};
 use sigstore_verify::{VerificationPolicy, verify};
 
 use crate::error::CacheError;
@@ -248,7 +248,7 @@ pub(crate) async fn verify_attestation(
     let response_json = download_attestation_bundle(client, &bundle_url).await?;
 
     // Load the production Sigstore trusted root (embedded, no network needed)
-    let trusted_root = TrustedRoot::production().map_err(|e| {
+    let trusted_root = TrustedRoot::from_json(SIGSTORE_PRODUCTION_TRUSTED_ROOT).map_err(|e| {
         CacheError::SigstoreTrustRoot(format!("Failed to load Sigstore trusted root: {}", e))
     })?;
 

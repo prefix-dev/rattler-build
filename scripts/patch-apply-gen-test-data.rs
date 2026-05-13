@@ -2,19 +2,21 @@
 use std::{
     collections::HashMap,
     default::Default,
-    io::{BufReader, Read},
-    path::PathBuf,
+    io::{BufReader, Cursor, Read},
+    path::{Path, PathBuf},
 };
 
-use http_range_client::HttpReader;
 use miette::{Context as _, IntoDiagnostic};
 use rattler_conda_types::{Channel, MatchSpec, ParseStrictness, Platform, RepoDataRecord};
 use rattler_networking::LazyClient;
-use rattler_package_streaming::seek::stream_conda_info;
+use rattler_package_streaming::{
+    reqwest::sparse::fetch_file_from_remote_sparse, seek::stream_conda_info,
+};
 use rattler_repodata_gateway::{
     Gateway, fetch,
     sparse::{PackageFormatSelection, SparseRepoData},
 };
+use reqwest_middleware::ClientWithMiddleware;
 
 use tokio::task::JoinSet;
 use url::Url;
@@ -64,6 +66,7 @@ async fn main() {
         .package_names(PackageFormatSelection::default())
         .map(|n| MatchSpec::from_str(n, ParseStrictness::Lenient).unwrap());
 
+    let http_client = client.client().clone();
     let gateway = Gateway::builder().with_client(client).finish();
 
     let repo_data = gateway
@@ -92,7 +95,11 @@ async fn main() {
     for record in latest_records.into_iter() {
         let recipe_expected_path = PathBuf::from("recipe.yaml");
 
-        record_tasks.spawn(handle_record(record, recipe_expected_path));
+        record_tasks.spawn(handle_record(
+            record,
+            recipe_expected_path,
+            http_client.clone(),
+        ));
     }
 
     let mut successes = 0;
@@ -112,12 +119,42 @@ async fn main() {
 async fn handle_record(
     record: RepoDataRecord,
     recipe_expected_path: PathBuf,
+    client: ClientWithMiddleware,
 ) -> miette::Result<String> {
     let pkg_name = record.package_record.name.as_source();
 
-    // TODO: Replace with async versions. Currently there is not asyn stream_conda_info.
-    let reader = HttpReader::new(record.url.as_str());
-    let mut sci = stream_conda_info(reader)
+    // Cheap gating check: use HTTP range requests to peek at info/recipe/recipe.yaml.
+    // Most packages don't have one, so we skip them without downloading the whole archive.
+    let target = Path::new("info").join("recipe").join(&recipe_expected_path);
+    let recipe_bytes = fetch_file_from_remote_sparse(client.clone(), record.url.clone(), &target)
+        .await
+        .into_diagnostic()
+        .with_context(|| format!("{}: sparse fetch failed", pkg_name))?;
+
+    if recipe_bytes.is_none() {
+        return Err(miette::miette!(
+            "{}: no info/recipe/{} found",
+            pkg_name,
+            recipe_expected_path.display()
+        ));
+    }
+
+    // The package has a recipe — fetch the full archive to also enumerate patches.
+    let response = client
+        .get(record.url.clone())
+        .send()
+        .await
+        .into_diagnostic()
+        .with_context(|| format!("{}: failed to download package", pkg_name))?
+        .error_for_status()
+        .into_diagnostic()?;
+    let bytes = response
+        .bytes()
+        .await
+        .into_diagnostic()
+        .with_context(|| format!("{}: failed to read package body", pkg_name))?;
+
+    let mut sci = stream_conda_info(Cursor::new(bytes))
         .into_diagnostic()
         .with_context(|| format!("{}: can't stream conda info", pkg_name))?;
 

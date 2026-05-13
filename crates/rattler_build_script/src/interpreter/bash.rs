@@ -33,7 +33,7 @@ fn print_debug_info(args: &ExecutionArgs) -> String {
 
 impl Interpreter for BashInterpreter {
     async fn run(&self, args: ExecutionArgs) -> Result<(), InterpreterError> {
-        let script = self.get_script(&args, shell::Bash).unwrap();
+        let script = self.get_script(&args, shell::Bash::default()).unwrap();
 
         let build_env_path = args.work_dir.join("build_env.sh");
         let build_script_path = args.work_dir.join("conda_build.sh");
