@@ -1385,8 +1385,9 @@ tests:
       # (default: false)
       strict: true
 
-      # searches for `$PREFIX/lib/libmamba.so` or `$PREFIX/lib/libmamba.dylib` on Linux or macOS,
-      # on Windows for %PREFIX%\Library\lib\mamba.dll & %PREFIX%\Library\bin\mamba.bin
+      # On MacOS, searches for `$PREFIX/lib/libmamba.dylib`
+      # On Linux, searches for `$PREFIX/lib/libmamba.so`
+      # On Windows, searches for both `%PREFIX%\Library\bin\mamba.dll` and %PREFIX%\Library\lib\mamba.lib
       lib:
         - mamba
 
