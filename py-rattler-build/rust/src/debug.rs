@@ -256,11 +256,10 @@ pub fn create_debug_session_py(
         .map(|tc| tc.inner)
         .unwrap_or_else(|| Configuration::builder().finish());
 
-    let output_dir = output_dir.unwrap_or_else(|| {
-        std::env::temp_dir()
-            .join(format!("rattler_build_{:x}", rand_hash()))
-            .join("output")
-    });
+    let output_dir = output_dir
+        .unwrap_or_else(std::env::temp_dir)
+        .join(format!("rattler_build_{:x}", rand_hash()))
+        .join("output");
 
     // Ensure output directory exists
     fs_err::create_dir_all(&output_dir).map_err(RattlerBuildError::Io)?;
