@@ -135,7 +135,7 @@ impl<'de> Deserialize<'de> for Script {
                 #[serde(default)]
                 cwd: Option<PathBuf>,
                 #[serde(default)]
-                sandbox: Option<SandboxRequest>,
+                sandbox: Option<Box<SandboxRequest>>,
             },
         }
 
@@ -158,7 +158,7 @@ impl<'de> Deserialize<'de> for Script {
                     env,
                     secrets,
                     cwd,
-                    sandbox,
+                    sandbox: sandbox.map(|request| *request),
                     content: match content {
                         Some(RawScriptContent::Command { content }) => {
                             ScriptContent::Command(content)
