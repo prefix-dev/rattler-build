@@ -1,0 +1,12 @@
+---
+source: crates/rattler_build_core/src/system_tools.rs
+expression: json
+---
+{
+  "build_tool": {
+    "name": "pixi-build-rust",
+    "version": "0.1.0"
+  },
+  "patchelf": "1.0.0",
+  "pixi-build-rust": "0.1.0"
+}

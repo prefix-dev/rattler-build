@@ -3,6 +3,7 @@ from pathlib import Path
 from rattler_build._rattler_build import (
     upload_package_to_anaconda_py,
     upload_package_to_artifactory_py,
+    upload_package_to_cloudsmith_py,
     upload_package_to_prefix_py,
     upload_package_to_quetz_py,
     upload_packages_to_conda_forge_py,
@@ -100,6 +101,32 @@ def upload_package_to_prefix(
         attestation_file,
         store_github_attestation,
     )
+
+
+def upload_package_to_cloudsmith(
+    package_files: list[str],
+    owner: str,
+    repo: str,
+    *,
+    api_key: str | None = None,
+    url: str | None = None,
+    auth_file: str | Path | None = None,
+) -> None:
+    """
+    Upload to a Cloudsmith repository. Authentication is used from the keychain / auth-file.
+
+    Args:
+        package_files: The package files to upload.
+        owner: The Cloudsmith organization/owner.
+        repo: The Cloudsmith repository name.
+        api_key: The Cloudsmith API key.
+        url: The URL to the Cloudsmith API (only necessary for self-hosted instances).
+        auth_file: The authentication file.
+
+    Returns:
+        None
+    """
+    upload_package_to_cloudsmith_py(package_files, owner, repo, api_key, url, auth_file)
 
 
 def upload_package_to_anaconda(

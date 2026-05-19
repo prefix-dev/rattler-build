@@ -23,18 +23,34 @@ use url::Url;
 
 use crate::{
     console_utils::{Color, LogStyle},
-    metadata::Debug,
     tool_configuration::{ContinueOnFailure, SkipExisting, TestStrategy},
 };
 #[cfg(feature = "recipe-generation")]
 use rattler_build_recipe_generator::GenerateRecipeOpts;
+
+/// Build-only options that are not shared with the publish command.
+#[derive(Parser, Clone)]
+pub struct BuildOnlyOpts {
+    /// Override the build number for all outputs (defaults to the build number in the recipe)
+    #[arg(long, help_heading = "Modifying result")]
+    pub build_num: Option<u64>,
+
+    /// Prefix to prepend to the auto-generated build string
+    /// (e.g. `--build-string-prefix my_prefix` produces `my_prefix_h1234_0`)
+    #[arg(long, help_heading = "Modifying result")]
+    pub build_string_prefix: Option<String>,
+
+    #[allow(missing_docs)]
+    #[clap(flatten)]
+    pub build: BuildOpts,
+}
 
 /// Application subcommands.
 #[derive(Parser)]
 #[allow(clippy::large_enum_variant)]
 pub enum SubCommands {
     /// Build a package from a recipe
-    Build(BuildOpts),
+    Build(BuildOnlyOpts),
 
     /// Publish packages to a channel.
     /// This command builds packages from recipes (or uses already built packages),
@@ -377,16 +393,6 @@ pub struct App {
     pub color: Color,
 }
 
-impl App {
-    /// Returns true if the application will launch a TUI.
-    pub fn is_tui(&self) -> bool {
-        match &self.subcommand {
-            Some(SubCommands::Build(args)) => args.tui,
-            _ => false,
-        }
-    }
-}
-
 /// Common opts that are shared between [`Rebuild`] and [`Build`]` subcommands
 #[derive(Parser, Clone, Debug, Default)]
 pub struct CommonOpts {
@@ -415,6 +421,10 @@ pub struct CommonOpts {
     #[arg(long, env = "RATTLER_BUILD_EXPERIMENTAL")]
     pub experimental: bool,
 
+    /// Enable V3 recipe fields and MatchSpec syntax
+    #[arg(long)]
+    pub v3: bool,
+
     /// List of hosts for which SSL certificate verification should be skipped
     #[arg(long, value_delimiter = ',')]
     pub allow_insecure_host: Option<Vec<String>>,
@@ -433,6 +443,7 @@ pub struct CommonOpts {
 pub struct CommonData {
     pub output_dir: PathBuf,
     pub experimental: bool,
+    pub v3: bool,
     pub auth_file: Option<PathBuf>,
     pub channel_priority: ChannelPriority,
     #[cfg(feature = "s3")]
@@ -450,6 +461,7 @@ impl CommonData {
     pub fn new(
         output_dir: Option<PathBuf>,
         experimental: bool,
+        v3: bool,
         auth_file: Option<PathBuf>,
         config: ConfigBase<()>,
         channel_priority: Option<ChannelPriority>,
@@ -493,6 +505,7 @@ impl CommonData {
         Self {
             output_dir: output_dir.unwrap_or_else(|| PathBuf::from("./output")),
             experimental,
+            v3,
             auth_file,
             #[cfg(feature = "s3")]
             s3_config,
@@ -510,6 +523,7 @@ impl CommonData {
         Self::new(
             value.output_dir,
             value.experimental,
+            value.v3,
             value.auth_file,
             config,
             value.channel_priority.map(|c| c.value),
@@ -647,13 +661,16 @@ pub struct BuildOpts {
     #[arg(long, default_value = "true", help_heading = "Modifying result")]
     pub color_build_log: bool,
 
+    /// Environment isolation mode for build scripts.
+    /// `strict` (default): clean environment with normalized locale, HOME, USER etc.
+    /// `conda-build`: match conda-build behavior (forward CFLAGS, LDFLAGS, LANG, HOME etc.)
+    /// `none`: inherit the entire host environment
+    #[arg(long, default_value = "strict", help_heading = "Modifying result")]
+    pub env_isolation: rattler_build_script::EnvironmentIsolation,
+
     #[allow(missing_docs)]
     #[clap(flatten)]
     pub common: CommonOpts,
-
-    /// Launch the terminal user interface.
-    #[arg(long, hide = !cfg!(feature = "tui"))]
-    pub tui: bool,
 
     /// Whether to skip packages that already exist in any channel
     /// If set to `none`, do not skip any packages, default when not specified.
@@ -676,10 +693,6 @@ pub struct BuildOpts {
     #[allow(missing_docs)]
     #[clap(flatten)]
     pub sandbox_arguments: SandboxArguments,
-
-    /// Enable debug output in build scripts
-    #[arg(long, help_heading = "Modifying result")]
-    pub debug: bool,
 
     /// Write a markdown summary to the specified file (appends to the file).
     /// Useful for generating PR comments or custom reports.
@@ -706,10 +719,6 @@ pub struct BuildOpts {
     /// Exclude packages newer than this date from the solver, in RFC3339 format (e.g. 2024-03-15T12:00:00Z)
     #[arg(long, help_heading = "Modifying result", value_parser = parse_datetime)]
     pub exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
-
-    /// Override the build number for all outputs (defaults to the build number in the recipe)
-    #[arg(long, help_heading = "Modifying result")]
-    pub build_num: Option<u64>,
 }
 
 /// Publish options for the `publish` command.
@@ -745,6 +754,11 @@ pub struct PublishOpts {
     /// When using a relative bump, the highest build number from the target channel is used as the base.
     #[arg(long, help_heading = "Publishing")]
     pub build_number: Option<String>,
+
+    /// Prefix to prepend to the auto-generated build string
+    /// (e.g. `--build-string-prefix my_prefix` produces `my_prefix_h1234_0`)
+    #[arg(long, help_heading = "Publishing")]
+    pub build_string_prefix: Option<String>,
 
     /// Force upload even if the package already exists (not recommended - may break lockfiles).
     /// Only works with S3, filesystem, Anaconda.org, and prefix.dev channels.
@@ -845,6 +859,9 @@ impl PublishData {
 
         build_opts.channels = channels;
 
+        let mut build_data = BuildData::from_opts_and_config(build_opts, config);
+        build_data.build_string_prefix = opts.build_string_prefix;
+
         Self {
             to: opts.to,
             build_number: opts.build_number,
@@ -852,7 +869,7 @@ impl PublishData {
             generate_attestation: opts.generate_attestation,
             package_files,
             recipe_paths,
-            build: BuildData::from_opts_and_config(build_opts, config),
+            build: build_data,
         }
     }
 }
@@ -878,19 +895,19 @@ pub struct BuildData {
     pub no_include_recipe: bool,
     pub test: TestStrategy,
     pub color_build_log: bool,
+    pub env_isolation: rattler_build_script::EnvironmentIsolation,
     pub common: CommonData,
-    pub tui: bool,
     pub skip_existing: SkipExisting,
     pub noarch_build_platform: Option<Platform>,
     pub extra_meta: Option<Vec<(String, Value)>>,
     pub sandbox_configuration: Option<SandboxConfiguration>,
-    pub debug: Debug,
     pub continue_on_failure: ContinueOnFailure,
     pub error_prefix_in_binary: bool,
     pub allow_symlinks_on_windows: bool,
     pub allow_absolute_license_paths: bool,
     pub exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
     pub build_num_override: Option<u64>,
+    pub build_string_prefix: Option<String>,
     pub markdown_summary: Option<PathBuf>,
 }
 
@@ -916,18 +933,18 @@ impl BuildData {
         no_include_recipe: bool,
         test: Option<TestStrategy>,
         common: CommonData,
-        tui: bool,
         skip_existing: Option<SkipExisting>,
         noarch_build_platform: Option<Platform>,
         extra_meta: Option<Vec<(String, Value)>>,
         sandbox_configuration: Option<SandboxConfiguration>,
-        debug: Debug,
+        env_isolation: rattler_build_script::EnvironmentIsolation,
         continue_on_failure: ContinueOnFailure,
         error_prefix_in_binary: bool,
         allow_symlinks_on_windows: bool,
         allow_absolute_license_paths: bool,
         exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
         build_num_override: Option<u64>,
+        build_string_prefix: Option<String>,
         markdown_summary: Option<PathBuf>,
     ) -> Self {
         Self {
@@ -956,19 +973,19 @@ impl BuildData {
             no_include_recipe,
             test: test.unwrap_or_default(),
             color_build_log: true,
+            env_isolation,
             common,
-            tui,
             skip_existing: skip_existing.unwrap_or(SkipExisting::None),
             noarch_build_platform,
             extra_meta,
             sandbox_configuration,
-            debug,
             continue_on_failure,
             error_prefix_in_binary,
             allow_symlinks_on_windows,
             allow_absolute_license_paths,
             exclude_newer,
             build_num_override,
+            build_string_prefix,
             markdown_summary,
         }
     }
@@ -1009,18 +1026,18 @@ impl BuildData {
                 None
             }),
             CommonData::from_opts_and_config(opts.common, config.unwrap_or_default()),
-            opts.tui,
             opts.skip_existing,
             opts.noarch_build_platform,
             opts.extra_meta,
             opts.sandbox_arguments.into(),
-            Debug::new(opts.debug),
+            opts.env_isolation,
             opts.continue_on_failure.into(),
             opts.error_prefix_in_binary,
             opts.allow_symlinks_on_windows,
             opts.allow_absolute_license_paths,
             opts.exclude_newer,
-            opts.build_num,
+            None, // build_num_override — set by caller (BuildOnlyOpts or PublishOpts)
+            None, // build_string_prefix — set by caller (BuildOnlyOpts or PublishOpts)
             opts.markdown_summary,
         )
     }
@@ -1088,10 +1105,6 @@ pub struct TestOpts {
     #[clap(long)]
     pub test_index: Option<usize>,
 
-    /// Build test environment and output debug information for manual debugging.
-    #[arg(long)]
-    pub debug: bool,
-
     /// Common options.
     #[clap(flatten)]
     pub common: CommonOpts,
@@ -1105,7 +1118,6 @@ pub struct TestData {
     pub compression_threads: Option<u32>,
     pub common: CommonData,
     pub test_index: Option<usize>,
-    pub debug: Debug,
 }
 
 impl TestData {
@@ -1116,7 +1128,6 @@ impl TestData {
             value.package_file,
             value.channels,
             value.compression_threads,
-            Debug::new(value.debug),
             value.test_index,
             CommonData::from_opts_and_config(value.common, config.unwrap_or_default()),
         )
@@ -1127,7 +1138,6 @@ impl TestData {
         package_file: PathBuf,
         channels: Option<Vec<NamedChannelOrUrl>>,
         compression_threads: Option<u32>,
-        debug: Debug,
         test_index: Option<usize>,
         common: CommonData,
     ) -> Self {
@@ -1136,7 +1146,6 @@ impl TestData {
             channels,
             compression_threads,
             test_index,
-            debug,
             common,
         }
     }

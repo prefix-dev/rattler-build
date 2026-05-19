@@ -1,34 +1,38 @@
 """Package a release binary into a tarball/zip and stage artifacts for upload.
 
+The binary at `target/<target>/release/rattler-build[.exe]` is expected to
+already be codesigned (macOS) or Azure-signed (Windows) when this script runs.
+
 Creates:
-    staging/<archive>  - .tar.gz (unix) or .zip (windows) with binary + README + LICENSE
-    staging/<binary>   - raw binary named rattler-build-<target>[.exe]
+    staging/<archive>         - .zip (windows) or .tar.gz (linux/macos) with binary + README + LICENSE
+    staging/<binary>          - raw binary named rattler-build-<target>[.exe]
+    staging/<archive>.sha256  - sha256 of the archive
+    staging/<binary>.sha256   - sha256 of the raw binary
 
 Outputs:
     pkg-name - archive filename (e.g. rattler-build-x86_64-unknown-linux-musl.tar.gz)
-    prefix   - artifact prefix: "release" for Linux, "build" for macOS/Windows (needs signing)
 
 Usage:
     pixi run -e release package-binary --target x86_64-unknown-linux-musl
 """
 
 import argparse
+import hashlib
 import os
 import shutil
 import subprocess
 import tarfile
-import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
 
-def is_linux_target(target: str) -> bool:
-    return "linux" in target
-
-
-def needs_signing(target: str) -> bool:
-    return "apple-darwin" in target or "pc-windows" in target
+def write_sha256(path: Path) -> None:
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            h.update(chunk)
+    (path.parent / f"{path.name}.sha256").write_text(f"{h.hexdigest()}  {path.name}\n")
 
 
 def main() -> None:
@@ -38,14 +42,12 @@ def main() -> None:
 
     target: str = args.target
     windows = "pc-windows" in target
-    linux = is_linux_target(target)
     ext = ".exe" if windows else ""
-    archive_ext = ".tar.gz" if linux else ".zip"
+    archive_ext = ".zip" if windows else ".tar.gz"
 
     pkg_basename = f"rattler-build-{target}"
     pkg_name = f"{pkg_basename}{archive_ext}"
 
-    # Create archive directory with binary + docs
     archive_dir = ROOT / "pkg" / pkg_basename
     archive_dir.mkdir(parents=True, exist_ok=True)
 
@@ -54,44 +56,37 @@ def main() -> None:
     shutil.copy2(ROOT / "README.md", archive_dir / "README.md")
     shutil.copy2(ROOT / "LICENSE", archive_dir / "LICENSE")
 
-    # Create archive
     archive_path = ROOT / "pkg" / pkg_name
-    if linux:
-        with tarfile.open(archive_path, "w:gz") as tf:
-            for item in sorted(archive_dir.iterdir()):
-                tf.add(item, arcname=f"{pkg_basename}/{item.name}")
-    elif windows:
-        # Use 7z on Windows for zip creation (handles paths better)
+    if windows:
         subprocess.run(
             ["7z", "-y", "a", str(archive_path), f"{pkg_basename}/*"],
             check=True,
             cwd=ROOT / "pkg",
         )
     else:
-        with zipfile.ZipFile(archive_path, "w", zipfile.ZIP_DEFLATED) as zf:
+        with tarfile.open(archive_path, "w:gz") as tf:
             for item in sorted(archive_dir.iterdir()):
-                zf.write(item, f"{pkg_basename}/{item.name}")
+                tf.add(item, arcname=f"{pkg_basename}/{item.name}")
 
-    # Stage everything flat for upload
     staging = ROOT / "staging"
     staging.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(archive_path, staging / pkg_name)
+
+    staged_archive = staging / pkg_name
+    shutil.copy2(archive_path, staged_archive)
+    write_sha256(staged_archive)
 
     binary_name = f"rattler-build-{target}{ext}"
-    shutil.copy2(binary_src, staging / binary_name)
-
-    # Determine artifact prefix
-    prefix = "build" if needs_signing(target) else "release"
+    staged_binary = staging / binary_name
+    shutil.copy2(binary_src, staged_binary)
+    write_sha256(staged_binary)
 
     print(f"Archive: {pkg_name}")
     print(f"Binary: {binary_name}")
-    print(f"Prefix: {prefix}")
 
     github_output = os.environ.get("GITHUB_OUTPUT")
     if github_output:
         with open(github_output, "a") as f:
             f.write(f"pkg-name={pkg_name}\n")
-            f.write(f"prefix={prefix}\n")
 
 
 if __name__ == "__main__":

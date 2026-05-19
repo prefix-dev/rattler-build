@@ -1,0 +1,28 @@
+schema_version: 1
+
+package:
+  name: v3-index-shape
+  version: 1.0.0
+
+build:
+  flags:
+    - cuda
+    - blas:openblas
+  script:
+    - if: win
+      then:
+        - echo v3 > %PREFIX%\v3-index-shape.txt
+      else:
+        - echo v3 > $PREFIX/v3-index-shape.txt
+
+requirements:
+  run:
+    - python >=3.10
+    - scipy[when="python >=3.10"]
+    - blas-provider[flags=[blas:*]]
+  extras:
+    plot:
+      - matplotlib >=3.8
+    full:
+      - pandas >=2
+      - rich[extras=[jupyter]]

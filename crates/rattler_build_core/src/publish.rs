@@ -100,7 +100,7 @@ pub async fn fetch_highest_build_numbers(
 
         // Create a matchspec that matches the package name (any version)
         let spec = MatchSpec {
-            name: Some(rattler_conda_types::PackageNameMatcher::Exact(name)),
+            name: rattler_conda_types::PackageNameMatcher::Exact(name),
             ..Default::default()
         };
         if !package_specs.iter().any(|s| s.name == spec.name) {
@@ -347,15 +347,10 @@ async fn upload_to_s3(
     publish_config: &PublishConfig,
 ) -> miette::Result<()> {
     use rattler_index::{IndexS3Config, ensure_channel_initialized_s3, index_s3};
-    use rattler_networking::s3_middleware;
     use rattler_upload::upload::upload_package_to_s3;
     use std::collections::HashSet;
 
     tracing::info!("Uploading packages to S3 channel: {}", url);
-
-    // Get authentication storage
-    let auth_storage = tool_configuration::get_auth_store(publish_config.auth_file.clone())
-        .map_err(|e| miette::miette!("Failed to get authentication storage: {}", e))?;
 
     // Resolve S3 credentials using config + auth storage, falling back to AWS SDK
     let resolved_credentials = tool_configuration::resolve_s3_credentials(
@@ -365,35 +360,6 @@ async fn upload_to_s3(
     )
     .await
     .into_diagnostic()?;
-
-    // Create S3Credentials from the config if available (for upload_package_to_s3)
-    let bucket_name = url.host_str().unwrap_or_default();
-    let s3_credentials = publish_config
-        .s3_config
-        .get(bucket_name)
-        .and_then(|config| {
-            if let s3_middleware::S3Config::Custom {
-                endpoint_url,
-                region,
-                force_path_style,
-            } = config
-            {
-                Some(rattler_s3::S3Credentials {
-                    endpoint_url: endpoint_url.clone(),
-                    region: region.clone(),
-                    addressing_style: if *force_path_style {
-                        rattler_s3::S3AddressingStyle::Path
-                    } else {
-                        rattler_s3::S3AddressingStyle::VirtualHost
-                    },
-                    access_key_id: None,
-                    secret_access_key: None,
-                    session_token: None,
-                })
-            } else {
-                None
-            }
-        });
 
     // Ensure channel is initialized with noarch/repodata.json
     ensure_channel_initialized_s3(url, &resolved_credentials)
@@ -409,9 +375,8 @@ async fn upload_to_s3(
 
     // Upload packages to S3
     upload_package_to_s3(
-        &auth_storage,
         url.clone(),
-        s3_credentials,
+        resolved_credentials.clone(),
         &package_paths.to_vec(),
         publish_config.force,
     )
@@ -435,6 +400,8 @@ async fn upload_to_s3(
             repodata_patch: None,
             write_zst: true,
             write_shards: true,
+            repodata_revisions: Vec::new(),
+            package_revision_assignment: Default::default(),
             force: false,
             max_parallel: num_cpus::get_physical(),
             multi_progress: None,
@@ -631,31 +598,26 @@ async fn upload_to_anaconda(
         .collect();
 
     let (owner, channel) = match path_segments.len() {
-        1 => (path_segments[0].to_string(), None),
-        2 => (
-            path_segments[0].to_string(),
-            Some(path_segments[1].to_string()),
-        ),
+        1 => (path_segments[0].to_string(), "main".to_string()),
+        2 => (path_segments[0].to_string(), path_segments[1].to_string()),
         _ => {
             return Err(miette::miette!(
-                "Invalid Anaconda.org URL format. Expected: https://anaconda.org/owner or https://anaconda.org/owner/channel"
+                "Invalid Anaconda.org URL format. Expected: https://anaconda.org/owner or https://anaconda.org/owner/label"
             ));
         }
     };
 
-    // Create AnacondaData with owner, optional channel, API key, URL, and force flag
     let anaconda_data = AnacondaData::new(
         owner,
-        channel.map(|c| vec![c]), // Automatically uses "main" channel if not specified
-        None,                     // API key from auth storage
-        Some(url.clone()),
+        Some(vec![channel]),
+        None,
+        None,
         ForceOverwrite(publish_config.force),
     );
 
-    // Upload packages
     upload_package_to_anaconda(&auth_storage, &package_paths.to_vec(), anaconda_data)
         .await
-        .map_err(|e| miette::miette!("Failed to upload packages to Anaconda.org: {}", e))?;
+        .into_diagnostic()?;
 
     tracing::info!("Successfully uploaded packages to Anaconda.org");
     tracing::info!("Note: Anaconda.org handles indexing automatically on the server side");
@@ -732,6 +694,8 @@ async fn upload_to_local_filesystem(
             repodata_patch: None,
             write_zst: true,
             write_shards: true,
+            repodata_revisions: Vec::new(),
+            package_revision_assignment: Default::default(),
             force: false,
             max_parallel: num_cpus::get_physical(),
             multi_progress: None,

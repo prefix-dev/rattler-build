@@ -12,11 +12,7 @@ pub struct BashInterpreter;
 fn print_debug_info(args: &ExecutionArgs) -> String {
     let mut output = String::new();
 
-    if args.debug.is_enabled() {
-        output.push_str("\nDebug mode enabled - not executing the script.\n\n");
-    } else {
-        output.push_str("\nScript execution failed.\n\n");
-    }
+    output.push_str("\nScript execution failed.\n\n");
 
     output.push_str(&format!("  Work directory: {}\n", args.work_dir.display()));
     output.push_str(&format!("  Prefix: {}\n", args.run_prefix.display()));
@@ -37,7 +33,7 @@ fn print_debug_info(args: &ExecutionArgs) -> String {
 
 impl Interpreter for BashInterpreter {
     async fn run(&self, args: ExecutionArgs) -> Result<(), InterpreterError> {
-        let script = self.get_script(&args, shell::Bash).unwrap();
+        let script = self.get_script(&args, shell::Bash::default()).unwrap();
 
         let build_env_path = args.work_dir.join("build_env.sh");
         let build_script_path = args.work_dir.join("conda_build.sh");
@@ -57,30 +53,26 @@ impl Interpreter for BashInterpreter {
         }
 
         let build_script_path_str = build_script_path.to_string_lossy().to_string();
-        let mut cmd_args = vec!["bash"];
-        if args.debug.is_enabled() {
-            cmd_args.push("-x");
-        }
-        cmd_args.push(&build_script_path_str);
-
-        if args.debug.is_enabled() {
-            return Err(InterpreterError::Debug(print_debug_info(&args)));
-        }
+        let cmd_args = vec!["bash", &build_script_path_str];
 
         let output = run_process_with_replacements(
             &cmd_args,
             &args.work_dir,
             &args.replacements("$((var))"),
+            &args.env_vars,
+            &args.secrets,
+            args.env_isolation,
             args.sandbox_config.as_ref(),
         )
         .await?;
 
         if !output.status.success() {
             let status_code = output.status.code().unwrap_or(1);
+            let debug_info = print_debug_info(&args);
             tracing::error!("Script failed with status {}", status_code);
-            tracing::error!("{}", print_debug_info(&args));
+            tracing::error!("{}", debug_info);
             return Err(InterpreterError::ExecutionFailed(std::io::Error::other(
-                "Script failed".to_string(),
+                format!("Script failed with status {}{}", status_code, debug_info),
             )));
         }
 

@@ -8,7 +8,9 @@ pub mod sandbox;
 mod script;
 
 pub use sandbox::{SandboxArguments, SandboxConfiguration};
-pub use script::{Script, ScriptContent, determine_interpreter_from_path};
+pub use script::{
+    Script, ScriptContent, determine_interpreter_from_path, platform_script_extensions,
+};
 
 #[cfg(feature = "execution")]
 mod execution;
@@ -17,7 +19,7 @@ mod interpreter;
 
 #[cfg(feature = "execution")]
 pub use execution::{
-    Debug, ExecutionArgs, ResolvedScriptContents, create_build_script,
+    EnvironmentIsolation, ExecutionArgs, ResolvedScriptContents, create_build_script,
     run_process_with_replacements, run_script,
 };
 #[cfg(feature = "execution")]

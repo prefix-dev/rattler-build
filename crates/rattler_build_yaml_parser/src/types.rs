@@ -562,6 +562,16 @@ impl<T> ConditionalList<T> {
         &self.items
     }
 
+    /// Push an item to the end of the list
+    pub fn push(&mut self, item: Item<T>) {
+        self.items.push(item);
+    }
+
+    /// Extend the list with items from an iterator
+    pub fn extend(&mut self, items: impl IntoIterator<Item = Item<T>>) {
+        self.items.extend(items);
+    }
+
     /// Get all variables used in all items
     pub fn used_variables(&self) -> Vec<String> {
         let mut vars = Vec::new();

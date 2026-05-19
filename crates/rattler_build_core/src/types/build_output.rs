@@ -20,6 +20,7 @@ use std::{
 
 use crate::{
     console_utils::github_integration_enabled,
+    post_process::package_nature::LibraryNameMap,
     render::resolved_dependencies::FinalizedDependencies,
     system_tools::SystemTools,
     types::{BuildConfiguration, BuildSummary, PlatformWithVirtualPackages},
@@ -60,6 +61,12 @@ pub struct BuildOutput {
     /// that created this artifact
     #[serde(skip_serializing_if = "Option::is_none")]
     pub extra_meta: Option<BTreeMap<String, Value>>,
+
+    /// Library name map from the staging cache, used as a fallback during
+    /// overlinking checks when the staging cache's host dependencies are not
+    /// physically installed in the host prefix.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub staging_library_name_map: Option<LibraryNameMap>,
 }
 
 impl BuildOutput {
@@ -150,13 +157,7 @@ impl BuildOutput {
             .iter()
             .find(|p| p.package_record.name.as_normalized() == name);
 
-        let is_requested = host.specs.iter().any(|s| {
-            s.spec()
-                .name
-                .as_ref()
-                .map(|n| n.to_string() == name)
-                .unwrap_or(false)
-        });
+        let is_requested = host.specs.iter().any(|s| s.spec().name.to_string() == name);
 
         record.map(|r| (r, is_requested))
     }

@@ -7,12 +7,11 @@ use indexmap::IndexMap;
 use minijinja::Value;
 use rattler_build_jinja::Jinja;
 use rattler_conda_types::Platform;
-use std::{collections::HashMap, collections::HashSet};
 
 // Re-export from rattler_build_script
 pub use rattler_build_script::{
-    Debug as ScriptDebug, ExecutionArgs, InterpreterError, ResolvedScriptContents,
-    SandboxArguments, SandboxConfiguration, Script, ScriptContent,
+    ExecutionArgs, InterpreterError, ResolvedScriptContents, SandboxArguments,
+    SandboxConfiguration, Script, ScriptContent, platform_script_extensions,
 };
 
 use crate::{
@@ -21,23 +20,6 @@ use crate::{
 };
 
 impl Output {
-    /// Add environment variables from the variant to the environment variables.
-    fn env_vars_from_variant(&self) -> HashMap<String, Option<String>> {
-        let languages: HashSet<&str> =
-            HashSet::from(["PERL", "LUA", "R", "NUMPY", "PYTHON", "RUBY", "NODEJS"]);
-        self.variant()
-            .iter()
-            .filter_map(|(k, v)| {
-                let key_upper = k.normalize().to_uppercase();
-                if !languages.contains(key_upper.as_str()) {
-                    Some((k.normalize(), Some(v.to_string())))
-                } else {
-                    None
-                }
-            })
-            .collect()
-    }
-
     /// Helper function to get a jinja renderer for the output's recipe context.
     pub(crate) fn jinja_renderer(&self) -> impl Fn(&str) -> Result<String, String> {
         let selector_config = self.build_configuration.selector_config();
@@ -49,9 +31,15 @@ impl Output {
     async fn prepare_build_script(&self) -> Result<ExecutionArgs, std::io::Error> {
         let host_prefix = self.build_configuration.directories.host_prefix.clone();
         let target_platform = self.build_configuration.target_platform;
+        let env_isolation = self.build_configuration.env_isolation;
         let mut env_vars = env_vars::vars(self, "BUILD");
-        env_vars.extend(env_vars::os_vars(&host_prefix, &target_platform));
-        env_vars.extend(self.env_vars_from_variant());
+        env_vars.extend(env_vars::os_vars(
+            &host_prefix,
+            &target_platform,
+            env_isolation,
+            &self.build_configuration.directories.work_dir,
+        ));
+        env_vars.extend(env_vars::env_vars_from_variant(self.variant()));
 
         let jinja_renderer = self.jinja_renderer();
 
@@ -66,7 +54,7 @@ impl Output {
             script: self.recipe.build().script.resolve_content(
                 &self.build_configuration.directories.recipe_dir,
                 Some(jinja_renderer),
-                if cfg!(windows) { &["bat"] } else { &["sh"] },
+                platform_script_extensions(),
             )?,
             env_vars: env_vars
                 .into_iter()
@@ -78,7 +66,7 @@ impl Output {
             execution_platform: Platform::current(),
             work_dir: work_dir.clone(),
             sandbox_config: self.build_configuration.sandbox_config().cloned(),
-            debug: ScriptDebug::new(self.build_configuration.debug.is_enabled()),
+            env_isolation,
         })
     }
 
@@ -97,6 +85,19 @@ impl Output {
     pub async fn run_build_script(&self) -> Result<(), InterpreterError> {
         let span = tracing::info_span!("Running build script");
         let _enter = span.enter();
+
+        // Reset the package files override list before running the build
+        // script. This ensures that we do not pick up paths from a previous
+        // run if the script does not write to the file this time.
+        let package_files_path = self
+            .build_configuration
+            .directories
+            .package_files_list_path();
+        match fs_err::remove_file(&package_files_path) {
+            Ok(()) => {}
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+            Err(err) => return Err(err.into()),
+        }
 
         let exec_args = self.prepare_build_script().await?;
         let build_prefix = if self.recipe.build().merge_build_and_host_envs {
@@ -135,7 +136,7 @@ impl Output {
                 build_prefix,
                 Some(jinja_renderer),
                 self.build_configuration.sandbox_config(),
-                ScriptDebug::new(self.build_configuration.debug.is_enabled()),
+                self.build_configuration.env_isolation,
             )
             .await?;
 

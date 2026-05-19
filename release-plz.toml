@@ -5,6 +5,7 @@ dependencies_update = true
 git_release_enable = false
 git_tag_enable = true
 pr_labels = ["release"]
+pr_name = "chore: bump & publish crates"
 publish_allow_dirty = false
 semver_check = true
 

@@ -1,6 +1,6 @@
 //! All the metadata that makes up a recipe file
 pub use crate::types::{
-    BuildConfiguration, Debug, Output, PlatformWithVirtualPackages, build_reindexed_channels,
+    BuildConfiguration, Output, PlatformWithVirtualPackages, build_reindexed_channels,
 };
 
 #[cfg(test)]
@@ -38,6 +38,7 @@ mod test {
                     constrains: vec![],
                     depends: vec![],
                     features: None,
+                    flags: Vec::new(),
                     legacy_bz2_md5: None,
                     legacy_bz2_size: None,
                     license: Some("MIT".into()),

@@ -4,6 +4,7 @@ use fs_err as fs;
 use rattler_build_recipe::stage1::{TestType, requirements::Dependency, tests::CommandsTest};
 use rattler_build_script::{
     ResolvedScriptContents, ScriptContent, determine_interpreter_from_path,
+    platform_script_extensions,
 };
 use rattler_conda_types::{MatchSpec, PackageNameMatcher};
 
@@ -25,7 +26,7 @@ fn resolve_dependency(dep: &Dependency, output: &Output) -> Dependency {
                     Err(_) => {
                         // If apply fails, fall back to just the package name
                         Dependency::Spec(Box::new(MatchSpec {
-                            name: Some(PackageNameMatcher::Exact(name.clone())),
+                            name: PackageNameMatcher::Exact(name.clone()),
                             ..Default::default()
                         }))
                     }
@@ -33,7 +34,7 @@ fn resolve_dependency(dep: &Dependency, output: &Output) -> Dependency {
             } else {
                 // Subpackage not found, fall back to just the package name
                 Dependency::Spec(Box::new(MatchSpec {
-                    name: Some(PackageNameMatcher::Exact(name.clone())),
+                    name: PackageNameMatcher::Exact(name.clone()),
                     ..Default::default()
                 }))
             }
@@ -43,7 +44,7 @@ fn resolve_dependency(dep: &Dependency, output: &Output) -> Dependency {
             // since we don't have compatibility_specs available here
             let name = &pin.pin_compatible.name;
             Dependency::Spec(Box::new(MatchSpec {
-                name: Some(PackageNameMatcher::Exact(name.clone())),
+                name: PackageNameMatcher::Exact(name.clone()),
                 ..Default::default()
             }))
         }
@@ -142,7 +143,7 @@ pub(crate) fn write_test_files(
             let contents = command_test.script.resolve_content(
                 &output.build_configuration.directories.recipe_dir,
                 Some(jinja_renderer),
-                &["sh", "bat"],
+                platform_script_extensions(),
             )?;
 
             // Replace with rendered contents
@@ -162,6 +163,21 @@ pub(crate) fn write_test_files(
             }
         }
     }
+
+    // Remove command tests that resolved to empty (no script content, no
+    // requirements, no test files). This happens when all commands were
+    // filtered out by conditionals (e.g. `if: not build_win`).
+    tests.retain(|test| {
+        if let TestType::Commands(cmd) = test {
+            let has_content =
+                !matches!(&cmd.script.content, ScriptContent::Command(s) if s.is_empty());
+            let has_requirements = !cmd.requirements.is_empty();
+            let has_files = !cmd.files.is_empty();
+            has_content || has_requirements || has_files
+        } else {
+            true
+        }
+    });
 
     let test_file_dir = tmp_dir_path.join("info/tests");
     fs::create_dir_all(&test_file_dir)?;

@@ -93,6 +93,8 @@ pub struct RenderConfig {
     pub extra_context: IndexMap<String, Variable>,
     /// Whether experimental features are enabled
     pub experimental: bool,
+    /// Whether V3 recipe fields and MatchSpec syntax are enabled
+    pub v3: bool,
     /// Path to the recipe file (for relative path resolution in Jinja functions)
     pub recipe_path: Option<PathBuf>,
     /// Target platform for the build
@@ -106,6 +108,12 @@ pub struct RenderConfig {
     /// like `MACOSX_DEPLOYMENT_TARGET` on macOS that have default values but can be
     /// customized via variant config.
     pub os_env_var_keys: HashSet<String>,
+    /// An optional prefix to prepend to the auto-generated build string.
+    /// When set, the build string becomes `{prefix}_{default_build_string}`.
+    pub build_string_prefix: Option<String>,
+    /// An optional build number override.
+    /// When set, this replaces the build number from the recipe.
+    pub build_number_override: Option<u64>,
 }
 
 impl Default for RenderConfig {
@@ -113,11 +121,14 @@ impl Default for RenderConfig {
         Self {
             extra_context: IndexMap::new(),
             experimental: false,
+            v3: false,
             recipe_path: None,
             target_platform: rattler_conda_types::Platform::current(),
             build_platform: rattler_conda_types::Platform::current(),
             host_platform: rattler_conda_types::Platform::current(),
             os_env_var_keys: HashSet::new(),
+            build_string_prefix: None,
+            build_number_override: None,
         }
     }
 }
@@ -137,6 +148,12 @@ impl RenderConfig {
     /// Enable experimental features
     pub fn with_experimental(mut self, experimental: bool) -> Self {
         self.experimental = experimental;
+        self
+    }
+
+    /// Enable V3 recipe fields and MatchSpec syntax
+    pub fn with_v3(mut self, v3: bool) -> Self {
+        self.v3 = v3;
         self
     }
 
@@ -173,6 +190,18 @@ impl RenderConfig {
     /// These are typically derived from `env_vars::os_vars()` keys.
     pub fn with_os_env_var_keys(mut self, keys: HashSet<String>) -> Self {
         self.os_env_var_keys = keys;
+        self
+    }
+
+    /// Set a prefix to prepend to the auto-generated build string.
+    pub fn with_build_string_prefix(mut self, prefix: impl Into<String>) -> Self {
+        self.build_string_prefix = Some(prefix.into());
+        self
+    }
+
+    /// Override the build number from the recipe.
+    pub fn with_build_number_override(mut self, build_number: u64) -> Self {
+        self.build_number_override = Some(build_number);
         self
     }
 }
@@ -884,10 +913,11 @@ fn build_evaluation_context(
     // NOTE: Do NOT call with_context() here - that will be done by Stage0Recipe::evaluate()
     // Calling it here would cause double-evaluation of context templates, leading to bugs
     // where e.g., `mpi: ${{ mpi ~ "foobar" }}` would evaluate to "blafoobarfoobar" instead of "blafoobar"
-    Ok(EvaluationContext::with_variables_config_and_os_env_keys(
+    Ok(EvaluationContext::with_variables_config_os_env_keys_and_v3(
         context_map,
         jinja_config,
         config.os_env_var_keys.clone(),
+        config.v3,
     ))
 }
 
@@ -912,7 +942,8 @@ fn render_with_empty_combinations(
     let empty_variant = BTreeMap::new();
     let jinja_config = create_jinja_config(config, &empty_variant);
     let context =
-        EvaluationContext::with_variables_and_config(config.extra_context.clone(), jinja_config);
+        EvaluationContext::with_variables_and_config(config.extra_context.clone(), jinja_config)
+            .with_v3(config.v3);
 
     // Evaluate the recipe
     let outputs = evaluate_recipe(stage0_recipe, &context)?;
@@ -978,7 +1009,7 @@ fn render_with_empty_combinations(
         results[i].pin_subpackages = pin_subpackages;
 
         // Finalize build string with complete pin information
-        finalize_build_string_single(&mut results[i])?;
+        finalize_build_string_single(&mut results[i], config)?;
     }
 
     Ok(results)
@@ -988,11 +1019,25 @@ fn render_with_empty_combinations(
 ///
 /// This computes the hash from the variant (which includes pin information)
 /// and resolves the build string for one variant.
-fn finalize_build_string_single(result: &mut RenderedVariant) -> Result<(), RenderError> {
+fn finalize_build_string_single(
+    result: &mut RenderedVariant,
+    config: &RenderConfig,
+) -> Result<(), RenderError> {
+    let build_string_prefix = config.build_string_prefix.as_deref();
     let noarch = result.recipe.build.noarch.unwrap_or(NoArchType::none());
 
     // Compute hash from the variant (which now includes pin_subpackage information)
-    let hash_info = HashInfo::from_variant(&result.variant, &noarch);
+    let mut hash_info = HashInfo::from_variant(&result.variant, &noarch);
+
+    // Prepend the user-provided build string prefix to the hash prefix so it
+    // becomes part of the default build string format: {prefix}h{hash}_{number}.
+    if let Some(prefix) = build_string_prefix {
+        if hash_info.prefix.is_empty() {
+            hash_info.prefix = format!("{prefix}_");
+        } else {
+            hash_info.prefix = format!("{prefix}_{}", hash_info.prefix);
+        }
+    }
 
     // If build string is not set (Default), or if it needs resolving
     if matches!(
@@ -1017,6 +1062,11 @@ fn finalize_build_string_single(result: &mut RenderedVariant) -> Result<(), Rend
         }
 
         let eval_ctx = EvaluationContext::from_variables(variables);
+
+        // Apply the build number override if provided.
+        if let Some(bn) = config.build_number_override {
+            result.recipe.build.number = Some(bn);
+        }
 
         // Resolve the build string template with the hash
         result.recipe.build.string.resolve(
@@ -1168,7 +1218,10 @@ pub fn render_recipe_with_variants(
     let yaml_content = fs_err::read_to_string(recipe_path)
         .map_err(|e| ParseError::io_error(recipe_path.to_path_buf(), e))?;
 
-    let stage0_recipe = stage0::parse_recipe_or_multi_from_source(&yaml_content)?;
+    let stage0_recipe = stage0::parse_recipe_or_multi_from_source_with_config(
+        &yaml_content,
+        stage0::ParseConfig { v3: config.v3 },
+    )?;
 
     // Load variant configuration
     let variant_config =
@@ -1287,18 +1340,6 @@ fn render_multi_output_with_variants(
     variant_config: &VariantConfig,
     config: RenderConfig,
 ) -> Result<Vec<RenderedVariant>, RenderError> {
-    // Check if recipe contains staging outputs - these require experimental flag
-    let has_staging = stage0_recipe
-        .outputs
-        .iter()
-        .any(|o| matches!(o, stage0::Output::Staging(_)));
-
-    if has_staging && !config.experimental {
-        return Err(RenderError::ExperimentalRequired {
-            message: "staging outputs are an experimental feature: provide the `--experimental` flag to enable this feature".to_string(),
-        });
-    }
-
     let stage0 = Stage0Recipe::MultiOutput(Box::new(stage0_recipe.clone()));
     render_with_variants(&stage0, variant_config, config)
 }
@@ -1395,7 +1436,7 @@ fn render_with_variants(
         results[i].pin_subpackages = pin_subpackages;
 
         // Finalize build string with complete pin information
-        finalize_build_string_single(&mut results[i])?;
+        finalize_build_string_single(&mut results[i], &config)?;
     }
 
     Ok(results)
@@ -1477,6 +1518,82 @@ python:
     }
 
     #[test]
+    fn test_render_v3_matchspec_requires_render_config() {
+        let recipe_yaml = r#"
+package:
+  name: test-pkg
+  version: "1.0.0"
+
+requirements:
+  run:
+    - 'foo[extras=[bar]]'
+"#;
+
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source_with_config(
+            recipe_yaml,
+            stage0::ParseConfig { v3: true },
+        )
+        .unwrap();
+        let variant_config = VariantConfig::default();
+
+        let err =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, RenderConfig::new())
+                .unwrap_err();
+        assert!(err.to_string().contains("--v3"));
+
+        let rendered = render_recipe_with_variant_config(
+            &stage0_recipe,
+            &variant_config,
+            RenderConfig::new().with_v3(true),
+        )
+        .unwrap();
+        assert_eq!(rendered.len(), 1);
+        assert_eq!(
+            rendered[0].recipe.requirements.run[0].to_string(),
+            "foo[extras=[bar]]"
+        );
+    }
+
+    #[test]
+    fn test_render_v3_recipe_fields_require_render_config() {
+        let recipe_yaml = r#"
+package:
+  name: test-pkg
+  version: "1.0.0"
+
+build:
+  flags:
+    - cuda
+
+requirements:
+  extras:
+    dev:
+      - pytest
+"#;
+
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config = VariantConfig::default();
+
+        let err =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, RenderConfig::new())
+                .unwrap_err();
+        assert!(err.to_string().contains("--v3"));
+
+        let rendered = render_recipe_with_variant_config(
+            &stage0_recipe,
+            &variant_config,
+            RenderConfig::new().with_v3(true),
+        )
+        .unwrap();
+        assert_eq!(rendered.len(), 1);
+        assert_eq!(rendered[0].recipe.build.flags[0].as_str(), "cuda");
+        assert_eq!(
+            rendered[0].recipe.requirements.extras["dev"][0].to_string(),
+            "pytest"
+        );
+    }
+
+    #[test]
     fn test_render_multi_output_simple() {
         let recipe_yaml = r#"
 schema_version: 1
@@ -1523,6 +1640,51 @@ outputs:
 
         assert!(names.contains(&"multi-pkg-lib".to_string()));
         assert!(names.contains(&"multi-pkg".to_string()));
+    }
+
+    #[test]
+    fn test_cache_inherited_output_inherits_top_level_build_number_before_build_string() {
+        let recipe_yaml = r#"
+schema_version: 1
+
+recipe:
+  name: multi-pkg
+  version: "1.0.0"
+
+build:
+  number: 1
+
+outputs:
+  - staging:
+      name: build-cache
+    build:
+      script: build
+
+  - package:
+      name: runtime
+    inherit: build-cache
+    build:
+      script: install
+"#;
+
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config = VariantConfig::from_yaml_str("{}").unwrap();
+
+        let rendered =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, RenderConfig::new())
+                .unwrap();
+
+        assert_eq!(rendered.len(), 1);
+
+        let output = &rendered[0].recipe;
+        assert_eq!(output.package.name.as_normalized(), "runtime");
+        assert_eq!(output.build.number, Some(1));
+
+        let build_string = output.build.string.as_resolved().unwrap();
+        assert!(
+            build_string.ends_with("_1"),
+            "cache-inherited output should resolve its build string with the inherited build number, got {build_string}"
+        );
     }
 
     #[test]
@@ -2115,69 +2277,6 @@ variant:
             .map(|v| v.recipe.package.name.as_normalized().to_string())
             .collect();
         assert_eq!(names, vec!["my-package-a"]);
-    }
-
-    #[test]
-    fn test_staging_requires_experimental() {
-        // Test that staging outputs require the experimental flag
-        let recipe_yaml = r#"
-schema_version: 1
-
-context:
-  version: "1.0.0"
-
-recipe:
-  version: ${{ version }}
-
-build:
-  number: 0
-
-outputs:
-  - staging:
-      name: build-cache
-    build:
-      script:
-        - echo "Building..."
-
-  - package:
-      name: my-pkg
-    inherit: build-cache
-    build:
-      noarch: generic
-"#;
-
-        let variant_yaml = r#"{}"#;
-
-        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
-        let variant_config = VariantConfig::from_yaml_str(variant_yaml).unwrap();
-
-        // Without experimental flag, should fail
-        let result =
-            render_recipe_with_variant_config(&stage0_recipe, &variant_config, RenderConfig::new());
-
-        assert!(
-            result.is_err(),
-            "Staging outputs should require experimental flag"
-        );
-        let err = result.unwrap_err();
-        assert!(
-            err.to_string().contains("experimental"),
-            "Error should mention experimental flag: {}",
-            err
-        );
-
-        // With experimental flag, should succeed
-        let result = render_recipe_with_variant_config(
-            &stage0_recipe,
-            &variant_config,
-            RenderConfig::new().with_experimental(true),
-        );
-
-        assert!(
-            result.is_ok(),
-            "Staging outputs should work with experimental flag: {:?}",
-            result.err()
-        );
     }
 
     #[test]
@@ -2990,6 +3089,246 @@ outputs:
             result.unwrap().len(),
             0,
             "All outputs should be skipped on Windows"
+        );
+    }
+
+    #[test]
+    fn test_match_with_integer_variant_values() {
+        // Regression: YAML integer values (unquoted `14` vs `"14"`) passed to match()
+        // were not recognized, causing match() to always return true and skip all builds.
+        let recipe_yaml = r#"
+package:
+  name: test
+  version: "1.0.0"
+
+requirements:
+  host:
+    - postgresql
+
+build:
+  skip:
+    - match(postgresql, "<=16")
+"#;
+
+        let variant_yaml = r#"
+postgresql:
+  - 16
+  - 17
+"#;
+
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config =
+            VariantConfig::from_yaml_str(variant_yaml).expect("Failed to parse variant config");
+
+        let rendered =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, RenderConfig::new())
+                .unwrap_or_else(|e| panic!("Failed to render: {e:?}"));
+
+        let skip_flags: Vec<_> = rendered
+            .iter()
+            .map(|r| {
+                let pg = r.variant.get(&"postgresql".into()).unwrap().to_string();
+                (pg, r.recipe.build.skip)
+            })
+            .collect();
+        // postgresql 16 should be skipped (<=16), 17 should build
+        assert_eq!(skip_flags, vec![("16".into(), true), ("17".into(), false)]);
+    }
+
+    #[test]
+    fn test_build_string_prefix_simple() {
+        let recipe_yaml = r#"
+package:
+  name: test-pkg
+  version: "1.0.0"
+"#;
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config = VariantConfig::default();
+
+        let config = RenderConfig::new().with_build_string_prefix("foobar");
+        let rendered =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, config).unwrap();
+
+        assert_eq!(rendered.len(), 1);
+        let build_string = rendered[0]
+            .recipe
+            .build
+            .string
+            .as_resolved()
+            .unwrap()
+            .to_string();
+        assert!(
+            build_string.starts_with("foobar_h"),
+            "build string should start with 'foobar_h', got '{build_string}'"
+        );
+    }
+
+    #[test]
+    fn test_build_string_prefix_with_variants() {
+        let recipe_yaml = r#"
+package:
+  name: test-pkg
+  version: "1.0.0"
+
+requirements:
+  host:
+    - python ${{ python }}
+  run:
+    - python
+"#;
+        let variant_yaml = r#"
+python:
+  - "3.9.*"
+  - "3.10.*"
+"#;
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config = VariantConfig::from_yaml_str(variant_yaml).unwrap();
+
+        let config = RenderConfig::new().with_build_string_prefix("myprefix");
+        let rendered =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, config).unwrap();
+
+        assert_eq!(rendered.len(), 2);
+        for variant in &rendered {
+            let build_string = variant
+                .recipe
+                .build
+                .string
+                .as_resolved()
+                .unwrap()
+                .to_string();
+            assert!(
+                build_string.starts_with("myprefix_"),
+                "build string should start with 'myprefix_', got '{build_string}'"
+            );
+        }
+
+        // The two variants should produce different build strings
+        let bs0 = rendered[0].recipe.build.string.as_resolved().unwrap();
+        let bs1 = rendered[1].recipe.build.string.as_resolved().unwrap();
+        assert_ne!(
+            bs0, bs1,
+            "different variants should produce different build strings"
+        );
+    }
+
+    #[test]
+    fn test_build_string_prefix_absent_gives_default() {
+        let recipe_yaml = r#"
+package:
+  name: test-pkg
+  version: "1.0.0"
+"#;
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config = VariantConfig::default();
+
+        let with_prefix = render_recipe_with_variant_config(
+            &stage0_recipe,
+            &variant_config,
+            RenderConfig::new().with_build_string_prefix("pfx"),
+        )
+        .unwrap();
+        let without_prefix =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, RenderConfig::new())
+                .unwrap();
+
+        let bs_with = with_prefix[0].recipe.build.string.as_resolved().unwrap();
+        let bs_without = without_prefix[0].recipe.build.string.as_resolved().unwrap();
+
+        // The prefixed version should contain the unprefixed version
+        assert!(
+            bs_with.starts_with("pfx_"),
+            "prefixed build string should start with 'pfx_', got '{bs_with}'"
+        );
+        assert!(
+            bs_with.ends_with(bs_without),
+            "prefixed '{bs_with}' should end with default '{bs_without}'"
+        );
+    }
+
+    #[test]
+    fn test_build_number_override() {
+        let recipe_yaml = r#"
+package:
+  name: test-pkg
+  version: "1.0.0"
+
+build:
+  number: 5
+"#;
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config = VariantConfig::default();
+
+        // Without override — should use the recipe's build number (5)
+        let rendered_default =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, RenderConfig::new())
+                .unwrap();
+        assert_eq!(rendered_default[0].recipe.build.number, Some(5));
+
+        // With override — should use 42
+        let rendered_override = render_recipe_with_variant_config(
+            &stage0_recipe,
+            &variant_config,
+            RenderConfig::new().with_build_number_override(42),
+        )
+        .unwrap();
+        assert_eq!(rendered_override[0].recipe.build.number, Some(42));
+
+        // Build string should contain the overridden build number
+        let bs = rendered_override[0]
+            .recipe
+            .build
+            .string
+            .as_resolved()
+            .unwrap();
+        assert!(
+            bs.ends_with("_42"),
+            "build string should end with '_42', got '{bs}'"
+        );
+    }
+
+    #[test]
+    fn test_build_number_override_default_recipe() {
+        let recipe_yaml = r#"
+package:
+  name: test-pkg
+  version: "1.0.0"
+"#;
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config = VariantConfig::default();
+
+        // Recipe has no build number (defaults to 0)
+        let rendered_default =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, RenderConfig::new())
+                .unwrap();
+        let bs_default = rendered_default[0]
+            .recipe
+            .build
+            .string
+            .as_resolved()
+            .unwrap();
+        assert!(
+            bs_default.ends_with("_0"),
+            "default build string should end with '_0', got '{bs_default}'"
+        );
+
+        // Override to 7
+        let rendered_override = render_recipe_with_variant_config(
+            &stage0_recipe,
+            &variant_config,
+            RenderConfig::new().with_build_number_override(7),
+        )
+        .unwrap();
+        assert_eq!(rendered_override[0].recipe.build.number, Some(7));
+        let bs_override = rendered_override[0]
+            .recipe
+            .build
+            .string
+            .as_resolved()
+            .unwrap();
+        assert!(
+            bs_override.ends_with("_7"),
+            "overridden build string should end with '_7', got '{bs_override}'"
         );
     }
 }

@@ -37,23 +37,37 @@ pub use build::parse_build;
 pub use extra::parse_extra;
 pub use output_parser::parse_multi_output_recipe;
 pub use package::parse_package;
-pub use requirements::parse_requirements;
 pub use source::parse_source;
 pub use test_parser::parse_tests;
 
 // Re-export helpers within crate only
 pub(crate) use helpers::get_span;
 
+/// Configuration used while parsing recipe source.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct ParseConfig {
+    /// Enable V3-only recipe fields and MatchSpec syntax.
+    pub v3: bool,
+}
+
 /// Parse a recipe (single or multi-output) from YAML source string
 ///
 /// This function automatically detects whether the recipe is single-output or multi-output
 /// and returns the appropriate Recipe variant.
 pub fn parse_recipe_or_multi_from_source(source: &str) -> ParseResult<crate::stage0::Recipe> {
+    parse_recipe_or_multi_from_source_with_config(source, ParseConfig::default())
+}
+
+/// Parse a recipe from YAML source with explicit parser configuration.
+pub fn parse_recipe_or_multi_from_source_with_config(
+    source: &str,
+    config: ParseConfig,
+) -> ParseResult<crate::stage0::Recipe> {
     let yaml = parse_yaml(source).map_err(|e| {
         ParseError::generic(format!("Failed to parse YAML: {}", e), Span::new_blank())
     })?;
 
-    parse_recipe_or_multi(&yaml)
+    parse_recipe_or_multi_with_config(&yaml, config)
 }
 
 /// Parse a complete stage0 recipe from YAML source string
@@ -61,11 +75,20 @@ pub fn parse_recipe_or_multi_from_source(source: &str) -> ParseResult<crate::sta
 /// Note: This function returns a SingleOutputRecipe for backwards compatibility.
 /// For multi-output recipe support, use `parse_recipe_or_multi_from_source()`.
 pub fn parse_recipe_from_source(source: &str) -> ParseResult<crate::stage0::Stage0Recipe> {
+    parse_recipe_from_source_with_config(source, ParseConfig::default())
+}
+
+/// Parse a complete single-output stage0 recipe from YAML source string with
+/// explicit parser configuration.
+pub fn parse_recipe_from_source_with_config(
+    source: &str,
+    config: ParseConfig,
+) -> ParseResult<crate::stage0::Stage0Recipe> {
     let yaml = parse_yaml(source).map_err(|e| {
         ParseError::generic(format!("Failed to parse YAML: {}", e), Span::new_blank())
     })?;
 
-    parse_recipe(&yaml)
+    parse_recipe_with_config(&yaml, config)
 }
 
 /// Parse a recipe (single or multi-output) from YAML
@@ -76,6 +99,15 @@ pub fn parse_recipe_from_source(source: &str) -> ParseResult<crate::stage0::Stag
 ///
 /// Multi-output recipes use a "recipe" section instead of "package" at the top level.
 pub fn parse_recipe_or_multi(yaml: &MarkedNode) -> ParseResult<crate::stage0::Recipe> {
+    parse_recipe_or_multi_with_config(yaml, ParseConfig::default())
+}
+
+/// Parse a recipe (single or multi-output) from YAML with explicit parser
+/// configuration.
+pub fn parse_recipe_or_multi_with_config(
+    yaml: &MarkedNode,
+    config: ParseConfig,
+) -> ParseResult<crate::stage0::Recipe> {
     let mapping = yaml.as_mapping().ok_or_else(|| {
         ParseError::expected_type("mapping", "non-mapping", helpers::get_span(yaml))
             .with_message("Recipe must be a mapping")
@@ -84,11 +116,11 @@ pub fn parse_recipe_or_multi(yaml: &MarkedNode) -> ParseResult<crate::stage0::Re
     // Detect multi-output by presence of "outputs" key
     if mapping.get("outputs").is_some() {
         // Multi-output recipe
-        let multi = parse_multi_output_recipe(mapping)?;
+        let multi = parse_multi_output_recipe(mapping, config)?;
         Ok(crate::stage0::Recipe::MultiOutput(Box::new(multi)))
     } else {
         // Single-output recipe
-        let single = parse_single_output_recipe(yaml)?;
+        let single = parse_single_output_recipe_with_config(yaml, config)?;
         Ok(crate::stage0::Recipe::SingleOutput(Box::new(single)))
     }
 }
@@ -119,13 +151,21 @@ pub fn parse_recipe_or_multi(yaml: &MarkedNode) -> ParseResult<crate::stage0::Re
 ///     - alice
 /// ```
 pub fn parse_recipe(yaml: &MarkedNode) -> ParseResult<crate::stage0::Stage0Recipe> {
-    parse_single_output_recipe(yaml)
+    parse_recipe_with_config(yaml, ParseConfig::default())
 }
 
-/// Parse a single-output recipe from YAML
-///
-/// Internal function used by both parse_recipe and parse_recipe_or_multi.
-fn parse_single_output_recipe(yaml: &MarkedNode) -> ParseResult<crate::stage0::SingleOutputRecipe> {
+/// Parse a complete stage0 recipe from YAML with explicit parser configuration.
+pub fn parse_recipe_with_config(
+    yaml: &MarkedNode,
+    config: ParseConfig,
+) -> ParseResult<crate::stage0::Stage0Recipe> {
+    parse_single_output_recipe_with_config(yaml, config)
+}
+
+fn parse_single_output_recipe_with_config(
+    yaml: &MarkedNode,
+    config: ParseConfig,
+) -> ParseResult<crate::stage0::SingleOutputRecipe> {
     let mapping = yaml.as_mapping().ok_or_else(|| {
         ParseError::expected_type("mapping", "non-mapping", helpers::get_span(yaml))
             .with_message("Recipe must be a mapping")
@@ -185,7 +225,7 @@ fn parse_single_output_recipe(yaml: &MarkedNode) -> ParseResult<crate::stage0::S
     };
 
     let requirements = if let Some(requirements_node) = mapping.get("requirements") {
-        parse_requirements(requirements_node)?
+        requirements::parse_requirements_with_config(requirements_node, config)?
     } else {
         crate::stage0::Requirements::default()
     };

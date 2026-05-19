@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.6](https://github.com/prefix-dev/rattler-build/compare/rattler_build_jinja-v0.1.5...rattler_build_jinja-v0.1.6) - 2026-04-13
+
+### Fixed
+
+- integers in skip/match conditions from variants.yaml ([#2395](https://github.com/prefix-dev/rattler-build/pull/2395))
+
+## [0.1.5](https://github.com/prefix-dev/rattler-build/compare/rattler_build_jinja-v0.1.4...rattler_build_jinja-v0.1.5) - 2026-03-31
+
+### Other
+
+- updated the following local packages: rattler_build_types
+
+## [0.1.4](https://github.com/prefix-dev/rattler-build/compare/rattler_build_jinja-v0.1.3...rattler_build_jinja-v0.1.4) - 2026-03-25
+
+### Other
+
+- update Cargo.toml dependencies
+
+## [0.1.3](https://github.com/prefix-dev/rattler-build/compare/rattler_build_jinja-v0.1.2...rattler_build_jinja-v0.1.3) - 2026-03-18
+
+### Other
+
+- update Cargo.toml dependencies
+
+## [0.1.2](https://github.com/prefix-dev/rattler-build/compare/rattler_build_jinja-v0.1.1...rattler_build_jinja-v0.1.2) - 2026-03-17
+
+### Other
+
+- update mininjinja and remove custom undefined variable handling ([#2300](https://github.com/prefix-dev/rattler-build/pull/2300))
+
 ## [0.1.1](https://github.com/prefix-dev/rattler-build/compare/rattler_build_jinja-v0.1.0...rattler_build_jinja-v0.1.1) - 2026-03-13
 
 ### Other

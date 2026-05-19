@@ -1,6 +1,6 @@
 [package]
 name = "rattler_build_source_cache"
-version = "0.1.1"
+version = "0.1.5"
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
@@ -9,17 +9,19 @@ readme = "README.md"
 description = "Source cache management for rattler-build"
 
 [features]
-default = ["rustls-tls", "sigstore"]
+default = ["rustls", "sigstore"]
 sigstore = [
   "dep:sigstore-verify",
   "dep:sigstore-trust-root",
   "dep:sigstore-types",
+  "sigstore-verify/tuf",
+  "sigstore-trust-root/tuf",
 ]
 native-tls = [
   "rattler_build_networking/native-tls",
   "sigstore-verify?/native-tls",
 ]
-rustls-tls = ["rattler_build_networking/rustls-tls", "sigstore-verify?/rustls"]
+rustls = ["rattler_build_networking/rustls", "sigstore-verify?/rustls"]
 
 [dependencies]
 async-trait = { workspace = true }
@@ -59,9 +61,9 @@ tempfile = { workspace = true }
 dunce = { workspace = true }
 rattler_git = { workspace = true }
 hex = { workspace = true }
-sigstore-verify = { version = "0.6.3", default-features = false, optional = true }
-sigstore-trust-root = { version = "0.6.3", default-features = false, optional = true }
-sigstore-types = { version = "0.6.3", optional = true }
+sigstore-verify = { version = "0.7.0", default-features = false, optional = true }
+sigstore-trust-root = { version = "0.7.0", default-features = false, optional = true }
+sigstore-types = { version = "0.7.0", optional = true }
 
 [dev-dependencies]
 base64 = "0.22"

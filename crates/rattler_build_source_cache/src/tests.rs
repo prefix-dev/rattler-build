@@ -223,6 +223,127 @@ mod source_cache_tests {
         );
     }
 
+    /// Regression test for <https://github.com/prefix-dev/rattler-build/issues/2379>.
+    ///
+    /// Submodules that use relative URLs (e.g. `../sibling.git`) are resolved
+    /// against the origin remote. Because rattler_git creates checkouts with
+    /// `git clone --local`, origin points at the local bare cache database
+    /// instead of the real remote. We resolve relative submodule URLs against
+    /// the real source URL ourselves (similar to Cargo's approach) so that
+    /// `git submodule update` uses the correct absolute URLs.
+    #[tokio::test]
+    async fn test_git_submodule_relative_url() {
+        use crate::GitReference;
+        use crate::source::{GitSource, Source};
+        use std::path::Path;
+        use std::process::Command;
+
+        let tmp = TempDir::new().unwrap();
+        let repos_dir = tmp.path().join("repos");
+        fs_err::create_dir_all(&repos_dir).unwrap();
+
+        // Helper: run git with a fake identity and file protocol allowed.
+        let git = |dir: &Path, args: &[&str]| -> std::process::Output {
+            let out = Command::new("git")
+                .current_dir(dir)
+                .arg("-c")
+                .arg("user.name=test")
+                .arg("-c")
+                .arg("user.email=test@test")
+                .arg("-c")
+                .arg("protocol.file.allow=always")
+                .args(args)
+                .output()
+                .unwrap();
+            assert!(
+                out.status.success(),
+                "git {} failed: {}",
+                args.join(" "),
+                String::from_utf8_lossy(&out.stderr),
+            );
+            out
+        };
+
+        // Create a "sub" repo that will serve as the submodule.
+        let sub_repo = repos_dir.join("sub.git");
+        git(&repos_dir, &["init", "--bare", sub_repo.to_str().unwrap()]);
+
+        // Populate it via a temporary worktree.
+        let sub_work = tmp.path().join("sub_work");
+        git(
+            &repos_dir,
+            &[
+                "clone",
+                sub_repo.to_str().unwrap(),
+                sub_work.to_str().unwrap(),
+            ],
+        );
+        fs_err::write(sub_work.join("hello.txt"), "hello from submodule").unwrap();
+        git(&sub_work, &["add", "."]);
+        git(&sub_work, &["commit", "-m", "init sub"]);
+        git(&sub_work, &["push"]);
+
+        // Create a "main" bare repo that references "sub" via a relative URL.
+        let main_repo = repos_dir.join("main.git");
+        git(&repos_dir, &["init", "--bare", main_repo.to_str().unwrap()]);
+        let main_work = tmp.path().join("main_work");
+        git(
+            &repos_dir,
+            &[
+                "clone",
+                main_repo.to_str().unwrap(),
+                main_work.to_str().unwrap(),
+            ],
+        );
+
+        // Add the submodule using a relative URL ("../sub.git").
+        git(&main_work, &["submodule", "add", "../sub.git", "ext/sub"]);
+
+        fs_err::write(main_work.join("README"), "main repo").unwrap();
+        git(&main_work, &["add", "."]);
+        git(&main_work, &["commit", "-m", "init with submodule"]);
+        git(&main_work, &["push"]);
+
+        // Get the commit we just pushed, so we can use it as a tag-like ref.
+        let out = git(&main_work, &["rev-parse", "HEAD"]);
+        let commit = String::from_utf8(out.stdout).unwrap().trim().to_string();
+
+        // Now exercise the source cache against the bare "main.git" repo.
+        let cache_dir = tmp.path().join("cache");
+        let url = url::Url::from_file_path(&main_repo).unwrap();
+
+        let cache = SourceCacheBuilder::new()
+            .cache_dir(&cache_dir)
+            .build()
+            .await
+            .unwrap();
+
+        let source = Source::Git(GitSource::with_expected_commit(
+            url,
+            GitReference::from_rev(commit.clone()),
+            None,
+            false,
+            true,
+            Some(commit),
+        ));
+
+        // This used to fail because git submodule update tried to resolve
+        // "../sub.git" against the local cache bare database path.
+        let result = cache.get_source(&source).await.unwrap();
+
+        // Verify the submodule was actually checked out.
+        let sub_file = result.path.join("ext/sub/hello.txt");
+        assert!(
+            sub_file.exists(),
+            "submodule file should exist at {}",
+            sub_file.display()
+        );
+        assert_eq!(
+            fs_err::read_to_string(&sub_file).unwrap(),
+            "hello from submodule"
+        );
+    }
+
     #[test]
     fn test_extract_filename_from_header_strips_path_components() {
         use crate::cache::extract_filename_from_header;

@@ -5,6 +5,7 @@ use pyo3::prelude::*;
 
 mod build;
 mod cli_api;
+mod debug;
 mod error;
 mod jinja_config;
 mod package;
@@ -19,7 +20,7 @@ mod tracing_subscriber;
 mod upload;
 mod variant_config;
 
-use build::BuildResultPy;
+use build::{BuildResultPy, PyEnvironmentIsolation};
 use error::RattlerBuildError;
 use jinja_config::PyJinjaConfig;
 
@@ -62,9 +63,11 @@ fn rattler_build<'py>(_py: Python<'py>, m: Bound<'py, PyModule>) -> PyResult<()>
     m.add_function(wrap_pyfunction!(upload::upload_package_to_artifactory_py, &m).unwrap())?;
     m.add_function(wrap_pyfunction!(upload::upload_package_to_prefix_py, &m).unwrap())?;
     m.add_function(wrap_pyfunction!(upload::upload_package_to_anaconda_py, &m).unwrap())?;
+    m.add_function(wrap_pyfunction!(upload::upload_package_to_cloudsmith_py, &m).unwrap())?;
     m.add_function(wrap_pyfunction!(upload::upload_packages_to_conda_forge_py, &m).unwrap())?;
     m.add_class::<PyJinjaConfig>()?;
     m.add_class::<BuildResultPy>()?;
+    m.add_class::<PyEnvironmentIsolation>()?;
 
     // Register all submodules
     stage0::register_stage0_module(_py, &m)?;
@@ -74,6 +77,7 @@ fn rattler_build<'py>(_py: Python<'py>, m: Bound<'py, PyModule>) -> PyResult<()>
     tool_config::register_tool_config_module(_py, &m)?;
     package::register_package_module(_py, &m)?;
     package_assembler::register_package_assembler_module(_py, &m)?;
+    debug::register_debug_module(_py, &m)?;
 
     Ok(())
 }

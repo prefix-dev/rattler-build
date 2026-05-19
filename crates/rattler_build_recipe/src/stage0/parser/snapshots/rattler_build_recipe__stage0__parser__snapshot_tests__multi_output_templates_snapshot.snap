@@ -1,5 +1,6 @@
 ---
 source: crates/rattler_build_recipe/src/stage0/parser/snapshot_tests.rs
+assertion_line: 120
 expression: "serde_yaml::to_string(&recipe).unwrap()"
 ---
 schema_version: 1
@@ -13,15 +14,11 @@ recipe:
   name: ${{ name }}
   version: ${{ version }}
 build:
-  number: null
-  string: null
   script: {}
-  noarch: null
   python:
     entry_points: []
     skip_pyc_compilation: []
     use_python_app_entrypoint: false
-    site_packages_path: null
   skip: []
   always_copy_files: []
   always_include_files: []
@@ -32,12 +29,9 @@ build:
     binary_relocation: true
     missing_dso_allowlist: []
     rpath_allowlist: []
-    overdepending_behavior: null
-    overlinking_behavior: null
   variant:
     use_keys: []
     ignore_keys: []
-    down_prioritize_variant: null
   prefix_detection:
     force_file_type:
       text: []
@@ -45,14 +39,7 @@ build:
     ignore: false
     ignore_binary_files: false
   post_process: []
-about:
-  homepage: null
-  license: null
-  license_family: null
-  summary: null
-  description: null
-  documentation: null
-  repository: null
+about: {}
 extra: {}
 outputs:
 - staging:
@@ -82,15 +69,11 @@ outputs:
     - python ${{ python_version }}.*
     - ${{ pin_subpackage(name ~ "-lib", max_pin="x.x") }}
   build:
-    number: null
-    string: null
     script: {}
-    noarch: null
     python:
       entry_points: []
       skip_pyc_compilation: []
       use_python_app_entrypoint: false
-      site_packages_path: null
     skip: []
     always_copy_files: []
     always_include_files: []
@@ -101,12 +84,9 @@ outputs:
       binary_relocation: true
       missing_dso_allowlist: []
       rpath_allowlist: []
-      overdepending_behavior: null
-      overlinking_behavior: null
     variant:
       use_keys: []
       ignore_keys: []
-      down_prioritize_variant: null
     prefix_detection:
       force_file_type:
         text: []
@@ -117,11 +97,7 @@ outputs:
   about:
     homepage: https://example.com/${{ name }}
     license: MIT
-    license_family: null
     summary: Package ${{ name }} version ${{ version }}
-    description: null
-    documentation: null
-    repository: null
 - package:
     name: ${{ name }}-lib
     version: ${{ version }}
@@ -130,15 +106,11 @@ outputs:
     run:
     - libgcc-ng
   build:
-    number: null
-    string: null
     script: {}
-    noarch: null
     python:
       entry_points: []
       skip_pyc_compilation: []
       use_python_app_entrypoint: false
-      site_packages_path: null
     skip: []
     always_copy_files: []
     always_include_files: []
@@ -149,12 +121,9 @@ outputs:
       binary_relocation: true
       missing_dso_allowlist: []
       rpath_allowlist: []
-      overdepending_behavior: null
-      overlinking_behavior: null
     variant:
       use_keys: []
       ignore_keys: []
-      down_prioritize_variant: null
     prefix_detection:
       force_file_type:
         text: []
@@ -163,10 +132,5 @@ outputs:
       ignore_binary_files: false
     post_process: []
   about:
-    homepage: null
     license: MIT
-    license_family: null
     summary: Library for ${{ name }}
-    description: null
-    documentation: null
-    repository: null

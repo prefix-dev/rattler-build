@@ -668,6 +668,30 @@ def test_always_include_files(
     assert "Force include new file" in (pkg_force / "hello.txt").read_text()
 
 
+@pytest.mark.skipif(
+    os.name == "nt", reason="recipe does not support execution on windows"
+)
+def test_package_files_override(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """The build script writes an explicit list of paths to
+    $RATTLER_BUILD_PACKAGE_FILES; only those should end up in the package."""
+    rattler_build.build(
+        recipes / "package_files_override/recipe.yaml",
+        tmp_path,
+    )
+
+    pkg = get_extracted_package(tmp_path, "package_files_override")
+    paths = json.loads((pkg / "info/paths.json").read_text())
+    listed = sorted(p["_path"] for p in paths["paths"])
+
+    assert listed == ["bin/also-keep.sh", "bin/keep.sh"]
+    assert (pkg / "bin/keep.sh").exists()
+    assert (pkg / "bin/also-keep.sh").exists()
+    assert not (pkg / "bin/skip.sh").exists()
+    assert not (pkg / "share/doc/skip.txt").exists()
+
+
 def test_script_env_in_recipe(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
@@ -870,6 +894,20 @@ def test_console_logging(rattler_build: RattlerBuild, recipes: Path, tmp_path: P
     assert "hahaha" not in output
     assert "I am hahaha" not in output
     assert "I am ********" in output
+
+
+def test_secret_passthrough(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    """Verify that secrets declared in the recipe are available as env vars
+    inside the build script, even in strict isolation mode."""
+    os.environ["BUILD_SECRET"] = "s3cret_token_42"
+    rattler_build.build(recipes / "secret_passthrough", tmp_path)
+    pkg = get_extracted_package(tmp_path, "secret_passthrough")
+    value_file = pkg / "secret_check" / "value.txt"
+    assert value_file.exists(), "build script did not write secret value file"
+    contents = value_file.read_text().strip()
+    assert contents == "s3cret_token_42", (
+        f"secret was not passed through to build script, got: {contents!r}"
+    )
 
 
 @pytest.mark.skipif(
@@ -1661,6 +1699,20 @@ def test_cycle_detection(rattler_build: RattlerBuild, recipes: Path, tmp_path: P
         )
     stdout = e.value.output
     assert "Cycle detected in recipe outputs: bazbus, foobar" in stdout
+
+
+def test_sibling_run_dep_ordering(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Test that outputs with plain run deps on sibling outputs are built in the right order.
+
+    repro-wrapper has a run dep on repro-runtime but is listed first in the recipe.
+    The build should succeed because repro-runtime must be built before repro-wrapper's
+    test environment is solved.
+    """
+    rattler_build.build(
+        recipes / "race-condition" / "recipe-sibling-run-dep.yaml", tmp_path
+    )
 
 
 def test_python_min_render(
@@ -3151,3 +3203,21 @@ def test_target_platform_in_variant_config_warning(
         in combined
     )
     assert "Please use the '--target-platform' command-line flag" in combined
+
+
+def test_c_compilation(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(recipes / "c_compilation", tmp_path)
+    pkg = get_extracted_package(tmp_path, "c_compilation")
+    if platform.system() == "Windows":
+        assert (pkg / "bin/hello.exe").exists()
+    else:
+        assert (pkg / "bin/hello").exists()
+
+
+def test_rust_compilation(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(recipes / "rust_compilation", tmp_path)
+    pkg = get_extracted_package(tmp_path, "rust_compilation")
+    if platform.system() == "Windows":
+        assert (pkg / "bin/hello-rust.exe").exists()
+    else:
+        assert (pkg / "bin/hello-rust").exists()

@@ -6,13 +6,13 @@ use std::{collections::HashMap, path::PathBuf, str::FromStr};
 
 use ::rattler_build::{
     build_recipes,
-    metadata::Debug,
     opt::{BuildData, ChannelPriorityWrapper, CommonData, TestData},
     run_test,
     tool_configuration::{ContinueOnFailure, SkipExisting, TestStrategy},
 };
 use clap::ValueEnum;
 use pyo3::prelude::*;
+use rattler_build_script::EnvironmentIsolation;
 use rattler_conda_types::{NamedChannelOrUrl, Platform};
 use rattler_config::config::{ConfigBase, build::PackageFormatAndCompression};
 
@@ -20,7 +20,7 @@ use crate::error::RattlerBuildError;
 use crate::run_async_task;
 
 #[pyfunction]
-#[pyo3(signature = (recipes, up_to, build_platform, target_platform, host_platform, channel, variant_config, variant_overrides=None, ignore_recipe_variants=false, render_only=false, with_solve=false, keep_build=false, no_build_id=false, package_format=None, compression_threads=None, io_concurrency_limit=None, no_include_recipe=false, test=None, output_dir=None, auth_file=None, channel_priority=None, skip_existing=None, noarch_build_platform=None, allow_insecure_host=None, continue_on_failure=false, debug=false, error_prefix_in_binary=false, allow_symlinks_on_windows=false, allow_absolute_license_paths=false, exclude_newer=None, build_num=None, use_bz2=true, use_zstd=true, use_sharded=true))]
+#[pyo3(signature = (recipes, up_to, build_platform, target_platform, host_platform, channel, variant_config, variant_overrides=None, ignore_recipe_variants=false, render_only=false, with_solve=false, keep_build=false, no_build_id=false, package_format=None, compression_threads=None, io_concurrency_limit=None, no_include_recipe=false, test=None, output_dir=None, auth_file=None, channel_priority=None, skip_existing=None, noarch_build_platform=None, allow_insecure_host=None, continue_on_failure=false, error_prefix_in_binary=false, allow_symlinks_on_windows=false, allow_absolute_license_paths=false, exclude_newer=None, build_num=None, build_string_prefix=None, use_bz2=true, use_zstd=true, use_sharded=true, v3=false))]
 #[allow(clippy::too_many_arguments)]
 pub fn build_recipes_py(
     recipes: Vec<PathBuf>,
@@ -48,15 +48,16 @@ pub fn build_recipes_py(
     noarch_build_platform: Option<String>,
     allow_insecure_host: Option<Vec<String>>,
     continue_on_failure: bool,
-    debug: bool,
     error_prefix_in_binary: bool,
     allow_symlinks_on_windows: bool,
     allow_absolute_license_paths: bool,
     exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
     build_num: Option<u64>,
+    build_string_prefix: Option<String>,
     use_bz2: bool,
     use_zstd: bool,
     use_sharded: bool,
+    v3: bool,
 ) -> PyResult<()> {
     let channel_priority = channel_priority
         .map(|c| ChannelPriorityWrapper::from_str(&c).map(|c| c.value))
@@ -66,6 +67,7 @@ pub fn build_recipes_py(
     let common = CommonData::new(
         output_dir,
         false,
+        v3,
         auth_file.map(|a| a.into()),
         config,
         channel_priority,
@@ -129,18 +131,18 @@ pub fn build_recipes_py(
         no_include_recipe,
         test,
         common,
-        false, // TUI disabled
         skip_existing,
         noarch_build_platform,
         None, // extra meta
         None, // sandbox configuration
-        Debug::new(debug),
+        EnvironmentIsolation::default(),
         ContinueOnFailure::from(continue_on_failure),
         error_prefix_in_binary,
         allow_symlinks_on_windows,
         allow_absolute_license_paths,
         exclude_newer,
         build_num,
+        build_string_prefix,
         None, // markdown_summary
     );
 
@@ -152,7 +154,7 @@ pub fn build_recipes_py(
 
 #[allow(clippy::too_many_arguments)]
 #[pyfunction]
-#[pyo3(signature = (package_file, channel, compression_threads, auth_file, channel_priority, allow_insecure_host=None, debug=false, test_index=None, use_bz2=true, use_zstd=true, use_sharded=true))]
+#[pyo3(signature = (package_file, channel, compression_threads, auth_file, channel_priority, allow_insecure_host=None, test_index=None, use_bz2=true, use_zstd=true, use_sharded=true))]
 pub fn test_package_py(
     package_file: PathBuf,
     channel: Option<Vec<String>>,
@@ -160,7 +162,6 @@ pub fn test_package_py(
     auth_file: Option<PathBuf>,
     channel_priority: Option<String>,
     allow_insecure_host: Option<Vec<String>>,
-    debug: bool,
     test_index: Option<usize>,
     use_bz2: bool,
     use_zstd: bool,
@@ -173,6 +174,7 @@ pub fn test_package_py(
     let config = ConfigBase::<()>::default();
     let common = CommonData::new(
         None,
+        false,
         false,
         auth_file,
         config,
@@ -199,7 +201,6 @@ pub fn test_package_py(
         package_file,
         channel,
         compression_threads,
-        Debug::new(debug),
         test_index,
         common,
     );

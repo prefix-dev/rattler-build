@@ -2,6 +2,7 @@
 use std::env::consts::ARCH;
 use std::{collections::HashMap, path::Path};
 
+use rattler_build_script::EnvironmentIsolation;
 use rattler_conda_types::Platform;
 
 use crate::unix;
@@ -10,6 +11,7 @@ use crate::unix;
 pub fn default_env_vars(
     prefix: &Path,
     target_platform: &Platform,
+    env_isolation: EnvironmentIsolation,
 ) -> HashMap<String, Option<String>> {
     let mut vars = unix::env::default_env_vars(prefix);
 
@@ -24,9 +26,14 @@ pub fn default_env_vars(
     // filtered so it only contains the result of `linux_vars`
     // which, before this change was empty, and after it only
     // contains other QEMU env vars.
-    vars.insert("CFLAGS".to_string(), std::env::var("CFLAGS").ok());
-    vars.insert("CXXFLAGS".to_string(), std::env::var("CXXFLAGS").ok());
-    vars.insert("LDFLAGS".to_string(), std::env::var("LDFLAGS").ok());
+    if matches!(
+        env_isolation,
+        EnvironmentIsolation::CondaBuild | EnvironmentIsolation::None
+    ) {
+        vars.insert("CFLAGS".to_string(), std::env::var("CFLAGS").ok());
+        vars.insert("CXXFLAGS".to_string(), std::env::var("CXXFLAGS").ok());
+        vars.insert("LDFLAGS".to_string(), std::env::var("LDFLAGS").ok());
+    }
     vars.insert(
         "QEMU_LD_PREFIX".to_string(),
         std::env::var("QEMU_LD_PREFIX").ok(),
@@ -59,7 +66,11 @@ mod tests {
         let tmp_prefix = tempfile::tempdir().unwrap();
         unsafe { std::env::remove_var("LD_RUN_PATH") };
 
-        let vars = default_env_vars(tmp_prefix.path(), &Platform::Linux64);
+        let vars = default_env_vars(
+            tmp_prefix.path(),
+            &Platform::Linux64,
+            EnvironmentIsolation::Strict,
+        );
         let build_val = vars
             .get("BUILD")
             .and_then(|o| o.as_ref())
@@ -81,12 +92,29 @@ mod tests {
         let tmp_prefix = tempfile::tempdir().unwrap();
         unsafe { std::env::set_var("LD_RUN_PATH", "/custom/lib") };
 
-        let vars = default_env_vars(tmp_prefix.path(), &Platform::Linux64);
+        let vars = default_env_vars(
+            tmp_prefix.path(),
+            &Platform::Linux64,
+            EnvironmentIsolation::Strict,
+        );
         assert_eq!(
             vars.get("LD_RUN_PATH"),
             Some(&Some("/custom/lib".to_string()))
         );
 
         unsafe { std::env::remove_var("LD_RUN_PATH") };
+    }
+
+    #[test]
+    fn host_compiler_flags_not_forwarded() {
+        let tmp_prefix = tempfile::tempdir().unwrap();
+        let vars = default_env_vars(
+            tmp_prefix.path(),
+            &Platform::Linux64,
+            EnvironmentIsolation::Strict,
+        );
+        assert_eq!(vars.get("CFLAGS"), None);
+        assert_eq!(vars.get("CXXFLAGS"), None);
+        assert_eq!(vars.get("LDFLAGS"), None);
     }
 }

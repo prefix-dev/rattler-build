@@ -25,14 +25,14 @@ def test_upload_to_artifactory_no_token() -> None:
 def test_upload_to_prefix_no_token() -> None:
     url = "https://prefix.dev"
     channel = "some_channel"
-    with pytest.raises(rattler_build.RattlerBuildError, match="No prefix.dev api key was given"):
+    with pytest.raises(rattler_build.RattlerBuildError, match="no prefix.dev API key provided"):
         rattler_build.upload_package_to_prefix([], url, channel)
 
 
 @pytest.mark.skipif(not os.getenv("CI"), reason="Only run on CI")
 def test_upload_to_anaconda_no_token() -> None:
     url = "https://anaconda.org"
-    with pytest.raises(rattler_build.RattlerBuildError, match="No anaconda.org api key was given"):
+    with pytest.raises(rattler_build.RattlerBuildError, match="no anaconda.org API key provided"):
         rattler_build.upload_package_to_anaconda([], url)
 
 

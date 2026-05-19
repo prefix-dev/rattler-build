@@ -12,6 +12,7 @@ use crate::{
     source::{AttestationVerification, Checksum, GitSource, Source, UrlSource},
 };
 use rattler_build_networking::BaseClient;
+use rattler_git::CheckoutOptions;
 use rattler_git::resolver::GitResolver;
 
 /// Result of fetching a source from the cache
@@ -98,13 +99,18 @@ impl SourceCache {
         let git_cache = self.cache_dir.join("git");
         fs_err::tokio::create_dir_all(&git_cache).await?;
 
+        let checkout_options = CheckoutOptions {
+            update_submodules: source.submodules,
+        };
+
         let fetch_result = self
             .git_resolver
             .fetch(
                 git_url.clone(),
-                self.client.get_client().clone(),
+                self.client.get_client().client().clone(),
                 git_cache,
                 None,
+                checkout_options,
             )
             .await
             .map_err(|e| CacheError::Git(format!("Git fetch failed: {}", e)))?;
@@ -122,11 +128,6 @@ impl SourceCache {
                 });
             }
             tracing::info!("Verified expected commit: {}", expected);
-        }
-
-        // Handle submodules if needed (defaults to true)
-        if source.submodules {
-            self.git_submodule_update(&repo_path).await?;
         }
 
         // Handle LFS if needed
@@ -160,28 +161,6 @@ impl SourceCache {
             path: repo_path,
             git_commit: Some(commit_hash),
         })
-    }
-
-    /// Initialize and recursively update git submodules
-    async fn git_submodule_update(&self, repo_path: &Path) -> Result<(), CacheError> {
-        let output = tokio::process::Command::new("git")
-            .current_dir(repo_path)
-            .arg("submodule")
-            .arg("update")
-            .arg("--init")
-            .arg("--recursive")
-            .output()
-            .await
-            .map_err(|e| CacheError::Git(format!("Failed to update git submodules: {}", e)))?;
-
-        if !output.status.success() {
-            return Err(CacheError::Git(format!(
-                "Git submodule update failed: {}",
-                String::from_utf8_lossy(&output.stderr)
-            )));
-        }
-
-        Ok(())
     }
 
     /// Pull LFS files for a git repository
@@ -472,7 +451,13 @@ impl SourceCache {
         }
 
         // Download from HTTP/HTTPS - use the appropriate client based on SSL settings
-        let response = self.client.for_host(url).get(url.clone()).send().await?;
+        let response = self
+            .client
+            .for_host(url)
+            .client()
+            .get(url.clone())
+            .send()
+            .await?;
 
         if !response.status().is_success() {
             return Err(CacheError::Download(

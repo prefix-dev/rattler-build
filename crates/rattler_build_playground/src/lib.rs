@@ -122,7 +122,8 @@ pub fn evaluate_recipe(yaml_source: &str, variables_json: &str, target_platform:
         ..Default::default()
     };
 
-    let context = EvaluationContext::with_variables_and_config(variables, jinja_config);
+    let context =
+        EvaluationContext::with_variables_and_config(variables, jinja_config).with_v3(true);
 
     match &recipe {
         Recipe::SingleOutput(r) => {
@@ -213,6 +214,8 @@ struct VariantSummary {
     noarch: Option<String>,
     /// Variant keys and values
     variant: Vec<(String, String)>,
+    /// V3 package variant flags (display strings)
+    flags: Vec<String>,
     /// Build dependencies (just names)
     build_deps: Vec<String>,
     /// Host dependencies (just names)
@@ -271,7 +274,8 @@ pub fn render_variants(
     let render_config = RenderConfig::new()
         .with_target_platform(platform)
         .with_host_platform(platform)
-        .with_build_platform(platform);
+        .with_build_platform(platform)
+        .with_v3(true);
 
     // Render with variant config
     match render_recipe_with_variant_config(&stage0_recipe, &variant_config, render_config) {
@@ -297,6 +301,9 @@ pub fn render_variants(
                         .iter()
                         .map(|(k, v)| (k.0.clone(), v.to_string()))
                         .collect();
+
+                    let flags: Vec<String> =
+                        recipe.build.flags.iter().map(|f| f.to_string()).collect();
 
                     let build_deps: Vec<String> = recipe
                         .requirements
@@ -326,6 +333,7 @@ pub fn render_variants(
                         skipped: recipe.build.skip,
                         noarch,
                         variant,
+                        flags,
                         build_deps,
                         host_deps,
                         run_deps,

@@ -1,7 +1,9 @@
 //! Stage 1 Requirements - evaluated dependencies with concrete values
 
+use std::collections::BTreeMap;
+
 use rattler_build_types::Pin;
-use rattler_conda_types::{MatchSpec, PackageName};
+use rattler_conda_types::{MatchSpec, PackageName, ParseMatchSpecOptions, RepodataRevision};
 use serde::{Deserialize, Serialize};
 
 use crate::stage0::evaluate::is_free_matchspec;
@@ -61,12 +63,8 @@ impl Dependency {
     /// Works for all dependency types including unresolved pins.
     /// Note: For Spec dependencies, only returns the name if it's an exact match.
     pub fn name(&self) -> Option<&PackageName> {
-        use rattler_conda_types::PackageNameMatcher;
         match self {
-            Dependency::Spec(spec) => spec.name.as_ref().and_then(|matcher| match matcher {
-                PackageNameMatcher::Exact(name) => Some(name),
-                _ => None,
-            }),
+            Dependency::Spec(spec) => spec.name.as_exact(),
             Dependency::PinSubpackage(pin) => Some(&pin.pin_subpackage.name),
             Dependency::PinCompatible(pin) => Some(&pin.pin_compatible.name),
         }
@@ -148,9 +146,13 @@ impl<'de> Deserialize<'de> for Dependency {
 
         let raw_spec = RawSpec::deserialize(deserializer)?;
         Ok(match raw_spec {
-            RawSpec::String(spec) => {
-                Dependency::Spec(Box::new(spec.parse().map_err(D::Error::custom)?))
-            }
+            RawSpec::String(spec) => Dependency::Spec(Box::new(
+                MatchSpec::from_str(
+                    &spec,
+                    ParseMatchSpecOptions::lenient().with_repodata_revision(RepodataRevision::V3),
+                )
+                .map_err(D::Error::custom)?,
+            )),
             RawSpec::Explicit(RawDependency::PinSubpackage(dep)) => Dependency::PinSubpackage(dep),
             RawSpec::Explicit(RawDependency::PinCompatible(dep)) => Dependency::PinCompatible(dep),
         })
@@ -240,6 +242,10 @@ pub struct Requirements {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub run_constraints: Vec<Dependency>,
 
+    /// Optional dependency groups selected by MatchSpec extras.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub extras: BTreeMap<String, Vec<Dependency>>,
+
     /// Run exports configuration
     #[serde(default, skip_serializing_if = "RunExports::is_empty")]
     pub run_exports: RunExports,
@@ -261,6 +267,7 @@ impl Requirements {
             && self.host.is_empty()
             && self.run.is_empty()
             && self.run_constraints.is_empty()
+            && self.extras.is_empty()
             && self.run_exports.is_empty()
             && self.ignore_run_exports.is_empty()
     }
@@ -273,6 +280,7 @@ impl Requirements {
             .chain(self.host.iter())
             .chain(self.run.iter())
             .chain(self.run_constraints.iter())
+            .chain(self.extras.values().flatten())
             .chain(self.run_exports.weak.iter())
             .chain(self.run_exports.weak_constraints.iter())
             .chain(self.run_exports.strong.iter())
@@ -299,7 +307,6 @@ impl Requirements {
 
     /// Get the free specs of the rendered dependencies (any MatchSpec without pins)
     pub fn free_specs(&self) -> Vec<PackageName> {
-        use rattler_conda_types::PackageNameMatcher;
         self.build
             .iter()
             .chain(self.host.iter())
@@ -307,10 +314,7 @@ impl Requirements {
                 Dependency::Spec(spec) => {
                     if is_free_matchspec(spec.as_ref()) {
                         // is_free_matchspec ensures name is Some
-                        spec.name.clone().and_then(|matcher| match matcher {
-                            PackageNameMatcher::Exact(name) => Some(name),
-                            _ => None,
-                        })
+                        spec.name.clone().into_exact()
                     } else {
                         None
                     }

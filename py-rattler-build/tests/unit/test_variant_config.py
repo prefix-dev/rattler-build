@@ -325,6 +325,182 @@ c_compiler:
     assert "vs2019" in c_compiler_values_win
 
 
+def test_variant_config_from_files(tmp_path: Path) -> None:
+    """Test loading and merging multiple variant config files."""
+    base_yaml = """
+python:
+  - "3.9"
+  - "3.10"
+numpy:
+  - "1.21"
+"""
+
+    override_yaml = """
+python:
+  - "3.11"
+  - "3.12"
+rust:
+  - "1.75"
+"""
+
+    base_path = tmp_path / "base.yaml"
+    base_path.write_text(base_yaml)
+
+    override_path = tmp_path / "override.yaml"
+    override_path.write_text(override_yaml)
+
+    config = VariantConfig.from_files([base_path, override_path])
+
+    # python should be overridden by the later file
+    python_values = config.get_values("python")
+    assert python_values is not None
+    assert python_values == ["3.11", "3.12"]
+
+    # numpy from the base file should still be present
+    numpy_values = config.get_values("numpy")
+    assert numpy_values is not None
+    assert numpy_values == ["1.21"]
+
+    # rust from the override file should be present
+    rust_values = config.get_values("rust")
+    assert rust_values is not None
+    assert rust_values == ["1.75"]
+
+
+def test_variant_config_from_files_single(tmp_path: Path) -> None:
+    """Test from_files with a single file behaves like from_file."""
+    yaml_content = """
+python:
+  - "3.10"
+"""
+
+    path = tmp_path / "variant.yaml"
+    path.write_text(yaml_content)
+
+    config = VariantConfig.from_files([path])
+
+    values = config.get_values("python")
+    assert values is not None
+    assert values == ["3.10"]
+
+
+def test_variant_config_from_files_empty() -> None:
+    """Test from_files with an empty list produces an empty config."""
+    config = VariantConfig.from_files([])
+    assert len(config) == 0
+
+
+def test_variant_config_from_files_zip_keys_precedence(tmp_path: Path) -> None:
+    """Test that zip_keys from the last file take precedence."""
+    first_yaml = """
+python:
+  - "3.9"
+  - "3.10"
+numpy:
+  - "1.20"
+  - "1.21"
+zip_keys:
+  - [python, numpy]
+"""
+
+    second_yaml = """
+rust:
+  - "1.70"
+  - "1.75"
+"""
+
+    first_path = tmp_path / "first.yaml"
+    first_path.write_text(first_yaml)
+    second_path = tmp_path / "second.yaml"
+    second_path.write_text(second_yaml)
+
+    config = VariantConfig.from_files([first_path, second_path])
+
+    # zip_keys from the first file should be preserved (second file has none)
+    assert config.zip_keys is not None
+    assert config.zip_keys == [["python", "numpy"]]
+
+    # With zip_keys, python+numpy produce 2 combos, crossed with 2 rust = 4
+    combinations = config.combinations()
+    assert len(combinations) == 4
+
+
+def test_variant_config_from_files_with_context(tmp_path: Path) -> None:
+    """Test loading multiple files with JinjaConfig context."""
+    from rattler_build import JinjaConfig
+
+    base_yaml = """
+c_compiler:
+  - if: unix
+    then: gcc
+  - if: win
+    then: msvc
+"""
+
+    override_yaml = """
+python:
+  - "3.11"
+"""
+
+    base_path = tmp_path / "base.yaml"
+    base_path.write_text(base_yaml)
+    override_path = tmp_path / "override.yaml"
+    override_path.write_text(override_yaml)
+
+    platform_config = PlatformConfig(target_platform="linux-64")
+    jinja_config = JinjaConfig(platform=platform_config)
+    config = VariantConfig.from_files_with_context([base_path, override_path], jinja_config)
+
+    c_values = config.get_values("c_compiler")
+    assert c_values is not None
+    assert "gcc" in c_values
+    assert "msvc" not in c_values
+
+    python_values = config.get_values("python")
+    assert python_values is not None
+    assert python_values == ["3.11"]
+
+
+def test_variant_config_merge() -> None:
+    """Test merging two VariantConfigs."""
+    base = VariantConfig({"python": ["3.9", "3.10"], "numpy": ["1.21"]})
+    override = VariantConfig({"python": ["3.11"], "rust": ["1.75"]})
+
+    merged = base.merge(override)
+
+    # python should be overridden
+    assert merged["python"] == ["3.11"]
+    # numpy should be preserved from base
+    assert merged["numpy"] == ["1.21"]
+    # rust should be added from override
+    assert merged["rust"] == ["1.75"]
+
+    # Original configs should be unchanged
+    assert base["python"] == ["3.9", "3.10"]
+    assert override.get_values("numpy") is None
+
+
+def test_variant_config_merge_zip_keys() -> None:
+    """Test that merge replaces zip_keys when other has them."""
+    base = VariantConfig(
+        {"python": ["3.9", "3.10"], "numpy": ["1.20", "1.21"]},
+        zip_keys=[["python", "numpy"]],
+    )
+    override = VariantConfig({"rust": ["1.70"]})
+
+    # Merging with no zip_keys preserves the original
+    merged = base.merge(override)
+    assert merged.zip_keys == [["python", "numpy"]]
+
+    # Merging with new zip_keys replaces
+    override_with_zk = VariantConfig(
+        {"c_compiler": ["gcc", "clang"], "cxx_compiler": ["gxx", "clangxx"]},
+        zip_keys=[["c_compiler", "cxx_compiler"]],
+    )
+    merged2 = base.merge(override_with_zk)
+    assert merged2.zip_keys == [["c_compiler", "cxx_compiler"]]
+
+
 def test_variant_config_multiple_zip_key_groups() -> None:
     """Test multiple zip_key groups."""
     config = VariantConfig(

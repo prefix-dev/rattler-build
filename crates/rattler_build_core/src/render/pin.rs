@@ -141,7 +141,7 @@ pub fn increment(version: &VersionWithSource, segments: i32) -> Result<Version, 
 }
 
 impl Pin {
-    /// Apply the pin to a version and hash of a resolved package. If a max_pin, min_pin or exact pin
+    /// Apply the pin to a version and hash of a resolved package. If a lower_bound, upper_bound or exact pin
     /// are given, the pin is applied to the version accordingly.
     pub fn apply(
         &self,
@@ -181,7 +181,9 @@ impl Pin {
                     .clone()
                     .with_segments(..cmp::min(pin_digits, version.segment_count()))
                     .ok_or_else(|| {
-                        PinError::CouldNotPin("Failed to extract min_pin from version".to_string())
+                        PinError::CouldNotPin(
+                            "Failed to extract lower_bound from version".to_string(),
+                        )
                     })?;
                 pin_str.push_str(&format!(">={}", pin));
             }

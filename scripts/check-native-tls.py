@@ -10,7 +10,7 @@ import sys
 
 # Configuration
 FORBIDDEN_CRATE = "rustls"
-EXCLUDE_FEATURES = {"rustls-tls", "default", "s3"}
+EXCLUDE_FEATURES = {"rustls", "default", "s3"}
 SKIP_PACKAGES: set[str] = {"rattler_build_docs"}
 
 

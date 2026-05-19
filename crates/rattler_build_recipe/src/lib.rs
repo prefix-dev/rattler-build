@@ -36,7 +36,16 @@ pub type RenderErrorWithSource<S> = WithSourceCode<RenderError, S>;
 pub fn parse_recipe(
     source: &source_code::Source,
 ) -> Result<stage0::Recipe, ParseErrorWithSource<source_code::Source>> {
-    stage0::parse_recipe_or_multi_from_source(source.as_ref())
+    parse_recipe_with_config(source, stage0::ParseConfig::default())
+}
+
+/// Parse a recipe from source with explicit parser configuration.
+#[allow(clippy::result_large_err)]
+pub fn parse_recipe_with_config(
+    source: &source_code::Source,
+    config: stage0::ParseConfig,
+) -> Result<stage0::Recipe, ParseErrorWithSource<source_code::Source>> {
+    stage0::parse_recipe_or_multi_from_source_with_config(source.as_ref(), config)
         .map_err(|e| ParseErrorWithSource::new(source.clone(), e))
 }
 

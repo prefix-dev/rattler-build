@@ -33,16 +33,22 @@ fn derive_pypi_provenance_url(source_url: &url::Url) -> Option<url::Url> {
     let path = source_url.path();
     let filename = path.rsplit('/').next()?;
 
-    // Extract project name and version from filename
-    // Filenames are typically: {project}-{version}.tar.gz or {project}-{version}.whl etc.
-    let stem = filename
-        .strip_suffix(".tar.gz")
-        .or_else(|| filename.strip_suffix(".tar.bz2"))
-        .or_else(|| filename.strip_suffix(".zip"))
-        .or_else(|| filename.strip_suffix(".whl"))?;
-
-    // Split on the last '-' to separate project from version
-    let (project, version) = stem.rsplit_once('-')?;
+    // Extract project name and version from the filename. Source distribution
+    // filenames are project-version archives; wheel filenames are
+    // project-version-python-abi-platform per PEP 427.
+    let (project, version) = if let Some(stem) = filename.strip_suffix(".whl") {
+        let mut parts = stem.splitn(3, '-');
+        let project = parts.next()?;
+        let version = parts.next()?;
+        parts.next()?;
+        (project, version)
+    } else {
+        let stem = filename
+            .strip_suffix(".tar.gz")
+            .or_else(|| filename.strip_suffix(".tar.bz2"))
+            .or_else(|| filename.strip_suffix(".zip"))?;
+        stem.rsplit_once('-')?
+    };
 
     // Normalize project name (PEP 503: replace [-_.] with -)
     let normalized_project = project.to_lowercase().replace(['-', '_', '.'], "-");
@@ -194,6 +200,7 @@ async fn download_attestation_bundle(
 ) -> Result<String, CacheError> {
     let response = client
         .for_host(url)
+        .client()
         .get(url.clone())
         .send()
         .await
@@ -257,7 +264,7 @@ fn verify_artifact_subject(
         found_any_subjects = true;
 
         // Check if the artifact hash matches any subject's sha256 digest
-        if statement.matches_sha256(&artifact_sha256_hex) {
+        if statement.matches_sha256(artifact_sha256_hex) {
             return Ok(());
         }
 
@@ -323,9 +330,13 @@ pub(crate) async fn verify_attestation(
     tracing::info!("Downloading attestation bundle from {}", bundle_url);
     let response_json = download_attestation_bundle(client, &bundle_url).await?;
 
-    // Load the production Sigstore trusted root (embedded, no network needed)
-    let trusted_root = TrustedRoot::production().map_err(|e| {
-        CacheError::SigstoreTrustRoot(format!("Failed to load Sigstore trusted root: {}", e))
+    // Load the production Sigstore trusted root through TUF so verification
+    // uses fresh trust material instead of the embedded snapshot.
+    let trusted_root = TrustedRoot::production().await.map_err(|e| {
+        CacheError::SigstoreTrustRoot(format!(
+            "Failed to load Sigstore trusted root via TUF: {}",
+            e
+        ))
     })?;
 
     // Read the artifact for verification
@@ -471,6 +482,19 @@ mod tests {
     }
 
     #[test]
+    fn test_derive_pypi_provenance_url_wheel() {
+        let url = url::Url::parse(
+            "https://files.pythonhosted.org/packages/aa/bb/charset_normalizer-3.4.0-py3-none-any.whl",
+        )
+        .unwrap();
+        let result = derive_pypi_provenance_url(&url).unwrap();
+        assert_eq!(
+            result.as_str(),
+            "https://pypi.org/integrity/charset-normalizer/3.4.0/charset_normalizer-3.4.0-py3-none-any.whl/provenance"
+        );
+    }
+
+    #[test]
     fn test_parse_attestation_response_sigstore_bundle() {
         // A sigstore bundle has a "mediaType" field
         let json = r#"{
@@ -528,9 +552,7 @@ mod tests {
 
     /// Helper to create a minimal sigstore bundle with an in-toto statement
     /// that attests to the given subjects (name, sha256_hex pairs).
-    fn make_bundle_with_subjects(
-        subjects: &[(&str, &str)],
-    ) -> sigstore_types::Bundle {
+    fn make_bundle_with_subjects(subjects: &[(&str, &str)]) -> sigstore_types::Bundle {
         use base64::{Engine, engine::general_purpose::STANDARD};
 
         let subject_json: Vec<serde_json::Value> = subjects
@@ -566,10 +588,7 @@ mod tests {
             }
         });
 
-        sigstore_types::Bundle::from_json(
-            &serde_json::to_string(&bundle_json).unwrap(),
-        )
-        .unwrap()
+        sigstore_types::Bundle::from_json(&serde_json::to_string(&bundle_json).unwrap()).unwrap()
     }
 
     #[test]

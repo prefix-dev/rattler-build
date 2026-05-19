@@ -91,15 +91,8 @@ def test_recipe_to_dict_snapshot() -> None:
             "package": {"name": "test-package", "version": "1.0.0"},
             "build": {
                 "number": 0,
-                "string": None,
                 "script": {},
-                "noarch": None,
-                "python": {
-                    "entry_points": [],
-                    "skip_pyc_compilation": [],
-                    "use_python_app_entrypoint": False,
-                    "site_packages_path": None,
-                },
+                "python": {"entry_points": [], "skip_pyc_compilation": [], "use_python_app_entrypoint": False},
                 "skip": [],
                 "always_copy_files": [],
                 "always_include_files": [],
@@ -110,14 +103,8 @@ def test_recipe_to_dict_snapshot() -> None:
                     "binary_relocation": True,
                     "missing_dso_allowlist": [],
                     "rpath_allowlist": [],
-                    "overdepending_behavior": None,
-                    "overlinking_behavior": None,
                 },
-                "variant": {
-                    "use_keys": [],
-                    "ignore_keys": [],
-                    "down_prioritize_variant": None,
-                },
+                "variant": {"use_keys": [], "ignore_keys": []},
                 "prefix_detection": {
                     "force_file_type": {"text": [], "binary": []},
                     "ignore": False,
@@ -126,15 +113,7 @@ def test_recipe_to_dict_snapshot() -> None:
                 "post_process": [],
             },
             "requirements": {"host": ["python"], "run": ["python"]},
-            "about": {
-                "homepage": None,
-                "license": "MIT",
-                "license_family": None,
-                "summary": "A test package",
-                "description": None,
-                "documentation": None,
-                "repository": None,
-            },
+            "about": {"license": "MIT", "summary": "A test package"},
             "extra": {},
         }
     )
@@ -173,15 +152,8 @@ def test_single_output_recipe_to_dict_snapshot() -> None:
             "package": {"name": "test-package", "version": "1.0.0"},
             "build": {
                 "number": 0,
-                "string": None,
                 "script": {},
-                "noarch": None,
-                "python": {
-                    "entry_points": [],
-                    "skip_pyc_compilation": [],
-                    "use_python_app_entrypoint": False,
-                    "site_packages_path": None,
-                },
+                "python": {"entry_points": [], "skip_pyc_compilation": [], "use_python_app_entrypoint": False},
                 "skip": [],
                 "always_copy_files": [],
                 "always_include_files": [],
@@ -192,14 +164,8 @@ def test_single_output_recipe_to_dict_snapshot() -> None:
                     "binary_relocation": True,
                     "missing_dso_allowlist": [],
                     "rpath_allowlist": [],
-                    "overdepending_behavior": None,
-                    "overlinking_behavior": None,
                 },
-                "variant": {
-                    "use_keys": [],
-                    "ignore_keys": [],
-                    "down_prioritize_variant": None,
-                },
+                "variant": {"use_keys": [], "ignore_keys": []},
                 "prefix_detection": {
                     "force_file_type": {"text": [], "binary": []},
                     "ignore": False,
@@ -208,15 +174,7 @@ def test_single_output_recipe_to_dict_snapshot() -> None:
                 "post_process": [],
             },
             "requirements": {"host": ["python"], "run": ["python"]},
-            "about": {
-                "homepage": None,
-                "license": "MIT",
-                "license_family": None,
-                "summary": "A test package",
-                "description": None,
-                "documentation": None,
-                "repository": None,
-            },
+            "about": {"license": "MIT", "summary": "A test package"},
             "extra": {},
         }
     )
@@ -256,15 +214,8 @@ def test_multi_output_recipe_to_dict_snapshot() -> None:
             "recipe": {"name": "test-multi", "version": "1.0.0"},
             "build": {
                 "number": 0,
-                "string": None,
                 "script": {},
-                "noarch": None,
-                "python": {
-                    "entry_points": [],
-                    "skip_pyc_compilation": [],
-                    "use_python_app_entrypoint": False,
-                    "site_packages_path": None,
-                },
+                "python": {"entry_points": [], "skip_pyc_compilation": [], "use_python_app_entrypoint": False},
                 "skip": [],
                 "always_copy_files": [],
                 "always_include_files": [],
@@ -275,14 +226,8 @@ def test_multi_output_recipe_to_dict_snapshot() -> None:
                     "binary_relocation": True,
                     "missing_dso_allowlist": [],
                     "rpath_allowlist": [],
-                    "overdepending_behavior": None,
-                    "overlinking_behavior": None,
                 },
-                "variant": {
-                    "use_keys": [],
-                    "ignore_keys": [],
-                    "down_prioritize_variant": None,
-                },
+                "variant": {"use_keys": [], "ignore_keys": []},
                 "prefix_detection": {
                     "force_file_type": {"text": [], "binary": []},
                     "ignore": False,
@@ -290,15 +235,7 @@ def test_multi_output_recipe_to_dict_snapshot() -> None:
                 },
                 "post_process": [],
             },
-            "about": {
-                "homepage": None,
-                "license": "MIT",
-                "license_family": None,
-                "summary": "A multi-output test package",
-                "description": None,
-                "documentation": None,
-                "repository": None,
-            },
+            "about": {"license": "MIT", "summary": "A multi-output test package"},
             "extra": {},
             "outputs": [
                 {
@@ -306,16 +243,8 @@ def test_multi_output_recipe_to_dict_snapshot() -> None:
                     "inherit": None,
                     "requirements": {"run": ["libtest"]},
                     "build": {
-                        "number": None,
-                        "string": None,
                         "script": {},
-                        "noarch": None,
-                        "python": {
-                            "entry_points": [],
-                            "skip_pyc_compilation": [],
-                            "use_python_app_entrypoint": False,
-                            "site_packages_path": None,
-                        },
+                        "python": {"entry_points": [], "skip_pyc_compilation": [], "use_python_app_entrypoint": False},
                         "skip": [],
                         "always_copy_files": [],
                         "always_include_files": [],
@@ -326,14 +255,8 @@ def test_multi_output_recipe_to_dict_snapshot() -> None:
                             "binary_relocation": True,
                             "missing_dso_allowlist": [],
                             "rpath_allowlist": [],
-                            "overdepending_behavior": None,
-                            "overlinking_behavior": None,
                         },
-                        "variant": {
-                            "use_keys": [],
-                            "ignore_keys": [],
-                            "down_prioritize_variant": None,
-                        },
+                        "variant": {"use_keys": [], "ignore_keys": []},
                         "prefix_detection": {
                             "force_file_type": {"text": [], "binary": []},
                             "ignore": False,
@@ -341,31 +264,15 @@ def test_multi_output_recipe_to_dict_snapshot() -> None:
                         },
                         "post_process": [],
                     },
-                    "about": {
-                        "homepage": None,
-                        "license": None,
-                        "license_family": None,
-                        "summary": None,
-                        "description": None,
-                        "documentation": None,
-                        "repository": None,
-                    },
+                    "about": {},
                 },
                 {
                     "package": {"name": "test-multi-dev"},
                     "inherit": None,
                     "requirements": {"run": ["test-multi-lib"]},
                     "build": {
-                        "number": None,
-                        "string": None,
                         "script": {},
-                        "noarch": None,
-                        "python": {
-                            "entry_points": [],
-                            "skip_pyc_compilation": [],
-                            "use_python_app_entrypoint": False,
-                            "site_packages_path": None,
-                        },
+                        "python": {"entry_points": [], "skip_pyc_compilation": [], "use_python_app_entrypoint": False},
                         "skip": [],
                         "always_copy_files": [],
                         "always_include_files": [],
@@ -376,14 +283,8 @@ def test_multi_output_recipe_to_dict_snapshot() -> None:
                             "binary_relocation": True,
                             "missing_dso_allowlist": [],
                             "rpath_allowlist": [],
-                            "overdepending_behavior": None,
-                            "overlinking_behavior": None,
                         },
-                        "variant": {
-                            "use_keys": [],
-                            "ignore_keys": [],
-                            "down_prioritize_variant": None,
-                        },
+                        "variant": {"use_keys": [], "ignore_keys": []},
                         "prefix_detection": {
                             "force_file_type": {"text": [], "binary": []},
                             "ignore": False,
@@ -391,15 +292,7 @@ def test_multi_output_recipe_to_dict_snapshot() -> None:
                         },
                         "post_process": [],
                     },
-                    "about": {
-                        "homepage": None,
-                        "license": None,
-                        "license_family": None,
-                        "summary": None,
-                        "description": None,
-                        "documentation": None,
-                        "repository": None,
-                    },
+                    "about": {},
                 },
             ],
         }
@@ -439,15 +332,8 @@ def test_build_to_dict_snapshot() -> None:
     assert build_dict == snapshot(
         {
             "number": 0,
-            "string": None,
             "script": {},
-            "noarch": None,
-            "python": {
-                "entry_points": [],
-                "skip_pyc_compilation": [],
-                "use_python_app_entrypoint": False,
-                "site_packages_path": None,
-            },
+            "python": {"entry_points": [], "skip_pyc_compilation": [], "use_python_app_entrypoint": False},
             "skip": [],
             "always_copy_files": [],
             "always_include_files": [],
@@ -458,14 +344,8 @@ def test_build_to_dict_snapshot() -> None:
                 "binary_relocation": True,
                 "missing_dso_allowlist": [],
                 "rpath_allowlist": [],
-                "overdepending_behavior": None,
-                "overlinking_behavior": None,
             },
-            "variant": {
-                "use_keys": [],
-                "ignore_keys": [],
-                "down_prioritize_variant": None,
-            },
+            "variant": {"use_keys": [], "ignore_keys": []},
             "prefix_detection": {
                 "force_file_type": {"text": [], "binary": []},
                 "ignore": False,
@@ -497,17 +377,7 @@ def test_about_to_dict_snapshot() -> None:
     about_dict = about.to_dict()
 
     # Snapshot should capture summary and license
-    assert about_dict == snapshot(
-        {
-            "homepage": None,
-            "license": "MIT",
-            "license_family": None,
-            "summary": "A test package",
-            "description": None,
-            "documentation": None,
-            "repository": None,
-        }
-    )
+    assert about_dict == snapshot({"license": "MIT", "summary": "A test package"})
 
 
 def test_recipe_with_context() -> None:
@@ -566,16 +436,8 @@ def test_multi_output_outputs_snapshot() -> None:
                 "inherit": None,
                 "requirements": {"run": ["libtest"]},
                 "build": {
-                    "number": None,
-                    "string": None,
                     "script": {},
-                    "noarch": None,
-                    "python": {
-                        "entry_points": [],
-                        "skip_pyc_compilation": [],
-                        "use_python_app_entrypoint": False,
-                        "site_packages_path": None,
-                    },
+                    "python": {"entry_points": [], "skip_pyc_compilation": [], "use_python_app_entrypoint": False},
                     "skip": [],
                     "always_copy_files": [],
                     "always_include_files": [],
@@ -586,14 +448,8 @@ def test_multi_output_outputs_snapshot() -> None:
                         "binary_relocation": True,
                         "missing_dso_allowlist": [],
                         "rpath_allowlist": [],
-                        "overdepending_behavior": None,
-                        "overlinking_behavior": None,
                     },
-                    "variant": {
-                        "use_keys": [],
-                        "ignore_keys": [],
-                        "down_prioritize_variant": None,
-                    },
+                    "variant": {"use_keys": [], "ignore_keys": []},
                     "prefix_detection": {
                         "force_file_type": {"text": [], "binary": []},
                         "ignore": False,
@@ -601,31 +457,15 @@ def test_multi_output_outputs_snapshot() -> None:
                     },
                     "post_process": [],
                 },
-                "about": {
-                    "homepage": None,
-                    "license": None,
-                    "license_family": None,
-                    "summary": None,
-                    "description": None,
-                    "documentation": None,
-                    "repository": None,
-                },
+                "about": {},
             },
             {
                 "package": {"name": "test-multi-dev"},
                 "inherit": None,
                 "requirements": {"run": ["test-multi-lib"]},
                 "build": {
-                    "number": None,
-                    "string": None,
                     "script": {},
-                    "noarch": None,
-                    "python": {
-                        "entry_points": [],
-                        "skip_pyc_compilation": [],
-                        "use_python_app_entrypoint": False,
-                        "site_packages_path": None,
-                    },
+                    "python": {"entry_points": [], "skip_pyc_compilation": [], "use_python_app_entrypoint": False},
                     "skip": [],
                     "always_copy_files": [],
                     "always_include_files": [],
@@ -636,14 +476,8 @@ def test_multi_output_outputs_snapshot() -> None:
                         "binary_relocation": True,
                         "missing_dso_allowlist": [],
                         "rpath_allowlist": [],
-                        "overdepending_behavior": None,
-                        "overlinking_behavior": None,
                     },
-                    "variant": {
-                        "use_keys": [],
-                        "ignore_keys": [],
-                        "down_prioritize_variant": None,
-                    },
+                    "variant": {"use_keys": [], "ignore_keys": []},
                     "prefix_detection": {
                         "force_file_type": {"text": [], "binary": []},
                         "ignore": False,
@@ -651,15 +485,7 @@ def test_multi_output_outputs_snapshot() -> None:
                     },
                     "post_process": [],
                 },
-                "about": {
-                    "homepage": None,
-                    "license": None,
-                    "license_family": None,
-                    "summary": None,
-                    "description": None,
-                    "documentation": None,
-                    "repository": None,
-                },
+                "about": {},
             },
         ]
     )

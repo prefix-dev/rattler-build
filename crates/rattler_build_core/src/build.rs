@@ -136,10 +136,12 @@ pub async fn run_build(
     // This will build or restore staging caches and return their dependencies/sources if inherited
     let staging_result = output.process_staging_caches(tool_configuration).await?;
 
-    // If we inherit from a staging cache, store its dependencies and sources
-    if let Some((deps, sources)) = staging_result {
+    // If we inherit from a staging cache, store its dependencies, sources, and
+    // library name map for overlinking checks
+    if let Some((deps, sources, library_name_map)) = staging_result {
         output.finalized_cache_dependencies = Some(deps);
         output.finalized_cache_sources = Some(sources);
+        output.staging_library_name_map = Some(library_name_map);
     }
 
     // Fetch sources for this output
@@ -183,12 +185,6 @@ pub async fn run_build(
 
     match output.run_build_script().await {
         Ok(_) => {}
-        Err(InterpreterError::Debug(info)) => {
-            tracing::info!("{}", info);
-            return Err(miette::miette!(
-                "Script not executed because debug mode is enabled"
-            ));
-        }
         Err(InterpreterError::ExecutionFailed(_)) => {
             return Err(miette::miette!("Script failed to execute"));
         }
@@ -232,10 +228,6 @@ pub async fn run_build(
         }
     }
 
-    if !tool_configuration.no_clean {
-        directories.clean().into_diagnostic()?;
-    }
-
     drop(enter);
 
     if !tool_configuration.no_clean {
@@ -272,12 +264,9 @@ fn check_for_binary_prefix(output: &Output, paths_json: &PathsJson) -> Result<()
 fn has_unix_virtual_package(output: &Output) -> bool {
     output.finalized_dependencies.as_ref().is_some_and(|deps| {
         deps.run.depends.iter().any(|dep| {
-            matches!(
-                &dep.spec().name,
-                Some(rattler_conda_types::PackageNameMatcher::Exact(name))
-                    if ["__unix", "__osx", "__linux", "__glibc"]
-                        .contains(&name.as_normalized())
-            )
+            dep.spec().name.as_exact().is_some_and(|name| {
+                ["__unix", "__osx", "__linux", "__glibc"].contains(&name.as_normalized())
+            })
         })
     })
 }

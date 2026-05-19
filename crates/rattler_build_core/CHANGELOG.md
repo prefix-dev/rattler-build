@@ -7,6 +7,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.4](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.3...rattler_build_core-v0.2.4) - 2026-04-13
+
+### Added
+
+- enforce clean build environment with configurable isolation modes ([#2372](https://github.com/prefix-dev/rattler-build/pull/2372))
+
+### Fixed
+
+- resolve overlinking false positives for staging outputs ([#2402](https://github.com/prefix-dev/rattler-build/pull/2402))
+- exclude new files from strip level guessing in patch application ([#2400](https://github.com/prefix-dev/rattler-build/pull/2400))
+
+## [0.2.3](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.2...rattler_build_core-v0.2.3) - 2026-03-31
+
+### Fixed
+
+- skip empty command tests during packaging ([#2390](https://github.com/prefix-dev/rattler-build/pull/2390))
+- "built with" metadata ([#2377](https://github.com/prefix-dev/rattler-build/pull/2377))
+- reindex all platform subdirs in build_reindexed_channels ([#2383](https://github.com/prefix-dev/rattler-build/pull/2383))
+- set variant and platform env vars in test scripts ([#2365](https://github.com/prefix-dev/rattler-build/pull/2365))
+
+### Other
+
+- Fix obsolete `min_pin` and `max_pin` references ([#2380](https://github.com/prefix-dev/rattler-build/pull/2380))
+
+## [0.2.2](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.1...rattler_build_core-v0.2.2) - 2026-03-25
+
+### Added
+
+- Add Python API for `debug` ([#2337](https://github.com/prefix-dev/rattler-build/pull/2337))
+
+### Fixed
+
+- use platform-specific script extensions for test scripts ([#2354](https://github.com/prefix-dev/rattler-build/pull/2354))
+
+### Other
+
+- improve table output ([#2369](https://github.com/prefix-dev/rattler-build/pull/2369))
+
+## [0.2.1](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.0...rattler_build_core-v0.2.1) - 2026-03-18
+
+### Fixed
+
+- expected commit usage ([#2335](https://github.com/prefix-dev/rattler-build/pull/2335))
+
+## [0.2.0](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.1.1...rattler_build_core-v0.2.0) - 2026-03-17
+
+### Added
+
+- update crates, move to workspace, drop tui ([#2331](https://github.com/prefix-dev/rattler-build/pull/2331))
+
+### Fixed
+
+- [**breaking**] remove `--debug` from CLI and Python API ([#2329](https://github.com/prefix-dev/rattler-build/pull/2329))
+
 ## [0.1.1](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.1.0...rattler_build_core-v0.1.1) - 2026-03-13
 
 ### Added

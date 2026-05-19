@@ -131,6 +131,9 @@ function renderCard(s) {
   const buildStr = s.build_string ? html`<span class="variant-build-string">${s.build_string}</span>` : '';
   const skippedBadge = s.skipped ? html`<span class="variant-badge variant-badge-skip">skipped</span>` : '';
   const noarchBadge = s.noarch ? html`<span class="variant-badge variant-badge-noarch">${s.noarch}</span>` : '';
+  const flagBadges = (s.flags || []).map(f =>
+    html`<span class="variant-badge variant-badge-flag">${f}</span>`
+  ).join('');
 
   const contextEntries = s.context ? Object.entries(s.context) : [];
   const contextTable = contextEntries.length === 0 ? '' :
@@ -160,7 +163,7 @@ function renderCard(s) {
     <div class="variant-card-header">
       <span class="variant-pkg-name">${s.name}</span>
       <span class="variant-pkg-version">${s.version}</span>
-      ${safe(buildStr)}${safe(skippedBadge)}${safe(noarchBadge)}
+      ${safe(buildStr)}${safe(skippedBadge)}${safe(noarchBadge)}${safe(flagBadges)}
     </div>
     ${safe(contextTable)}${safe(variantKeys)}${safe(depsSection)}
   </div>`;

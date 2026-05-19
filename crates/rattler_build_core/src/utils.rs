@@ -209,16 +209,52 @@ fn try_remove_with_retry(path: &Path, last_err: Option<std::io::Error>) -> std::
     }
 }
 
+/// Whether a path has been marked for deferred removal by
+/// `remove_dir_all_force` on Windows (a `.{name}.pending-rm-{nanos}` sibling).
+///
+/// Callers that iterate a parent directory (e.g. `Directories::clean`) should
+/// skip such entries: re-processing them just stacks more suffixes and burns
+/// retries on files the OS still holds open.
+pub fn is_pending_removal(path: &Path) -> bool {
+    path.file_name()
+        .and_then(|n| n.to_str())
+        .is_some_and(|n| n.starts_with('.') && n.contains(".pending-rm-"))
+}
+
 /// Generate a unique sibling path for rename-before-delete.
+///
+/// If `path` is already a pending-rm sibling, the original base name is
+/// recovered so repeated attempts don't accumulate names like
+/// `..work.pending-rm-A.pending-rm-B`.
 #[cfg(windows)]
 fn pending_removal_path(path: &Path) -> PathBuf {
     let parent = path.parent().unwrap_or(Path::new("."));
-    let name = path.file_name().unwrap_or_default().to_string_lossy();
+    let raw = path.file_name().unwrap_or_default().to_string_lossy();
+    let base = strip_pending_rm(&raw);
     let unique = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_nanos())
         .unwrap_or(0);
-    parent.join(format!(".{name}.pending-rm-{unique}"))
+    parent.join(format!(".{base}.pending-rm-{unique}"))
+}
+
+/// Strip any `.pending-rm-{digits}` suffixes and the matching leading `.`
+/// that `pending_removal_path` prepended alongside each suffix on previous
+/// attempts, so repeated renames don't drift the recovered base name.
+#[cfg(windows)]
+fn strip_pending_rm(name: &str) -> &str {
+    const MARKER: &str = ".pending-rm-";
+    let mut stripped = name;
+    while let Some(idx) = stripped.rfind(MARKER) {
+        let tail = &stripped[idx + MARKER.len()..];
+        if !tail.is_empty() && tail.bytes().all(|b| b.is_ascii_digit()) {
+            stripped = &stripped[..idx];
+            stripped = stripped.strip_prefix('.').unwrap_or(stripped);
+        } else {
+            break;
+        }
+    }
+    stripped
 }
 
 /// Make the path and any children writable by adjusting permissions.
@@ -272,6 +308,56 @@ mod tests {
             let forward_slash = to_forward_slash_lossy(path);
             assert_eq!(forward_slash, "/foo/bar/baz");
         }
+    }
+
+    #[test]
+    fn test_is_pending_removal() {
+        assert!(is_pending_removal(Path::new(".work.pending-rm-123")));
+        assert!(is_pending_removal(Path::new(
+            "/tmp/build/.work.pending-rm-1776529982099702900"
+        )));
+        assert!(is_pending_removal(Path::new(
+            "..work.pending-rm-1.pending-rm-2"
+        )));
+
+        assert!(!is_pending_removal(Path::new("work")));
+        assert!(!is_pending_removal(Path::new(".hidden")));
+        assert!(!is_pending_removal(Path::new("pending-rm-123")));
+        assert!(!is_pending_removal(Path::new(".work")));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_strip_pending_rm() {
+        assert_eq!(strip_pending_rm("work"), "work");
+        assert_eq!(strip_pending_rm(".work.pending-rm-123"), "work");
+        assert_eq!(
+            strip_pending_rm("..work.pending-rm-123.pending-rm-456"),
+            "work"
+        );
+        assert_eq!(
+            strip_pending_rm(".work.pending-rm-123.pending-rm-notdigits"),
+            ".work.pending-rm-123.pending-rm-notdigits"
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_pending_removal_path_does_not_stack() {
+        use std::path::PathBuf;
+
+        let base = PathBuf::from(r"C:\bld\rattler-build_pkg\work");
+        let first = pending_removal_path(&base);
+        let first_name = first.file_name().unwrap().to_string_lossy().into_owned();
+        assert!(first_name.starts_with(".work.pending-rm-"));
+        assert_eq!(first_name.matches(".pending-rm-").count(), 1);
+
+        // Re-renaming the trash path must not nest suffixes.
+        let second = pending_removal_path(&first);
+        let second_name = second.file_name().unwrap().to_string_lossy().into_owned();
+        assert!(second_name.starts_with(".work.pending-rm-"));
+        assert_eq!(second_name.matches(".pending-rm-").count(), 1);
+        assert!(!second_name.starts_with(".."));
     }
 
     #[cfg(windows)]

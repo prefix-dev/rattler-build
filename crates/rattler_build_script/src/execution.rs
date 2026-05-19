@@ -2,11 +2,14 @@
 
 use crate::sandbox::SandboxConfiguration;
 use crate::script::{Script, ScriptContent};
+use fs_err as fs;
 use futures::TryStreamExt;
 use indexmap::IndexMap;
 use itertools::Itertools;
 use rattler_conda_types::Platform;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fmt;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
@@ -14,6 +17,53 @@ use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWriteExt};
 use tokio_util::bytes::BytesMut;
 use tokio_util::codec::{Decoder, FramedRead};
 use tokio_util::compat::FuturesAsyncReadCompatExt;
+
+/// Controls how the build subprocess environment is constructed.
+///
+/// This determines which host environment variables are visible to build scripts.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum EnvironmentIsolation {
+    /// Clean environment with only explicitly set build variables and a minimal
+    /// passthrough whitelist (SSL certs, SSH agent, proxies). Locale is
+    /// normalized to `C.UTF-8`, HOME to the work directory, and USER to
+    /// `"rattler"`. Maximum reproducibility.
+    #[default]
+    Strict,
+    /// Match conda-build behavior: forward `CFLAGS`, `CXXFLAGS`, `LDFLAGS`,
+    /// `MAKEFLAGS`, `LANG`, `LC_ALL`, and `HOME` from the host. Does not
+    /// normalize USER, SHELL, EDITOR, or TERM.
+    CondaBuild,
+    /// Inherit the entire host environment. Build variables are set on top.
+    /// Least reproducible but useful for debugging.
+    None,
+}
+
+impl fmt::Display for EnvironmentIsolation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Strict => write!(f, "strict"),
+            Self::CondaBuild => write!(f, "conda-build"),
+            Self::None => write!(f, "none"),
+        }
+    }
+}
+
+impl std::str::FromStr for EnvironmentIsolation {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "strict" => Ok(Self::Strict),
+            "conda-build" => Ok(Self::CondaBuild),
+            "none" => Ok(Self::None),
+            _ => Err(format!(
+                "unknown environment isolation mode '{}', expected 'strict', 'conda-build', or 'none'",
+                s
+            )),
+        }
+    }
+}
 
 /// Arguments for executing a script in a given interpreter.
 #[derive(Debug)]
@@ -39,8 +89,8 @@ pub struct ExecutionArgs {
     /// The sandbox configuration to use for the script execution
     pub sandbox_config: Option<SandboxConfiguration>,
 
-    /// Whether to enable debug output
-    pub debug: Debug,
+    /// The environment isolation mode
+    pub env_isolation: EnvironmentIsolation,
 }
 
 impl ExecutionArgs {
@@ -116,28 +166,6 @@ impl ResolvedScriptContents {
     }
 }
 
-/// Debug mode for script execution
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Debug(bool);
-
-impl Debug {
-    /// Create a new Debug mode
-    pub fn new(enabled: bool) -> Self {
-        Self(enabled)
-    }
-
-    /// Check if debug mode is enabled
-    pub fn is_enabled(&self) -> bool {
-        self.0
-    }
-}
-
-impl From<bool> for Debug {
-    fn from(enabled: bool) -> Self {
-        Self(enabled)
-    }
-}
-
 impl Script {
     /// Run the script with the given parameters
     ///
@@ -157,28 +185,22 @@ impl Script {
         build_prefix: Option<&PathBuf>,
         jinja_renderer: Option<F>,
         sandbox_config: Option<&SandboxConfiguration>,
-        debug: Debug,
+        env_isolation: EnvironmentIsolation,
     ) -> Result<(), crate::InterpreterError>
     where
         F: Fn(&str) -> Result<String, String>,
     {
-        // Determine the valid script extensions based on the available interpreters.
-        let mut valid_script_extensions = Vec::new();
-        if cfg!(windows) {
-            valid_script_extensions.push("bat");
-            valid_script_extensions.push("ps1");
-        } else {
-            valid_script_extensions.push("sh");
-        }
-
         let env_vars = env_vars
             .into_iter()
             .filter_map(|(k, v)| v.map(|v| (k, v)))
             .chain(self.env().clone().into_iter())
             .collect::<IndexMap<String, String>>();
 
-        let contents =
-            self.resolve_content(recipe_dir, jinja_renderer, &valid_script_extensions)?;
+        let contents = self.resolve_content(
+            recipe_dir,
+            jinja_renderer,
+            crate::platform_script_extensions(),
+        )?;
 
         let secrets = self
             .secrets()
@@ -226,7 +248,7 @@ impl Script {
             execution_platform: Platform::current(),
             work_dir,
             sandbox_config: sandbox_config.cloned(),
-            debug,
+            env_isolation,
         };
 
         crate::execution::run_script(exec_args, interpreter).await?;
@@ -272,7 +294,7 @@ impl Script {
             ScriptContent::Default => {
                 let recipe_file = self.find_file(recipe_dir, extensions, Path::new("build"));
                 if let Some(recipe_file) = recipe_file {
-                    match fs_err::read_to_string(&recipe_file) {
+                    match fs::read_to_string(&recipe_file) {
                         Err(e) => Err(e),
                         Ok(content) => Ok(ResolvedScriptContents::Path(recipe_file, content)),
                     }
@@ -285,7 +307,7 @@ impl Script {
             ScriptContent::Path(path) => {
                 let recipe_file = self.find_file(recipe_dir, extensions, path);
                 if let Some(recipe_file) = recipe_file {
-                    match fs_err::read_to_string(&recipe_file) {
+                    match fs::read_to_string(&recipe_file) {
                         Err(e) => Err(e),
                         Ok(content) => Ok(ResolvedScriptContents::Path(recipe_file, content)),
                     }
@@ -305,7 +327,7 @@ impl Script {
                 } else {
                     let resolved_path = self.find_file(recipe_dir, extensions, Path::new(path));
                     if let Some(resolved_path) = resolved_path {
-                        match fs_err::read_to_string(&resolved_path) {
+                        match fs::read_to_string(&resolved_path) {
                             Err(e) => Err(e),
                             Ok(content) => Ok(ResolvedScriptContents::Path(resolved_path, content)),
                         }
@@ -440,7 +462,9 @@ pub async fn create_build_script(exec_args: ExecutionArgs) -> Result<(), std::io
     let work_dir = &exec_args.work_dir;
 
     if interpreter == "bash" {
-        let script = BashInterpreter.get_script(&exec_args, shell::Bash).unwrap();
+        let script = BashInterpreter
+            .get_script(&exec_args, shell::Bash::default())
+            .unwrap();
         let build_env_path = work_dir.join("build_env.sh");
         let build_script_path = work_dir.join("conda_build.sh");
 
@@ -482,12 +506,97 @@ fn find_rattler_sandbox() -> Option<PathBuf> {
     which::which("rattler-sandbox").ok()
 }
 
+/// Environment variables that are passed through from the host environment
+/// into the build subprocess. These are variables that cannot be computed
+/// by rattler-build but are needed for builds to function correctly.
+const PASSTHROUGH_ENV_VARS: &[&str] = &[
+    // TLS certificates (needed for https in build scripts)
+    "SSL_CERT_FILE",
+    "SSL_CERT_DIR",
+    // Python requests CA bundle (needed for pip/requests in corporate environments)
+    "REQUESTS_CA_BUNDLE",
+    // SSH agent (needed for private git repo access)
+    "SSH_AUTH_SOCK",
+    // Display server (needed for GUI-related builds on Linux)
+    "DISPLAY",
+    // Proxy configuration (needed in corporate/CI environments)
+    "http_proxy",
+    "https_proxy",
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "no_proxy",
+    "NO_PROXY",
+];
+
+/// Platform-critical environment variables that must always be passed through
+/// to avoid breaking fundamental OS functionality.
+#[cfg(target_os = "windows")]
+const PLATFORM_PASSTHROUGH_ENV_VARS: &[&str] = &[
+    // Required for Winsock/networking and DLL loading
+    "SYSTEMROOT",
+    "WINDIR",
+    // Command interpreter
+    "COMSPEC",
+    // Temp directories
+    "TEMP",
+    "TMP",
+    // Executable extension resolution
+    "PATHEXT",
+];
+
+/// Platform-critical environment variables that must always be passed through
+/// to avoid breaking fundamental OS functionality.
+#[cfg(target_os = "macos")]
+const PLATFORM_PASSTHROUGH_ENV_VARS: &[&str] = &[
+    // macOS uses per-session temp directories
+    "TMPDIR",
+    // CoreFoundation text encoding
+    "__CF_USER_TEXT_ENCODING",
+];
+
+/// Platform-critical environment variables that must always be passed through
+/// to avoid breaking fundamental OS functionality.
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
+const PLATFORM_PASSTHROUGH_ENV_VARS: &[&str] = &[];
+
+/// Configures the subprocess environment for the given isolation mode.
+fn configure_subprocess_env(
+    command: &mut tokio::process::Command,
+    env_vars: &IndexMap<String, String>,
+    secrets: &IndexMap<String, String>,
+    env_isolation: EnvironmentIsolation,
+) {
+    match env_isolation {
+        EnvironmentIsolation::Strict | EnvironmentIsolation::CondaBuild => {
+            command.env_clear();
+
+            for var in PASSTHROUGH_ENV_VARS
+                .iter()
+                .chain(PLATFORM_PASSTHROUGH_ENV_VARS)
+            {
+                if let Ok(value) = std::env::var(var) {
+                    command.env(var, value);
+                }
+            }
+
+            command.envs(env_vars);
+            command.envs(secrets.iter());
+        }
+        EnvironmentIsolation::None => {
+            command.envs(env_vars);
+        }
+    }
+}
+
 /// Spawns a process and replaces the given strings in the output with the given replacements.
 /// This is used to replace the host prefix with $PREFIX and the build prefix with $BUILD_PREFIX
 pub async fn run_process_with_replacements(
     args: &[&str],
     cwd: &Path,
     replacements: &HashMap<String, String>,
+    env_vars: &IndexMap<String, String>,
+    secrets: &IndexMap<String, String>,
+    env_isolation: EnvironmentIsolation,
     sandbox_config: Option<&SandboxConfiguration>,
 ) -> Result<std::process::Output, std::io::Error> {
     // Create or open the build log file
@@ -524,6 +633,8 @@ pub async fn run_process_with_replacements(
     } else {
         tokio::process::Command::new(args[0])
     };
+
+    configure_subprocess_env(&mut command, env_vars, secrets, env_isolation);
 
     command
         .current_dir(cwd)
@@ -613,6 +724,59 @@ pub async fn run_process_with_replacements(
 mod tests {
     use super::*;
     use tokio_util::bytes::BytesMut;
+
+    /// `CONDA_BUILD=1` must live inside the sourced activation script so that
+    /// nested shells inherit it while the outer subprocess starts without it.
+    #[test]
+    fn test_conda_build_marker_written_into_build_env_script() {
+        use crate::interpreter::BashInterpreter;
+        use rattler_shell::shell;
+
+        let tmp = tempfile::tempdir().unwrap();
+        let prefix = tmp.path().join("prefix");
+        fs_err::create_dir_all(&prefix).unwrap();
+
+        let args = ExecutionArgs {
+            script: ResolvedScriptContents::Inline(String::new()),
+            env_vars: IndexMap::new(),
+            secrets: IndexMap::new(),
+            execution_platform: Platform::current(),
+            build_prefix: None,
+            run_prefix: prefix,
+            work_dir: tmp.path().to_path_buf(),
+            sandbox_config: None,
+            env_isolation: EnvironmentIsolation::None,
+        };
+
+        let script = BashInterpreter
+            .get_script(&args, shell::Bash::default())
+            .unwrap();
+        assert!(
+            script.contains("CONDA_BUILD") && script.contains("1"),
+            "build_env.sh must set CONDA_BUILD=1 for nested-shell re-entrancy, got:\n{script}"
+        );
+    }
+
+    /// The outer subprocess must start without `CONDA_BUILD` set, otherwise
+    /// the preamble skips sourcing the activation script.
+    #[test]
+    fn test_conda_build_not_leaked_to_subprocess_in_none_mode() {
+        let env_vars = IndexMap::new();
+        let secrets = IndexMap::new();
+
+        let mut command = tokio::process::Command::new("true");
+        configure_subprocess_env(
+            &mut command,
+            &env_vars,
+            &secrets,
+            EnvironmentIsolation::None,
+        );
+
+        assert!(
+            !command.as_std().get_envs().any(|(k, _)| k == "CONDA_BUILD"),
+            "CONDA_BUILD must not be set on the outer subprocess"
+        );
+    }
 
     #[test]
     fn test_cmd_errorlevel_injected() {
@@ -781,5 +945,58 @@ mod tests {
 
         let resolved_missing = ResolvedScriptContents::Missing;
         assert_eq!(resolved_missing.infer_interpreter(), None);
+    }
+
+    /// Regression test for <https://github.com/prefix-dev/rattler-build/issues/2199>
+    ///
+    /// Extension order in `resolve_content` determines which file is picked
+    /// when both `.sh` and `.bat` exist. `platform_script_extensions()` must
+    /// select the platform-appropriate one.
+    #[test]
+    fn test_script_extension_resolution_respects_order() {
+        use std::path::PathBuf;
+
+        use crate::script::{Script, ScriptContent};
+
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("test-script.sh"), "#!/bin/bash\necho hello").unwrap();
+        fs::write(dir.path().join("test-script.bat"), "@echo off\necho hello").unwrap();
+
+        let resolve = |content: ScriptContent, exts: &[&str]| -> PathBuf {
+            let script = Script {
+                content,
+                ..Script::default()
+            };
+            match script
+                .resolve_content(dir.path(), None::<fn(&str) -> Result<String, String>>, exts)
+                .unwrap()
+            {
+                ResolvedScriptContents::Path(path, _) => path,
+                other => panic!("expected Path variant, got {:?}", other),
+            }
+        };
+
+        // Extension list order controls which file wins
+        let path_content = || ScriptContent::Path(PathBuf::from("test-script"));
+        assert_eq!(
+            resolve(path_content(), &["sh", "bat"]).extension().unwrap(),
+            "sh"
+        );
+        assert_eq!(
+            resolve(path_content(), &["bat", "sh"]).extension().unwrap(),
+            "bat"
+        );
+
+        // CommandOrPath variant behaves the same
+        let cop_content = || ScriptContent::CommandOrPath("test-script".into());
+        assert_eq!(resolve(cop_content(), &["sh"]).extension().unwrap(), "sh");
+        assert_eq!(resolve(cop_content(), &["bat"]).extension().unwrap(), "bat");
+
+        // platform_script_extensions() picks the right one for the current platform
+        let ext = resolve(path_content(), crate::platform_script_extensions())
+            .extension()
+            .unwrap()
+            .to_owned();
+        assert_eq!(ext, if cfg!(windows) { "bat" } else { "sh" });
     }
 }

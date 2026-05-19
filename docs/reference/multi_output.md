@@ -133,11 +133,7 @@ outputs:
 ```
 
 
-## Staging Outputs (Experimental)
-
-!!! warning
-    Staging outputs require the `--experimental` flag:
-    `rattler-build build --experimental -r recipe.yaml`
+## Staging Outputs
 
 A staging output compiles code once and caches the result. Package outputs then
 inherit from the staging cache and select subsets of the built files. This avoids

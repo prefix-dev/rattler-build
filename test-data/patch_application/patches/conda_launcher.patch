@@ -1,0 +1,12 @@
+--- launcher.c.orig
++++ launcher.c
+@@ -1,6 +1,7 @@
+-// Conda launcher (Anaconda variant)
++// Conda launcher (Anaconda/Setuptools variant)
+ #include <stdlib.h>
++#include <stdio.h>
+
+ int main(void) {
+-    return 0;
++    return EXIT_SUCCESS;
+ }

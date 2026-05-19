@@ -1,0 +1,13 @@
+schema_version: 1
+
+package:
+  name: legacy-index-shape
+  version: 1.0.0
+
+build:
+  script:
+    - if: win
+      then:
+        - echo legacy > %PREFIX%\legacy-index-shape.txt
+      else:
+        - echo legacy > $PREFIX/legacy-index-shape.txt

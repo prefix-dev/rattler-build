@@ -215,6 +215,72 @@ impl PrefixInfo {
     }
 }
 
+/// A mapping from shared library filenames to the package that provides them.
+///
+/// This is used as a fallback during overlinking checks when the staging
+/// cache's host dependencies are not physically installed in the prefix.
+/// Instead of requiring files on disk, this allows name-based attribution
+/// of libraries to packages.
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+pub struct LibraryNameMap {
+    /// Maps library filenames (e.g. "libz.so.1", "libz.1.dylib") to the
+    /// package name that provides them.
+    pub library_to_package: HashMap<String, PackageName>,
+}
+
+impl LibraryNameMap {
+    /// Build a `LibraryNameMap` from a `PrefixInfo` by extracting the
+    /// filenames of all files that look like shared objects.
+    pub(crate) fn from_prefix_info(prefix_info: &PrefixInfo) -> Self {
+        let mut library_to_package = HashMap::new();
+
+        for (path, package_name) in &prefix_info.path_to_package {
+            if is_dso(&path.path)
+                && let Some(file_name) = path.path.file_name()
+            {
+                library_to_package.insert(
+                    file_name.to_string_lossy().to_string(),
+                    package_name.clone(),
+                );
+            }
+        }
+
+        Self { library_to_package }
+    }
+
+    /// Look up a library path by extracting its filename and checking the map.
+    /// Returns the package name if found.
+    ///
+    /// Handles various library path forms:
+    /// - Plain filenames: `libz.so.1`
+    /// - macOS @rpath references: `@rpath/libz.1.dylib`
+    /// - Full or relative paths: `lib/libz.so.1`
+    pub fn find_package(&self, library: &Path) -> Option<PackageName> {
+        let path_str = library.to_string_lossy();
+
+        // Strip @rpath/ or @loader_path/ prefixes (macOS)
+        let stripped = path_str
+            .strip_prefix("@rpath/")
+            .or_else(|| path_str.strip_prefix("@loader_path/"))
+            .unwrap_or(&path_str);
+
+        // Try the stripped path directly (handles plain filenames)
+        if let Some(pkg) = self.library_to_package.get(stripped) {
+            return Some(pkg.clone());
+        }
+
+        // Try just the filename component
+        let file_name = Path::new(stripped).file_name()?.to_string_lossy();
+
+        self.library_to_package.get(file_name.as_ref()).cloned()
+    }
+
+    /// Returns true if the map is empty.
+    pub fn is_empty(&self) -> bool {
+        self.library_to_package.is_empty()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

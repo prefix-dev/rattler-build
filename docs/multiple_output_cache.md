@@ -52,10 +52,6 @@ outputs:
         - include/*
 ```
 
-!!!note
-
-    Since this is an experimental feature, you need to pass the `--experimental` flag to enable parsing of staging outputs.
-
 In this example, we have a staging output called `mypackage-build` that creates files during its build. The two package outputs `mypackage-library` and `mypackage-headers` inherit from it using the `inherit:` key.
 
 When building, the staging output runs first and creates files in `$PREFIX`. These files are then copied into the `$PREFIX` of each inheriting output package.

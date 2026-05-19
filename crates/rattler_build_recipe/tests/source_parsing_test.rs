@@ -215,7 +215,7 @@ fn test_parse_conditional_source_yaml() {
 
     // Check package name
     assert_eq!(
-        recipe.package.name.as_concrete().unwrap().0.as_normalized(),
+        recipe.package.name.as_concrete().unwrap().as_str(),
         "conditional-source"
     );
 
@@ -278,7 +278,7 @@ fn test_parse_conditional_tests_yaml() {
 
     // Check package name
     assert_eq!(
-        recipe.package.name.as_concrete().unwrap().0.as_normalized(),
+        recipe.package.name.as_concrete().unwrap().as_str(),
         "conditional-test"
     );
 
@@ -338,7 +338,7 @@ fn test_parse_version_independent_template() {
 
     // Check package name
     assert_eq!(
-        recipe.package.name.as_concrete().unwrap().0.as_normalized(),
+        recipe.package.name.as_concrete().unwrap().as_str(),
         "version-independent-test"
     );
 
@@ -371,7 +371,7 @@ fn test_parse_binary_relocation_template() {
 
     // Check package name
     assert_eq!(
-        recipe.package.name.as_concrete().unwrap().0.as_normalized(),
+        recipe.package.name.as_concrete().unwrap().as_str(),
         "binary-relocation-test"
     );
 
@@ -404,7 +404,7 @@ fn test_parse_nested_conditionals() {
 
     // Check package name
     assert_eq!(
-        recipe.package.name.as_concrete().unwrap().0.as_normalized(),
+        recipe.package.name.as_concrete().unwrap().as_str(),
         "nested-conditionals-test"
     );
 
@@ -587,10 +587,7 @@ fn test_parse_flask_attestation_example() {
     let yaml = include_str!("../../../examples/flask-attestation/recipe.yaml");
     let recipe = parse_recipe_from_source(yaml).unwrap();
 
-    assert_eq!(
-        recipe.package.name.as_concrete().unwrap().0.as_normalized(),
-        "flask"
-    );
+    assert_eq!(recipe.package.name.as_concrete().unwrap().as_str(), "flask");
 
     let source = get_concrete_source(&recipe.source.as_slice()[0]).unwrap();
     match source {
@@ -611,10 +608,7 @@ fn test_parse_zstd_attestation_example() {
     let yaml = include_str!("../../../examples/zstd-attestation/recipe.yaml");
     let recipe = parse_recipe_from_source(yaml).unwrap();
 
-    assert_eq!(
-        recipe.package.name.as_concrete().unwrap().0.as_normalized(),
-        "zstd"
-    );
+    assert_eq!(recipe.package.name.as_concrete().unwrap().as_str(), "zstd");
 
     let source = get_concrete_source(&recipe.source.as_slice()[0]).unwrap();
     match source {
