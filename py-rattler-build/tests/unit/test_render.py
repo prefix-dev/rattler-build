@@ -84,7 +84,7 @@ requirements:
     assert index_json["repodata_revision"] == 3
     assert index_json["flags"] == ["cuda"]
     assert index_json["extra_depends"] == {"plot": ["matplotlib"]}
-    assert 'scipy[when="python >=3.10"]' in index_json["depends"]
+    assert 'scipy[when="python>=3.10"]' in index_json["depends"]
 
 
 def test_render_recipe_with_variants() -> None:
