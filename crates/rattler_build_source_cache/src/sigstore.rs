@@ -305,9 +305,24 @@ fn verify_artifact_subject(
 /// attestation's in-toto statement — regardless of whether publisher identity
 /// checks are configured.
 ///
-/// Identity matching uses **prefix** semantics: the expected identity (e.g.
-/// `https://github.com/pallets/flask`) must be a prefix of the actual certificate
+/// Identity matching uses repository-boundary prefix semantics: the expected
+/// identity (e.g. `https://github.com/pallets/flask`) must either equal the
+/// actual certificate identity or be followed by `/` or `@` in the actual
 /// identity (e.g. `https://github.com/pallets/flask/.github/workflows/release.yml@refs/tags/3.1.1`).
+fn identity_matches(expected: &str, actual: &str) -> bool {
+    if actual == expected {
+        return true;
+    }
+
+    let Some(suffix) = actual.strip_prefix(expected) else {
+        return false;
+    };
+
+    // Require a repository boundary so `github:pallets/flask` does not match
+    // identities for repositories such as `pallets/flask-cors`.
+    suffix.starts_with('/') || suffix.starts_with('@')
+}
+
 pub(crate) async fn verify_attestation(
     client: &BaseClient,
     file_path: &Path,
@@ -369,8 +384,7 @@ pub(crate) async fn verify_attestation(
             match verify(artifact_bytes.as_slice(), bundle, &policy, &trusted_root) {
                 Ok(result) => {
                     if let Some(ref actual_identity) = result.identity {
-                        // Prefix match: expected identity must be a prefix of the actual identity
-                        if actual_identity.starts_with(&check.identity) {
+                        if identity_matches(&check.identity, actual_identity) {
                             tracing::info!(
                                 "\u{2714} Attestation verified (identity={})",
                                 actual_identity,
@@ -548,6 +562,30 @@ mod tests {
     fn test_parse_attestation_response_unrecognized_format() {
         let json = r#"{ "foo": "bar" }"#;
         assert!(parse_attestation_response(json).is_err());
+    }
+
+    #[test]
+    fn test_identity_matches_github_workflow_identity() {
+        assert!(identity_matches(
+            "https://github.com/pallets/flask",
+            "https://github.com/pallets/flask/.github/workflows/release.yml@refs/tags/3.1.1"
+        ));
+    }
+
+    #[test]
+    fn test_identity_matches_exact_identity() {
+        assert!(identity_matches(
+            "https://github.com/pallets/flask",
+            "https://github.com/pallets/flask"
+        ));
+    }
+
+    #[test]
+    fn test_identity_rejects_repository_prefix_collision() {
+        assert!(!identity_matches(
+            "https://github.com/pallets/flask",
+            "https://github.com/pallets/flask-cors/.github/workflows/release.yml@refs/tags/4.0.0"
+        ));
     }
 
     /// Helper to create a minimal sigstore bundle with an in-toto statement
