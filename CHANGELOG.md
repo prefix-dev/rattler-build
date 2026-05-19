@@ -147,7 +147,7 @@ The biggest change of this release is that we now clean environment variables be
 This makes build scripts more reproducible and also matches what conda-build is doing.
 However, we went for a more strict approach than conda-build since we also re-map the home directory to the working directory.
 Both the CLI and Python API allow to opt for the conda-build behaviour or no environment variable isolation instead.
-With the CLI a new flag `--env-isolation` is available which takes `strict` (default), `conda-build` or `none` as option. 
+With the CLI a new flag `--env-isolation` is available which takes `strict` (default), `conda-build` or `none` as option.
 
 
 ### Added
