@@ -1254,7 +1254,7 @@ mod tests {
             rendered,
             vec![
                 ("python".to_string(), "*".to_string()),
-                ("scipy".to_string(), r#"[when="python >=3.10"]"#.to_string()),
+                ("scipy".to_string(), r#"[when="python>=3.10"]"#.to_string()),
             ]
         );
     }
