@@ -69,6 +69,7 @@ mod source_cache_tests {
             created: chrono::Utc::now(),
             lock_file: None,
             attestation_verified: false,
+            content_sha256: Some("deadbeef".to_string()),
         };
 
         let key = "test_key";
@@ -79,6 +80,7 @@ mod source_cache_tests {
         assert_eq!(retrieved.url, entry.url);
         assert_eq!(retrieved.checksum, entry.checksum);
         assert_eq!(retrieved.actual_filename, entry.actual_filename);
+        assert_eq!(retrieved.content_sha256, entry.content_sha256);
     }
 
     #[tokio::test]
