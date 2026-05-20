@@ -1058,9 +1058,9 @@ dependencies = [
 
 [[package]]
 name = "minijinja"
-version = "2.18.0"
+version = "2.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "328251e58ad8e415be6198888fc207502727dc77945806421ab34f35bf012e7d"
+checksum = "2929e494b2280e1e18959bb2e121da03347ae896896fdfaceaab43c88a02803f"
 dependencies = [
  "aho-corasick",
  "memo-map",
@@ -1225,7 +1225,7 @@ checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
 
 [[package]]
 name = "rattler_build_jinja"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "fs-err",
  "indexmap 2.13.0",
@@ -1267,7 +1267,7 @@ dependencies = [
 
 [[package]]
 name = "rattler_build_recipe"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "fs-err",
  "globset",
@@ -1299,7 +1299,7 @@ dependencies = [
 
 [[package]]
 name = "rattler_build_script"
-version = "0.2.3"
+version = "0.2.4"
 dependencies = [
  "clap",
  "console",
@@ -1309,7 +1309,7 @@ dependencies = [
 
 [[package]]
 name = "rattler_build_types"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "globset",
  "itertools",
@@ -1323,7 +1323,7 @@ dependencies = [
 
 [[package]]
 name = "rattler_build_variant_config"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "fs-err",
  "marked-yaml",
@@ -1342,7 +1342,7 @@ dependencies = [
 
 [[package]]
 name = "rattler_build_yaml_parser"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "marked-yaml",
  "miette",
