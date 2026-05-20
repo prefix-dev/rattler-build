@@ -7,7 +7,10 @@
 pub mod sandbox;
 mod script;
 
-pub use sandbox::{SandboxArguments, SandboxConfiguration};
+pub use sandbox::{
+    PlatformKind, PlatformOverride, SandboxArguments, SandboxConfigFile, SandboxConfiguration,
+    SandboxRequest,
+};
 pub use script::{
     Script, ScriptContent, determine_interpreter_from_path, platform_script_extensions,
 };

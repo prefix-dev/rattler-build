@@ -4,6 +4,8 @@ use indexmap::IndexMap;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::path::{Path, PathBuf};
 
+use crate::SandboxRequest;
+
 /// Defines the script to run to build the package.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Script {
@@ -20,6 +22,11 @@ pub struct Script {
 
     /// The current working directory for the script.
     pub cwd: Option<PathBuf>,
+
+    /// Recipe-declared sandbox escape requests. Applied additively on top of the host's
+    /// resolved sandbox configuration; the recipe can grant more access but cannot
+    /// tighten the host's policy.
+    pub sandbox: Option<SandboxRequest>,
 
     /// Whether content was explicitly specified via `content:` field.
     /// When true, serialization should always use `{content: ...}` structure.
@@ -55,13 +62,16 @@ impl Serialize for Script {
                 content: Option<RawScriptContent<'a>>,
                 #[serde(skip_serializing_if = "Option::is_none")]
                 cwd: Option<&'a PathBuf>,
+                #[serde(skip_serializing_if = "Option::is_none")]
+                sandbox: Option<&'a SandboxRequest>,
             },
         }
 
         let only_content = self.interpreter.is_none()
             && self.env.is_empty()
             && self.secrets.is_empty()
-            && self.cwd.is_none();
+            && self.cwd.is_none()
+            && self.sandbox.is_none();
 
         // When content_explicit is true, always use the Object form with content: field
         let raw_script = match &self.content {
@@ -76,6 +86,7 @@ impl Serialize for Script {
                 env: &self.env,
                 secrets: &self.secrets,
                 cwd: self.cwd.as_ref(),
+                sandbox: self.sandbox.as_ref(),
                 content: match &self.content {
                     ScriptContent::Command(content) => Some(RawScriptContent::Command { content }),
                     ScriptContent::Commands(content) => {
@@ -123,6 +134,8 @@ impl<'de> Deserialize<'de> for Script {
                 content: Option<RawScriptContent>,
                 #[serde(default)]
                 cwd: Option<PathBuf>,
+                #[serde(default)]
+                sandbox: Option<Box<SandboxRequest>>,
             },
         }
 
@@ -136,6 +149,7 @@ impl<'de> Deserialize<'de> for Script {
                 secrets,
                 content,
                 cwd,
+                sandbox,
             } => {
                 // When deserializing from Object form, content was explicitly specified
                 let content_explicit = content.is_some();
@@ -144,6 +158,7 @@ impl<'de> Deserialize<'de> for Script {
                     env,
                     secrets,
                     cwd,
+                    sandbox: sandbox.map(|request| *request),
                     content: match content {
                         Some(RawScriptContent::Command { content }) => {
                             ScriptContent::Command(content)
@@ -197,6 +212,7 @@ impl Script {
             && self.interpreter.is_none()
             && self.env.is_empty()
             && self.secrets.is_empty()
+            && self.sandbox.as_ref().is_none_or(SandboxRequest::is_empty)
     }
 }
 
@@ -208,6 +224,7 @@ impl From<ScriptContent> for Script {
             secrets: Default::default(),
             content: value,
             cwd: None,
+            sandbox: None,
             content_explicit: false,
         }
     }

@@ -1146,13 +1146,65 @@ pub fn evaluate_script(
     // Use inferred interpreter if no explicit interpreter was set
     let final_interpreter = interpreter.or(inferred_interpreter);
 
+    // Evaluate the recipe-declared sandbox escape requests.
+    let sandbox = if let Some(sandbox) = &script.sandbox {
+        let evaluated = evaluate_sandbox(sandbox, context)?;
+        if evaluated.is_empty() {
+            None
+        } else {
+            Some(evaluated)
+        }
+    } else {
+        None
+    };
+
     Ok(Script {
         interpreter: final_interpreter,
         env,
         secrets,
         content,
         cwd,
+        sandbox,
         content_explicit: script.content_explicit,
+    })
+}
+
+/// Evaluate a stage0 [`Sandbox`] block into a concrete [`SandboxRequest`].
+fn evaluate_sandbox(
+    sandbox: &crate::stage0::types::Sandbox,
+    context: &EvaluationContext,
+) -> Result<rattler_build_script::SandboxRequest, ParseError> {
+    use rattler_build_script::SandboxRequest;
+    use std::path::PathBuf;
+
+    let network = if let Some(net) = &sandbox.network {
+        evaluate_bool_value(net, context, "script.sandbox.network", false)?
+    } else {
+        false
+    };
+
+    let to_paths = |list: &crate::stage0::types::ConditionalList<String>| {
+        evaluate_string_list(list, context)
+            .map(|v| v.into_iter().map(PathBuf::from).collect::<Vec<_>>())
+    };
+
+    let read = to_paths(&sandbox.read)?;
+    let read_execute = to_paths(&sandbox.read_execute)?;
+    let read_write = to_paths(&sandbox.read_write)?;
+
+    let reason = if let Some(reason) = &sandbox.reason {
+        let s = evaluate_string_value(reason, context)?;
+        if s.is_empty() { None } else { Some(s) }
+    } else {
+        None
+    };
+
+    Ok(SandboxRequest {
+        network,
+        read,
+        read_execute,
+        read_write,
+        reason,
     })
 }
 
@@ -5360,5 +5412,39 @@ package:
         let r = render_template(r#"${{ "yes" if x is defined else "no" }}"#, &ctx, None);
         assert!(r.is_ok(), "is defined test must not error: {:?}", r.err());
         assert_eq!(r.unwrap(), "no");
+    }
+
+    #[test]
+    fn test_evaluate_script_sandbox_block() {
+        use crate::stage0::types::Sandbox;
+        use std::path::PathBuf;
+
+        let script = crate::stage0::types::Script {
+            content: Some(ConditionalList::new(vec![Item::Value(
+                Value::new_concrete("cargo build".to_string(), None),
+            )])),
+            sandbox: Some(Sandbox {
+                network: Some(Value::new_concrete(true, None)),
+                read_write: ConditionalList::new(vec![Item::Value(Value::new_concrete(
+                    "/tmp/cargo".to_string(),
+                    None,
+                ))]),
+                reason: Some(Value::new_concrete("cargo fetch".to_string(), None)),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
+        let ctx = EvaluationContext::new();
+        let result = evaluate_script(&script, &ctx).unwrap();
+
+        let req = result
+            .sandbox
+            .expect("evaluated script should carry sandbox request");
+        assert!(req.network);
+        assert_eq!(req.read_write, vec![PathBuf::from("/tmp/cargo")]);
+        assert_eq!(req.reason.as_deref(), Some("cargo fetch"));
+        assert!(req.read.is_empty());
+        assert!(req.read_execute.is_empty());
     }
 }

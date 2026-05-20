@@ -234,6 +234,7 @@ pub(crate) fn parse_script(node: &Node) -> Result<crate::stage0::types::Script, 
         let mut content = None;
         let mut file = None;
         let mut cwd = None;
+        let mut sandbox = None;
         let mut content_explicit = false;
 
         for (key_node, value_node) in mapping.iter() {
@@ -309,6 +310,9 @@ pub(crate) fn parse_script(node: &Node) -> Result<crate::stage0::types::Script, 
                 "cwd" => {
                     cwd = Some(parse_field!("script.cwd", value_node));
                 }
+                "sandbox" => {
+                    sandbox = Some(parse_sandbox(value_node)?);
+                }
                 _ => {
                     return Err(ParseError::invalid_value(
                         "script",
@@ -316,7 +320,7 @@ pub(crate) fn parse_script(node: &Node) -> Result<crate::stage0::types::Script, 
                         *key_node.span(),
                     )
                     .with_suggestion(
-                        "Valid fields are: interpreter, env, secrets, content, file, cwd",
+                        "Valid fields are: interpreter, env, secrets, content, file, cwd, sandbox",
                     ));
                 }
             }
@@ -329,6 +333,7 @@ pub(crate) fn parse_script(node: &Node) -> Result<crate::stage0::types::Script, 
             content,
             file,
             cwd,
+            sandbox,
             content_explicit,
         });
     }
@@ -341,6 +346,60 @@ pub(crate) fn parse_script(node: &Node) -> Result<crate::stage0::types::Script, 
     .with_message(
         "script must be either a list of commands, a multiline string, or a script object",
     ))
+}
+
+/// Parse the `sandbox:` block of a script object.
+fn parse_sandbox(node: &Node) -> Result<crate::stage0::types::Sandbox, ParseError> {
+    use crate::stage0::types::{ConditionalList, Sandbox};
+
+    let mapping = node.as_mapping().ok_or_else(|| {
+        ParseError::expected_type("mapping", "non-mapping", get_span(node))
+            .with_message("Expected 'sandbox' to be a mapping")
+    })?;
+
+    let mut network: Option<Value<bool>> = None;
+    let mut read: ConditionalList<String> = ConditionalList::default();
+    let mut read_execute: ConditionalList<String> = ConditionalList::default();
+    let mut read_write: ConditionalList<String> = ConditionalList::default();
+    let mut reason: Option<Value<String>> = None;
+
+    for (key_node, value_node) in mapping.iter() {
+        match key_node.as_str() {
+            "network" => {
+                network = Some(parse_bool_value(value_node, "script.sandbox.network")?);
+            }
+            "read" => {
+                read = parse_conditional_list(value_node)?;
+            }
+            "read_execute" => {
+                read_execute = parse_conditional_list(value_node)?;
+            }
+            "read_write" => {
+                read_write = parse_conditional_list(value_node)?;
+            }
+            "reason" => {
+                reason = Some(parse_field!("script.sandbox.reason", value_node));
+            }
+            other => {
+                return Err(ParseError::invalid_value(
+                    "script.sandbox",
+                    format!("unknown field '{}' in sandbox object", other),
+                    *key_node.span(),
+                )
+                .with_suggestion(
+                    "Valid fields are: network, read, read_execute, read_write, reason",
+                ));
+            }
+        }
+    }
+
+    Ok(Sandbox {
+        network,
+        read,
+        read_execute,
+        read_write,
+        reason,
+    })
 }
 
 /// Parse build files field - can be a list or include/exclude mapping

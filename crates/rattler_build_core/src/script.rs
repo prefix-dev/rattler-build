@@ -50,6 +50,17 @@ impl Output {
         };
 
         let work_dir = &self.build_configuration.directories.work_dir;
+        let mut sandbox_config = self.build_configuration.sandbox_config().cloned();
+        if let (Some(config), Some(request)) = (
+            &mut sandbox_config,
+            self.recipe.build().script.sandbox.as_ref(),
+        ) {
+            if let Some(reason) = request.reason.as_deref() {
+                tracing::info!("applying recipe sandbox request: {reason}");
+            }
+            config.merge_request(request);
+        }
+
         Ok(ExecutionArgs {
             script: self.recipe.build().script.resolve_content(
                 &self.build_configuration.directories.recipe_dir,
@@ -65,7 +76,7 @@ impl Output {
             run_prefix: host_prefix,
             execution_platform: Platform::current(),
             work_dir: work_dir.clone(),
-            sandbox_config: self.build_configuration.sandbox_config().cloned(),
+            sandbox_config,
             env_isolation,
         })
     }
@@ -121,6 +132,8 @@ impl Output {
             jinja.render_str(template).map_err(|e| e.to_string())
         };
 
+        let sandbox_config = exec_args.sandbox_config;
+
         self.recipe
             .build()
             .script
@@ -135,7 +148,7 @@ impl Output {
                 &self.build_configuration.directories.host_prefix,
                 build_prefix,
                 Some(jinja_renderer),
-                self.build_configuration.sandbox_config(),
+                sandbox_config.as_ref(),
                 self.build_configuration.env_isolation,
             )
             .await?;
