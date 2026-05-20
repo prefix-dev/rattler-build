@@ -384,6 +384,12 @@ fn collect_variables_from_expr(
             collect_variables_from_expr(&binop.left, variables);
             collect_variables_from_expr(&binop.right, variables);
         }
+        Expr::Compare(compare) => {
+            collect_variables_from_expr(&compare.expr, variables);
+            for op in &compare.ops {
+                collect_variables_from_expr(&op.expr, variables);
+            }
+        }
         Expr::IfExpr(if_expr) => {
             collect_variables_from_expr(&if_expr.test_expr, variables);
             collect_variables_from_expr(&if_expr.true_expr, variables);
