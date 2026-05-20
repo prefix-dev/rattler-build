@@ -4792,7 +4792,7 @@ dependencies = [
 
 [[package]]
 name = "rattler_build_core"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "anyhow",
  "arwen-codesign",
@@ -4875,7 +4875,7 @@ dependencies = [
 
 [[package]]
 name = "rattler_build_jinja"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "fs-err",
  "indexmap 2.13.0",
@@ -4906,7 +4906,7 @@ dependencies = [
 
 [[package]]
 name = "rattler_build_package"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "chrono",
  "content_inspector",
@@ -4934,7 +4934,7 @@ dependencies = [
 
 [[package]]
 name = "rattler_build_recipe"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "fs-err",
  "globset",
@@ -5069,7 +5069,7 @@ dependencies = [
 
 [[package]]
 name = "rattler_build_variant_config"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "fs-err",
  "marked-yaml",
@@ -5088,7 +5088,7 @@ dependencies = [
 
 [[package]]
 name = "rattler_build_yaml_parser"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "marked-yaml",
  "miette",
