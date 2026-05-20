@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.65.0] - 2026-05-19
+### ✨ Highlights
+
+Just some minor changes, and a release to pull in the latest `rattler` release.
+
+### Added
+
+- Add warning when new repodata format is unsupported by @wolfv in [#2472](https://github.com/prefix-dev/rattler-build/pull/2472)
+- Allow build scripts to override package contents by @baszalmstra in [#2476](https://github.com/prefix-dev/rattler-build/pull/2476)
+- `git.latest_tag_distance` by @casperdcl in [#2484](https://github.com/prefix-dev/rattler-build/pull/2484)
+
+
+### Fixed
+
+- Respect `.orig`-only sources in patch application by @wolfv in [#2470](https://github.com/prefix-dev/rattler-build/pull/2470)
+- Correct `git.latest_tag_distance` parsing for dashed tag names by @pb01ka in [#2491](https://github.com/prefix-dev/rattler-build/pull/2491)
+- Improve error handling in DependencyResolutionError by @wolfv in [#2485](https://github.com/prefix-dev/rattler-build/pull/2485)
+- Validate source attestations by @wolfv in [#2338](https://github.com/prefix-dev/rattler-build/pull/2338)
+
+
+### New Contributors
+* @pb01ka made their first contribution in [#2491](https://github.com/prefix-dev/rattler-build/pull/2491)
+* @casperdcl made their first contribution in [#2484](https://github.com/prefix-dev/rattler-build/pull/2484)
+
 ## [0.64.1] - 2026-05-04
 ### ✨ Highlights
 
