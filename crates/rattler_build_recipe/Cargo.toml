@@ -39,6 +39,7 @@ spdx = { workspace = true }
 globset = { workspace = true }
 fs-err = { workspace = true }
 regex = { workspace = true }
+hex = { workspace = true }
 sha1 = { workspace = true }
 petgraph = { workspace = true, optional = true, default-features = false }
 

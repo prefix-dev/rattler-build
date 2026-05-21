@@ -26,8 +26,8 @@ indexmap = "2.13.0"
 pyo3 = { version = "0.28.2", features = [
   "abi3-py38",
   "extension-module",
+  "jiff-02",
   "multiple-pymethods",
-  "chrono",
 ] }
 tokio = { version = "1.50.0", features = [
   "rt",
@@ -35,16 +35,17 @@ tokio = { version = "1.50.0", features = [
   "rt-multi-thread",
   "process",
 ] }
-rattler_conda_types = "0.46.0"
-rattler_config = "0.4.1"
-rattler_networking = { version = "0.27.0" }
-rattler_solve = "7.1.1"
-rattler_virtual_packages = "2.4.1"
+rattler_conda_types = { version = "0.46.0", git = "https://github.com/conda/rattler", branch = "main" }
+rattler_config = { version = "0.4.1", git = "https://github.com/conda/rattler", branch = "main" }
+rattler_networking = { version = "0.27.0", git = "https://github.com/conda/rattler", branch = "main" }
+rattler_solve = { version = "7.1.1", git = "https://github.com/conda/rattler", branch = "main" }
+rattler_virtual_packages = { version = "2.4.1", git = "https://github.com/conda/rattler", branch = "main" }
 clap = "4.6.0"
 url = "2.5.8"
-chrono = "0.4.44"
-rattler_upload = "0.7.0"
-rattler_package_streaming = { version = "0.26.0", default-features = false }
+jiff = { version = "0.2", default-features = false, features = ["std", "serde"] }
+hex = "0.4.3"
+rattler_upload = { version = "0.7.0", git = "https://github.com/conda/rattler", branch = "main" }
+rattler_package_streaming = { version = "0.26.0", git = "https://github.com/conda/rattler", branch = "main", default-features = false }
 miette = "7.6.0"
 tempfile = "3.27.0"
 serde_yaml = "0.9"
@@ -58,6 +59,7 @@ indicatif = "0.18"
 
 [build-dependencies]
 pyo3-build-config = "0.28.2"
+
 
 # Prevent package from thinking it's in the workspace
 [workspace]

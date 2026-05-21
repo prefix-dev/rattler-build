@@ -21,7 +21,7 @@ use rattler_conda_types::{
         PathsJson, PrefixPlaceholder, PythonEntryPoints, RunExportsJson,
     },
 };
-use rattler_digest::{compute_bytes_digest, compute_file_digest};
+use rattler_digest::{Sha256, compute_bytes_digest, compute_file_digest};
 use rayon::prelude::*;
 use url::Url;
 
@@ -390,7 +390,7 @@ impl Output {
                 .map(|dep| dep.spec().to_string())
                 .unique()
                 .collect(),
-            experimental_extra_depends: finalized_dependencies
+            extra_depends: finalized_dependencies
                 .run
                 .extra_depends
                 .iter()
@@ -513,9 +513,9 @@ impl Output {
                     let file_size = meta.len();
                     // Compute SHA256 for files - empty files get empty hash
                     let digest = if file_size > 0 {
-                        Some(compute_file_digest::<sha2::Sha256>(p)?)
+                        Some(compute_file_digest::<Sha256>(p)?)
                     } else {
-                        Some(compute_bytes_digest::<sha2::Sha256>(&[]))
+                        Some(compute_bytes_digest::<Sha256>(&[]))
                     };
                     let no_link = always_copy_files.is_match(&relative_path);
                     return Ok(Some(PathsEntry {
@@ -529,9 +529,9 @@ impl Output {
                 } else if meta.is_symlink() {
                     // For symlinks, compute hash of the target file content if it exists and is within package, otherwise empty digest
                     let digest = if is_symlink_to_file(p) {
-                        compute_file_digest::<sha2::Sha256>(p)?
+                        compute_file_digest::<Sha256>(p)?
                     } else {
-                        compute_bytes_digest::<sha2::Sha256>(&[])
+                        compute_bytes_digest::<Sha256>(&[])
                     };
                     return Ok(Some(PathsEntry {
                         sha256: Some(digest),

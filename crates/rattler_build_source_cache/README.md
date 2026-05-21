@@ -28,7 +28,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create a cache with custom configuration
     let cache = SourceCacheBuilder::new()
         .cache_dir("/path/to/cache")
-        .max_age(chrono::Duration::days(30))
+        .max_age(jiff::SignedDuration::from_hours(24 * 30))
         .enable_cleanup(true)
         .cleanup_interval(std::time::Duration::from_secs(3600))
         .build()

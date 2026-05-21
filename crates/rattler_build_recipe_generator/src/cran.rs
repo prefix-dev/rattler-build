@@ -4,9 +4,8 @@ use std::{collections::HashMap, collections::HashSet, path::PathBuf};
 use clap::Parser;
 use itertools::Itertools;
 use miette::IntoDiagnostic;
-use rattler_digest::{Sha256Hash, compute_bytes_digest};
+use rattler_digest::{Sha256, Sha256Hash, compute_bytes_digest};
 use serde::{Deserialize, Serialize};
-use sha2::Sha256;
 use url::Url;
 
 use crate::{
@@ -268,11 +267,12 @@ async fn build_cran_recipe_and_deps(
     .expect("Failed to parse URL");
 
     let sha256 = fetch_package_sha256sum(&url).await?;
+    let sha256_hex: &[u8] = sha256.as_ref();
 
     let source = UrlSourceElement {
         url: vec![url.to_string(), url_archive.to_string()],
         md5: None,
-        sha256: Some(format!("{:x}", sha256)),
+        sha256: Some(hex::encode(sha256_hex)),
     };
     recipe.source.push(source.into());
 

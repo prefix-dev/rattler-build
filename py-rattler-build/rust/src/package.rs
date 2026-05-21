@@ -147,11 +147,11 @@ impl PyPackage {
 
     /// Build timestamp as a datetime object
     #[getter]
-    fn timestamp(&self) -> Option<chrono::DateTime<chrono::Utc>> {
+    fn timestamp(&self) -> Option<jiff::Timestamp> {
         self.index
             .timestamp
             .as_ref()
-            .map(|ts| ts.datetime().to_owned())
+            .map(|ts| ts.jiff_timestamp())
     }
 
     /// Architecture (e.g., "x86_64")
@@ -1091,7 +1091,10 @@ impl PyPathEntry {
     /// SHA256 hash of the file (if available)
     #[getter]
     fn sha256(&self) -> Option<String> {
-        self.inner.sha256.as_ref().map(|h| format!("{:x}", h))
+        self.inner.sha256.as_ref().map(|h| {
+            let bytes: &[u8] = h.as_ref();
+            hex::encode(bytes)
+        })
     }
 
     fn __repr__(&self) -> String {

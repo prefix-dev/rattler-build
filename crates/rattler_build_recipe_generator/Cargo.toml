@@ -20,6 +20,7 @@ async-once-cell = { workspace = true }
 async-recursion = { workspace = true }
 flate2 = { workspace = true }
 fs-err = { workspace = true }
+hex = { workspace = true }
 indexmap = { workspace = true }
 itertools = { workspace = true }
 miette = { workspace = true }

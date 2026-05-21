@@ -307,7 +307,7 @@ python:
 
 
 def test_run_build_exclude_newer_datetime_conversion(tmp_path: Path) -> None:
-    """Test that Python datetime converts correctly to Rust chrono::DateTime<Utc>."""
+    """Test that Python datetime converts correctly to Rust jiff::Timestamp."""
     from datetime import datetime, timezone
 
     recipe_yaml = """
@@ -324,7 +324,7 @@ build:
     variant_config = VariantConfig()
     rendered = recipe.render(variant_config)
 
-    # Create a timezone-aware datetime (required for chrono::DateTime<Utc>)
+    # Create a timezone-aware datetime (required for jiff::Timestamp)
     exclude_newer = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
 
     result = rendered[0].run_build(output_dir=tmp_path, exclude_newer=exclude_newer)

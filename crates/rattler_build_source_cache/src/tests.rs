@@ -65,8 +65,8 @@ mod source_cache_tests {
             git_rev: None,
             cache_path: std::path::PathBuf::from("file_abcd.tar.gz"),
             extracted_path: Some(std::path::PathBuf::from("file_abcd_extracted")),
-            last_accessed: chrono::Utc::now(),
-            created: chrono::Utc::now(),
+            last_accessed: jiff::Timestamp::now(),
+            created: jiff::Timestamp::now(),
             lock_file: None,
             attestation_verified: false,
         };

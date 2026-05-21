@@ -41,14 +41,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_target_platform(&platform)
         .with_license("MIT".to_string())
         .with_dependency("python >=3.8".to_string())
-        .with_timestamp(chrono::Utc::now())
+        .with_timestamp(jiff::Timestamp::now())
         .build()?;
 
     // Configure package creation
     let config = PackageConfig {
         compression_level: 6,
         archive_type: ArchiveType::Conda,
-        timestamp: Some(chrono::Utc::now()),
+        timestamp: Some(jiff::Timestamp::now()),
         compression_threads: 4,
         detect_prefix: true,
         store_recipe: false,

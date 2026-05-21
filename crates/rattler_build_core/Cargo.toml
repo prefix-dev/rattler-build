@@ -82,7 +82,7 @@ indicatif = { workspace = true, features = ["in_memory"] }
 console = { workspace = true }
 thiserror = { workspace = true }
 tempfile = { workspace = true }
-chrono = { workspace = true }
+jiff = { workspace = true }
 ignore = { workspace = true }
 globset = { workspace = true }
 text-stub-library = { workspace = true }
@@ -121,9 +121,7 @@ rattler_redaction = { workspace = true, default-features = false }
 rattler_repodata_gateway = { workspace = true, default-features = false, features = [
   "gateway",
 ] }
-rattler_shell = { workspace = true, default-features = false, features = [
-  "sysinfo",
-] }
+rattler_shell = { workspace = true, default-features = false }
 rattler_solve = { workspace = true, default-features = false, features = [
   "resolvo",
   "serde",

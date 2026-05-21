@@ -1,4 +1,5 @@
-use rattler_digest::{Md5Hash, Sha256Hash};
+use rattler_build_yaml_parser::ValueInner;
+use rattler_digest::{Md5, Md5Hash, Sha256, Sha256Hash, parse_digest_from_hex};
 use serde::{Deserialize, Serialize};
 use serde_with::{OneOrMany, formats::PreferMany, serde_as};
 use std::path::PathBuf;
@@ -127,7 +128,8 @@ pub struct UrlSource {
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        serialize_with = "sha256_serialization::serialize"
+        serialize_with = "sha256_serialization::serialize",
+        deserialize_with = "sha256_serialization::deserialize"
     )]
     pub sha256: Option<Value<Sha256Hash>>,
 
@@ -135,7 +137,8 @@ pub struct UrlSource {
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        serialize_with = "md5_serialization::serialize"
+        serialize_with = "md5_serialization::serialize",
+        deserialize_with = "md5_serialization::deserialize"
     )]
     pub md5: Option<Value<Md5Hash>>,
 
@@ -166,7 +169,8 @@ pub struct PathSource {
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        serialize_with = "sha256_serialization::serialize"
+        serialize_with = "sha256_serialization::serialize",
+        deserialize_with = "sha256_serialization::deserialize"
     )]
     pub sha256: Option<Value<Sha256Hash>>,
 
@@ -174,7 +178,8 @@ pub struct PathSource {
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        serialize_with = "md5_serialization::serialize"
+        serialize_with = "md5_serialization::serialize",
+        deserialize_with = "md5_serialization::deserialize"
     )]
     pub md5: Option<Value<Md5Hash>>,
 
@@ -210,7 +215,7 @@ fn is_true(value: &bool) -> bool {
 /// Serialize a SHA256 hash Value as a hex string
 mod sha256_serialization {
     use super::*;
-    use serde::Serializer;
+    use serde::{Deserialize, Deserializer, Serializer};
 
     pub fn serialize<S>(value: &Option<Value<Sha256Hash>>, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -219,7 +224,8 @@ mod sha256_serialization {
         match value {
             None => serializer.serialize_none(),
             Some(v) if v.is_concrete() => {
-                serializer.serialize_str(&format!("{:x}", v.as_concrete().unwrap()))
+                let hash: &[u8] = v.as_concrete().unwrap().as_ref();
+                serializer.serialize_str(&hex::encode(hash))
             }
             Some(v) if v.is_template() => {
                 serializer.serialize_str(v.as_template().unwrap().source())
@@ -227,12 +233,28 @@ mod sha256_serialization {
             _ => unreachable!("Value must be either concrete or template"),
         }
     }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<Value<Sha256Hash>>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let Some(value) = Option::<Value<String>>::deserialize(deserializer)? else {
+            return Ok(None);
+        };
+        let (inner, span) = value.into_parts();
+        match inner {
+            ValueInner::Concrete(hash) => parse_digest_from_hex::<Sha256>(&hash)
+                .map(|hash| Some(Value::new_concrete(hash, span)))
+                .ok_or_else(|| serde::de::Error::custom("failed to parse SHA256 digest")),
+            ValueInner::Template(template) => Ok(Some(Value::new_template(template, span))),
+        }
+    }
 }
 
 /// Serialize an MD5 hash Value as a hex string
 mod md5_serialization {
     use super::*;
-    use serde::Serializer;
+    use serde::{Deserialize, Deserializer, Serializer};
 
     pub fn serialize<S>(value: &Option<Value<Md5Hash>>, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -241,12 +263,29 @@ mod md5_serialization {
         match value {
             None => serializer.serialize_none(),
             Some(v) if v.is_concrete() => {
-                serializer.serialize_str(&format!("{:x}", v.as_concrete().unwrap()))
+                let hash: &[u8] = v.as_concrete().unwrap().as_ref();
+                serializer.serialize_str(&hex::encode(hash))
             }
             Some(v) if v.is_template() => {
                 serializer.serialize_str(v.as_template().unwrap().source())
             }
             _ => unreachable!("Value must be either concrete or template"),
+        }
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<Value<Md5Hash>>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let Some(value) = Option::<Value<String>>::deserialize(deserializer)? else {
+            return Ok(None);
+        };
+        let (inner, span) = value.into_parts();
+        match inner {
+            ValueInner::Concrete(hash) => parse_digest_from_hex::<Md5>(&hash)
+                .map(|hash| Some(Value::new_concrete(hash, span)))
+                .ok_or_else(|| serde::de::Error::custom("failed to parse MD5 digest")),
+            ValueInner::Template(template) => Ok(Some(Value::new_template(template, span))),
         }
     }
 }

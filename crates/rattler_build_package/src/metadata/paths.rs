@@ -3,7 +3,7 @@
 use fs_err as fs;
 use rattler_conda_types::Platform;
 use rattler_conda_types::package::{FileMode, PathType, PathsEntry, PathsJson, PrefixPlaceholder};
-use rattler_digest::{compute_bytes_digest, compute_file_digest};
+use rattler_digest::{Sha256, compute_bytes_digest, compute_file_digest};
 use rayon::prelude::*;
 use std::path::{Path, PathBuf};
 
@@ -115,9 +115,9 @@ impl PathsJsonBuilder {
         if metadata.is_symlink() {
             // For symlinks, compute hash of target content if it's a file
             let digest = if self.is_symlink_to_file(&file.source) {
-                compute_file_digest::<sha2::Sha256>(&file.source)?
+                compute_file_digest::<Sha256>(&file.source)?
             } else {
-                compute_bytes_digest::<sha2::Sha256>(&[])
+                compute_bytes_digest::<Sha256>(&[])
             };
 
             return Ok(PathsEntry {
@@ -133,9 +133,9 @@ impl PathsJsonBuilder {
         // Regular file
         let file_size = metadata.len();
         let digest = if file_size > 0 {
-            Some(compute_file_digest::<sha2::Sha256>(&file.source)?)
+            Some(compute_file_digest::<Sha256>(&file.source)?)
         } else {
-            Some(compute_bytes_digest::<sha2::Sha256>(&[]))
+            Some(compute_bytes_digest::<Sha256>(&[]))
         };
 
         // Detect prefix placeholder

@@ -9,7 +9,7 @@ use fs_err as fs;
 use indexmap::IndexMap;
 use minijinja::Value;
 use rattler_conda_types::Platform;
-use rattler_digest::Sha256Hash;
+use rattler_digest::{Sha256, Sha256Hash, compute_bytes_digest};
 use regex::Regex;
 use reqwest::Client;
 use serde::Deserialize;
@@ -529,10 +529,7 @@ pub async fn fetch_sha256(client: &Client, url: &str) -> Result<Sha256Hash, Bump
 
     let bytes = response.bytes().await?;
 
-    use sha2::{Digest, Sha256};
-    let mut hasher = Sha256::new();
-    hasher.update(&bytes);
-    Ok(hasher.finalize())
+    Ok(compute_bytes_digest::<Sha256>(&bytes))
 }
 
 /// Reset the build number to 0 in the recipe content
@@ -684,7 +681,8 @@ pub async fn bump_recipe(
 
         tracing::info!("Fetching {}", new_url);
         let sha256 = fetch_sha256(client, &new_url).await?;
-        let sha256_str = format!("{:x}", sha256);
+        let sha256_bytes: &[u8] = sha256.as_ref();
+        let sha256_str = hex::encode(sha256_bytes);
         tracing::debug!("Fetched SHA256: {}", sha256_str);
 
         new_sha256s.push(sha256_str);
