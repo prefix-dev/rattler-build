@@ -190,10 +190,7 @@ native-tls = [
   'rattler_build_core/native-tls',
   'rattler_build_recipe_generator?/native-tls',
 ]
-rustls = [
-  'rattler_build_core/rustls',
-  'rattler_build_recipe_generator?/rustls',
-]
+rustls = ['rattler_build_core/rustls', 'rattler_build_recipe_generator?/rustls']
 s3 = ['rattler_build_core/s3']
 sigstore = ['rattler_build_core/sigstore']
 recipe-generation = ["rattler_build_recipe_generator"]
