@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.8](https://github.com/prefix-dev/rattler-build/compare/rattler_build_recipe-v0.1.7...rattler_build_recipe-v0.1.8) - 2026-05-27
+
+### Other
+
+- use `RepodataRevision` enum instead of new `v3` boolean ([#2517](https://github.com/prefix-dev/rattler-build/pull/2517))
+
 ## [0.1.7](https://github.com/prefix-dev/rattler-build/compare/rattler_build_recipe-v0.1.6...rattler_build_recipe-v0.1.7) - 2026-05-20
 
 ### Added
