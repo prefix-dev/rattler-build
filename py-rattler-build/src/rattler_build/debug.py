@@ -135,8 +135,8 @@ class DebugSession:
             channels=channels,
             no_build_id=no_build_id,
             progress_callback=progress_callback,
-            v3=variant._v3,
             recipe_path=variant._recipe_path,
+            repodata_revision=variant._repodata_revision,
         )
         return cls(inner)
 

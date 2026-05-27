@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 use rattler_build_jinja::{JinjaConfig, Variable};
 use rattler_build_recipe::stage1::HashInfo;
 use rattler_build_types::NormalizedKey;
-use rattler_conda_types::{ChannelUrl, PackageName, Platform};
+use rattler_conda_types::{ChannelUrl, PackageName, Platform, RepodataRevision};
 use rattler_solve::{ChannelPriority, SolveStrategy};
 use serde::{Deserialize, Serialize};
 
@@ -66,9 +66,9 @@ pub struct BuildConfiguration {
     /// Exclude packages newer than this date from the solver
     #[serde(skip_serializing, default)]
     pub exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
-    /// Whether to write V3 package metadata.
+    /// Repodata revision to target when writing package metadata.
     #[serde(skip_serializing, default)]
-    pub v3: bool,
+    pub repodata_revision: RepodataRevision,
 }
 
 impl BuildConfiguration {

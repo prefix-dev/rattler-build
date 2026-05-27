@@ -29,7 +29,8 @@ use indexmap::IndexMap;
 use rattler_build_script::ScriptContent;
 use rattler_build_types::NormalizedKey;
 use rattler_conda_types::{
-    MatchSpec, NoArchType, PackageName, PackageNameMatcher, ParseStrictness, VersionWithSource,
+    MatchSpec, NoArchType, PackageName, PackageNameMatcher, ParseStrictness, RepodataRevision,
+    VersionWithSource,
 };
 use rattler_digest::{Md5Hash, Sha256Hash};
 
@@ -608,7 +609,7 @@ fn evaluate_flag_list(
         }
     })?;
 
-    if !flags.is_empty() && !context.v3() {
+    if !flags.is_empty() && context.repodata_revision() != RepodataRevision::V3 {
         return Err(ParseError::invalid_value(
             "build.flags",
             "package flags require the --v3 flag",
@@ -997,7 +998,7 @@ pub fn evaluate_dependency_list(
             }
 
             let span_opt = value.span().copied();
-            let dep = parse_dependency_string(&s, &span_opt, ctx.v3())?;
+            let dep = parse_dependency_string(&s, &span_opt, ctx.repodata_revision())?;
             Ok(Some(dep))
         } else {
             unreachable!("Value must be either concrete or template")
@@ -1010,8 +1011,8 @@ fn ensure_matchspec_v3_allowed(
     context: &EvaluationContext,
     span: Option<&Span>,
 ) -> Result<(), ParseError> {
-    if !context.v3()
-        && spec.required_repodata_revision() == rattler_conda_types::RepodataRevision::V3
+    if context.repodata_revision() != RepodataRevision::V3
+        && spec.required_repodata_revision() == RepodataRevision::V3
     {
         return Err(ParseError::invalid_value(
             "match spec",
@@ -1030,7 +1031,7 @@ fn ensure_matchspec_v3_allowed(
 fn parse_dependency_string(
     s: &str,
     span: &Option<Span>,
-    v3: bool,
+    repodata_revision: RepodataRevision,
 ) -> Result<Dependency, ParseError> {
     let span = (*span).unwrap_or_else(Span::new_blank);
 
@@ -1046,14 +1047,17 @@ fn parse_dependency_string(
         })
     } else {
         // It's a regular MatchSpec string
-        let spec = MatchSpec::from_str(s, matchspec_parse_options(ParseStrictness::Strict, v3))
-            .map_err(|e| {
-                ParseError::invalid_value(
-                    "match spec",
-                    format!("Invalid match spec '{}': {}", s, e),
-                    span,
-                )
-            })?;
+        let spec = MatchSpec::from_str(
+            s,
+            matchspec_parse_options(ParseStrictness::Strict, repodata_revision),
+        )
+        .map_err(|e| {
+            ParseError::invalid_value(
+                "match spec",
+                format!("Invalid match spec '{}': {}", s, e),
+                span,
+            )
+        })?;
         Ok(Dependency::Spec(Box::new(spec)))
     }
 }
@@ -1521,7 +1525,7 @@ impl Evaluate for Stage0Requirements {
     type Output = Stage1Requirements;
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
-        if !self.extras.is_empty() && !context.v3() {
+        if !self.extras.is_empty() && context.repodata_revision() != RepodataRevision::V3 {
             return Err(ParseError::invalid_value(
                 "requirements.extras",
                 "optional dependency groups require the --v3 flag",
