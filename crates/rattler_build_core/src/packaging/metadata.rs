@@ -410,7 +410,10 @@ impl Output {
             features: None,
             python_site_packages_path: recipe.build().python.site_packages_path.clone(),
             purls: None,
-            repodata_revision: self.build_configuration.v3.then_some(RepodataRevision::V3),
+            repodata_revision: match self.build_configuration.repodata_revision {
+                RepodataRevision::Legacy => None,
+                revision => Some(revision),
+            },
         })
     }
 

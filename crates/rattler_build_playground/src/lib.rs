@@ -11,7 +11,7 @@ use rattler_build_recipe::{
     variant_render::{RenderConfig, render_recipe_with_variant_config},
 };
 use rattler_build_variant_config::{VariantConfig, parse_conda_build_config};
-use rattler_conda_types::Platform;
+use rattler_conda_types::{Platform, RepodataRevision};
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
 
@@ -122,8 +122,8 @@ pub fn evaluate_recipe(yaml_source: &str, variables_json: &str, target_platform:
         ..Default::default()
     };
 
-    let context =
-        EvaluationContext::with_variables_and_config(variables, jinja_config).with_v3(true);
+    let context = EvaluationContext::with_variables_and_config(variables, jinja_config)
+        .with_repodata_revision(RepodataRevision::V3);
 
     match &recipe {
         Recipe::SingleOutput(r) => {
@@ -275,7 +275,7 @@ pub fn render_variants(
         .with_target_platform(platform)
         .with_host_platform(platform)
         .with_build_platform(platform)
-        .with_v3(true);
+        .with_repodata_revision(RepodataRevision::V3);
 
     // Render with variant config
     match render_recipe_with_variant_config(&stage0_recipe, &variant_config, render_config) {

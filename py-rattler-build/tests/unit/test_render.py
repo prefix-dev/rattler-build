@@ -15,6 +15,7 @@ from rattler_build import (
     RecipeParseError,
     RenderConfig,
     RenderedVariant,
+    RepodataRevision,
     Stage0Recipe,
     VariantConfig,
 )
@@ -38,8 +39,8 @@ def test_render_config_with_platforms() -> None:
 
 def test_render_config_with_v3_enabled() -> None:
     """Test RenderConfig with V3 recipe fields enabled."""
-    config = RenderConfig(v3=True)
-    assert config.v3 is True
+    config = RenderConfig(repodata_revision=RepodataRevision.V3)
+    assert config.repodata_revision == RepodataRevision.V3
 
 
 def test_v3_python_api_renders_and_builds_v3_index_json(tmp_path: Path) -> None:
@@ -66,7 +67,7 @@ requirements:
     with pytest.raises(RecipeParseError, match="--v3|invalid bracket key"):
         Stage0Recipe.from_yaml(recipe_yaml)
 
-    recipe = Stage0Recipe.from_yaml(recipe_yaml, v3=True)
+    recipe = Stage0Recipe.from_yaml(recipe_yaml, repodata_revision=RepodataRevision.V3)
     rendered = recipe.render()
 
     assert len(rendered) == 1

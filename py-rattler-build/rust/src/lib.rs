@@ -13,6 +13,7 @@ mod package_assembler;
 mod progress_callback;
 mod recipe_generation;
 mod render;
+mod repodata_revision;
 mod stage0;
 mod stage1;
 mod tool_config;
@@ -23,6 +24,7 @@ mod variant_config;
 use build::{BuildResultPy, PyEnvironmentIsolation};
 use error::RattlerBuildError;
 use jinja_config::PyJinjaConfig;
+use repodata_revision::PyRepodataRevision;
 
 /// Execute async tasks in Python bindings with proper error handling
 pub(crate) fn run_async_task<F, R>(future: F) -> PyResult<R>
@@ -68,6 +70,7 @@ fn rattler_build<'py>(_py: Python<'py>, m: Bound<'py, PyModule>) -> PyResult<()>
     m.add_class::<PyJinjaConfig>()?;
     m.add_class::<BuildResultPy>()?;
     m.add_class::<PyEnvironmentIsolation>()?;
+    m.add_class::<PyRepodataRevision>()?;
 
     // Register all submodules
     stage0::register_stage0_module(_py, &m)?;

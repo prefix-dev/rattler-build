@@ -20,6 +20,7 @@ use std::{
 
 use crate::error::RattlerBuildError;
 use crate::render;
+use crate::repodata_revision::PyRepodataRevision;
 use crate::run_async_task;
 use crate::tool_config;
 use crate::tracing_subscriber;
@@ -121,7 +122,7 @@ pub(crate) fn output_from_rendered_variant(
     recipe_path: Option<&Path>,
     exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
     env_isolation: EnvironmentIsolation,
-    v3: bool,
+    repodata_revision: PyRepodataRevision,
     extra_subpackages: BTreeMap<rattler_conda_types::PackageName, PackageIdentifier>,
 ) -> Result<Output, RattlerBuildError> {
     let timestamp = chrono::Utc::now();
@@ -225,7 +226,7 @@ pub(crate) fn output_from_rendered_variant(
             env_isolation,
             sandbox_config: None,
             exclude_newer,
-            v3,
+            repodata_revision: repodata_revision.into(),
         },
         finalized_dependencies: None,
         finalized_sources: None,
@@ -246,6 +247,7 @@ use std::path::Path;
 /// directly without needing to write temporary files.
 #[pyfunction]
 #[allow(clippy::too_many_arguments)]
+#[pyo3(signature = (rendered_variant, tool_config, output_dir, channels, progress_callback=None, recipe_path=None, no_build_id=false, package_format=None, no_include_recipe=false, exclude_newer=None, env_isolation=PyEnvironmentIsolation::Strict, sibling_variants=Vec::new(), repodata_revision=None))]
 pub fn build_rendered_variant_py(
     py: Python<'_>,
     rendered_variant: render::PyRenderedVariant,
@@ -260,7 +262,7 @@ pub fn build_rendered_variant_py(
     exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
     env_isolation: PyEnvironmentIsolation,
     sibling_variants: Vec<render::PyRenderedVariant>,
-    v3: bool,
+    repodata_revision: Option<PyRepodataRevision>,
 ) -> PyResult<BuildResultPy> {
     let tool_config = tool_config.inner;
 
@@ -305,7 +307,7 @@ pub fn build_rendered_variant_py(
         recipe_path.as_deref(),
         exclude_newer,
         env_isolation,
-        v3,
+        repodata_revision.unwrap_or_default(),
         extra_subpackages,
     )?;
 

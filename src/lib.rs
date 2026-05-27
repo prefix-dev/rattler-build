@@ -54,7 +54,7 @@ use rattler_build_core::consts;
 use rattler_build_recipe::{stage0, stage1::TestType};
 use rattler_build_variant_config::VariantConfig;
 use rattler_conda_types::{
-    MatchSpec, NamedChannelOrUrl, NoArchType, PackageName, Platform,
+    MatchSpec, NamedChannelOrUrl, NoArchType, PackageName, Platform, RepodataRevision,
     compression_level::CompressionLevel, package::CondaArchiveType,
 };
 use rattler_config::config::build::PackageFormatAndCompression;
@@ -80,6 +80,15 @@ use crate::publish::{
 use indexmap::IndexSet;
 use rattler_build_recipe::topological_sort_by_dependencies;
 
+/// Convert the CLI `--v3` boolean flag into a [`RepodataRevision`].
+fn repodata_revision_from_v3_flag(v3: bool) -> RepodataRevision {
+    if v3 {
+        RepodataRevision::V3
+    } else {
+        RepodataRevision::Legacy
+    }
+}
+
 /// Result of finding variants, including the top-level recipe name if available
 struct FoundVariants {
     outputs: IndexSet<DiscoveredOutput>,
@@ -102,7 +111,7 @@ fn find_variants(
     let stage0_recipe = rattler_build_recipe::parse_recipe_with_config(
         &source,
         rattler_build_recipe::stage0::ParseConfig {
-            v3: render_config.v3,
+            repodata_revision: render_config.repodata_revision,
         },
     )
     .wrap_err("Failed to parse recipe")?;
@@ -395,7 +404,7 @@ pub async fn get_build_output(
         build_platform: build_data.build_platform,
         host_platform: build_data.host_platform,
         experimental: build_data.common.experimental,
-        v3: build_data.common.v3,
+        repodata_revision: repodata_revision_from_v3_flag(build_data.common.v3),
         recipe_path: Some(recipe_path.to_path_buf()),
         os_env_var_keys,
         build_number_override: build_data.build_num_override,
@@ -560,7 +569,7 @@ pub async fn get_build_output(
                 env_isolation: build_data.env_isolation,
                 sandbox_config: build_data.sandbox_configuration.clone(),
                 exclude_newer: build_data.exclude_newer,
-                v3: build_data.common.v3,
+                repodata_revision: repodata_revision_from_v3_flag(build_data.common.v3),
             },
             finalized_dependencies: None,
             finalized_sources: None,
