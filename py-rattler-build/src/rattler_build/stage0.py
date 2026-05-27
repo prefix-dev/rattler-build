@@ -99,14 +99,10 @@ class Stage0Recipe(ABC):
         wrapper = _stage0.Stage0Recipe.from_yaml(yaml, repodata_revision=repodata_revision)
         if wrapper.is_single_output():
             single_inner = wrapper.as_single_output()
-            return SingleOutputRecipe(
-                single_inner, wrapper, recipe_path, repodata_revision=repodata_revision
-            )
+            return SingleOutputRecipe(single_inner, wrapper, recipe_path, repodata_revision=repodata_revision)
         else:
             multi_inner = wrapper.as_multi_output()
-            return MultiOutputRecipe(
-                multi_inner, wrapper, recipe_path, repodata_revision=repodata_revision
-            )
+            return MultiOutputRecipe(multi_inner, wrapper, recipe_path, repodata_revision=repodata_revision)
 
     @classmethod
     def from_file(
@@ -134,14 +130,10 @@ class Stage0Recipe(ABC):
         wrapper = _stage0.Stage0Recipe.from_yaml(yaml, repodata_revision=repodata_revision)
         if wrapper.is_single_output():
             single_inner = wrapper.as_single_output()
-            return SingleOutputRecipe(
-                single_inner, wrapper, path, repodata_revision=repodata_revision
-            )
+            return SingleOutputRecipe(single_inner, wrapper, path, repodata_revision=repodata_revision)
         else:
             multi_inner = wrapper.as_multi_output()
-            return MultiOutputRecipe(
-                multi_inner, wrapper, path, repodata_revision=repodata_revision
-            )
+            return MultiOutputRecipe(multi_inner, wrapper, path, repodata_revision=repodata_revision)
 
     @classmethod
     def from_dict(
@@ -188,14 +180,10 @@ class Stage0Recipe(ABC):
         wrapper = _stage0.Stage0Recipe.from_dict(recipe_dict, repodata_revision=repodata_revision)
         if wrapper.is_single_output():
             single_inner = wrapper.as_single_output()
-            return SingleOutputRecipe(
-                single_inner, wrapper, recipe_path, repodata_revision=repodata_revision
-            )
+            return SingleOutputRecipe(single_inner, wrapper, recipe_path, repodata_revision=repodata_revision)
         else:
             multi_inner = wrapper.as_multi_output()
-            return MultiOutputRecipe(
-                multi_inner, wrapper, recipe_path, repodata_revision=repodata_revision
-            )
+            return MultiOutputRecipe(multi_inner, wrapper, recipe_path, repodata_revision=repodata_revision)
 
     def as_single_output(self) -> SingleOutputRecipe:
         """
@@ -295,8 +283,7 @@ class Stage0Recipe(ABC):
         rendered = _render.render_recipe(self._wrapper, variant_config_inner, render_config_inner)
 
         variants = [
-            RenderedVariant(r, self._recipe_path, repodata_revision=render_config.repodata_revision)
-            for r in rendered
+            RenderedVariant(r, self._recipe_path, repodata_revision=render_config.repodata_revision) for r in rendered
         ]
         for variant in variants:
             variant._siblings = variants
