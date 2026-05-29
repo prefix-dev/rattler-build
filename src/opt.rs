@@ -740,7 +740,7 @@ pub struct PublishOpts {
     /// Examples:
     /// - prefix.dev: https://prefix.dev/my-channel
     /// - anaconda.org: https://anaconda.org/my-org
-    /// - Cloudsmith: https://conda.cloudsmith.io/my-org/my-repository/
+    /// - Cloudsmith: cloudsmith://my-org/my-repository
     /// - S3: s3://my-bucket
     /// - Filesystem: file:///path/to/channel or /path/to/channel
     /// - Quetz: quetz://server.company.com/channel
