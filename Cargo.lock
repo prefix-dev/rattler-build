@@ -4874,7 +4874,7 @@ dependencies = [
 
 [[package]]
 name = "rattler-build"
-version = "0.65.0"
+version = "0.65.1"
 dependencies = [
  "anyhow",
  "astral-reqwest-middleware",
