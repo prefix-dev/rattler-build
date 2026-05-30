@@ -788,6 +788,50 @@ pub struct PublishData {
     pub build: BuildData,
 }
 
+const DEFAULT_CLOUDSMITH_CHANNEL_HOST: &str = "conda.cloudsmith.io";
+
+/// The repodata resolver can't read the `cloudsmith://` scheme, so rewrite such targets
+/// to `https://<host>/owner/repo` (host from `CLOUDSMITH_CHANNEL_HOST`, default
+/// [`DEFAULT_CLOUDSMITH_CHANNEL_HOST`]). The raw `cloudsmith://` value is kept as the
+/// upload target; acceptance matches `upload_to_cloudsmith`. All other targets are
+/// returned unchanged.
+fn resolve_publish_channel(to: &NamedChannelOrUrl) -> NamedChannelOrUrl {
+    let NamedChannelOrUrl::Url(url) = to else {
+        return to.clone();
+    };
+
+    match url.scheme() {
+        "cloudsmith" => {
+            let Some(owner) = url.host_str() else {
+                return to.clone();
+            };
+            let Some(mut segments) =
+                url.path_segments().map(|s| s.filter(|seg| !seg.is_empty()))
+            else {
+                return to.clone();
+            };
+            let Some(repo) = segments.next() else {
+                return to.clone();
+            };
+            if segments.next().is_some() {
+                return to.clone();
+            }
+
+            let host = std::env::var("CLOUDSMITH_CHANNEL_HOST")
+                .unwrap_or_else(|_| DEFAULT_CLOUDSMITH_CHANNEL_HOST.to_string());
+
+            match Url::parse(&format!(
+                "https://{}/{owner}/{repo}",
+                host.trim_end_matches('/')
+            )) {
+                Ok(converted) => NamedChannelOrUrl::Url(converted),
+                Err(_) => to.clone(),
+            }
+        }
+        _ => to.clone(),
+    }
+}
+
 impl PublishData {
     /// Generate a new PublishData struct from PublishOpts and an optional config.
     pub fn from_opts_and_config(opts: PublishOpts, config: Option<ConfigBase<()>>) -> Self {
@@ -848,14 +892,14 @@ impl PublishData {
 
         // Prepend the --to channel to the list of channels for dependency resolution
         let mut build_opts = opts.build;
-        let to_channel = opts.to.clone();
+        let to_channel = resolve_publish_channel(&opts.to);
 
         // Add the to channel as the first channel (highest priority)
         let channels = if let Some(mut channels) = build_opts.channels.take() {
-            channels.insert(0, to_channel.clone());
+            channels.insert(0, to_channel);
             Some(channels)
         } else {
-            Some(vec![to_channel.clone()])
+            Some(vec![to_channel])
         };
 
         build_opts.channels = channels;
@@ -1420,4 +1464,63 @@ pub struct MigrateRecipeOpts {
     /// Perform a dry-run: show the migrated recipe without writing to the file.
     #[arg(long, default_value = "false")]
     pub dry_run: bool,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serial_test::serial;
+
+    fn resolve(raw: &str) -> NamedChannelOrUrl {
+        resolve_publish_channel(&NamedChannelOrUrl::from_str(raw).unwrap())
+    }
+
+    #[test]
+    #[serial]
+    fn resolve_publish_channel_rewrites_cloudsmith_with_default_host() {
+        unsafe { std::env::remove_var("CLOUDSMITH_CHANNEL_HOST") };
+        assert_eq!(
+            resolve("cloudsmith://my-org/my-repo"),
+            NamedChannelOrUrl::Url(
+                Url::parse("https://conda.cloudsmith.io/my-org/my-repo").unwrap()
+            )
+        );
+    }
+
+    #[test]
+    #[serial]
+    fn resolve_publish_channel_honors_custom_host_and_trailing_slash() {
+        unsafe { std::env::set_var("CLOUDSMITH_CHANNEL_HOST", "conda.example.com/") };
+        let resolved = resolve("cloudsmith://my-org/my-repo");
+        unsafe { std::env::remove_var("CLOUDSMITH_CHANNEL_HOST") };
+        assert_eq!(
+            resolved,
+            NamedChannelOrUrl::Url(
+                Url::parse("https://conda.example.com/my-org/my-repo").unwrap()
+            )
+        );
+    }
+
+    // These targets short-circuit before the env var is read, so they need no `#[serial]`.
+    #[test]
+    fn resolve_publish_channel_passes_through_targets_upload_rejects() {
+        for raw in ["cloudsmith://my-org/my-repo/extra", "cloudsmith://my-org"] {
+            assert_eq!(
+                resolve(raw),
+                NamedChannelOrUrl::from_str(raw).unwrap(),
+                "{raw} should be passed through unchanged"
+            );
+        }
+    }
+
+    #[test]
+    fn resolve_publish_channel_leaves_other_targets_untouched() {
+        for raw in ["https://prefix.dev/my-channel", "s3://my-bucket", "conda-forge"] {
+            assert_eq!(
+                resolve(raw),
+                NamedChannelOrUrl::from_str(raw).unwrap(),
+                "{raw} should be unchanged"
+            );
+        }
+    }
 }
