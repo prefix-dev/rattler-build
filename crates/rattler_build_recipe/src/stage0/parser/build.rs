@@ -1,6 +1,6 @@
 use marked_yaml::{Node, types::MarkedMappingNode};
 use rattler_build_yaml_parser::ParseError;
-use rattler_conda_types::NoArchType;
+use rattler_conda_types::{NoArchType, package::EntryPoint};
 
 use crate::stage0::{
     Conditional, ConditionalList, Item, JinjaExpression, NestedItemList,
@@ -12,9 +12,38 @@ use crate::stage0::{
     types::{IncludeExclude, Value},
 };
 use rattler_build_yaml_parser::{
-    helpers::contains_jinja_template, parse_conditional_list, parse_conditional_list_or_item,
-    parse_value_with_name,
+    NodeConverter, ParseResult, helpers::contains_jinja_template, parse_conditional_list,
+    parse_conditional_list_or_item, parse_conditional_list_with_converter, parse_value_with_name,
 };
+
+/// Converter for entry points that produces a clearer error than the default
+/// `FromStrConverter`: it names the field (`python.entry_points`), echoes the
+/// offending scalar in the message, and attaches a format suggestion. The
+/// underlying validation is `EntryPoint::from_str`, which rejects invalid
+/// commands and non-identifier module/function names.
+struct EntryPointConverter;
+
+impl NodeConverter<EntryPoint> for EntryPointConverter {
+    fn convert_scalar(&self, node: &Node, _field_name: &str) -> ParseResult<EntryPoint> {
+        let scalar = node
+            .as_scalar()
+            .ok_or_else(|| ParseError::expected_type("scalar", "non-scalar", get_span(node)))?;
+        let s = scalar.as_str();
+        let span = *scalar.span();
+        s.parse::<EntryPoint>().map_err(|e| {
+            ParseError::invalid_value(
+                "python.entry_points",
+                format!("Invalid entry point '{}': {}", s, e),
+                span,
+            )
+            .with_suggestion(
+                "Entry points must be in the format 'command = module:function' \
+                 (e.g. 'flask = flask.cli:main'). The module and function must be \
+                 unquoted Python dotted identifiers.",
+            )
+        })
+    }
+}
 
 /// Macro to parse a value with automatic field name inference for better error messages
 ///
@@ -538,7 +567,8 @@ fn parse_python_build(node: &Node) -> Result<PythonBuild, ParseError> {
 
         match key {
             "entry_points" => {
-                python.entry_points = parse_conditional_list(value_node)?;
+                python.entry_points =
+                    parse_conditional_list_with_converter(value_node, &EntryPointConverter)?;
             }
             "skip_pyc_compilation" => {
                 python.skip_pyc_compilation = parse_conditional_list(value_node)?;
