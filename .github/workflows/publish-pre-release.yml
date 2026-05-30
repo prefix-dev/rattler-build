@@ -42,7 +42,7 @@ jobs:
           Copy-Item D:/a/rattler-build/rattler-build/* ${{ matrix.working-directory }} -Recurse -Force
         working-directory: "D:/"
         if: ${{ matrix.os=='windows-latest' }}
-      - uses: prefix-dev/setup-pixi@1b2de7f3351f171c8b4dfeb558c639cb58ed4ec0 # v0.9.5
+      - uses: prefix-dev/setup-pixi@5185adfbffb4bd703da3010310260805d89ebb11 # v0.9.6
         with:
           environments: packaging
           manifest-path: ${{ matrix.working-directory && format('{0}\pixi.toml', matrix.working-directory) || 'pixi.toml' }}
