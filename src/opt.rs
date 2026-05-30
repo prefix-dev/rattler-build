@@ -805,8 +805,7 @@ fn resolve_publish_channel(to: &NamedChannelOrUrl) -> NamedChannelOrUrl {
             let Some(owner) = url.host_str() else {
                 return to.clone();
             };
-            let Some(mut segments) =
-                url.path_segments().map(|s| s.filter(|seg| !seg.is_empty()))
+            let Some(mut segments) = url.path_segments().map(|s| s.filter(|seg| !seg.is_empty()))
             else {
                 return to.clone();
             };
@@ -1495,9 +1494,7 @@ mod tests {
         unsafe { std::env::remove_var("CLOUDSMITH_CHANNEL_HOST") };
         assert_eq!(
             resolved,
-            NamedChannelOrUrl::Url(
-                Url::parse("https://conda.example.com/my-org/my-repo").unwrap()
-            )
+            NamedChannelOrUrl::Url(Url::parse("https://conda.example.com/my-org/my-repo").unwrap())
         );
     }
 
@@ -1515,7 +1512,11 @@ mod tests {
 
     #[test]
     fn resolve_publish_channel_leaves_other_targets_untouched() {
-        for raw in ["https://prefix.dev/my-channel", "s3://my-bucket", "conda-forge"] {
+        for raw in [
+            "https://prefix.dev/my-channel",
+            "s3://my-bucket",
+            "conda-forge",
+        ] {
             assert_eq!(
                 resolve(raw),
                 NamedChannelOrUrl::from_str(raw).unwrap(),
