@@ -755,9 +755,9 @@ dependencies = [
  "http 1.4.1",
  "http-body 1.0.1",
  "http-body-util",
- "md-5",
+ "md-5 0.10.6",
  "pin-project-lite",
- "sha1",
+ "sha1 0.10.6",
  "sha2 0.10.9",
  "tracing",
 ]
@@ -1935,7 +1935,7 @@ dependencies = [
  "libc",
  "option-ext",
  "redox_users",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -2181,7 +2181,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -2954,7 +2954,7 @@ dependencies = [
  "tokio",
  "tower-service",
  "tracing",
- "windows-registry 0.6.1",
+ "windows-registry",
 ]
 
 [[package]]
@@ -3402,7 +3402,7 @@ version = "1.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a1886916523694cd6ea3d175f03a1e5010699a2a4cc13696d83d7bea1d80638"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -3601,6 +3601,16 @@ checksum = "d89e7ee0cfbedfc4da3340218492196241d89eefb6dab27de5df917a6d2e78cf"
 dependencies = [
  "cfg-if",
  "digest 0.10.7",
+]
+
+[[package]]
+name = "md-5"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "69b6441f590336821bb897fb28fc622898ccceb1d6cea3fde5ea86b090c4de98"
+dependencies = [
+ "cfg-if",
+ "digest 0.11.3",
 ]
 
 [[package]]
@@ -3810,7 +3820,7 @@ version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -3925,7 +3935,7 @@ version = "5.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "51e219e79014df21a225b1860a479e2dcd7cbd9130f4defd4bd0e191ea31d67d"
 dependencies = [
- "base64 0.22.1",
+ "base64 0.21.7",
  "chrono",
  "getrandom 0.2.17",
  "http 1.4.1",
@@ -4042,7 +4052,7 @@ dependencies = [
  "http-body 1.0.1",
  "jiff",
  "log",
- "md-5",
+ "md-5 0.10.6",
  "mea",
  "percent-encoding",
  "quick-xml 0.38.4",
@@ -4092,7 +4102,7 @@ dependencies = [
  "crc32c",
  "http 1.4.1",
  "log",
- "md-5",
+ "md-5 0.10.6",
  "opendal-core",
  "quick-xml 0.38.4",
  "reqsign-aws-v4",
@@ -4707,7 +4717,7 @@ dependencies = [
  "once_cell",
  "socket2",
  "tracing",
- "windows-sys 0.60.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -5140,7 +5150,7 @@ dependencies = [
  "serde_json",
  "serde_with",
  "serde_yaml",
- "sha1",
+ "sha1 0.11.0",
  "spdx",
  "thiserror 2.0.18",
  "url",
@@ -5219,7 +5229,7 @@ dependencies = [
  "hex",
  "indicatif",
  "lzma-rust2",
- "md-5",
+ "md-5 0.11.0",
  "rattler_build_networking",
  "rattler_git",
  "rattler_prefix_guard",
@@ -5228,8 +5238,8 @@ dependencies = [
  "serde_json",
  "sevenz-rust2",
  "sha2 0.10.9",
- "sigstore-trust-root 0.7.0",
- "sigstore-types 0.7.0",
+ "sigstore-trust-root 0.8.0",
+ "sigstore-types 0.8.0",
  "sigstore-verify",
  "tar",
  "tempfile",
@@ -5396,7 +5406,7 @@ dependencies = [
  "digest 0.10.7",
  "generic-array",
  "hex",
- "md-5",
+ "md-5 0.10.6",
  "serde",
  "serde-untagged",
  "serde_bytes",
@@ -5504,7 +5514,7 @@ dependencies = [
  "unicode-normalization",
  "which",
  "windows 0.61.3",
- "windows-registry 0.5.3",
+ "windows-registry",
 ]
 
 [[package]]
@@ -5924,7 +5934,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_urlencoded",
- "sha1",
+ "sha1 0.10.6",
 ]
 
 [[package]]
@@ -5944,7 +5954,7 @@ dependencies = [
  "jiff",
  "log",
  "percent-encoding",
- "sha1",
+ "sha1 0.10.6",
  "sha2 0.10.9",
  "windows-sys 0.61.2",
 ]
@@ -6232,7 +6242,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.12.1",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -6246,7 +6256,7 @@ dependencies = [
  "once_cell",
  "ring",
  "rustls-pki-types",
- "rustls-webpki 0.103.13",
+ "rustls-webpki",
  "subtle",
  "zeroize",
 ]
@@ -6287,11 +6297,11 @@ dependencies = [
  "rustls",
  "rustls-native-certs",
  "rustls-platform-verifier-android",
- "rustls-webpki 0.103.13",
+ "rustls-webpki",
  "security-framework 3.7.0",
  "security-framework-sys",
  "webpki-root-certs",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -6299,18 +6309,6 @@ name = "rustls-platform-verifier-android"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f87165f0995f63a9fbeea62b64d10b4d9d8e78ec6d7d51fb2125fda7bb36788f"
-
-[[package]]
-name = "rustls-webpki"
-version = "0.102.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "64ca1bc8749bd4cf37b5ce386cc146580777b4e8572c7b97baf22c83f444bee9"
-dependencies = [
- "aws-lc-rs",
- "ring",
- "rustls-pki-types",
- "untrusted 0.9.0",
-]
 
 [[package]]
 name = "rustls-webpki"
@@ -6781,6 +6779,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "sha1"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aacc4cc499359472b4abe1bf11d0b12e688af9a805fa5e3016f9a386dc2d0214"
+dependencies = [
+ "cfg-if",
+ "cpufeatures 0.3.0",
+ "digest 0.11.3",
+]
+
+[[package]]
 name = "sha2"
 version = "0.10.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6893,19 +6902,19 @@ dependencies = [
 
 [[package]]
 name = "sigstore-bundle"
-version = "0.7.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0bb2255028e90ba8e7abe7cc49fb04e6f824a8f7a061fc6922f67a48e84ab052"
+checksum = "9a86d28a25d9e6107e02ca60fc60dfeb7cdc2b98251950d6fcd055f2afa31acb"
 dependencies = [
  "base64 0.22.1",
  "hex",
  "serde",
  "serde_json",
- "sigstore-crypto 0.7.0",
- "sigstore-merkle 0.7.0",
- "sigstore-rekor 0.7.0",
- "sigstore-tsa 0.7.0",
- "sigstore-types 0.7.0",
+ "sigstore-crypto 0.8.0",
+ "sigstore-merkle 0.8.0",
+ "sigstore-rekor 0.8.0",
+ "sigstore-tsa 0.8.0",
+ "sigstore-types 0.8.0",
  "thiserror 2.0.18",
 ]
 
@@ -6933,9 +6942,9 @@ dependencies = [
 
 [[package]]
 name = "sigstore-crypto"
-version = "0.7.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ac7172898e15789d69d12469bb3d33397aab0771fb4f8d32cd56972e97808bf3"
+checksum = "9cdc66f1480e176533425cc880bc5f8a8e0d88ae1fe2701e98de4fb68984b71c"
 dependencies = [
  "aws-lc-rs",
  "base64 0.22.1",
@@ -6946,7 +6955,7 @@ dependencies = [
  "rand_core 0.9.5",
  "sha2 0.10.9",
  "signature 2.2.0",
- "sigstore-types 0.7.0",
+ "sigstore-types 0.8.0",
  "spki 0.7.3",
  "thiserror 2.0.18",
  "tracing",
@@ -6985,14 +6994,14 @@ dependencies = [
 
 [[package]]
 name = "sigstore-merkle"
-version = "0.7.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5e86ee272adfcfa21a2248b2fbf05a79b6e39a1fb699ef70c578c814af16e4db"
+checksum = "a4dbea5d8d5f293dfc2ed6abd06dc26a5ef017af126e53e3e36a6b2f7b7dac8c"
 dependencies = [
  "base64 0.22.1",
  "hex",
- "sigstore-crypto 0.7.0",
- "sigstore-types 0.7.0",
+ "sigstore-crypto 0.8.0",
+ "sigstore-types 0.8.0",
  "thiserror 2.0.18",
 ]
 
@@ -7035,18 +7044,18 @@ dependencies = [
 
 [[package]]
 name = "sigstore-rekor"
-version = "0.7.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2448f8a13b91c615c23badca4d7e51b0376539b8723a2a2d43d27c016f9cce08"
+checksum = "fbe0bf948de89bed9b3b5c9d62940264a4da60db3518006b952b107d0e71926f"
 dependencies = [
  "base64 0.22.1",
  "hex",
  "reqwest 0.13.4",
  "serde",
  "serde_json",
- "sigstore-crypto 0.7.0",
- "sigstore-merkle 0.7.0",
- "sigstore-types 0.7.0",
+ "sigstore-crypto 0.8.0",
+ "sigstore-merkle 0.8.0",
+ "sigstore-types 0.8.0",
  "thiserror 2.0.18",
  "url",
 ]
@@ -7091,21 +7100,21 @@ dependencies = [
 
 [[package]]
 name = "sigstore-trust-root"
-version = "0.7.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1bf02c1ab8f7a10db78dbf37cc80bb0f93d2afd636d5c37a572c815cb418b925"
+checksum = "54fdf65b1207f96d4b1e5b44028fe3e078d40a50f6316715f6ad97ae21b0bfeb"
 dependencies = [
  "base64 0.22.1",
- "chrono",
  "directories",
  "futures",
  "hex",
+ "jiff",
  "reqwest 0.12.28",
  "rustls-pki-types",
  "serde",
  "serde_json",
- "sigstore-crypto 0.7.0",
- "sigstore-types 0.7.0",
+ "sigstore-crypto 0.8.0",
+ "sigstore-types 0.8.0",
  "thiserror 2.0.18",
  "tokio",
  "tough",
@@ -7131,7 +7140,7 @@ dependencies = [
  "rand 0.10.1",
  "reqwest 0.13.4",
  "rustls-pki-types",
- "rustls-webpki 0.103.13",
+ "rustls-webpki",
  "sigstore-crypto 0.6.6",
  "sigstore-types 0.6.6",
  "thiserror 2.0.18",
@@ -7142,24 +7151,24 @@ dependencies = [
 
 [[package]]
 name = "sigstore-tsa"
-version = "0.7.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "31ea02ad335b7386c9a72455aecd2be964bef1d7118199858ee4c6d679af48ed"
+checksum = "860eb6a645e0a22fa316031b06e9e87f9310c21915743bfa83901472dd3e7146"
 dependencies = [
  "aws-lc-rs",
  "base64 0.22.1",
- "chrono",
  "cmpv2",
  "cms",
  "const-oid 0.9.6",
  "der 0.7.10",
  "hex",
+ "jiff",
  "rand 0.9.4",
  "reqwest 0.13.4",
  "rustls-pki-types",
- "rustls-webpki 0.102.8",
- "sigstore-crypto 0.7.0",
- "sigstore-types 0.7.0",
+ "rustls-webpki",
+ "sigstore-crypto 0.8.0",
+ "sigstore-types 0.8.0",
  "thiserror 2.0.18",
  "tracing",
  "x509-cert",
@@ -7183,12 +7192,11 @@ dependencies = [
 
 [[package]]
 name = "sigstore-types"
-version = "0.7.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ce83bc56c60bbfb197a054d541839ff248c7e1aabf7016f704f8f3e6552fd13c"
+checksum = "7fb0334b69834c1f29757e57ade7e9bdbc42f5383cc22d003256d4d2df47af13"
 dependencies = [
  "base64 0.22.1",
- "chrono",
  "hex",
  "pem",
  "serde",
@@ -7198,28 +7206,28 @@ dependencies = [
 
 [[package]]
 name = "sigstore-verify"
-version = "0.7.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "080e191482c7e040b9bdfd5bd60032915bb0052e5a0944c4881055ef41b6c2cb"
+checksum = "c23f74b41da93e92dc1de793d5450b662fce5c8cea887daa46002a793d78bca9"
 dependencies = [
  "base64 0.22.1",
- "chrono",
  "cms",
  "const-oid 0.9.6",
  "hex",
+ "jiff",
  "pem",
  "rustls-pki-types",
- "rustls-webpki 0.102.8",
+ "rustls-webpki",
  "serde",
  "serde_json",
  "serde_json_canonicalizer",
- "sigstore-bundle 0.7.0",
- "sigstore-crypto 0.7.0",
- "sigstore-merkle 0.7.0",
- "sigstore-rekor 0.7.0",
- "sigstore-trust-root 0.7.0",
- "sigstore-tsa 0.7.0",
- "sigstore-types 0.7.0",
+ "sigstore-bundle 0.8.0",
+ "sigstore-crypto 0.8.0",
+ "sigstore-merkle 0.8.0",
+ "sigstore-rekor 0.8.0",
+ "sigstore-trust-root 0.8.0",
+ "sigstore-tsa 0.8.0",
+ "sigstore-types 0.8.0",
  "thiserror 2.0.18",
  "tls_codec",
  "tracing",
@@ -7545,7 +7553,7 @@ dependencies = [
  "getrandom 0.4.2",
  "once_cell",
  "rustix 1.1.4",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -7555,7 +7563,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "230a1b821ccbd75b185820a1f1ff7b14d21da1e442e22c0863ea5f08771a8874"
 dependencies = [
  "rustix 1.1.4",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -8559,7 +8567,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -8731,17 +8739,6 @@ dependencies = [
  "windows-link 0.1.3",
  "windows-result 0.3.4",
  "windows-strings 0.4.2",
-]
-
-[[package]]
-name = "windows-registry"
-version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "02752bf7fbdcce7f2a27a742f798510f3e5ad88dbe84871e5168e2120c3d5720"
-dependencies = [
- "windows-link 0.2.1",
- "windows-result 0.4.1",
- "windows-strings 0.5.1",
 ]
 
 [[package]]
@@ -9161,7 +9158,7 @@ checksum = "1301e935010a701ae5f8655edc0ad17c44bad3ac5ce8c39185f75453b720ae94"
 dependencies = [
  "const-oid 0.9.6",
  "der 0.7.10",
- "sha1",
+ "sha1 0.10.6",
  "signature 2.2.0",
  "spki 0.7.3",
  "tls_codec",
@@ -9280,7 +9277,7 @@ dependencies = [
  "rand 0.8.6",
  "serde",
  "serde_repr",
- "sha1",
+ "sha1 0.10.6",
  "static_assertions",
  "tracing",
  "uds_windows",
