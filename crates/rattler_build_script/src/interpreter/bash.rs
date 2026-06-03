@@ -5,7 +5,9 @@ use rattler_shell::shell;
 
 use crate::execution::{ExecutionArgs, run_process_with_replacements};
 
-use super::{BASH_PREAMBLE, Interpreter, InterpreterError, find_interpreter};
+use super::{
+    BASH_PREAMBLE, Interpreter, InterpreterError, InterpreterSearchScope, find_interpreter,
+};
 
 pub struct BashInterpreter;
 
@@ -84,6 +86,11 @@ impl Interpreter for BashInterpreter {
         build_prefix: Option<&PathBuf>,
         platform: &Platform,
     ) -> Result<Option<PathBuf>, which::Error> {
-        find_interpreter("bash", build_prefix, platform)
+        find_interpreter(
+            "bash",
+            build_prefix,
+            platform,
+            InterpreterSearchScope::PrefixThenSystemPath,
+        )
     }
 }

@@ -188,6 +188,14 @@ pub async fn run_build(
         Err(InterpreterError::ExecutionFailed(_)) => {
             return Err(miette::miette!("Script failed to execute"));
         }
+        Err(InterpreterError::InterpreterNotFound(interpreter)) => {
+            return Err(miette::miette!(
+                help = format!(
+                    "Add `{interpreter}` to the `requirements/build` section of your recipe so it is provided by the build environment."
+                ),
+                "interpreter `{interpreter}` was not found in the build environment"
+            ));
+        }
     }
 
     // Package all the new files

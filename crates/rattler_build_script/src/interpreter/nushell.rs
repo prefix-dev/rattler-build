@@ -9,7 +9,7 @@ use rattler_shell::{
 
 use crate::execution::{ExecutionArgs, run_process_with_replacements};
 
-use super::{Interpreter, InterpreterError, find_interpreter};
+use super::{Interpreter, InterpreterError, InterpreterSearchScope, find_interpreter};
 
 pub struct NuShellInterpreter;
 
@@ -108,18 +108,22 @@ impl Interpreter for NuShellInterpreter {
 
         let build_script_path_str = build_script_path.to_string_lossy().to_string();
 
-        let nu_path =
-            match find_interpreter("nu", args.build_prefix.as_ref(), &args.execution_platform) {
-                Ok(Some(path)) => path,
-                _ => {
-                    return Err(InterpreterError::ExecutionFailed(std::io::Error::new(
-                        std::io::ErrorKind::NotFound,
-                        "NuShell executable not found in PATH",
-                    )));
-                }
+        let nu_path = match find_interpreter(
+            "nu",
+            args.build_prefix.as_ref(),
+            &args.execution_platform,
+            InterpreterSearchScope::PrefixThenSystemPath,
+        ) {
+            Ok(Some(path)) => path,
+            _ => {
+                return Err(InterpreterError::ExecutionFailed(std::io::Error::new(
+                    std::io::ErrorKind::NotFound,
+                    "NuShell executable not found in PATH",
+                )));
             }
-            .to_string_lossy()
-            .to_string();
+        }
+        .to_string_lossy()
+        .to_string();
 
         let cmd_args = [nu_path.as_str(), build_script_path_str.as_str()];
 
@@ -155,6 +159,11 @@ impl Interpreter for NuShellInterpreter {
         build_prefix: Option<&PathBuf>,
         platform: &Platform,
     ) -> Result<Option<PathBuf>, which::Error> {
-        find_interpreter("nu", build_prefix, platform)
+        find_interpreter(
+            "nu",
+            build_prefix,
+            platform,
+            InterpreterSearchScope::PrefixThenSystemPath,
+        )
     }
 }

@@ -1,4 +1,5 @@
 mod bash;
+mod brush;
 mod cmd_exe;
 mod nodejs;
 mod nushell;
@@ -12,6 +13,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 pub use bash::BashInterpreter;
+pub use brush::BrushInterpreter;
 pub use cmd_exe::CmdExeInterpreter;
 pub use nodejs::NodeJsInterpreter;
 pub use nushell::NuShellInterpreter;
@@ -38,6 +40,18 @@ pub enum InterpreterError {
     /// interpreter is not found
     #[error("IO Error: {0}")]
     ExecutionFailed(#[from] std::io::Error),
+
+    /// The interpreter executable could not be located.
+    #[error("interpreter '{0}' was not found in the build environment")]
+    InterpreterNotFound(String),
+}
+
+/// Where to look for an interpreter executable.
+pub enum InterpreterSearchScope {
+    /// Search the build prefix (if any), then fall back to the system PATH.
+    PrefixThenSystemPath,
+    /// Search only the build prefix; never the host prefix or system PATH.
+    BuildPrefixOnly,
 }
 
 pub const BASH_PREAMBLE: &str = r#"#!/usr/bin/env bash
@@ -64,8 +78,20 @@ fn find_interpreter(
     name: &str,
     build_prefix: Option<&PathBuf>,
     platform: &Platform,
+    scope: InterpreterSearchScope,
 ) -> Result<Option<PathBuf>, which::Error> {
     let exe_name = format!("{}{}", name, std::env::consts::EXE_SUFFIX);
+
+    // Build-prefix-only: search just the prefix bin entries, no PATH fallback.
+    if let InterpreterSearchScope::BuildPrefixOnly = scope {
+        let Some(build_prefix) = build_prefix else {
+            return Ok(None);
+        };
+        let prefix_path = prefix_path_entries(build_prefix, platform);
+        return Ok(
+            which::which_in_global(exe_name, std::env::join_paths(prefix_path).ok())?.next(),
+        );
+    }
 
     let path = std::env::var("PATH").unwrap_or_default();
     if let Some(build_prefix) = build_prefix {

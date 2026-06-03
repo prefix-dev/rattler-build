@@ -4,7 +4,10 @@ use rattler_conda_types::Platform;
 
 use crate::execution::{ExecutionArgs, ResolvedScriptContents};
 
-use super::{BashInterpreter, CmdExeInterpreter, Interpreter, InterpreterError, find_interpreter};
+use super::{
+    BashInterpreter, CmdExeInterpreter, Interpreter, InterpreterError, InterpreterSearchScope,
+    find_interpreter,
+};
 
 pub struct PerlInterpreter;
 
@@ -31,6 +34,11 @@ impl Interpreter for PerlInterpreter {
         build_prefix: Option<&PathBuf>,
         platform: &Platform,
     ) -> Result<Option<PathBuf>, which::Error> {
-        find_interpreter("perl", build_prefix, platform)
+        find_interpreter(
+            "perl",
+            build_prefix,
+            platform,
+            InterpreterSearchScope::PrefixThenSystemPath,
+        )
     }
 }

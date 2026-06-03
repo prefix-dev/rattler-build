@@ -5,7 +5,9 @@ use rattler_shell::shell;
 
 use crate::execution::{ExecutionArgs, run_process_with_replacements};
 
-use super::{CMDEXE_PREAMBLE, Interpreter, InterpreterError, find_interpreter};
+use super::{
+    CMDEXE_PREAMBLE, Interpreter, InterpreterError, InterpreterSearchScope, find_interpreter,
+};
 
 fn print_debug_info(args: &ExecutionArgs) -> String {
     let mut output = String::new();
@@ -94,6 +96,11 @@ impl Interpreter for CmdExeInterpreter {
         }
 
         // check if cmd.exe is in PATH
-        find_interpreter("cmd", build_prefix, platform)
+        find_interpreter(
+            "cmd",
+            build_prefix,
+            platform,
+            InterpreterSearchScope::PrefixThenSystemPath,
+        )
     }
 }
