@@ -717,7 +717,54 @@ pub fn is_tarball(file_name: &str) -> bool {
     .any(|ext| file_name.ends_with(ext))
 }
 
-fn extract_tar(archive: &Path, target: &Path) -> Result<(), CacheError> {
+/// Iterates over the entries of a tar archive and unpacks each one into `target`.
+///
+/// On Windows, symlink entries that fail to unpack are skipped with a warning instead of
+/// aborting the whole extraction. Creating symlinks on Windows requires Developer Mode or
+/// administrator privileges; skipping them gracefully means the rest of the archive is
+/// still extracted and the build can proceed (a missing symlink will surface as a build
+/// error only if it is actually needed).
+fn unpack_tar_entries<R: std::io::Read>(
+    archive: &mut tar::Archive<R>,
+    target: &Path,
+) -> Result<(), CacheError> {
+    let entries = archive.entries().map_err(|e| {
+        CacheError::ExtractionError(format!("Failed to read archive entries: {}", e))
+    })?;
+
+    for entry in entries {
+        let mut entry = entry.map_err(|e| {
+            CacheError::ExtractionError(format!("Failed to read archive entry: {}", e))
+        })?;
+
+        match entry.unpack_in(target) {
+            Ok(_) => {}
+            Err(e) => {
+                // On Windows, creating symlinks requires Developer Mode or admin
+                // privileges. If unpacking a symlink fails, warn and skip the entry
+                // rather than failing the whole extraction.
+                #[cfg(target_os = "windows")]
+                if entry.header().entry_type().is_symlink() {
+                    tracing::warn!(
+                        "skipping symlink in tar archive: {}: {e}",
+                        entry
+                            .path()
+                            .map(|p| p.display().to_string())
+                            .unwrap_or_default()
+                    );
+                    continue;
+                }
+                return Err(CacheError::ExtractionError(format!(
+                    "Failed to unpack archive entry: {e}"
+                )));
+            }
+        }
+    }
+
+    Ok(())
+}
+
+pub(crate) fn extract_tar(archive: &Path, target: &Path) -> Result<(), CacheError> {
     let file = fs_err::File::open(archive)
         .map_err(|e| CacheError::ExtractionError(format!("Failed to open archive: {}", e)))?;
 
@@ -725,32 +772,22 @@ fn extract_tar(archive: &Path, target: &Path) -> Result<(), CacheError> {
 
     if name.ends_with(".tar.gz") || name.ends_with(".tgz") {
         let mut archive = tar::Archive::new(GzDecoder::new(file));
-        archive
-            .unpack(target)
-            .map_err(|e| CacheError::ExtractionError(format!("Failed to extract tar.gz: {}", e)))?;
+        unpack_tar_entries(&mut archive, target)?;
     } else if name.ends_with(".tar.bz2") || name.ends_with(".tbz2") {
         let mut archive = tar::Archive::new(bzip2::read::BzDecoder::new(file));
-        archive.unpack(target).map_err(|e| {
-            CacheError::ExtractionError(format!("Failed to extract tar.bz2: {}", e))
-        })?;
+        unpack_tar_entries(&mut archive, target)?;
     } else if name.ends_with(".tar.xz") || name.ends_with(".txz") {
         let mut archive = tar::Archive::new(lzma_rust2::XzReader::new(file, true));
-        archive
-            .unpack(target)
-            .map_err(|e| CacheError::ExtractionError(format!("Failed to extract tar.xz: {}", e)))?;
+        unpack_tar_entries(&mut archive, target)?;
     } else if name.ends_with(".tar.zst") {
         let decoder = zstd::stream::read::Decoder::new(file).map_err(|e| {
             CacheError::ExtractionError(format!("Failed to create zstd decoder: {}", e))
         })?;
         let mut archive = tar::Archive::new(decoder);
-        archive.unpack(target).map_err(|e| {
-            CacheError::ExtractionError(format!("Failed to extract tar.zst: {}", e))
-        })?;
+        unpack_tar_entries(&mut archive, target)?;
     } else {
         let mut archive = tar::Archive::new(file);
-        archive
-            .unpack(target)
-            .map_err(|e| CacheError::ExtractionError(format!("Failed to extract tar: {}", e)))?;
+        unpack_tar_entries(&mut archive, target)?;
     }
 
     Ok(())

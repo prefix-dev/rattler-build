@@ -344,6 +344,46 @@ mod source_cache_tests {
         );
     }
 
+    /// Creates a minimal `.tar.gz` at `dest` containing a single symlink entry.
+    #[cfg(target_os = "windows")]
+    fn make_tar_gz_with_symlink(dest: &std::path::Path) {
+        use flate2::{Compression, write::GzEncoder};
+
+        let file = fs_err::File::create(dest).unwrap();
+        let enc = GzEncoder::new(file, Compression::default());
+        let mut builder = tar::Builder::new(enc);
+
+        let mut header = tar::Header::new_gnu();
+        header.set_entry_type(tar::EntryType::Symlink);
+        header.set_size(0);
+        header.set_mode(0o777);
+        header.set_cksum();
+        builder
+            .append_link(&mut header, "link_target", "real_file")
+            .unwrap();
+        builder.finish().unwrap();
+    }
+
+    /// On Windows, extracting a symlink-containing archive should always succeed:
+    /// symlinks that cannot be created are skipped with a warning rather than
+    /// aborting the extraction, regardless of Developer Mode status.
+    #[test]
+    #[cfg(target_os = "windows")]
+    fn test_symlink_extraction_skipped_on_windows() {
+        use crate::cache::extract_tar;
+
+        let dir = TempDir::new().unwrap();
+        let archive = dir.path().join("test.tar.gz");
+        make_tar_gz_with_symlink(&archive);
+
+        let target = dir.path().join("out");
+        fs_err::create_dir_all(&target).unwrap();
+
+        // Symlinks that fail to unpack on Windows are skipped with a warning,
+        // so extraction always succeeds.
+        extract_tar(&archive, &target).unwrap();
+    }
+
     #[test]
     fn test_extract_filename_from_header_strips_path_components() {
         use crate::cache::extract_filename_from_header;
