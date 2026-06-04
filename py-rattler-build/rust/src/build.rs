@@ -120,12 +120,12 @@ pub(crate) fn output_from_rendered_variant(
     package_format: Option<&PackageFormatAndCompression>,
     no_include_recipe: bool,
     recipe_path: Option<&Path>,
-    exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
+    exclude_newer: Option<jiff::Timestamp>,
     env_isolation: EnvironmentIsolation,
     repodata_revision: PyRepodataRevision,
     extra_subpackages: BTreeMap<rattler_conda_types::PackageName, PackageIdentifier>,
 ) -> Result<Output, RattlerBuildError> {
-    let timestamp = chrono::Utc::now();
+    let timestamp = jiff::Timestamp::now();
     let virtual_package_override = rattler_virtual_packages::VirtualPackageOverrides::from_env();
 
     let mut subpackages = extra_subpackages;
@@ -259,7 +259,7 @@ pub fn build_rendered_variant_py(
     no_build_id: bool,
     package_format: Option<String>,
     no_include_recipe: bool,
-    exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
+    exclude_newer: Option<jiff::Timestamp>,
     env_isolation: PyEnvironmentIsolation,
     sibling_variants: Vec<render::PyRenderedVariant>,
     repodata_revision: Option<PyRepodataRevision>,
