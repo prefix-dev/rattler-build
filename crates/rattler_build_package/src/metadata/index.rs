@@ -1,7 +1,8 @@
 //! IndexJson builder
 
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use rattler_conda_types::package::IndexJson;
+use rattler_conda_types::utils::TimestampMs;
 use rattler_conda_types::{NoArchType, PackageName, Platform, VersionWithSource};
 
 use crate::Result;
@@ -37,7 +38,7 @@ pub struct IndexJsonBuilder {
     subdir: Option<String>,
     license: Option<String>,
     license_family: Option<String>,
-    timestamp: Option<DateTime<Utc>>,
+    timestamp: Option<Timestamp>,
     depends: Vec<String>,
     constrains: Vec<String>,
     noarch: NoArchType,
@@ -109,7 +110,7 @@ impl IndexJsonBuilder {
     }
 
     /// Set the timestamp
-    pub fn with_timestamp(mut self, timestamp: DateTime<Utc>) -> Self {
+    pub fn with_timestamp(mut self, timestamp: Timestamp) -> Self {
         self.timestamp = Some(timestamp);
         self
     }
@@ -162,7 +163,7 @@ impl IndexJsonBuilder {
             subdir: self.subdir,
             license: self.license,
             license_family: self.license_family,
-            timestamp: self.timestamp.map(Into::into),
+            timestamp: self.timestamp.map(TimestampMs::from),
             depends: self.depends,
             constrains: self.constrains,
             noarch: self.noarch,
@@ -171,7 +172,7 @@ impl IndexJsonBuilder {
             features: None,
             python_site_packages_path: None,
             purls: None,
-            experimental_extra_depends: Default::default(),
+            extra_depends: Default::default(),
             repodata_revision: None,
         })
     }

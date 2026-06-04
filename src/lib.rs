@@ -455,7 +455,7 @@ pub async fn get_build_output(
         .or_else(|| outputs_and_variants.first().map(|o| o.name.clone()))
         .unwrap_or_else(|| "build".to_string());
 
-    let timestamp = chrono::Utc::now();
+    let timestamp = jiff::Timestamp::now();
 
     for discovered_output in outputs_and_variants {
         let recipe = &discovered_output.recipe;
@@ -1040,7 +1040,7 @@ pub async fn rebuild_package_core(
     let original_sha = rattler_digest::compute_file_digest::<rattler_digest::Sha256>(&package_path)
         .into_diagnostic()?;
 
-    tracing::info!("Original package SHA256: {:x}", original_sha);
+    tracing::info!("Original package SHA256: {}", hex::encode(original_sha));
     tracing::info!("Rebuilding \"{}\"", package_path.display());
 
     // we extract the recipe folder from the package file (info/recipe/*)
@@ -1094,7 +1094,7 @@ pub async fn rebuild_package_core(
         run_build(output, &tool_config, WorkingDirectoryBehavior::Cleanup).await?;
 
     // Generate timestamp for the rebuilt package
-    let timestamp = chrono::Utc::now().format("%Y%m%d-%H%M%S");
+    let timestamp = jiff::Timestamp::now().strftime("%Y%m%d-%H%M%S");
 
     // Create final output directory
     let final_output_dir = rebuild_data.common.output_dir.clone();
@@ -1133,14 +1133,14 @@ pub async fn rebuild_package_core(
     let rebuilt_sha = rattler_digest::compute_file_digest::<rattler_digest::Sha256>(&rebuilt_path)
         .into_diagnostic()?;
 
-    tracing::info!("Rebuilt package SHA256: {:x}", rebuilt_sha);
+    tracing::info!("Rebuilt package SHA256: {}", hex::encode(rebuilt_sha));
     tracing::info!("Rebuilt package saved to: \"{:?}\"", rebuilt_path);
 
     Ok(RebuildOutput {
         original_path: package_path,
         rebuilt_path,
-        original_sha256: format!("{:x}", original_sha),
-        rebuilt_sha256: format!("{:x}", rebuilt_sha),
+        original_sha256: hex::encode(original_sha),
+        rebuilt_sha256: hex::encode(rebuilt_sha),
     })
 }
 

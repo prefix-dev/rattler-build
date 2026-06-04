@@ -2,7 +2,7 @@
 //! All the metadata that makes up a recipe file
 use std::{iter, path::PathBuf, str::FromStr};
 
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use rattler_conda_types::{
     Channel, ChannelUrl, GenericVirtualPackage, PackageName, Platform, VersionWithSource,
     compression_level::CompressionLevel,
@@ -129,9 +129,9 @@ pub struct PackageIdentifier {
 #[derive(Debug, Clone, Default)]
 pub struct BuildSummary {
     /// The start time of the build
-    pub build_start: Option<DateTime<Utc>>,
+    pub build_start: Option<Timestamp>,
     /// The end time of the build
-    pub build_end: Option<DateTime<Utc>>,
+    pub build_end: Option<Timestamp>,
 
     /// The path to the artifact
     pub artifact: Option<PathBuf>,

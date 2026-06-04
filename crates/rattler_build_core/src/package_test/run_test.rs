@@ -310,7 +310,7 @@ pub struct TestConfiguration {
     /// The output directory to create the test prefixes in (will be `output_dir/test`)
     pub output_dir: PathBuf,
     /// Exclude packages newer than this date from the solver
-    pub exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
+    pub exclude_newer: Option<jiff::Timestamp>,
     /// The environment isolation mode for test scripts
     pub env_isolation: EnvironmentIsolation,
 }

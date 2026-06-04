@@ -137,9 +137,10 @@ impl Output {
         let cache_key = (&staging, &selected_variant, self.prefix());
 
         // Serialize to JSON and hash
+        let json = serde_json::to_vec(&cache_key)?;
         let mut hasher = Sha256::new();
-        cache_key.serialize(&mut serde_json::Serializer::new(&mut hasher))?;
-        Ok(format!("{:x}", hasher.finalize()))
+        hasher.update(&json);
+        Ok(hex::encode(hasher.finalize()))
     }
 
     /// Build a staging cache or restore it if it already exists

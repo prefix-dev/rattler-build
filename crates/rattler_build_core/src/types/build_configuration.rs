@@ -41,7 +41,7 @@ pub struct BuildConfiguration {
     /// The solve strategy to use when resolving dependencies
     pub solve_strategy: SolveStrategy,
     /// The timestamp to use for the build
-    pub timestamp: chrono::DateTime<chrono::Utc>,
+    pub timestamp: jiff::Timestamp,
     /// All subpackages coming from this output or other outputs from the same
     /// recipe
     pub subpackages: BTreeMap<PackageName, PackageIdentifier>,
@@ -65,7 +65,7 @@ pub struct BuildConfiguration {
     pub sandbox_config: Option<SandboxConfiguration>,
     /// Exclude packages newer than this date from the solver
     #[serde(skip_serializing, default)]
-    pub exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
+    pub exclude_newer: Option<jiff::Timestamp>,
     /// Repodata revision to target when writing package metadata.
     #[serde(skip_serializing, default)]
     pub repodata_revision: RepodataRevision,

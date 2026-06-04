@@ -390,7 +390,7 @@ impl Output {
                 .map(|dep| dep.spec().to_string())
                 .unique()
                 .collect(),
-            experimental_extra_depends: finalized_dependencies
+            extra_depends: finalized_dependencies
                 .run
                 .extra_depends
                 .iter()

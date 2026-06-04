@@ -2,7 +2,6 @@
 
 use std::{collections::HashMap, error::Error, path::PathBuf, str::FromStr};
 
-use chrono;
 use clap::{Parser, ValueEnum, builder::ArgPredicate, crate_version};
 use clap_complete::{Generator, shells};
 use clap_complete_nushell::Nushell;
@@ -718,7 +717,7 @@ pub struct BuildOpts {
 
     /// Exclude packages newer than this date from the solver, in RFC3339 format (e.g. 2024-03-15T12:00:00Z)
     #[arg(long, help_heading = "Modifying result", value_parser = parse_datetime)]
-    pub exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
+    pub exclude_newer: Option<jiff::Timestamp>,
 }
 
 /// Publish options for the `publish` command.
@@ -905,7 +904,7 @@ pub struct BuildData {
     pub error_prefix_in_binary: bool,
     pub allow_symlinks_on_windows: bool,
     pub allow_absolute_license_paths: bool,
-    pub exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
+    pub exclude_newer: Option<jiff::Timestamp>,
     pub build_num_override: Option<u64>,
     pub build_string_prefix: Option<String>,
     pub markdown_summary: Option<PathBuf>,
@@ -942,7 +941,7 @@ impl BuildData {
         error_prefix_in_binary: bool,
         allow_symlinks_on_windows: bool,
         allow_absolute_license_paths: bool,
-        exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
+        exclude_newer: Option<jiff::Timestamp>,
         build_num_override: Option<u64>,
         build_string_prefix: Option<String>,
         markdown_summary: Option<PathBuf>,
@@ -1075,15 +1074,13 @@ fn parse_variant_override(
 }
 
 /// Parse a datetime string in RFC3339 format
-fn parse_datetime(s: &str) -> Result<chrono::DateTime<chrono::Utc>, String> {
-    chrono::DateTime::parse_from_rfc3339(s)
-        .map(|dt| dt.with_timezone(&chrono::Utc))
-        .map_err(|e| {
-            format!(
-                "Invalid datetime format '{}': {}. Expected RFC3339 format (e.g., 2024-03-15T12:00:00Z)",
-                s, e
-            )
-        })
+fn parse_datetime(s: &str) -> Result<jiff::Timestamp, String> {
+    s.parse::<jiff::Timestamp>().map_err(|e| {
+        format!(
+            "Invalid datetime format '{}': {}. Expected RFC3339 format (e.g., 2024-03-15T12:00:00Z)",
+            s, e
+        )
+    })
 }
 
 /// Test options.

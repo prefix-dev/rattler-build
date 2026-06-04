@@ -255,8 +255,8 @@ fn output_human_readable(
     if let Some(timestamp) = index_json.timestamp {
         // Format timestamp as a readable date (e.g., "2025-11-25 07:56:45 UTC")
         let formatted_time = timestamp
-            .datetime()
-            .format("%Y-%m-%d %H:%M:%S UTC")
+            .jiff_timestamp()
+            .strftime("%Y-%m-%d %H:%M:%S UTC")
             .to_string();
         table.add_row(vec!["Timestamp", &formatted_time]);
     }
@@ -522,8 +522,8 @@ pub async fn extract_package(args: ExtractOpts) -> miette::Result<()> {
         console::style("✔").green(),
     );
     println!("  Destination: {}", destination.display());
-    println!("  SHA256: {:x}", result.sha256);
-    println!("  MD5: {:x}", result.md5);
+    println!("  SHA256: {}", hex::encode(result.sha256));
+    println!("  MD5: {}", hex::encode(result.md5));
     println!(
         "  Size: {} ({} bytes)",
         HumanBytes(result.total_size),

@@ -2,7 +2,7 @@
 
 use std::path::{Path, PathBuf};
 
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use rattler_conda_types::package::{AboutJson, IndexJson, PathsJson, RunExportsJson};
 use rattler_conda_types::{PackageName, Platform, VersionWithSource};
 
@@ -19,7 +19,7 @@ pub struct PackageConfig {
     pub archive_type: ArchiveType,
 
     /// Timestamp for reproducible builds
-    pub timestamp: Option<DateTime<Utc>>,
+    pub timestamp: Option<Timestamp>,
 
     /// Number of threads to use for compression
     pub compression_threads: usize,
