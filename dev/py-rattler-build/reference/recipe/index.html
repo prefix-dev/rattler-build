@@ -21,7 +21,7 @@
       
       
       <link rel="icon" href="../../../assets/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.2">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
@@ -5374,7 +5374,12 @@ to create concrete instances (<code>SingleOutputRecipe</code> or <code>MultiOutp
   </span>
 
 <a href="#rattler_build.Stage0Recipe.from_yaml" class="headerlink" title="Permanent link">#</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">from_yaml</span><span class="p">(</span><span class="n">yaml</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">recipe_dir</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">v3</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">from_yaml</span><span class="p">(</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">yaml</span><span class="p">,</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">recipe_dir</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">repodata_revision</span><span class="o">=</span><span class="n">RepodataRevision</span><span class="o">.</span><span class="n">LEGACY</span><span class="p">,</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="p">)</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">
@@ -5428,18 +5433,19 @@ to create concrete instances (<code>SingleOutputRecipe</code> or <code>MultiOutp
           </tr>
           <tr class="doc-section-item">
             <td>
-                <code>v3</code>
+                <code>repodata_revision</code>
             </td>
             <td>
-                  <code><span title="bool">bool</span></code>
+                  <code><span title="rattler_build._rattler_build.RepodataRevision">RepodataRevision</span></code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Enable V3 recipe fields and MatchSpec syntax.</p>
+                <p>Repodata revision controlling which recipe fields and
+MatchSpec syntax are accepted. Defaults to <code>RepodataRevision.LEGACY</code>.</p>
               </div>
             </td>
             <td>
-                  <code>False</code>
+                  <code><span title="rattler_build._rattler_build.RepodataRevision.LEGACY">LEGACY</span></code>
             </td>
           </tr>
       </tbody>
@@ -5485,7 +5491,9 @@ to create concrete instances (<code>SingleOutputRecipe</code> or <code>MultiOutp
   </span>
 
 <a href="#rattler_build.Stage0Recipe.from_file" class="headerlink" title="Permanent link">#</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">from_file</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">v3</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">from_file</span><span class="p">(</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">path</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">repodata_revision</span><span class="o">=</span><span class="n">RepodataRevision</span><span class="o">.</span><span class="n">LEGACY</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="p">)</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">
@@ -5523,18 +5531,19 @@ to create concrete instances (<code>SingleOutputRecipe</code> or <code>MultiOutp
           </tr>
           <tr class="doc-section-item">
             <td>
-                <code>v3</code>
+                <code>repodata_revision</code>
             </td>
             <td>
-                  <code><span title="bool">bool</span></code>
+                  <code><span title="rattler_build._rattler_build.RepodataRevision">RepodataRevision</span></code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Enable V3 recipe fields and MatchSpec syntax.</p>
+                <p>Repodata revision controlling which recipe fields and
+MatchSpec syntax are accepted. Defaults to <code>RepodataRevision.LEGACY</code>.</p>
               </div>
             </td>
             <td>
-                  <code>False</code>
+                  <code><span title="rattler_build._rattler_build.RepodataRevision.LEGACY">LEGACY</span></code>
             </td>
           </tr>
       </tbody>
@@ -5580,7 +5589,12 @@ to create concrete instances (<code>SingleOutputRecipe</code> or <code>MultiOutp
   </span>
 
 <a href="#rattler_build.Stage0Recipe.from_dict" class="headerlink" title="Permanent link">#</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">from_dict</span><span class="p">(</span><span class="n">recipe_dict</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">recipe_dir</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">v3</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">from_dict</span><span class="p">(</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">recipe_dict</span><span class="p">,</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">recipe_dir</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">repodata_revision</span><span class="o">=</span><span class="n">RepodataRevision</span><span class="o">.</span><span class="n">LEGACY</span><span class="p">,</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="p">)</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">
@@ -5636,18 +5650,19 @@ messages if the structure is invalid or types don't match.</p>
           </tr>
           <tr class="doc-section-item">
             <td>
-                <code>v3</code>
+                <code>repodata_revision</code>
             </td>
             <td>
-                  <code><span title="bool">bool</span></code>
+                  <code><span title="rattler_build._rattler_build.RepodataRevision">RepodataRevision</span></code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Enable V3 recipe fields and MatchSpec syntax.</p>
+                <p>Repodata revision controlling which recipe fields and
+MatchSpec syntax are accepted. Defaults to <code>RepodataRevision.LEGACY</code>.</p>
               </div>
             </td>
             <td>
-                  <code>False</code>
+                  <code><span title="rattler_build._rattler_build.RepodataRevision.LEGACY">LEGACY</span></code>
             </td>
           </tr>
       </tbody>

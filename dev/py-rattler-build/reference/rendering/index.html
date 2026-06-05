@@ -21,7 +21,7 @@
       
       
       <link rel="icon" href="../../../assets/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.2">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
@@ -5263,18 +5263,20 @@ the :class:<code>~rattler_build.stage0.Stage0Recipe</code> during :meth:<code>re
           </tr>
           <tr class="doc-section-item">
             <td>
-                <code>v3</code>
+                <code>repodata_revision</code>
             </td>
             <td>
-                  <code><span title="bool">bool</span></code>
+                  <code><span title="rattler_build._rattler_build.RepodataRevision">RepodataRevision</span></code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Enable V3 recipe fields and MatchSpec syntax.</p>
+                <p>Repodata revision controlling which recipe fields and
+MatchSpec syntax are accepted (<code>RepodataRevision.LEGACY</code> or
+<code>RepodataRevision.V3</code>). Defaults to <code>RepodataRevision.LEGACY</code>.</p>
               </div>
             </td>
             <td>
-                  <code>False</code>
+                  <code><span title="rattler_build._rattler_build.RepodataRevision.LEGACY">LEGACY</span></code>
             </td>
           </tr>
           <tr class="doc-section-item">
@@ -5433,7 +5435,11 @@ the :class:<code>~rattler_build.stage0.Stage0Recipe</code> during :meth:<code>re
 
 
 <a href="#rattler_build.RenderConfig.__init__" class="headerlink" title="Permanent link">#</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">__init__</span><span class="p">(</span><span class="n">platform</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">extra_context</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">v3</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">__init__</span><span class="p">(</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">platform</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">extra_context</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">repodata_revision</span><span class="o">=</span><span class="n">RepodataRevision</span><span class="o">.</span><span class="n">LEGACY</span><span class="p">,</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="p">)</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">
