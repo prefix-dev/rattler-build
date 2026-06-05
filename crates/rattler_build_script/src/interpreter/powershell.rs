@@ -5,7 +5,10 @@ use rattler_conda_types::Platform;
 
 use crate::execution::ExecutionArgs;
 
-use super::{BashInterpreter, CmdExeInterpreter, Interpreter, InterpreterError, find_interpreter};
+use super::{
+    BashInterpreter, CmdExeInterpreter, Interpreter, InterpreterError, InterpreterSearchScope,
+    find_interpreter,
+};
 
 pub(crate) struct PowerShellInterpreter;
 
@@ -51,10 +54,14 @@ impl Interpreter for PowerShellInterpreter {
         // Try to find pwsh in the build prefix or system PATH for version checking.
         // The actual command used in the script may rely on the activation script
         // (build_env.sh) to put pwsh on PATH at runtime.
-        let pwsh_path =
-            find_interpreter("pwsh", args.build_prefix.as_ref(), &args.execution_platform)
-                .ok()
-                .flatten();
+        let pwsh_path = find_interpreter(
+            "pwsh",
+            args.build_prefix.as_ref(),
+            &args.execution_platform,
+            InterpreterSearchScope::PrefixThenSystemPath,
+        )
+        .ok()
+        .flatten();
 
         let (shell_cmd, new_enough) = match &pwsh_path {
             Some(path) => {
@@ -104,6 +111,11 @@ impl Interpreter for PowerShellInterpreter {
         build_prefix: Option<&PathBuf>,
         platform: &Platform,
     ) -> Result<Option<PathBuf>, which::Error> {
-        find_interpreter("pwsh", build_prefix, platform)
+        find_interpreter(
+            "pwsh",
+            build_prefix,
+            platform,
+            InterpreterSearchScope::PrefixThenSystemPath,
+        )
     }
 }

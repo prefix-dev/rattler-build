@@ -1302,6 +1302,21 @@ def test_nushell_script_detection(
     assert "Hello, world!" == content
 
 
+def test_brush(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    # Builds a recipe with `interpreter: brush`. `brush` is pulled from the
+    # build environment (requirements/build), the bash wrapper activates the
+    # environment, and brush then runs the bash-syntax script.
+    rattler_build.build(
+        recipes / "brush-test/recipe.yaml",
+        tmp_path,
+    )
+    pkg = get_extracted_package(tmp_path, "brush-test")
+
+    assert (pkg / "info/paths.json").exists()
+    content = (pkg / "hello.txt").read_text()
+    assert "Hello from brush!" == content.strip()
+
+
 def test_channel_specific(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     rattler_build.build(
         recipes / "channel_specific/recipe.yaml",
