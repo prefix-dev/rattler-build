@@ -149,8 +149,8 @@ impl SourceCache {
                 .unwrap_or(&repo_path)
                 .to_path_buf(),
             extracted_path: None,
-            last_accessed: chrono::Utc::now(),
-            created: chrono::Utc::now(),
+            last_accessed: jiff::Timestamp::now(),
+            created: jiff::Timestamp::now(),
             lock_file: Some(_lock.path().to_path_buf()),
             attestation_verified: false,
         };
@@ -411,8 +411,8 @@ impl SourceCache {
             extracted_path: final_path
                 .as_ref()
                 .map(|p| p.strip_prefix(&self.cache_dir).unwrap_or(p).to_path_buf()),
-            last_accessed: chrono::Utc::now(),
-            created: chrono::Utc::now(),
+            last_accessed: jiff::Timestamp::now(),
+            created: jiff::Timestamp::now(),
             lock_file: Some(_lock.path().to_path_buf()),
             attestation_verified: attestation.is_some(),
         };

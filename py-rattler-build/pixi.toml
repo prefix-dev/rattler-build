@@ -31,7 +31,7 @@ make = ">=4,<5"
 
 [feature.lint.dependencies]
 # we need rust for cargo-fmt and clippy
-rust = ">=1.93.1,<1.94"
+rust = ">=1.95.0,<1.96"
 ruff = ">=0.3.3,<0.4"
 
 [feature.lint.tasks]

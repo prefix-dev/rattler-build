@@ -657,7 +657,7 @@ fn print_enhanced_file_listing(
             .iter()
             .filter(|e| e.size_in_bytes.is_some() && e.size_in_bytes.unwrap() > 0)
             .collect();
-        files_with_sizes.sort_by(|a, b| b.size_in_bytes.cmp(&a.size_in_bytes));
+        files_with_sizes.sort_by_key(|b| std::cmp::Reverse(b.size_in_bytes));
 
         if !files_with_sizes.is_empty() {
             tracing::info!("Largest files:");

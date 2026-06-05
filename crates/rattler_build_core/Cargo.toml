@@ -82,7 +82,7 @@ indicatif = { workspace = true, features = ["in_memory"] }
 console = { workspace = true }
 thiserror = { workspace = true }
 tempfile = { workspace = true }
-chrono = { workspace = true }
+jiff = { workspace = true }
 ignore = { workspace = true }
 globset = { workspace = true }
 text-stub-library = { workspace = true }
@@ -144,10 +144,6 @@ rattler_build_networking = { workspace = true }
 rattler_build_source_cache = { workspace = true }
 rattler_build_script = { workspace = true, features = ["execution"] }
 
-[target.'cfg(not(target_os = "windows"))'.dependencies]
-sha2 = { workspace = true, features = ["asm"] }
-
-[target.'cfg(target_os = "windows")'.dependencies]
 sha2 = { workspace = true }
 
 [dev-dependencies]

@@ -193,7 +193,7 @@ impl Script {
         let env_vars = env_vars
             .into_iter()
             .filter_map(|(k, v)| v.map(|v| (k, v)))
-            .chain(self.env().clone().into_iter())
+            .chain(self.env().clone())
             .collect::<IndexMap<String, String>>();
 
         let contents = self.resolve_content(

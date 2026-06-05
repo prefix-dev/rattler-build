@@ -52,7 +52,7 @@ pub fn build_recipes_py(
     error_prefix_in_binary: bool,
     allow_symlinks_on_windows: bool,
     allow_absolute_license_paths: bool,
-    exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
+    exclude_newer: Option<jiff::Timestamp>,
     build_num: Option<u64>,
     build_string_prefix: Option<String>,
     use_bz2: bool,

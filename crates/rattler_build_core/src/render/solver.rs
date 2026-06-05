@@ -62,7 +62,7 @@ pub async fn solve_environment(
     tool_configuration: &tool_configuration::Configuration,
     channel_priority: ChannelPriority,
     solve_strategy: SolveStrategy,
-    exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
+    exclude_newer: Option<jiff::Timestamp>,
 ) -> miette::Result<Vec<RepoDataRecord>> {
     let span_msg = format!("Resolving {name} environment");
     let span = tracing::info_span!("", message = %span_msg);
@@ -134,7 +134,7 @@ pub async fn create_environment(
     tool_configuration: &tool_configuration::Configuration,
     channel_priority: ChannelPriority,
     solve_strategy: SolveStrategy,
-    exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
+    exclude_newer: Option<jiff::Timestamp>,
 ) -> miette::Result<Vec<RepoDataRecord>> {
     let required_packages = solve_environment(
         name,

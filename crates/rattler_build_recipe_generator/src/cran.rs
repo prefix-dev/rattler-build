@@ -272,7 +272,7 @@ async fn build_cran_recipe_and_deps(
     let source = UrlSourceElement {
         url: vec![url.to_string(), url_archive.to_string()],
         md5: None,
-        sha256: Some(format!("{:x}", sha256)),
+        sha256: Some(hex::encode(sha256)),
     };
     recipe.source.push(source.into());
 

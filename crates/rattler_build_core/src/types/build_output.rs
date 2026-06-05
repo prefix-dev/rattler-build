@@ -106,7 +106,7 @@ impl BuildOutput {
 
     /// Record the start of the build
     pub fn record_build_start(&self) {
-        self.build_summary.lock().unwrap().build_start = Some(chrono::Utc::now());
+        self.build_summary.lock().unwrap().build_start = Some(jiff::Timestamp::now());
     }
 
     /// Record the artifact that was created during the build
@@ -119,7 +119,7 @@ impl BuildOutput {
     /// Record the end of the build
     pub fn record_build_end(&self) {
         let mut summary = self.build_summary.lock().unwrap();
-        summary.build_end = Some(chrono::Utc::now());
+        summary.build_end = Some(jiff::Timestamp::now());
     }
 
     /// Shorthand to retrieve the variant configuration for this output

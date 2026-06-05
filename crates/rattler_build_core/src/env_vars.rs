@@ -419,7 +419,7 @@ pub fn vars(output: &Output, build_state: &str) -> HashMap<String, Option<String
 
     // for reproducibility purposes, set the SOURCE_DATE_EPOCH to the configured timestamp
     // this value will be taken from the previous package for rebuild purposes
-    let timestamp_epoch_secs = output.build_configuration.timestamp.timestamp();
+    let timestamp_epoch_secs = output.build_configuration.timestamp.as_second();
     insert!(vars, "SOURCE_DATE_EPOCH", timestamp_epoch_secs);
 
     vars
