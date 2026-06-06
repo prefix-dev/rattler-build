@@ -55,7 +55,7 @@ indexmap = "2.13.0"
 indicatif = "0.18.4"
 insta = "1.46.3"
 itertools = "0.14.0"
-jiff = { version = "0.2.27", features = ["serde"] }
+jiff = { version = "0.2.28", features = ["serde"] }
 hex = "0.4.3"
 libc = "0.2"
 md-5 = "0.11"
@@ -99,7 +99,7 @@ pathdiff = "0.2.3"
 marked-yaml = "0.8.0"
 rstest = "0.26.1"
 petgraph = { version = "0.8.3", default-features = false }
-sha1 = { version = "0.10.6" }
+sha1 = { version = "0.11.0" }
 lzma-rust2 = { version = "0.16", features = ["xz"] }
 line-ending = "1.5.1"
 anyhow = "1.0.102"
@@ -114,7 +114,7 @@ unicode-normalization = "0.1.25"
 clap-verbosity-flag = "3.0.4"
 comfy-table = "7.2.2"
 flickzeug = "0.5.1"
-goblin = "0.10.5"
+goblin = "0.10.7"
 ignore = "0.4.25"
 num_cpus = "1.17.0"
 pretty_assertions = "1.4.1"
