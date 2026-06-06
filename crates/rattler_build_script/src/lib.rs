@@ -13,14 +13,18 @@ pub use script::{
 };
 
 #[cfg(feature = "execution")]
+mod activation;
+#[cfg(feature = "execution")]
 mod execution;
 #[cfg(feature = "execution")]
 mod interpreter;
+#[cfg(feature = "execution")]
+mod native_runner;
 
 #[cfg(feature = "execution")]
 pub use execution::{
     EnvironmentIsolation, ExecutionArgs, ResolvedScriptContents, create_build_script,
-    run_process_with_replacements, run_script,
+    generate_build_script, run_process_with_replacements, run_script,
 };
 #[cfg(feature = "execution")]
 pub use interpreter::InterpreterError;

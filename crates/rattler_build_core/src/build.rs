@@ -196,6 +196,14 @@ pub async fn run_build(
                 "interpreter `{interpreter}` was not found in the build environment"
             ));
         }
+        Err(InterpreterError::InvalidInterpreter {
+            interpreter,
+            reason,
+        }) => {
+            return Err(miette::miette!(
+                "interpreter `{interpreter}` was found but is not valid: {reason}"
+            ));
+        }
     }
 
     // Package all the new files

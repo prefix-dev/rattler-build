@@ -51,6 +51,7 @@ impl Output {
 
         let work_dir = &self.build_configuration.directories.work_dir;
         Ok(ExecutionArgs {
+            interpreter: self.recipe.build().script.interpreter.clone(),
             script: self.recipe.build().script.resolve_content(
                 &self.build_configuration.directories.recipe_dir,
                 Some(jinja_renderer),

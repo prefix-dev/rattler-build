@@ -1,4 +1,8 @@
 //! Script execution types and utilities.
+//!
+//! This module resolves script contents, generates build scripts with
+//! [`generate_build_script`], executes them with [`run_script`], and provides
+//! subprocess output handling via [`run_process_with_replacements`].
 
 use crate::sandbox::SandboxConfiguration;
 use crate::script::{Script, ScriptContent};
@@ -7,6 +11,7 @@ use futures::TryStreamExt;
 use indexmap::IndexMap;
 use itertools::Itertools;
 use rattler_conda_types::Platform;
+use rattler_shell::shell::Shell;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
@@ -70,6 +75,8 @@ impl std::str::FromStr for EnvironmentIsolation {
 pub struct ExecutionArgs {
     /// Contents of the script to execute
     pub script: ResolvedScriptContents,
+    /// Explicit interpreter requested for the script, if any.
+    pub interpreter: Option<String>,
     /// Environment variables to set before executing the script
     pub env_vars: IndexMap<String, String>,
     /// Secrets to set as env vars and replace in the output
@@ -225,22 +232,9 @@ impl Script {
 
         tracing::debug!("Running script in {}", work_dir.display());
 
-        // Determine the interpreter to use:
-        // 1. Use explicitly specified interpreter if set
-        // 2. Try to infer from the resolved script path (if it's a file)
-        // 3. Finally fall back to platform default (bash/cmd)
-        let inferred_interpreter = contents.infer_interpreter();
-        let interpreter = if self.interpreter.is_some() {
-            self.interpreter()
-        } else if let Some(ref inferred) = inferred_interpreter {
-            tracing::debug!("Inferred interpreter '{}' from script file path", inferred);
-            inferred.as_str()
-        } else {
-            self.interpreter()
-        };
-
         let exec_args = ExecutionArgs {
             script: contents,
+            interpreter: self.interpreter.clone(),
             env_vars,
             secrets,
             build_prefix: build_prefix.map(|p| p.to_owned()),
@@ -251,7 +245,7 @@ impl Script {
             env_isolation,
         };
 
-        crate::execution::run_script(exec_args, interpreter).await?;
+        crate::execution::run_script(exec_args).await?;
 
         Ok(())
     }
@@ -424,85 +418,176 @@ impl Decoder for CrLfNormalizer {
     }
 }
 
-use crate::interpreter::{
-    BASH_PREAMBLE, BashInterpreter, BrushInterpreter, CMDEXE_PREAMBLE, CmdExeInterpreter,
-    Interpreter, NodeJsInterpreter, NuShellInterpreter, PerlInterpreter, PowerShellInterpreter,
-    PythonInterpreter, RInterpreter, RubyInterpreter,
-};
-use rattler_shell::shell;
-
-/// Run a script with the given execution arguments and interpreter
-pub async fn run_script(
-    exec_args: ExecutionArgs,
-    interpreter: &str,
-) -> Result<(), crate::InterpreterError> {
-    match interpreter {
-        "nushell" | "nu" => NuShellInterpreter.run(exec_args).await?,
-        "bash" => BashInterpreter.run(exec_args).await?,
-        "brush" => BrushInterpreter.run(exec_args).await?,
-        "cmd" => CmdExeInterpreter.run(exec_args).await?,
-        "python" => PythonInterpreter.run(exec_args).await?,
-        "perl" => PerlInterpreter.run(exec_args).await?,
-        "rscript" => RInterpreter.run(exec_args).await?,
-        "ruby" => RubyInterpreter.run(exec_args).await?,
-        "node" | "nodejs" => NodeJsInterpreter.run(exec_args).await?,
-        "powershell" => PowerShellInterpreter.run(exec_args).await?,
-        _ => {
-            return Err(
-                std::io::Error::other(format!("Unsupported interpreter: {}", interpreter)).into(),
-            );
-        }
-    };
-
-    Ok(())
+#[derive(Debug)]
+pub struct GeneratedBuildScript {
+    pub build_script_path: PathBuf,
 }
 
-/// Create build script files without executing them
-pub async fn create_build_script(exec_args: ExecutionArgs) -> Result<(), std::io::Error> {
-    let interpreter = if cfg!(windows) { "cmd" } else { "bash" };
-    let work_dir = &exec_args.work_dir;
+/// Returns the generated native build wrapper and any interpreter script file.
+///
+/// If `args.interpreter` is set, or if the resolved script path has a known
+/// interpreter extension, inline script text is written to a separate file and
+/// the native wrapper invokes the resolved interpreter with that file. Otherwise
+/// the script contents are appended directly to the native wrapper.
+pub async fn generate_build_script(
+    args: &ExecutionArgs,
+) -> Result<GeneratedBuildScript, crate::InterpreterError> {
+    let runner = crate::native_runner::native_runner();
+    let shell = runner.shell();
 
-    if interpreter == "bash" {
-        let script = BashInterpreter
-            .get_script(&exec_args, shell::Bash::default())
-            .unwrap();
-        let build_env_path = work_dir.join("build_env.sh");
-        let build_script_path = work_dir.join("conda_build.sh");
+    let script_extension = shell.extension();
+    let activation_script_path = args.work_dir.join(format!("build_env.{script_extension}"));
+    let build_script_path = args
+        .work_dir
+        .join(format!("conda_build.{script_extension}"));
 
-        tokio::fs::write(&build_env_path, script).await?;
+    let activation_script = crate::activation::activation_script(args, shell.clone())
+        .map_err(|err| std::io::Error::other(err.to_string()))?;
+    tokio::fs::write(
+        &activation_script_path,
+        crate::native_runner::write_shell_script(shell.clone(), &activation_script)?,
+    )
+    .await?;
 
-        let preamble = BASH_PREAMBLE.replace("((script_path))", &build_env_path.to_string_lossy());
-        let script = format!("{}\n{}", preamble, exec_args.script.script());
-        tokio::fs::write(&build_script_path, script).await?;
+    // Interpreter inference is intentionally done after content resolution:
+    // only file-backed scripts can infer from their resolved path. Inline
+    // scripts use the explicit recipe interpreter or remain native shell code.
+    let explicit_or_inferred = args
+        .interpreter
+        .as_deref()
+        .map(str::to_string)
+        .or_else(|| args.script.infer_interpreter());
 
-        tracing::info!("Build script created at {}", build_script_path.display());
-    } else if interpreter == "cmd" {
-        let script = CmdExeInterpreter
-            .get_script(&exec_args, shell::CmdExe)
-            .unwrap();
-        let build_env_path = work_dir.join("build_env.bat");
-        let build_script_path = work_dir.join("conda_build.bat");
+    let body = if let Some(user_interpreter) = explicit_or_inferred {
+        let invocation =
+            crate::interpreter::interpreter_invocation(&user_interpreter).ok_or_else(|| {
+                std::io::Error::other(format!("Unsupported interpreter: {user_interpreter}"))
+            })?;
 
-        tokio::fs::write(&build_env_path, script).await?;
+        let script_path = match &args.script {
+            ResolvedScriptContents::Path(path, _) => path.clone(),
+            ResolvedScriptContents::Inline(script) => {
+                let path = args
+                    .work_dir
+                    .join(format!("conda_build_script.{}", invocation.extension()));
+                tokio::fs::write(&path, invocation.script_contents(script)).await?;
+                path
+            }
+            ResolvedScriptContents::Missing => {
+                let path = args
+                    .work_dir
+                    .join(format!("conda_build_script.{}", invocation.extension()));
+                tokio::fs::write(&path, invocation.script_contents("")).await?;
+                path
+            }
+        };
 
-        let build_script = format!(
-            "{}\n{}",
-            CMDEXE_PREAMBLE.replace("((script_path))", &build_env_path.to_string_lossy()),
-            exec_args.script.script()
-        );
-        tokio::fs::write(
-            &build_script_path,
-            &build_script.replace('\n', "\r\n").as_bytes(),
-        )
-        .await?;
+        // Search the build environment for the executable described by the
+        // invocation. `user_interpreter` is the recipe value (e.g. `nushell`),
+        // which is preserved for user-facing errors even when the executable
+        // has a different name (e.g. `nu`).
+        let prefix = args.build_prefix.as_ref().or(Some(&args.run_prefix));
+        let executable = crate::interpreter::resolve_interpreter_executable(
+            prefix,
+            &args.execution_platform,
+            &user_interpreter,
+            invocation.as_ref(),
+        )?;
 
-        tracing::info!("Build script created at {}", build_script_path.display());
+        let mut command = vec![executable.to_string_lossy().into_owned()];
+        command.extend(invocation.args(&script_path));
+        let command_refs = command.iter().map(String::as_str).collect::<Vec<_>>();
+        let mut body = String::new();
+        shell
+            .run_command(&mut body, command_refs)
+            .map_err(std::io::Error::other)?;
+        body
+    } else {
+        args.script.script().to_string()
+    };
+
+    let build_script = format!("{}\n{}", runner.preamble(&activation_script_path), body);
+    tokio::fs::write(
+        &build_script_path,
+        crate::native_runner::write_shell_script(shell, &build_script)?,
+    )
+    .await?;
+
+    #[cfg(unix)]
+    {
+        if build_script_path.extension().and_then(|e| e.to_str()) == Some("sh") {
+            use std::{fs::Permissions, os::unix::fs::PermissionsExt};
+            let permissions = Permissions::from_mode(0o755);
+            tokio::fs::set_permissions(&build_script_path, permissions).await?;
+        }
+    }
+
+    Ok(GeneratedBuildScript { build_script_path })
+}
+
+/// Runs a script with the given execution arguments.
+pub async fn run_script(exec_args: ExecutionArgs) -> Result<(), crate::InterpreterError> {
+    let runner = crate::native_runner::native_runner();
+    let generated = generate_build_script(&exec_args).await?;
+    let build_script_path_str = generated.build_script_path.to_string_lossy().to_string();
+    let cmd_args = runner.command_to_run_script(&build_script_path_str);
+
+    let output = crate::execution::run_process_with_replacements(
+        &cmd_args,
+        &exec_args.work_dir,
+        &exec_args.replacements(runner.replacements_template()),
+        &exec_args.env_vars,
+        &exec_args.secrets,
+        exec_args.env_isolation,
+        if runner.supports_sandbox() {
+            exec_args.sandbox_config.as_ref()
+        } else {
+            None
+        },
+    )
+    .await?;
+
+    if !output.status.success() {
+        let status_code = output.status.code().unwrap_or(1);
+        let debug_info = runner.debug_info(&exec_args);
+        tracing::error!("Script failed with status {}", status_code);
+        tracing::error!("{}", debug_info);
+        return Err(crate::InterpreterError::ExecutionFailed(
+            std::io::Error::other(format!(
+                "Script failed with status {}{}",
+                status_code, debug_info
+            )),
+        ));
     }
 
     Ok(())
 }
 
-/// Find the rattler-sandbox executable in PATH
+/// Creates build script files without executing them.
+pub async fn create_build_script(exec_args: ExecutionArgs) -> Result<(), std::io::Error> {
+    let generated = generate_build_script(&exec_args)
+        .await
+        .map_err(|err| match err {
+            crate::InterpreterError::ExecutionFailed(err) => err,
+            crate::InterpreterError::InterpreterNotFound(interpreter) => std::io::Error::other(
+                format!("interpreter '{interpreter}' was not found in the build environment"),
+            ),
+            crate::InterpreterError::InvalidInterpreter {
+                interpreter,
+                reason,
+            } => std::io::Error::other(format!(
+                "interpreter '{interpreter}' was found but is not valid: {reason}"
+            )),
+        })?;
+
+    tracing::info!(
+        "Build script created at {}",
+        generated.build_script_path.display()
+    );
+    Ok(())
+}
+
+/// Finds the rattler-sandbox executable in PATH.
 fn find_rattler_sandbox() -> Option<PathBuf> {
     which::which("rattler-sandbox").ok()
 }
@@ -730,7 +815,6 @@ mod tests {
     /// nested shells inherit it while the outer subprocess starts without it.
     #[test]
     fn test_conda_build_marker_written_into_build_env_script() {
-        use crate::interpreter::BashInterpreter;
         use rattler_shell::shell;
 
         let tmp = tempfile::tempdir().unwrap();
@@ -739,6 +823,7 @@ mod tests {
 
         let args = ExecutionArgs {
             script: ResolvedScriptContents::Inline(String::new()),
+            interpreter: None,
             env_vars: IndexMap::new(),
             secrets: IndexMap::new(),
             execution_platform: Platform::current(),
@@ -749,41 +834,10 @@ mod tests {
             env_isolation: EnvironmentIsolation::None,
         };
 
-        let script = BashInterpreter
-            .get_script(&args, shell::Bash::default())
-            .unwrap();
+        let script = crate::activation::activation_script(&args, shell::Bash::default()).unwrap();
         assert!(
             script.contains("CONDA_BUILD") && script.contains("1"),
             "build_env.sh must set CONDA_BUILD=1 for nested-shell re-entrancy, got:\n{script}"
-        );
-    }
-
-    /// brush must be provided by the build environment. With no build prefix
-    /// it cannot be located and a clear `InterpreterNotFound` is returned.
-    #[tokio::test]
-    async fn test_brush_not_found_without_build_prefix() {
-        use crate::interpreter::BrushInterpreter;
-
-        let tmp = tempfile::tempdir().unwrap();
-        let prefix = tmp.path().join("prefix");
-        fs_err::create_dir_all(&prefix).unwrap();
-
-        let args = ExecutionArgs {
-            script: ResolvedScriptContents::Inline("echo hello".to_string()),
-            env_vars: IndexMap::new(),
-            secrets: IndexMap::new(),
-            execution_platform: Platform::current(),
-            build_prefix: None,
-            run_prefix: prefix,
-            work_dir: tmp.path().to_path_buf(),
-            sandbox_config: None,
-            env_isolation: EnvironmentIsolation::None,
-        };
-
-        let err = BrushInterpreter.run(args).await.unwrap_err();
-        assert!(
-            matches!(err, crate::InterpreterError::InterpreterNotFound(ref name) if name == "brush"),
-            "expected InterpreterNotFound for brush, got: {err:?}"
         );
     }
 
