@@ -251,13 +251,13 @@ fn reqwest_client(user_agent: &str, timeout_secs: u64, dangerous: bool) -> reqwe
         .referer(false)
         .read_timeout(std::time::Duration::from_secs(timeout_secs));
 
-    #[cfg(any(feature = "native-tls", feature = "rustls-tls"))]
+    #[cfg(any(feature = "native-tls", feature = "rustls"))]
     let builder = if dangerous {
         builder.danger_accept_invalid_certs(true)
     } else {
         builder
     };
-    #[cfg(not(any(feature = "native-tls", feature = "rustls-tls")))]
+    #[cfg(not(any(feature = "native-tls", feature = "rustls")))]
     let _ = dangerous;
 
     builder.build().expect("failed to create reqwest client")

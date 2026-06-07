@@ -34,8 +34,8 @@ python = ">=3.12,<4"
 clang = ">=21.1.8,<23"
 livereload = ">=2.7,<3"
 wasm-pack = ">=0.14.0,<0.15"
-rust = ">=1.94.0,<1.95"
-rust-std-wasm32-unknown-unknown = ">=1.94.0,<1.95"
+rust = ">=1.95.0,<1.96"
+rust-std-wasm32-unknown-unknown = ">=1.95.0,<1.96"
 
 [feature.playground.tasks]
 playground-build = { cmd = "python scripts/build_playground.py", description = "Build the WASM playground", inputs = [
@@ -84,8 +84,8 @@ deploy-dev = { cmd = "mike deploy --push dev devel", depends-on = [
 
 [dependencies]
 openssl = ">=3.6.1,<4"
-rust = ">=1.94.0,<1.95"
-rust-src = ">=1.94.0,<2"
+rust = ">=1.95.0,<1.96"
+rust-src = ">=1.95.0,<2"
 sccache = ">=0.14.0,<0.15"
 compilers = ">=1.11.0,<2"
 libssh2 = ">=1.11.1,<2"
@@ -212,7 +212,7 @@ ipykernel = ">=6.29,<7"
 python = ">=3.14.3,<3.15"
 git-cliff = ">=2.12.0,<3"
 release-plz = ">=0.3.157,<0.4"
-rust = ">=1.94.0,<1.95"
+rust = ">=1.95.0,<1.96"
 7zip = ">=26.0,<27"
 httpx = ">=0.28.1,<0.29"
 

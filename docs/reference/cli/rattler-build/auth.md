@@ -16,4 +16,5 @@ rattler-build auth <COMMAND>
 |---------|-------------|
 | [`login`](auth/login.md) | Store authentication information for a given host |
 | [`logout`](auth/logout.md) | Remove authentication information for a given host |
+| [`status`](auth/status.md) | Show stored authentication entries and non-secret token metadata |
 

@@ -124,6 +124,25 @@ requirements:
     - nushell
 ```
 
+### Using `brush`
+
+[`brush`](https://github.com/reubeno/brush) is a bash-compatible shell written in Rust. Select it with `interpreter: brush`. Activation is handled by the native shell (`bash` on Unix, `cmd.exe` on Windows), which then invokes `brush` on your script, so existing bash scripts work unchanged across platforms.
+
+`brush` is always taken from the build environment, so it must be listed in `requirements/build`. A `brush` found on the system `PATH` is intentionally not used, which keeps builds reproducible.
+
+```yaml title="recipe.yaml"
+build:
+  script:
+    interpreter: brush
+    content: |
+      echo "Hello from brush!"
+
+# Note: `brush` must be in the `build` section of your recipe!
+requirements:
+  build:
+    - brush
+```
+
 ### Using `python`
 
 In order to use `python` you can select the `interpreter: python` or have a
@@ -311,6 +330,20 @@ noted, no variables are inherited from the shell environment in which you invoke
 
 : The subdirectory describing the platform that the resulting package will
   run on. Equivalent to `SUBDIR`.
+
+`RATTLER_BUILD_PACKAGE_FILES`
+
+: Path to a writable file. If the build script writes any paths to this file
+  (one per line), those paths are used as the package contents instead of the
+  default "new files in `$PREFIX`" diff. Each line must be either an absolute
+  path under `$PREFIX` or a relative path resolved against `$PREFIX`. The file
+  is appendable across multiple invocations, so
+  `echo path >> $RATTLER_BUILD_PACKAGE_FILES` works as expected. If the file
+  is empty or absent, rattler-build falls back to the default behavior. See
+  [Override package contents from the build script][override-package-contents]
+  in the build options for more details.
+
+  [override-package-contents]: ./build_options.md#override-package-contents-from-the-build-script
 
 `PKG_BUILDNUM`
 

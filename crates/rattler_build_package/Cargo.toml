@@ -1,6 +1,6 @@
 [package]
 name = "rattler_build_package"
-version = "0.1.6"
+version = "0.1.8"
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -41,7 +41,7 @@ serde_json = { workspace = true }
 rayon = { workspace = true }
 
 # Utilities
-chrono = { workspace = true }
+jiff = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 sha2 = { workspace = true }

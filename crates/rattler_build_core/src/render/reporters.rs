@@ -5,7 +5,7 @@ use std::{
 
 use indicatif::{MultiProgress, ProgressBar, ProgressFinish, ProgressStyle};
 use rattler::install::Placement;
-use rattler_repodata_gateway::{DownloadReporter, Reporter};
+use rattler_repodata_gateway::{DownloadReporter, Reporter, UnsupportedRepodataRevision};
 use url::Url;
 
 /// Reporter used for tracking download progress via `MultiProgress`.
@@ -94,6 +94,10 @@ impl DownloadReporter for GatewayReporter {
 impl Reporter for GatewayReporter {
     fn download_reporter(&self) -> Option<&dyn DownloadReporter> {
         Some(self)
+    }
+
+    fn on_unsupported_repodata_revision(&self, message: &UnsupportedRepodataRevision) {
+        tracing::warn!("{}", message);
     }
 }
 

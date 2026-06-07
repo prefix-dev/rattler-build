@@ -1,0 +1,29 @@
+package:
+  name: package_files_override
+  version: 1.0.0
+
+build:
+  # Even though many files would be included by default, the build script
+  # writes an explicit list to $RATTLER_BUILD_PACKAGE_FILES, which then
+  # determines the package contents.
+  script:
+    - if: unix
+      then:
+        - mkdir -p $PREFIX/bin $PREFIX/share/doc
+        - echo "kept" > $PREFIX/bin/keep.sh
+        - echo "also kept" > $PREFIX/bin/also-keep.sh
+        - echo "skipped" > $PREFIX/bin/skip.sh
+        - echo "skipped doc" > $PREFIX/share/doc/skip.txt
+        # Write absolute and relative paths to exercise both forms,
+        # using `>>` across multiple invocations.
+        - echo "$PREFIX/bin/keep.sh" >> $RATTLER_BUILD_PACKAGE_FILES
+        - echo "bin/also-keep.sh" >> $RATTLER_BUILD_PACKAGE_FILES
+      else:
+        - mkdir %PREFIX%\bin
+        - mkdir %PREFIX%\share\doc
+        - echo kept > %PREFIX%\bin\keep.txt
+        - echo also kept > %PREFIX%\bin\also-keep.txt
+        - echo skipped > %PREFIX%\bin\skip.txt
+        - echo skipped doc > %PREFIX%\share\doc\skip.txt
+        - echo %PREFIX%\bin\keep.txt >> %RATTLER_BUILD_PACKAGE_FILES%
+        - echo bin\also-keep.txt >> %RATTLER_BUILD_PACKAGE_FILES%

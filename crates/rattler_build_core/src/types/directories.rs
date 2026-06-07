@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
-use chrono::{DateTime, Utc};
 use fs_err as fs;
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 
 use dunce::canonicalize;
@@ -14,7 +14,7 @@ pub struct DirectoriesBuilder<'a> {
     name: &'a str,
     recipe_path: &'a Path,
     output_dir: &'a Path,
-    timestamp: &'a DateTime<Utc>,
+    timestamp: &'a Timestamp,
     no_build_id: bool,
     merge_build_and_host: bool,
     skip_directory_creation: bool,
@@ -26,7 +26,7 @@ impl<'a> DirectoriesBuilder<'a> {
         name: &'a str,
         recipe_path: &'a Path,
         output_dir: &'a Path,
-        timestamp: &'a DateTime<Utc>,
+        timestamp: &'a Timestamp,
     ) -> Self {
         Self {
             name,
@@ -104,9 +104,9 @@ fn get_build_dir(
     output_dir: &Path,
     name: &str,
     no_build_id: bool,
-    timestamp: &DateTime<Utc>,
+    timestamp: &Timestamp,
 ) -> Result<PathBuf, std::io::Error> {
-    let since_the_epoch = timestamp.timestamp();
+    let since_the_epoch = timestamp.as_second();
 
     let dirname = if no_build_id {
         format!("rattler-build_{}", name)
@@ -122,7 +122,7 @@ impl Directories {
         name: &'a str,
         recipe_path: &'a Path,
         output_dir: &'a Path,
-        timestamp: &'a DateTime<Utc>,
+        timestamp: &'a Timestamp,
     ) -> DirectoriesBuilder<'a> {
         DirectoriesBuilder::new(name, recipe_path, output_dir, timestamp)
     }
@@ -133,7 +133,7 @@ impl Directories {
         recipe_path: &Path,
         output_dir: &Path,
         no_build_id: bool,
-        timestamp: &DateTime<Utc>,
+        timestamp: &Timestamp,
         merge_build_and_host: bool,
         skip_directory_creation: bool,
     ) -> Result<Directories, std::io::Error> {
@@ -204,6 +204,14 @@ impl Directories {
         }
 
         Ok(directories)
+    }
+
+    /// Path to the file pointed at by the `RATTLER_BUILD_PACKAGE_FILES`
+    /// environment variable. Build scripts may write paths to this file (one
+    /// per line) to override the default mechanism that determines which files
+    /// end up in the final package.
+    pub fn package_files_list_path(&self) -> PathBuf {
+        self.build_dir.join(crate::consts::PACKAGE_FILES_LIST_NAME)
     }
 
     /// Remove all directories except for the cache directory
@@ -313,15 +321,15 @@ mod tests {
     fn setup_build_dir_test() {
         // without build_id (aka timestamp)
         let dir = tempfile::tempdir().unwrap();
-        let p1 = get_build_dir(dir.path(), "name", true, &Utc::now()).unwrap();
+        let p1 = get_build_dir(dir.path(), "name", true, &Timestamp::now()).unwrap();
         let f1 = p1.file_name().unwrap();
         assert!(f1.eq("rattler-build_name"));
 
         // with build_id (aka timestamp)
-        let timestamp = &Utc::now();
+        let timestamp = &Timestamp::now();
         let p2 = get_build_dir(dir.path(), "name", false, timestamp).unwrap();
         let f2 = p2.file_name().unwrap();
-        let epoch = timestamp.timestamp();
+        let epoch = timestamp.as_second();
         assert!(f2.eq(format!("rattler-build_name_{epoch}").as_str()));
     }
 
@@ -333,7 +341,7 @@ mod tests {
             "name",
             &tempdir.path().join("recipe"),
             &tempdir.path().join("output"),
-            &chrono::Utc::now(),
+            &Timestamp::now(),
         )
         .build()
         .unwrap();
@@ -366,7 +374,7 @@ mod tests {
             "name",
             &tempdir.path().join("recipe"),
             &tempdir.path().join("output"),
-            &chrono::Utc::now(),
+            &Timestamp::now(),
         )
         .build()
         .unwrap();

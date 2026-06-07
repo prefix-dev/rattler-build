@@ -10,7 +10,10 @@ import sys
 
 # Configuration
 FORBIDDEN_CRATE = "rustls"
-EXCLUDE_FEATURES = {"rustls-tls", "default", "s3"}
+# This guard checks native-tls builds. Sigstore TUF trust-root fetching currently
+# uses upstream reqwest/rustls internally, so do not include the optional
+# sigstore feature when validating the native-tls-only dependency graph.
+EXCLUDE_FEATURES = {"rustls", "default", "s3", "sigstore"}
 SKIP_PACKAGES: set[str] = {"rattler_build_docs"}
 
 

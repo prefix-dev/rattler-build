@@ -668,6 +668,30 @@ def test_always_include_files(
     assert "Force include new file" in (pkg_force / "hello.txt").read_text()
 
 
+@pytest.mark.skipif(
+    os.name == "nt", reason="recipe does not support execution on windows"
+)
+def test_package_files_override(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """The build script writes an explicit list of paths to
+    $RATTLER_BUILD_PACKAGE_FILES; only those should end up in the package."""
+    rattler_build.build(
+        recipes / "package_files_override/recipe.yaml",
+        tmp_path,
+    )
+
+    pkg = get_extracted_package(tmp_path, "package_files_override")
+    paths = json.loads((pkg / "info/paths.json").read_text())
+    listed = sorted(p["_path"] for p in paths["paths"])
+
+    assert listed == ["bin/also-keep.sh", "bin/keep.sh"]
+    assert (pkg / "bin/keep.sh").exists()
+    assert (pkg / "bin/also-keep.sh").exists()
+    assert not (pkg / "bin/skip.sh").exists()
+    assert not (pkg / "share/doc/skip.txt").exists()
+
+
 def test_script_env_in_recipe(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
@@ -1276,6 +1300,21 @@ def test_nushell_script_detection(
     assert (pkg / "info/paths.json").exists()
     content = (pkg / "hello.txt").read_text()
     assert "Hello, world!" == content
+
+
+def test_brush(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    # Builds a recipe with `interpreter: brush`. `brush` is pulled from the
+    # build environment (requirements/build), the bash wrapper activates the
+    # environment, and brush then runs the bash-syntax script.
+    rattler_build.build(
+        recipes / "brush-test/recipe.yaml",
+        tmp_path,
+    )
+    pkg = get_extracted_package(tmp_path, "brush-test")
+
+    assert (pkg / "info/paths.json").exists()
+    content = (pkg / "hello.txt").read_text()
+    assert "Hello from brush!" == content.strip()
 
 
 def test_channel_specific(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):

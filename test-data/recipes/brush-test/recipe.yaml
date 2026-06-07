@@ -1,0 +1,16 @@
+package:
+  name: brush-test
+  version: 0.1.0
+
+build:
+  script:
+    # `brush` is a bash-compatible shell, so an ordinary bash script runs
+    # unchanged. The activated `$PREFIX` is inherited from the bash/cmd
+    # wrapper that performs activation before invoking brush.
+    interpreter: brush
+    content: |
+      echo "Hello from brush!" > "$PREFIX/hello.txt"
+
+requirements:
+  build:
+    - brush

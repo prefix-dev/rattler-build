@@ -1,6 +1,6 @@
 [package]
 name = "rattler_build_networking"
-version = "0.1.5"
+version = "0.1.6"
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
@@ -12,11 +12,10 @@ description = "Networking utilities for rattler-build, providing shared HTTP cli
 default = []
 s3 = ["rattler_networking/s3"]
 native-tls = ["reqwest/native-tls", "rattler_networking/native-tls"]
-rustls-tls = [
-  "reqwest/rustls-tls",
-  "reqwest/rustls-tls-native-roots",
-  "reqwest-middleware/rustls-tls",
-  "rattler_networking/rustls-tls",
+rustls = [
+  "reqwest/rustls",
+  "reqwest-middleware/rustls",
+  "rattler_networking/rustls",
 ]
 
 [dependencies]

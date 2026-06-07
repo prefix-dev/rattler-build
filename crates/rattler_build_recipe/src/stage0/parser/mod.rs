@@ -28,6 +28,7 @@ use rattler_build_jinja::Variable;
 use rattler_build_yaml_parser::{
     ParseError, ParseResult, helpers::contains_jinja_template, parse_yaml,
 };
+use rattler_conda_types::RepodataRevision;
 
 use crate::Span;
 
@@ -46,8 +47,8 @@ pub(crate) use helpers::get_span;
 /// Configuration used while parsing recipe source.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct ParseConfig {
-    /// Enable V3-only recipe fields and MatchSpec syntax.
-    pub v3: bool,
+    /// Repodata revision controlling which recipe fields and MatchSpec syntax are accepted.
+    pub repodata_revision: RepodataRevision,
 }
 
 /// Parse a recipe (single or multi-output) from YAML source string

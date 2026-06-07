@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.8](https://github.com/prefix-dev/rattler-build/compare/rattler_build_jinja-v0.1.7...rattler_build_jinja-v0.1.8) - 2026-05-27
+
+### Fixed
+
+- *(jinja)* exhaustively handle CallArg variants in used-variable collection ([#2505](https://github.com/prefix-dev/rattler-build/pull/2505))
+
+## [0.1.7](https://github.com/prefix-dev/rattler-build/compare/rattler_build_jinja-v0.1.6...rattler_build_jinja-v0.1.7) - 2026-05-20
+
+### Added
+
+- `git.latest_tag_distance` ([#2484](https://github.com/prefix-dev/rattler-build/pull/2484))
+
+### Fixed
+
+- correct `git.latest_tag_distance` parsing for dashed tag names ([#2491](https://github.com/prefix-dev/rattler-build/pull/2491))
+
 ## [0.1.6](https://github.com/prefix-dev/rattler-build/compare/rattler_build_jinja-v0.1.5...rattler_build_jinja-v0.1.6) - 2026-04-13
 
 ### Fixed

@@ -193,7 +193,7 @@ impl Script {
         let env_vars = env_vars
             .into_iter()
             .filter_map(|(k, v)| v.map(|v| (k, v)))
-            .chain(self.env().clone().into_iter())
+            .chain(self.env().clone())
             .collect::<IndexMap<String, String>>();
 
         let contents = self.resolve_content(
@@ -425,8 +425,8 @@ impl Decoder for CrLfNormalizer {
 }
 
 use crate::interpreter::{
-    BASH_PREAMBLE, BashInterpreter, CMDEXE_PREAMBLE, CmdExeInterpreter, Interpreter,
-    NodeJsInterpreter, NuShellInterpreter, PerlInterpreter, PowerShellInterpreter,
+    BASH_PREAMBLE, BashInterpreter, BrushInterpreter, CMDEXE_PREAMBLE, CmdExeInterpreter,
+    Interpreter, NodeJsInterpreter, NuShellInterpreter, PerlInterpreter, PowerShellInterpreter,
     PythonInterpreter, RInterpreter, RubyInterpreter,
 };
 use rattler_shell::shell;
@@ -439,6 +439,7 @@ pub async fn run_script(
     match interpreter {
         "nushell" | "nu" => NuShellInterpreter.run(exec_args).await?,
         "bash" => BashInterpreter.run(exec_args).await?,
+        "brush" => BrushInterpreter.run(exec_args).await?,
         "cmd" => CmdExeInterpreter.run(exec_args).await?,
         "python" => PythonInterpreter.run(exec_args).await?,
         "perl" => PerlInterpreter.run(exec_args).await?,
@@ -462,7 +463,9 @@ pub async fn create_build_script(exec_args: ExecutionArgs) -> Result<(), std::io
     let work_dir = &exec_args.work_dir;
 
     if interpreter == "bash" {
-        let script = BashInterpreter.get_script(&exec_args, shell::Bash).unwrap();
+        let script = BashInterpreter
+            .get_script(&exec_args, shell::Bash::default())
+            .unwrap();
         let build_env_path = work_dir.join("build_env.sh");
         let build_script_path = work_dir.join("conda_build.sh");
 
@@ -746,10 +749,41 @@ mod tests {
             env_isolation: EnvironmentIsolation::None,
         };
 
-        let script = BashInterpreter.get_script(&args, shell::Bash).unwrap();
+        let script = BashInterpreter
+            .get_script(&args, shell::Bash::default())
+            .unwrap();
         assert!(
             script.contains("CONDA_BUILD") && script.contains("1"),
             "build_env.sh must set CONDA_BUILD=1 for nested-shell re-entrancy, got:\n{script}"
+        );
+    }
+
+    /// brush must be provided by the build environment. With no build prefix
+    /// it cannot be located and a clear `InterpreterNotFound` is returned.
+    #[tokio::test]
+    async fn test_brush_not_found_without_build_prefix() {
+        use crate::interpreter::BrushInterpreter;
+
+        let tmp = tempfile::tempdir().unwrap();
+        let prefix = tmp.path().join("prefix");
+        fs_err::create_dir_all(&prefix).unwrap();
+
+        let args = ExecutionArgs {
+            script: ResolvedScriptContents::Inline("echo hello".to_string()),
+            env_vars: IndexMap::new(),
+            secrets: IndexMap::new(),
+            execution_platform: Platform::current(),
+            build_prefix: None,
+            run_prefix: prefix,
+            work_dir: tmp.path().to_path_buf(),
+            sandbox_config: None,
+            env_isolation: EnvironmentIsolation::None,
+        };
+
+        let err = BrushInterpreter.run(args).await.unwrap_err();
+        assert!(
+            matches!(err, crate::InterpreterError::InterpreterNotFound(ref name) if name == "brush"),
+            "expected InterpreterNotFound for brush, got: {err:?}"
         );
     }
 

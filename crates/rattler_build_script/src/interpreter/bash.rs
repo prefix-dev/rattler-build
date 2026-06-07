@@ -5,7 +5,9 @@ use rattler_shell::shell;
 
 use crate::execution::{ExecutionArgs, run_process_with_replacements};
 
-use super::{BASH_PREAMBLE, Interpreter, InterpreterError, find_interpreter};
+use super::{
+    BASH_PREAMBLE, Interpreter, InterpreterError, InterpreterSearchScope, find_interpreter,
+};
 
 pub struct BashInterpreter;
 
@@ -33,7 +35,7 @@ fn print_debug_info(args: &ExecutionArgs) -> String {
 
 impl Interpreter for BashInterpreter {
     async fn run(&self, args: ExecutionArgs) -> Result<(), InterpreterError> {
-        let script = self.get_script(&args, shell::Bash).unwrap();
+        let script = self.get_script(&args, shell::Bash::default()).unwrap();
 
         let build_env_path = args.work_dir.join("build_env.sh");
         let build_script_path = args.work_dir.join("conda_build.sh");
@@ -84,6 +86,11 @@ impl Interpreter for BashInterpreter {
         build_prefix: Option<&PathBuf>,
         platform: &Platform,
     ) -> Result<Option<PathBuf>, which::Error> {
-        find_interpreter("bash", build_prefix, platform)
+        find_interpreter(
+            "bash",
+            build_prefix,
+            platform,
+            InterpreterSearchScope::PrefixThenSystemPath,
+        )
     }
 }

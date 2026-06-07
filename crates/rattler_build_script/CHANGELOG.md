@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.4](https://github.com/prefix-dev/rattler-build/compare/rattler_build_script-v0.2.3...rattler_build_script-v0.2.4) - 2026-05-20
+
+### Fixed
+
+- set CONDA_BUILD env var in build_env.sh to fix env-isolation none ([#2433](https://github.com/prefix-dev/rattler-build/pull/2433))
+
+### Other
+
+- bump rattler crates and migrate to reqwest 0.13 ([#2493](https://github.com/prefix-dev/rattler-build/pull/2493))
+
 ## [0.2.3](https://github.com/prefix-dev/rattler-build/compare/rattler_build_script-v0.2.2...rattler_build_script-v0.2.3) - 2026-04-13
 
 ### Added

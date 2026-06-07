@@ -523,8 +523,8 @@ pub enum ResolveError {
     #[error("Failed to get finalized dependencies")]
     FinalizedDependencyNotFound,
 
-    #[error("Failed to resolve dependencies: {0}")]
-    DependencyResolutionError(String),
+    #[error("Failed to resolve dependencies")]
+    DependencyResolutionError(#[source] Box<dyn std::error::Error + Send + Sync + 'static>),
 
     #[error("Could not collect run exports")]
     CouldNotCollectRunExports(#[from] RunExportExtractorError),
@@ -731,7 +731,7 @@ pub async fn install_environments(
         tool_configuration,
     )
     .await
-    .map_err(|e| ResolveError::DependencyResolutionError(e.to_string()))?;
+    .map_err(|e| ResolveError::DependencyResolutionError(e.into()))?;
 
     install_packages(
         "host",
@@ -745,7 +745,7 @@ pub async fn install_environments(
         tool_configuration,
     )
     .await
-    .map_err(|e| ResolveError::DependencyResolutionError(e.to_string()))?;
+    .map_err(|e| ResolveError::DependencyResolutionError(e.into()))?;
 
     Ok(())
 }
@@ -809,9 +809,10 @@ pub(crate) async fn resolve_dependencies(
     let gateway = if download_missing_run_exports == RunExportsDownload::DownloadMissing {
         let client = tool_configuration.client.get_client().clone();
         let package_cache = tool_configuration.package_cache.clone();
+        let io_concurrency_limit = tool_configuration.io_concurrency_limit.unwrap_or(50);
         Some(
             Gateway::builder()
-                .with_max_concurrent_requests(50)
+                .with_max_concurrent_requests(io_concurrency_limit)
                 .with_client(client)
                 .with_package_cache(package_cache)
                 .finish(),
@@ -857,7 +858,7 @@ pub(crate) async fn resolve_dependencies(
             output.build_configuration.exclude_newer,
         )
         .await
-        .map_err(|e| ResolveError::DependencyResolutionError(e.to_string()))?;
+        .map_err(|e| ResolveError::DependencyResolutionError(e.into()))?;
 
         // Optionally add run exports to records that don't have them yet by
         // downloading packages and extracting run_exports.json
@@ -946,7 +947,7 @@ pub(crate) async fn resolve_dependencies(
             output.build_configuration.exclude_newer,
         )
         .await
-        .map_err(|e| ResolveError::DependencyResolutionError(e.to_string()))?;
+        .map_err(|e| ResolveError::DependencyResolutionError(e.into()))?;
 
         // Optionally add run exports to records that don't have them yet by
         // downloading packages and extracting run_exports.json
@@ -1254,7 +1255,7 @@ mod tests {
             rendered,
             vec![
                 ("python".to_string(), "*".to_string()),
-                ("scipy".to_string(), r#"[when="python >=3.10"]"#.to_string()),
+                ("scipy".to_string(), r#"[when="python>=3.10"]"#.to_string()),
             ]
         );
     }

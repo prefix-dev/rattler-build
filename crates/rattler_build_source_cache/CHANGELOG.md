@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.6](https://github.com/prefix-dev/rattler-build/compare/rattler_build_source_cache-v0.1.5...rattler_build_source_cache-v0.1.6) - 2026-05-20
+
+### Fixed
+
+- validate source attestations ([#2338](https://github.com/prefix-dev/rattler-build/pull/2338))
+
+### Other
+
+- bump rattler crates and migrate to reqwest 0.13 ([#2493](https://github.com/prefix-dev/rattler-build/pull/2493))
+- lazily initialize the `BaseClient` ([#2456](https://github.com/prefix-dev/rattler-build/pull/2456))
+
 ## [0.1.5](https://github.com/prefix-dev/rattler-build/compare/rattler_build_source_cache-v0.1.4...rattler_build_source_cache-v0.1.5) - 2026-04-13
 
 ### Fixed

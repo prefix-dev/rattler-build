@@ -22,7 +22,7 @@ use unicode_normalization::UnicodeNormalization;
 mod file_finder;
 mod file_mapper;
 mod metadata;
-pub use file_finder::{Files, TempFiles, content_type, record_files};
+pub use file_finder::{Files, TempFiles, content_type, read_package_files_list, record_files};
 pub use metadata::{contains_prefix_binary, contains_prefix_text, create_prefix_placeholder};
 use tempfile::NamedTempFile;
 
@@ -93,6 +93,12 @@ pub enum PackagingError {
 
     #[error("Invalid MenuInst schema file: {0} - {1}")]
     InvalidMenuInstSchema(PathBuf, serde_json::Error),
+
+    #[error("Package file `{0}` listed in $RATTLER_BUILD_PACKAGE_FILES is not inside the prefix")]
+    PackageFileOutsidePrefix(PathBuf),
+
+    #[error("Package file `{0}` listed in $RATTLER_BUILD_PACKAGE_FILES does not exist")]
+    PackageFileMissing(PathBuf),
 }
 
 /// This function copies the license files to the info/licenses folder.
@@ -651,7 +657,7 @@ fn print_enhanced_file_listing(
             .iter()
             .filter(|e| e.size_in_bytes.is_some() && e.size_in_bytes.unwrap() > 0)
             .collect();
-        files_with_sizes.sort_by(|a, b| b.size_in_bytes.cmp(&a.size_in_bytes));
+        files_with_sizes.sort_by_key(|b| std::cmp::Reverse(b.size_in_bytes));
 
         if !files_with_sizes.is_empty() {
             tracing::info!("Largest files:");
@@ -865,12 +871,34 @@ impl Output {
     ) -> Result<(PathBuf, PathsJson), PackagingError> {
         let span = tracing::info_span!("Packaging new files");
         let _enter = span.enter();
-        let files_after = Files::from_prefix(
-            &self.build_configuration.directories.host_prefix,
-            &self.recipe.build().always_include_files,
-            &self.recipe.build().files,
-            post_install_files,
-        )?;
+
+        let host_prefix = &self.build_configuration.directories.host_prefix;
+        let package_files_list = self
+            .build_configuration
+            .directories
+            .package_files_list_path();
+
+        let files_after = match read_package_files_list(&package_files_list)? {
+            Some(paths) => {
+                tracing::info!(
+                    "Using {} explicit package file(s) from {}",
+                    paths.len(),
+                    package_files_list.display()
+                );
+                Files::from_paths(
+                    host_prefix,
+                    paths,
+                    &self.recipe.build().always_include_files,
+                    &self.recipe.build().files,
+                )?
+            }
+            None => Files::from_prefix(
+                host_prefix,
+                &self.recipe.build().always_include_files,
+                &self.recipe.build().files,
+                post_install_files,
+            )?,
+        };
 
         package_conda(self, tool_configuration, &files_after)
     }

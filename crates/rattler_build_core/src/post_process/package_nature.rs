@@ -272,7 +272,9 @@ impl LibraryNameMap {
         // Try just the filename component
         let file_name = Path::new(stripped).file_name()?.to_string_lossy();
 
-        self.library_to_package.get(file_name.as_ref()).cloned()
+        self.library_to_package
+            .get(file_name.as_ref() as &str)
+            .cloned()
     }
 
     /// Returns true if the map is empty.
