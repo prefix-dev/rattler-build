@@ -1,6 +1,6 @@
-use rattler_shell::shell;
+use std::path::Path;
 
-use crate::execution::ExecutionArgs;
+use rattler_shell::shell;
 
 use super::NativeShellRunner;
 
@@ -33,23 +33,29 @@ fi
         "$((var))"
     }
 
-    fn debug_info(&self, args: &ExecutionArgs) -> String {
+    /// Returns reproduction instructions for the failed bash wrapper script.
+    fn debug_info(
+        &self,
+        work_dir: &Path,
+        run_prefix: &Path,
+        build_prefix: Option<&Path>,
+    ) -> String {
         let mut output = String::new();
 
         output.push_str("\nScript execution failed.\n\n");
-        output.push_str(&format!("  Work directory: {}\n", args.work_dir.display()));
-        output.push_str(&format!("  Prefix: {}\n", args.run_prefix.display()));
+        output.push_str(&format!("  Work directory: {}\n", work_dir.display()));
+        output.push_str(&format!("  Prefix: {}\n", run_prefix.display()));
 
-        if let Some(build_prefix) = &args.build_prefix {
+        if let Some(build_prefix) = build_prefix {
             output.push_str(&format!("  Build prefix: {}\n", build_prefix.display()));
         } else {
             output.push_str("  Build prefix: None\n");
         }
 
         output.push_str("\nTo run the script manually, use the following command:\n\n");
-        output.push_str(&format!("  cd {:?} && ./conda_build.sh\n\n", args.work_dir));
+        output.push_str(&format!("  cd {:?} && ./conda_build.sh\n\n", work_dir));
         output.push_str("To run commands interactively in the build environment:\n\n");
-        output.push_str(&format!("  cd {:?} && source build_env.sh", args.work_dir));
+        output.push_str(&format!("  cd {:?} && source build_env.sh", work_dir));
 
         output
     }

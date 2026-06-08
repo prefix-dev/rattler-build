@@ -530,20 +530,29 @@ with the following fields (all optional):
   the rendered recipe. The variables must already be set in the environment
   running `rattler-build`.
 - **`interpreter`** - Explicit interpreter to run `content` with. Supported
-  values are `bash` (default on Unix), `cmd.exe` (default on Windows), `nu`
-  (nushell), `python`, `perl`, `rscript`, `ruby` and `node`/`nodejs`. When
-  unset, the interpreter is auto-detected from the script's file extension
-  (`.sh`, `.bat`, `.nu`, `.py`, `.pl`, `.r`, `.rb`, `.js`).
+  values are `bash` (default on Unix), `cmd.exe` (default on Windows),
+  `powershell`, `nu` (nushell), `brush`, `python`, `perl`, `rscript`, `ruby`
+  and `node`/`nodejs`. When unset, the interpreter is auto-detected from the
+  script's file extension (`.sh`/`.bash`, `.bat`/`.cmd`, `.ps1`, `.nu`, `.py`,
+  `.pl`, `.r`, `.rb`, `.js`).
 - **`cwd`** - Working directory for the script, relative to the
   `[build folder]/work` directory. Defaults to the `[build folder]/work`
   directory itself.
 
 !!! warning "Non-default interpreters need a build dependency"
 
-    Only `bash` and `cmd.exe` are assumed to exist on the build machine.
-    Every other interpreter must be added to `requirements.build` (or
-    otherwise be available on `PATH`) so the build environment actually
-    has it. For example:
+    Every build and test script is launched through a native shell wrapper
+    (`bash` on Unix, `cmd.exe` on Windows) that activates the build/host
+    prefixes and then invokes the chosen interpreter as a command. Only the
+    native shells are assumed to exist on the build machine: `bash`/`cmd.exe`,
+    plus `powershell` on Windows, may be taken from the system `PATH` on their
+    native platform.
+
+    Every other interpreter (`python`, `perl`, `ruby`, `node`/`nodejs`,
+    `rscript`, `nu`/nushell and `brush`) is resolved **only** from the build
+    (or host) prefix, so it must be added to `requirements.build`. A copy
+    found on the system `PATH` is intentionally ignored to keep builds
+    reproducible. For example:
      - `interpreter: nu` requires `nushell` in `requirements.build`
      - `interpreter: python` requires `python`
      - `interpreter: node` requires `nodejs`

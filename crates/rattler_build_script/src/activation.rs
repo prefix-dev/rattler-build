@@ -64,3 +64,58 @@ pub(crate) fn activation_script<T: Shell + Clone + 'static>(
 
     Ok(shell_script.contents()?)
 }
+
+#[cfg(test)]
+mod tests {
+    use indexmap::IndexMap;
+    use rattler_conda_types::Platform;
+    use rattler_shell::shell;
+
+    use crate::execution::{EnvironmentIsolation, ExecutionArgs, ResolvedScriptContents};
+
+    /// When a build prefix is present, both the run prefix and build prefix are
+    /// activated and the generated script references both paths.
+    #[test]
+    fn activation_with_build_prefix_references_both_prefixes() {
+        let tmp = tempfile::tempdir().unwrap();
+        let run_prefix = tmp.path().join("run_prefix");
+        let build_prefix = tmp.path().join("build_prefix");
+        fs_err::create_dir_all(&run_prefix).unwrap();
+        fs_err::create_dir_all(&build_prefix).unwrap();
+
+        let args = ExecutionArgs {
+            script: ResolvedScriptContents::Inline(String::new()),
+            interpreter: None,
+            env_vars: IndexMap::new(),
+            secrets: IndexMap::new(),
+            execution_platform: Platform::current(),
+            build_prefix: Some(build_prefix.clone()),
+            run_prefix: run_prefix.clone(),
+            work_dir: tmp.path().to_path_buf(),
+            sandbox_config: None,
+            env_isolation: EnvironmentIsolation::None,
+        };
+
+        let script = super::activation_script(&args, shell::Bash::default()).unwrap();
+
+        // Both activations are appended. The Bash activator emits paths with
+        // forward slashes (and may use a normalized temp root), so we assert on
+        // the stable trailing component of each prefix rather than the full
+        // platform display path. Distinct names prove both activations ran.
+        assert!(
+            script.contains("run_prefix"),
+            "activation script must reference the run prefix, got:\n{script}"
+        );
+        assert!(
+            script.contains("build_prefix"),
+            "activation script must reference the build prefix, got:\n{script}"
+        );
+        // The build activation must be appended in addition to the run
+        // activation: two separate PATH exports, one per prefix.
+        let path_exports = script.matches("export PATH=").count();
+        assert!(
+            path_exports >= 2,
+            "expected separate PATH exports for both prefixes, got {path_exports}:\n{script}"
+        );
+    }
+}

@@ -12,8 +12,6 @@ use std::path::Path;
 
 use rattler_shell::shell::{Shell, ShellEnum};
 
-use crate::execution::ExecutionArgs;
-
 /// Defines platform-native wrapper execution.
 pub(crate) trait NativeShellRunner: Send + Sync {
     /// Returns the shell syntax used for the generated native wrapper script.
@@ -34,7 +32,8 @@ pub(crate) trait NativeShellRunner: Send + Sync {
     }
 
     /// Returns human-readable reproduction instructions shown when execution fails.
-    fn debug_info(&self, args: &ExecutionArgs) -> String;
+    fn debug_info(&self, work_dir: &Path, run_prefix: &Path, build_prefix: Option<&Path>)
+    -> String;
 }
 
 pub(crate) fn native_runner() -> Box<dyn NativeShellRunner> {

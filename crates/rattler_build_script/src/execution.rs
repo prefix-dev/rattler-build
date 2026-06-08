@@ -104,7 +104,7 @@ impl ExecutionArgs {
     /// Returns strings that should be replaced. The template argument can be used to specify
     /// a nice "variable" syntax, e.g. "$((var))" for bash or "%((var))%" for cmd.exe. The `var` part
     /// will be replaced with the actual variable name.
-    pub fn replacements(&self, template: &str) -> HashMap<String, String> {
+    pub(crate) fn replacements(&self, template: &str) -> HashMap<String, String> {
         let mut replacements = HashMap::new();
         if let Some(build_prefix) = &self.build_prefix {
             replacements.insert(
@@ -167,7 +167,7 @@ impl ResolvedScriptContents {
     }
 
     /// Determine interpreter based on file extension from the path
-    pub fn infer_interpreter(&self) -> Option<String> {
+    pub(crate) fn infer_interpreter(&self) -> Option<String> {
         self.path()
             .and_then(crate::script::determine_interpreter_from_path)
     }
@@ -369,7 +369,7 @@ impl Script {
 }
 
 /// An AsyncRead wrapper that replaces carriage return (\r) bytes with newline (\n) bytes.
-pub fn normalize_crlf<R: AsyncRead + Unpin>(reader: R) -> impl AsyncRead + Unpin {
+pub(crate) fn normalize_crlf<R: AsyncRead + Unpin>(reader: R) -> impl AsyncRead + Unpin {
     FramedRead::new(reader, CrLfNormalizer::default())
         .into_async_read()
         .compat()
@@ -377,8 +377,8 @@ pub fn normalize_crlf<R: AsyncRead + Unpin>(reader: R) -> impl AsyncRead + Unpin
 
 /// Codec that normalizes CR and CRLF to LF
 #[derive(Default)]
-pub struct CrLfNormalizer {
-    last_was_cr: bool,
+pub(crate) struct CrLfNormalizer {
+    pub(crate) last_was_cr: bool,
 }
 
 impl Decoder for CrLfNormalizer {
@@ -418,20 +418,15 @@ impl Decoder for CrLfNormalizer {
     }
 }
 
-#[derive(Debug)]
-pub struct GeneratedBuildScript {
-    pub build_script_path: PathBuf,
-}
-
-/// Returns the generated native build wrapper and any interpreter script file.
+/// Returns the path to the generated native build wrapper script.
 ///
 /// If `args.interpreter` is set, or if the resolved script path has a known
 /// interpreter extension, inline script text is written to a separate file and
 /// the native wrapper invokes the resolved interpreter with that file. Otherwise
 /// the script contents are appended directly to the native wrapper.
-pub async fn generate_build_script(
+pub(crate) async fn generate_build_script(
     args: &ExecutionArgs,
-) -> Result<GeneratedBuildScript, crate::InterpreterError> {
+) -> Result<PathBuf, crate::InterpreterError> {
     let runner = crate::native_runner::native_runner();
     let shell = runner.shell();
 
@@ -459,43 +454,39 @@ pub async fn generate_build_script(
         .or_else(|| args.script.infer_interpreter());
 
     let body = if let Some(user_interpreter) = explicit_or_inferred {
-        let invocation =
-            crate::interpreter::interpreter_invocation(&user_interpreter).ok_or_else(|| {
-                std::io::Error::other(format!("Unsupported interpreter: {user_interpreter}"))
-            })?;
+        let interpreter =
+            crate::interpreter::SelectedInterpreter::from_recipe_name(&user_interpreter)
+                .ok_or_else(|| {
+                    std::io::Error::other(format!("Unsupported interpreter: {user_interpreter}"))
+                })?;
 
         let script_path = match &args.script {
             ResolvedScriptContents::Path(path, _) => path.clone(),
             ResolvedScriptContents::Inline(script) => {
                 let path = args
                     .work_dir
-                    .join(format!("conda_build_script.{}", invocation.extension()));
-                tokio::fs::write(&path, invocation.script_contents(script)).await?;
+                    .join(format!("conda_build_script.{}", interpreter.extension()));
+                tokio::fs::write(&path, interpreter.script_contents(script)).await?;
                 path
             }
             ResolvedScriptContents::Missing => {
                 let path = args
                     .work_dir
-                    .join(format!("conda_build_script.{}", invocation.extension()));
-                tokio::fs::write(&path, invocation.script_contents("")).await?;
+                    .join(format!("conda_build_script.{}", interpreter.extension()));
+                tokio::fs::write(&path, interpreter.script_contents("")).await?;
                 path
             }
         };
 
-        // Search the build environment for the executable described by the
-        // invocation. `user_interpreter` is the recipe value (e.g. `nushell`),
-        // which is preserved for user-facing errors even when the executable
-        // has a different name (e.g. `nu`).
+        // Search the build environment for the executable. The selected
+        // interpreter preserves the recipe value (e.g. `nushell`) for
+        // user-facing errors even when the executable has a different name
+        // (e.g. `nu`).
         let prefix = args.build_prefix.as_ref().or(Some(&args.run_prefix));
-        let executable = crate::interpreter::resolve_interpreter_executable(
-            prefix,
-            &args.execution_platform,
-            &user_interpreter,
-            invocation.as_ref(),
-        )?;
+        let executable = interpreter.resolve_executable(prefix, &args.execution_platform)?;
 
         let mut command = vec![executable.to_string_lossy().into_owned()];
-        command.extend(invocation.args(&script_path));
+        command.extend(interpreter.args(&script_path));
         let command_refs = command.iter().map(String::as_str).collect::<Vec<_>>();
         let mut body = String::new();
         shell
@@ -522,14 +513,14 @@ pub async fn generate_build_script(
         }
     }
 
-    Ok(GeneratedBuildScript { build_script_path })
+    Ok(build_script_path)
 }
 
 /// Runs a script with the given execution arguments.
-pub async fn run_script(exec_args: ExecutionArgs) -> Result<(), crate::InterpreterError> {
+pub(crate) async fn run_script(exec_args: ExecutionArgs) -> Result<(), crate::InterpreterError> {
     let runner = crate::native_runner::native_runner();
-    let generated = generate_build_script(&exec_args).await?;
-    let build_script_path_str = generated.build_script_path.to_string_lossy().to_string();
+    let build_script_path = generate_build_script(&exec_args).await?;
+    let build_script_path_str = build_script_path.to_string_lossy().to_string();
     let cmd_args = runner.command_to_run_script(&build_script_path_str);
 
     let output = crate::execution::run_process_with_replacements(
@@ -549,7 +540,11 @@ pub async fn run_script(exec_args: ExecutionArgs) -> Result<(), crate::Interpret
 
     if !output.status.success() {
         let status_code = output.status.code().unwrap_or(1);
-        let debug_info = runner.debug_info(&exec_args);
+        let debug_info = runner.debug_info(
+            &exec_args.work_dir,
+            &exec_args.run_prefix,
+            exec_args.build_prefix.as_deref(),
+        );
         tracing::error!("Script failed with status {}", status_code);
         tracing::error!("{}", debug_info);
         return Err(crate::InterpreterError::ExecutionFailed(
@@ -565,7 +560,7 @@ pub async fn run_script(exec_args: ExecutionArgs) -> Result<(), crate::Interpret
 
 /// Creates build script files without executing them.
 pub async fn create_build_script(exec_args: ExecutionArgs) -> Result<(), std::io::Error> {
-    let generated = generate_build_script(&exec_args)
+    let build_script_path = generate_build_script(&exec_args)
         .await
         .map_err(|err| match err {
             crate::InterpreterError::ExecutionFailed(err) => err,
@@ -580,10 +575,7 @@ pub async fn create_build_script(exec_args: ExecutionArgs) -> Result<(), std::io
             )),
         })?;
 
-    tracing::info!(
-        "Build script created at {}",
-        generated.build_script_path.display()
-    );
+    tracing::info!("Build script created at {}", build_script_path.display());
     Ok(())
 }
 
@@ -676,7 +668,7 @@ fn configure_subprocess_env(
 
 /// Spawns a process and replaces the given strings in the output with the given replacements.
 /// This is used to replace the host prefix with $PREFIX and the build prefix with $BUILD_PREFIX
-pub async fn run_process_with_replacements(
+pub(crate) async fn run_process_with_replacements(
     args: &[&str],
     cwd: &Path,
     replacements: &HashMap<String, String>,
@@ -1082,5 +1074,225 @@ mod tests {
             .unwrap()
             .to_owned();
         assert_eq!(ext, if cfg!(windows) { "bat" } else { "sh" });
+    }
+
+    use rattler_shell::activation::prefix_path_entries;
+
+    /// Mirrors the interpreter-module test helper: places a 0-byte executable in
+    /// the prefix's bin directory and returns its path.
+    fn create_fake_executable(prefix: &Path, name: &str) -> PathBuf {
+        let exe_name = format!("{}{}", name, std::env::consts::EXE_SUFFIX);
+        let bin_dir = prefix_path_entries(prefix, &Platform::current())
+            .into_iter()
+            .next()
+            .expect("prefix has executable path entries");
+        fs::create_dir_all(&bin_dir).unwrap();
+        let exe = bin_dir.join(exe_name);
+        fs::write(&exe, "").unwrap();
+        #[cfg(unix)]
+        {
+            use std::{fs::Permissions, os::unix::fs::PermissionsExt};
+            fs::set_permissions(&exe, Permissions::from_mode(0o755)).unwrap();
+        }
+        exe
+    }
+
+    fn execution_args(
+        work_dir: PathBuf,
+        run_prefix: PathBuf,
+        script: ResolvedScriptContents,
+        interpreter: Option<&str>,
+    ) -> ExecutionArgs {
+        ExecutionArgs {
+            script,
+            interpreter: interpreter.map(str::to_string),
+            env_vars: IndexMap::new(),
+            secrets: IndexMap::new(),
+            execution_platform: Platform::current(),
+            build_prefix: None,
+            run_prefix,
+            work_dir,
+            sandbox_config: None,
+            env_isolation: EnvironmentIsolation::None,
+        }
+    }
+
+    /// In Strict mode the subprocess env is cleared, only the passthrough
+    /// whitelist is forwarded from the host, and explicit env_vars + secrets are
+    /// applied on top.
+    #[test]
+    #[serial_test::serial]
+    fn test_strict_env_clear_and_passthrough_whitelist() {
+        let original_random = std::env::var_os("RB_TEST_RANDOM_VAR");
+        let original_ssl = std::env::var_os("SSL_CERT_FILE");
+        // SAFETY: env mutation is serialized via #[serial] and restored below.
+        unsafe {
+            std::env::set_var("RB_TEST_RANDOM_VAR", "should-not-leak");
+            std::env::set_var("SSL_CERT_FILE", "/host/cacert.pem");
+        }
+
+        let mut env_vars = IndexMap::new();
+        env_vars.insert("EXPLICIT_VAR".to_string(), "explicit".to_string());
+        let mut secrets = IndexMap::new();
+        secrets.insert("SECRET_VAR".to_string(), "secret".to_string());
+
+        let collect_envs = |isolation: EnvironmentIsolation| {
+            let mut command = tokio::process::Command::new("true");
+            configure_subprocess_env(&mut command, &env_vars, &secrets, isolation);
+            command
+                .as_std()
+                .get_envs()
+                .filter_map(|(k, v)| {
+                    v.map(|v| {
+                        (
+                            k.to_string_lossy().into_owned(),
+                            v.to_string_lossy().into_owned(),
+                        )
+                    })
+                })
+                .collect::<HashMap<String, String>>()
+        };
+
+        let strict = collect_envs(EnvironmentIsolation::Strict);
+        assert!(
+            !strict.contains_key("RB_TEST_RANDOM_VAR"),
+            "non-whitelisted host var must be absent in Strict mode"
+        );
+        assert_eq!(
+            strict.get("SSL_CERT_FILE").map(String::as_str),
+            Some("/host/cacert.pem"),
+            "whitelisted host var must be passed through"
+        );
+        assert_eq!(
+            strict.get("EXPLICIT_VAR").map(String::as_str),
+            Some("explicit")
+        );
+        assert_eq!(strict.get("SECRET_VAR").map(String::as_str), Some("secret"));
+
+        // CondaBuild also clears the env and applies the same whitelist.
+        let conda_build = collect_envs(EnvironmentIsolation::CondaBuild);
+        assert!(
+            !conda_build.contains_key("RB_TEST_RANDOM_VAR"),
+            "non-whitelisted host var must be absent in CondaBuild mode"
+        );
+        assert_eq!(
+            conda_build.get("SSL_CERT_FILE").map(String::as_str),
+            Some("/host/cacert.pem")
+        );
+
+        // SAFETY: env mutation is serialized via #[serial].
+        unsafe {
+            match original_random {
+                Some(v) => std::env::set_var("RB_TEST_RANDOM_VAR", v),
+                None => std::env::remove_var("RB_TEST_RANDOM_VAR"),
+            }
+            match original_ssl {
+                Some(v) => std::env::set_var("SSL_CERT_FILE", v),
+                None => std::env::remove_var("SSL_CERT_FILE"),
+            }
+        }
+    }
+
+    /// The PowerShell prologue is written verbatim into the generated script
+    /// file for an inline body.
+    #[tokio::test]
+    async fn test_powershell_prologue_written_into_script_file() {
+        let tmp = tempfile::tempdir().unwrap();
+        let prefix = tmp.path().join("prefix");
+        fs::create_dir_all(&prefix).unwrap();
+        // The fake pwsh is 0 bytes; `is_pwsh_new_enough` will fail to parse a
+        // version and only warn, so resolution still succeeds.
+        create_fake_executable(&prefix, "pwsh");
+
+        let args = execution_args(
+            tmp.path().to_path_buf(),
+            prefix,
+            ResolvedScriptContents::Inline("Write-Output 'hi'".to_string()),
+            Some("powershell"),
+        );
+
+        generate_build_script(&args).await.unwrap();
+
+        let script_file = tmp.path().join("conda_build_script.ps1");
+        let contents = fs::read_to_string(&script_file).unwrap();
+        assert!(
+            contents.contains("$ErrorActionPreference = 'Stop'"),
+            "missing ErrorActionPreference, got:\n{contents}"
+        );
+        assert!(
+            contents.contains("$PSNativeCommandUseErrorActionPreference"),
+            "missing PSNativeCommandUseErrorActionPreference, got:\n{contents}"
+        );
+        assert!(
+            contents.contains("Write-Output 'hi'"),
+            "user body must be appended after the prologue"
+        );
+    }
+
+    /// `create_build_script` maps `InterpreterNotFound` to an io::Error whose
+    /// message mentions the build environment.
+    #[tokio::test]
+    async fn test_create_build_script_missing_interpreter_error() {
+        let tmp = tempfile::tempdir().unwrap();
+        let prefix = tmp.path().join("prefix");
+        fs::create_dir_all(&prefix).unwrap();
+
+        let args = execution_args(
+            tmp.path().to_path_buf(),
+            prefix,
+            ResolvedScriptContents::Inline("print('hi')".to_string()),
+            Some("python"),
+        );
+
+        let err = create_build_script(args).await.unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("was not found in the build environment"),
+            "unexpected error: {err}"
+        );
+    }
+
+    /// An unsupported interpreter name surfaces as an `Unsupported interpreter`
+    /// io::Error.
+    #[tokio::test]
+    async fn test_create_build_script_unsupported_interpreter_error() {
+        let tmp = tempfile::tempdir().unwrap();
+        let prefix = tmp.path().join("prefix");
+        fs::create_dir_all(&prefix).unwrap();
+
+        let args = execution_args(
+            tmp.path().to_path_buf(),
+            prefix,
+            ResolvedScriptContents::Inline("noop".to_string()),
+            Some("not-a-real-interp"),
+        );
+
+        let err = create_build_script(args).await.unwrap_err();
+        assert!(
+            err.to_string().contains("Unsupported interpreter"),
+            "unexpected error: {err}"
+        );
+    }
+
+    /// `EnvironmentIsolation` round-trips between `FromStr` and `Display`, and an
+    /// unknown value errors with the documented message.
+    #[test]
+    fn test_environment_isolation_round_trip() {
+        use std::str::FromStr;
+
+        for (text, value) in [
+            ("strict", EnvironmentIsolation::Strict),
+            ("conda-build", EnvironmentIsolation::CondaBuild),
+            ("none", EnvironmentIsolation::None),
+        ] {
+            assert_eq!(EnvironmentIsolation::from_str(text).unwrap(), value);
+            assert_eq!(value.to_string(), text);
+        }
+
+        let err = EnvironmentIsolation::from_str("bogus").unwrap_err();
+        assert!(
+            err.contains("unknown environment isolation mode 'bogus'"),
+            "unexpected error: {err}"
+        );
     }
 }

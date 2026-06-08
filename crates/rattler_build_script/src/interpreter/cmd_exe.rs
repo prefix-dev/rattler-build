@@ -42,8 +42,6 @@ impl InterpreterInvocation for CmdExeInvocation {
             build_platform,
             self.search_scope(build_platform),
         )
-        .ok()
-        .flatten()
         .ok_or_else(|| super::InterpreterError::InterpreterNotFound("cmd".to_string()))
     }
 

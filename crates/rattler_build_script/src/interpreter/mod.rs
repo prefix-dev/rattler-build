@@ -51,18 +51,16 @@ pub(crate) fn find_interpreter(
     build_prefix: Option<&PathBuf>,
     platform: &Platform,
     scope: InterpreterSearchScope,
-) -> Result<Option<PathBuf>, which::Error> {
+) -> Option<PathBuf> {
     let exe_name = format!("{}{}", name, std::env::consts::EXE_SUFFIX);
 
     // Build-prefix-only: search just the prefix bin entries, no PATH fallback.
     if let InterpreterSearchScope::BuildPrefixOnly = scope {
-        let Some(build_prefix) = build_prefix else {
-            return Ok(None);
-        };
+        let build_prefix = build_prefix?;
         let prefix_path = prefix_path_entries(build_prefix, platform);
-        return Ok(
-            which::which_in_global(exe_name, std::env::join_paths(prefix_path).ok())?.next(),
-        );
+        return which::which_in_global(exe_name, std::env::join_paths(prefix_path).ok())
+            .ok()?
+            .next();
     }
 
     let path = std::env::var("PATH").unwrap_or_default();
@@ -71,12 +69,12 @@ pub(crate) fn find_interpreter(
             .into_iter()
             .collect::<Vec<_>>();
         prepend_path.extend(std::env::split_paths(&path));
-        return Ok(
-            which::which_in_global(exe_name, std::env::join_paths(prepend_path).ok())?.next(),
-        );
+        return which::which_in_global(exe_name, std::env::join_paths(prepend_path).ok())
+            .ok()?
+            .next();
     }
 
-    Ok(which::which_in_global(exe_name, Some(path))?.next())
+    which::which_in_global(exe_name, Some(path)).ok()?.next()
 }
 
 /// Describes how a specialized interpreter executes a script file.
@@ -132,11 +130,11 @@ pub(crate) trait InterpreterInvocation: Send + Sync {
 
         for executable_name in self.executable_names(build_platform) {
             match find_interpreter(executable_name, build_prefix, build_platform, scope) {
-                Ok(Some(path)) => match self.is_usable_executable(&path) {
+                Some(path) => match self.is_usable_executable(&path) {
                     Ok(()) => return Ok(path),
                     Err(err) => unusable_candidate = Some((path, err)),
                 },
-                Ok(None) | Err(_) => continue,
+                None => continue,
             }
         }
 
@@ -163,7 +161,7 @@ pub(crate) trait InterpreterInvocation: Send + Sync {
     fn args(&self, script_path: &Path) -> Vec<String>;
 }
 
-pub(crate) fn interpreter_invocation(interpreter: &str) -> Option<Box<dyn InterpreterInvocation>> {
+fn interpreter_invocation(interpreter: &str) -> Option<Box<dyn InterpreterInvocation>> {
     match interpreter {
         "bash" => Some(Box::new(bash::BashInvocation)),
         "cmd" => Some(Box::new(cmd_exe::CmdExeInvocation)),
@@ -179,26 +177,57 @@ pub(crate) fn interpreter_invocation(interpreter: &str) -> Option<Box<dyn Interp
     }
 }
 
-pub(crate) fn resolve_interpreter_executable(
-    build_prefix: Option<&PathBuf>,
-    build_platform: &Platform,
-    user_interpreter: &str,
-    invocation: &dyn InterpreterInvocation,
-) -> Result<PathBuf, InterpreterError> {
-    invocation
-        .resolve_executable(build_prefix, build_platform)
-        .map_err(|err| match err {
-            InterpreterError::InterpreterNotFound(_) => {
-                InterpreterError::InterpreterNotFound(user_interpreter.to_string())
-            }
-            InterpreterError::InvalidInterpreter { reason, .. } => {
-                InterpreterError::InvalidInterpreter {
-                    interpreter: user_interpreter.to_string(),
-                    reason,
-                }
-            }
-            other => other,
+/// An interpreter selected from a recipe, pairing the user-facing name with its invocation behavior.
+pub(crate) struct SelectedInterpreter {
+    user_name: String,
+    invocation: Box<dyn InterpreterInvocation>,
+}
+
+impl SelectedInterpreter {
+    /// Look up the interpreter by its recipe name, returning None if unsupported.
+    pub(crate) fn from_recipe_name(name: &str) -> Option<Self> {
+        interpreter_invocation(name).map(|invocation| Self {
+            user_name: name.to_string(),
+            invocation,
         })
+    }
+
+    /// Returns the default file extension for scripts run by this interpreter.
+    pub(crate) fn extension(&self) -> &'static str {
+        self.invocation.extension()
+    }
+
+    /// Returns the contents to write to files executed by this interpreter.
+    pub(crate) fn script_contents(&self, raw: &str) -> String {
+        self.invocation.script_contents(raw)
+    }
+
+    /// Returns the argument values following the executable for the given script file.
+    pub(crate) fn args(&self, script_path: &Path) -> Vec<String> {
+        self.invocation.args(script_path)
+    }
+
+    /// Resolve the executable, remapping internal errors to the user-facing name.
+    pub(crate) fn resolve_executable(
+        &self,
+        build_prefix: Option<&PathBuf>,
+        platform: &Platform,
+    ) -> Result<PathBuf, InterpreterError> {
+        self.invocation
+            .resolve_executable(build_prefix, platform)
+            .map_err(|err| match err {
+                InterpreterError::InterpreterNotFound(_) => {
+                    InterpreterError::InterpreterNotFound(self.user_name.clone())
+                }
+                InterpreterError::InvalidInterpreter { reason, .. } => {
+                    InterpreterError::InvalidInterpreter {
+                        interpreter: self.user_name.clone(),
+                        reason,
+                    }
+                }
+                other => other,
+            })
+    }
 }
 #[cfg(test)]
 mod tests {
@@ -240,7 +269,7 @@ mod tests {
 
     fn create_fake_executable(prefix: &Path, name: &str) -> PathBuf {
         let exe_name = format!("{}{}", name, std::env::consts::EXE_SUFFIX);
-        let bin_dir = prefix_path_entries(&prefix.to_path_buf(), &Platform::current())
+        let bin_dir = prefix_path_entries(prefix, &Platform::current())
             .into_iter()
             .next()
             .expect("prefix has executable path entries");
@@ -374,6 +403,276 @@ mod tests {
         assert!(
             matches!(err, InterpreterError::InterpreterNotFound(ref name) if name == "python"),
             "expected missing python error, got {err:?}"
+        );
+    }
+
+    /// Stub interpreter that exercises the candidate iteration and
+    /// `is_usable_executable` rejection path of the default
+    /// `resolve_executable`. It searches the build prefix only and tries two
+    /// executable names; the first name is always rejected by validation.
+    struct RejectFirstStub;
+
+    impl InterpreterInvocation for RejectFirstStub {
+        fn executable_names(&self, _build_platform: &Platform) -> &'static [&'static str] {
+            &["stub_first", "stub_second"]
+        }
+
+        fn search_scope(&self, _build_platform: &Platform) -> InterpreterSearchScope {
+            InterpreterSearchScope::BuildPrefixOnly
+        }
+
+        fn extension(&self) -> &'static str {
+            "stub"
+        }
+
+        fn is_usable_executable(&self, executable: &Path) -> Result<(), InterpreterError> {
+            // Reject any candidate whose file stem is `stub_first`.
+            let stem = executable
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or_default();
+            if stem == "stub_first" {
+                Err(InterpreterError::InvalidInterpreter {
+                    interpreter: executable.display().to_string(),
+                    reason: "rejected by test stub".to_string(),
+                })
+            } else {
+                Ok(())
+            }
+        }
+
+        fn args(&self, script_path: &Path) -> Vec<String> {
+            vec![script_path.to_string_lossy().into_owned()]
+        }
+    }
+
+    /// Case A: the first candidate is rejected by `is_usable_executable`, so
+    /// lookup continues and returns the second (usable) candidate.
+    #[test]
+    fn rejected_first_candidate_falls_through_to_second() {
+        let tmp = tempfile::tempdir().unwrap();
+        let prefix = tmp.path().join("prefix");
+        fs::create_dir_all(&prefix).unwrap();
+        create_fake_executable(&prefix, "stub_first");
+        let second = create_fake_executable(&prefix, "stub_second");
+
+        let stub = RejectFirstStub;
+        let resolved = stub
+            .resolve_executable(Some(&prefix), &Platform::current())
+            .expect("second candidate should resolve");
+        assert_eq!(resolved, second);
+    }
+
+    /// Case B: the only available candidate is rejected, so
+    /// `resolve_executable` reports `InvalidInterpreter`. Going through
+    /// `SelectedInterpreter` is not possible for a test-only stub, so the
+    /// recipe-name remapping is asserted by exercising the same `map_err`
+    /// behavior directly via a real factory interpreter below.
+    #[test]
+    fn only_candidate_rejected_yields_invalid_interpreter() {
+        let tmp = tempfile::tempdir().unwrap();
+        let prefix = tmp.path().join("prefix");
+        fs::create_dir_all(&prefix).unwrap();
+        let first = create_fake_executable(&prefix, "stub_first");
+
+        let stub = RejectFirstStub;
+        let err = stub
+            .resolve_executable(Some(&prefix), &Platform::current())
+            .expect_err("only candidate is rejected");
+        match err {
+            InterpreterError::InvalidInterpreter { interpreter, .. } => {
+                // The raw error carries the executable path, not a user-facing name.
+                assert_eq!(interpreter, first.display().to_string());
+            }
+            other => panic!("expected InvalidInterpreter, got {other:?}"),
+        }
+    }
+
+    /// Wrapping a `SelectedInterpreter` around an invocation remaps the
+    /// `InvalidInterpreter.interpreter` field from the executable path to the
+    /// user-facing recipe name. We exercise this with the powershell factory
+    /// interpreter, whose `is_usable_executable` never errors, so we instead
+    /// assert the remapping logic via a directly-constructed SelectedInterpreter
+    /// whose invocation always rejects.
+    #[test]
+    fn selected_interpreter_remaps_invalid_to_user_name() {
+        let tmp = tempfile::tempdir().unwrap();
+        let prefix = tmp.path().join("prefix");
+        fs::create_dir_all(&prefix).unwrap();
+        create_fake_executable(&prefix, "stub_first");
+
+        let selected = SelectedInterpreter {
+            user_name: "my-recipe-interp".to_string(),
+            invocation: Box::new(RejectFirstStub),
+        };
+
+        let err = selected
+            .resolve_executable(Some(&prefix), &Platform::current())
+            .expect_err("only candidate is rejected");
+        match err {
+            InterpreterError::InvalidInterpreter {
+                interpreter,
+                reason,
+            } => {
+                assert_eq!(interpreter, "my-recipe-interp");
+                assert!(reason.contains("rejected by test stub"), "reason: {reason}");
+            }
+            other => panic!("expected InvalidInterpreter, got {other:?}"),
+        }
+    }
+
+    /// Language interpreters must not leak from the system PATH: `find_interpreter`
+    /// with `PrefixThenSystemPath` finds an exe present only on PATH, while
+    /// `BuildPrefixOnly` does not.
+    #[test]
+    #[serial_test::serial]
+    fn search_scope_path_fallback_vs_prefix_only() {
+        let tmp = tempfile::tempdir().unwrap();
+        let prefix = tmp.path().join("prefix");
+        fs::create_dir_all(&prefix).unwrap();
+
+        // Place a fake exe in a separate dir that we prepend onto PATH, NOT in
+        // the build prefix.
+        let path_dir = tmp.path().join("path_only");
+        fs::create_dir_all(&path_dir).unwrap();
+        let exe_name = format!("rb_path_only_tool{}", std::env::consts::EXE_SUFFIX);
+        let exe = path_dir.join(&exe_name);
+        fs::write(&exe, "").unwrap();
+        #[cfg(unix)]
+        {
+            use std::{fs::Permissions, os::unix::fs::PermissionsExt};
+            fs::set_permissions(&exe, Permissions::from_mode(0o755)).unwrap();
+        }
+
+        let original_path = std::env::var_os("PATH");
+        let mut new_paths = vec![path_dir.clone()];
+        if let Some(orig) = &original_path {
+            new_paths.extend(std::env::split_paths(orig));
+        }
+        // SAFETY: env mutation is serialized via #[serial] and restored below.
+        unsafe {
+            std::env::set_var("PATH", std::env::join_paths(&new_paths).unwrap());
+        }
+
+        let platform = Platform::current();
+        let found_via_path = find_interpreter(
+            "rb_path_only_tool",
+            Some(&prefix),
+            &platform,
+            InterpreterSearchScope::PrefixThenSystemPath,
+        );
+        let found_prefix_only = find_interpreter(
+            "rb_path_only_tool",
+            Some(&prefix),
+            &platform,
+            InterpreterSearchScope::BuildPrefixOnly,
+        );
+
+        // Restore PATH before asserting so a failure does not corrupt later tests.
+        // SAFETY: env mutation is serialized via #[serial].
+        unsafe {
+            match original_path {
+                Some(orig) => std::env::set_var("PATH", orig),
+                None => std::env::remove_var("PATH"),
+            }
+        }
+
+        assert!(
+            found_via_path.is_some(),
+            "PrefixThenSystemPath should find the exe on PATH"
+        );
+        assert_eq!(found_via_path.unwrap(), exe);
+        assert!(
+            found_prefix_only.is_none(),
+            "BuildPrefixOnly must not find an exe that lives only on PATH"
+        );
+    }
+
+    /// PowerShell tries `pwsh` first then `powershell` on the windows branch.
+    /// This documents the candidate order without resolving (the real invocation
+    /// uses `PrefixThenSystemPath`, so a system `pwsh` would leak into resolution).
+    #[test]
+    fn powershell_lists_pwsh_then_powershell_on_windows() {
+        let names = super::powershell::PowerShellInvocation.executable_names(&Platform::Win64);
+        assert_eq!(names, &["pwsh", "powershell"]);
+    }
+
+    /// When the first executable name is absent from the prefix, resolution falls
+    /// through to a later name. Uses the `BuildPrefixOnly` stub so the system PATH
+    /// cannot leak a real `stub_first`/`stub_second` into the result. This covers
+    /// the `find_interpreter == None` continue branch (distinct from the
+    /// `is_usable_executable` rejection branch above), mirroring how PowerShell
+    /// falls through from `pwsh` to `powershell`.
+    #[test]
+    fn missing_first_candidate_falls_through_to_second() {
+        let tmp = tempfile::tempdir().unwrap();
+        let prefix = tmp.path().join("prefix");
+        fs::create_dir_all(&prefix).unwrap();
+        // Create only the second candidate; `stub_first` is never found on disk.
+        let second = create_fake_executable(&prefix, "stub_second");
+
+        let resolved = RejectFirstStub
+            .resolve_executable(Some(&prefix), &Platform::current())
+            .expect("second candidate should resolve when the first is absent");
+        assert_eq!(resolved, second);
+    }
+
+    /// On Windows, cmd resolution special-cases `COMSPEC` when it points at
+    /// `cmd.exe`, returning it verbatim.
+    #[cfg(windows)]
+    #[test]
+    #[serial_test::serial]
+    fn cmd_uses_comspec_special_case() {
+        let tmp = tempfile::tempdir().unwrap();
+        let fake_cmd = tmp.path().join("system32").join("cmd.exe");
+        fs::create_dir_all(fake_cmd.parent().unwrap()).unwrap();
+        fs::write(&fake_cmd, "").unwrap();
+
+        let original = std::env::var_os("COMSPEC");
+        // SAFETY: env mutation is serialized via #[serial] and restored below.
+        unsafe {
+            std::env::set_var("COMSPEC", &fake_cmd);
+        }
+
+        let resolved = super::cmd_exe::CmdExeInvocation.resolve_executable(None, &Platform::Win64);
+
+        // SAFETY: env mutation is serialized via #[serial].
+        unsafe {
+            match original {
+                Some(orig) => std::env::set_var("COMSPEC", orig),
+                None => std::env::remove_var("COMSPEC"),
+            }
+        }
+
+        assert_eq!(resolved.unwrap(), fake_cmd);
+    }
+
+    /// Recipe-name factory mapping to file extensions.
+    #[test]
+    fn factory_maps_recipe_names_to_extensions() {
+        assert_eq!(
+            SelectedInterpreter::from_recipe_name("nushell")
+                .unwrap()
+                .extension(),
+            "nu"
+        );
+        assert_eq!(
+            SelectedInterpreter::from_recipe_name("nu")
+                .unwrap()
+                .extension(),
+            "nu"
+        );
+        assert_eq!(
+            SelectedInterpreter::from_recipe_name("brush")
+                .unwrap()
+                .extension(),
+            "sh"
+        );
+        assert_eq!(
+            SelectedInterpreter::from_recipe_name("python")
+                .unwrap()
+                .extension(),
+            "py"
         );
     }
 }
