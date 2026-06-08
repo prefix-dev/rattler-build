@@ -172,8 +172,11 @@ pub(crate) fn write_test_files(
     // filtered out by conditionals (e.g. `if: not build_win`).
     tests.retain(|test| {
         if let TestType::Commands(cmd) = test {
-            let has_content =
-                !matches!(&cmd.script.content, ScriptContent::Command(s) if s.is_empty());
+            let has_content = match &cmd.script.content {
+                ScriptContent::Command(s) => !s.is_empty(),
+                ScriptContent::Commands(c) => !c.is_empty(),
+                _ => true,
+            };
             let has_requirements = !cmd.requirements.is_empty();
             let has_files = !cmd.files.is_empty();
             has_content || has_requirements || has_files
