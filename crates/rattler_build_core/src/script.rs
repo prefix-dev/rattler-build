@@ -6,11 +6,10 @@
 use indexmap::IndexMap;
 use minijinja::Value;
 use rattler_build_jinja::Jinja;
-use rattler_conda_types::Platform;
 
 // Re-export from rattler_build_script
 pub use rattler_build_script::{
-    ExecutionArgs, InterpreterError, ResolvedScriptContents, SandboxArguments,
+    ExecutionArgs, InterpreterError, ResolvedScriptContents, RuntimeEnv, SandboxArguments,
     SandboxConfiguration, Script, ScriptContent, platform_script_extensions,
 };
 
@@ -64,7 +63,7 @@ impl Output {
             secrets: IndexMap::new(),
             build_prefix: build_prefix.map(|p| p.to_owned()),
             run_prefix: host_prefix,
-            execution_platform: Platform::current(),
+            runtime: RuntimeEnv::current(),
             work_dir: work_dir.clone(),
             sandbox_config: self.build_configuration.sandbox_config().cloned(),
             env_isolation,

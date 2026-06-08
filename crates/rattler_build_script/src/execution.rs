@@ -4,13 +4,13 @@
 //! [`generate_build_script`], executes them with [`run_script`], and provides
 //! subprocess output handling via [`run_process_with_replacements`].
 
+use crate::runtime::RuntimeEnv;
 use crate::sandbox::SandboxConfiguration;
 use crate::script::{Script, ScriptContent};
 use fs_err as fs;
 use futures::TryStreamExt;
 use indexmap::IndexMap;
 use itertools::Itertools;
-use rattler_conda_types::Platform;
 use rattler_shell::shell::Shell;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -82,8 +82,9 @@ pub struct ExecutionArgs {
     /// Secrets to set as env vars and replace in the output
     pub secrets: IndexMap<String, String>,
 
-    /// The platform on which the script should be executed
-    pub execution_platform: Platform,
+    /// The environment rattler-build is running in: process environment
+    /// variables (including `PATH`) and the platform scripts execute on.
+    pub runtime: RuntimeEnv,
 
     /// The build prefix that should contain the interpreter to use
     pub build_prefix: Option<PathBuf>,
@@ -209,14 +210,16 @@ impl Script {
             crate::platform_script_extensions(),
         )?;
 
+        let runtime = RuntimeEnv::current();
+
         let secrets = self
             .secrets()
             .iter()
             .filter_map(|k| {
                 let secret = k.to_string();
 
-                if let Ok(value) = std::env::var(&secret) {
-                    Some((secret, value))
+                if let Some(value) = runtime.var(&secret) {
+                    Some((secret, value.to_string()))
                 } else {
                     tracing::warn!("Secret {} not found in environment", secret);
                     None
@@ -239,7 +242,7 @@ impl Script {
             secrets,
             build_prefix: build_prefix.map(|p| p.to_owned()),
             run_prefix: run_prefix.to_owned(),
-            execution_platform: Platform::current(),
+            runtime,
             work_dir,
             sandbox_config: sandbox_config.cloned(),
             env_isolation,
@@ -483,7 +486,7 @@ pub(crate) async fn generate_build_script(
         // user-facing errors even when the executable has a different name
         // (e.g. `nu`).
         let prefix = args.build_prefix.as_ref().or(Some(&args.run_prefix));
-        let executable = interpreter.resolve_executable(prefix, &args.execution_platform)?;
+        let executable = interpreter.resolve_executable(prefix, &args.runtime)?;
 
         let mut command = vec![executable.to_string_lossy().into_owned()];
         command.extend(interpreter.args(&script_path));
@@ -535,6 +538,7 @@ pub(crate) async fn run_script(exec_args: ExecutionArgs) -> Result<(), crate::In
         } else {
             None
         },
+        &exec_args.runtime,
     )
     .await?;
 
@@ -579,9 +583,11 @@ pub async fn create_build_script(exec_args: ExecutionArgs) -> Result<(), std::io
     Ok(())
 }
 
-/// Finds the rattler-sandbox executable in PATH.
-fn find_rattler_sandbox() -> Option<PathBuf> {
-    which::which("rattler-sandbox").ok()
+/// Finds the rattler-sandbox executable on the runtime `PATH`.
+fn find_rattler_sandbox(runtime: &RuntimeEnv) -> Option<PathBuf> {
+    which::which_in_global("rattler-sandbox", Some(runtime.path()))
+        .ok()?
+        .next()
 }
 
 /// Environment variables that are passed through from the host environment
@@ -643,6 +649,7 @@ fn configure_subprocess_env(
     env_vars: &IndexMap<String, String>,
     secrets: &IndexMap<String, String>,
     env_isolation: EnvironmentIsolation,
+    runtime: &RuntimeEnv,
 ) {
     match env_isolation {
         EnvironmentIsolation::Strict | EnvironmentIsolation::CondaBuild => {
@@ -652,7 +659,7 @@ fn configure_subprocess_env(
                 .iter()
                 .chain(PLATFORM_PASSTHROUGH_ENV_VARS)
             {
-                if let Ok(value) = std::env::var(var) {
+                if let Some(value) = runtime.var(var) {
                     command.env(var, value);
                 }
             }
@@ -668,6 +675,7 @@ fn configure_subprocess_env(
 
 /// Spawns a process and replaces the given strings in the output with the given replacements.
 /// This is used to replace the host prefix with $PREFIX and the build prefix with $BUILD_PREFIX
+#[allow(clippy::too_many_arguments)]
 pub(crate) async fn run_process_with_replacements(
     args: &[&str],
     cwd: &Path,
@@ -676,6 +684,7 @@ pub(crate) async fn run_process_with_replacements(
     secrets: &IndexMap<String, String>,
     env_isolation: EnvironmentIsolation,
     sandbox_config: Option<&SandboxConfiguration>,
+    runtime: &RuntimeEnv,
 ) -> Result<std::process::Output, std::io::Error> {
     // Create or open the build log file
     let log_file_path = cwd.join("conda_build.log");
@@ -688,7 +697,7 @@ pub(crate) async fn run_process_with_replacements(
         tracing::info!("{}", sandbox_config);
 
         // Try to find rattler-sandbox executable
-        if let Some(sandbox_exe) = find_rattler_sandbox() {
+        if let Some(sandbox_exe) = find_rattler_sandbox(runtime) {
             let mut cmd = tokio::process::Command::new(sandbox_exe);
 
             // Add sandbox configuration arguments
@@ -712,7 +721,7 @@ pub(crate) async fn run_process_with_replacements(
         tokio::process::Command::new(args[0])
     };
 
-    configure_subprocess_env(&mut command, env_vars, secrets, env_isolation);
+    configure_subprocess_env(&mut command, env_vars, secrets, env_isolation, runtime);
 
     command
         .current_dir(cwd)
@@ -801,6 +810,7 @@ pub(crate) async fn run_process_with_replacements(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rattler_conda_types::Platform;
     use tokio_util::bytes::BytesMut;
 
     /// `CONDA_BUILD=1` must live inside the sourced activation script so that
@@ -818,7 +828,7 @@ mod tests {
             interpreter: None,
             env_vars: IndexMap::new(),
             secrets: IndexMap::new(),
-            execution_platform: Platform::current(),
+            runtime: RuntimeEnv::for_test(Platform::current()),
             build_prefix: None,
             run_prefix: prefix,
             work_dir: tmp.path().to_path_buf(),
@@ -846,6 +856,7 @@ mod tests {
             &env_vars,
             &secrets,
             EnvironmentIsolation::None,
+            &RuntimeEnv::for_test(Platform::current()),
         );
 
         assert!(
@@ -1108,7 +1119,7 @@ mod tests {
             interpreter: interpreter.map(str::to_string),
             env_vars: IndexMap::new(),
             secrets: IndexMap::new(),
-            execution_platform: Platform::current(),
+            runtime: RuntimeEnv::current(),
             build_prefix: None,
             run_prefix,
             work_dir,
@@ -1119,17 +1130,13 @@ mod tests {
 
     /// In Strict mode the subprocess env is cleared, only the passthrough
     /// whitelist is forwarded from the host, and explicit env_vars + secrets are
-    /// applied on top.
+    /// applied on top. The host vars are injected through `RuntimeEnv`, so the
+    /// test does not touch the real process environment.
     #[test]
-    #[serial_test::serial]
     fn test_strict_env_clear_and_passthrough_whitelist() {
-        let original_random = std::env::var_os("RB_TEST_RANDOM_VAR");
-        let original_ssl = std::env::var_os("SSL_CERT_FILE");
-        // SAFETY: env mutation is serialized via #[serial] and restored below.
-        unsafe {
-            std::env::set_var("RB_TEST_RANDOM_VAR", "should-not-leak");
-            std::env::set_var("SSL_CERT_FILE", "/host/cacert.pem");
-        }
+        let runtime = RuntimeEnv::for_test(Platform::current())
+            .with_var("RB_TEST_RANDOM_VAR", "should-not-leak")
+            .with_var("SSL_CERT_FILE", "/host/cacert.pem");
 
         let mut env_vars = IndexMap::new();
         env_vars.insert("EXPLICIT_VAR".to_string(), "explicit".to_string());
@@ -1138,7 +1145,7 @@ mod tests {
 
         let collect_envs = |isolation: EnvironmentIsolation| {
             let mut command = tokio::process::Command::new("true");
-            configure_subprocess_env(&mut command, &env_vars, &secrets, isolation);
+            configure_subprocess_env(&mut command, &env_vars, &secrets, isolation, &runtime);
             command
                 .as_std()
                 .get_envs()
@@ -1179,18 +1186,6 @@ mod tests {
             conda_build.get("SSL_CERT_FILE").map(String::as_str),
             Some("/host/cacert.pem")
         );
-
-        // SAFETY: env mutation is serialized via #[serial].
-        unsafe {
-            match original_random {
-                Some(v) => std::env::set_var("RB_TEST_RANDOM_VAR", v),
-                None => std::env::remove_var("RB_TEST_RANDOM_VAR"),
-            }
-            match original_ssl {
-                Some(v) => std::env::set_var("SSL_CERT_FILE", v),
-                None => std::env::remove_var("SSL_CERT_FILE"),
-            }
-        }
     }
 
     /// The PowerShell prologue is written verbatim into the generated script

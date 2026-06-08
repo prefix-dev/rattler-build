@@ -25,6 +25,8 @@ mod execution;
 mod interpreter;
 #[cfg(feature = "execution")]
 mod native_runner;
+#[cfg(feature = "execution")]
+mod runtime;
 
 #[cfg(feature = "execution")]
 pub use execution::{
@@ -32,3 +34,5 @@ pub use execution::{
 };
 #[cfg(feature = "execution")]
 pub use interpreter::InterpreterError;
+#[cfg(feature = "execution")]
+pub use runtime::RuntimeEnv;

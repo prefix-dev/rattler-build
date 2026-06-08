@@ -21,6 +21,8 @@ use std::path::{Path, PathBuf};
 use rattler_conda_types::Platform;
 use rattler_shell::activation::prefix_path_entries;
 
+use crate::runtime::RuntimeEnv;
+
 /// Describes interpreter execution and lookup errors.
 #[derive(Debug, thiserror::Error)]
 pub enum InterpreterError {
@@ -49,26 +51,27 @@ pub enum InterpreterSearchScope {
 pub(crate) fn find_interpreter(
     name: &str,
     build_prefix: Option<&PathBuf>,
-    platform: &Platform,
+    runtime: &RuntimeEnv,
     scope: InterpreterSearchScope,
 ) -> Option<PathBuf> {
     let exe_name = format!("{}{}", name, std::env::consts::EXE_SUFFIX);
+    let platform = runtime.platform();
 
     // Build-prefix-only: search just the prefix bin entries, no PATH fallback.
     if let InterpreterSearchScope::BuildPrefixOnly = scope {
         let build_prefix = build_prefix?;
-        let prefix_path = prefix_path_entries(build_prefix, platform);
+        let prefix_path = prefix_path_entries(build_prefix, &platform);
         return which::which_in_global(exe_name, std::env::join_paths(prefix_path).ok())
             .ok()?
             .next();
     }
 
-    let path = std::env::var("PATH").unwrap_or_default();
+    let path = runtime.path();
     if let Some(build_prefix) = build_prefix {
-        let mut prepend_path = prefix_path_entries(build_prefix, platform)
+        let mut prepend_path = prefix_path_entries(build_prefix, &platform)
             .into_iter()
             .collect::<Vec<_>>();
-        prepend_path.extend(std::env::split_paths(&path));
+        prepend_path.extend(std::env::split_paths(path));
         return which::which_in_global(exe_name, std::env::join_paths(prepend_path).ok())
             .ok()?
             .next();
@@ -123,13 +126,14 @@ pub(crate) trait InterpreterInvocation: Send + Sync {
     fn resolve_executable(
         &self,
         build_prefix: Option<&PathBuf>,
-        build_platform: &Platform,
+        runtime: &RuntimeEnv,
     ) -> Result<PathBuf, InterpreterError> {
-        let scope = self.search_scope(build_platform);
+        let platform = runtime.platform();
+        let scope = self.search_scope(&platform);
         let mut unusable_candidate = None;
 
-        for executable_name in self.executable_names(build_platform) {
-            match find_interpreter(executable_name, build_prefix, build_platform, scope) {
+        for executable_name in self.executable_names(&platform) {
+            match find_interpreter(executable_name, build_prefix, runtime, scope) {
                 Some(path) => match self.is_usable_executable(&path) {
                     Ok(()) => return Ok(path),
                     Err(err) => unusable_candidate = Some((path, err)),
@@ -146,7 +150,7 @@ pub(crate) trait InterpreterInvocation: Send + Sync {
         }
 
         Err(InterpreterError::InterpreterNotFound(
-            self.executable_names(build_platform)
+            self.executable_names(&platform)
                 .first()
                 .copied()
                 .unwrap_or("<unknown>")
@@ -211,10 +215,10 @@ impl SelectedInterpreter {
     pub(crate) fn resolve_executable(
         &self,
         build_prefix: Option<&PathBuf>,
-        platform: &Platform,
+        runtime: &RuntimeEnv,
     ) -> Result<PathBuf, InterpreterError> {
         self.invocation
-            .resolve_executable(build_prefix, platform)
+            .resolve_executable(build_prefix, runtime)
             .map_err(|err| match err {
                 InterpreterError::InterpreterNotFound(_) => {
                     InterpreterError::InterpreterNotFound(self.user_name.clone())
@@ -250,7 +254,7 @@ mod tests {
             interpreter: interpreter.map(str::to_string),
             env_vars: IndexMap::new(),
             secrets: IndexMap::new(),
-            execution_platform: Platform::current(),
+            runtime: RuntimeEnv::current(),
             build_prefix: None,
             run_prefix,
             work_dir,
@@ -458,7 +462,7 @@ mod tests {
 
         let stub = RejectFirstStub;
         let resolved = stub
-            .resolve_executable(Some(&prefix), &Platform::current())
+            .resolve_executable(Some(&prefix), &RuntimeEnv::current())
             .expect("second candidate should resolve");
         assert_eq!(resolved, second);
     }
@@ -477,7 +481,7 @@ mod tests {
 
         let stub = RejectFirstStub;
         let err = stub
-            .resolve_executable(Some(&prefix), &Platform::current())
+            .resolve_executable(Some(&prefix), &RuntimeEnv::current())
             .expect_err("only candidate is rejected");
         match err {
             InterpreterError::InvalidInterpreter { interpreter, .. } => {
@@ -507,7 +511,7 @@ mod tests {
         };
 
         let err = selected
-            .resolve_executable(Some(&prefix), &Platform::current())
+            .resolve_executable(Some(&prefix), &RuntimeEnv::current())
             .expect_err("only candidate is rejected");
         match err {
             InterpreterError::InvalidInterpreter {
@@ -523,16 +527,16 @@ mod tests {
 
     /// Language interpreters must not leak from the system PATH: `find_interpreter`
     /// with `PrefixThenSystemPath` finds an exe present only on PATH, while
-    /// `BuildPrefixOnly` does not.
+    /// `BuildPrefixOnly` does not. The `PATH` is injected through `RuntimeEnv`, so
+    /// the test does not touch the real process environment.
     #[test]
-    #[serial_test::serial]
     fn search_scope_path_fallback_vs_prefix_only() {
         let tmp = tempfile::tempdir().unwrap();
         let prefix = tmp.path().join("prefix");
         fs::create_dir_all(&prefix).unwrap();
 
-        // Place a fake exe in a separate dir that we prepend onto PATH, NOT in
-        // the build prefix.
+        // Place a fake exe in a separate dir that we expose only via the runtime
+        // PATH, NOT in the build prefix.
         let path_dir = tmp.path().join("path_only");
         fs::create_dir_all(&path_dir).unwrap();
         let exe_name = format!("rb_path_only_tool{}", std::env::consts::EXE_SUFFIX);
@@ -544,38 +548,21 @@ mod tests {
             fs::set_permissions(&exe, Permissions::from_mode(0o755)).unwrap();
         }
 
-        let original_path = std::env::var_os("PATH");
-        let mut new_paths = vec![path_dir.clone()];
-        if let Some(orig) = &original_path {
-            new_paths.extend(std::env::split_paths(orig));
-        }
-        // SAFETY: env mutation is serialized via #[serial] and restored below.
-        unsafe {
-            std::env::set_var("PATH", std::env::join_paths(&new_paths).unwrap());
-        }
+        let runtime = RuntimeEnv::for_test(Platform::current())
+            .with_var("PATH", path_dir.to_string_lossy().into_owned());
 
-        let platform = Platform::current();
         let found_via_path = find_interpreter(
             "rb_path_only_tool",
             Some(&prefix),
-            &platform,
+            &runtime,
             InterpreterSearchScope::PrefixThenSystemPath,
         );
         let found_prefix_only = find_interpreter(
             "rb_path_only_tool",
             Some(&prefix),
-            &platform,
+            &runtime,
             InterpreterSearchScope::BuildPrefixOnly,
         );
-
-        // Restore PATH before asserting so a failure does not corrupt later tests.
-        // SAFETY: env mutation is serialized via #[serial].
-        unsafe {
-            match original_path {
-                Some(orig) => std::env::set_var("PATH", orig),
-                None => std::env::remove_var("PATH"),
-            }
-        }
 
         assert!(
             found_via_path.is_some(),
@@ -612,38 +599,26 @@ mod tests {
         let second = create_fake_executable(&prefix, "stub_second");
 
         let resolved = RejectFirstStub
-            .resolve_executable(Some(&prefix), &Platform::current())
+            .resolve_executable(Some(&prefix), &RuntimeEnv::current())
             .expect("second candidate should resolve when the first is absent");
         assert_eq!(resolved, second);
     }
 
     /// On Windows, cmd resolution special-cases `COMSPEC` when it points at
-    /// `cmd.exe`, returning it verbatim.
-    #[cfg(windows)]
+    /// `cmd.exe`, returning it verbatim. `COMSPEC` and the platform are injected
+    /// through `RuntimeEnv`, so this runs on every host without touching the real
+    /// environment.
     #[test]
-    #[serial_test::serial]
     fn cmd_uses_comspec_special_case() {
         let tmp = tempfile::tempdir().unwrap();
         let fake_cmd = tmp.path().join("system32").join("cmd.exe");
         fs::create_dir_all(fake_cmd.parent().unwrap()).unwrap();
         fs::write(&fake_cmd, "").unwrap();
 
-        let original = std::env::var_os("COMSPEC");
-        // SAFETY: env mutation is serialized via #[serial] and restored below.
-        unsafe {
-            std::env::set_var("COMSPEC", &fake_cmd);
-        }
+        let runtime = RuntimeEnv::for_test(Platform::Win64)
+            .with_var("COMSPEC", fake_cmd.to_string_lossy().into_owned());
 
-        let resolved = super::cmd_exe::CmdExeInvocation.resolve_executable(None, &Platform::Win64);
-
-        // SAFETY: env mutation is serialized via #[serial].
-        unsafe {
-            match original {
-                Some(orig) => std::env::set_var("COMSPEC", orig),
-                None => std::env::remove_var("COMSPEC"),
-            }
-        }
-
+        let resolved = super::cmd_exe::CmdExeInvocation.resolve_executable(None, &runtime);
         assert_eq!(resolved.unwrap(), fake_cmd);
     }
 
