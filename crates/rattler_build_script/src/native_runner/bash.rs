@@ -11,6 +11,10 @@ impl NativeShellRunner for BashNativeRunner {
         shell::Bash::default().into()
     }
 
+    fn default_interpreter(&self) -> &'static str {
+        "bash"
+    }
+
     fn preamble(&self, activation_script_path: &std::path::Path) -> String {
         format!(
             r#"#!/usr/bin/env bash

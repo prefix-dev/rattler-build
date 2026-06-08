@@ -39,45 +39,81 @@ pub enum InterpreterError {
     InvalidInterpreter { interpreter: String, reason: String },
 }
 
-/// Defines where to look for an interpreter executable.
+/// Describes where to look for an interpreter executable: which environments to
+/// search and whether to fall back to the system `PATH`.
 #[derive(Debug, Clone, Copy)]
-pub enum InterpreterSearchScope {
-    /// Searches through the build prefix, then the system PATH.
-    PrefixThenSystemPath,
-    /// Searches only the build prefix.
-    BuildPrefixOnly,
+pub(crate) struct InterpreterSearchScope {
+    /// Search the build environment (the build prefix, or the host prefix when
+    /// build and host are merged).
+    search_build: bool,
+    /// Search the host (run) prefix.
+    search_host: bool,
+    /// Fall back to the system `PATH`.
+    system_fallback: bool,
+}
+
+impl InterpreterSearchScope {
+    /// Search only the build environment. For interpreters that must come from
+    /// the build environment for reproducibility (e.g. `brush`).
+    pub(crate) fn build_only() -> Self {
+        Self {
+            search_build: true,
+            search_host: false,
+            system_fallback: false,
+        }
+    }
+
+    /// Search the build and host environments, then fall back to the system
+    /// `PATH`. Mirrors the activated `PATH` a script actually runs under.
+    pub(crate) fn build_and_host_with_system_fallback() -> Self {
+        Self {
+            search_build: true,
+            search_host: true,
+            system_fallback: true,
+        }
+    }
+
+    /// Whether this scope falls back to the system `PATH`.
+    pub(crate) fn allows_system_fallback(&self) -> bool {
+        self.system_fallback
+    }
 }
 
 pub(crate) fn find_interpreter(
     name: &str,
-    build_prefix: Option<&PathBuf>,
+    build_prefix: Option<&Path>,
+    run_prefix: &Path,
     runtime: &RuntimeEnv,
     scope: InterpreterSearchScope,
 ) -> Option<PathBuf> {
-    let exe_name = format!("{}{}", name, std::env::consts::EXE_SUFFIX);
+    let exe_name = format!("{}{}", name, runtime.exe_suffix());
     let platform = runtime.platform();
 
-    // Build-prefix-only: search just the prefix bin entries, no PATH fallback.
-    if let InterpreterSearchScope::BuildPrefixOnly = scope {
-        let build_prefix = build_prefix?;
-        let prefix_path = prefix_path_entries(build_prefix, &platform);
-        return which::which_in_global(exe_name, std::env::join_paths(prefix_path).ok())
-            .ok()?
-            .next();
+    let mut search_path = Vec::new();
+    if scope.search_build {
+        // When build and host are merged there is no separate build prefix; the
+        // run prefix is the build environment.
+        let build_env = build_prefix.unwrap_or(run_prefix);
+        search_path.extend(prefix_path_entries(build_env, &platform));
+    }
+    if scope.search_host {
+        search_path.extend(prefix_path_entries(run_prefix, &platform));
+    }
+    if scope.system_fallback {
+        search_path.extend(std::env::split_paths(runtime.path()));
     }
 
-    let path = runtime.path();
-    if let Some(build_prefix) = build_prefix {
-        let mut prepend_path = prefix_path_entries(build_prefix, &platform)
-            .into_iter()
-            .collect::<Vec<_>>();
-        prepend_path.extend(std::env::split_paths(path));
-        return which::which_in_global(exe_name, std::env::join_paths(prepend_path).ok())
-            .ok()?
-            .next();
+    if search_path.is_empty() {
+        return None;
     }
-
-    which::which_in_global(exe_name, Some(path)).ok()?.next()
+    // The interpreter is resolved on the host filesystem, so use the host's path
+    // conventions throughout: `std::env::{split_paths,join_paths}` and `which`
+    // (path-list separator, `PATHEXT`, executable bit) all key off the host
+    // platform. `runtime.platform()` always equals the host here, so there is no
+    // cross-platform case to handle.
+    which::which_in_global(exe_name, std::env::join_paths(search_path).ok())
+        .ok()?
+        .next()
 }
 
 /// Describes how a specialized interpreter executes a script file.
@@ -90,11 +126,11 @@ pub(crate) trait InterpreterInvocation: Send + Sync {
 
     /// Returns where the executable should be searched for.
     ///
-    /// Implementations can opt into platform-specific system tools such as Unix
-    /// `bash` or Windows `cmd`; language interpreters default to the build
-    /// prefix to avoid host-tool leakage.
+    /// Defaults to the build environment only, for reproducibility. Native
+    /// shells and language interpreters override this to also search the host
+    /// environment and the system `PATH`; `brush` keeps the default.
     fn search_scope(&self, _build_platform: &Platform) -> InterpreterSearchScope {
-        InterpreterSearchScope::BuildPrefixOnly
+        InterpreterSearchScope::build_only()
     }
 
     /// Returns the default extension for files executed by this interpreter.
@@ -111,6 +147,14 @@ pub(crate) trait InterpreterInvocation: Send + Sync {
         raw.to_string()
     }
 
+    /// Assembles a list of recipe commands into a single script.
+    ///
+    /// The default joins with newlines; interpreters needing explicit error
+    /// propagation between commands (`cmd`) override it.
+    fn join_commands(&self, commands: &[String]) -> String {
+        commands.join("\n")
+    }
+
     /// Checks whether an executable candidate is usable for this interpreter.
     ///
     /// Implementations can reject a found executable and let lookup continue
@@ -125,7 +169,8 @@ pub(crate) trait InterpreterInvocation: Send + Sync {
     /// can override it for platform-specific behavior.
     fn resolve_executable(
         &self,
-        build_prefix: Option<&PathBuf>,
+        build_prefix: Option<&Path>,
+        run_prefix: &Path,
         runtime: &RuntimeEnv,
     ) -> Result<PathBuf, InterpreterError> {
         let platform = runtime.platform();
@@ -133,7 +178,7 @@ pub(crate) trait InterpreterInvocation: Send + Sync {
         let mut unusable_candidate = None;
 
         for executable_name in self.executable_names(&platform) {
-            match find_interpreter(executable_name, build_prefix, runtime, scope) {
+            match find_interpreter(executable_name, build_prefix, run_prefix, runtime, scope) {
                 Some(path) => match self.is_usable_executable(&path) {
                     Ok(()) => return Ok(path),
                     Err(err) => unusable_candidate = Some((path, err)),
@@ -206,6 +251,11 @@ impl SelectedInterpreter {
         self.invocation.script_contents(raw)
     }
 
+    /// Assembles a list of recipe commands into a single script.
+    pub(crate) fn join_commands(&self, commands: &[String]) -> String {
+        self.invocation.join_commands(commands)
+    }
+
     /// Returns the argument values following the executable for the given script file.
     pub(crate) fn args(&self, script_path: &Path) -> Vec<String> {
         self.invocation.args(script_path)
@@ -214,11 +264,12 @@ impl SelectedInterpreter {
     /// Resolve the executable, remapping internal errors to the user-facing name.
     pub(crate) fn resolve_executable(
         &self,
-        build_prefix: Option<&PathBuf>,
+        build_prefix: Option<&Path>,
+        run_prefix: &Path,
         runtime: &RuntimeEnv,
     ) -> Result<PathBuf, InterpreterError> {
         self.invocation
-            .resolve_executable(build_prefix, runtime)
+            .resolve_executable(build_prefix, run_prefix, runtime)
             .map_err(|err| match err {
                 InterpreterError::InterpreterNotFound(_) => {
                     InterpreterError::InterpreterNotFound(self.user_name.clone())
@@ -388,6 +439,8 @@ mod tests {
         assert!(build_script.contains("echo custom"));
     }
 
+    /// A build-prefix-only interpreter (`brush`) errors when absent instead of
+    /// falling back to a system copy (which `python` would).
     #[tokio::test]
     async fn build_prefix_only_interpreter_missing_errors() {
         let tmp = tempfile::tempdir().unwrap();
@@ -397,23 +450,23 @@ mod tests {
         let args = execution_args(
             tmp.path().to_path_buf(),
             prefix,
-            ResolvedScriptContents::Inline("print('missing')".to_string()),
-            Some("python"),
+            ResolvedScriptContents::Inline("echo missing".to_string()),
+            Some("brush"),
         );
 
         let err = crate::execution::generate_build_script(&args)
             .await
             .unwrap_err();
         assert!(
-            matches!(err, InterpreterError::InterpreterNotFound(ref name) if name == "python"),
-            "expected missing python error, got {err:?}"
+            matches!(err, InterpreterError::InterpreterNotFound(ref name) if name == "brush"),
+            "expected missing brush error, got {err:?}"
         );
     }
 
     /// Stub interpreter that exercises the candidate iteration and
     /// `is_usable_executable` rejection path of the default
-    /// `resolve_executable`. It searches the build prefix only and tries two
-    /// executable names; the first name is always rejected by validation.
+    /// `resolve_executable`. It searches the build environment only and tries
+    /// two executable names; the first name is always rejected by validation.
     struct RejectFirstStub;
 
     impl InterpreterInvocation for RejectFirstStub {
@@ -422,7 +475,7 @@ mod tests {
         }
 
         fn search_scope(&self, _build_platform: &Platform) -> InterpreterSearchScope {
-            InterpreterSearchScope::BuildPrefixOnly
+            InterpreterSearchScope::build_only()
         }
 
         fn extension(&self) -> &'static str {
@@ -462,7 +515,11 @@ mod tests {
 
         let stub = RejectFirstStub;
         let resolved = stub
-            .resolve_executable(Some(&prefix), &RuntimeEnv::current())
+            .resolve_executable(
+                Some(prefix.as_path()),
+                prefix.as_path(),
+                &RuntimeEnv::current(),
+            )
             .expect("second candidate should resolve");
         assert_eq!(resolved, second);
     }
@@ -481,7 +538,11 @@ mod tests {
 
         let stub = RejectFirstStub;
         let err = stub
-            .resolve_executable(Some(&prefix), &RuntimeEnv::current())
+            .resolve_executable(
+                Some(prefix.as_path()),
+                prefix.as_path(),
+                &RuntimeEnv::current(),
+            )
             .expect_err("only candidate is rejected");
         match err {
             InterpreterError::InvalidInterpreter { interpreter, .. } => {
@@ -511,7 +572,11 @@ mod tests {
         };
 
         let err = selected
-            .resolve_executable(Some(&prefix), &RuntimeEnv::current())
+            .resolve_executable(
+                Some(prefix.as_path()),
+                prefix.as_path(),
+                &RuntimeEnv::current(),
+            )
             .expect_err("only candidate is rejected");
         match err {
             InterpreterError::InvalidInterpreter {
@@ -525,18 +590,18 @@ mod tests {
         }
     }
 
-    /// Language interpreters must not leak from the system PATH: `find_interpreter`
-    /// with `PrefixThenSystemPath` finds an exe present only on PATH, while
-    /// `BuildPrefixOnly` does not. The `PATH` is injected through `RuntimeEnv`, so
-    /// the test does not touch the real process environment.
+    /// A `build_only` interpreter must not leak from the system PATH, while one
+    /// with a system fallback finds an exe present only on PATH. The `PATH` is
+    /// injected through `RuntimeEnv`, so the test does not touch the real process
+    /// environment.
     #[test]
-    fn search_scope_path_fallback_vs_prefix_only() {
+    fn system_fallback_scope_finds_path_only_exe() {
         let tmp = tempfile::tempdir().unwrap();
         let prefix = tmp.path().join("prefix");
         fs::create_dir_all(&prefix).unwrap();
 
         // Place a fake exe in a separate dir that we expose only via the runtime
-        // PATH, NOT in the build prefix.
+        // PATH, NOT in any prefix.
         let path_dir = tmp.path().join("path_only");
         fs::create_dir_all(&path_dir).unwrap();
         let exe_name = format!("rb_path_only_tool{}", std::env::consts::EXE_SUFFIX);
@@ -553,31 +618,103 @@ mod tests {
 
         let found_via_path = find_interpreter(
             "rb_path_only_tool",
-            Some(&prefix),
+            Some(prefix.as_path()),
+            prefix.as_path(),
             &runtime,
-            InterpreterSearchScope::PrefixThenSystemPath,
+            InterpreterSearchScope::build_and_host_with_system_fallback(),
         );
-        let found_prefix_only = find_interpreter(
+        let found_build_only = find_interpreter(
             "rb_path_only_tool",
-            Some(&prefix),
+            Some(prefix.as_path()),
+            prefix.as_path(),
             &runtime,
-            InterpreterSearchScope::BuildPrefixOnly,
+            InterpreterSearchScope::build_only(),
         );
 
         assert!(
             found_via_path.is_some(),
-            "PrefixThenSystemPath should find the exe on PATH"
+            "system-fallback scope should find the exe on PATH"
         );
         assert_eq!(found_via_path.unwrap(), exe);
         assert!(
-            found_prefix_only.is_none(),
-            "BuildPrefixOnly must not find an exe that lives only on PATH"
+            found_build_only.is_none(),
+            "build_only must not find an exe that lives only on PATH"
+        );
+    }
+
+    /// The generated wrapper quotes a resolved interpreter path that contains
+    /// spaces (the cmd.exe-on-Windows failure), so it survives the native shell.
+    #[tokio::test]
+    async fn generated_wrapper_quotes_spaced_interpreter_path() {
+        let tmp = tempfile::tempdir().unwrap();
+        // A prefix path containing a space, like `C:\Program Files\...`.
+        let prefix = tmp.path().join("pre fix");
+        fs::create_dir_all(&prefix).unwrap();
+        let python = create_fake_executable(&prefix, "python");
+        assert!(python.to_string_lossy().contains(' '));
+
+        let args = execution_args(
+            tmp.path().to_path_buf(),
+            prefix,
+            ResolvedScriptContents::Inline("print('hi')".to_string()),
+            Some("python"),
+        );
+        crate::execution::generate_build_script(&args)
+            .await
+            .unwrap();
+
+        let wrapper = fs::read_to_string(native_build_script_path(tmp.path())).unwrap();
+        let path = python.to_string_lossy();
+        let quoted = if cfg!(windows) {
+            format!("\"{path}\"")
+        } else {
+            format!("'{path}'")
+        };
+        assert!(
+            wrapper.contains(&quoted),
+            "wrapper must quote the spaced interpreter path `{quoted}`, got:\n{wrapper}"
+        );
+    }
+
+    /// An interpreter provided as a `host` dependency lives in the run prefix.
+    /// A system-fallback scope searches it, while `build_only` does not.
+    #[test]
+    fn host_prefix_searched_only_with_system_fallback_scope() {
+        let tmp = tempfile::tempdir().unwrap();
+        let build_prefix = tmp.path().join("build");
+        let host_prefix = tmp.path().join("host");
+        fs::create_dir_all(&build_prefix).unwrap();
+        fs::create_dir_all(&host_prefix).unwrap();
+        // The tool exists only in the host prefix.
+        let tool = create_fake_executable(&host_prefix, "rb_host_tool");
+        // Empty runtime PATH so resolution can only come from a prefix.
+        let runtime = RuntimeEnv::for_test(Platform::current()).with_var("PATH", "");
+
+        let found = find_interpreter(
+            "rb_host_tool",
+            Some(build_prefix.as_path()),
+            host_prefix.as_path(),
+            &runtime,
+            InterpreterSearchScope::build_and_host_with_system_fallback(),
+        );
+        assert_eq!(found.as_deref(), Some(tool.as_path()));
+
+        let build_only = find_interpreter(
+            "rb_host_tool",
+            Some(build_prefix.as_path()),
+            host_prefix.as_path(),
+            &runtime,
+            InterpreterSearchScope::build_only(),
+        );
+        assert!(
+            build_only.is_none(),
+            "build_only must not search the host prefix"
         );
     }
 
     /// PowerShell tries `pwsh` first then `powershell` on the windows branch.
     /// This documents the candidate order without resolving (the real invocation
-    /// uses `PrefixThenSystemPath`, so a system `pwsh` would leak into resolution).
+    /// has a system fallback, so a system `pwsh` would leak into resolution).
     #[test]
     fn powershell_lists_pwsh_then_powershell_on_windows() {
         let names = super::powershell::PowerShellInvocation.executable_names(&Platform::Win64);
@@ -585,7 +722,7 @@ mod tests {
     }
 
     /// When the first executable name is absent from the prefix, resolution falls
-    /// through to a later name. Uses the `BuildPrefixOnly` stub so the system PATH
+    /// through to a later name. Uses the `build_only` stub so the system PATH
     /// cannot leak a real `stub_first`/`stub_second` into the result. This covers
     /// the `find_interpreter == None` continue branch (distinct from the
     /// `is_usable_executable` rejection branch above), mirroring how PowerShell
@@ -599,7 +736,11 @@ mod tests {
         let second = create_fake_executable(&prefix, "stub_second");
 
         let resolved = RejectFirstStub
-            .resolve_executable(Some(&prefix), &RuntimeEnv::current())
+            .resolve_executable(
+                Some(prefix.as_path()),
+                prefix.as_path(),
+                &RuntimeEnv::current(),
+            )
             .expect("second candidate should resolve when the first is absent");
         assert_eq!(resolved, second);
     }
@@ -618,7 +759,8 @@ mod tests {
         let runtime = RuntimeEnv::for_test(Platform::Win64)
             .with_var("COMSPEC", fake_cmd.to_string_lossy().into_owned());
 
-        let resolved = super::cmd_exe::CmdExeInvocation.resolve_executable(None, &runtime);
+        let resolved =
+            super::cmd_exe::CmdExeInvocation.resolve_executable(None, tmp.path(), &runtime);
         assert_eq!(resolved.unwrap(), fake_cmd);
     }
 
@@ -648,6 +790,28 @@ mod tests {
                 .unwrap()
                 .extension(),
             "py"
+        );
+    }
+
+    /// `cmd` propagates a non-zero exit between commands; others join plainly.
+    #[test]
+    fn join_commands_is_interpreter_specific() {
+        let commands = vec!["echo Hello".to_string(), "echo World".to_string()];
+
+        assert_eq!(
+            super::cmd_exe::CmdExeInvocation.join_commands(&commands),
+            "echo Hello\nif %errorlevel% neq 0 exit /b %errorlevel%\n\
+             echo World\nif %errorlevel% neq 0 exit /b %errorlevel%"
+        );
+        // bash relies on `set -e` in the preamble, so a plain join is enough.
+        assert_eq!(
+            super::bash::BashInvocation.join_commands(&commands),
+            "echo Hello\necho World"
+        );
+        // A language interpreter uses the default plain join too.
+        assert_eq!(
+            super::python::PythonInvocation.join_commands(&commands),
+            "echo Hello\necho World"
         );
     }
 }

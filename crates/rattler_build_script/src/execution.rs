@@ -10,9 +10,9 @@ use crate::script::{Script, ScriptContent};
 use fs_err as fs;
 use futures::TryStreamExt;
 use indexmap::IndexMap;
-use itertools::Itertools;
 use rattler_shell::shell::Shell;
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fmt;
 use std::io;
@@ -145,17 +145,22 @@ pub enum ResolvedScriptContents {
     Path(PathBuf, String),
     /// The script contents from an inline YAML string
     Inline(String),
+    /// A list of inline commands; the interpreter assembles them at generation
+    /// time (so kept as a list, not joined here).
+    Commands(Vec<String>),
     /// There are no script contents
     Missing,
 }
 
 impl ResolvedScriptContents {
-    /// Get the script contents as a string
-    pub fn script(&self) -> &str {
+    /// The script contents as text (a command list is plainly newline-joined;
+    /// interpreter-specific assembly happens at generation time).
+    pub fn script(&self) -> Cow<'_, str> {
         match self {
-            ResolvedScriptContents::Path(_, script) => script,
-            ResolvedScriptContents::Inline(script) => script,
-            ResolvedScriptContents::Missing => "",
+            ResolvedScriptContents::Path(_, script) => Cow::Borrowed(script),
+            ResolvedScriptContents::Inline(script) => Cow::Borrowed(script),
+            ResolvedScriptContents::Commands(commands) => Cow::Owned(commands.join("\n")),
+            ResolvedScriptContents::Missing => Cow::Borrowed(""),
         }
     }
 
@@ -333,35 +338,36 @@ impl Script {
                     }
                 }
             }
+            // Keep the list; the interpreter assembles it in `generate_build_script`.
             ScriptContent::Commands(commands) => {
-                if self.interpreter() == "cmd" {
-                    // add in an `if %errorlevel% neq 0` check
-                    Ok(ResolvedScriptContents::Inline(
-                        commands
-                            .iter()
-                            .map(|c| format!("{}\nif %errorlevel% neq 0 exit /b %errorlevel%", c))
-                            .join("\n"),
-                    ))
-                } else {
-                    Ok(ResolvedScriptContents::Inline(commands.iter().join("\n")))
-                }
+                Ok(ResolvedScriptContents::Commands(commands.clone()))
             }
             ScriptContent::Command(command) => {
                 Ok(ResolvedScriptContents::Inline(command.to_owned()))
             }
         };
 
-        // render jinja if it is an inline script
+        // Render jinja for inline content, each command individually; file-backed
+        // scripts are not rendered.
         if let Some(renderer) = jinja_renderer {
+            let render = |script: &str| -> Result<String, std::io::Error> {
+                renderer(script).map_err(|e| {
+                    std::io::Error::other(format!(
+                        "Failed to render jinja template in build `script`: {}",
+                        e
+                    ))
+                })
+            };
             match script_content? {
                 ResolvedScriptContents::Inline(script) => {
-                    let rendered = renderer(&script).map_err(|e| {
-                        std::io::Error::other(format!(
-                            "Failed to render jinja template in build `script`: {}",
-                            e
-                        ))
-                    })?;
-                    Ok(ResolvedScriptContents::Inline(rendered))
+                    Ok(ResolvedScriptContents::Inline(render(&script)?))
+                }
+                ResolvedScriptContents::Commands(commands) => {
+                    let rendered = commands
+                        .iter()
+                        .map(|c| render(c))
+                        .collect::<Result<Vec<_>, _>>()?;
+                    Ok(ResolvedScriptContents::Commands(rendered))
                 }
                 other => Ok(other),
             }
@@ -430,7 +436,7 @@ impl Decoder for CrLfNormalizer {
 pub(crate) async fn generate_build_script(
     args: &ExecutionArgs,
 ) -> Result<PathBuf, crate::InterpreterError> {
-    let runner = crate::native_runner::native_runner();
+    let runner = crate::native_runner::native_runner(args.runtime.platform());
     let shell = runner.shell();
 
     let script_extension = shell.extension();
@@ -456,48 +462,66 @@ pub(crate) async fn generate_build_script(
         .map(str::to_string)
         .or_else(|| args.script.infer_interpreter());
 
-    let body = if let Some(user_interpreter) = explicit_or_inferred {
-        let interpreter =
-            crate::interpreter::SelectedInterpreter::from_recipe_name(&user_interpreter)
-                .ok_or_else(|| {
-                    std::io::Error::other(format!("Unsupported interpreter: {user_interpreter}"))
-                })?;
+    // The interpreter that runs the content (and assembles a command list).
+    // With none specified, default to the wrapper shell from the runner.
+    let interpreter_name = explicit_or_inferred
+        .clone()
+        .unwrap_or_else(|| runner.default_interpreter().to_string());
+    let interpreter = crate::interpreter::SelectedInterpreter::from_recipe_name(&interpreter_name)
+        .ok_or_else(|| {
+            std::io::Error::other(format!("Unsupported interpreter: {interpreter_name}"))
+        })?;
 
+    // Assemble the rendered content; the interpreter joins a command list.
+    let script_text = match &args.script {
+        ResolvedScriptContents::Commands(commands) => interpreter.join_commands(commands),
+        ResolvedScriptContents::Inline(script) => script.clone(),
+        ResolvedScriptContents::Path(_, script) => script.clone(),
+        ResolvedScriptContents::Missing => String::new(),
+    };
+
+    let body = if explicit_or_inferred.is_some() {
+        // Specialized interpreter: invoke a script file (the original path, or
+        // one written next to the wrapper).
         let script_path = match &args.script {
             ResolvedScriptContents::Path(path, _) => path.clone(),
-            ResolvedScriptContents::Inline(script) => {
+            _ => {
                 let path = args
                     .work_dir
                     .join(format!("conda_build_script.{}", interpreter.extension()));
-                tokio::fs::write(&path, interpreter.script_contents(script)).await?;
-                path
-            }
-            ResolvedScriptContents::Missing => {
-                let path = args
-                    .work_dir
-                    .join(format!("conda_build_script.{}", interpreter.extension()));
-                tokio::fs::write(&path, interpreter.script_contents("")).await?;
+                tokio::fs::write(&path, interpreter.script_contents(&script_text)).await?;
                 path
             }
         };
 
-        // Search the build environment for the executable. The selected
-        // interpreter preserves the recipe value (e.g. `nushell`) for
-        // user-facing errors even when the executable has a different name
+        // Resolve the executable from the activated environment (build prefix,
+        // then host prefix, then the system PATH depending on the interpreter).
+        // The selected interpreter preserves the recipe value (e.g. `nushell`)
+        // for user-facing errors even when the executable has a different name
         // (e.g. `nu`).
-        let prefix = args.build_prefix.as_ref().or(Some(&args.run_prefix));
-        let executable = interpreter.resolve_executable(prefix, &args.runtime)?;
+        let executable = interpreter.resolve_executable(
+            args.build_prefix.as_deref(),
+            &args.run_prefix,
+            &args.runtime,
+        )?;
 
+        // Quote the resolved path and arguments so a prefix or script path
+        // containing spaces survives the native shell.
         let mut command = vec![executable.to_string_lossy().into_owned()];
         command.extend(interpreter.args(&script_path));
-        let command_refs = command.iter().map(String::as_str).collect::<Vec<_>>();
+        let quoted = command
+            .iter()
+            .map(|arg| crate::native_runner::quote_arg(&shell, arg))
+            .collect::<Vec<_>>();
+        let command_refs = quoted.iter().map(String::as_str).collect::<Vec<_>>();
         let mut body = String::new();
         shell
             .run_command(&mut body, command_refs)
             .map_err(std::io::Error::other)?;
         body
     } else {
-        args.script.script().to_string()
+        // No interpreter: the content is the native wrapper body.
+        script_text
     };
 
     let build_script = format!("{}\n{}", runner.preamble(&activation_script_path), body);
@@ -521,7 +545,7 @@ pub(crate) async fn generate_build_script(
 
 /// Runs a script with the given execution arguments.
 pub(crate) async fn run_script(exec_args: ExecutionArgs) -> Result<(), crate::InterpreterError> {
-    let runner = crate::native_runner::native_runner();
+    let runner = crate::native_runner::native_runner(exec_args.runtime.platform());
     let build_script_path = generate_build_script(&exec_args).await?;
     let build_script_path_str = build_script_path.to_string_lossy().to_string();
     let cmd_args = runner.command_to_run_script(&build_script_path_str);
@@ -865,8 +889,10 @@ mod tests {
         );
     }
 
+    /// `resolve_content` keeps a command list as `Commands`, unjoined and
+    /// without shell-specific error handling (the interpreter's job).
     #[test]
-    fn test_cmd_errorlevel_injected() {
+    fn test_commands_resolved_as_list() {
         use crate::script::{Script, ScriptContent};
         let commands = vec!["echo Hello".to_string(), "echo World".to_string()];
         let script = Script {
@@ -878,31 +904,78 @@ mod tests {
             content_explicit: false,
         };
 
-        // Use dummy paths for recipe_dir and extensions
-        let recipe_dir = std::path::Path::new(".");
-        let extensions = &["bat"];
-
         let resolved = script
             .resolve_content(
-                recipe_dir,
+                std::path::Path::new("."),
                 None::<fn(&str) -> Result<String, String>>,
-                extensions,
+                &["bat"],
             )
             .unwrap();
 
-        if cfg!(windows) {
-            let expected = "echo Hello\nif %errorlevel% neq 0 exit /b %errorlevel%\necho World\nif %errorlevel% neq 0 exit /b %errorlevel%";
-            match resolved {
-                ResolvedScriptContents::Inline(s) => assert_eq!(s, expected),
-                _ => panic!("Expected Inline variant"),
-            }
-        } else {
-            let expected = "echo Hello\necho World";
-            match resolved {
-                ResolvedScriptContents::Inline(s) => assert_eq!(s, expected),
-                _ => panic!("Expected Inline variant"),
-            }
+        match resolved {
+            ResolvedScriptContents::Commands(c) => assert_eq!(c, commands),
+            other => panic!("expected Commands variant, got {other:?}"),
         }
+    }
+
+    /// A command list is jinja-rendered per command in `resolve_content`.
+    #[test]
+    fn test_command_list_rendered_per_command() {
+        use crate::script::{Script, ScriptContent};
+        let script = Script {
+            content: ScriptContent::Commands(vec![
+                "echo MARK one".to_string(),
+                "echo MARK two".to_string(),
+            ]),
+            ..Script::default()
+        };
+        let renderer = |s: &str| -> Result<String, String> { Ok(s.replace("MARK", "rendered")) };
+
+        let resolved = script
+            .resolve_content(std::path::Path::new("."), Some(renderer), &["sh"])
+            .unwrap();
+
+        match resolved {
+            ResolvedScriptContents::Commands(c) => {
+                assert_eq!(c, vec!["echo rendered one", "echo rendered two"]);
+            }
+            other => panic!("expected Commands variant, got {other:?}"),
+        }
+    }
+
+    /// Unified path: a command list with no interpreter, on a Windows runtime,
+    /// is assembled by `cmd` (errorlevel) into the generated `.bat`, on any host.
+    #[tokio::test]
+    async fn test_command_list_errorlevel_in_generated_cmd_wrapper() {
+        let tmp = tempfile::tempdir().unwrap();
+        let prefix = tmp.path().join("prefix");
+        fs::create_dir_all(&prefix).unwrap();
+
+        let args = ExecutionArgs {
+            script: ResolvedScriptContents::Commands(vec![
+                "echo Hello".to_string(),
+                "echo World".to_string(),
+            ]),
+            interpreter: None,
+            env_vars: IndexMap::new(),
+            secrets: IndexMap::new(),
+            runtime: RuntimeEnv::for_test(Platform::Win64),
+            build_prefix: None,
+            run_prefix: prefix,
+            work_dir: tmp.path().to_path_buf(),
+            sandbox_config: None,
+            env_isolation: EnvironmentIsolation::None,
+        };
+
+        crate::execution::generate_build_script(&args)
+            .await
+            .unwrap();
+
+        let wrapper = fs::read_to_string(tmp.path().join("conda_build.bat")).unwrap();
+        assert!(
+            wrapper.contains("if %errorlevel% neq 0 exit /b %errorlevel%"),
+            "cmd wrapper must propagate errors between commands, got:\n{wrapper}"
+        );
     }
 
     #[test]
@@ -1225,7 +1298,8 @@ mod tests {
     }
 
     /// `create_build_script` maps `InterpreterNotFound` to an io::Error whose
-    /// message mentions the build environment.
+    /// message mentions the build environment. `brush` is build-prefix-only, so
+    /// it errors when absent (unlike `python`, which falls back to `PATH`).
     #[tokio::test]
     async fn test_create_build_script_missing_interpreter_error() {
         let tmp = tempfile::tempdir().unwrap();
@@ -1235,8 +1309,8 @@ mod tests {
         let args = execution_args(
             tmp.path().to_path_buf(),
             prefix,
-            ResolvedScriptContents::Inline("print('hi')".to_string()),
-            Some("python"),
+            ResolvedScriptContents::Inline("echo hi".to_string()),
+            Some("brush"),
         );
 
         let err = create_build_script(args).await.unwrap_err();

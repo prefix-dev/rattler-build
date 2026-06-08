@@ -52,6 +52,17 @@ impl RuntimeEnv {
         self.var("PATH").unwrap_or_default()
     }
 
+    /// The executable file suffix for this platform (`.exe` on Windows, empty
+    /// elsewhere), keyed off the platform rather than the one rattler-build was
+    /// compiled for (unlike [`std::env::consts::EXE_SUFFIX`]).
+    pub(crate) fn exe_suffix(&self) -> &'static str {
+        if self.platform.is_windows() {
+            ".exe"
+        } else {
+            ""
+        }
+    }
+
     /// Iterates over all environment variables as `(name, value)` pairs.
     pub fn vars(&self) -> impl Iterator<Item = (&str, &str)> {
         self.env.iter().map(|(k, v)| (k.as_str(), v.as_str()))
@@ -69,5 +80,17 @@ impl RuntimeEnv {
     pub fn with_platform(mut self, platform: Platform) -> Self {
         self.platform = platform;
         self
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn exe_suffix_follows_the_platform() {
+        assert_eq!(RuntimeEnv::for_test(Platform::Win64).exe_suffix(), ".exe");
+        assert_eq!(RuntimeEnv::for_test(Platform::Linux64).exe_suffix(), "");
+        assert_eq!(RuntimeEnv::for_test(Platform::OsxArm64).exe_suffix(), "");
     }
 }

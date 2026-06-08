@@ -107,6 +107,14 @@ requirements:
     `cmd.exe`. If you encounter any issues, please
     [open an issue](https://github.com/prefix-dev/rattler-build/issues/new).
 
+!!! tip "Put the interpreter in `build`"
+    An interpreter that runs the build script is a build-time tool, so the
+    correct place for it is the `build` section of `requirements`. The `host`
+    environment is searched as well (and, for most interpreters, the system
+    `PATH` as a last resort), so a `host` dependency also works — but `build` is
+    preferred. `brush` is the exception: it must be in `build`, and a system
+    copy is never used.
+
 ### Using `nushell`
 
 In order to use `nushell` you can select the `interpreter: nu` or have a
@@ -120,7 +128,7 @@ build:
     content: |
       echo "Hello from nushell!"
 
-# Note: it's required to have `nushell` in the `build` section of your recipe!
+# Note: add `nushell` to the `build` section of your recipe!
 requirements:
   build:
     - nushell
@@ -158,7 +166,7 @@ build:
     content: |
       print("Hello from Python!")
 
-# Note: it's required to have `python` in the `build` section of your recipe!
+# Note: add `python` to the `build` section of your recipe!
 requirements:
   build:
     - python
@@ -177,7 +185,7 @@ build:
     content: |
       puts "Hello from Ruby!"
 
-# Note: it's required to have `ruby` in the `build` section of your recipe!
+# Note: add `ruby` to the `build` section of your recipe!
 requirements:
   build:
     - ruby
@@ -196,7 +204,7 @@ build:
     content: |
       console.log("Hello from NodeJS!");
 
-# Note: it's required to have `nodejs` in the `build` section of your recipe!
+# Note: add `nodejs` to the `build` section of your recipe!
 requirements:
   build:
     - nodejs
@@ -215,7 +223,7 @@ build:
     content: |
       print "Hello from Perl!\n";
 
-# Note: it's required to have `perl` in the `build` section of your recipe!
+# Note: add `perl` to the `build` section of your recipe!
 requirements:
   build:
     - perl
@@ -235,7 +243,7 @@ build:
     content: |
       cat("Hello from R!\n")
 
-# Note: it's required to have `r-base` in the `build` section of your recipe!
+# Note: add `r-base` to the `build` section of your recipe!
 requirements:
   build:
     - r-base

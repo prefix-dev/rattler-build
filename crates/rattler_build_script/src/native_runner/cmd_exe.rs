@@ -11,6 +11,10 @@ impl NativeShellRunner for CmdExeNativeRunner {
         shell::CmdExe.into()
     }
 
+    fn default_interpreter(&self) -> &'static str {
+        "cmd"
+    }
+
     fn preamble(&self, activation_script_path: &std::path::Path) -> String {
         format!(
             r#"

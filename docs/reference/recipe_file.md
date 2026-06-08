@@ -539,23 +539,27 @@ with the following fields (all optional):
   `[build folder]/work` directory. Defaults to the `[build folder]/work`
   directory itself.
 
-!!! warning "Non-default interpreters need a build dependency"
+!!! note "Where interpreters come from"
 
     Every build and test script is launched through a native shell wrapper
     (`bash` on Unix, `cmd.exe` on Windows) that activates the build/host
-    prefixes and then invokes the chosen interpreter as a command. Only the
-    native shells are assumed to exist on the build machine: `bash`/`cmd.exe`,
-    plus `powershell` on Windows, may be taken from the system `PATH` on their
-    native platform.
+    prefixes and then invokes the chosen interpreter as a command.
 
-    Every other interpreter (`python`, `perl`, `ruby`, `node`/`nodejs`,
-    `rscript`, `nu`/nushell and `brush`) is resolved **only** from the build
-    (or host) prefix, so it must be added to `requirements.build`. A copy
-    found on the system `PATH` is intentionally ignored to keep builds
-    reproducible. For example:
-     - `interpreter: nu` requires `nushell` in `requirements.build`
-     - `interpreter: python` requires `python`
-     - `interpreter: node` requires `nodejs`
+    An interpreter that runs the build script is a build-time tool, so add it to
+    `requirements.build` (for example `interpreter: nu` → `nushell`,
+    `interpreter: rscript` → `r-base`, `interpreter: node` → `nodejs`). It is
+    resolved from the activated environment in the same order the `PATH` would:
+    the **build** prefix, then the **host** prefix, and for most interpreters the
+    system `PATH` as a last resort. So a `host` dependency is also found, but
+    `build` is the correct place; relying on a system copy works but makes builds
+    non-reproducible. When the build and host environments are merged
+    (`build.merge_build_and_host_envs`), that single environment is used.
+
+    Two interpreters are resolved differently:
+     - `bash`/`cmd.exe` (and `powershell` on Windows) may be taken from the
+       system `PATH` on their native platform.
+     - `brush` is resolved **only** from the build environment (not the host
+       prefix or the system `PATH`), so it must be in `requirements.build`.
 
 ```yaml title="recipe.yaml"
 build:

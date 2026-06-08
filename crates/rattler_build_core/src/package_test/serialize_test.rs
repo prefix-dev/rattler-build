@@ -157,6 +157,9 @@ pub(crate) fn write_test_files(
                     }
                     command_test.script.content = ScriptContent::Command(contents);
                 }
+                ResolvedScriptContents::Commands(commands) => {
+                    command_test.script.content = ScriptContent::Commands(commands);
+                }
                 ResolvedScriptContents::Missing => {
                     command_test.script.content = ScriptContent::Command("".to_string());
                 }

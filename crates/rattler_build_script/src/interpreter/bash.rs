@@ -11,9 +11,9 @@ impl InterpreterInvocation for BashInvocation {
 
     fn search_scope(&self, build_platform: &Platform) -> InterpreterSearchScope {
         if build_platform.is_unix() {
-            InterpreterSearchScope::PrefixThenSystemPath
+            InterpreterSearchScope::build_and_host_with_system_fallback()
         } else {
-            InterpreterSearchScope::BuildPrefixOnly
+            InterpreterSearchScope::build_only()
         }
     }
 

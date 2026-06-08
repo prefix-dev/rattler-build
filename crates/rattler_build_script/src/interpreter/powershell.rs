@@ -53,9 +53,9 @@ impl InterpreterInvocation for PowerShellInvocation {
 
     fn search_scope(&self, build_platform: &Platform) -> InterpreterSearchScope {
         if build_platform.is_windows() {
-            InterpreterSearchScope::PrefixThenSystemPath
+            InterpreterSearchScope::build_and_host_with_system_fallback()
         } else {
-            InterpreterSearchScope::BuildPrefixOnly
+            InterpreterSearchScope::build_only()
         }
     }
 
