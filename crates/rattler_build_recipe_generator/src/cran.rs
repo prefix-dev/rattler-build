@@ -1,6 +1,6 @@
-use std::{collections::HashMap, collections::HashSet};
 #[cfg(not(target_arch = "wasm32"))]
 use std::path::PathBuf;
+use std::{collections::HashMap, collections::HashSet};
 
 #[cfg(feature = "cli")]
 use clap::Parser;
