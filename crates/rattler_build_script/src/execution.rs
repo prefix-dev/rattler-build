@@ -427,12 +427,48 @@ impl Decoder for CrLfNormalizer {
     }
 }
 
+/// One unit of a generated build wrapper: content run in a single interpreter,
+/// with optional step-local `env` and a boundary-comment label.
+///
+/// `env` is scoped to the section (see `NativeShellRunner::scope_section`) and is
+/// distinct from [`ExecutionArgs::env_vars`], the whole-build environment. Today
+/// one section is built from [`ExecutionArgs`]; the step expander will build many.
+pub(crate) struct ScriptSection<'a> {
+    /// Explicit interpreter, or `None` to infer from a file-backed path and
+    /// otherwise fall back to the wrapper shell.
+    pub interpreter: Option<&'a str>,
+    /// Resolved content for this section.
+    pub content: &'a ResolvedScriptContents,
+    /// Environment variables scoped to this section only.
+    pub env: &'a IndexMap<String, String>,
+    /// Optional annotation rendered as a boundary comment above the section.
+    pub label: Option<&'a str>,
+}
+
+/// A section's place in the wrapper. Used only for naming the interpreter script
+/// file so the single-section case keeps its historic name.
+#[derive(Clone, Copy)]
+struct SectionIndex {
+    position: usize,
+    total: usize,
+}
+
+/// Names the file an interpreter section's content is written to. A sole section
+/// keeps the historic `conda_build_script.<ext>` name (asserted by tests and
+/// referenced by the debugging docs); multiple sections are numbered.
+fn section_script_filename(extension: &str, index: SectionIndex) -> String {
+    if index.total == 1 {
+        format!("conda_build_script.{extension}")
+    } else {
+        format!("conda_build_step{}.{extension}", index.position)
+    }
+}
+
 /// Returns the path to the generated native build wrapper script.
 ///
-/// If `args.interpreter` is set, or if the resolved script path has a known
-/// interpreter extension, inline script text is written to a separate file and
-/// the native wrapper invokes the resolved interpreter with that file. Otherwise
-/// the script contents are appended directly to the native wrapper.
+/// The wrapper sources the activation script, then runs an ordered list of
+/// sections, each wrapped in an isolated scope (see `scope_section`). Today one
+/// section is built from `args`; the step expander will build more.
 pub(crate) async fn generate_build_script(
     args: &ExecutionArgs,
 ) -> Result<PathBuf, crate::InterpreterError> {
@@ -453,76 +489,39 @@ pub(crate) async fn generate_build_script(
     )
     .await?;
 
-    // Interpreter inference is intentionally done after content resolution:
-    // only file-backed scripts can infer from their resolved path. Inline
-    // scripts use the explicit recipe interpreter or remain native shell code.
-    let explicit_or_inferred = args
-        .interpreter
-        .as_deref()
-        .map(str::to_string)
-        .or_else(|| args.script.infer_interpreter());
+    // One section today; the expander will build many.
+    let no_env = IndexMap::new();
+    let sections = [ScriptSection {
+        interpreter: args.interpreter.as_deref(),
+        content: &args.script,
+        env: &no_env,
+        label: None,
+    }];
 
-    // The interpreter that runs the content (and assembles a command list).
-    // With none specified, default to the wrapper shell from the runner.
-    let interpreter_name = explicit_or_inferred
-        .clone()
-        .unwrap_or_else(|| runner.default_interpreter().to_string());
-    let interpreter = crate::interpreter::SelectedInterpreter::from_recipe_name(&interpreter_name)
-        .ok_or_else(|| crate::InterpreterError::UnsupportedInterpreter(interpreter_name.clone()))?;
+    let total = sections.len();
+    let mut fragments = Vec::with_capacity(total);
+    for (position, section) in sections.iter().enumerate() {
+        let body = build_section_body(
+            args,
+            runner.as_ref(),
+            &shell,
+            section,
+            SectionIndex { position, total },
+        )
+        .await?;
+        // Drop empty sections: an empty bash subshell `()` is a syntax error,
+        // and no-script recipes stay preamble-only.
+        if body.trim().is_empty() {
+            continue;
+        }
+        fragments.push(runner.scope_section(section.label, section.env, &body)?);
+    }
 
-    // Assemble the rendered content; the interpreter joins a command list.
-    let script_text = match &args.script {
-        ResolvedScriptContents::Commands(commands) => interpreter.join_commands(commands),
-        ResolvedScriptContents::Inline(script) => script.clone(),
-        ResolvedScriptContents::Path(_, script) => script.clone(),
-        ResolvedScriptContents::Missing => String::new(),
-    };
-
-    let body = if explicit_or_inferred.is_some() {
-        // Specialized interpreter: invoke a script file (the original path, or
-        // one written next to the wrapper).
-        let script_path = match &args.script {
-            ResolvedScriptContents::Path(path, _) => path.clone(),
-            _ => {
-                let path = args
-                    .work_dir
-                    .join(format!("conda_build_script.{}", interpreter.extension()));
-                tokio::fs::write(&path, interpreter.script_contents(&script_text)).await?;
-                path
-            }
-        };
-
-        // Resolve the executable from the activated environment (build prefix,
-        // then host prefix, then the system PATH depending on the interpreter).
-        // The selected interpreter preserves the recipe value (e.g. `nushell`)
-        // for user-facing errors even when the executable has a different name
-        // (e.g. `nu`).
-        let executable = interpreter.resolve_executable(
-            args.build_prefix.as_deref(),
-            &args.run_prefix,
-            &args.runtime,
-        )?;
-
-        // Quote the resolved path and arguments so a prefix or script path
-        // containing spaces survives the native shell.
-        let mut command = vec![executable.to_string_lossy().into_owned()];
-        command.extend(interpreter.args(&script_path));
-        let quoted = command
-            .iter()
-            .map(|arg| crate::native_runner::quote_arg(&shell, arg))
-            .collect::<Vec<_>>();
-        let command_refs = quoted.iter().map(String::as_str).collect::<Vec<_>>();
-        let mut body = String::new();
-        shell
-            .run_command(&mut body, command_refs)
-            .map_err(std::io::Error::other)?;
-        body
-    } else {
-        // No interpreter: the content is the native wrapper body.
-        script_text
-    };
-
-    let build_script = format!("{}\n{}", runner.preamble(&activation_script_path), body);
+    let build_script = format!(
+        "{}\n{}",
+        runner.preamble(&activation_script_path),
+        fragments.join("\n"),
+    );
     tokio::fs::write(
         &build_script_path,
         crate::native_runner::write_shell_script(shell, &build_script)?,
@@ -539,6 +538,77 @@ pub(crate) async fn generate_build_script(
     }
 
     Ok(build_script_path)
+}
+
+/// Builds the raw (unscoped) wrapper body for one section: native code when no
+/// interpreter applies, otherwise an invocation of the resolved interpreter.
+async fn build_section_body(
+    args: &ExecutionArgs,
+    runner: &dyn crate::native_runner::NativeShellRunner,
+    shell: &rattler_shell::shell::ShellEnum,
+    section: &ScriptSection<'_>,
+    index: SectionIndex,
+) -> Result<String, crate::InterpreterError> {
+    // Inference runs after resolution: only file-backed scripts infer from their
+    // path; inline scripts use the explicit interpreter or stay native code.
+    let explicit_or_inferred = section
+        .interpreter
+        .map(str::to_string)
+        .or_else(|| section.content.infer_interpreter());
+
+    // No interpreter specified: default to the wrapper shell.
+    let interpreter_name = explicit_or_inferred
+        .clone()
+        .unwrap_or_else(|| runner.default_interpreter().to_string());
+    let interpreter = crate::interpreter::SelectedInterpreter::from_recipe_name(&interpreter_name)
+        .ok_or_else(|| crate::InterpreterError::UnsupportedInterpreter(interpreter_name.clone()))?;
+
+    // Assemble the rendered content; the interpreter joins a command list.
+    let script_text = match section.content {
+        ResolvedScriptContents::Commands(commands) => interpreter.join_commands(commands),
+        ResolvedScriptContents::Inline(script) => script.clone(),
+        ResolvedScriptContents::Path(_, script) => script.clone(),
+        ResolvedScriptContents::Missing => String::new(),
+    };
+
+    if explicit_or_inferred.is_none() {
+        // No interpreter: the content is the native wrapper body.
+        return Ok(script_text);
+    }
+
+    // Specialized interpreter: invoke a script file (the original path, or one
+    // written next to the wrapper).
+    let script_path = match section.content {
+        ResolvedScriptContents::Path(path, _) => path.clone(),
+        _ => {
+            let path = args
+                .work_dir
+                .join(section_script_filename(interpreter.extension(), index));
+            tokio::fs::write(&path, interpreter.script_contents(&script_text)).await?;
+            path
+        }
+    };
+
+    // Resolve from the activated environment (build/host prefix, then PATH).
+    let executable = interpreter.resolve_executable(
+        args.build_prefix.as_deref(),
+        &args.run_prefix,
+        &args.runtime,
+    )?;
+
+    // Quote so a prefix or script path with spaces survives the native shell.
+    let mut command = vec![executable.to_string_lossy().into_owned()];
+    command.extend(interpreter.args(&script_path));
+    let quoted = command
+        .iter()
+        .map(|arg| crate::native_runner::quote_arg(shell, arg))
+        .collect::<Vec<_>>();
+    let command_refs = quoted.iter().map(String::as_str).collect::<Vec<_>>();
+    let mut body = String::new();
+    shell
+        .run_command(&mut body, command_refs)
+        .map_err(std::io::Error::other)?;
+    Ok(body)
 }
 
 /// Runs a script with the given execution arguments.
@@ -1403,6 +1473,114 @@ mod tests {
         assert!(
             err.contains("unknown environment isolation mode 'bogus'"),
             "unexpected error: {err}"
+        );
+    }
+
+    fn has_line(s: &str, want: &str) -> bool {
+        s.lines().any(|l| l.trim_end() == want)
+    }
+
+    /// The single section is subshell-wrapped on bash (uniform isolation).
+    #[tokio::test]
+    async fn test_bash_single_section_wrapped_in_subshell() {
+        let tmp = tempfile::tempdir().unwrap();
+        let prefix = tmp.path().join("prefix");
+        fs::create_dir_all(&prefix).unwrap();
+        let args = execution_args(
+            tmp.path().to_path_buf(),
+            prefix,
+            ResolvedScriptContents::Inline("echo hi".to_string()),
+            None,
+        );
+        let args = ExecutionArgs {
+            runtime: RuntimeEnv::for_test(Platform::Linux64),
+            ..args
+        };
+        generate_build_script(&args).await.unwrap();
+        let wrapper = fs::read_to_string(tmp.path().join("conda_build.sh")).unwrap();
+        assert!(
+            has_line(&wrapper, "("),
+            "section must be subshell-wrapped:\n{wrapper}"
+        );
+        assert!(has_line(&wrapper, ")"), "{wrapper}");
+        assert!(wrapper.contains("echo hi"), "{wrapper}");
+    }
+
+    /// A recipe with no build script stays preamble-only: no empty subshell.
+    #[tokio::test]
+    async fn test_bash_missing_script_is_preamble_only() {
+        let tmp = tempfile::tempdir().unwrap();
+        let prefix = tmp.path().join("prefix");
+        fs::create_dir_all(&prefix).unwrap();
+        let args = execution_args(
+            tmp.path().to_path_buf(),
+            prefix,
+            ResolvedScriptContents::Missing,
+            None,
+        );
+        let args = ExecutionArgs {
+            runtime: RuntimeEnv::for_test(Platform::Linux64),
+            ..args
+        };
+        generate_build_script(&args).await.unwrap();
+        let wrapper = fs::read_to_string(tmp.path().join("conda_build.sh")).unwrap();
+        assert!(
+            !has_line(&wrapper, "("),
+            "no script => no subshell:\n{wrapper}"
+        );
+        assert!(wrapper.contains("End of preamble"), "{wrapper}");
+    }
+
+    /// The single section is `setlocal`/`endlocal`-scoped on cmd, with the
+    /// trailing errorlevel guard.
+    #[tokio::test]
+    async fn test_cmd_single_section_setlocal_and_guard() {
+        let tmp = tempfile::tempdir().unwrap();
+        let prefix = tmp.path().join("prefix");
+        fs::create_dir_all(&prefix).unwrap();
+        let args = execution_args(
+            tmp.path().to_path_buf(),
+            prefix,
+            ResolvedScriptContents::Inline("echo hi".to_string()),
+            None,
+        );
+        let args = ExecutionArgs {
+            runtime: RuntimeEnv::for_test(Platform::Win64),
+            ..args
+        };
+        generate_build_script(&args).await.unwrap();
+        let wrapper = fs::read_to_string(tmp.path().join("conda_build.bat")).unwrap();
+        assert!(has_line(&wrapper, "setlocal"), "{wrapper}");
+        assert!(has_line(&wrapper, "endlocal"), "{wrapper}");
+        assert!(
+            has_line(&wrapper, "if %errorlevel% neq 0 exit /b %errorlevel%"),
+            "{wrapper}"
+        );
+    }
+
+    /// A sole section keeps the historic file name; multiple are numbered.
+    #[test]
+    fn test_section_script_filename_single_vs_multi() {
+        let single = SectionIndex {
+            position: 0,
+            total: 1,
+        };
+        assert_eq!(
+            section_script_filename("py", single),
+            "conda_build_script.py"
+        );
+        let first = SectionIndex {
+            position: 0,
+            total: 2,
+        };
+        let second = SectionIndex {
+            position: 1,
+            total: 2,
+        };
+        assert_eq!(section_script_filename("py", first), "conda_build_step0.py");
+        assert_eq!(
+            section_script_filename("py", second),
+            "conda_build_step1.py"
         );
     }
 }
