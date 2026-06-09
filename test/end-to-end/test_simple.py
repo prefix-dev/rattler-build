@@ -1716,6 +1716,21 @@ def test_cycle_detection(rattler_build: RattlerBuild, recipes: Path, tmp_path: P
     assert "Cycle detected in recipe outputs: bazbus, foobar" in stdout
 
 
+def test_non_exact_run_constraint_no_cycle(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    # Issue #2531: a non-exact run_constraints pin must not edge the graph.
+    rendered = rattler_build.render(
+        recipes / "race-condition" / "recipe-constraint-no-cycle.yaml",
+        tmp_path,
+    )
+    # libopenblas first via openblas's exact run pin.
+    assert [rx["recipe"]["package"]["name"] for rx in rendered] == [
+        "libopenblas",
+        "openblas",
+    ]
+
+
 def test_sibling_run_dep_ordering(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
