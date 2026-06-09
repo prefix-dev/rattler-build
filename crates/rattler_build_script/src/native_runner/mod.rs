@@ -10,6 +10,7 @@ mod cmd_exe;
 
 use std::path::Path;
 
+use indexmap::IndexMap;
 use rattler_conda_types::Platform;
 use rattler_shell::shell::{Shell, ShellEnum};
 
@@ -35,6 +36,17 @@ pub(crate) trait NativeShellRunner: Send + Sync {
     fn supports_sandbox(&self) -> bool {
         true
     }
+
+    /// Wraps a non-empty section body in an isolated shell scope so its
+    /// step-local `env` and shell state don't leak into later sections and a
+    /// failure aborts the wrapper. `env` is emitted via [`Shell::set_env_var`]
+    /// for consistent quoting; the scope primitive is shell-specific.
+    fn scope_section(
+        &self,
+        label: Option<&str>,
+        env: &IndexMap<String, String>,
+        body: &str,
+    ) -> Result<String, std::io::Error>;
 
     /// Returns human-readable reproduction instructions shown when execution fails.
     fn debug_info(&self, work_dir: &Path, run_prefix: &Path, build_prefix: Option<&Path>)
@@ -81,8 +93,68 @@ pub(crate) fn quote_arg(shell: &ShellEnum, arg: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::{native_runner, quote_arg};
+    use indexmap::IndexMap;
     use rattler_conda_types::Platform;
     use rattler_shell::shell::{self, Shell};
+
+    /// True if any line equals `want` after trimming trailing whitespace.
+    fn has_line(s: &str, want: &str) -> bool {
+        s.lines().any(|l| l.trim_end() == want)
+    }
+
+    /// bash scopes a section in a bare subshell, emits the label comment, and
+    /// quotes env via `set_env_var` (shlex). No errorlevel guard — `set -e`
+    /// from the preamble handles failure.
+    #[test]
+    fn bash_scope_section_subshell_env_and_label() {
+        let runner = native_runner(Platform::Linux64);
+        let mut env = IndexMap::new();
+        env.insert("FOO".to_string(), "a b".to_string());
+        let out = runner
+            .scope_section(Some("uses: configure"), &env, "echo hi")
+            .unwrap();
+        assert!(out.contains("# === uses: configure ==="), "{out}");
+        assert!(has_line(&out, "("), "missing subshell open:\n{out}");
+        assert!(has_line(&out, ")"), "missing subshell close:\n{out}");
+        assert!(
+            out.contains("export FOO='a b'"),
+            "env must be quoted:\n{out}"
+        );
+        assert!(out.contains("echo hi"), "{out}");
+        assert!(!out.contains("errorlevel"), "bash needs no guard:\n{out}");
+    }
+
+    /// No label and empty env => just `( body )`.
+    #[test]
+    fn bash_scope_section_minimal() {
+        let runner = native_runner(Platform::Linux64);
+        let out = runner
+            .scope_section(None, &IndexMap::new(), "echo hi")
+            .unwrap();
+        assert!(!out.contains("# ==="), "no label => no comment:\n{out}");
+        assert!(has_line(&out, "("), "{out}");
+        assert!(has_line(&out, ")"), "{out}");
+    }
+
+    /// cmd scopes via `setlocal`/`endlocal`, sets env via `@SET`, and always
+    /// appends the errorlevel guard (required even for the last section).
+    #[test]
+    fn cmd_scope_section_setlocal_env_and_guard() {
+        let runner = native_runner(Platform::Win64);
+        let mut env = IndexMap::new();
+        env.insert("FOO".to_string(), "bar".to_string());
+        let out = runner
+            .scope_section(Some("step 1"), &env, "echo hi")
+            .unwrap();
+        assert!(out.contains("@rem === step 1 ==="), "{out}");
+        assert!(has_line(&out, "setlocal"), "{out}");
+        assert!(has_line(&out, "endlocal"), "{out}");
+        assert!(
+            has_line(&out, "if %errorlevel% neq 0 exit /b %errorlevel%"),
+            "guard required even when last:\n{out}"
+        );
+        assert!(out.contains(r#"@SET "FOO=bar""#), "{out}");
+    }
 
     #[test]
     fn native_runner_follows_the_platform() {
