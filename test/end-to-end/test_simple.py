@@ -1397,12 +1397,10 @@ def test_noarch_flask(
 
     assert (pkg / "info/tests/tests.yaml").exists()
 
-    # check that the snapshot matches (different on windows vs. unix)
+    # The serialized test script stores the command list verbatim (the same on
+    # all platforms); per-command error handling is applied when the test runs.
     test_yaml = (pkg / "info/tests/tests.yaml").read_text()
-    if os.name == "nt":
-        assert "if %errorlevel% neq 0 exit /b %errorlevel%" in test_yaml
-    else:
-        assert test_yaml == snapshot
+    assert test_yaml == snapshot
 
     # make sure that the entry point does not exist
     assert not (pkg / "python-scripts/flask").exists()

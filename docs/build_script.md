@@ -80,7 +80,9 @@ So far, the following interpreters are supported:
 
 - `bash` (default on Unix)
 - `cmd.exe` (default on Windows)
+- `powershell`
 - `nushell`
+- `brush`
 - `python`
 - `perl`
 - `rscript` (for R scripts)
@@ -88,8 +90,8 @@ So far, the following interpreters are supported:
 - `node` or `nodejs` (for NodeJS scripts)
 
 Rattler-Build automatically detects the interpreter based on the file extension
-(`.sh`, `.bat`, `.nu`, `.py`, `.pl`, `.r`, `.rb`, `.js`) or you can specify it in the
-`interpreter` key in the `script` section of your recipe.
+(`.sh`/`.bash`, `.bat`/`.cmd`, `.ps1`, `.nu`, `.py`, `.pl`, `.r`, `.rb`, `.js`) or you
+can specify it in the `interpreter` key in the `script` section of your recipe.
 
 ```yaml title="recipe.yaml"
 build:
@@ -105,6 +107,14 @@ requirements:
     `cmd.exe`. If you encounter any issues, please
     [open an issue](https://github.com/prefix-dev/rattler-build/issues/new).
 
+!!! tip "Put the interpreter in `build`"
+    An interpreter that runs the build script is a build-time tool, so the
+    correct place for it is the `build` section of `requirements`. The `host`
+    environment is searched as well (and, for most interpreters, the system
+    `PATH` as a last resort), so a `host` dependency also works — but `build` is
+    preferred. `brush` is the exception: it must be in `build`, and a system
+    copy is never used.
+
 ### Using `nushell`
 
 In order to use `nushell` you can select the `interpreter: nu` or have a
@@ -118,7 +128,7 @@ build:
     content: |
       echo "Hello from nushell!"
 
-# Note: it's required to have `nushell` in the `build` section of your recipe!
+# Note: add `nushell` to the `build` section of your recipe!
 requirements:
   build:
     - nushell
@@ -156,7 +166,7 @@ build:
     content: |
       print("Hello from Python!")
 
-# Note: it's required to have `python` in the `build` section of your recipe!
+# Note: add `python` to the `build` section of your recipe!
 requirements:
   build:
     - python
@@ -175,7 +185,7 @@ build:
     content: |
       puts "Hello from Ruby!"
 
-# Note: it's required to have `ruby` in the `build` section of your recipe!
+# Note: add `ruby` to the `build` section of your recipe!
 requirements:
   build:
     - ruby
@@ -194,10 +204,74 @@ build:
     content: |
       console.log("Hello from NodeJS!");
 
-# Note: it's required to have `nodejs` in the `build` section of your recipe!
+# Note: add `nodejs` to the `build` section of your recipe!
 requirements:
   build:
     - nodejs
+```
+
+### Using `perl`
+
+In order to use `perl` you can select the `interpreter: perl` or have a
+`build.pl` file in your recipe directory and `perl` in the
+`requirements/build` section.
+
+```yaml title="recipe.yaml"
+build:
+  script:
+    interpreter: perl
+    content: |
+      print "Hello from Perl!\n";
+
+# Note: add `perl` to the `build` section of your recipe!
+requirements:
+  build:
+    - perl
+```
+
+### Using `rscript` (R)
+
+In order to run R scripts you can select the `interpreter: rscript` or have a
+`build.r` file in your recipe directory and `r-base` in the
+`requirements/build` section. The script is executed with `Rscript` from the
+build environment.
+
+```yaml title="recipe.yaml"
+build:
+  script:
+    interpreter: rscript
+    content: |
+      cat("Hello from R!\n")
+
+# Note: add `r-base` to the `build` section of your recipe!
+requirements:
+  build:
+    - r-base
+```
+
+### Using `powershell`
+
+In order to use `powershell` you can select the `interpreter: powershell` or
+have a `build.ps1` file in your recipe directory. On Windows, PowerShell is
+taken from the system, so no extra dependency is required. On other platforms
+`pwsh` must be available in the build environment, so add `powershell-core` to
+`requirements/build`. Rattler-Build prefers PowerShell 7.4+; on older versions
+errors from native commands may be skipped and you have to check `$?` or
+`$LASTEXITCODE` manually.
+
+```yaml title="recipe.yaml"
+build:
+  script:
+    interpreter: powershell
+    content: |
+      Write-Host "Hello from PowerShell!"
+
+# Note: on non-Windows platforms `powershell-core` must be in the `build` section!
+requirements:
+  build:
+    - if: not win
+      then:
+        - powershell-core
 ```
 
 

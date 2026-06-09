@@ -1,44 +1,23 @@
-use std::path::PathBuf;
-
 use rattler_conda_types::Platform;
 
-use crate::execution::{ExecutionArgs, ResolvedScriptContents};
+use super::{InterpreterInvocation, InterpreterSearchScope};
 
-use super::{
-    BashInterpreter, CmdExeInterpreter, Interpreter, InterpreterError, InterpreterSearchScope,
-    find_interpreter,
-};
+pub struct PerlInvocation;
 
-pub struct PerlInterpreter;
-
-// Perl interpreter calls either bash or cmd.exe interpreter for activation and then runs Perl script
-impl Interpreter for PerlInterpreter {
-    async fn run(&self, args: ExecutionArgs) -> Result<(), InterpreterError> {
-        let perl_script = args.work_dir.join("conda_build_script.pl");
-        tokio::fs::write(&perl_script, args.script.script()).await?;
-
-        let args = ExecutionArgs {
-            script: ResolvedScriptContents::Inline(format!("perl {:?}", perl_script)),
-            ..args
-        };
-
-        if cfg!(windows) {
-            CmdExeInterpreter.run(args).await
-        } else {
-            BashInterpreter.run(args).await
-        }
+impl InterpreterInvocation for PerlInvocation {
+    fn executable_names(&self, _build_platform: &Platform) -> &'static [&'static str] {
+        &["perl"]
     }
 
-    async fn find_interpreter(
-        &self,
-        build_prefix: Option<&PathBuf>,
-        platform: &Platform,
-    ) -> Result<Option<PathBuf>, which::Error> {
-        find_interpreter(
-            "perl",
-            build_prefix,
-            platform,
-            InterpreterSearchScope::PrefixThenSystemPath,
-        )
+    fn search_scope(&self, _build_platform: &Platform) -> InterpreterSearchScope {
+        InterpreterSearchScope::build_and_host_with_system_fallback()
+    }
+
+    fn extension(&self) -> &'static str {
+        "pl"
+    }
+
+    fn args(&self, script_path: &std::path::Path) -> Vec<String> {
+        vec![script_path.to_string_lossy().into_owned()]
     }
 }

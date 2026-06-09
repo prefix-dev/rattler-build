@@ -530,23 +530,36 @@ with the following fields (all optional):
   the rendered recipe. The variables must already be set in the environment
   running `rattler-build`.
 - **`interpreter`** - Explicit interpreter to run `content` with. Supported
-  values are `bash` (default on Unix), `cmd.exe` (default on Windows), `nu`
-  (nushell), `python`, `perl`, `rscript`, `ruby` and `node`/`nodejs`. When
-  unset, the interpreter is auto-detected from the script's file extension
-  (`.sh`, `.bat`, `.nu`, `.py`, `.pl`, `.r`, `.rb`, `.js`).
+  values are `bash` (default on Unix), `cmd.exe` (default on Windows),
+  `powershell`, `nu` (nushell), `brush`, `python`, `perl`, `rscript`, `ruby`
+  and `node`/`nodejs`. When unset, the interpreter is auto-detected from the
+  script's file extension (`.sh`/`.bash`, `.bat`/`.cmd`, `.ps1`, `.nu`, `.py`,
+  `.pl`, `.r`, `.rb`, `.js`).
 - **`cwd`** - Working directory for the script, relative to the
   `[build folder]/work` directory. Defaults to the `[build folder]/work`
   directory itself.
 
-!!! warning "Non-default interpreters need a build dependency"
+!!! note "Where interpreters come from"
 
-    Only `bash` and `cmd.exe` are assumed to exist on the build machine.
-    Every other interpreter must be added to `requirements.build` (or
-    otherwise be available on `PATH`) so the build environment actually
-    has it. For example:
-     - `interpreter: nu` requires `nushell` in `requirements.build`
-     - `interpreter: python` requires `python`
-     - `interpreter: node` requires `nodejs`
+    Every build and test script is launched through a native shell wrapper
+    (`bash` on Unix, `cmd.exe` on Windows) that activates the build/host
+    prefixes and then invokes the chosen interpreter as a command.
+
+    An interpreter that runs the build script is a build-time tool, so add it to
+    `requirements.build` (for example `interpreter: nu` → `nushell`,
+    `interpreter: rscript` → `r-base`, `interpreter: node` → `nodejs`). It is
+    resolved from the activated environment in the same order the `PATH` would:
+    the **build** prefix, then the **host** prefix, and for most interpreters the
+    system `PATH` as a last resort. So a `host` dependency is also found, but
+    `build` is the correct place; relying on a system copy works but makes builds
+    non-reproducible. When the build and host environments are merged
+    (`build.merge_build_and_host_envs`), that single environment is used.
+
+    Two interpreters are resolved differently:
+     - `bash`/`cmd.exe` (and `powershell` on Windows) may be taken from the
+       system `PATH` on their native platform.
+     - `brush` is resolved **only** from the build environment (not the host
+       prefix or the system `PATH`), so it must be in `requirements.build`.
 
 ```yaml title="recipe.yaml"
 build:
