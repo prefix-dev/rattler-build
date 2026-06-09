@@ -4292,23 +4292,34 @@ with the following fields (all optional):</p>
   the rendered recipe. The variables must already be set in the environment
   running <code>rattler-build</code>.</li>
 <li><strong><code>interpreter</code></strong> - Explicit interpreter to run <code>content</code> with. Supported
-  values are <code>bash</code> (default on Unix), <code>cmd.exe</code> (default on Windows), <code>nu</code>
-  (nushell), <code>python</code>, <code>perl</code>, <code>rscript</code>, <code>ruby</code> and <code>node</code>/<code>nodejs</code>. When
-  unset, the interpreter is auto-detected from the script's file extension
-  (<code>.sh</code>, <code>.bat</code>, <code>.nu</code>, <code>.py</code>, <code>.pl</code>, <code>.r</code>, <code>.rb</code>, <code>.js</code>).</li>
+  values are <code>bash</code> (default on Unix), <code>cmd.exe</code> (default on Windows),
+  <code>powershell</code>, <code>nu</code> (nushell), <code>brush</code>, <code>python</code>, <code>perl</code>, <code>rscript</code>, <code>ruby</code>
+  and <code>node</code>/<code>nodejs</code>. When unset, the interpreter is auto-detected from the
+  script's file extension (<code>.sh</code>/<code>.bash</code>, <code>.bat</code>/<code>.cmd</code>, <code>.ps1</code>, <code>.nu</code>, <code>.py</code>,
+  <code>.pl</code>, <code>.r</code>, <code>.rb</code>, <code>.js</code>).</li>
 <li><strong><code>cwd</code></strong> - Working directory for the script, relative to the
   <code>[build folder]/work</code> directory. Defaults to the <code>[build folder]/work</code>
   directory itself.</li>
 </ul>
-<div class="admonition warning">
-<p class="admonition-title">Non-default interpreters need a build dependency</p>
-<p>Only <code>bash</code> and <code>cmd.exe</code> are assumed to exist on the build machine.
-Every other interpreter must be added to <code>requirements.build</code> (or
-otherwise be available on <code>PATH</code>) so the build environment actually
-has it. For example:
- - <code>interpreter: nu</code> requires <code>nushell</code> in <code>requirements.build</code>
- - <code>interpreter: python</code> requires <code>python</code>
- - <code>interpreter: node</code> requires <code>nodejs</code></p>
+<div class="admonition note">
+<p class="admonition-title">Where interpreters come from</p>
+<p>Every build and test script is launched through a native shell wrapper
+(<code>bash</code> on Unix, <code>cmd.exe</code> on Windows) that activates the build/host
+prefixes and then invokes the chosen interpreter as a command.</p>
+<p>An interpreter that runs the build script is a build-time tool, so add it to
+<code>requirements.build</code> (for example <code>interpreter: nu</code> → <code>nushell</code>,
+<code>interpreter: rscript</code> → <code>r-base</code>, <code>interpreter: node</code> → <code>nodejs</code>). It is
+resolved from the activated environment in the same order the <code>PATH</code> would:
+the <strong>build</strong> prefix, then the <strong>host</strong> prefix, and for most interpreters the
+system <code>PATH</code> as a last resort. So a <code>host</code> dependency is also found, but
+<code>build</code> is the correct place; relying on a system copy works but makes builds
+non-reproducible. When the build and host environments are merged
+(<code>build.merge_build_and_host_envs</code>), that single environment is used.</p>
+<p>Two interpreters are resolved differently:
+ - <code>bash</code>/<code>cmd.exe</code> (and <code>powershell</code> on Windows) may be taken from the
+   system <code>PATH</code> on their native platform.
+ - <code>brush</code> is resolved <strong>only</strong> from the build environment (not the host
+   prefix or the system <code>PATH</code>), so it must be in <code>requirements.build</code>.</p>
 </div>
 <div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-28-1"><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a><span class="nt">build</span><span class="p">:</span>
 </span><span id="__span-28-2"><a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a><span class="w">  </span><span class="nt">script</span><span class="p">:</span>
