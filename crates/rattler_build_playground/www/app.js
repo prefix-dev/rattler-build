@@ -1,4 +1,4 @@
-import wasmInit, { parse_recipe, evaluate_recipe, get_used_variables, get_platforms, render_variants, get_theme_css, highlight_source_yaml, first_variant_values } from './rattler_build_playground.js';
+import wasmInit, { parse_recipe, evaluate_recipe, get_used_variables, get_platforms, render_variants, get_theme_css, highlight_source_yaml, first_variant_values, generate_pypi_recipe, generate_cran_recipe, generate_cpan_recipe } from './rattler_build_playground.js';
 
 // ===== HTML utilities =====
 
@@ -98,6 +98,10 @@ const outputBadge = document.getElementById('output-badge');
 const platformSelect = document.getElementById('platform-select');
 const usedVarsEl = document.getElementById('used-vars');
 const loadPinningBtn = document.getElementById('load-pinning-btn');
+const generatorSource = document.getElementById('generator-source');
+const generatorPackage = document.getElementById('generator-package');
+const generatorVersion = document.getElementById('generator-version');
+const generatorBtn = document.getElementById('generator-btn');
 
 // ===== Editor helpers =====
 
@@ -327,6 +331,79 @@ variantsEditor.addEventListener('input', () => {
 platformSelect.addEventListener('change', () => {
   localStorage.setItem('playground-platform', platformSelect.value);
   update();
+});
+
+// Recipe generator (PyPI / CRAN / CPAN)
+const GENERATORS = {
+  pypi: { fn: generate_pypi_recipe, versioned: true, placeholder: 'package name' },
+  cran: { fn: generate_cran_recipe, versioned: false, placeholder: 'R package' },
+  cpan: { fn: generate_cpan_recipe, versioned: true, placeholder: 'Perl distribution' },
+};
+
+function updateGeneratorPlaceholders() {
+  const cfg = GENERATORS[generatorSource.value] || GENERATORS.pypi;
+  generatorPackage.placeholder = cfg.placeholder;
+  generatorVersion.style.display = cfg.versioned ? '' : 'none';
+}
+
+generatorSource.value = localStorage.getItem('playground-gen-source') || 'pypi';
+updateGeneratorPlaceholders();
+
+generatorSource.addEventListener('change', () => {
+  localStorage.setItem('playground-gen-source', generatorSource.value);
+  updateGeneratorPlaceholders();
+});
+
+async function runGenerator() {
+  const source = generatorSource.value;
+  const cfg = GENERATORS[source];
+  if (!cfg) return;
+  const pkg = generatorPackage.value.trim();
+  if (!pkg) {
+    generatorPackage.focus();
+    return;
+  }
+  const version = generatorVersion.value.trim() || null;
+
+  generatorBtn.disabled = true;
+  const originalText = generatorBtn.textContent;
+  generatorBtn.textContent = 'generating...';
+  outputBadge.textContent = `fetching ${source}…`;
+  outputBadge.style.color = '';
+  try {
+    const arg2 = cfg.versioned ? version : null;
+    const resultJson = await cfg.fn(pkg, arg2);
+    const result = JSON.parse(resultJson);
+    if (result.ok) {
+      recipeEditor.value = result.result;
+      localStorage.setItem('playground-recipe', recipeEditor.value);
+      if (wasmReady) highlightEditor(recipeEditor, recipeHighlight);
+      autoResize(recipeEditor);
+      scheduleUpdate();
+    } else {
+      outputBadge.textContent = 'error';
+      outputBadge.style.color = 'var(--error)';
+      renderError(result.error);
+    }
+  } catch (e) {
+    outputBadge.textContent = 'error';
+    outputBadge.style.color = 'var(--error)';
+    renderError({ message: e.toString() });
+  } finally {
+    generatorBtn.disabled = false;
+    generatorBtn.textContent = originalText;
+  }
+}
+
+generatorBtn.addEventListener('click', runGenerator);
+
+[generatorPackage, generatorVersion].forEach(input => {
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      runGenerator();
+    }
+  });
 });
 
 // Load conda-forge pinning

@@ -1,4 +1,6 @@
-use std::{collections::HashMap, collections::HashSet, path::PathBuf};
+use std::{collections::HashMap, collections::HashSet};
+#[cfg(not(target_arch = "wasm32"))]
+use std::path::PathBuf;
 
 #[cfg(feature = "cli")]
 use clap::Parser;
@@ -9,10 +11,9 @@ use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use url::Url;
 
-use crate::{
-    serialize::{self, ScriptTest, Test, UrlSourceElement},
-    write_recipe,
-};
+use crate::serialize::{self, ScriptTest, Test, UrlSourceElement};
+#[cfg(not(target_arch = "wasm32"))]
+use crate::write_recipe;
 /// Package metadata returned by the R-universe/CRAN API.
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize, Debug)]
@@ -267,12 +268,25 @@ async fn build_cran_recipe_and_deps(
     ))
     .expect("Failed to parse URL");
 
-    let sha256 = fetch_package_sha256sum(&url).await?;
+    // Fetching the tarball to hash it is best-effort: in restricted environments
+    // (e.g. WASM/browser with no CORS on cran.r-project.org) we fall back to the
+    // MD5 the R-universe API already gave us.
+    let (sha256, md5) = match fetch_package_sha256sum(&url).await {
+        Ok(hash) => (Some(hex::encode(hash)), None),
+        Err(e) => {
+            tracing::warn!(
+                "Failed to fetch SHA256 for {}: {} — falling back to MD5 from R-universe.",
+                package_info._file,
+                e
+            );
+            (None, Some(package_info.MD5sum.clone()))
+        }
+    };
 
     let source = UrlSourceElement {
         url: vec![url.to_string(), url_archive.to_string()],
-        md5: None,
-        sha256: Some(hex::encode(sha256)),
+        md5,
+        sha256,
     };
     recipe.source.push(source.into());
 
@@ -369,6 +383,7 @@ pub async fn generate_r_recipe_string(
     Ok(format_cran_recipe_with_suggests(&recipe))
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 #[async_recursion::async_recursion]
 /// Generate a CRAN recipe using `CranOpts` and either print it or write it to disk.
 ///
