@@ -37,6 +37,51 @@ pub enum InterpreterError {
     /// Indicates that the interpreter executable was found but rejected by validation.
     #[error("interpreter '{interpreter}' was found but is not valid: {reason}")]
     InvalidInterpreter { interpreter: String, reason: String },
+
+    /// Indicates that the recipe requested an interpreter that rattler-build
+    /// does not support (e.g. a typo like `brus` instead of `brush`).
+    #[error("unsupported interpreter '{0}'")]
+    UnsupportedInterpreter(String),
+}
+
+/// Constructs the invocation behavior for a supported interpreter.
+type InvocationFactory = fn() -> Box<dyn InterpreterInvocation>;
+
+/// Recipe-facing interpreter names and their invocation constructors. This is
+/// the single source of truth for which `build.script.interpreter` values are
+/// supported; lookup and typo suggestions both derive from it.
+const INTERPRETERS: &[(&str, InvocationFactory)] = &[
+    ("bash", || Box::new(bash::BashInvocation)),
+    ("cmd", || Box::new(cmd_exe::CmdExeInvocation)),
+    ("brush", || Box::new(brush::BrushInvocation)),
+    ("nushell", || Box::new(nushell::NuShellInvocation)),
+    ("nu", || Box::new(nushell::NuShellInvocation)),
+    ("python", || Box::new(python::PythonInvocation)),
+    ("perl", || Box::new(perl::PerlInvocation)),
+    ("rscript", || Box::new(r::RInvocation)),
+    ("ruby", || Box::new(ruby::RubyInvocation)),
+    ("node", || Box::new(nodejs::NodeJsInvocation)),
+    ("nodejs", || Box::new(nodejs::NodeJsInvocation)),
+    ("powershell", || Box::new(powershell::PowerShellInvocation)),
+];
+
+/// Returns the supported interpreter name most similar to `name`, if it is
+/// similar enough — so typos get a suggestion, unrelated names do not.
+/// The comparison is case-insensitive.
+pub fn closest_interpreter(name: &str) -> Option<&'static str> {
+    /// Minimum similarity to treat a name as a typo of an interpreter.
+    /// Jaro-Winkler rather than plain Jaro so that prefix-sharing near-misses
+    /// like `pwsh` -> `powershell` (exactly 0.8 under Jaro, and prone to
+    /// falling just below it in floating point) clear the threshold.
+    const SIMILARITY_THRESHOLD: f64 = 0.8;
+
+    let name = name.to_lowercase();
+    INTERPRETERS
+        .iter()
+        .map(|(candidate, _)| (strsim::jaro_winkler(&name, candidate), *candidate))
+        .filter(|(similarity, _)| *similarity >= SIMILARITY_THRESHOLD)
+        .max_by(|(a, _), (b, _)| a.total_cmp(b))
+        .map(|(_, candidate)| candidate)
 }
 
 /// Describes where to look for an interpreter executable: which environments to
@@ -211,19 +256,10 @@ pub(crate) trait InterpreterInvocation: Send + Sync {
 }
 
 fn interpreter_invocation(interpreter: &str) -> Option<Box<dyn InterpreterInvocation>> {
-    match interpreter {
-        "bash" => Some(Box::new(bash::BashInvocation)),
-        "cmd" => Some(Box::new(cmd_exe::CmdExeInvocation)),
-        "brush" => Some(Box::new(brush::BrushInvocation)),
-        "nushell" | "nu" => Some(Box::new(nushell::NuShellInvocation)),
-        "python" => Some(Box::new(python::PythonInvocation)),
-        "perl" => Some(Box::new(perl::PerlInvocation)),
-        "rscript" => Some(Box::new(r::RInvocation)),
-        "ruby" => Some(Box::new(ruby::RubyInvocation)),
-        "node" | "nodejs" => Some(Box::new(nodejs::NodeJsInvocation)),
-        "powershell" => Some(Box::new(powershell::PowerShellInvocation)),
-        _ => None,
-    }
+    INTERPRETERS
+        .iter()
+        .find(|(name, _)| *name == interpreter)
+        .map(|(_, invocation)| invocation())
 }
 
 /// An interpreter selected from a recipe, pairing the user-facing name with its invocation behavior.
@@ -791,6 +827,37 @@ mod tests {
                 .extension(),
             "py"
         );
+    }
+
+    /// The interpreter table maps each recipe name once; a duplicate entry
+    /// would shadow the later constructor.
+    #[test]
+    fn interpreter_table_has_no_duplicate_names() {
+        let mut names: Vec<&str> = INTERPRETERS.iter().map(|(name, _)| *name).collect();
+        names.sort_unstable();
+        let before = names.len();
+        names.dedup();
+        assert_eq!(before, names.len(), "duplicate name in INTERPRETERS");
+    }
+
+    /// Typos within a small edit distance suggest the intended interpreter;
+    /// unrelated names produce no suggestion.
+    #[test]
+    fn closest_interpreter_suggests_typos_only() {
+        assert_eq!(closest_interpreter("brus"), Some("brush"));
+        assert_eq!(closest_interpreter("pyton"), Some("python"));
+        assert_eq!(closest_interpreter("powershel"), Some("powershell"));
+        assert_eq!(closest_interpreter("pwsh"), Some("powershell"));
+        assert_eq!(closest_interpreter("zsh"), None);
+        assert_eq!(closest_interpreter("not-a-real-interp"), None);
+    }
+
+    /// The similarity comparison is case-insensitive.
+    #[test]
+    fn closest_interpreter_is_case_insensitive() {
+        assert_eq!(closest_interpreter("Bash"), Some("bash"));
+        assert_eq!(closest_interpreter("PYTHON"), Some("python"));
+        assert_eq!(closest_interpreter("PowerShell"), Some("powershell"));
     }
 
     /// `cmd` propagates a non-zero exit between commands; others join plainly.

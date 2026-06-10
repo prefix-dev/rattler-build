@@ -468,9 +468,7 @@ pub(crate) async fn generate_build_script(
         .clone()
         .unwrap_or_else(|| runner.default_interpreter().to_string());
     let interpreter = crate::interpreter::SelectedInterpreter::from_recipe_name(&interpreter_name)
-        .ok_or_else(|| {
-            std::io::Error::other(format!("Unsupported interpreter: {interpreter_name}"))
-        })?;
+        .ok_or_else(|| crate::InterpreterError::UnsupportedInterpreter(interpreter_name.clone()))?;
 
     // Assemble the rendered content; the interpreter joins a command list.
     let script_text = match &args.script {
@@ -601,6 +599,14 @@ pub async fn create_build_script(exec_args: ExecutionArgs) -> Result<(), std::io
             } => std::io::Error::other(format!(
                 "interpreter '{interpreter}' was found but is not valid: {reason}"
             )),
+            crate::InterpreterError::UnsupportedInterpreter(interpreter) => {
+                let suggestion = crate::interpreter::closest_interpreter(&interpreter)
+                    .map(|s| format!(". Did you mean `{s}`?"))
+                    .unwrap_or_default();
+                std::io::Error::other(format!(
+                    "unsupported interpreter '{interpreter}'{suggestion}"
+                ))
+            }
         })?;
 
     tracing::info!("Build script created at {}", build_script_path.display());
@@ -1321,10 +1327,45 @@ mod tests {
         );
     }
 
-    /// An unsupported interpreter name surfaces as an `Unsupported interpreter`
-    /// io::Error.
+    /// An unsupported interpreter name surfaces as an `unsupported interpreter`
+    /// io::Error, with a "did you mean" suggestion for near-misses only.
     #[tokio::test]
     async fn test_create_build_script_unsupported_interpreter_error() {
+        let tmp = tempfile::tempdir().unwrap();
+        let prefix = tmp.path().join("prefix");
+        fs::create_dir_all(&prefix).unwrap();
+
+        let unsupported_error = |interpreter: &str| {
+            let args = execution_args(
+                tmp.path().to_path_buf(),
+                tmp.path().join("prefix"),
+                ResolvedScriptContents::Inline("noop".to_string()),
+                Some(interpreter),
+            );
+            async { create_build_script(args).await.unwrap_err().to_string() }
+        };
+
+        let message = unsupported_error("not-a-real-interp").await;
+        assert!(
+            message.contains("unsupported interpreter 'not-a-real-interp'"),
+            "unexpected error: {message}"
+        );
+        assert!(
+            !message.contains("Did you mean"),
+            "no suggestion expected for an unrelated name: {message}"
+        );
+
+        let message = unsupported_error("brus").await;
+        assert!(
+            message.contains("Did you mean `brush`?"),
+            "unexpected error: {message}"
+        );
+    }
+
+    /// A typo in the recipe `interpreter` (issue #2530) surfaces as
+    /// `UnsupportedInterpreter` instead of a generic execution failure.
+    #[tokio::test]
+    async fn test_generate_build_script_interpreter_typo_error() {
         let tmp = tempfile::tempdir().unwrap();
         let prefix = tmp.path().join("prefix");
         fs::create_dir_all(&prefix).unwrap();
@@ -1332,14 +1373,14 @@ mod tests {
         let args = execution_args(
             tmp.path().to_path_buf(),
             prefix,
-            ResolvedScriptContents::Inline("noop".to_string()),
-            Some("not-a-real-interp"),
+            ResolvedScriptContents::Inline("echo \"Hello from brush!\"".to_string()),
+            Some("brus"),
         );
 
-        let err = create_build_script(args).await.unwrap_err();
+        let err = generate_build_script(&args).await.unwrap_err();
         assert!(
-            err.to_string().contains("Unsupported interpreter"),
-            "unexpected error: {err}"
+            matches!(err, crate::InterpreterError::UnsupportedInterpreter(ref name) if name == "brus"),
+            "expected UnsupportedInterpreter, got {err:?}"
         );
     }
 

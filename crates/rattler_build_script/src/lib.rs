@@ -33,6 +33,6 @@ pub use execution::{
     EnvironmentIsolation, ExecutionArgs, ResolvedScriptContents, create_build_script,
 };
 #[cfg(feature = "execution")]
-pub use interpreter::InterpreterError;
+pub use interpreter::{InterpreterError, closest_interpreter};
 #[cfg(feature = "execution")]
 pub use runtime::RuntimeEnv;
