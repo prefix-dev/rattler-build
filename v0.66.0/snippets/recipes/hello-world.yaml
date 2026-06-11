@@ -1,0 +1,22 @@
+context:
+  version: "1.0.0"
+
+package:
+  name: hello-world
+  version: ${{ version }}
+
+build:
+  number: 0
+  script:
+    - mkdir -p $PREFIX/bin
+    - echo '#!/bin/bash' > $PREFIX/bin/hello
+    - echo 'echo "Hello, World!"' >> $PREFIX/bin/hello
+    - chmod +x $PREFIX/bin/hello
+
+tests:
+  - script:
+      - hello
+
+about:
+  summary: A simple hello world package
+  license: MIT
