@@ -6,8 +6,15 @@ platforms = ["linux-64", "win-64", "osx-64", "osx-arm64"]
 preview = ['pixi-build']
 name = "rattler-build"
 
+[workspace.build-variants]
+rust_compiler_version = [">=1.95,<1.96"]
+
 [workspace.target.osx.build-variants]
 c_compiler_version = ["19"]
+
+[workspace.target.win.build-variants]
+c_compiler = ["vs"]
+c_compiler_version = ["2026"]
 
 [tasks]
 build-release = "cargo build --release"
@@ -83,15 +90,10 @@ deploy-dev = { cmd = "mike deploy --push dev devel", depends-on = [
 ] }
 
 [dependencies]
-openssl = ">=3.6.1,<4"
-rust = ">=1.95.0,<1.96"
-rust-src = ">=1.95.0,<2"
+rust-src = "*"
 sccache = ">=0.14.0,<0.15"
-compilers = ">=1.11.0,<2"
 libssh2 = ">=1.11.1,<2"
 pkg-config = ">=0.29.2,<0.30"
-cmake = ">=4.2.3,<5"
-make = ">=4.4.1,<5"
 perl = ">=5.32.1,<5.33"
 pytest = ">=8.4.2,<9"
 pytest-xdist = ">=3.8.0,<4"
@@ -100,6 +102,12 @@ conda-package-handling = ">=2.4.0,<3"
 requests = ">=2.32.5,<3"
 syrupy = ">=5.1.0,<6"
 boto3 = ">=1.42.66,<2"
+
+[target.unix.dependencies]
+make = ">=4.4.1,<5"
+
+[dev]
+rattler-build = { path = "." }
 
 [activation.env]
 RUSTC_WRAPPER = "sccache"
@@ -178,6 +186,7 @@ upload-package = "python scripts/upload_package.py"
 clang = ">=18.1.8,<19.0"
 mold = ">=2.33.0,<3.0"
 patchelf = ">=0.17.2,<0.18"
+openssl = ">=3.6.1,<4"
 
 [target.osx-64.dependencies]
 patchelf = ">=0.18.0,<0.19"
@@ -235,7 +244,9 @@ packaging = { features = ["packaging"], no-default-feature = true }
 playground = { features = ["playground"], no-default-feature = true }
 release = { features = ["release"], no-default-feature = true }
 
-# pixi build
+# -------------------------------------------------------------------------------------------------
+# Pixi package definition
+# -------------------------------------------------------------------------------------------------
 [package]
 name.workspace = true
 
@@ -248,7 +259,7 @@ channels = [
 ]
 
 [package.build-dependencies]
-cmake = ">=4.3.0, <5"
+cmake = ">=4.3.0,<5"
 
 [package.build.config]
 compilers = ["rust", "c"]
