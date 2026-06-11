@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.66.0] - 2026-06-11
+### ✨ Highlights
+
+This release features a couple of nice improvements to the interpreter feature of Rattler-Build.
+We now support the `brush` interpreter and have a consistent way of activating all interpreters
+
+### Added
+
+- Add brush interpreter support by @baszalmstra in [#2527](https://github.com/prefix-dev/rattler-build/pull/2527)
+
+
+### Changed
+
+- Rattler-build binary detection by @Hofer-Julian in [#2542](https://github.com/prefix-dev/rattler-build/pull/2542)
+
+
+### Fixed
+
+- Honor io_concurrency_limit by @nehaljwani in [#2525](https://github.com/prefix-dev/rattler-build/pull/2525)
+- Useful error messages for typos in `interpreter` by @baszalmstra in [#2540](https://github.com/prefix-dev/rattler-build/pull/2540)
+
+
+### Refactor
+
+- Align nushell interpreter with brush approach by @baszalmstra in [#2533](https://github.com/prefix-dev/rattler-build/pull/2533)
+- Streamline script interpreters through a native shell wrapper by @baszalmstra in [#2535](https://github.com/prefix-dev/rattler-build/pull/2535)
+
+
+### New Contributors
+* @nehaljwani made their first contribution in [#2525](https://github.com/prefix-dev/rattler-build/pull/2525)
+
 ## [0.65.1] - 2026-05-29
 ### ✨ Highlights
 
