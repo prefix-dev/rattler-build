@@ -137,14 +137,14 @@ jobs:
       - name: Build rich package
         run: |
           mkdir -p output
-          ./target-pixi/release/rattler-build build --recipe ./examples/rich
+          ./target-pixi/$CARGO_BUILD_TARGET/release/rattler-build build --recipe ./examples/rich
           echo "Built packages:"
           ls -la ./output/noarch/
       - name: Rebuild rich package
         run: |
           PACKAGE=$(find ./output/noarch/rich-*.conda | head -n1)
           echo "Rebuilding package: $PACKAGE"
-          ./target-pixi/release/rattler-build rebuild --package-file "$PACKAGE"
+          ./target-pixi/$CARGO_BUILD_TARGET/release/rattler-build rebuild --package-file "$PACKAGE"
           echo "Rebuild completed successfully"
       - name: Compare original and rebuilt packages
         run: |
