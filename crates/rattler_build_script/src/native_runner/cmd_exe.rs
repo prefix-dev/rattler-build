@@ -1,6 +1,8 @@
+use std::fmt::Write as _;
 use std::path::Path;
 
-use rattler_shell::shell;
+use indexmap::IndexMap;
+use rattler_shell::shell::{self, Shell};
 
 use super::NativeShellRunner;
 
@@ -41,6 +43,35 @@ IF "%CONDA_BUILD%" == "" (
 
     fn supports_sandbox(&self) -> bool {
         false
+    }
+
+    /// `setlocal`/`endlocal` scope plus an errorlevel guard. The guard is
+    /// required even on the last section: falling off the end after `endlocal`
+    /// exits 0 regardless of failure, but `endlocal` preserves the
+    /// `%errorlevel%` value so the guard still catches it.
+    fn scope_section(
+        &self,
+        label: Option<&str>,
+        env: &IndexMap<String, String>,
+        body: &str,
+    ) -> Result<String, std::io::Error> {
+        let shell = shell::CmdExe;
+        let mut out = String::new();
+        if let Some(label) = label {
+            let _ = writeln!(out, "@rem === {label} ===");
+        }
+        out.push_str("setlocal\n");
+        for (key, value) in env {
+            shell
+                .set_env_var(&mut out, key, value)
+                .map_err(std::io::Error::other)?;
+        }
+        out.push_str(body);
+        if !body.ends_with('\n') {
+            out.push('\n');
+        }
+        out.push_str("endlocal\nif %errorlevel% neq 0 exit /b %errorlevel%");
+        Ok(out)
     }
 
     /// Returns reproduction instructions for the failed cmd wrapper script.
