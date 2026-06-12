@@ -451,6 +451,45 @@ mod tests {
         assert!(!build_script.contains("print('from file')"));
     }
 
+    /// An interpreter that matches the wrapper shell (`cmd` on Windows, `bash`
+    /// on Unix) is inlined into the wrapper rather than resolved from the build
+    /// environment and re-invoked. This must succeed even with an empty prefix:
+    /// `cmd` in particular is a system shell, not a conda-provided executable,
+    /// so resolving it from the build environment used to fail with
+    /// "interpreter 'cmd' was not found in the build environment".
+    /// Regression test for the `file: build` -> `build.bat` path on Windows.
+    #[tokio::test]
+    async fn interpreter_matching_wrapper_shell_is_native_body() {
+        let tmp = tempfile::tempdir().unwrap();
+        // Empty prefix: no interpreter executable is resolvable from it.
+        let prefix = tmp.path().join("prefix");
+        fs::create_dir_all(&prefix).unwrap();
+
+        // The recipe interpreter that equals the native wrapper shell.
+        let native = if cfg!(windows) { "cmd" } else { "bash" };
+        let marker = "echo wrapper-shell-body";
+
+        let args = execution_args(
+            tmp.path().to_path_buf(),
+            prefix,
+            ResolvedScriptContents::Inline(marker.to_string()),
+            Some(native),
+        );
+
+        crate::execution::generate_build_script(&args)
+            .await
+            .expect("native wrapper shell must not be resolved from the build environment");
+
+        let build_script = fs::read_to_string(native_build_script_path(tmp.path())).unwrap();
+        assert!(
+            build_script.contains(marker),
+            "wrapper should inline the script body, got:\n{build_script}"
+        );
+        // No separate interpreter script file is written for the native shell.
+        assert!(!tmp.path().join("conda_build_script.bat").exists());
+        assert!(!tmp.path().join("conda_build_script.sh").exists());
+    }
+
     #[tokio::test]
     async fn unknown_file_extension_without_interpreter_is_native_body() {
         let tmp = tempfile::tempdir().unwrap();

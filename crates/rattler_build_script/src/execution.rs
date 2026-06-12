@@ -430,8 +430,10 @@ impl Decoder for CrLfNormalizer {
 /// Returns the path to the generated native build wrapper script.
 ///
 /// If `args.interpreter` is set, or if the resolved script path has a known
-/// interpreter extension, inline script text is written to a separate file and
-/// the native wrapper invokes the resolved interpreter with that file. Otherwise
+/// interpreter extension, and that interpreter differs from the wrapper shell,
+/// inline script text is written to a separate file and the native wrapper
+/// invokes the resolved interpreter with that file. Otherwise — no interpreter,
+/// or one that is the wrapper shell itself (`cmd` on Windows, `bash` on Unix) —
 /// the script contents are appended directly to the native wrapper.
 pub(crate) async fn generate_build_script(
     args: &ExecutionArgs,
@@ -470,6 +472,17 @@ pub(crate) async fn generate_build_script(
     let interpreter = crate::interpreter::SelectedInterpreter::from_recipe_name(&interpreter_name)
         .ok_or_else(|| crate::InterpreterError::UnsupportedInterpreter(interpreter_name.clone()))?;
 
+    // Whether the content needs a specialized interpreter invocation. An
+    // interpreter that matches the wrapper shell itself (`cmd` on Windows,
+    // `bash` on Unix) is *not* specialized: the wrapper is already executed by
+    // that shell, so its body is inlined directly rather than resolving the
+    // interpreter executable from the build environment and re-invoking it.
+    // This matters most for `cmd`, which is a system shell rather than a
+    // conda-provided executable and would otherwise fail to resolve.
+    let needs_specialized_interpreter = explicit_or_inferred
+        .as_deref()
+        .is_some_and(|name| name != runner.default_interpreter());
+
     // Assemble the rendered content; the interpreter joins a command list.
     let script_text = match &args.script {
         ResolvedScriptContents::Commands(commands) => interpreter.join_commands(commands),
@@ -478,7 +491,7 @@ pub(crate) async fn generate_build_script(
         ResolvedScriptContents::Missing => String::new(),
     };
 
-    let body = if explicit_or_inferred.is_some() {
+    let body = if needs_specialized_interpreter {
         // Specialized interpreter: invoke a script file (the original path, or
         // one written next to the wrapper).
         let script_path = match &args.script {
@@ -518,7 +531,8 @@ pub(crate) async fn generate_build_script(
             .map_err(std::io::Error::other)?;
         body
     } else {
-        // No interpreter: the content is the native wrapper body.
+        // No interpreter, or one that matches the wrapper shell: the content is
+        // the native wrapper body, run directly by the wrapper shell.
         script_text
     };
 
