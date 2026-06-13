@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.66.1] - 2026-06-13
+
+### Fixed
+
+- Don't resolve the native wrapper shell as a build-env interpreter by @wolfv in [#2545](https://github.com/prefix-dev/rattler-build/pull/2545)
+
 ## [0.66.0] - 2026-06-11
 ### ✨ Highlights
 
