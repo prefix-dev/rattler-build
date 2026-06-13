@@ -100,7 +100,7 @@ pathdiff = "0.2.3"
 marked-yaml = "0.8.0"
 rstest = "0.26.1"
 petgraph = { version = "0.8.3", default-features = false }
-sha1 = { version = "0.10.6" }
+sha1 = { version = "0.11.0" }
 lzma-rust2 = { version = "0.16", features = ["xz"] }
 line-ending = "1.5.1"
 anyhow = "1.0.102"
