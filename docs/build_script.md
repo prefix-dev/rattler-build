@@ -42,6 +42,47 @@ build:
         - copy %RECIPE_DIR%\my_script_with_recipe.bat %LIBRARY_BIN%\super-cool-script.bat
 ```
 
+## Experimental build steps
+
+`build.steps` is an experimental alternative to `build.script`. Enable it with
+`--experimental`. `script` and `steps` are mutually exclusive; even
+`steps: []` explicitly selects steps mode and prevents default `build.sh` /
+`build.bat` discovery.
+
+Each step is a scoped section of the generated build wrapper, so step-local
+`env` values and `cwd` changes do not leak into later steps. A step supports:
+
+- **`run`** - Required inline command, multiline string, or list of commands.
+- **`if`** - Optional Jinja selector expression, such as `unix` or
+  `target_platform == "linux-64"`.
+- **`interpreter`** - Optional interpreter override for this step.
+- **`cwd`** - Optional working directory for this step. Relative paths are
+  resolved against the host prefix (`$PREFIX` / `%PREFIX%`), and the wrapper
+  changes to it only for that step.
+- **`env`** - Optional environment variables scoped to this step.
+
+```yaml title="recipe.yaml"
+build:
+  steps:
+    - if: unix
+      run: |
+        mkdir -p "$PREFIX/bin"
+        cp "$RECIPE_DIR/my_script_with_recipe.sh" "$PREFIX/bin/super-cool-script.sh"
+
+    - if: win
+      run: copy %RECIPE_DIR%\my_script_with_recipe.bat %LIBRARY_BIN%\super-cool-script.bat
+
+    - run: python -m pip install . --no-deps
+      env:
+        SETUPTOOLS_SCM_PRETEND_VERSION: ${{ version }}
+```
+
+!!! warning "Windows multiline steps"
+    On Windows, a multiline `run: |` block is emitted as one command-list item.
+    Rattler-Build inserts fail-fast guards between list items, not between the
+    physical lines inside one multiline scalar, so check `%errorlevel%` yourself
+    when a multiline `cmd.exe` block needs per-line failure handling.
+
 ## Environment variables
 
 There are many environment variables that are automatically set during the build
@@ -79,7 +120,7 @@ for your script.
 So far, the following interpreters are supported:
 
 - `bash` (default on Unix)
-- `cmd.exe` (default on Windows)
+- `cmd` (Windows `cmd.exe`)
 - `powershell`
 - `nushell`
 - `brush`
@@ -91,7 +132,8 @@ So far, the following interpreters are supported:
 
 Rattler-Build automatically detects the interpreter based on the file extension
 (`.sh`/`.bash`, `.bat`/`.cmd`, `.ps1`, `.nu`, `.py`, `.pl`, `.r`, `.rb`, `.js`) or you
-can specify it in the `interpreter` key in the `script` section of your recipe.
+can specify it in the `interpreter` key in the `script` section of your recipe
+(use `interpreter: cmd` for Windows `cmd.exe`).
 
 ```yaml title="recipe.yaml"
 build:

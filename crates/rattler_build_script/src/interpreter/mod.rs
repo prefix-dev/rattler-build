@@ -323,7 +323,7 @@ impl SelectedInterpreter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::execution::{ExecutionArgs, ResolvedScriptContents};
+    use crate::execution::{BuildScriptSection, ExecutionArgs, ResolvedScriptContents};
     use fs_err as fs;
     use indexmap::IndexMap;
     use rattler_conda_types::Platform;
@@ -337,8 +337,13 @@ mod tests {
         interpreter: Option<&str>,
     ) -> ExecutionArgs {
         ExecutionArgs {
-            script,
-            interpreter: interpreter.map(str::to_string),
+            sections: vec![BuildScriptSection {
+                interpreter: interpreter.map(str::to_string),
+                content: script,
+                env: IndexMap::new(),
+                cwd: None,
+                label: None,
+            }],
             env_vars: IndexMap::new(),
             secrets: IndexMap::new(),
             runtime: RuntimeEnv::current(),
@@ -393,7 +398,19 @@ mod tests {
             .unwrap();
 
         let build_script = fs::read_to_string(native_build_script_path(tmp.path())).unwrap();
-        assert!(build_script.contains("echo native"));
+        if cfg!(windows) {
+            assert!(build_script.contains("conda_build_script.bat"));
+            assert_eq!(
+                fs::read_to_string(tmp.path().join("conda_build_script.bat"))
+                    .unwrap()
+                    .replace("\r\n", "\n")
+                    .trim(),
+                "echo native"
+            );
+        } else {
+            assert!(build_script.contains("echo native"));
+            assert!(!tmp.path().join("conda_build_script.sh").exists());
+        }
         assert!(!tmp.path().join("conda_build_script.py").exists());
     }
 
@@ -452,12 +469,14 @@ mod tests {
     }
 
     /// An interpreter that matches the wrapper shell (`cmd` on Windows, `bash`
-    /// on Unix) is inlined into the wrapper rather than resolved from the build
-    /// environment and re-invoked. This must succeed even with an empty prefix:
-    /// `cmd` in particular is a system shell, not a conda-provided executable,
-    /// so resolving it from the build environment used to fail with
-    /// "interpreter 'cmd' was not found in the build environment".
-    /// Regression test for the `file: build` -> `build.bat` path on Windows.
+    /// on Unix) is treated as native wrapper code rather than resolved from the
+    /// build environment and re-invoked. On Windows the native body is invoked
+    /// through `call` indirection so `exit /b` cannot terminate the wrapper.
+    /// This must succeed even with an empty prefix: `cmd` in particular is a
+    /// system shell, not a conda-provided executable, so resolving it from the
+    /// build environment used to fail with "interpreter 'cmd' was not found in
+    /// the build environment". Regression test for the `file: build` ->
+    /// `build.bat` path on Windows.
     #[tokio::test]
     async fn interpreter_matching_wrapper_shell_is_native_body() {
         let tmp = tempfile::tempdir().unwrap();
@@ -481,13 +500,22 @@ mod tests {
             .expect("native wrapper shell must not be resolved from the build environment");
 
         let build_script = fs::read_to_string(native_build_script_path(tmp.path())).unwrap();
-        assert!(
-            build_script.contains(marker),
-            "wrapper should inline the script body, got:\n{build_script}"
-        );
-        // No separate interpreter script file is written for the native shell.
-        assert!(!tmp.path().join("conda_build_script.bat").exists());
-        assert!(!tmp.path().join("conda_build_script.sh").exists());
+        if cfg!(windows) {
+            assert!(build_script.contains("conda_build_script.bat"));
+            assert_eq!(
+                fs::read_to_string(tmp.path().join("conda_build_script.bat"))
+                    .unwrap()
+                    .replace("\r\n", "\n")
+                    .trim(),
+                marker
+            );
+        } else {
+            assert!(
+                build_script.contains(marker),
+                "wrapper should inline the script body, got:\n{build_script}"
+            );
+            assert!(!tmp.path().join("conda_build_script.sh").exists());
+        }
     }
 
     #[tokio::test]
@@ -511,7 +539,18 @@ mod tests {
             .unwrap();
 
         let build_script = fs::read_to_string(native_build_script_path(tmp.path())).unwrap();
-        assert!(build_script.contains("echo custom"));
+        if cfg!(windows) {
+            assert!(build_script.contains("conda_build_script.bat"));
+            assert_eq!(
+                fs::read_to_string(tmp.path().join("conda_build_script.bat"))
+                    .unwrap()
+                    .replace("\r\n", "\n")
+                    .trim(),
+                "echo custom"
+            );
+        } else {
+            assert!(build_script.contains("echo custom"));
+        }
     }
 
     /// A build-prefix-only interpreter (`brush`) errors when absent instead of

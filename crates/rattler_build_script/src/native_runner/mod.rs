@@ -37,6 +37,13 @@ pub(crate) trait NativeShellRunner: Send + Sync {
         true
     }
 
+    /// Returns a native-shell command that invokes a section script file, if
+    /// native sections must be run indirectly. `cmd.exe` uses this so
+    /// `exit /b` exits only the called section script, not the whole wrapper.
+    fn native_section_script_command(&self, _script_path: &Path) -> Option<Vec<String>> {
+        None
+    }
+
     /// Wraps a non-empty section body in an isolated shell scope so its
     /// step-local `env` and shell state don't leak into later sections and a
     /// failure aborts the wrapper. `env` is emitted via [`Shell::set_env_var`]
@@ -45,6 +52,7 @@ pub(crate) trait NativeShellRunner: Send + Sync {
         &self,
         label: Option<&str>,
         env: &IndexMap<String, String>,
+        cwd: Option<&Path>,
         body: &str,
     ) -> Result<String, std::io::Error>;
 
@@ -73,20 +81,32 @@ pub(crate) fn write_shell_script(
     Ok(bytes)
 }
 
-/// Quotes a single command argument for the given shell when it contains
-/// whitespace (or is empty). `rattler_shell::Shell::run_command` joins arguments
-/// with spaces without quoting, so a resolved interpreter or script path
-/// containing spaces (e.g. `C:\Program Files\nodejs\node.exe`) would otherwise
-/// be split by the shell.
+/// Quotes a single command argument for the given shell when it contains shell
+/// metacharacters, whitespace, or is empty. `rattler_shell::Shell::run_command`
+/// joins arguments with spaces without quoting, so a resolved interpreter,
+/// script path, or `cwd` containing characters like spaces or `&` would
+/// otherwise be split or interpreted by the shell.
 pub(crate) fn quote_arg(shell: &ShellEnum, arg: &str) -> String {
-    if !arg.is_empty() && !arg.chars().any(char::is_whitespace) {
-        return arg.to_string();
+    fn posix_needs_quotes(arg: &str) -> bool {
+        arg.is_empty()
+            || arg.chars().any(|c| {
+                !(c.is_ascii_alphanumeric()
+                    || matches!(c, '/' | '.' | '-' | '_' | ':' | '+' | '=' | '@' | '%'))
+            })
     }
+
+    fn cmd_needs_quotes(arg: &str) -> bool {
+        arg.is_empty()
+            || arg
+                .chars()
+                .any(|c| c.is_whitespace() || matches!(c, '&' | '|' | '<' | '>' | '(' | ')' | '^'))
+    }
+
     match shell {
-        ShellEnum::CmdExe(_) => format!("\"{arg}\""),
-        // POSIX single-quoting neutralizes spaces and metacharacters; an
-        // embedded single quote is closed, escaped, and reopened.
-        _ => format!("'{}'", arg.replace('\'', r"'\''")),
+        ShellEnum::CmdExe(_) if cmd_needs_quotes(arg) => format!("\"{arg}\""),
+        ShellEnum::CmdExe(_) => arg.to_string(),
+        _ if posix_needs_quotes(arg) => format!("'{}'", arg.replace('\'', r"'\''")),
+        _ => arg.to_string(),
     }
 }
 
@@ -97,11 +117,6 @@ mod tests {
     use rattler_conda_types::Platform;
     use rattler_shell::shell::{self, Shell};
 
-    /// True if any line equals `want` after trimming trailing whitespace.
-    fn has_line(s: &str, want: &str) -> bool {
-        s.lines().any(|l| l.trim_end() == want)
-    }
-
     /// bash scopes a section in a bare subshell, emits the label comment, and
     /// quotes env via `set_env_var` (shlex). No errorlevel guard — `set -e`
     /// from the preamble handles failure.
@@ -111,17 +126,15 @@ mod tests {
         let mut env = IndexMap::new();
         env.insert("FOO".to_string(), "a b".to_string());
         let out = runner
-            .scope_section(Some("uses: configure"), &env, "echo hi")
+            .scope_section(Some("uses: configure"), &env, None, "echo hi")
             .unwrap();
-        assert!(out.contains("# === uses: configure ==="), "{out}");
-        assert!(has_line(&out, "("), "missing subshell open:\n{out}");
-        assert!(has_line(&out, ")"), "missing subshell close:\n{out}");
-        assert!(
-            out.contains("export FOO='a b'"),
-            "env must be quoted:\n{out}"
-        );
-        assert!(out.contains("echo hi"), "{out}");
-        assert!(!out.contains("errorlevel"), "bash needs no guard:\n{out}");
+        insta::assert_snapshot!(out, @r###"
+# === uses: configure ===
+(
+export FOO='a b'
+echo hi
+)
+"###);
     }
 
     /// No label and empty env => just `( body )`.
@@ -129,31 +142,62 @@ mod tests {
     fn bash_scope_section_minimal() {
         let runner = native_runner(Platform::Linux64);
         let out = runner
-            .scope_section(None, &IndexMap::new(), "echo hi")
+            .scope_section(None, &IndexMap::new(), None, "echo hi")
             .unwrap();
-        assert!(!out.contains("# ==="), "no label => no comment:\n{out}");
-        assert!(has_line(&out, "("), "{out}");
-        assert!(has_line(&out, ")"), "{out}");
+        insta::assert_snapshot!(out, @r###"
+(
+echo hi
+)
+"###);
     }
 
-    /// cmd scopes via `setlocal`/`endlocal`, sets env via `@SET`, and always
-    /// appends the errorlevel guard (required even for the last section).
+    /// cmd scopes env via `setlocal`/`endlocal`, cwd via `pushd`/`popd`, and
+    /// appends an errorlevel guard (required even for the last section).
     #[test]
     fn cmd_scope_section_setlocal_env_and_guard() {
         let runner = native_runner(Platform::Win64);
         let mut env = IndexMap::new();
         env.insert("FOO".to_string(), "bar".to_string());
         let out = runner
-            .scope_section(Some("step 1"), &env, "echo hi")
+            .scope_section(Some("step 1"), &env, None, "echo hi")
             .unwrap();
-        assert!(out.contains("@rem === step 1 ==="), "{out}");
-        assert!(has_line(&out, "setlocal"), "{out}");
-        assert!(has_line(&out, "endlocal"), "{out}");
-        assert!(
-            has_line(&out, "if %errorlevel% neq 0 exit /b %errorlevel%"),
-            "guard required even when last:\n{out}"
-        );
-        assert!(out.contains(r#"@SET "FOO=bar""#), "{out}");
+        insta::assert_snapshot!(out, @r###"
+@rem === step 1 ===
+setlocal
+@SET "FOO=bar"
+pushd .
+if %errorlevel% neq 0 exit /b %errorlevel%
+echo hi
+set "RB_SECTION_ERRORLEVEL=%errorlevel%"
+popd
+if %RB_SECTION_ERRORLEVEL% equ 0 if %errorlevel% neq 0 set "RB_SECTION_ERRORLEVEL=%errorlevel%"
+endlocal & if %RB_SECTION_ERRORLEVEL% neq 0 exit /b %RB_SECTION_ERRORLEVEL%
+"###);
+    }
+
+    #[test]
+    fn cmd_scope_section_pushd_uses_cwd() {
+        let runner = native_runner(Platform::Win64);
+        let out = runner
+            .scope_section(
+                Some("step 1"),
+                &IndexMap::new(),
+                Some(std::path::Path::new(r"C:\some&dir")),
+                "echo hi",
+            )
+            .unwrap();
+
+        insta::assert_snapshot!(out, @r###"
+@rem === step 1 ===
+setlocal
+pushd "C:\some&dir"
+if %errorlevel% neq 0 exit /b %errorlevel%
+echo hi
+set "RB_SECTION_ERRORLEVEL=%errorlevel%"
+popd
+if %RB_SECTION_ERRORLEVEL% equ 0 if %errorlevel% neq 0 set "RB_SECTION_ERRORLEVEL=%errorlevel%"
+endlocal & if %RB_SECTION_ERRORLEVEL% neq 0 exit /b %RB_SECTION_ERRORLEVEL%
+"###);
     }
 
     #[test]
@@ -192,11 +236,12 @@ mod tests {
         // No whitespace: left untouched (flags must not be quoted).
         assert_eq!(quote_arg(&bash, "-NoLogo"), "-NoLogo");
         assert_eq!(quote_arg(&bash, "/usr/bin/python"), "/usr/bin/python");
-        // Whitespace: single-quoted for posix shells.
+        // Whitespace and metacharacters are single-quoted for posix shells.
         assert_eq!(
             quote_arg(&bash, "/opt/my tools/node"),
             "'/opt/my tools/node'"
         );
+        assert_eq!(quote_arg(&bash, "/tmp/a&b"), "'/tmp/a&b'");
         // Embedded single quote is escaped.
         assert_eq!(quote_arg(&bash, "a'b c"), "'a'\\''b c'");
     }
@@ -209,5 +254,6 @@ mod tests {
             quote_arg(&cmd, r"C:\Program Files\nodejs\node.exe"),
             "\"C:\\Program Files\\nodejs\\node.exe\""
         );
+        assert_eq!(quote_arg(&cmd, r"C:\tmp\a&b"), "\"C:\\tmp\\a&b\"");
     }
 }

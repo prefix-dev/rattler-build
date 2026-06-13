@@ -1,6 +1,9 @@
 //! Stage 1 Build - evaluated build configuration with concrete values
+use std::{ops::Deref, path::PathBuf};
+
+use indexmap::IndexMap;
 use rattler_build_jinja::Variable;
-use rattler_build_script::Script;
+use rattler_build_script::{Script, ScriptContent};
 use rattler_build_yaml_parser::ParseError;
 use rattler_conda_types::{Flag, NoArchType, package::EntryPoint};
 use serde::{Deserialize, Serialize};
@@ -164,6 +167,120 @@ impl AsRef<str> for BuildString {
     }
 }
 
+/// A stage1 build step with evaluated metadata and script content.
+///
+/// This is deliberately separate from [`Script`]: rendered recipes use
+/// `build.steps[].run`, while `build.script` uses the normal script syntax.
+/// Keeping a real step type makes stage1 serialization and deserialization
+/// symmetric and preserves the original recipe step index for diagnostics.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Step {
+    /// Script-like payload for the step.
+    pub script: Script,
+    /// Zero-based index in the original recipe's `build.steps` list.
+    #[allow(dead_code)]
+    pub source_index: usize,
+}
+
+impl Step {
+    /// Create a step from an evaluated script payload and source index.
+    pub fn new(script: Script, source_index: usize) -> Self {
+        Self {
+            script,
+            source_index,
+        }
+    }
+}
+
+impl Default for Step {
+    fn default() -> Self {
+        Self::new(Script::default(), 0)
+    }
+}
+
+impl Deref for Step {
+    type Target = Script;
+
+    fn deref(&self) -> &Self::Target {
+        &self.script
+    }
+}
+
+impl Serialize for Step {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+
+        let script = &self.script;
+        let mut len = 1;
+        len += usize::from(script.interpreter.is_some());
+        len += usize::from(!script.env.is_empty());
+        len += usize::from(script.cwd.is_some());
+
+        let mut state = serializer.serialize_struct("RunStep", len)?;
+        state.serialize_field("run", &SerializableStepRun(&script.content))?;
+        if let Some(interpreter) = &script.interpreter {
+            state.serialize_field("interpreter", interpreter)?;
+        }
+        if !script.env.is_empty() {
+            state.serialize_field("env", &script.env)?;
+        }
+        if let Some(cwd) = &script.cwd {
+            state.serialize_field("cwd", cwd)?;
+        }
+        state.end()
+    }
+}
+
+impl<'de> Deserialize<'de> for Step {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct RawStep {
+            run: DeserializableStepRun,
+            #[serde(default)]
+            interpreter: Option<String>,
+            #[serde(default)]
+            cwd: Option<PathBuf>,
+            #[serde(default)]
+            env: IndexMap<String, String>,
+        }
+
+        let raw = RawStep::deserialize(deserializer)?;
+        Ok(Self::new(
+            Script {
+                interpreter: raw.interpreter,
+                env: raw.env,
+                secrets: Vec::new(),
+                content: raw.run.into(),
+                cwd: raw.cwd,
+                content_explicit: false,
+            },
+            0,
+        ))
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum DeserializableStepRun {
+    Commands(Vec<String>),
+    Command(String),
+}
+
+impl From<DeserializableStepRun> for ScriptContent {
+    fn from(value: DeserializableStepRun) -> Self {
+        match value {
+            DeserializableStepRun::Commands(commands) => Self::Commands(commands),
+            DeserializableStepRun::Command(command) => Self::Command(command),
+        }
+    }
+}
+
 /// Variant key usage configuration (evaluated)
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct VariantKeyUsage {
@@ -295,7 +412,8 @@ impl<'de> serde::Deserialize<'de> for PostProcess {
 }
 
 /// Evaluated build configuration with all templates and conditionals resolved
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Deserialize)]
+#[serde(from = "BuildDeserialize")]
 pub struct Build {
     /// Build number (increments with each rebuild)
     /// None means inherit from top-level, Some(n) means use n (even if n is 0)
@@ -310,6 +428,18 @@ pub struct Build {
     /// Build script - contains script content, interpreter, environment variables, etc.
     #[serde(default, skip_serializing_if = "Script::is_default")]
     pub script: Script,
+
+    /// Ordered build steps. Each step is an independent script (its own
+    /// interpreter and step-local `env`) that becomes one scoped section of the
+    /// generated build wrapper. Mutually exclusive with a non-default `script`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub steps: Vec<Step>,
+
+    /// Whether the recipe explicitly selected `build.steps` mode, even if all
+    /// steps were filtered out. Internal-only sentinel used for output
+    /// inheritance and wrapper generation.
+    #[serde(default, skip)]
+    pub steps_explicit: bool,
 
     /// Noarch type - "python" or "generic" if set
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -360,6 +490,151 @@ pub struct Build {
     /// Post-processing operations
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub post_process: Vec<PostProcess>,
+}
+
+#[derive(Default, Deserialize)]
+struct BuildDeserialize {
+    #[serde(default)]
+    number: Option<u64>,
+    #[serde(default)]
+    string: BuildString,
+    #[serde(default)]
+    script: Script,
+    steps: Option<Vec<Step>>,
+    #[serde(default)]
+    noarch: Option<NoArchType>,
+    #[serde(default)]
+    flags: Vec<Flag>,
+    #[serde(default)]
+    python: PythonBuild,
+    #[serde(default)]
+    skip: bool,
+    #[serde(default)]
+    always_copy_files: GlobVec,
+    #[serde(default)]
+    always_include_files: GlobVec,
+    #[serde(default)]
+    merge_build_and_host_envs: bool,
+    #[serde(default)]
+    files: GlobVec,
+    #[serde(default)]
+    dynamic_linking: DynamicLinking,
+    #[serde(default)]
+    variant: VariantKeyUsage,
+    #[serde(default)]
+    prefix_detection: PrefixDetection,
+    #[serde(default)]
+    post_process: Vec<PostProcess>,
+}
+
+impl From<BuildDeserialize> for Build {
+    fn from(raw: BuildDeserialize) -> Self {
+        let steps_explicit = raw.steps.is_some();
+        let mut steps = raw.steps.unwrap_or_default();
+        for (index, step) in steps.iter_mut().enumerate() {
+            step.source_index = index;
+        }
+
+        Self {
+            number: raw.number,
+            string: raw.string,
+            script: raw.script,
+            steps,
+            steps_explicit,
+            noarch: raw.noarch,
+            flags: raw.flags,
+            python: raw.python,
+            skip: raw.skip,
+            always_copy_files: raw.always_copy_files,
+            always_include_files: raw.always_include_files,
+            merge_build_and_host_envs: raw.merge_build_and_host_envs,
+            files: raw.files,
+            dynamic_linking: raw.dynamic_linking,
+            variant: raw.variant,
+            prefix_detection: raw.prefix_detection,
+            post_process: raw.post_process,
+        }
+    }
+}
+
+impl Serialize for Build {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        #[derive(Serialize)]
+        struct BuildSerialize<'a> {
+            #[serde(skip_serializing_if = "Option::is_none")]
+            number: Option<&'a u64>,
+            string: &'a BuildString,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            script: Option<&'a Script>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            steps: Option<&'a Vec<Step>>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            noarch: Option<&'a NoArchType>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            flags: Option<&'a Vec<Flag>>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            python: Option<&'a PythonBuild>,
+            #[serde(skip_serializing_if = "std::ops::Not::not")]
+            merge_build_and_host_envs: bool,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            always_copy_files: Option<&'a GlobVec>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            always_include_files: Option<&'a GlobVec>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            files: Option<&'a GlobVec>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            dynamic_linking: Option<&'a DynamicLinking>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            variant: Option<&'a VariantKeyUsage>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            prefix_detection: Option<&'a PrefixDetection>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            post_process: Option<&'a Vec<PostProcess>>,
+        }
+
+        BuildSerialize {
+            number: self.number.as_ref(),
+            string: &self.string,
+            script: (!self.script.is_default()).then_some(&self.script),
+            steps: (self.steps_explicit || !self.steps.is_empty()).then_some(&self.steps),
+            noarch: self.noarch.as_ref(),
+            flags: (!self.flags.is_empty()).then_some(&self.flags),
+            python: (!self.python.is_default()).then_some(&self.python),
+            merge_build_and_host_envs: self.merge_build_and_host_envs,
+            always_copy_files: (!self.always_copy_files.is_empty())
+                .then_some(&self.always_copy_files),
+            always_include_files: (!self.always_include_files.is_empty())
+                .then_some(&self.always_include_files),
+            files: (!self.files.is_empty()).then_some(&self.files),
+            dynamic_linking: (!self.dynamic_linking.is_default()).then_some(&self.dynamic_linking),
+            variant: (!self.variant.is_default()).then_some(&self.variant),
+            prefix_detection: (!self.prefix_detection.is_default())
+                .then_some(&self.prefix_detection),
+            post_process: (!self.post_process.is_empty()).then_some(&self.post_process),
+        }
+        .serialize(serializer)
+    }
+}
+
+struct SerializableStepRun<'a>(&'a ScriptContent);
+
+impl Serialize for SerializableStepRun<'_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self.0 {
+            ScriptContent::Commands(commands) => commands.serialize(serializer),
+            ScriptContent::Command(command) | ScriptContent::CommandOrPath(command) => {
+                command.serialize(serializer)
+            }
+            ScriptContent::Path(path) => path.serialize(serializer),
+            ScriptContent::Default => Vec::<String>::new().serialize(serializer),
+        }
+    }
 }
 
 /// Dynamic linking configuration
@@ -507,6 +782,8 @@ impl Build {
         self.number.is_none()
             && matches!(self.string, BuildString::Default)
             && self.script.is_default()
+            && self.steps.is_empty()
+            && !self.steps_explicit
             && self.noarch.is_none()
             && self.flags.is_empty()
             && self.python.entry_points.is_empty()
@@ -571,5 +848,69 @@ mod tests {
 
         assert!(!build.is_default());
         assert!(!build.script.is_default());
+    }
+
+    #[test]
+    fn test_build_with_steps_is_not_default_and_serializes_steps() {
+        use rattler_build_script::ScriptContent;
+
+        let build = Build {
+            steps: vec![Step::new(
+                Script {
+                    interpreter: Some("bash".to_string()),
+                    env: [("FOO".to_string(), "bar".to_string())]
+                        .into_iter()
+                        .collect(),
+                    content: ScriptContent::Commands(vec!["echo step".to_string()]),
+                    cwd: Some("subdir".into()),
+                    ..Default::default()
+                },
+                0,
+            )],
+            steps_explicit: true,
+            ..Default::default()
+        };
+
+        assert!(!build.is_default());
+        let yaml = serde_yaml::to_string(&build).unwrap();
+        assert!(yaml.contains("steps:"), "{yaml}");
+        assert!(yaml.contains("run:"), "{yaml}");
+        assert!(yaml.contains("echo step"), "{yaml}");
+        assert!(yaml.contains("interpreter: bash"), "{yaml}");
+        assert!(yaml.contains("cwd: subdir"), "{yaml}");
+
+        let recipe_yaml = format!(
+            "package:\n  name: test-pkg\n  version: 1.0.0\nbuild:\n{}",
+            yaml.lines()
+                .map(|line| format!("  {line}\n"))
+                .collect::<String>()
+        );
+        let parsed = crate::stage0::parse_recipe_from_source(&recipe_yaml).unwrap();
+        assert!(parsed.build.steps_explicit);
+        assert_eq!(parsed.build.steps.len(), 1);
+
+        let roundtripped: Build = serde_yaml::from_str(&yaml).unwrap();
+        assert!(roundtripped.steps_explicit);
+        assert_eq!(roundtripped.steps.len(), 1);
+        assert_eq!(
+            roundtripped.steps[0].content,
+            ScriptContent::Commands(vec!["echo step".to_string()])
+        );
+    }
+
+    #[test]
+    fn test_explicit_empty_steps_serializes_steps_mode() {
+        let build = Build {
+            steps_explicit: true,
+            ..Default::default()
+        };
+
+        assert!(!build.is_default());
+        let yaml = serde_yaml::to_string(&build).unwrap();
+        assert!(yaml.contains("steps: []"), "{yaml}");
+
+        let roundtripped: Build = serde_yaml::from_str(&yaml).unwrap();
+        assert!(roundtripped.steps_explicit);
+        assert!(roundtripped.steps.is_empty());
     }
 }

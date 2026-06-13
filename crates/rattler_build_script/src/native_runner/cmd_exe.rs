@@ -45,14 +45,21 @@ IF "%CONDA_BUILD%" == "" (
         false
     }
 
-    /// `setlocal`/`endlocal` scope plus an errorlevel guard. The guard is
-    /// required even on the last section: falling off the end after `endlocal`
-    /// exits 0 regardless of failure, but `endlocal` preserves the
-    /// `%errorlevel%` value so the guard still catches it.
+    fn native_section_script_command(&self, script_path: &Path) -> Option<Vec<String>> {
+        Some(vec![
+            "call".to_string(),
+            script_path.to_string_lossy().into_owned(),
+        ])
+    }
+
+    /// `setlocal`/`endlocal` scope environment changes, while `pushd`/`popd`
+    /// restore the working directory after successful sections. The saved
+    /// errorlevel keeps `popd`/`endlocal` from masking a failing body.
     fn scope_section(
         &self,
         label: Option<&str>,
         env: &IndexMap<String, String>,
+        cwd: Option<&Path>,
         body: &str,
     ) -> Result<String, std::io::Error> {
         let shell = shell::CmdExe;
@@ -66,11 +73,21 @@ IF "%CONDA_BUILD%" == "" (
                 .set_env_var(&mut out, key, value)
                 .map_err(std::io::Error::other)?;
         }
+        let cwd = cwd
+            .map(|cwd| super::quote_arg(&self.shell(), &cwd.to_string_lossy()))
+            .unwrap_or_else(|| ".".to_string());
+        let _ = writeln!(out, "pushd {cwd}");
+        out.push_str("if %errorlevel% neq 0 exit /b %errorlevel%\n");
         out.push_str(body);
         if !body.ends_with('\n') {
             out.push('\n');
         }
-        out.push_str("endlocal\nif %errorlevel% neq 0 exit /b %errorlevel%");
+        out.push_str("set \"RB_SECTION_ERRORLEVEL=%errorlevel%\"\n");
+        out.push_str("popd\n");
+        out.push_str(
+            "if %RB_SECTION_ERRORLEVEL% equ 0 if %errorlevel% neq 0 set \"RB_SECTION_ERRORLEVEL=%errorlevel%\"\n",
+        );
+        out.push_str("endlocal & if %RB_SECTION_ERRORLEVEL% neq 0 exit /b %RB_SECTION_ERRORLEVEL%");
         Ok(out)
     }
 

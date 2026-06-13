@@ -44,7 +44,8 @@ use crate::{
             BinaryRelocation as Stage0BinaryRelocation, DynamicLinking as Stage0DynamicLinking,
             ForceFileType as Stage0ForceFileType, PostProcess as Stage0PostProcess,
             PrefixDetection as Stage0PrefixDetection, PrefixIgnore as Stage0PrefixIgnore,
-            PythonBuild as Stage0PythonBuild, VariantKeyUsage as Stage0VariantKeyUsage,
+            PythonBuild as Stage0PythonBuild, Step as Stage0Step,
+            VariantKeyUsage as Stage0VariantKeyUsage,
         },
         match_spec::matchspec_parse_options,
         requirements::{
@@ -74,7 +75,7 @@ use crate::{
             Build as Stage1Build, BuildString, DynamicLinking as Stage1DynamicLinking,
             ForceFileType as Stage1ForceFileType, PostProcess as Stage1PostProcess,
             PrefixDetection as Stage1PrefixDetection, PythonBuild as Stage1PythonBuild,
-            VariantKeyUsage as Stage1VariantKeyUsage,
+            Step as Stage1Step, VariantKeyUsage as Stage1VariantKeyUsage,
         },
         requirements::{
             IgnoreRunExports as Stage1IgnoreRunExports, RunExports as Stage1RunExports,
@@ -1351,6 +1352,149 @@ pub fn evaluate_script(
     })
 }
 
+/// Evaluate an ordered list of build [`steps`](Stage0Step) into one
+/// [`Step`](Stage1Step) per included recipe step.
+///
+/// Each step's `if` condition is evaluated here, where the target platform and
+/// selectors are known, and excluded steps are dropped. `run` content keeps its
+/// templates so they render at build time, exactly like `build.script`.
+pub fn evaluate_steps(
+    steps: &[Stage0Step],
+    context: &EvaluationContext,
+) -> Result<Vec<Stage1Step>, ParseError> {
+    let mut scripts = Vec::new();
+
+    for (source_index, step) in steps.iter().enumerate() {
+        match step {
+            Stage0Step::Run(run) => {
+                for var in run.used_variables() {
+                    context.track_access(&var);
+                }
+
+                if let Some(condition) = &run.condition
+                    && !evaluate_step_condition(condition, context)?
+                {
+                    continue;
+                }
+
+                let commands = preserve_string_list(&run.run, context)?;
+                if commands.is_empty() {
+                    continue;
+                }
+
+                let interpreter = match &run.interpreter {
+                    Some(interpreter) => Some(evaluate_string_value(interpreter, context)?),
+                    None => None,
+                };
+                let cwd = match &run.cwd {
+                    Some(cwd) => Some(PathBuf::from(evaluate_string_value(cwd, context)?)),
+                    None => None,
+                };
+
+                scripts.push(Stage1Step::new(
+                    rattler_build_script::Script {
+                        interpreter,
+                        env: evaluate_step_env(&run.env, context)?,
+                        content: ScriptContent::Commands(commands),
+                        cwd,
+                        ..Default::default()
+                    },
+                    source_index,
+                ));
+            }
+        }
+    }
+
+    Ok(scripts)
+}
+
+/// Evaluate step-local `env` values eagerly (like `build.script.env`).
+fn evaluate_step_env(
+    env: &indexmap::IndexMap<String, Value<String>>,
+    context: &EvaluationContext,
+) -> Result<IndexMap<String, String>, ParseError> {
+    let mut evaluated = IndexMap::new();
+    for (key, value) in env {
+        let evaluated_value = evaluate_string_value(value, context)?;
+        if !evaluated_value.is_empty() {
+            evaluated.insert(key.clone(), evaluated_value);
+        }
+    }
+    Ok(evaluated)
+}
+
+/// Evaluate a step `if` condition as a Jinja boolean expression (e.g. `unix`).
+///
+/// Unlike `skip`, a step condition that fails to evaluate is treated as an error
+/// rather than silently dropping the step.
+fn evaluate_step_condition(
+    condition: &Value<String>,
+    context: &EvaluationContext,
+) -> Result<bool, ParseError> {
+    if let Some(expr) = condition.as_concrete() {
+        return evaluate_step_condition_expression(expr, context, condition.span());
+    }
+
+    if let Some(template) = condition.as_template() {
+        if let Some(expr) = single_jinja_expression(template.source()) {
+            return evaluate_step_condition_expression(expr, context, condition.span());
+        }
+
+        let rendered = render_template(template.source(), context, condition.span())?;
+        return Ok(rendered_step_condition_is_true(&rendered));
+    }
+
+    unreachable!("Value must be either concrete or template")
+}
+
+fn evaluate_step_condition_expression(
+    expr: &str,
+    context: &EvaluationContext,
+    span: Option<&Span>,
+) -> Result<bool, ParseError> {
+    let jinja = context.to_jinja();
+    let value = match jinja.eval(expr) {
+        Ok(value) => value,
+        Err(e) => {
+            for var in jinja.accessed_variables_excluding_functions() {
+                context.track_access(&var);
+            }
+            return Err(ParseError::invalid_value(
+                "steps.if",
+                format!("failed to evaluate step condition '{}': {}", expr, e),
+                span.copied().unwrap_or_else(Span::new_blank),
+            ));
+        }
+    };
+
+    for var in jinja.accessed_variables_excluding_functions() {
+        context.track_access(&var);
+    }
+
+    if value.is_undefined() {
+        return Err(ParseError::invalid_value(
+            "steps.if",
+            format!("undefined variable in step condition '{}'", expr),
+            span.copied().unwrap_or_else(Span::new_blank),
+        ));
+    }
+
+    Ok(value.is_true())
+}
+
+fn single_jinja_expression(template: &str) -> Option<&str> {
+    let trimmed = template.trim();
+    let expr = trimmed.strip_prefix("${{")?.strip_suffix("}}")?.trim();
+    (!expr.is_empty()).then_some(expr)
+}
+
+fn rendered_step_condition_is_true(rendered: &str) -> bool {
+    match rendered.trim().to_ascii_lowercase().as_str() {
+        "" | "false" => false,
+        _ => true,
+    }
+}
+
 /// Parse a boolean from a string (case-insensitive)
 fn parse_bool_from_str(
     s: &str,
@@ -2083,7 +2227,28 @@ impl Evaluate for Stage0Build {
         // like ${{ PYTHON }} or ${{ PREFIX }} that are only available at build time.
         // Track the variables used in the script to count towards "actually used" variables,
         // but defer actual evaluation until build time.
-        let script = evaluate_script(&self.script, context)?;
+        //
+        // `steps` and `script` are mutually exclusive (enforced during parsing). When
+        // steps mode is selected each included step becomes a scoped section of the
+        // generated wrapper; otherwise the single `script` is used. Preserve steps
+        // mode even if the list is empty or all steps filter out so outputs don't
+        // accidentally inherit a top-level script.
+        let steps_explicit = self.steps_explicit || !self.steps.is_empty();
+        let (script, steps) = if steps_explicit {
+            if !context.jinja_config().experimental {
+                return Err(ParseError::invalid_value(
+                    "build.steps",
+                    "`build.steps` is an experimental feature: provide the `--experimental` flag to enable it",
+                    Span::new_blank(),
+                ));
+            }
+            (
+                rattler_build_script::Script::default(),
+                evaluate_steps(&self.steps, context)?,
+            )
+        } else {
+            (evaluate_script(&self.script, context)?, Vec::new())
+        };
 
         // Evaluate noarch
         //
@@ -2189,6 +2354,8 @@ impl Evaluate for Stage0Build {
             number,
             string,
             script,
+            steps,
+            steps_explicit,
             noarch,
             flags,
             python,
@@ -2937,11 +3104,21 @@ fn merge_stage1_build(
     toplevel: crate::stage1::Build,
     output: crate::stage1::Build,
 ) -> crate::stage1::Build {
-    // Script: use output if not default, otherwise inherit from top-level
-    let script = if output.script.is_default() {
-        toplevel.script
+    // Build-authoring mode (`script` vs `steps`) is mutually exclusive and is
+    // determined per build unit. If the output specifies either, it fully owns
+    // the mode; only when the output sets neither do we inherit from top-level.
+    let (script, steps, steps_explicit) = if output.steps_explicit || !output.steps.is_empty() {
+        (rattler_build_script::Script::default(), output.steps, true)
+    } else if !output.script.is_default() {
+        (output.script, Vec::new(), false)
+    } else if toplevel.steps_explicit || !toplevel.steps.is_empty() {
+        (
+            rattler_build_script::Script::default(),
+            toplevel.steps,
+            true,
+        )
     } else {
-        output.script
+        (toplevel.script, Vec::new(), false)
     };
 
     // Build string: use output unless it's Default, then inherit from top-level
@@ -3028,6 +3205,8 @@ fn merge_stage1_build(
 
     stage1::Build {
         script,
+        steps,
+        steps_explicit,
         number,
         string,
         noarch,
@@ -3609,6 +3788,7 @@ mod tests {
     use super::*;
     use crate::stage0::{
         self,
+        build::RunStep as Stage0RunStep,
         parser::parse_recipe_or_multi_from_source,
         types::{Conditional, ConditionalList, Item, JinjaTemplate, NestedItemList, Value},
     };
@@ -5778,6 +5958,346 @@ package:
         assert!(
             !result.content.is_default(),
             "Empty conditional script must not fall back to Default (which discovers build.sh)"
+        );
+    }
+
+    fn run_step(cmd: &str) -> Stage0Step {
+        Stage0Step::Run(Stage0RunStep {
+            run: ConditionalList::new(vec![Item::Value(Value::new_concrete(
+                cmd.to_string(),
+                None,
+            ))]),
+            ..Default::default()
+        })
+    }
+
+    #[test]
+    fn test_evaluate_steps_basic_desugar() {
+        let steps = vec![run_step("echo a"), run_step("echo b")];
+        let ctx = EvaluationContext::new();
+
+        let scripts = evaluate_steps(&steps, &ctx).unwrap();
+
+        assert_eq!(scripts.len(), 2);
+        assert_eq!(
+            scripts[0].content,
+            ScriptContent::Commands(vec!["echo a".to_string()])
+        );
+        assert_eq!(
+            scripts[1].content,
+            ScriptContent::Commands(vec!["echo b".to_string()])
+        );
+    }
+
+    #[test]
+    fn test_evaluate_steps_if_filters_step() {
+        let win_step = Stage0Step::Run(Stage0RunStep {
+            run: ConditionalList::new(vec![Item::Value(Value::new_concrete(
+                "echo windows".to_string(),
+                None,
+            ))]),
+            condition: Some(Value::new_concrete("win".to_string(), None)),
+            ..Default::default()
+        });
+        let steps = vec![run_step("echo always"), win_step];
+
+        let mut ctx = EvaluationContext::new();
+        ctx.insert("win".to_string(), Variable::from(false));
+        ctx.insert("unix".to_string(), Variable::from(true));
+
+        let scripts = evaluate_steps(&steps, &ctx).unwrap();
+
+        assert_eq!(scripts.len(), 1);
+        assert_eq!(
+            scripts[0].content,
+            ScriptContent::Commands(vec!["echo always".to_string()])
+        );
+        assert_eq!(scripts[0].source_index, 0);
+    }
+
+    #[test]
+    fn test_evaluate_steps_preserves_source_index_after_filtering() {
+        let false_step = Stage0Step::Run(Stage0RunStep {
+            run: ConditionalList::new(vec![Item::Value(Value::new_concrete(
+                "echo filtered".to_string(),
+                None,
+            ))]),
+            condition: Some(Value::new_concrete("win".to_string(), None)),
+            ..Default::default()
+        });
+        let steps = vec![false_step, run_step("echo kept")];
+        let mut ctx = EvaluationContext::new();
+        ctx.insert("win".to_string(), Variable::from(false));
+
+        let scripts = evaluate_steps(&steps, &ctx).unwrap();
+
+        assert_eq!(scripts.len(), 1);
+        assert_eq!(scripts[0].source_index, 1);
+    }
+
+    #[test]
+    fn test_evaluate_steps_if_tracks_accessed_variables() {
+        let gated_step = Stage0Step::Run(Stage0RunStep {
+            run: ConditionalList::new(vec![Item::Value(Value::new_concrete(
+                "echo enabled".to_string(),
+                None,
+            ))]),
+            condition: Some(Value::new_concrete("enable_feature".to_string(), None)),
+            ..Default::default()
+        });
+        let mut ctx = EvaluationContext::new();
+        ctx.insert("enable_feature".to_string(), Variable::from(true));
+
+        let scripts = evaluate_steps(&[gated_step], &ctx).unwrap();
+
+        assert_eq!(scripts.len(), 1);
+        assert!(
+            ctx.accessed_variables().contains("enable_feature"),
+            "steps.if variables must participate in used_variant/hash tracking"
+        );
+    }
+
+    #[test]
+    fn test_evaluate_steps_if_undefined_variable_errors() {
+        let typo_step = Stage0Step::Run(Stage0RunStep {
+            run: ConditionalList::new(vec![Item::Value(Value::new_concrete(
+                "echo typo".to_string(),
+                None,
+            ))]),
+            condition: Some(Value::new_concrete("enabel_feature".to_string(), None)),
+            ..Default::default()
+        });
+        let ctx = EvaluationContext::new();
+
+        let err = evaluate_steps(&[typo_step], &ctx).unwrap_err();
+
+        assert!(
+            err.to_string().contains("undefined variable"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn test_evaluate_steps_tracks_filtered_out_step_variables() {
+        let step = Stage0Step::Run(Stage0RunStep {
+            run: ConditionalList::new(vec![Item::Value(Value::new_template(
+                JinjaTemplate::new("echo ${{ flavor }}".to_string()).unwrap(),
+                None,
+            ))]),
+            condition: Some(Value::new_concrete("win".to_string(), None)),
+            ..Default::default()
+        });
+        let mut ctx = EvaluationContext::new();
+        ctx.insert("win".to_string(), Variable::from(false));
+        ctx.insert("flavor".to_string(), Variable::from("vanilla"));
+
+        let scripts = evaluate_steps(&[step], &ctx).unwrap();
+
+        assert!(scripts.is_empty());
+        assert!(ctx.accessed_variables().contains("flavor"));
+    }
+
+    #[test]
+    fn test_evaluate_steps_if_template_expression_uses_jinja_truthiness() {
+        let step = Stage0Step::Run(Stage0RunStep {
+            run: ConditionalList::new(vec![Item::Value(Value::new_concrete(
+                "echo string condition".to_string(),
+                None,
+            ))]),
+            condition: Some(Value::new_template(
+                JinjaTemplate::new("${{ target_platform }}".to_string()).unwrap(),
+                None,
+            )),
+            ..Default::default()
+        });
+        let mut ctx = EvaluationContext::new();
+        ctx.insert("target_platform".to_string(), Variable::from("linux-64"));
+
+        let scripts = evaluate_steps(&[step], &ctx).unwrap();
+
+        assert_eq!(scripts.len(), 1);
+        assert!(ctx.accessed_variables().contains("target_platform"));
+    }
+
+    /// A run step that sets an explicit interpreter and step-local env.
+    fn run_step_with(cmd: &str, interpreter: &str, env: &[(&str, &str)]) -> Stage0Step {
+        Stage0Step::Run(Stage0RunStep {
+            run: ConditionalList::new(vec![Item::Value(Value::new_concrete(
+                cmd.to_string(),
+                None,
+            ))]),
+            interpreter: Some(Value::new_concrete(interpreter.to_string(), None)),
+            env: env
+                .iter()
+                .map(|(k, v)| (k.to_string(), Value::new_concrete(v.to_string(), None)))
+                .collect(),
+            ..Default::default()
+        })
+    }
+
+    #[test]
+    fn test_evaluate_steps_carries_interpreter_and_env() {
+        let steps = vec![run_step_with("make install", "bash", &[("FOO", "bar")])];
+        let ctx = EvaluationContext::new();
+
+        let scripts = evaluate_steps(&steps, &ctx).unwrap();
+
+        assert_eq!(scripts.len(), 1);
+        assert_eq!(scripts[0].interpreter.as_deref(), Some("bash"));
+        assert_eq!(scripts[0].env.get("FOO").map(String::as_str), Some("bar"));
+        assert_eq!(
+            scripts[0].content,
+            ScriptContent::Commands(vec!["make install".to_string()])
+        );
+    }
+
+    #[test]
+    fn test_evaluate_steps_drops_empty_env_values_like_script_env() {
+        let steps = vec![run_step_with("make install", "bash", &[("EMPTY", "")])];
+        let ctx = EvaluationContext::new();
+
+        let scripts = evaluate_steps(&steps, &ctx).unwrap();
+
+        assert_eq!(scripts.len(), 1);
+        assert!(!scripts[0].env.contains_key("EMPTY"));
+    }
+
+    #[test]
+    fn test_evaluate_steps_carries_cwd() {
+        let step = Stage0Step::Run(Stage0RunStep {
+            run: ConditionalList::new(vec![Item::Value(Value::new_concrete(
+                "make install".to_string(),
+                None,
+            ))]),
+            cwd: Some(Value::new_concrete("subdir".to_string(), None)),
+            ..Default::default()
+        });
+        let ctx = EvaluationContext::new();
+
+        let scripts = evaluate_steps(&[step], &ctx).unwrap();
+
+        assert_eq!(scripts.len(), 1);
+        assert_eq!(
+            scripts[0].cwd.as_deref(),
+            Some(std::path::Path::new("subdir"))
+        );
+    }
+
+    #[test]
+    fn test_evaluate_steps_allows_per_step_interpreters() {
+        // Per-step interpreters are independent sections; no conflict.
+        let steps = vec![
+            run_step_with("echo a", "bash", &[]),
+            run_step_with("echo b", "nu", &[]),
+        ];
+        let ctx = EvaluationContext::new();
+
+        let scripts = evaluate_steps(&steps, &ctx).unwrap();
+
+        assert_eq!(scripts.len(), 2);
+        assert_eq!(scripts[0].interpreter.as_deref(), Some("bash"));
+        assert_eq!(scripts[1].interpreter.as_deref(), Some("nu"));
+    }
+
+    /// `build.steps` is experimental and is rejected without `--experimental`.
+    #[test]
+    fn test_build_steps_requires_experimental() {
+        let build = Stage0Build {
+            steps: vec![run_step("echo a")],
+            ..Default::default()
+        };
+        let ctx = EvaluationContext::new();
+
+        let err = build.evaluate(&ctx).unwrap_err();
+        assert!(err.to_string().contains("experimental"));
+    }
+
+    #[test]
+    fn test_build_evaluate_uses_steps() {
+        let build = Stage0Build {
+            steps: vec![run_step("echo a"), run_step("echo b")],
+            ..Default::default()
+        };
+        let ctx = EvaluationContext::with_variables_and_config(
+            IndexMap::new(),
+            JinjaConfig {
+                experimental: true,
+                ..Default::default()
+            },
+        );
+
+        let stage1 = build.evaluate(&ctx).unwrap();
+
+        // Steps populate `steps`, not the single `script`.
+        assert!(stage1.script.is_default());
+        assert!(stage1.steps_explicit);
+        assert_eq!(stage1.steps.len(), 2);
+        assert_eq!(
+            stage1.steps[0].content,
+            ScriptContent::Commands(vec!["echo a".to_string()])
+        );
+        assert_eq!(
+            stage1.steps[1].content,
+            ScriptContent::Commands(vec!["echo b".to_string()])
+        );
+    }
+
+    #[test]
+    fn test_build_evaluate_preserves_steps_mode_when_all_steps_filter_out() {
+        let false_step = Stage0Step::Run(Stage0RunStep {
+            run: ConditionalList::new(vec![Item::Value(Value::new_concrete(
+                "echo filtered".to_string(),
+                None,
+            ))]),
+            condition: Some(Value::new_concrete("win".to_string(), None)),
+            ..Default::default()
+        });
+        let build = Stage0Build {
+            script: crate::stage0::types::Script::from_content("echo fallback"),
+            steps: vec![false_step],
+            steps_explicit: true,
+            ..Default::default()
+        };
+        let mut ctx = EvaluationContext::with_variables_and_config(
+            IndexMap::new(),
+            JinjaConfig {
+                experimental: true,
+                ..Default::default()
+            },
+        );
+        ctx.insert("win".to_string(), Variable::from(false));
+
+        let stage1 = build.evaluate(&ctx).unwrap();
+
+        assert!(stage1.steps_explicit);
+        assert!(stage1.steps.is_empty());
+        assert!(
+            stage1.script.is_default(),
+            "explicit steps mode must not fall back to build.script"
+        );
+    }
+
+    #[test]
+    fn test_merge_stage1_build_filtered_empty_steps_do_not_inherit_script() {
+        let toplevel = stage1::Build {
+            script: rattler_build_script::Script {
+                content: ScriptContent::Command("echo top-level".to_string()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let output = stage1::Build {
+            steps_explicit: true,
+            ..Default::default()
+        };
+
+        let merged = merge_stage1_build(toplevel, output);
+
+        assert!(merged.steps_explicit);
+        assert!(merged.steps.is_empty());
+        assert!(
+            merged.script.is_default(),
+            "explicit empty/filtered steps must not inherit the top-level script"
         );
     }
 

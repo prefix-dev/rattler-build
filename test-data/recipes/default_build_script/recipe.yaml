@@ -1,0 +1,6 @@
+package:
+  name: default_build_script_test
+  version: "1.0.0"
+
+build:
+  number: 0

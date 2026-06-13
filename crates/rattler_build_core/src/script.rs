@@ -9,8 +9,8 @@ use rattler_build_jinja::Jinja;
 
 // Re-export from rattler_build_script
 pub use rattler_build_script::{
-    ExecutionArgs, InterpreterError, ResolvedScriptContents, RuntimeEnv, SandboxArguments,
-    SandboxConfiguration, Script, ScriptContent, platform_script_extensions,
+    BuildScriptSection, ExecutionArgs, InterpreterError, ResolvedScriptContents, RuntimeEnv,
+    SandboxArguments, SandboxConfiguration, Script, ScriptContent, platform_script_extensions,
 };
 
 use crate::{
@@ -26,11 +26,18 @@ impl Output {
         move |template: &str| jinja.render_str(template).map_err(|e| e.to_string())
     }
 
-    /// Helper method to prepare build script execution arguments
+    /// Helper method to prepare build script execution arguments.
+    ///
+    /// The build script is always expressed as an ordered list of sections: a
+    /// `build.script` is a single section, and `build.steps` are one section per
+    /// step. Both go through the same execution path.
     async fn prepare_build_script(&self) -> Result<ExecutionArgs, std::io::Error> {
         let host_prefix = self.build_configuration.directories.host_prefix.clone();
         let target_platform = self.build_configuration.target_platform;
         let env_isolation = self.build_configuration.env_isolation;
+        let build = self.recipe.build();
+        let steps_mode = build.steps_explicit || !build.steps.is_empty();
+
         let mut env_vars = env_vars::vars(self, "BUILD");
         env_vars.extend(env_vars::os_vars(
             &host_prefix,
@@ -39,8 +46,24 @@ impl Output {
             &self.build_configuration.directories.work_dir,
         ));
         env_vars.extend(env_vars::env_vars_from_variant(self.variant()));
+        let mut env_vars: IndexMap<String, String> = env_vars
+            .into_iter()
+            .filter_map(|(k, v)| v.map(|v| (k, v)))
+            .collect();
+        if !steps_mode {
+            env_vars.extend(build.script.env().clone());
+        }
 
-        let jinja_renderer = self.jinja_renderer();
+        // Renderer for script content, with the build environment variables
+        // available in the Jinja context.
+        let mut jinja = Jinja::new(self.build_configuration.selector_config())
+            .with_context(&self.recipe.context);
+        for (k, v) in &env_vars {
+            jinja
+                .context_mut()
+                .insert(k.clone(), Value::from_safe_string(v.clone()));
+        }
+        let jinja_renderer = |template: &str| jinja.render_str(template).map_err(|e| e.to_string());
 
         let build_prefix = if self.recipe.build().merge_build_and_host_envs {
             None
@@ -48,23 +71,66 @@ impl Output {
             Some(&self.build_configuration.directories.build_prefix)
         };
 
-        let work_dir = &self.build_configuration.directories.work_dir;
-        Ok(ExecutionArgs {
-            interpreter: self.recipe.build().script.interpreter.clone(),
-            script: self.recipe.build().script.resolve_content(
-                &self.build_configuration.directories.recipe_dir,
-                Some(jinja_renderer),
+        let recipe_dir = &self.build_configuration.directories.recipe_dir;
+
+        // Unify the two build-authoring modes: `steps` are the sections, and a
+        // plain `script` is a single section. When steps mode was not selected,
+        // always resolve the script even if it is default so legacy build.sh /
+        // build.bat auto-discovery still works.
+        let scripts: Vec<(&Script, Option<usize>)> = if steps_mode {
+            build
+                .steps
+                .iter()
+                .map(|step| (&step.script, Some(step.source_index)))
+                .collect()
+        } else {
+            vec![(&build.script, None)]
+        };
+
+        let runtime = RuntimeEnv::current();
+        let mut secrets = IndexMap::new();
+        let work_dir = self.build_configuration.directories.work_dir.clone();
+        let mut sections = Vec::with_capacity(scripts.len());
+
+        for (script, source_index) in scripts {
+            let content = script.resolve_content(
+                recipe_dir,
+                Some(&jinja_renderer),
                 platform_script_extensions(),
-            )?,
-            env_vars: env_vars
-                .into_iter()
-                .filter_map(|(k, v)| v.map(|v| (k, v)))
-                .collect(),
-            secrets: IndexMap::new(),
+            )?;
+
+            // Secrets are whole-build (used for redaction); resolve declared
+            // names from the runtime environment.
+            for name in script.secrets() {
+                if let Some(value) = runtime.var(name) {
+                    secrets.insert(name.to_string(), value.to_string());
+                } else {
+                    tracing::warn!("Secret {} not found in environment", name);
+                }
+            }
+
+            let cwd = script.cwd.as_ref().map(|cwd| host_prefix.join(cwd));
+
+            sections.push(BuildScriptSection {
+                interpreter: script.interpreter.clone(),
+                content,
+                env: source_index
+                    .is_some()
+                    .then(|| script.env().clone())
+                    .unwrap_or_default(),
+                cwd,
+                label: source_index.map(|index| format!("step {index}")),
+            });
+        }
+
+        Ok(ExecutionArgs {
+            sections,
+            env_vars,
+            secrets,
             build_prefix: build_prefix.map(|p| p.to_owned()),
             run_prefix: host_prefix,
-            runtime: RuntimeEnv::current(),
-            work_dir: work_dir.clone(),
+            runtime,
+            work_dir,
             sandbox_config: self.build_configuration.sandbox_config().cloned(),
             env_isolation,
         })
@@ -100,45 +166,7 @@ impl Output {
         }
 
         let exec_args = self.prepare_build_script().await?;
-        let build_prefix = if self.recipe.build().merge_build_and_host_envs {
-            None
-        } else {
-            Some(&self.build_configuration.directories.build_prefix)
-        };
-
-        // Create Jinja context with environment variables
-        let mut jinja = Jinja::new(self.build_configuration.selector_config())
-            .with_context(&self.recipe.context);
-
-        // Add env vars to jinja context
-        for (k, v) in &exec_args.env_vars {
-            jinja
-                .context_mut()
-                .insert(k.clone(), Value::from_safe_string(v.clone()));
-        }
-
-        let jinja_renderer = |template: &str| -> Result<String, String> {
-            jinja.render_str(template).map_err(|e| e.to_string())
-        };
-
-        self.recipe
-            .build()
-            .script
-            .run_script(
-                exec_args
-                    .env_vars
-                    .into_iter()
-                    .map(|(k, v)| (k, Some(v)))
-                    .collect(),
-                &self.build_configuration.directories.work_dir,
-                &self.build_configuration.directories.recipe_dir,
-                &self.build_configuration.directories.host_prefix,
-                build_prefix,
-                Some(jinja_renderer),
-                self.build_configuration.sandbox_config(),
-                self.build_configuration.env_isolation,
-            )
-            .await?;
+        rattler_build_script::run_script(exec_args).await?;
 
         Ok(())
     }

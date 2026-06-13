@@ -6,10 +6,10 @@ use crate::stage0::{
     Conditional, ConditionalList, Item, JinjaExpression, NestedItemList,
     build::{
         BinaryRelocation, Build, DynamicLinking, ForceFileType, PostProcess, PrefixDetection,
-        PrefixIgnore, PythonBuild, VariantKeyUsage,
+        PrefixIgnore, PythonBuild, RunStep, Step, VariantKeyUsage,
     },
     parser::helpers::get_span,
-    types::{IncludeExclude, Value},
+    types::{IncludeExclude, JinjaTemplate, Value},
 };
 use rattler_build_yaml_parser::{
     helpers::contains_jinja_template, parse_conditional_list, parse_conditional_list_or_item,
@@ -349,6 +349,114 @@ pub(crate) fn parse_script(node: &Node) -> Result<crate::stage0::types::Script, 
 }
 
 /// Parse build files field - can be a list or include/exclude mapping
+/// Parse the `build.steps` list into an ordered list of [`Step`]s.
+fn parse_steps(node: &Node) -> Result<Vec<Step>, ParseError> {
+    let sequence = node.as_sequence().ok_or_else(|| {
+        ParseError::expected_type("sequence", "non-sequence", get_span(node))
+            .with_message("Expected 'steps' to be a list of steps")
+    })?;
+
+    let mut steps = Vec::with_capacity(sequence.len());
+    for item in sequence.iter() {
+        steps.push(parse_step(item)?);
+    }
+    Ok(steps)
+}
+
+/// Parse a single build step mapping into a [`Step`].
+fn parse_step(node: &Node) -> Result<Step, ParseError> {
+    let mapping = node.as_mapping().ok_or_else(|| {
+        ParseError::expected_type("mapping", "non-mapping", get_span(node))
+            .with_message("Expected each step to be a mapping")
+    })?;
+
+    let mut run = None;
+    let mut condition = None;
+    let mut interpreter = None;
+    let mut cwd = None;
+    let mut env = indexmap::IndexMap::new();
+
+    for (key_node, value_node) in mapping.iter() {
+        let key = key_node.as_str();
+
+        match key {
+            "run" => {
+                run = Some(parse_step_content(value_node)?);
+            }
+            "if" => {
+                condition = Some(parse_field!("steps.if", value_node));
+            }
+            "interpreter" => {
+                interpreter = Some(parse_field!("steps.interpreter", value_node));
+            }
+            "cwd" => {
+                cwd = Some(parse_field!("steps.cwd", value_node));
+            }
+            "env" => {
+                let env_mapping = value_node.as_mapping().ok_or_else(|| {
+                    ParseError::expected_type("mapping", "non-mapping", get_span(value_node))
+                        .with_message("Expected step 'env' to be a mapping")
+                })?;
+
+                for (env_key_node, env_value_node) in env_mapping.iter() {
+                    let env_key = env_key_node.as_str().to_string();
+                    let env_value = parse_field!("steps.env", env_value_node);
+                    env.insert(env_key, env_value);
+                }
+            }
+            _ => {
+                return Err(ParseError::invalid_value(
+                    "steps",
+                    format!("unknown field '{}' in step", key),
+                    *key_node.span(),
+                )
+                .with_suggestion("Valid fields are: run, if, interpreter, cwd, env"));
+            }
+        }
+    }
+
+    let run = run.ok_or_else(|| {
+        ParseError::invalid_value("steps", "a step must contain a 'run' field", get_span(node))
+            .with_suggestion("Add a 'run:' field with the script to execute")
+    })?;
+
+    Ok(Step::Run(RunStep {
+        run,
+        condition,
+        interpreter,
+        cwd,
+        env,
+    }))
+}
+
+/// Parse step `run` content: either a (multiline) scalar string or a list of
+/// commands, into a [`ConditionalList`] of strings.
+fn parse_step_content(node: &Node) -> Result<ConditionalList<String>, ParseError> {
+    if let Some(scalar) = node.as_scalar() {
+        let content = scalar.as_str();
+        let span = *scalar.span();
+
+        let value = if contains_jinja_template(content) {
+            let template = JinjaTemplate::new(content.to_string())
+                .map_err(|e| ParseError::jinja_error(e, span))?;
+            Value::new_template(template, Some(span))
+        } else {
+            Value::new_concrete(content.to_string(), Some(span))
+        };
+
+        return Ok(ConditionalList::new(vec![Item::Value(value)]));
+    }
+
+    if node.as_sequence().is_some() {
+        return parse_conditional_list(node);
+    }
+
+    Err(
+        ParseError::expected_type("scalar string or sequence", "other", get_span(node))
+            .with_message("step 'run' must be a string or a list of commands"),
+    )
+}
+
 fn parse_build_files(node: &Node) -> Result<IncludeExclude, ParseError> {
     // Try parsing as a mapping with include/exclude first
     if let Some(mapping) = node.as_mapping() {
@@ -409,6 +517,7 @@ pub fn parse_build(node: &Node) -> Result<Build, ParseError> {
 
 fn parse_build_from_mapping(mapping: &MarkedMappingNode) -> Result<Build, ParseError> {
     let mut build = Build::default();
+    let mut steps_span = None;
 
     for (key_node, value_node) in mapping.iter() {
         let key = key_node.as_str();
@@ -422,6 +531,11 @@ fn parse_build_from_mapping(mapping: &MarkedMappingNode) -> Result<Build, ParseE
             }
             "script" => {
                 build.script = parse_script(value_node)?;
+            }
+            "steps" => {
+                steps_span = Some(*key_node.span());
+                build.steps_explicit = true;
+                build.steps = parse_steps(value_node)?;
             }
             "noarch" => {
                 build.noarch = Some(parse_noarch(value_node)?);
@@ -464,10 +578,24 @@ fn parse_build_from_mapping(mapping: &MarkedMappingNode) -> Result<Build, ParseE
             _ => {
                 return Err(
                     ParseError::invalid_value("build", format!("unknown field '{}'", key), *key_node.span())
-                        .with_suggestion("Valid fields are: number, string, script, noarch, flags, python, skip, always_copy_files, always_include_files, merge_build_and_host_envs, files, dynamic_linking, variant, prefix_detection, post_process")
+                        .with_suggestion("Valid fields are: number, string, script, steps, noarch, flags, python, skip, always_copy_files, always_include_files, merge_build_and_host_envs, files, dynamic_linking, variant, prefix_detection, post_process")
                 );
             }
         }
+    }
+
+    // A build unit uses either `script` or `steps`, never both. Even an empty
+    // `steps: []` list explicitly selects steps mode.
+    if !build.script.is_default()
+        && build.steps_explicit
+        && let Some(span) = steps_span
+    {
+        return Err(ParseError::invalid_value(
+            "build",
+            "`script` and `steps` are mutually exclusive; use one or the other",
+            span,
+        )
+        .with_suggestion("Remove either `build.script` or `build.steps`"));
     }
 
     Ok(build)
@@ -874,6 +1002,77 @@ script:
         let build = parse_build(&node).unwrap();
         assert!(build.script.content.is_some());
         assert_eq!(build.script.content.as_ref().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn test_parse_build_with_steps() {
+        let yaml = r#"
+steps:
+  - run: echo "configure"
+  - run: make install
+    if: unix
+    interpreter: bash
+    cwd: subdir
+    env:
+      FOO: bar
+"#;
+        let node = marked_yaml::parse_yaml(0, yaml).unwrap();
+        let build = parse_build(&node).unwrap();
+
+        assert!(build.steps_explicit);
+        assert_eq!(build.steps.len(), 2);
+
+        match &build.steps[0] {
+            Step::Run(first) => {
+                assert_eq!(first.run.len(), 1);
+                assert!(first.condition.is_none());
+                assert!(first.interpreter.is_none());
+                assert!(first.env.is_empty());
+            }
+        }
+
+        match &build.steps[1] {
+            Step::Run(second) => {
+                assert!(second.condition.is_some());
+                assert!(second.interpreter.is_some());
+                assert!(second.cwd.is_some());
+                assert!(second.env.contains_key("FOO"));
+            }
+        }
+    }
+
+    #[test]
+    fn test_build_script_and_steps_are_mutually_exclusive() {
+        let yaml = r#"
+script: echo "hi"
+steps:
+  - run: echo "step"
+"#;
+        let node = marked_yaml::parse_yaml(0, yaml).unwrap();
+        let result = parse_build(&node);
+
+        assert!(result.is_err(), "expected script+steps to be rejected");
+        let err = result.unwrap_err();
+        assert!(matches!(err, ParseError::InvalidValue { .. }));
+        assert!(err.to_string().contains("mutually exclusive"));
+    }
+
+    #[test]
+    fn test_build_script_and_empty_steps_are_mutually_exclusive() {
+        let yaml = r#"
+script: echo "hi"
+steps: []
+"#;
+        let node = marked_yaml::parse_yaml(0, yaml).unwrap();
+        let result = parse_build(&node);
+
+        assert!(
+            result.is_err(),
+            "explicit empty steps still selects steps mode"
+        );
+        let err = result.unwrap_err();
+        assert!(matches!(err, ParseError::InvalidValue { .. }));
+        assert!(err.to_string().contains("mutually exclusive"));
     }
 
     #[test]

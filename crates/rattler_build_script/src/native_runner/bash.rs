@@ -49,6 +49,7 @@ set -x
         &self,
         label: Option<&str>,
         env: &IndexMap<String, String>,
+        cwd: Option<&Path>,
         body: &str,
     ) -> Result<String, std::io::Error> {
         let shell = shell::Bash::default();
@@ -61,6 +62,10 @@ set -x
             shell
                 .set_env_var(&mut out, key, value)
                 .map_err(std::io::Error::other)?;
+        }
+        if let Some(cwd) = cwd {
+            let cwd = super::quote_arg(&self.shell(), &cwd.to_string_lossy());
+            let _ = writeln!(out, "cd {cwd}");
         }
         out.push_str(body);
         if !body.ends_with('\n') {

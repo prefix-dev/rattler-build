@@ -4,7 +4,7 @@ use itertools::Itertools as _;
 use rattler_conda_types::{Flag, NoArchType, package::EntryPoint};
 use serde::{Deserialize, Serialize};
 
-use crate::stage0::types::{ConditionalList, IncludeExclude, Item, Script, Value};
+use crate::stage0::types::{ConditionalList, IncludeExclude, Item, JinjaExpression, Script, Value};
 
 /// Variant key usage configuration
 #[derive(Debug, Serialize, Deserialize, Default, Clone, PartialEq)]
@@ -23,6 +23,86 @@ pub struct VariantKeyUsage {
     pub down_prioritize_variant: Option<Value<i32>>,
 }
 
+/// A single build step.
+///
+/// Steps are an ordered, GitHub-Actions-style alternative to a monolithic
+/// `build.script`. A step is an inline `run` script.
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(untagged)]
+pub enum Step {
+    /// An inline script step.
+    Run(RunStep),
+}
+
+/// An inline `run` step that executes script content as part of the build.
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
+pub struct RunStep {
+    /// The script content to execute for this step.
+    pub run: ConditionalList<String>,
+
+    /// Optional selector expression gating whether this step runs (e.g. `unix`).
+    #[serde(default, rename = "if", skip_serializing_if = "Option::is_none")]
+    pub condition: Option<Value<String>>,
+
+    /// Optional interpreter override for this step (e.g. `bash`, `cmd.exe`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub interpreter: Option<Value<String>>,
+
+    /// Optional working directory for this step, relative to the host prefix.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cwd: Option<Value<String>>,
+
+    /// Environment variables scoped to this step only.
+    #[serde(default, skip_serializing_if = "indexmap::IndexMap::is_empty")]
+    pub env: indexmap::IndexMap<String, Value<String>>,
+}
+
+impl Step {
+    /// Collect all variables used in this step.
+    pub fn used_variables(&self) -> Vec<String> {
+        match self {
+            Step::Run(run) => run.used_variables(),
+        }
+    }
+}
+
+impl RunStep {
+    /// Collect all variables used in this run step.
+    pub fn used_variables(&self) -> Vec<String> {
+        let RunStep {
+            run,
+            condition,
+            interpreter,
+            cwd,
+            env,
+        } = self;
+
+        let mut vars = run.used_variables();
+
+        if let Some(condition) = condition {
+            vars.extend(condition.used_variables());
+            if let Some(expr) = condition.as_concrete()
+                && let Ok(expr) = JinjaExpression::new(expr.clone())
+            {
+                vars.extend(expr.used_variables().iter().cloned());
+            }
+        }
+        if let Some(interpreter) = interpreter {
+            vars.extend(interpreter.used_variables());
+        }
+        if let Some(cwd) = cwd {
+            vars.extend(cwd.used_variables());
+        }
+        for value in env.values() {
+            vars.extend(value.used_variables());
+        }
+
+        vars.sort();
+        vars.dedup();
+        vars
+    }
+}
+
 /// Stage0 Build configuration - contains templates and conditionals
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Build {
@@ -39,6 +119,17 @@ pub struct Build {
     /// Default is `build.sh` on Unix, `build.bat` on Windows
     #[serde(default)]
     pub script: Script,
+
+    /// Ordered build steps. An alternative to `script`; the two are mutually
+    /// exclusive for a single build unit.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub steps: Vec<Step>,
+
+    /// Whether `steps` was explicitly specified, even if the list is empty or
+    /// later filters to zero runnable steps. This preserves authoring mode
+    /// during evaluation and output inheritance.
+    #[serde(default, skip)]
+    pub steps_explicit: bool,
 
     /// Noarch type - python or generic
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -95,6 +186,8 @@ impl Default for Build {
             number: None,
             string: None,
             script: Script::default(),
+            steps: Vec::new(),
+            steps_explicit: false,
             noarch: None,
             flags: ConditionalList::default(),
             python: PythonBuild::default(),
@@ -276,6 +369,8 @@ impl Build {
             number,
             string,
             script,
+            steps,
+            steps_explicit: _,
             noarch,
             flags,
             python,
@@ -301,6 +396,10 @@ impl Build {
         }
 
         vars.extend(script.used_variables());
+
+        for step in steps {
+            vars.extend(step.used_variables());
+        }
 
         if let Some(noarch) = noarch {
             vars.extend(noarch.used_variables());

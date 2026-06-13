@@ -1499,6 +1499,50 @@ python:
     }
 
     #[test]
+    fn test_build_steps_if_participates_in_variant_matrix() {
+        let recipe_yaml = r#"
+package:
+  name: test-pkg
+  version: "1.0.0"
+
+build:
+  steps:
+    - if: feature_enabled
+      run: echo enabled
+"#;
+
+        let variant_yaml = r#"
+feature_enabled:
+  - true
+  - false
+"#;
+
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config = VariantConfig::from_yaml_str(variant_yaml).unwrap();
+
+        let rendered = render_recipe_with_variant_config(
+            &stage0_recipe,
+            &variant_config,
+            RenderConfig::new().with_experimental(true),
+        )
+        .unwrap();
+
+        assert_eq!(rendered.len(), 2);
+        let variants = rendered
+            .iter()
+            .map(|r| {
+                r.variant
+                    .get(&"feature_enabled".into())
+                    .unwrap()
+                    .to_string()
+            })
+            .collect::<Vec<_>>();
+        assert!(variants.contains(&"true".to_string()), "{variants:?}");
+        assert!(variants.contains(&"false".to_string()), "{variants:?}");
+        assert!(rendered.iter().all(|r| r.recipe.build.steps_explicit));
+    }
+
+    #[test]
     fn test_render_with_free_specs() {
         let recipe_yaml = r#"
 package:

@@ -72,7 +72,7 @@ mod tests {
     use rattler_conda_types::Platform;
     use rattler_shell::shell;
 
-    use crate::execution::{EnvironmentIsolation, ExecutionArgs, ResolvedScriptContents};
+    use crate::execution::{EnvironmentIsolation, ExecutionArgs};
     use crate::runtime::RuntimeEnv;
 
     /// When a build prefix is present, both the run prefix and build prefix are
@@ -86,8 +86,7 @@ mod tests {
         fs_err::create_dir_all(&build_prefix).unwrap();
 
         let args = ExecutionArgs {
-            script: ResolvedScriptContents::Inline(String::new()),
-            interpreter: None,
+            sections: Vec::new(),
             env_vars: IndexMap::new(),
             secrets: IndexMap::new(),
             runtime: RuntimeEnv::for_test(Platform::current()),
