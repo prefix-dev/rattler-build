@@ -8,7 +8,7 @@ use rattler_conda_types::SourcePackageName;
 use crate::{
     error::{ParseError, ParseResult},
     stage0::{
-        ConditionalList, Requirements, Value,
+        ConditionalList, Requirements, Subpackage, Value,
         output::{
             CacheInherit, Inherit, MultiOutputRecipe, Output, PackageOutput, RecipeMetadata,
             StagingBuild, StagingMetadata, StagingOutput,
@@ -484,6 +484,13 @@ fn parse_package_output(
         ConditionalList::default()
     };
 
+    // Parse optional subpackages
+    let subpackages = if let Some(subpackages_node) = mapping.get("subpackages") {
+        parse_subpackages(subpackages_node, config)?
+    } else {
+        Vec::new()
+    };
+
     // Validate field names
     let node = MarkedNode::Mapping(mapping.clone());
     node.validate_keys(
@@ -496,6 +503,7 @@ fn parse_package_output(
             "build",
             "about",
             "tests",
+            "subpackages",
         ],
     )?;
 
@@ -505,6 +513,92 @@ fn parse_package_output(
         source,
         requirements,
         build,
+        about,
+        tests,
+        subpackages,
+    })
+}
+
+/// Parse the `subpackages` list of an output.
+///
+/// Each entry splits a set of files off of the owning output. See
+/// `design/subpackages.md` for the semantics.
+pub(crate) fn parse_subpackages(
+    node: &MarkedNode,
+    config: ParseConfig,
+) -> ParseResult<Vec<Subpackage>> {
+    let sequence = node.as_sequence().ok_or_else(|| {
+        ParseError::expected_type("sequence", "non-sequence", get_span(node))
+            .with_message("subpackages must be a list")
+    })?;
+
+    let mut subpackages = Vec::with_capacity(sequence.len());
+    for item in sequence.iter() {
+        subpackages.push(parse_subpackage(item, config)?);
+    }
+    Ok(subpackages)
+}
+
+/// Parse a single subpackage entry.
+fn parse_subpackage(node: &MarkedNode, config: ParseConfig) -> ParseResult<Subpackage> {
+    let mapping = node.as_mapping().ok_or_else(|| {
+        ParseError::expected_type("mapping", "non-mapping", get_span(node))
+            .with_message("each subpackage must be a mapping")
+    })?;
+
+    // Package metadata (required); version is optional and inherits from parent.
+    let package_node = mapping
+        .get("package")
+        .ok_or_else(|| ParseError::missing_field("package", get_span(node)))?;
+    let package = parse_package_metadata(package_node)?;
+
+    // Files to split off (optional, but a subpackage without files claims nothing).
+    let files = if let Some(files_node) = mapping.get("files") {
+        super::build::parse_build_files(files_node)?
+    } else {
+        crate::stage0::IncludeExclude::default()
+    };
+
+    // Requirements (optional). build/host are rejected: subpackages share the
+    // parent's single build and never build on their own.
+    let requirements = if let Some(req_node) = mapping.get("requirements") {
+        let reqs = super::requirements::parse_requirements_with_config(req_node, config)?;
+        if !reqs.build.is_empty() || !reqs.host.is_empty() {
+            return Err(ParseError::invalid_value(
+                "requirements",
+                "subpackages cannot have `build` or `host` requirements (they share the parent output's build)",
+                get_span(req_node),
+            )
+            .with_suggestion("Only `run`, `run_constraints`, `run_exports` and `ignore_run_exports` are allowed in a subpackage"));
+        }
+        reqs
+    } else {
+        Requirements::default()
+    };
+
+    // About (optional); unset fields inherit from the parent output.
+    let about = if let Some(about_node) = mapping.get("about") {
+        parse_about(about_node)?
+    } else {
+        crate::stage0::About::default()
+    };
+
+    // Tests (optional).
+    let tests = if let Some(tests_node) = mapping.get("tests") {
+        parse_tests(tests_node)?
+    } else {
+        ConditionalList::default()
+    };
+
+    node.validate_keys(
+        "subpackage",
+        &["package", "files", "requirements", "about", "tests"],
+    )?;
+
+    Ok(Subpackage {
+        package,
+        files,
+        requirements,
         about,
         tests,
     })

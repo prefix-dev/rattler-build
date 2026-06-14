@@ -21,6 +21,8 @@ mod recipe_tests;
 #[cfg(test)]
 mod snapshot_tests;
 #[cfg(test)]
+mod subpackage_tests;
+#[cfg(test)]
 mod unit_tests;
 
 use marked_yaml::{Node as MarkedNode, types::MarkedScalarNode};
@@ -251,6 +253,13 @@ fn parse_single_output_recipe_with_config(
         crate::stage0::ConditionalList::default()
     };
 
+    // Parse optional subpackages section (can be empty)
+    let subpackages = if let Some(subpackages_node) = mapping.get("subpackages") {
+        output_parser::parse_subpackages(subpackages_node, config)?
+    } else {
+        Vec::new()
+    };
+
     // Check for unknown top-level fields
     for (key, _) in mapping.iter() {
         let key_str = key.as_str();
@@ -263,6 +272,7 @@ fn parse_single_output_recipe_with_config(
                 | "extra"
                 | "source"
                 | "tests"
+                | "subpackages"
                 | "schema_version"
                 | "context"
         ) {
@@ -271,7 +281,7 @@ fn parse_single_output_recipe_with_config(
                 format!("unknown top-level field '{}'", key_str),
                 *key.span(),
             )
-            .with_suggestion("valid top-level fields are: package, build, about, requirements, extra, source, tests, schema_version, context"));
+            .with_suggestion("valid top-level fields are: package, build, about, requirements, extra, source, tests, subpackages, schema_version, context"));
         }
     }
 
@@ -285,6 +295,7 @@ fn parse_single_output_recipe_with_config(
         extra,
         source,
         tests,
+        subpackages,
     })
 }
 

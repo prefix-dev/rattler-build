@@ -12,6 +12,7 @@ use crate::stage0::{
     package::{Package, PackageMetadata},
     requirements::Requirements,
     source::Source,
+    subpackage::Subpackage,
     tests::TestType,
     types::{ConditionalList, Item, Value},
 };
@@ -46,6 +47,10 @@ pub struct SingleOutputRecipe {
     pub source: ConditionalList<Source>,
     #[serde(default, skip_serializing_if = "ConditionalList::is_empty")]
     pub tests: ConditionalList<TestType>,
+
+    /// Subpackages that split files off of this output (melange-style).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub subpackages: Vec<Subpackage>,
 }
 
 /// Multi-output recipe with staging support
@@ -183,6 +188,10 @@ pub struct PackageOutput {
     /// Tests for this output
     #[serde(default, skip_serializing_if = "ConditionalList::is_empty")]
     pub tests: ConditionalList<TestType>,
+
+    /// Subpackages that split files off of this output (melange-style).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub subpackages: Vec<Subpackage>,
 }
 
 /// Serialize TopLevel as null
@@ -261,6 +270,7 @@ impl SingleOutputRecipe {
             extra: crate::stage0::extra::Extra::default(),
             source: ConditionalList::default(),
             tests: ConditionalList::default(),
+            subpackages: Vec::new(),
         }
     }
 
@@ -276,6 +286,7 @@ impl SingleOutputRecipe {
             extra,
             source,
             tests,
+            subpackages,
         } = self;
 
         let mut vars = package.used_variables();
@@ -288,6 +299,9 @@ impl SingleOutputRecipe {
         }
         for test_item in tests {
             vars.extend(collect_test_item_variables(test_item));
+        }
+        for subpackage in subpackages {
+            vars.extend(subpackage.used_variables());
         }
         for value in context.values() {
             vars.extend(value.used_variables());
@@ -473,6 +487,7 @@ impl PackageOutput {
             build,
             about,
             tests,
+            subpackages,
         } = self;
 
         let mut vars = package.used_variables();
@@ -485,6 +500,9 @@ impl PackageOutput {
         vars.extend(about.used_variables());
         for test_item in tests {
             vars.extend(collect_test_item_variables(test_item));
+        }
+        for subpackage in subpackages {
+            vars.extend(subpackage.used_variables());
         }
         vars.sort();
         vars.dedup();
@@ -564,7 +582,7 @@ fn collect_source_item_variables(item: &Item<Source>) -> Vec<String> {
 /// Helper to collect used variables from a test Item
 /// This handles both Value (concrete TestType) and Conditional cases
 /// Supports nested conditionals at any depth.
-fn collect_test_item_variables(item: &Item<TestType>) -> Vec<String> {
+pub(crate) fn collect_test_item_variables(item: &Item<TestType>) -> Vec<String> {
     match item {
         Item::Value(value) => {
             let mut vars = value.used_variables();
