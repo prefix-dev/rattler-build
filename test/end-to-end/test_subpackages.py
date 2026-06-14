@@ -20,23 +20,22 @@ def test_subpackages_require_experimental(
 def test_subpackages_render(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
-    """Rendering desugars subpackages into staging-backed package outputs."""
+    """A subpackages recipe renders as a single output with embedded subpackages."""
     rendered = rattler_build.render(
         recipes / "subpackages/recipe.yaml",
         tmp_path,
         extra_args=["--experimental"],
     )
 
-    names = sorted(o["recipe"]["package"]["name"] for o in rendered)
-    assert names == ["mylib", "mylib-dev", "mylib-doc"]
+    # The output is a single recipe (one build); subpackages are attached to it,
+    # not turned into separate outputs or a staging cache.
+    assert len(rendered) == 1
+    recipe = rendered[0]["recipe"]
+    assert recipe["package"]["name"] == "mylib"
+    assert not recipe.get("staging_caches")
 
-    # Every output shares a single staging cache (the one build) and inherits it.
-    for output in rendered:
-        recipe = output["recipe"]
-        assert len(recipe["staging_caches"]) == 1
-        assert recipe["inherits_from"] is not None
-        cache_name = recipe["staging_caches"][0]["name"]
-        assert recipe["inherits_from"]["cache_name"] == cache_name
+    sub_names = sorted(s["package"]["name"] for s in recipe["subpackages"])
+    assert sub_names == ["mylib-dev", "mylib-doc"]
 
 
 @pytest.mark.skipif(os.name == "nt", reason="recipe build script is unix-only")
@@ -109,6 +108,31 @@ def test_subpackages_about_inheritance(
     about_doc = json.loads((pkg_doc / "info/about.json").read_text())
     assert about_doc["summary"] == "My library"
     assert about_doc["license"] == "MIT"
+
+
+@pytest.mark.skipif(os.name == "nt", reason="recipe build script is unix-only")
+def test_subpackages_overlap_and_internal_exclude(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Files are partitioned on concrete paths: first-match-wins, and a
+    subpackage's internal `exclude` lets files fall through to the parent."""
+    rattler_build.build(
+        recipes / "subpackages/recipe-overlap.yaml",
+        tmp_path,
+        extra_args=["--experimental"],
+    )
+
+    def files(name: str) -> set[str]:
+        pkg = get_extracted_package(tmp_path, name)
+        paths = json.loads((pkg / "info/paths.json").read_text())
+        return {p["_path"] for p in paths["paths"]}
+
+    # edge-lib includes lib/** but excludes lib/*.a -> only the shared lib.
+    assert files("edge-lib") == {"lib/libfoo.so"}
+    # edge-static claims the static lib that fell through edge-lib's exclude.
+    assert files("edge-static") == {"lib/libfoo.a"}
+    # The parent keeps the remainder (the static lib claimed by nobody).
+    assert files("edge") == {"lib/keepme.a"}
 
 
 if __name__ == "__main__":

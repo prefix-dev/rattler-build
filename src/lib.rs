@@ -116,15 +116,13 @@ fn find_variants(
     )
     .wrap_err("Failed to parse recipe")?;
 
-    // `subpackages` is an experimental feature for now. Desugar it into the
-    // existing multi-output staging machinery once enabled.
+    // `subpackages` is an experimental feature for now.
     if rattler_build_recipe::recipe_has_subpackages(&stage0_recipe) && !render_config.experimental {
         return Err(miette::miette!(
             help = "Pass the `--experimental` flag to enable subpackages.",
             "`subpackages` is an experimental feature"
         ));
     }
-    let stage0_recipe = rattler_build_recipe::desugar_subpackages(stage0_recipe);
 
     // Extract the top-level recipe name from multi-output recipes (if concrete)
     let recipe_name = match &stage0_recipe {
@@ -489,6 +487,19 @@ pub async fn get_build_output(
             },
         );
 
+        // Register subpackages too, so that `pin_subpackage` can resolve them.
+        // They share the parent output's build string (the same variant hash).
+        for subpackage in recipe.subpackages() {
+            subpackages.insert(
+                subpackage.package.name().clone(),
+                PackageIdentifier {
+                    name: subpackage.package.name().clone(),
+                    version: subpackage.package.version().clone(),
+                    build_string: discovered_output.build_string.clone(),
+                },
+            );
+        }
+
         // Use the global build name for outputs that inherit from staging caches
         // This ensures staging caches and their dependent packages share the same build directory
         // Otherwise, use the output's own name for the build directory
@@ -687,7 +698,7 @@ pub async fn run_build_from_args(
         .collect::<Vec<_>>();
     tracing::info!("Starting build of {} outputs", outputs_to_build.len());
     for (index, output) in outputs_to_build.iter().enumerate() {
-        let (output, archive) = match run_build(
+        let build_results = match run_build(
             output.clone(),
             &tool_configuration,
             WorkingDirectoryBehavior::Cleanup,
@@ -695,9 +706,11 @@ pub async fn run_build_from_args(
         .boxed_local()
         .await
         {
-            Ok((output, archive)) => {
-                output.record_build_end();
-                (output, archive)
+            Ok(results) => {
+                for (built, _) in &results {
+                    built.record_build_end();
+                }
+                results
             }
             Err(e) => {
                 if tool_configuration.continue_on_failure == ContinueOnFailure::Yes {
@@ -709,120 +722,126 @@ pub async fn run_build_from_args(
             }
         };
 
-        outputs.push(output.clone());
+        // A single build may produce multiple artifacts (the parent output plus
+        // one per subpackage). Process each through tests / upload uniformly.
+        let is_last_output = index == outputs_to_build.len() - 1;
+        let last_artifact_index = build_results.len().saturating_sub(1);
+        for (artifact_index, (output, archive)) in build_results.into_iter().enumerate() {
+            outputs.push(output.clone());
 
-        // We can now run the tests for the output. However, we need to check if
-        // all dependencies that are needed for the test are already built.
+            // We can now run the tests for the output. However, we need to check if
+            // all dependencies that are needed for the test are already built.
 
-        // Decide whether the tests should be skipped or not
-        let (skip_test, skip_test_reason) = match tool_configuration.test_strategy {
-            TestStrategy::Skip => (true, "the argument --test=skip was set".to_string()),
-            TestStrategy::Native => {
-                // Skip if `host_platform != build_platform` and `target_platform != noarch`
-                if output.build_configuration.target_platform != Platform::NoArch
-                    && output.build_configuration.host_platform.platform
-                        != output.build_configuration.build_platform.platform
-                {
-                    let reason = format!(
-                        "the argument --test=native was set and the build is a cross-compilation (target_platform={}, build_platform={}, host_platform={})",
-                        output.build_configuration.target_platform,
-                        output.build_configuration.build_platform.platform,
-                        output.build_configuration.host_platform.platform
-                    );
+            // Decide whether the tests should be skipped or not
+            let (skip_test, skip_test_reason) = match tool_configuration.test_strategy {
+                TestStrategy::Skip => (true, "the argument --test=skip was set".to_string()),
+                TestStrategy::Native => {
+                    // Skip if `host_platform != build_platform` and `target_platform != noarch`
+                    if output.build_configuration.target_platform != Platform::NoArch
+                        && output.build_configuration.host_platform.platform
+                            != output.build_configuration.build_platform.platform
+                    {
+                        let reason = format!(
+                            "the argument --test=native was set and the build is a cross-compilation (target_platform={}, build_platform={}, host_platform={})",
+                            output.build_configuration.target_platform,
+                            output.build_configuration.build_platform.platform,
+                            output.build_configuration.host_platform.platform
+                        );
 
-                    (true, reason)
-                } else {
-                    (false, "".to_string())
+                        (true, reason)
+                    } else {
+                        (false, "".to_string())
+                    }
                 }
-            }
-            TestStrategy::NativeAndEmulated => (false, "".to_string()),
-        };
-        if skip_test {
-            tracing::info!("Skipping tests because {}", skip_test_reason);
-            build_reindexed_channels(&output.build_configuration, &tool_configuration)
-                .await
-                .into_diagnostic()
-                .context("failed to reindex output channel")?;
-        } else {
-            test_queue.push((output, archive));
-
-            let is_last_iteration = index == outputs_to_build.len() - 1;
-            let to_test = if is_last_iteration {
-                // On last iteration, test everything in the queue
-                std::mem::take(&mut test_queue)
-            } else {
-                // Update the test queue with the tests that we can't run yet
-                let (to_test, new_test_queue) = test_queue
-                    .into_iter()
-                    .partition(|(output, _)| can_test(output, &all_output_names, &outputs));
-                test_queue = new_test_queue;
-                to_test
+                TestStrategy::NativeAndEmulated => (false, "".to_string()),
             };
+            if skip_test {
+                tracing::info!("Skipping tests because {}", skip_test_reason);
+                build_reindexed_channels(&output.build_configuration, &tool_configuration)
+                    .await
+                    .into_diagnostic()
+                    .context("failed to reindex output channel")?;
+            } else {
+                test_queue.push((output, archive));
 
-            for (output, archive) in &to_test {
-                match package_test::run_test(
-                    archive,
-                    &TestConfiguration {
-                        test_prefix: output
-                            .build_configuration
-                            .directories
-                            .output_dir
-                            .join("test"),
-                        target_platform: Some(output.build_configuration.target_platform),
-                        host_platform: Some(output.build_configuration.host_platform.clone()),
-                        current_platform: output.build_configuration.build_platform.clone(),
-                        keep_test_prefix: tool_configuration.no_clean,
-                        channels: build_reindexed_channels(
-                            &output.build_configuration,
-                            &tool_configuration,
-                        )
-                        .await
-                        .into_diagnostic()
-                        .context("failed to reindex output channel")?,
-                        channel_priority: tool_configuration.channel_priority,
-                        solve_strategy: SolveStrategy::Highest,
-                        tool_configuration: tool_configuration.clone(),
-                        test_index: None,
-                        output_dir: output.build_configuration.directories.output_dir.clone(),
-                        exclude_newer: output.build_configuration.exclude_newer,
-                        env_isolation: output.build_configuration.env_isolation,
-                    },
-                    None,
-                )
-                .await
-                {
-                    Ok(_) => {}
-                    Err(e) => {
-                        // move the package file to the failed directory
-                        let failed_dir = output
-                            .build_configuration
-                            .directories
-                            .output_dir
-                            .join("broken");
-                        fs::create_dir_all(&failed_dir).into_diagnostic()?;
-                        fs::rename(archive, failed_dir.join(archive.file_name().unwrap()))
-                            .into_diagnostic()?;
+                let is_last_iteration = is_last_output && artifact_index == last_artifact_index;
+                let to_test = if is_last_iteration {
+                    // On last iteration, test everything in the queue
+                    std::mem::take(&mut test_queue)
+                } else {
+                    // Update the test queue with the tests that we can't run yet
+                    let (to_test, new_test_queue) = test_queue
+                        .into_iter()
+                        .partition(|(output, _)| can_test(output, &all_output_names, &outputs));
+                    test_queue = new_test_queue;
+                    to_test
+                };
 
-                        // Reindex the output directory so that the broken package is no longer
-                        // listed in the repodata. This is important for --skip-existing to work
-                        // correctly on subsequent builds.
-                        if let Err(e) = build_reindexed_channels(
-                            &output.build_configuration,
-                            &tool_configuration,
-                        )
-                        .await
-                        {
-                            tracing::warn!(
-                                "Failed to reindex output directory after moving package to broken folder: {}",
-                                e
-                            );
-                        }
+                for (output, archive) in &to_test {
+                    match package_test::run_test(
+                        archive,
+                        &TestConfiguration {
+                            test_prefix: output
+                                .build_configuration
+                                .directories
+                                .output_dir
+                                .join("test"),
+                            target_platform: Some(output.build_configuration.target_platform),
+                            host_platform: Some(output.build_configuration.host_platform.clone()),
+                            current_platform: output.build_configuration.build_platform.clone(),
+                            keep_test_prefix: tool_configuration.no_clean,
+                            channels: build_reindexed_channels(
+                                &output.build_configuration,
+                                &tool_configuration,
+                            )
+                            .await
+                            .into_diagnostic()
+                            .context("failed to reindex output channel")?,
+                            channel_priority: tool_configuration.channel_priority,
+                            solve_strategy: SolveStrategy::Highest,
+                            tool_configuration: tool_configuration.clone(),
+                            test_index: None,
+                            output_dir: output.build_configuration.directories.output_dir.clone(),
+                            exclude_newer: output.build_configuration.exclude_newer,
+                            env_isolation: output.build_configuration.env_isolation,
+                        },
+                        None,
+                    )
+                    .await
+                    {
+                        Ok(_) => {}
+                        Err(e) => {
+                            // move the package file to the failed directory
+                            let failed_dir = output
+                                .build_configuration
+                                .directories
+                                .output_dir
+                                .join("broken");
+                            fs::create_dir_all(&failed_dir).into_diagnostic()?;
+                            fs::rename(archive, failed_dir.join(archive.file_name().unwrap()))
+                                .into_diagnostic()?;
 
-                        if tool_configuration.continue_on_failure == ContinueOnFailure::Yes {
-                            tracing::error!("Test failed for {}: {}", output.identifier(), e);
-                            output.record_warning(&format!("Test failed: {}", e));
-                        } else {
-                            return Err(miette::miette!("Test failed: {}", e));
+                            // Reindex the output directory so that the broken package is no longer
+                            // listed in the repodata. This is important for --skip-existing to work
+                            // correctly on subsequent builds.
+                            if let Err(e) = build_reindexed_channels(
+                                &output.build_configuration,
+                                &tool_configuration,
+                            )
+                            .await
+                            {
+                                tracing::warn!(
+                                    "Failed to reindex output directory after moving package to broken folder: {}",
+                                    e
+                                );
+                            }
+
+                            if tool_configuration.continue_on_failure == ContinueOnFailure::Yes {
+                                tracing::error!("Test failed for {}: {}", output.identifier(), e);
+                                output.record_warning(&format!("Test failed: {}", e));
+                            } else {
+                                return Err(miette::miette!("Test failed: {}", e));
+                            }
                         }
                     }
                 }
@@ -1100,8 +1119,13 @@ pub async fn rebuild_package_core(
         .recreate_directories()
         .into_diagnostic()?;
 
+    // Rebuild operates on a single package; take the primary (parent) artifact.
     let (rebuilt_output, temp_rebuilt_path) =
-        run_build(output, &tool_config, WorkingDirectoryBehavior::Cleanup).await?;
+        run_build(output, &tool_config, WorkingDirectoryBehavior::Cleanup)
+            .await?
+            .into_iter()
+            .next()
+            .ok_or_else(|| miette::miette!("build produced no package"))?;
 
     // Generate timestamp for the rebuilt package
     let timestamp = jiff::Timestamp::now().strftime("%Y%m%d-%H%M%S");
@@ -1300,7 +1324,7 @@ async fn build_and_collect_packages(
     let outputs_to_build = skip_existing(build_output, tool_configuration).await?;
 
     for output in outputs_to_build.iter() {
-        let (_output, archive) = match run_build(
+        let build_results = match run_build(
             output.clone(),
             tool_configuration,
             WorkingDirectoryBehavior::Cleanup,
@@ -1308,9 +1332,11 @@ async fn build_and_collect_packages(
         .boxed_local()
         .await
         {
-            Ok((output, archive)) => {
-                output.record_build_end();
-                (output, archive)
+            Ok(results) => {
+                for (built, _) in &results {
+                    built.record_build_end();
+                }
+                results
             }
             Err(e) => {
                 if tool_configuration.continue_on_failure == ContinueOnFailure::Yes {
@@ -1322,7 +1348,9 @@ async fn build_and_collect_packages(
             }
         };
 
-        package_paths.push(archive);
+        for (_output, archive) in build_results {
+            package_paths.push(archive);
+        }
     }
 
     Ok(package_paths)

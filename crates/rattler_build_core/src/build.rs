@@ -10,7 +10,7 @@ use rattler_conda_types::{Channel, MatchSpec, Platform, package::PathsJson};
 use crate::{
     metadata::{Output, build_reindexed_channels},
     package_test::PackageContentsTestExt as _,
-    packaging::record_files,
+    packaging::{PackagedArtifact, record_files},
     render::{resolved_dependencies::RunExportsDownload, solver::load_repodatas},
     tool_configuration,
 };
@@ -111,7 +111,7 @@ pub async fn run_build(
     mut output: Output,
     tool_configuration: &tool_configuration::Configuration,
     working_directory_behavior: WorkingDirectoryBehavior,
-) -> miette::Result<(Output, PathBuf)> {
+) -> miette::Result<Vec<(Output, PathBuf)>> {
     let cleanup = matches!(
         working_directory_behavior,
         WorkingDirectoryBehavior::Cleanup
@@ -219,51 +219,62 @@ pub async fn run_build(
         }
     }
 
-    // Package all the new files
-    let (result, paths_json) = output
-        .create_package(tool_configuration, install_added_files.as_ref())
+    // Package all the new files. With subpackages this produces several
+    // artifacts (the parent plus one per subpackage) from the single build.
+    let artifacts = output
+        .create_packages(tool_configuration, install_added_files.as_ref())
         .await
         .into_diagnostic()?;
 
-    // Check for binary prefix if configured
-    if tool_configuration.error_prefix_in_binary {
-        tracing::info!("Checking for embedded prefix in binary files...");
-        check_for_binary_prefix(&output, &paths_json)?;
-    }
-
-    // Check for symlinks on Windows if not allowed
-    // Skip the check for noarch packages that have __unix in run dependencies,
-    // since they will never be installed on Windows.
-    if (output.build_configuration.target_platform.is_windows()
-        || (output.build_configuration.target_platform == Platform::NoArch
-            && !has_unix_virtual_package(&output)))
-        && !tool_configuration.allow_symlinks_on_windows
+    let mut results = Vec::with_capacity(artifacts.len());
+    for PackagedArtifact {
+        output: artifact_output,
+        path,
+        paths_json,
+    } in artifacts
     {
-        tracing::info!("Checking for symlinks ...");
-        check_for_symlinks_on_windows(&output, &paths_json)?;
-    }
-
-    output.record_artifact(&result, &paths_json);
-
-    let span = tracing::info_span!("Running package tests");
-    let enter = span.enter();
-
-    // We run all the package content tests
-    for test in output.recipe.tests() {
-        if let TestType::PackageContents { package_contents } = test {
-            package_contents
-                .run_test(&paths_json, &output)
-                .into_diagnostic()?;
+        // Check for binary prefix if configured
+        if tool_configuration.error_prefix_in_binary {
+            tracing::info!("Checking for embedded prefix in binary files...");
+            check_for_binary_prefix(&artifact_output, &paths_json)?;
         }
-    }
 
-    drop(enter);
+        // Check for symlinks on Windows if not allowed
+        // Skip the check for noarch packages that have __unix in run dependencies,
+        // since they will never be installed on Windows.
+        if (artifact_output.build_configuration.target_platform.is_windows()
+            || (artifact_output.build_configuration.target_platform == Platform::NoArch
+                && !has_unix_virtual_package(&artifact_output)))
+            && !tool_configuration.allow_symlinks_on_windows
+        {
+            tracing::info!("Checking for symlinks ...");
+            check_for_symlinks_on_windows(&artifact_output, &paths_json)?;
+        }
+
+        artifact_output.record_artifact(&path, &paths_json);
+
+        let span = tracing::info_span!("Running package tests");
+        let enter = span.enter();
+
+        // We run all the package content tests
+        for test in artifact_output.recipe.tests() {
+            if let TestType::PackageContents { package_contents } = test {
+                package_contents
+                    .run_test(&paths_json, &artifact_output)
+                    .into_diagnostic()?;
+            }
+        }
+
+        drop(enter);
+
+        results.push((artifact_output, path));
+    }
 
     if !tool_configuration.no_clean {
         directories.clean().into_diagnostic()?;
     }
 
-    Ok((output, result))
+    Ok(results)
 }
 
 /// Check if any binary files contain the host prefix

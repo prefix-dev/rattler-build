@@ -11,11 +11,22 @@ use serde::Serialize;
 
 use crate::stage0::{
     about::About,
+    output::{Output, Recipe},
     package::PackageMetadata,
     requirements::Requirements,
     tests::TestType,
     types::{ConditionalList, IncludeExclude},
 };
+
+/// Returns true if any output in the recipe declares `subpackages`.
+pub fn recipe_has_subpackages(recipe: &Recipe) -> bool {
+    match recipe {
+        Recipe::SingleOutput(single) => !single.subpackages.is_empty(),
+        Recipe::MultiOutput(multi) => multi.outputs.iter().any(
+            |output| matches!(output, Output::Package(p) if !p.subpackages.is_empty()),
+        ),
+    }
+}
 
 /// A subpackage of an output.
 ///

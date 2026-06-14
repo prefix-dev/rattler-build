@@ -1,0 +1,34 @@
+# Exercises concrete-file semantics of subpackages:
+# - first-match-wins across overlapping globs
+# - a subpackage's internal `exclude` lets files fall through to later
+#   subpackages / the parent.
+schema_version: 1
+
+package:
+  name: edge
+  version: 1.0.0
+
+build:
+  number: 0
+  script:
+    - if: unix
+      then: |
+        mkdir -p $PREFIX/lib
+        echo so   > $PREFIX/lib/libfoo.so
+        echo a    > $PREFIX/lib/libfoo.a
+        echo keep > $PREFIX/lib/keepme.a
+
+subpackages:
+  # Claims everything under lib/ except static libs (which fall through).
+  - package:
+      name: edge-lib
+    files:
+      include:
+        - lib/**
+      exclude:
+        - lib/*.a
+  # Claims one specific static lib; keepme.a stays with the parent.
+  - package:
+      name: edge-static
+    files:
+      - lib/libfoo.a

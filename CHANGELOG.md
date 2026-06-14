@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Experimental `subpackages` support: split files (headers, man pages, `-dev` files, ...) off of an output into separate packages from a single build, with per-subpackage requirements and `pin_subpackage` support. Enable with `--experimental`.
+- Experimental `subpackages` support: split files (headers, man pages, `-dev` files, ...) off of an output into separate packages from a single build. Files are partitioned on concrete paths (first-match-wins, internal excludes fall through to the parent), and each subpackage has its own requirements/about/tests with `pin_subpackage` and run-export inheritance. Enable with `--experimental`.
 
 ## [0.66.1] - 2026-06-13
 

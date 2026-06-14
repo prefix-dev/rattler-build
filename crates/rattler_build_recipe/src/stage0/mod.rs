@@ -3,7 +3,6 @@
 
 mod about;
 mod build;
-mod desugar;
 pub mod evaluate;
 mod extra;
 mod match_spec;
@@ -18,7 +17,6 @@ mod types;
 
 pub use about::{About, License};
 pub use build::{BinaryRelocation, Build, PythonBuild};
-pub use desugar::{desugar_subpackages, recipe_has_subpackages};
 pub use extra::Extra;
 pub use match_spec::SerializableMatchSpec;
 pub use output::{
@@ -34,7 +32,7 @@ pub use parser::{
 };
 pub use requirements::Requirements;
 pub use source::Source;
-pub use subpackage::Subpackage;
+pub use subpackage::{Subpackage, recipe_has_subpackages};
 pub use tests::{PythonVersion, TestType};
 pub use types::{
     Conditional, ConditionalList, ConditionalListOrItem, IncludeExclude, Item, JinjaExpression,

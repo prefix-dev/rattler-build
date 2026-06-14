@@ -99,6 +99,9 @@ pub enum PackagingError {
 
     #[error("Package file `{0}` listed in $RATTLER_BUILD_PACKAGE_FILES does not exist")]
     PackageFileMissing(PathBuf),
+
+    #[error("Failed to resolve subpackage dependencies: {0}")]
+    ResolveError(#[from] crate::render::resolved_dependencies::ResolveError),
 }
 
 /// This function copies the license files to the info/licenses folder.
@@ -860,15 +863,34 @@ fn create_empty_build_folder(
     Ok(())
 }
 
+/// A single package produced from a build.
+///
+/// A build normally produces one artifact; with subpackages it produces several
+/// (the parent plus one per subpackage), each carrying its own (possibly
+/// derived) [`Output`].
+pub struct PackagedArtifact {
+    /// The output that was packaged (a derived output for subpackages).
+    pub output: Output,
+    /// Path to the resulting package archive.
+    pub path: PathBuf,
+    /// The `paths.json` of the resulting package.
+    pub paths_json: PathsJson,
+}
+
 impl Output {
-    /// Create a conda package from any new files in the host prefix. Note: the
-    /// previous stages should have been completed before calling this
+    /// Create the conda package(s) from any new files in the host prefix. Note:
+    /// the previous stages should have been completed before calling this
     /// function.
-    pub async fn create_package(
+    ///
+    /// Without subpackages this returns a single artifact. With subpackages the
+    /// single build is split: every subpackage claims the files matching its
+    /// globs (first-match-wins on concrete paths, in declaration order) and the
+    /// parent output keeps the remainder, yielding one archive per package.
+    pub async fn create_packages(
         &self,
         tool_configuration: &tool_configuration::Configuration,
         post_install_files: Option<&HashSet<PathBuf>>,
-    ) -> Result<(PathBuf, PathsJson), PackagingError> {
+    ) -> Result<Vec<PackagedArtifact>, PackagingError> {
         let span = tracing::info_span!("Packaging new files");
         let _enter = span.enter();
 
@@ -878,7 +900,18 @@ impl Output {
             .directories
             .package_files_list_path();
 
-        let files_after = match read_package_files_list(&package_files_list)? {
+        let has_subpackages = !self.recipe.subpackages().is_empty();
+
+        // With subpackages we must collect *all* built files so we can partition
+        // them; the parent's own `files` glob is applied to the remainder later.
+        let empty_glob = GlobVec::default();
+        let collect_glob = if has_subpackages {
+            &empty_glob
+        } else {
+            &self.recipe.build().files
+        };
+
+        let all_files = match read_package_files_list(&package_files_list)? {
             Some(paths) => {
                 tracing::info!(
                     "Using {} explicit package file(s) from {}",
@@ -889,18 +922,163 @@ impl Output {
                     host_prefix,
                     paths,
                     &self.recipe.build().always_include_files,
-                    &self.recipe.build().files,
+                    collect_glob,
                 )?
             }
             None => Files::from_prefix(
                 host_prefix,
                 &self.recipe.build().always_include_files,
-                &self.recipe.build().files,
+                collect_glob,
                 post_install_files,
             )?,
         };
 
-        package_conda(self, tool_configuration, &files_after)
+        if !has_subpackages {
+            let (path, paths_json) = package_conda(self, tool_configuration, &all_files)?;
+            return Ok(vec![PackagedArtifact {
+                output: self.clone(),
+                path,
+                paths_json,
+            }]);
+        }
+
+        let prefix = all_files.prefix.clone();
+
+        // Partition the file set across subpackages (first-match-wins).
+        let mut remaining = all_files.new_files.clone();
+        let mut sub_claims: Vec<HashSet<PathBuf>> = Vec::new();
+        for subpackage in self.recipe.subpackages() {
+            let mut claimed = HashSet::new();
+            remaining.retain(|file| {
+                let rel = file.strip_prefix(&prefix).unwrap_or_else(|_| file.as_path());
+                if subpackage.files.is_match(rel) {
+                    claimed.insert(file.clone());
+                    false
+                } else {
+                    true
+                }
+            });
+            sub_claims.push(claimed);
+        }
+
+        let mut artifacts = Vec::with_capacity(1 + sub_claims.len());
+
+        // Parent keeps the remainder, optionally narrowed by its own `files` glob.
+        let parent_glob = &self.recipe.build().files;
+        if !parent_glob.is_empty() {
+            remaining
+                .retain(|f| parent_glob.is_match(f.strip_prefix(&prefix).unwrap_or_else(|_| f.as_path())));
+        }
+        let parent_files = Files {
+            new_files: remaining,
+            old_files: all_files.old_files.clone(),
+            prefix: prefix.clone(),
+        };
+        let (path, paths_json) = package_conda(self, tool_configuration, &parent_files)?;
+        artifacts.push(PackagedArtifact {
+            output: self.clone(),
+            path,
+            paths_json,
+        });
+
+        // Build each subpackage from its claimed files.
+        for (subpackage, claimed) in self.recipe.subpackages().iter().zip(sub_claims) {
+            let sub_output = self.derive_subpackage_output(subpackage)?;
+            let sub_files = Files {
+                new_files: claimed,
+                old_files: all_files.old_files.clone(),
+                prefix: prefix.clone(),
+            };
+            tracing::info!(
+                "Packaging subpackage '{}'",
+                sub_output.name().as_normalized()
+            );
+            let (path, paths_json) = package_conda(&sub_output, tool_configuration, &sub_files)?;
+            artifacts.push(PackagedArtifact {
+                output: sub_output,
+                path,
+                paths_json,
+            });
+        }
+
+        Ok(artifacts)
+    }
+
+    /// Derive a standalone [`Output`] for a subpackage that shares this output's
+    /// single build. The subpackage gets its own identity, run dependencies
+    /// (resolving `pin_subpackage`/`pin_compatible`), about and tests, and
+    /// inherits the environment run-exports the parent received.
+    fn derive_subpackage_output(
+        &self,
+        subpackage: &rattler_build_recipe::stage1::Subpackage,
+    ) -> Result<Output, PackagingError> {
+        use crate::render::resolved_dependencies::{
+            DependencyInfo, FinalizedDependencies, FinalizedRunDependencies, apply_variant,
+        };
+
+        let parent_deps = self
+            .finalized_dependencies
+            .as_ref()
+            .ok_or(PackagingError::DependenciesNotFinalized)?;
+
+        // Reconstruct compatibility specs from the parent's resolved build/host
+        // environments so that `pin_compatible` can be resolved in run deps.
+        let mut compatibility_specs = HashMap::new();
+        for env in [parent_deps.build.as_ref(), parent_deps.host.as_ref()]
+            .into_iter()
+            .flatten()
+        {
+            for record in &env.resolved {
+                compatibility_specs
+                    .insert(record.package_record.name.clone(), record.package_record.clone());
+            }
+        }
+
+        // Resolve the subpackage's own run deps + constraints (incl. pins).
+        let mut depends = apply_variant(
+            &subpackage.requirements.run,
+            &self.build_configuration,
+            &compatibility_specs,
+            false,
+        )?;
+        let constraints = apply_variant(
+            &subpackage.requirements.run_constraints,
+            &self.build_configuration,
+            &compatibility_specs,
+            false,
+        )?;
+
+        // Subpackages inherit the build/host run-exports the parent received.
+        depends.extend(
+            parent_deps
+                .run
+                .depends
+                .iter()
+                .filter(|dep| matches!(dep, DependencyInfo::RunExport(_)))
+                .cloned(),
+        );
+
+        let finalized = FinalizedDependencies {
+            build: None,
+            host: None,
+            run: FinalizedRunDependencies {
+                depends,
+                constraints,
+                extra_depends: std::collections::BTreeMap::new(),
+                run_exports: Default::default(),
+            },
+        };
+
+        let mut output = self.clone();
+        output.build_summary =
+            std::sync::Arc::new(std::sync::Mutex::new(crate::types::BuildSummary::default()));
+        output.recipe.package = subpackage.package.clone();
+        output.recipe.requirements = subpackage.requirements.clone();
+        output.recipe.about = subpackage.about.clone();
+        output.recipe.tests = subpackage.tests.clone();
+        output.recipe.subpackages = Vec::new();
+        output.finalized_dependencies = Some(finalized);
+        Ok(output)
     }
 }
 

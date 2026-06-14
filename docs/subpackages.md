@@ -84,31 +84,36 @@ Each entry under `subpackages` accepts:
 
 - **First match wins.** Files are claimed in subpackage declaration order. A file
   matched by an earlier subpackage is not re-claimed by a later one. Anything
-  unclaimed stays with the parent output.
-- **No separate build.** Subpackages share the parent's single build, so they
-  cannot declare `build`/`host` requirements (those belong to the build and are
-  declared on the owning output). They *can* declare independent `run`
-  requirements.
+  unclaimed stays with the parent output. Claiming is computed on the concrete
+  built files, so overlapping globs are predictable.
+- **Internal excludes fall through.** If a subpackage's `files` uses an
+  `include`/`exclude` mapping, files it excludes are *not* claimed and remain
+  available for a later subpackage or the parent. For example
+  `include: [lib/**], exclude: [lib/*.a]` leaves the static libraries for
+  another subpackage or the parent.
+- **No separate build.** Subpackages share the parent's single build (the build
+  runs once), so they cannot declare `build`/`host` requirements — those belong
+  to the build and are declared on the owning output. They *can* declare
+  independent `run` requirements.
 - **`pin_subpackage`.** Subpackages and the parent can reference each other with
   `pin_subpackage(...)` — the common case being `pin_subpackage('<parent>',
   exact=true)` from a `-dev` package so it always installs the matching build of
   the runtime package.
+- **Run-exports.** Subpackages inherit the run-exports contributed by the build/host
+  environment, just like the parent package.
 - **About inheritance.** A subpackage inherits the parent output's `about`
   section; any field set on the subpackage overrides it.
 
-## Limitations
-
-- The parent "remainder" is computed by excluding the union of the subpackages'
-  *include* globs. If a subpackage uses an internal `exclude` inside its `files`,
-  the excluded files are **not** returned to the parent. For the common
-  include-only case (`include/**`, `share/man/**`, …) this is exact.
-- Reusable subpackage *templates* (e.g. an automatic C/C++ `-dev` split) are not
-  available yet; they are planned as a follow-up.
-
 ## Under the hood
 
-Subpackages desugar into a [multiple output cache](multiple_output_cache.md): a
-staging cache that runs the build once, plus one package output per subpackage
-and one for the parent (selecting the remainder via `files`). Everything that
-applies to multi-output recipes — variant handling, `pin_subpackage`, run-exports
-inheritance — applies to subpackages too.
+Subpackages are a first-class, single-build mechanism: the output builds **once**,
+then the resulting file set is partitioned between the parent and its subpackages
+and one conda package is written per subpackage (plus the parent remainder). They
+are *not* turned into separate outputs or a staging cache, so a recipe with
+subpackages still renders as a single output (with the subpackages attached),
+which keeps the build logs and rendered recipe easy to reason about.
+
+## Limitations
+
+- Reusable subpackage *templates* (e.g. an automatic C/C++ `-dev` split) are not
+  available yet; they are planned as a follow-up.

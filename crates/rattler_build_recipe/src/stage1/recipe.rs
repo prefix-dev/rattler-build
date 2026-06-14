@@ -2,9 +2,38 @@
 
 use indexmap::IndexMap;
 use rattler_build_jinja::Variable;
+use rattler_build_types::GlobVec;
 use serde::{Deserialize, Serialize};
 
 use super::{About, Build, Extra, Package, Requirements, Source, TestType};
+
+/// An evaluated subpackage: a set of files split off of the owning output into a
+/// separate package, with its own metadata and runtime requirements.
+///
+/// Subpackages share the owning output's single build; the files matching
+/// `files` are packaged into this subpackage instead of the parent.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Subpackage {
+    /// Package identity (name + version; version defaults to the parent's).
+    pub package: Package,
+
+    /// Glob patterns selecting which built files this subpackage claims.
+    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
+    pub files: GlobVec,
+
+    /// Runtime requirements for this subpackage (run / run_constraints /
+    /// run_exports / ignore_run_exports).
+    #[serde(default)]
+    pub requirements: Requirements,
+
+    /// About metadata (merged with the parent output's about).
+    #[serde(default, skip_serializing_if = "About::is_empty")]
+    pub about: About,
+
+    /// Tests for this subpackage.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tests: Vec<TestType>,
+}
 
 /// Staging cache - a build artifact that doesn't produce a package
 ///
@@ -150,6 +179,11 @@ pub struct Recipe {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub inherits_from: Option<InheritsFrom>,
 
+    /// Subpackages that split files off of this output (experimental).
+    /// Each subpackage is produced from this output's single build.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub subpackages: Vec<Subpackage>,
+
     /// Used variant - the subset of variant variables that were actually accessed
     /// during recipe evaluation (plus always-included variables like target_platform)
     #[serde(skip)]
@@ -182,6 +216,7 @@ impl Recipe {
             context,
             staging_caches: Vec::new(),
             inherits_from: None,
+            subpackages: Vec::new(),
             used_variant,
         }
     }
@@ -213,8 +248,14 @@ impl Recipe {
             context,
             staging_caches,
             inherits_from,
+            subpackages: Vec::new(),
             used_variant,
         }
+    }
+
+    /// Get the subpackages
+    pub fn subpackages(&self) -> &[Subpackage] {
+        &self.subpackages
     }
 
     /// Get the package information

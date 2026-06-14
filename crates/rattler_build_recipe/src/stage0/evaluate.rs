@@ -2709,7 +2709,10 @@ impl Evaluate for Stage0Recipe {
         // added to the variant (which happens in variant_render.rs after evaluation).
         // The build string will remain unresolved until finalize_build_strings() is called.
 
-        Ok(Stage1Recipe::new(
+        let subpackages =
+            evaluate_subpackages(&self.subpackages, &about, package.version(), &context_with_vars)?;
+
+        let mut recipe = Stage1Recipe::new(
             package,
             build,
             about,
@@ -2719,7 +2722,9 @@ impl Evaluate for Stage0Recipe {
             tests,
             evaluated_context,
             actual_variant,
-        ))
+        );
+        recipe.subpackages = subpackages;
+        Ok(recipe)
     }
 }
 
@@ -2882,6 +2887,62 @@ fn merge_stage1_about(toplevel: stage1::About, output: stage1::About) -> stage1:
             toplevel.description
         },
     }
+}
+
+/// Evaluate a list of stage0 subpackages into stage1 subpackages.
+///
+/// The version defaults to the parent output's version when omitted, and the
+/// about section is merged on top of the parent output's about.
+fn evaluate_subpackages(
+    subpackages: &[crate::stage0::Subpackage],
+    parent_about: &crate::stage1::About,
+    parent_version: &VersionWithSource,
+    context: &EvaluationContext,
+) -> Result<Vec<crate::stage1::Subpackage>, ParseError> {
+    let mut result = Vec::with_capacity(subpackages.len());
+    for sp in subpackages {
+        let name_str = evaluate_value_to_string(&sp.package.name, context)?;
+        let name = PackageName::from_str(&name_str).map_err(|e| {
+            ParseError::invalid_value(
+                "name",
+                format!(
+                    "invalid value for subpackage name: '{}' is not a valid package name: {}",
+                    name_str, e
+                ),
+                Span::new_blank(),
+            )
+        })?;
+
+        let version = if let Some(ref version_value) = sp.package.version {
+            let version_str = evaluate_value_to_string(version_value, context)?;
+            VersionWithSource::from_str(&version_str).map_err(|e| {
+                ParseError::invalid_value(
+                    "version",
+                    format!("invalid subpackage version '{}': {}", version_str, e),
+                    Span::new_blank(),
+                )
+            })?
+        } else {
+            parent_version.clone()
+        };
+
+        let files = evaluate_glob_vec(&sp.files, context)?;
+        let requirements = sp.requirements.evaluate(context)?;
+        let about = merge_stage1_about(parent_about.clone(), sp.about.evaluate(context)?);
+        let mut tests = Vec::new();
+        for test in &sp.tests {
+            tests.extend(evaluate_test(test, context)?);
+        }
+
+        result.push(crate::stage1::Subpackage {
+            package: Stage1Package::new(name, version),
+            files,
+            requirements,
+            about,
+            tests,
+        });
+    }
+    Ok(result)
 }
 
 /// Helper to evaluate a package output into a Stage1Recipe
@@ -3150,7 +3211,9 @@ fn evaluate_package_output_to_recipe(
     // added to the variant (which happens in variant_render.rs after evaluation).
     // The build string will remain unresolved until finalize_build_strings() is called.
 
-    Ok(Some(Stage1Recipe::new(
+    let subpackages = evaluate_subpackages(&output.subpackages, &about, package.version(), context)?;
+
+    let mut recipe = Stage1Recipe::new(
         package,
         build,
         about,
@@ -3160,7 +3223,9 @@ fn evaluate_package_output_to_recipe(
         tests,
         resolved_context,
         actual_variant,
-    )))
+    );
+    recipe.subpackages = subpackages;
+    Ok(Some(recipe))
 }
 
 /// Implement Evaluate for MultiOutputRecipe
