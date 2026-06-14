@@ -24,6 +24,12 @@ source:
 
 See the [Sigstore source attestation documentation](sigstore.md#source-attestation-verification) for more details.
 
+## Subpackages
+
+The `subpackages` key under an output lets you build once and split files off into
+separate packages (e.g. `-dev`, `-doc`). See the
+[Subpackages documentation](subpackages.md) for details.
+
 ## Jinja functions
 
 ### `load_from_file(<file_path>)`

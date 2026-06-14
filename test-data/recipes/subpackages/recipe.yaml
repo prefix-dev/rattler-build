@@ -1,0 +1,50 @@
+# Experimental: melange-style subpackages.
+#
+# A single build produces lib/, include/ and share/man/ files. The `mylib-dev`
+# and `mylib-doc` subpackages split off the headers and man pages; the `mylib`
+# output keeps the remainder (the shared library).
+schema_version: 1
+
+package:
+  name: mylib
+  version: 1.0.0
+
+build:
+  number: 0
+  script:
+    - if: unix
+      then: |
+        mkdir -p $PREFIX/lib $PREFIX/include $PREFIX/share/man/man1
+        echo "shared library" > $PREFIX/lib/libmylib.so
+        echo "header" > $PREFIX/include/mylib.h
+        echo "manual page" > $PREFIX/share/man/man1/mylib.1
+    - if: win
+      then: |
+        if not exist "%PREFIX%\lib" mkdir "%PREFIX%\lib"
+        if not exist "%PREFIX%\include" mkdir "%PREFIX%\include"
+        if not exist "%PREFIX%\share\man\man1" mkdir "%PREFIX%\share\man\man1"
+        echo shared library > "%PREFIX%\lib\mylib.lib"
+        echo header > "%PREFIX%\include\mylib.h"
+        echo manual page > "%PREFIX%\share\man\man1\mylib.1"
+
+about:
+  summary: My library
+  license: MIT
+
+subpackages:
+  # Development files: headers (and would-be CMake/pkg-config files).
+  - package:
+      name: mylib-dev
+    files:
+      - include/**
+    requirements:
+      run:
+        - ${{ pin_subpackage('mylib', exact=true) }}
+    about:
+      summary: Development files for mylib
+
+  # Documentation / man pages.
+  - package:
+      name: mylib-doc
+    files:
+      - share/man/**

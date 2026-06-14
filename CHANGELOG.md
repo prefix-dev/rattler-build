@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Experimental `subpackages` support: split files (headers, man pages, `-dev` files, ...) off of an output into separate packages from a single build, with per-subpackage requirements and `pin_subpackage` support. Enable with `--experimental`.
+
 ## [0.66.1] - 2026-06-13
 
 ### Fixed

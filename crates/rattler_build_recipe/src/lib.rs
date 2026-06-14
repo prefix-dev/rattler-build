@@ -11,6 +11,7 @@ pub mod variant_render;
 
 pub use error::{ParseError, ParseErrorWithSource, ParseResult, WithSourceCode};
 pub use stage0::Stage0Recipe;
+pub use stage0::{desugar_subpackages, recipe_has_subpackages};
 pub use stage1::{Evaluate, EvaluationContext, Recipe as Stage1Recipe};
 
 #[cfg(feature = "variant-config")]

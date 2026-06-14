@@ -116,6 +116,16 @@ fn find_variants(
     )
     .wrap_err("Failed to parse recipe")?;
 
+    // `subpackages` is an experimental feature for now. Desugar it into the
+    // existing multi-output staging machinery once enabled.
+    if rattler_build_recipe::recipe_has_subpackages(&stage0_recipe) && !render_config.experimental {
+        return Err(miette::miette!(
+            help = "Pass the `--experimental` flag to enable subpackages.",
+            "`subpackages` is an experimental feature"
+        ));
+    }
+    let stage0_recipe = rattler_build_recipe::desugar_subpackages(stage0_recipe);
+
     // Extract the top-level recipe name from multi-output recipes (if concrete)
     let recipe_name = match &stage0_recipe {
         stage0::Recipe::MultiOutput(multi) => multi

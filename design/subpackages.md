@@ -202,21 +202,27 @@ parent's built files in a single packaging pass:
    remainder. This yields **correct remainder semantics** (concrete files, not
    globs) and a single prefix walk.
 
-**Chosen: Option B**, because correct remainder semantics and a single build are
-core to the feature. Option A is kept in mind as a possible fast path / fallback,
-and the desugaring insight (subpackages ≈ sibling outputs sharing a build) still
-drives the data model.
+**Implemented: Option A (desugaring), behind `--experimental`.** Building once
+and splitting files end-to-end is delivered by desugaring `subpackages` into the
+existing, well-tested staging machinery, which gives `pin_subpackage`, per-output
+`run` dependencies, run-exports inheritance, metadata, and tests for free. The
+remainder is expressed as exclude globs (the union of the subpackages' includes),
+which is exact for the common include-only case.
 
-### Where Option B hooks in
+Option B (a bespoke packaging-time split with concrete remainder semantics)
+remains the longer-term target for precise remainder handling and avoiding the
+per-output prefix re-walk; it can replace the desugaring internally without any
+recipe-syntax change.
+
+### Where the desugaring hooks in
 
 | Concern | Location |
 | --- | --- |
-| Schema (stage0) | `crates/rattler_build_recipe/src/stage0/subpackage.rs` (new), referenced from `SingleOutputRecipe` and `PackageOutput` in `stage0/output.rs` |
-| Parsing | `crates/rattler_build_recipe/src/stage0/parser/` (new `subpackage.rs`), wired into `parse_single_output_recipe_with_config` and `parse_package_output`, plus `validate_keys` |
-| Evaluated form (stage1) | new `Subpackage` on stage1 `Recipe` (`crates/rattler_build_recipe/src/stage1/`), produced in `stage0/evaluate.rs` |
-| Registry + topo sort | `variant_render.rs` (register subpackage names; add pin edges), `src/lib.rs` subpackages map |
-| Per-subpackage dependency resolution | `crates/rattler_build_core/src/render/resolved_dependencies.rs` |
-| File split + archive emission | `crates/rattler_build_core/src/packaging.rs` (`create_package`/`package_conda`) using `GlobVec` from `packaging/file_finder.rs` |
+| Schema (stage0) | `crates/rattler_build_recipe/src/stage0/subpackage.rs`, referenced from `SingleOutputRecipe` and `PackageOutput` in `stage0/output.rs` |
+| Parsing | `crates/rattler_build_recipe/src/stage0/parser/output_parser.rs` (`parse_subpackages`), wired into `parse_single_output_recipe_with_config` and `parse_package_output`, plus `validate_keys` |
+| Desugaring transform | `crates/rattler_build_recipe/src/stage0/desugar.rs` (`recipe_has_subpackages`, `desugar_subpackages`) — pure stage0→stage0 rewrite into a staging-backed multi-output recipe |
+| Experimental gate + wiring | `src/lib.rs` `find_variants` — error unless `--experimental`, then desugar before rendering |
+| Everything downstream | unchanged: staging evaluation, `pin_subpackage`, topo sort, dependency resolution, packaging (`build.files`/`GlobVec`) |
 
 ## Data model
 
@@ -265,15 +271,19 @@ the subpackages map and inserts pin edges into the topo sort.
 
 ## Phased plan
 
-- **Phase 1 (this change): schema + parser + tests.** Stage0 `Subpackage` type,
-  parsing under single-output and package outputs, field validation, and
-  `used_variables` plumbing. No behavioural change to builds yet. This is the
-  foundation both options share and is independently reviewable.
-- **Phase 2: stage1 evaluation + rendering.** Evaluate subpackages, register them
-  in the subpackages map, and make `pin_subpackage` + topo-sort aware of them.
-- **Phase 3: packaging split.** Partition files at packaging time and emit one
-  archive per subpackage + the parent remainder; per-subpackage metadata
-  (index.json/about.json/paths.json), dependency resolution, and tests.
+- **Phase 1 (done): schema + parser + tests.** Stage0 `Subpackage` type, parsing
+  under single-output and package outputs, field validation, and `used_variables`
+  plumbing.
+- **Phase 2 (done): desugaring + experimental gate + end-to-end.** Pure
+  stage0→stage0 transform into a staging-backed multi-output recipe, gated behind
+  `--experimental`, wired into `find_variants`. Reuses all downstream machinery,
+  so `pin_subpackage`, per-subpackage `run` deps, about inheritance, run-exports,
+  and tests work end-to-end. Covered by unit tests (desugar transform) and
+  Python e2e tests (`test/end-to-end/test_subpackages.py`).
+- **Phase 3 (later): bespoke packaging-time split (Option B).** Replace the
+  desugaring internally with a single-prefix file partition for precise remainder
+  semantics (handling subpackage internal `exclude`) and to avoid re-walking the
+  prefix per output. No recipe-syntax change.
 - **Phase 4 (later): templates/pipelines** for common C/C++/Python layouts that
   expand into `subpackages` entries.
 
