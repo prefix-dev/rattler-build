@@ -231,11 +231,29 @@ fn expand_output(parent: PackageOutput, cache_idx: usize) -> Vec<Output> {
     }
     outputs.push(Output::Package(Box::new(parent_pkg)));
 
-    // One package output per subpackage.
+    // One package output per subpackage. To make file claiming first-match-wins
+    // across subpackages, each subpackage excludes the include patterns of all
+    // earlier subpackages, so an overlapping file lands only in the first one.
+    let mut claimed_so_far: Vec<Item<String>> = Vec::new();
     for subpackage in subpackages {
         let mut sub_build = build.clone();
         sub_build.script = Script::default();
-        sub_build.files = subpackage.files;
+
+        let sub_includes = include_items(&subpackage.files);
+        sub_build.files = if claimed_so_far.is_empty() {
+            subpackage.files
+        } else {
+            let (include, mut exclude) = match subpackage.files {
+                IncludeExclude::List(list) => (list, Vec::new()),
+                IncludeExclude::Mapping { include, exclude } => (include, exclude.into_vec()),
+            };
+            exclude.extend(claimed_so_far.iter().cloned());
+            IncludeExclude::Mapping {
+                include,
+                exclude: ConditionalList::new(exclude),
+            }
+        };
+        claimed_so_far.extend(sub_includes);
 
         let version = subpackage.package.version.or_else(|| parent_version.clone());
         let sub_about = merge_about(about.clone(), subpackage.about);
@@ -504,6 +522,55 @@ outputs:
         assert_eq!(
             package_names(&multi.outputs),
             vec!["plain", "withsub", "withsub-dev"]
+        );
+    }
+
+    #[test]
+    fn test_overlapping_globs_are_first_match_wins() {
+        // Two subpackages whose globs overlap (`lib/**` vs `lib/*.so`). The
+        // later one must exclude the earlier one's includes so a shared file is
+        // claimed only once.
+        let recipe_yaml = r#"
+package:
+  name: mylib
+  version: 1.0.0
+
+build:
+  script: make install
+
+subpackages:
+  - package:
+      name: mylib-all-lib
+    files:
+      - lib/**
+  - package:
+      name: mylib-so
+    files:
+      - lib/*.so
+"#;
+        let recipe = parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let Recipe::MultiOutput(multi) = desugar_subpackages(recipe) else {
+            panic!("expected multi-output");
+        };
+
+        // outputs: staging, parent, mylib-all-lib, mylib-so
+        assert_eq!(package_names(&multi.outputs), vec!["mylib", "mylib-all-lib", "mylib-so"]);
+
+        let Output::Package(first) = &multi.outputs[2] else {
+            panic!("expected first subpackage");
+        };
+        // The first subpackage claims unconditionally (no preceding excludes).
+        assert!(exclude_globs(&first.build.files).is_empty());
+        assert_eq!(include_globs(&first.build.files), vec!["lib/**"]);
+
+        let Output::Package(second) = &multi.outputs[3] else {
+            panic!("expected second subpackage");
+        };
+        // The second subpackage excludes the first's includes (first-match-wins).
+        assert_eq!(include_globs(&second.build.files), vec!["lib/*.so"]);
+        assert!(
+            exclude_globs(&second.build.files).contains(&"lib/**".to_string()),
+            "second subpackage should exclude the first's includes"
         );
     }
 

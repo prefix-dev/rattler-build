@@ -127,10 +127,13 @@ outputs:
 
 ### Semantics
 
-1. **File claiming order.** Subpackages are evaluated in declaration order. A
-   built file is assigned to the *first* subpackage whose `files` globs match it.
-   Files matched by no subpackage stay with the parent. (First-match-wins mirrors
-   melange and makes overlapping globs predictable.)
+1. **File claiming order (first-match-wins).** Subpackages are evaluated in
+   declaration order. A built file is assigned to the *first* subpackage whose
+   `files` globs match it. Files matched by no subpackage stay with the parent.
+   This is implemented in the desugaring by making each subpackage *exclude* the
+   include patterns of every earlier subpackage, so an overlapping file is
+   claimed exactly once (no duplication across packages). Mirrors melange and
+   makes overlapping globs predictable.
 2. **`version`** defaults to the parent's version; it may be overridden per
    subpackage (rare, but some distros do this).
 3. **`build.number`/`build string`** default to the parent's. The variant hash is
