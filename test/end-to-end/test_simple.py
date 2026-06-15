@@ -3189,6 +3189,28 @@ def test_absolute_path_license_with_flag(
     assert (pkg / "info/licenses/external_license.txt").exists()
 
 
+def test_late_bound_license_path(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    # A license file installed into ${{ PREFIX }} during the build is collected
+    # without requiring --allow-absolute-license-paths.
+    rattler_build.build(recipes / "late_bound_license", tmp_path)
+    pkg = get_extracted_package(tmp_path, "late-bound-license")
+    license_file = pkg / "info/licenses/LICENSE"
+    assert license_file.exists()
+    assert "late bound license content" in license_file.read_text()
+
+
+def test_patch_from_other_source(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    # A patch that ships inside another source can be applied by referencing it
+    # through the late-bound ${{ SRC_DIR }} variable. The build script fails if
+    # the patch was not applied.
+    rattler_build.build(recipes / "patch_from_other_source", tmp_path)
+    get_extracted_package(tmp_path, "patch-from-other-source")
+
+
 def test_sourceforge_redirects(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):

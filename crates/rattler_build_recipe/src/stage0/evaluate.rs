@@ -303,6 +303,155 @@ fn render_template(
     }
 }
 
+/// Render a template while preserving a restricted allow-list of late-bound
+/// variable tokens (e.g. `${{ SRC_DIR }}`, `${{ PREFIX }}`).
+///
+/// The allowed variables are registered as self-referential globals, so a
+/// reference like `${{ SRC_DIR }}` renders back to the literal `${{ SRC_DIR }}`
+/// token instead of erroring as undefined. Any *other* undefined variable still
+/// produces an error, which is what enforces the allow-list. The preserved
+/// tokens are substituted with concrete paths at build time (see
+/// [`rattler_build_types::LateBoundPath::resolve`]).
+fn render_template_late_bound(
+    template: &str,
+    context: &EvaluationContext,
+    allowed_vars: &[&str],
+    span: Option<&Span>,
+) -> Result<rattler_build_types::LateBoundPath, ParseError> {
+    let mut jinja = context.to_jinja();
+    for var in allowed_vars {
+        // Don't shadow a real variable if one happens to exist with this name.
+        jinja
+            .context_mut()
+            .entry(var.to_string())
+            .or_insert_with(|| {
+                minijinja::Value::from(rattler_build_types::LateBoundPath::token(var))
+            });
+    }
+
+    let result = jinja.render_str(template);
+
+    // Track accessed variables, but skip the synthetic late-bound globals so
+    // they do not leak into the computed variant / hash.
+    for accessed in jinja.accessed_variables_excluding_functions() {
+        if !allowed_vars.contains(&accessed.as_str()) {
+            context.track_access(&accessed);
+        }
+    }
+
+    match result {
+        Ok(rendered) => Ok(rattler_build_types::LateBoundPath::new(rendered)),
+        Err(e) => Err(ParseError::jinja_error(
+            format!("Template rendering failed: {} (template: {})", e, template),
+            span.map_or_else(Span::new_blank, |s| *s),
+        )),
+    }
+}
+
+/// Evaluate a `ConditionalList<String>` into a list of [`LateBoundPath`]s,
+/// preserving the allow-listed late-bound variable tokens.
+///
+/// Used for `source.patches`, where paths may reference directories that only
+/// exist once the build has started (e.g. `${{ SRC_DIR }}/patches/foo.patch`).
+pub fn evaluate_late_bound_path_list(
+    list: &ConditionalList<String>,
+    context: &EvaluationContext,
+    allowed_vars: &[&str],
+) -> Result<Vec<rattler_build_types::LateBoundPath>, ParseError> {
+    evaluate_conditional_list(list.as_slice(), context, |value, ctx| {
+        let rendered = if let Some(s) = value.as_concrete() {
+            rattler_build_types::LateBoundPath::new(s.clone())
+        } else if let Some(template) = value.as_template() {
+            render_template_late_bound(template.source(), ctx, allowed_vars, value.span())?
+        } else {
+            unreachable!("Value must be either concrete or template")
+        };
+
+        // Filter out empty strings from templates like `${{ "x" if condition }}`
+        if rendered.as_str().is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(rendered))
+        }
+    })
+}
+
+/// Evaluate license file patterns, splitting entries that reference late-bound
+/// build directory variables (e.g. `${{ PREFIX }}/share/licenses/LICENSE`) from
+/// ordinary relative globs.
+///
+/// Ordinary globs are returned as a [`GlobVec`] (matched against the work and
+/// recipe directories during packaging, as before). Late-bound entries are
+/// returned separately and resolved against the build directories at packaging
+/// time.
+#[allow(clippy::type_complexity)]
+pub fn evaluate_license_files(
+    list: &ConditionalList<String>,
+    context: &EvaluationContext,
+) -> Result<(Option<GlobVec>, Vec<rattler_build_types::LateBoundPath>), ParseError> {
+    let entries = evaluate_conditional_list(list.as_slice(), context, |value, ctx| {
+        let rendered = if let Some(s) = value.as_concrete() {
+            rattler_build_types::LateBoundPath::new(s.clone())
+        } else if let Some(template) = value.as_template() {
+            render_template_late_bound(
+                template.source(),
+                ctx,
+                rattler_build_types::LICENSE_VARS,
+                value.span(),
+            )?
+        } else {
+            unreachable!("Value must be either concrete or template")
+        };
+
+        if rendered.as_str().is_empty() {
+            return Ok(None);
+        }
+
+        // Validate ordinary entries as glob patterns up front (with span info).
+        // Late-bound entries are resolved to concrete paths later, so they are
+        // not glob patterns and must not be validated as such (the `${{ }}`
+        // tokens would clash with glob brace syntax).
+        if !rendered.is_late_bound() {
+            rattler_build_types::glob::validate_glob_pattern(rendered.as_str()).map_err(|e| {
+                ParseError::invalid_value(
+                    "glob pattern",
+                    format!("Invalid glob pattern '{}': {}", rendered.as_str(), e),
+                    value.span().copied().unwrap_or_else(Span::new_blank),
+                )
+                .with_suggestion("Check your glob pattern syntax. Common issues include unmatched braces or invalid escape sequences.")
+            })?;
+        }
+
+        Ok(Some(rendered))
+    })?;
+
+    let mut glob_sources = Vec::new();
+    let mut late_bound = Vec::new();
+    for entry in entries {
+        if entry.is_late_bound() {
+            late_bound.push(entry);
+        } else {
+            glob_sources.push(entry.as_str().to_string());
+        }
+    }
+
+    let glob_vec = if glob_sources.is_empty() {
+        None
+    } else {
+        Some(
+            GlobVec::from_strings(glob_sources, Vec::new()).map_err(|e| {
+                ParseError::invalid_value(
+                    "glob set",
+                    format!("Failed to build glob set: {}", e),
+                    Span::new_blank(),
+                )
+            })?,
+        )
+    };
+
+    Ok((glob_vec, late_bound))
+}
+
 /// Evaluate a simple conditional expression
 fn evaluate_condition(
     expr: &JinjaExpression,
@@ -1473,6 +1622,11 @@ impl Evaluate for Stage0About {
     type Output = Stage1About;
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
+        let (license_file, license_file_late_bound) = match self.license_file.as_ref() {
+            Some(lf) => evaluate_license_files(lf, context)?,
+            None => (None, Vec::new()),
+        };
+
         Ok(Stage1About {
             homepage: self.homepage.evaluate(context)?,
             repository: self.repository.evaluate(context)?,
@@ -1482,11 +1636,8 @@ impl Evaluate for Stage0About {
                 .as_ref()
                 .map(|v| v.evaluate(context))
                 .transpose()?,
-            license_file: self
-                .license_file
-                .as_ref()
-                .map(|lf| evaluate_glob_vec_simple(lf, context))
-                .transpose()?,
+            license_file,
+            license_file_late_bound,
             license_family: evaluate_optional_string_value(&self.license_family, context)?,
             summary: evaluate_optional_string_value(&self.summary, context)?,
             description: evaluate_optional_string_value(&self.description, context)?,
@@ -2056,10 +2207,11 @@ impl Evaluate for Stage0GitSource {
             url,
             rev,
             depth: evaluate_optional_value_to_type(&self.depth, context)?,
-            patches: evaluate_string_list(&self.patches, context)?
-                .into_iter()
-                .map(PathBuf::from)
-                .collect(),
+            patches: evaluate_late_bound_path_list(
+                &self.patches,
+                context,
+                rattler_build_types::PATCH_VARS,
+            )?,
             target_directory: self
                 .target_directory
                 .as_ref()
@@ -2126,10 +2278,11 @@ impl Evaluate for Stage0UrlSource {
                 .map(|v| evaluate_md5(v, context))
                 .transpose()?,
             file_name: evaluate_optional_string_value(&self.file_name, context)?,
-            patches: evaluate_string_list(&self.patches, context)?
-                .into_iter()
-                .map(PathBuf::from)
-                .collect(),
+            patches: evaluate_late_bound_path_list(
+                &self.patches,
+                context,
+                rattler_build_types::PATCH_VARS,
+            )?,
             target_directory: self
                 .target_directory
                 .as_ref()
@@ -2193,10 +2346,11 @@ impl Evaluate for Stage0PathSource {
                 .as_ref()
                 .map(|v| evaluate_md5(v, context))
                 .transpose()?,
-            patches: evaluate_string_list(&self.patches, context)?
-                .into_iter()
-                .map(PathBuf::from)
-                .collect(),
+            patches: evaluate_late_bound_path_list(
+                &self.patches,
+                context,
+                rattler_build_types::PATCH_VARS,
+            )?,
             target_directory: self
                 .target_directory
                 .as_ref()
@@ -2840,6 +2994,12 @@ fn merge_stage1_build(
 /// Merge two Stage1 About configurations
 /// The output about takes precedence for non-empty fields
 fn merge_stage1_about(toplevel: stage1::About, output: stage1::About) -> stage1::About {
+    // `license_file` and `license_file_late_bound` are both derived from the
+    // single `license_file` recipe key, so they are merged as a unit: if the
+    // output specified any license files, its values win entirely.
+    let use_output_license =
+        output.license_file.is_some() || !output.license_file_late_bound.is_empty();
+
     stage1::About {
         homepage: if output.homepage.is_some() {
             output.homepage
@@ -2866,10 +3026,15 @@ fn merge_stage1_about(toplevel: stage1::About, output: stage1::About) -> stage1:
         } else {
             toplevel.license_family
         },
-        license_file: if output.license_file.is_some() {
+        license_file: if use_output_license {
             output.license_file
         } else {
             toplevel.license_file
+        },
+        license_file_late_bound: if use_output_license {
+            output.license_file_late_bound
+        } else {
+            toplevel.license_file_late_bound
         },
         summary: if output.summary.is_some() {
             output.summary
@@ -3641,6 +3806,75 @@ mod tests {
         let ctx = EvaluationContext::new();
         let result = render_template_to_variable("${{ undefined_var }}", &ctx, None);
         assert!(result.is_err(), "bare undefined variable must error");
+    }
+
+    fn late_bound_list(entries: &[&str]) -> ConditionalList<String> {
+        ConditionalList::new(
+            entries
+                .iter()
+                .map(|e| {
+                    Item::Value(Value::new_template(
+                        JinjaTemplate::new(e.to_string()).unwrap(),
+                        None,
+                    ))
+                })
+                .collect(),
+        )
+    }
+
+    #[test]
+    fn test_patches_preserve_src_dir_token() {
+        let mut ctx = EvaluationContext::new();
+        ctx.insert("name".to_string(), Variable::from_string("conda"));
+
+        let list = late_bound_list(&[
+            "${{ SRC_DIR }}/src/patches/0001.patch",
+            "patches/${{ name }}.patch",
+        ]);
+        let result =
+            evaluate_late_bound_path_list(&list, &ctx, rattler_build_types::PATCH_VARS).unwrap();
+
+        // The SRC_DIR token is preserved for late binding...
+        assert_eq!(result[0].as_str(), "${{ SRC_DIR }}/src/patches/0001.patch");
+        assert!(result[0].is_late_bound());
+        // ...while ordinary variables are rendered eagerly.
+        assert_eq!(result[1].as_str(), "patches/conda.patch");
+        assert!(!result[1].is_late_bound());
+    }
+
+    #[test]
+    fn test_patches_reject_disallowed_variable() {
+        let ctx = EvaluationContext::new();
+        // PREFIX is not allowed in patches (it does not exist yet when patches
+        // are applied), so it must error as an undefined variable.
+        let list = late_bound_list(&["${{ PREFIX }}/foo.patch"]);
+        let result = evaluate_late_bound_path_list(&list, &ctx, rattler_build_types::PATCH_VARS);
+        assert!(result.is_err(), "PREFIX must not be allowed in patches");
+    }
+
+    #[test]
+    fn test_license_files_split_late_bound() {
+        let ctx = EvaluationContext::new();
+        let list = late_bound_list(&[
+            "LICENSE",
+            "${{ PREFIX }}/share/licenses/foo/LICENSE",
+            "licenses/*.txt",
+        ]);
+        let (globs, late_bound) = evaluate_license_files(&list, &ctx).unwrap();
+
+        let globs = globs.expect("expected ordinary globs");
+        let glob_sources: Vec<_> = globs
+            .include_globs()
+            .iter()
+            .map(|g| g.source().to_string())
+            .collect();
+        assert_eq!(glob_sources, vec!["LICENSE", "licenses/*.txt"]);
+
+        assert_eq!(late_bound.len(), 1);
+        assert_eq!(
+            late_bound[0].as_str(),
+            "${{ PREFIX }}/share/licenses/foo/LICENSE"
+        );
     }
 
     #[test]

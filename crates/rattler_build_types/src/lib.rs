@@ -2,10 +2,12 @@
 //! version pinning, and variant configuration keys.
 
 pub mod glob;
+pub mod late_bound_path;
 mod pin;
 pub mod variant_config;
 
 pub use glob::{AllOrGlobVec, GlobCheckerVec, GlobVec, GlobWithSource};
+pub use late_bound_path::{LICENSE_VARS, LateBoundPath, PATCH_VARS};
 pub use pin::*;
 pub use variant_config::NormalizedKey;
 

@@ -101,20 +101,46 @@ pub enum PackagingError {
     PackageFileMissing(PathBuf),
 }
 
+/// Split a path into the longest leading directory prefix that contains no glob
+/// metacharacters and the remaining glob pattern (components joined with `/`).
+///
+/// If the path contains no glob metacharacters the pattern is empty and the
+/// whole path is returned as the base.
+fn split_glob_base(path: &Path) -> (PathBuf, String) {
+    let has_glob = |s: &str| s.contains(['*', '?', '[', ']', '{', '}']);
+    let mut base = PathBuf::new();
+    let mut rest: Vec<String> = Vec::new();
+    for component in path.components() {
+        let comp_str = component.as_os_str().to_string_lossy();
+        if rest.is_empty() && !has_glob(&comp_str) {
+            base.push(component);
+        } else {
+            rest.push(comp_str.into_owned());
+        }
+    }
+    (base, rest.join("/"))
+}
+
 /// This function copies the license files to the info/licenses folder.
 /// License files are selected from the recipe directory and the source (work) folder.
 /// If the same file is found in both locations, the file from the recipe directory is used.
 /// Absolute paths are also supported when `allow_absolute_license_paths` is true.
+/// License paths that reference late-bound build directory variables (e.g.
+/// `${{ PREFIX }}/...`) are resolved here and are always permitted.
 fn copy_license_files(
     output: &Output,
     tmp_dir_path: &Path,
     allow_absolute_license_paths: bool,
 ) -> Result<Option<HashSet<PathBuf>>, PackagingError> {
-    let Some(license_file) = output.recipe.about().license_file.as_ref() else {
-        return Ok(None);
-    };
+    let about = output.recipe.about();
+    let late_bound_license_files = &about.license_file_late_bound;
 
-    if license_file.is_empty() {
+    // `license_file` holds the ordinary (relative/absolute) glob patterns, while
+    // late-bound entries (e.g. `${{ PREFIX }}/...`) are tracked separately.
+    let empty_globs = GlobVec::default();
+    let license_file = about.license_file.as_ref().unwrap_or(&empty_globs);
+
+    if license_file.is_empty() && late_bound_license_files.is_empty() {
         return Ok(None);
     }
 
@@ -223,6 +249,62 @@ fn copy_license_files(
                     }
                 } else {
                     missing_globs.push(glob_str.clone());
+                }
+            }
+        }
+    }
+
+    // Handle late-bound license files (e.g. `${{ PREFIX }}/share/licenses/...`).
+    // These reference build directory variables that are only known now, at
+    // packaging time. Because they resolve from a restricted, controlled set of
+    // variables they are always allowed (they do not require the
+    // `--allow-absolute-license-paths` flag).
+    if !late_bound_license_files.is_empty() {
+        let directories = &output.build_configuration.directories;
+        let resolve_var = |var: &str| -> Option<PathBuf> {
+            match var {
+                "PREFIX" => Some(directories.host_prefix.clone()),
+                "BUILD_PREFIX" => Some(directories.build_prefix.clone()),
+                "SRC_DIR" => Some(directories.work_dir.clone()),
+                "RECIPE_DIR" => Some(directories.recipe_dir.clone()),
+                "BUILD_DIR" => Some(directories.build_dir.clone()),
+                _ => None,
+            }
+        };
+
+        for late_bound in late_bound_license_files {
+            let resolved = late_bound.resolve(resolve_var);
+            // Split the resolved path into a non-glob base directory and a glob
+            // remainder so we can reuse the directory-copy + glob machinery.
+            let (base_dir, pattern) = split_glob_base(&resolved);
+
+            if pattern.is_empty() {
+                // A concrete path: copy the file directly.
+                if resolved.is_file() {
+                    let file_name = resolved.file_name().ok_or_else(|| {
+                        PackagingError::IoError(std::io::Error::new(
+                            std::io::ErrorKind::InvalidInput,
+                            format!("Invalid license file path: {}", resolved.display()),
+                        ))
+                    })?;
+                    let dest_path = licenses_folder.join(file_name);
+                    fs::copy(&resolved, &dest_path)?;
+                    copied_files.insert(dest_path);
+                } else {
+                    missing_globs.push(late_bound.as_str().to_string());
+                }
+            } else {
+                // A glob pattern rooted at the resolved base directory.
+                let glob_vec = GlobVec::from_vec(vec![&pattern], None);
+                let copy_result = copy_dir::CopyDir::new(&base_dir, &licenses_folder)
+                    .with_globvec(&glob_vec)
+                    .use_gitignore(false)
+                    .run()?;
+                let copied = copy_result.copied_paths();
+                if copied.is_empty() {
+                    missing_globs.push(late_bound.as_str().to_string());
+                } else {
+                    copied_files.extend(copied.iter().map(PathBuf::from));
                 }
             }
         }
@@ -915,6 +997,19 @@ mod packaging_tests {
     use std::os::unix::ffi::OsStrExt;
     #[cfg(windows)]
     use std::os::windows::ffi::OsStringExt;
+
+    #[test]
+    fn test_split_glob_base() {
+        // No glob metacharacters: whole path is the base.
+        let (base, pattern) = split_glob_base(Path::new("/opt/conda/lib/LICENSE"));
+        assert_eq!(base, PathBuf::from("/opt/conda/lib/LICENSE"));
+        assert_eq!(pattern, "");
+
+        // A glob component splits the base from the relative pattern.
+        let (base, pattern) = split_glob_base(Path::new("/opt/conda/share/licenses/*/LICENSE"));
+        assert_eq!(base, PathBuf::from("/opt/conda/share/licenses"));
+        assert_eq!(pattern, "*/LICENSE");
+    }
 
     #[test]
     fn test_find_case_insensitive_collisions_detects() {
