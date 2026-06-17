@@ -81,6 +81,8 @@ pub fn default_env_vars(
         "INCLUDE".to_string(),
         Some(format!("{};{}", library_inc.display(), include_var)),
     );
+
+    vars.insert("CYGWIN_PREFIX".to_string(), Some(to_cygdrive(prefix)));
     vars
 }
 
@@ -145,8 +147,6 @@ pub fn default_env_vars_build(
                 .unwrap_or_else(|_| format!("{}-pc-windows-{}", win_arch, win_msvc)),
         ),
     );
-
-    vars.insert("CYGWIN_PREFIX".to_string(), Some(to_cygdrive(prefix)));
 
     let re_vs_comntools = Regex::new(r"^VS[0-9]{2,3}COMNTOOLS$").unwrap();
     let re_vs_installdir = Regex::new(r"^VS[0-9]{4}INSTALLDIR$").unwrap();

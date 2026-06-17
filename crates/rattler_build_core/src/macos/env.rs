@@ -10,7 +10,7 @@ pub fn default_env_vars(
     target_platform: &Platform,
 ) -> HashMap<String, Option<String>> {
     let mut vars = unix::env::default_env_vars(prefix);
-    let arch = build_platform.arch().to_string();
+    let arch = target_platform.arch().to_string();
     let (osx_arch, deployment_target) = match arch {
         "x86" => ("i386", "10.9"),
         "arm64" => ("arm64", "11.0"),
