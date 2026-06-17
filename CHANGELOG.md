@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.66.2] - 2026-06-17
+### ✨ Highlights
+
+This release includes an important fix for how we define default environment variables during the build,
+and updates the default windows compiler to VS2022
+
+### Added
+
+- Update default windows compiler by @Glatzel in [#2136](https://github.com/prefix-dev/rattler-build/pull/2136)
+
+
+### Fixed
+
+- Separate build env vars and host env vars by @isuruf in [#2558](https://github.com/prefix-dev/rattler-build/pull/2558)
+
+
+
 ## [0.66.1] - 2026-06-13
 
 ### Fixed
