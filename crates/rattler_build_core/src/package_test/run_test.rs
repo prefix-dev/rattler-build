@@ -478,7 +478,7 @@ pub async fn run_test(
     // Use the package cache to extract the package for reading test metadata.
     // This avoids manual extraction and reuses the cache properly.
     let cache_metadata = temp_package_cache
-        .get_or_fetch_from_path(package_file, None)
+        .get_or_fetch_from_path(package_file, None, None)
         .await
         .map_err(|e| TestError::TestFailed(format!("failed to cache package: {e}")))?;
     let package_folder = cache_metadata.path().to_path_buf();
