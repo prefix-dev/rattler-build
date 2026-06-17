@@ -1477,6 +1477,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#windows-path-length-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Windows PATH length issues
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -3073,6 +3084,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#windows-path-length-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Windows PATH length issues
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -3271,6 +3293,19 @@ command and you have to check <code>$?</code> or <code>$LASTEXITCODE</code> manu
 <li>You want Clang's diagnostics and optimizations but need MSVC ABI compatibility</li>
 <li>The build system expects MSVC-style compiler flags</li>
 <li>You're integrating with existing MSVC-compiled libraries</li>
+</ul>
+<h2 id="windows-path-length-issues">Windows PATH length issues<a class="headerlink" href="#windows-path-length-issues" title="Permanent link">#</a></h2>
+<p>When building on Windows, you may encounter failures caused by the <strong>command line or <code>PATH</code> length limit</strong>. This commonly happens in the following situations:</p>
+<ul>
+<li>Activating a <strong>Visual Studio toolchain</strong> (for example <code>vs2022</code>) whose activation scripts include <code>.bat</code> files such as <code>vcvars64.bat</code>.</li>
+<li>Building <strong>Rust crates that contain C or C++ code</strong>, which require the MSVC toolchain during compilation.</li>
+</ul>
+<p>In these cases, the activation scripts and compiler environment setup may produce extremely long command lines or <code>PATH</code> values, which can exceed the limits of <code>cmd.exe</code> or Windows environment handling. This can result in errors such as failed activation, truncated PATH values, or build failures.</p>
+<p>To reduce the risk of hitting these limits, keep build paths as <strong>short as possible</strong>. Recommended practices:</p>
+<ul>
+<li><code>--output-dir</code> is short</li>
+<li><code>CARGO_TARGET_DIR</code> is short</li>
+<li><code>CARGO_HOME</code> is short</li>
 </ul>
 
 
