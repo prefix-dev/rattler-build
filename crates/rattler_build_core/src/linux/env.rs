@@ -68,7 +68,7 @@ pub fn default_env_vars_build(
         Platform::Linux32 => "i686",
         Platform::Linux64 => "x86_64",
         Platform::LinuxPpc64le => "powerpc64le",
-        _ => build_platform.arch().as_str(),
+        _ => build_platform.arch().expect("arch for build_platform missing").as_str(),
     };
 
     vars.insert(

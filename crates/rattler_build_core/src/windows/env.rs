@@ -41,7 +41,6 @@ fn to_cygdrive(path: &Path) -> String {
 
 pub fn default_env_vars(
     prefix: &Path,
-    target_platform: &Platform,
 ) -> HashMap<String, Option<String>> {
     let library_prefix = prefix.join("Library");
     let mut vars = HashMap::<String, Option<String>>::new();

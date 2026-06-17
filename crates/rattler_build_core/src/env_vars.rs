@@ -247,7 +247,7 @@ pub fn os_vars(
     vars.insert(path_var.to_string(), env::var(path_var).ok());
 
     if target_platform.is_windows() {
-        vars.extend(windows::env::default_env_vars(prefix, target_platform));
+        vars.extend(windows::env::default_env_vars(prefix));
     } else if target_platform.is_osx() {
         vars.extend(macos::env::default_env_vars(prefix, target_platform));
     } else if target_platform.is_linux() {
@@ -259,11 +259,11 @@ pub fn os_vars(
     }
     let build_platform = Platform::current();
     if build_platform.is_windows() {
-        vars.extend(windows::env::default_env_vars_build(build_platform));
+        vars.extend(windows::env::default_env_vars_build(&build_platform));
     } else if build_platform.is_osx() {
-        vars.extend(macos::env::default_env_vars_build(build_platform));
+        vars.extend(macos::env::default_env_vars_build(&build_platform));
     } else if build_platform.is_linux() {
-        vars.extend(linux::env::default_env_vars_build(build_platform));
+        vars.extend(linux::env::default_env_vars_build(&build_platform));
     }
 
     if build_platform.is_windows() {
