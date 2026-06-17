@@ -5,11 +5,11 @@ use std::{collections::HashMap, path::Path};
 use crate::unix;
 
 /// Get default env vars for macOS
-pub fn default_env_vars(
+pub fn default_env_vars_target(
     prefix: &Path,
     target_platform: &Platform,
 ) -> HashMap<String, Option<String>> {
-    let mut vars = unix::env::default_env_vars(prefix);
+    let mut vars = unix::env::default_env_vars_target(prefix);
     let arch = target_platform
         .arch()
         .expect("arch missing on target_platform")

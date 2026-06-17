@@ -8,12 +8,12 @@ use rattler_conda_types::Platform;
 use crate::unix;
 
 /// Get default env vars for Linux
-pub fn default_env_vars(
+pub fn default_env_vars_target(
     prefix: &Path,
     target_platform: &Platform,
     env_isolation: EnvironmentIsolation,
 ) -> HashMap<String, Option<String>> {
-    let mut vars = unix::env::default_env_vars(prefix);
+    let mut vars = unix::env::default_env_vars_target(prefix);
 
     let build_distro = match target_platform {
         Platform::Linux32 | Platform::Linux64 => "cos6",
@@ -91,7 +91,7 @@ mod tests {
         let tmp_prefix = tempfile::tempdir().unwrap();
         unsafe { std::env::remove_var("LD_RUN_PATH") };
 
-        let vars = default_env_vars(
+        let vars = default_env_vars_target(
             tmp_prefix.path(),
             &Platform::Linux64,
             EnvironmentIsolation::Strict,
@@ -117,7 +117,7 @@ mod tests {
         let tmp_prefix = tempfile::tempdir().unwrap();
         unsafe { std::env::set_var("LD_RUN_PATH", "/custom/lib") };
 
-        let vars = default_env_vars(
+        let vars = default_env_vars_target(
             tmp_prefix.path(),
             &Platform::Linux64,
             EnvironmentIsolation::Strict,
@@ -133,7 +133,7 @@ mod tests {
     #[test]
     fn host_compiler_flags_not_forwarded() {
         let tmp_prefix = tempfile::tempdir().unwrap();
-        let vars = default_env_vars(
+        let vars = default_env_vars_target(
             tmp_prefix.path(),
             &Platform::Linux64,
             EnvironmentIsolation::Strict,

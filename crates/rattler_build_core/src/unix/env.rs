@@ -1,6 +1,6 @@
 use std::{collections::HashMap, path::Path};
 
-pub fn default_env_vars(prefix: &Path) -> HashMap<String, Option<String>> {
+pub fn default_env_vars_target(prefix: &Path) -> HashMap<String, Option<String>> {
     let mut vars = HashMap::new();
     vars.insert(
         "PKG_CONFIG_PATH".to_string(),
@@ -24,7 +24,7 @@ mod tests {
     #[test]
     fn pkconfig_path_uses_prefix() {
         let tmp = tempfile::tempdir().expect("create temp dir");
-        let env_vars = default_env_vars(tmp.path());
+        let env_vars = default_env_vars_target(tmp.path());
         let expected = tmp
             .path()
             .join("lib/pkgconfig")
@@ -35,7 +35,7 @@ mod tests {
 
     #[test]
     fn home_not_set_by_default_env_vars() {
-        let env_vars = default_env_vars(Path::new("/some/prefix"));
+        let env_vars = default_env_vars_target(Path::new("/some/prefix"));
         assert_eq!(env_vars.get("HOME"), None);
     }
 }
