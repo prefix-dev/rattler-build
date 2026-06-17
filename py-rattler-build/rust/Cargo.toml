@@ -35,17 +35,17 @@ tokio = { version = "1.50.0", features = [
   "rt-multi-thread",
   "process",
 ] }
-rattler_conda_types = "0.47.0"
-rattler_config = "0.5.0"
-rattler_networking = { version = "0.28.0" }
-rattler_solve = "7.1.1"
-rattler_virtual_packages = "3.0.0"
+rattler_conda_types = "0.47.2"
+rattler_config = "0.5.2"
+rattler_networking = { version = "0.29.0" }
+rattler_solve = "7.1.4"
+rattler_virtual_packages = "3.0.2"
 clap = "4.6.0"
 url = "2.5.8"
 jiff = "0.2.27"
 hex = "0.4.3"
-rattler_upload = "0.7.0"
-rattler_package_streaming = { version = "0.26.0", default-features = false }
+rattler_upload = "0.8.0"
+rattler_package_streaming = { version = "0.26.5", default-features = false }
 miette = "7.6.0"
 tempfile = "3.27.0"
 serde_yaml = "0.9"
