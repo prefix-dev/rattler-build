@@ -10,7 +10,10 @@ pub fn default_env_vars(
     target_platform: &Platform,
 ) -> HashMap<String, Option<String>> {
     let mut vars = unix::env::default_env_vars(prefix);
-    let arch = target_platform.arch().expect("arch missing on target_platform").as_str();
+    let arch = target_platform
+        .arch()
+        .expect("arch missing on target_platform")
+        .as_str();
     let (osx_arch, deployment_target) = match arch {
         "x86" => ("i386", "10.9"),
         "arm64" => ("arm64", "11.0"),
@@ -25,11 +28,12 @@ pub fn default_env_vars(
     vars
 }
 
-pub fn default_env_vars_build(
-    build_platform: &Platform,
-) -> HashMap<String, Option<String>> {
+pub fn default_env_vars_build(build_platform: &Platform) -> HashMap<String, Option<String>> {
     let mut vars = HashMap::<String, Option<String>>::new();
-    let arch = build_platform.arch().expect("arch missing on build_platform").as_str();
+    let arch = build_platform
+        .arch()
+        .expect("arch missing on build_platform")
+        .as_str();
     let build = match arch {
         "x86" => "i386-apple-darwin13.4.0",
         "arm64" => "arm64-apple-darwin20.0.0",

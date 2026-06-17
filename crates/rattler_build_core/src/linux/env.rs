@@ -55,9 +55,7 @@ pub fn default_env_vars(
     vars
 }
 
-pub fn default_env_vars_build(
-    build_platform: &Platform,
-) -> HashMap<String, Option<String>> {
+pub fn default_env_vars_build(build_platform: &Platform) -> HashMap<String, Option<String>> {
     let mut vars = HashMap::<String, Option<String>>::new();
     let build_distro = match build_platform {
         Platform::Linux32 | Platform::Linux64 => "cos6",
@@ -68,7 +66,10 @@ pub fn default_env_vars_build(
         Platform::Linux32 => "i686",
         Platform::Linux64 => "x86_64",
         Platform::LinuxPpc64le => "powerpc64le",
-        _ => build_platform.arch().expect("arch for build_platform missing").as_str(),
+        _ => build_platform
+            .arch()
+            .expect("arch for build_platform missing")
+            .as_str(),
     };
 
     vars.insert(

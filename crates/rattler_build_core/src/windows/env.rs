@@ -39,9 +39,7 @@ fn to_cygdrive(path: &Path) -> String {
     }
 }
 
-pub fn default_env_vars(
-    prefix: &Path,
-) -> HashMap<String, Option<String>> {
+pub fn default_env_vars(prefix: &Path) -> HashMap<String, Option<String>> {
     let library_prefix = prefix.join("Library");
     let mut vars = HashMap::<String, Option<String>>::new();
     vars.insert(
@@ -85,9 +83,7 @@ pub fn default_env_vars(
     vars
 }
 
-pub fn default_env_vars_build(
-    build_platform: &Platform,
-) -> HashMap<String, Option<String>> {
+pub fn default_env_vars_build(build_platform: &Platform) -> HashMap<String, Option<String>> {
     let mut vars = HashMap::<String, Option<String>>::new();
     let default_vars = vec![
         "ALLUSERSPROFILE",
