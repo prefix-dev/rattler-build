@@ -257,8 +257,15 @@ pub fn os_vars(
             env_isolation,
         ));
     }
-
     let build_platform = Platform::current();
+    if build_platform.is_windows() {
+        vars.extend(windows::env::default_env_vars_build(build_platform));
+    } else if build_platform.is_osx() {
+        vars.extend(macos::env::default_env_vars_build(build_platform));
+    } else if build_platform.is_linux() {
+        vars.extend(linux::env::default_env_vars_build(build_platform));
+    }
+
     if build_platform.is_windows() {
         match env_isolation {
             EnvironmentIsolation::Strict => {

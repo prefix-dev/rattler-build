@@ -55,6 +55,30 @@ pub fn default_env_vars(
     vars
 }
 
+pub fn default_env_vars_build(
+    build_platform: &Platform,
+) -> HashMap<String, Option<String>> {
+    let mut vars = HashMap::<String, Option<String>>::new();
+    let build_distro = match build_platform {
+        Platform::Linux32 | Platform::Linux64 => "cos6",
+        _ => "cos7",
+    };
+
+    let build_arch = match build_platform {
+        Platform::Linux32 => "i686",
+        Platform::Linux64 => "x86_64",
+        Platform::LinuxPpc64le => "powerpc64le",
+        _ => build_platform.arch().as_str(),
+    };
+
+    vars.insert(
+        "BUILD".to_string(),
+        Some(format!("{}-conda_{}-linux-gnu", build_arch, build_distro)),
+    );
+
+    vars
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

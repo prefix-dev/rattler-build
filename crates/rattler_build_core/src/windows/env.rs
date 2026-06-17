@@ -81,7 +81,13 @@ pub fn default_env_vars(
         "INCLUDE".to_string(),
         Some(format!("{};{}", library_inc.display(), include_var)),
     );
+    vars
+}
 
+pub fn default_env_vars_build(
+    build_platform: &Platform,
+) -> HashMap<String, Option<String>> {
+    let mut vars = HashMap::<String, Option<String>>::new();
     let default_vars = vec![
         "ALLUSERSPROFILE",
         "APPDATA",
@@ -124,7 +130,7 @@ pub fn default_env_vars(
     // Do we need to get these from the variant configuration?
     let win_msvc = "19.0.0";
 
-    let win_arch = match target_platform {
+    let win_arch = match build_platform {
         Platform::Win32 => "i386",
         Platform::Win64 => "amd64",
         Platform::WinArm64 => "arm64",
