@@ -4303,7 +4303,7 @@ dependencies = [
 
 [[package]]
 name = "py-rattler-build"
-version = "0.66.1"
+version = "0.66.2"
 dependencies = [
  "clap",
  "fs-err",
@@ -4667,7 +4667,7 @@ dependencies = [
 
 [[package]]
 name = "rattler-build"
-version = "0.66.1"
+version = "0.66.2"
 dependencies = [
  "anyhow",
  "astral-reqwest-middleware",
