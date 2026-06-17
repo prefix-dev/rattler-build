@@ -1,44 +1,23 @@
-use std::path::PathBuf;
-
 use rattler_conda_types::Platform;
 
-use crate::execution::{ExecutionArgs, ResolvedScriptContents};
+use super::{InterpreterInvocation, InterpreterSearchScope};
 
-use super::{
-    BashInterpreter, CmdExeInterpreter, Interpreter, InterpreterError, InterpreterSearchScope,
-    find_interpreter,
-};
+pub struct RubyInvocation;
 
-pub struct RubyInterpreter;
-
-// Ruby interpreter calls either bash or cmd.exe interpreter for activation and then runs Ruby script
-impl Interpreter for RubyInterpreter {
-    async fn run(&self, args: ExecutionArgs) -> Result<(), InterpreterError> {
-        let ruby_script = args.work_dir.join("conda_build_script.rb");
-        tokio::fs::write(&ruby_script, args.script.script()).await?;
-
-        let args = ExecutionArgs {
-            script: ResolvedScriptContents::Inline(format!("ruby {:?}", ruby_script)),
-            ..args
-        };
-
-        if cfg!(windows) {
-            CmdExeInterpreter.run(args).await
-        } else {
-            BashInterpreter.run(args).await
-        }
+impl InterpreterInvocation for RubyInvocation {
+    fn executable_names(&self, _build_platform: &Platform) -> &'static [&'static str] {
+        &["ruby"]
     }
 
-    async fn find_interpreter(
-        &self,
-        build_prefix: Option<&PathBuf>,
-        platform: &Platform,
-    ) -> Result<Option<PathBuf>, which::Error> {
-        find_interpreter(
-            "ruby",
-            build_prefix,
-            platform,
-            InterpreterSearchScope::PrefixThenSystemPath,
-        )
+    fn search_scope(&self, _build_platform: &Platform) -> InterpreterSearchScope {
+        InterpreterSearchScope::build_and_host_with_system_fallback()
+    }
+
+    fn extension(&self) -> &'static str {
+        "rb"
+    }
+
+    fn args(&self, script_path: &std::path::Path) -> Vec<String> {
+        vec![script_path.to_string_lossy().into_owned()]
     }
 }

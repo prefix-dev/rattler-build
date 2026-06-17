@@ -36,8 +36,10 @@ def rattler_build():
         possible_paths = [
             base_path / f"target/release/{executable_name}",
             base_path / f"target/debug/{executable_name}",
-            base_path / f"target-pixi/release/{executable_name}",
-            base_path / f"target-pixi/debug/{executable_name}",
+            base_path
+            / f"target-pixi/{os.environ.get('CARGO_BUILD_TARGET')}/release/{executable_name}",
+            base_path
+            / f"target-pixi/{os.environ.get('CARGO_BUILD_TARGET')}/debug/{executable_name}",
         ]
 
         # Use the most recently modified binary

@@ -4769,7 +4769,7 @@ dependencies = [
 
 [[package]]
 name = "rattler-build"
-version = "0.65.1"
+version = "0.66.1"
 dependencies = [
  "anyhow",
  "astral-reqwest-middleware",
@@ -5092,6 +5092,7 @@ dependencies = [
  "rattler_shell",
  "serde",
  "serde_yaml",
+ "strsim",
  "tempfile",
  "thiserror 2.0.18",
  "tokio",
