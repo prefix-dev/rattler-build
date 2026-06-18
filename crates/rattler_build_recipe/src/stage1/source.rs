@@ -1,3 +1,4 @@
+use rattler_build_types::LateBoundPath;
 use rattler_digest::{Md5, Md5Hash, Sha256, Sha256Hash, serde::SerializableHash};
 use serde::{Deserialize, Serialize};
 use serde_with::{OneOrMany, formats::PreferOne, serde_as};
@@ -127,7 +128,7 @@ pub struct GitSource {
 
     /// Patches to apply to the source code
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub patches: Vec<PathBuf>,
+    pub patches: Vec<LateBoundPath>,
 
     /// Optionally a folder name under the `work` directory
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -313,7 +314,7 @@ pub struct UrlSource {
 
     /// Patches to apply to the source code
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub patches: Vec<PathBuf>,
+    pub patches: Vec<LateBoundPath>,
 
     /// Optionally a folder name under the `work` directory
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -343,7 +344,7 @@ pub struct PathSource {
 
     /// Patches to apply to the source code
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub patches: Vec<PathBuf>,
+    pub patches: Vec<LateBoundPath>,
 
     /// Optionally a folder name under the `work` directory
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -372,7 +373,7 @@ fn is_true(value: &bool) -> bool {
 
 impl Source {
     /// Get the patches for this source
-    pub fn patches(&self) -> &[PathBuf] {
+    pub fn patches(&self) -> &[LateBoundPath] {
         match self {
             Self::Git(git) => &git.patches,
             Self::Url(url) => &url.patches,

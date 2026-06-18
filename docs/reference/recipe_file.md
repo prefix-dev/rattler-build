@@ -304,6 +304,32 @@ Patches may optionally be applied to the source.
 
 <!-- boa (conda-build) automatically determines the patch strip level. -->
 
+Patch paths are resolved relative to the recipe directory. They may also refer
+to a restricted set of build-time directory variables that are only known once
+the build has started:
+
+- `${{ SRC_DIR }}` – the source working directory
+- `${{ RECIPE_DIR }}` – the recipe directory
+- `${{ BUILD_DIR }}` – the top-level build directory
+
+This is useful when a patch ships inside another source. Because sources are
+fetched in order into the shared `SRC_DIR`, a later source can apply a patch
+that was extracted from an earlier one:
+
+```yaml
+source:
+  - url: https://example.com/tool-{{ version }}.tar.gz  # ships patches under src/
+    sha256: "..."
+  - url: https://example.com/lib-{{ version }}.tar.gz
+    sha256: "..."
+    target_directory: lib_src
+    patches:
+      - ${{ SRC_DIR }}/src/patches/0001-fix.patch
+```
+
+Only the variables listed above are allowed in `patches`; any other variable
+is treated as undefined and produces an error.
+
 #### Destination path
 
 Within Rattler-Build's work directory, you may specify a particular folder to
@@ -1699,6 +1725,30 @@ about:
     - LICENSE
     - vendor-licenses/
 ```
+
+License file entries may also refer to a restricted set of build-time directory
+variables that are only known once the build has finished. These are resolved
+during packaging:
+
+- `${{ PREFIX }}` – the host prefix
+- `${{ BUILD_PREFIX }}` – the build prefix
+- `${{ SRC_DIR }}` – the source working directory
+- `${{ RECIPE_DIR }}` – the recipe directory
+- `${{ BUILD_DIR }}` – the top-level build directory
+
+This is useful for packages (such as R packages) that install their license
+files into `${{ PREFIX }}` during the build:
+
+```yaml
+about:
+  license_file:
+    - LICENSE
+    - ${{ PREFIX }}/lib/R/library/mypkg/LICENSE
+```
+
+Entries that reference one of these variables may contain glob patterns
+(e.g. `${{ PREFIX }}/share/licenses/*/LICENSE`) and are always allowed — unlike
+plain absolute paths they do not require `--allow-absolute-license-paths`.
 
 
 ## Extra section

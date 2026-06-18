@@ -244,12 +244,15 @@ struct FetchResult {
 async fn fetch_source(
     source: &Source,
     source_cache: &rattler_build_source_cache::SourceCache,
-    work_dir: &Path,
-    recipe_dir: &Path,
+    directories: &Directories,
     cache_src: &Path,
     tool_configuration: &tool_configuration::Configuration,
     apply_patch: impl Fn(&Path, &Path) -> Result<(), SourceError>,
 ) -> Result<FetchResult, SourceError> {
+    let work_dir = &directories.work_dir;
+    let recipe_dir = &directories.recipe_dir;
+    let build_dir = &directories.build_dir;
+
     match source {
         Source::Git(git_src) => {
             tracing::info!("Fetching source from git repo: {}", git_src.url);
@@ -273,7 +276,14 @@ async fn fetch_source(
                 },
             )?;
 
-            patch::apply_patches(&git_src.patches, &dest_dir, recipe_dir, apply_patch)?;
+            patch::apply_patches(
+                &git_src.patches,
+                &dest_dir,
+                recipe_dir,
+                work_dir,
+                build_dir,
+                apply_patch,
+            )?;
 
             let updated_src = if let Some(commit_sha) = result.git_commit {
                 let mut updated_git_src = git_src.clone();
@@ -330,7 +340,14 @@ async fn fetch_source(
                 None
             };
 
-            patch::apply_patches(&url_src.patches, &dest_dir, recipe_dir, apply_patch)?;
+            patch::apply_patches(
+                &url_src.patches,
+                &dest_dir,
+                recipe_dir,
+                work_dir,
+                build_dir,
+                apply_patch,
+            )?;
 
             Ok(FetchResult {
                 rendered_source: source.clone(),
@@ -428,7 +445,14 @@ async fn fetch_source(
                 }
             }
 
-            patch::apply_patches(&path_src.patches, &dest_dir, recipe_dir, apply_patch)?;
+            patch::apply_patches(
+                &path_src.patches,
+                &dest_dir,
+                recipe_dir,
+                work_dir,
+                build_dir,
+                apply_patch,
+            )?;
 
             Ok(FetchResult {
                 rendered_source: source.clone(),
@@ -455,7 +479,6 @@ pub async fn fetch_sources(
 
     // Figure out the directories we need
     let work_dir = &directories.work_dir;
-    let recipe_dir = &directories.recipe_dir;
     let cache_src = directories.output_dir.join("src_cache");
 
     // Create the source cache using the client from tool_configuration
@@ -473,8 +496,7 @@ pub async fn fetch_sources(
         let result = fetch_source(
             src,
             &source_cache,
-            work_dir,
-            recipe_dir,
+            directories,
             &cache_src,
             tool_configuration,
             apply_patch,
