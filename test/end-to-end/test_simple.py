@@ -3201,6 +3201,31 @@ def test_late_bound_license_path(
     assert "late bound license content" in license_file.read_text()
 
 
+def test_late_bound_license_glob(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    # A glob rooted at a late-bound ${{ PREFIX }} path collects every matching
+    # license file, preserving the directory structure under info/licenses.
+    rattler_build.build(recipes / "late_bound_license_glob", tmp_path)
+    pkg = get_extracted_package(tmp_path, "late-bound-license-glob")
+    foo_license = pkg / "info/licenses/foo/LICENSE"
+    bar_license = pkg / "info/licenses/bar/LICENSE"
+    assert foo_license.exists()
+    assert bar_license.exists()
+    assert "foo license content" in foo_license.read_text()
+    assert "bar license content" in bar_license.read_text()
+
+
+def test_late_bound_license_traversal_rejected(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    # A late-bound license path that escapes the build directories via `..` must
+    # be rejected, otherwise it would be an absolute-path backdoor around
+    # --allow-absolute-license-paths.
+    with pytest.raises(CalledProcessError):
+        rattler_build.build(recipes / "late_bound_license_traversal", tmp_path)
+
+
 def test_patch_from_other_source(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):

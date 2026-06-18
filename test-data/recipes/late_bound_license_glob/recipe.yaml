@@ -1,0 +1,27 @@
+package:
+  name: late-bound-license-glob
+  version: "0.1.0"
+
+build:
+  script:
+    # Simulate a package that installs several license files into the host
+    # prefix during the build, collected with a glob over a late-bound path.
+    - if: unix
+      then:
+        - mkdir -p $PREFIX/share/licenses/foo $PREFIX/share/licenses/bar
+        - echo "foo license content" > $PREFIX/share/licenses/foo/LICENSE
+        - echo "bar license content" > $PREFIX/share/licenses/bar/LICENSE
+    - if: win
+      then:
+        - if not exist "%PREFIX%\share\licenses\foo" mkdir "%PREFIX%\share\licenses\foo"
+        - if not exist "%PREFIX%\share\licenses\bar" mkdir "%PREFIX%\share\licenses\bar"
+        - echo foo license content > "%PREFIX%\share\licenses\foo\LICENSE"
+        - echo bar license content > "%PREFIX%\share\licenses\bar\LICENSE"
+
+about:
+  license: MIT
+  # A glob rooted at the late-bound ${{ PREFIX }} variable. This exercises the
+  # split-base + directory-copy path and does not require
+  # --allow-absolute-license-paths.
+  license_file:
+    - ${{ PREFIX }}/share/licenses/*/LICENSE

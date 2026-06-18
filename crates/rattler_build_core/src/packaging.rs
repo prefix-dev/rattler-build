@@ -32,6 +32,7 @@ use crate::{
     post_process,
     source::{self, copy_dir},
     tool_configuration,
+    utils::to_lexical_absolute,
 };
 
 #[allow(missing_docs)]
@@ -51,6 +52,9 @@ pub enum PackagingError {
 
     #[error("Could not open or create, or write to file")]
     IoError(#[from] std::io::Error),
+
+    #[error("license file path '{0}' escapes the build directories (resolved to '{1}')")]
+    LicenseFileTraversal(String, PathBuf),
 
     #[error("Could not strip a prefix from a Path")]
     StripPrefixError(#[from] std::path::StripPrefixError),
@@ -272,8 +276,35 @@ fn copy_license_files(
             }
         };
 
+        // The directories a resolved late-bound path is allowed to point into.
+        // These are exactly the roots `resolve_var` can substitute.
+        let license_roots = [
+            &directories.host_prefix,
+            &directories.build_prefix,
+            &directories.work_dir,
+            &directories.recipe_dir,
+            &directories.build_dir,
+        ];
+
         for late_bound in late_bound_license_files {
             let resolved = late_bound.resolve(resolve_var);
+
+            // Late-bound license paths bypass `--allow-absolute-license-paths`
+            // because they resolve from a controlled set of build directories.
+            // That guarantee only holds if the resolved path stays inside one of
+            // those directories: collapse any `.`/`..` components and reject the
+            // path if it escapes (e.g. `${{ PREFIX }}/../../etc/passwd`).
+            let normalized = to_lexical_absolute(&resolved, &directories.work_dir);
+            if !license_roots
+                .iter()
+                .any(|root| normalized.starts_with(root))
+            {
+                return Err(PackagingError::LicenseFileTraversal(
+                    late_bound.as_str().to_string(),
+                    resolved,
+                ));
+            }
+
             // Split the resolved path into a non-glob base directory and a glob
             // remainder so we can reuse the directory-copy + glob machinery.
             let (base_dir, pattern) = split_glob_base(&resolved);
