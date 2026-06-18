@@ -8,6 +8,7 @@ on:
       - "crates/**"
       - "Cargo.*"
       - "test/end-to-end/**"
+      - "test-data/**"
   workflow_dispatch:
 
 name: CI
