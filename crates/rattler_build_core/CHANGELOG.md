@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.7](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.6...rattler_build_core-v0.2.7) - 2026-06-18
+
+### Added
+
+- support late-bound build directory variables in patches and license files ([#2554](https://github.com/prefix-dev/rattler-build/pull/2554))
+- Add brush interpreter support ([#2527](https://github.com/prefix-dev/rattler-build/pull/2527))
+
+### Fixed
+
+- separate build env vars and host env vars ([#2558](https://github.com/prefix-dev/rattler-build/pull/2558))
+- useful error messages for typos in `interpreter` ([#2540](https://github.com/prefix-dev/rattler-build/pull/2540))
+- honor io_concurrency_limit ([#2525](https://github.com/prefix-dev/rattler-build/pull/2525))
+
+### Other
+
+- update rattler to latest releases ([#2559](https://github.com/prefix-dev/rattler-build/pull/2559))
+- streamline script interpreters through a native shell wrapper ([#2535](https://github.com/prefix-dev/rattler-build/pull/2535))
+- bump rattler crates to latest versions ([#2528](https://github.com/prefix-dev/rattler-build/pull/2528))
+
 ## [0.2.6](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.5...rattler_build_core-v0.2.6) - 2026-05-27
 
 ### Other
