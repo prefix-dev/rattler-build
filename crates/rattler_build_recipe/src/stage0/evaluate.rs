@@ -64,7 +64,7 @@ use crate::{
             PythonTest as Stage0PythonTest, PythonVersion as Stage0PythonVersion,
             RTest as Stage0RTest, RubyTest as Stage0RubyTest,
         },
-        types::{ConditionalList, Item, JinjaExpression, Value},
+        types::{ConditionalList, Item, JinjaExpression, Value, ValueInner},
     },
     stage1::{
         self, About as Stage1About, AllOrGlobVec, Dependency, Evaluate, EvaluationContext,
@@ -348,6 +348,21 @@ fn render_template_late_bound(
     }
 }
 
+/// Render a single `Value<String>` into a [`LateBoundPath`], preserving the
+/// allow-listed late-bound variable tokens for template values.
+fn evaluate_value_late_bound(
+    value: &Value<String>,
+    context: &EvaluationContext,
+    allowed_vars: &[&str],
+) -> Result<rattler_build_types::LateBoundPath, ParseError> {
+    match value.inner() {
+        ValueInner::Concrete(s) => Ok(rattler_build_types::LateBoundPath::new(s.clone())),
+        ValueInner::Template(template) => {
+            render_template_late_bound(template.source(), context, allowed_vars, value.span())
+        }
+    }
+}
+
 /// Evaluate a `ConditionalList<String>` into a list of [`LateBoundPath`]s,
 /// preserving the allow-listed late-bound variable tokens.
 ///
@@ -359,13 +374,7 @@ pub fn evaluate_late_bound_path_list(
     allowed_vars: &[&str],
 ) -> Result<Vec<rattler_build_types::LateBoundPath>, ParseError> {
     evaluate_conditional_list(list.as_slice(), context, |value, ctx| {
-        let rendered = if let Some(s) = value.as_concrete() {
-            rattler_build_types::LateBoundPath::new(s.clone())
-        } else if let Some(template) = value.as_template() {
-            render_template_late_bound(template.source(), ctx, allowed_vars, value.span())?
-        } else {
-            unreachable!("Value must be either concrete or template")
-        };
+        let rendered = evaluate_value_late_bound(value, ctx, allowed_vars)?;
 
         // Filter out empty strings from templates like `${{ "x" if condition }}`
         if rendered.as_str().is_empty() {
@@ -376,32 +385,26 @@ pub fn evaluate_late_bound_path_list(
     })
 }
 
+/// The evaluated `about.license_file` entries, split by how they are resolved.
+#[derive(Debug, Default)]
+pub struct LicenseFiles {
+    /// Ordinary relative globs, matched against the work and recipe directories
+    /// during packaging.
+    pub license_file_globs: Option<GlobVec>,
+    /// Entries referencing late-bound build directory variables, resolved
+    /// against the build directories at packaging time.
+    pub license_file_late_bound: Vec<rattler_build_types::LateBoundPath>,
+}
+
 /// Evaluate license file patterns, splitting entries that reference late-bound
 /// build directory variables (e.g. `${{ PREFIX }}/share/licenses/LICENSE`) from
 /// ordinary relative globs.
-///
-/// Ordinary globs are returned as a [`GlobVec`] (matched against the work and
-/// recipe directories during packaging, as before). Late-bound entries are
-/// returned separately and resolved against the build directories at packaging
-/// time.
-#[allow(clippy::type_complexity)]
 pub fn evaluate_license_files(
     list: &ConditionalList<String>,
     context: &EvaluationContext,
-) -> Result<(Option<GlobVec>, Vec<rattler_build_types::LateBoundPath>), ParseError> {
+) -> Result<LicenseFiles, ParseError> {
     let entries = evaluate_conditional_list(list.as_slice(), context, |value, ctx| {
-        let rendered = if let Some(s) = value.as_concrete() {
-            rattler_build_types::LateBoundPath::new(s.clone())
-        } else if let Some(template) = value.as_template() {
-            render_template_late_bound(
-                template.source(),
-                ctx,
-                rattler_build_types::LICENSE_VARS,
-                value.span(),
-            )?
-        } else {
-            unreachable!("Value must be either concrete or template")
-        };
+        let rendered = evaluate_value_late_bound(value, ctx, rattler_build_types::LICENSE_VARS)?;
 
         if rendered.as_str().is_empty() {
             return Ok(None);
@@ -426,16 +429,16 @@ pub fn evaluate_license_files(
     })?;
 
     let mut glob_sources = Vec::new();
-    let mut late_bound = Vec::new();
+    let mut license_file_late_bound = Vec::new();
     for entry in entries {
         if entry.is_late_bound() {
-            late_bound.push(entry);
+            license_file_late_bound.push(entry);
         } else {
             glob_sources.push(entry.as_str().to_string());
         }
     }
 
-    let glob_vec = if glob_sources.is_empty() {
+    let license_file_globs = if glob_sources.is_empty() {
         None
     } else {
         Some(
@@ -449,7 +452,10 @@ pub fn evaluate_license_files(
         )
     };
 
-    Ok((glob_vec, late_bound))
+    Ok(LicenseFiles {
+        license_file_globs,
+        license_file_late_bound,
+    })
 }
 
 /// Evaluate a simple conditional expression
@@ -491,12 +497,9 @@ pub fn evaluate_string_value(
     value: &Value<String>,
     context: &EvaluationContext,
 ) -> Result<String, ParseError> {
-    if let Some(s) = value.as_concrete() {
-        Ok(s.clone())
-    } else if let Some(template) = value.as_template() {
-        render_template(template.source(), context, value.span())
-    } else {
-        unreachable!("Value must be either concrete or template")
+    match value.inner() {
+        ValueInner::Concrete(s) => Ok(s.clone()),
+        ValueInner::Template(template) => render_template(template.source(), context, value.span()),
     }
 }
 
@@ -505,12 +508,9 @@ pub fn evaluate_value_to_string<T: ToString>(
     value: &Value<T>,
     context: &EvaluationContext,
 ) -> Result<String, ParseError> {
-    if let Some(v) = value.as_concrete() {
-        Ok(v.to_string())
-    } else if let Some(template) = value.as_template() {
-        render_template(template.source(), context, value.span())
-    } else {
-        unreachable!("Value must be either concrete or template")
+    match value.inner() {
+        ValueInner::Concrete(v) => Ok(v.to_string()),
+        ValueInner::Template(template) => render_template(template.source(), context, value.span()),
     }
 }
 
@@ -522,20 +522,19 @@ pub fn evaluate_value_to_variable(
     value: &Value<Variable>,
     context: &EvaluationContext,
 ) -> Result<Variable, ParseError> {
-    if let Some(var) = value.as_concrete() {
-        Ok(var.clone())
-    } else if let Some(template) = value.as_template() {
-        let result = render_template_to_variable(template.source(), context, value.span())?;
-        if value.force_string() {
-            // The original YAML scalar was quoted or a block scalar, so the user
-            // intended a string even if the jinja expression evaluates to a number
-            // or boolean (e.g. `"${{ 123 }}"` should produce "123", not 123).
-            Ok(Variable::from(result.as_ref().to_string()))
-        } else {
-            Ok(result)
+    match value.inner() {
+        ValueInner::Concrete(var) => Ok(var.clone()),
+        ValueInner::Template(template) => {
+            let result = render_template_to_variable(template.source(), context, value.span())?;
+            if value.force_string() {
+                // The original YAML scalar was quoted or a block scalar, so the user
+                // intended a string even if the jinja expression evaluates to a number
+                // or boolean (e.g. `"${{ 123 }}"` should produce "123", not 123).
+                Ok(Variable::from(result.as_ref().to_string()))
+            } else {
+                Ok(result)
+            }
         }
-    } else {
-        unreachable!("Value must be either concrete or template")
     }
 }
 
@@ -553,12 +552,9 @@ pub fn evaluate_optional_string_value(
 /// Extract the template source from a Value<String> without evaluating it
 /// This is used for deferred evaluation (e.g., build.string with hash variable)
 fn extract_template_source(value: &Value<String>) -> Option<String> {
-    if let Some(v) = value.as_concrete() {
-        Some(v.clone())
-    } else if let Some(template) = value.as_template() {
-        Some(template.source().to_string())
-    } else {
-        unreachable!("Value must be either concrete or template")
+    match value.inner() {
+        ValueInner::Concrete(v) => Some(v.clone()),
+        ValueInner::Template(template) => Some(template.source().to_string()),
     }
 }
 
@@ -1135,22 +1131,23 @@ pub fn evaluate_dependency_list(
     context: &EvaluationContext,
 ) -> Result<Vec<crate::stage1::Dependency>, ParseError> {
     evaluate_conditional_list(list.as_slice(), context, |value, ctx| {
-        if let Some(match_spec) = value.as_concrete() {
-            ensure_matchspec_v3_allowed(&match_spec.0, ctx, value.span())?;
-            Ok(Some(Dependency::Spec(Box::new(match_spec.0.clone()))))
-        } else if let Some(template) = value.as_template() {
-            let s = render_template(template.source(), ctx, value.span())?;
-
-            // Filter out empty strings from templates like `${{ "numpy" if unix }}`
-            if s.is_empty() {
-                return Ok(None);
+        match value.inner() {
+            ValueInner::Concrete(match_spec) => {
+                ensure_matchspec_v3_allowed(&match_spec.0, ctx, value.span())?;
+                Ok(Some(Dependency::Spec(Box::new(match_spec.0.clone()))))
             }
+            ValueInner::Template(template) => {
+                let s = render_template(template.source(), ctx, value.span())?;
 
-            let span_opt = value.span().copied();
-            let dep = parse_dependency_string(&s, &span_opt, ctx.repodata_revision())?;
-            Ok(Some(dep))
-        } else {
-            unreachable!("Value must be either concrete or template")
+                // Filter out empty strings from templates like `${{ "numpy" if unix }}`
+                if s.is_empty() {
+                    return Ok(None);
+                }
+
+                let span_opt = value.span().copied();
+                let dep = parse_dependency_string(&s, &span_opt, ctx.repodata_revision())?;
+                Ok(Some(dep))
+            }
         }
     })
 }
@@ -1342,13 +1339,12 @@ pub fn evaluate_bool_value(
     field_name: &str,
     default_for_empty: bool,
 ) -> Result<bool, ParseError> {
-    if let Some(b) = value.as_concrete() {
-        Ok(*b)
-    } else if let Some(template) = value.as_template() {
-        let s = render_template(template.source(), context, value.span())?;
-        parse_bool_from_str(&s, field_name, default_for_empty)
-    } else {
-        unreachable!("Value must be either concrete or template")
+    match value.inner() {
+        ValueInner::Concrete(b) => Ok(*b),
+        ValueInner::Template(template) => {
+            let s = render_template(template.source(), context, value.span())?;
+            parse_bool_from_str(&s, field_name, default_for_empty)
+        }
     }
 }
 
@@ -1379,25 +1375,24 @@ where
     T: ToString + FromStr,
     T::Err: std::fmt::Display,
 {
-    if let Some(v) = value.as_concrete() {
-        Ok(v.to_string().parse().map_err(|e| {
+    match value.inner() {
+        ValueInner::Concrete(v) => Ok(v.to_string().parse().map_err(|e| {
             ParseError::invalid_value(
                 type_name,
                 format!("Failed to parse {}: {}", type_name, e),
                 Span::new_blank(),
             )
-        })?)
-    } else if let Some(template) = value.as_template() {
-        let s = render_template(template.source(), context, value.span())?;
-        s.parse().map_err(|e| {
-            ParseError::invalid_value(
-                type_name,
-                format!("Invalid {} '{}': {}", type_name, s, e),
-                value.span().copied().unwrap_or_else(Span::new_blank),
-            )
-        })
-    } else {
-        unreachable!("Value must be either concrete or template")
+        })?),
+        ValueInner::Template(template) => {
+            let s = render_template(template.source(), context, value.span())?;
+            s.parse().map_err(|e| {
+                ParseError::invalid_value(
+                    type_name,
+                    format!("Invalid {} '{}': {}", type_name, s, e),
+                    value.span().copied().unwrap_or_else(Span::new_blank),
+                )
+            })
+        }
     }
 }
 
@@ -1424,19 +1419,18 @@ impl Evaluate for Value<url::Url> {
     type Output = url::Url;
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
-        if let Some(u) = self.as_concrete() {
-            Ok(u.clone())
-        } else if let Some(template) = self.as_template() {
-            let s = render_template(template.source(), context, self.span())?;
-            url::Url::parse(&s).map_err(|e| {
-                ParseError::invalid_value(
-                    "URL",
-                    format!("Invalid URL '{}': {}", s, e),
-                    self.span().copied().unwrap_or_else(Span::new_blank),
-                )
-            })
-        } else {
-            unreachable!("Value must be either concrete or template")
+        match self.inner() {
+            ValueInner::Concrete(u) => Ok(u.clone()),
+            ValueInner::Template(template) => {
+                let s = render_template(template.source(), context, self.span())?;
+                url::Url::parse(&s).map_err(|e| {
+                    ParseError::invalid_value(
+                        "URL",
+                        format!("Invalid URL '{}': {}", s, e),
+                        self.span().copied().unwrap_or_else(Span::new_blank),
+                    )
+                })
+            }
         }
     }
 }
@@ -1453,19 +1447,18 @@ impl Evaluate for Value<License> {
     type Output = License;
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
-        if let Some(license) = self.as_concrete() {
-            Ok(license.clone())
-        } else if let Some(template) = self.as_template() {
-            let s = render_template(template.source(), context, self.span())?;
-            s.parse::<License>().map_err(|e| {
-                ParseError::invalid_value(
-                    "SPDX license",
-                    format!("Invalid SPDX license expression: {}", e),
-                    self.span().copied().unwrap_or_else(Span::new_blank),
-                )
-            })
-        } else {
-            unreachable!("Value must be either concrete or template")
+        match self.inner() {
+            ValueInner::Concrete(license) => Ok(license.clone()),
+            ValueInner::Template(template) => {
+                let s = render_template(template.source(), context, self.span())?;
+                s.parse::<License>().map_err(|e| {
+                    ParseError::invalid_value(
+                        "SPDX license",
+                        format!("Invalid SPDX license expression: {}", e),
+                        self.span().copied().unwrap_or_else(Span::new_blank),
+                    )
+                })
+            }
         }
     }
 }
@@ -1474,13 +1467,12 @@ impl Evaluate for Value<PathBuf> {
     type Output = PathBuf;
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
-        if let Some(p) = self.as_concrete() {
-            Ok(p.clone())
-        } else if let Some(template) = self.as_template() {
-            let s = render_template(template.source(), context, self.span())?;
-            Ok(PathBuf::from(s))
-        } else {
-            unreachable!("Value must be either concrete or template")
+        match self.inner() {
+            ValueInner::Concrete(p) => Ok(p.clone()),
+            ValueInner::Template(template) => {
+                let s = render_template(template.source(), context, self.span())?;
+                Ok(PathBuf::from(s))
+            }
         }
     }
 }
@@ -1494,19 +1486,18 @@ fn evaluate_sha256(
     value: &Value<Sha256Hash>,
     context: &EvaluationContext,
 ) -> Result<Sha256Hash, ParseError> {
-    if let Some(hash) = value.as_concrete() {
-        Ok(*hash)
-    } else if let Some(template) = value.as_template() {
-        let s = render_template(template.source(), context, value.span())?;
-        rattler_digest::parse_digest_from_hex::<rattler_digest::Sha256>(&s).ok_or_else(|| {
-            ParseError::invalid_value(
-                "SHA256 checksum",
-                format!("Invalid SHA256 checksum: {}", s),
-                value.span().copied().unwrap_or_else(Span::new_blank),
-            )
-        })
-    } else {
-        unreachable!("Value must be either concrete or template")
+    match value.inner() {
+        ValueInner::Concrete(hash) => Ok(*hash),
+        ValueInner::Template(template) => {
+            let s = render_template(template.source(), context, value.span())?;
+            rattler_digest::parse_digest_from_hex::<rattler_digest::Sha256>(&s).ok_or_else(|| {
+                ParseError::invalid_value(
+                    "SHA256 checksum",
+                    format!("Invalid SHA256 checksum: {}", s),
+                    value.span().copied().unwrap_or_else(Span::new_blank),
+                )
+            })
+        }
     }
 }
 
@@ -1515,19 +1506,18 @@ fn evaluate_md5(
     value: &Value<Md5Hash>,
     context: &EvaluationContext,
 ) -> Result<Md5Hash, ParseError> {
-    if let Some(hash) = value.as_concrete() {
-        Ok(*hash)
-    } else if let Some(template) = value.as_template() {
-        let s = render_template(template.source(), context, value.span())?;
-        rattler_digest::parse_digest_from_hex::<rattler_digest::Md5>(&s).ok_or_else(|| {
-            ParseError::invalid_value(
-                "MD5 checksum",
-                format!("Invalid MD5 checksum: {}", s),
-                value.span().copied().unwrap_or_else(Span::new_blank),
-            )
-        })
-    } else {
-        unreachable!("Value must be either concrete or template")
+    match value.inner() {
+        ValueInner::Concrete(hash) => Ok(*hash),
+        ValueInner::Template(template) => {
+            let s = render_template(template.source(), context, value.span())?;
+            rattler_digest::parse_digest_from_hex::<rattler_digest::Md5>(&s).ok_or_else(|| {
+                ParseError::invalid_value(
+                    "MD5 checksum",
+                    format!("Invalid MD5 checksum: {}", s),
+                    value.span().copied().unwrap_or_else(Span::new_blank),
+                )
+            })
+        }
     }
 }
 
@@ -1622,9 +1612,12 @@ impl Evaluate for Stage0About {
     type Output = Stage1About;
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
-        let (license_file, license_file_late_bound) = match self.license_file.as_ref() {
+        let LicenseFiles {
+            license_file_globs,
+            license_file_late_bound,
+        } = match self.license_file.as_ref() {
             Some(lf) => evaluate_license_files(lf, context)?,
-            None => (None, Vec::new()),
+            None => LicenseFiles::default(),
         };
 
         Ok(Stage1About {
@@ -1636,7 +1629,7 @@ impl Evaluate for Stage0About {
                 .as_ref()
                 .map(|v| v.evaluate(context))
                 .transpose()?,
-            license_file,
+            license_file: license_file_globs,
             license_file_late_bound,
             license_family: evaluate_optional_string_value(&self.license_family, context)?,
             summary: evaluate_optional_string_value(&self.summary, context)?,
@@ -3860,9 +3853,12 @@ mod tests {
             "${{ PREFIX }}/share/licenses/foo/LICENSE",
             "licenses/*.txt",
         ]);
-        let (globs, late_bound) = evaluate_license_files(&list, &ctx).unwrap();
+        let LicenseFiles {
+            license_file_globs,
+            license_file_late_bound,
+        } = evaluate_license_files(&list, &ctx).unwrap();
 
-        let globs = globs.expect("expected ordinary globs");
+        let globs = license_file_globs.expect("expected ordinary globs");
         let glob_sources: Vec<_> = globs
             .include_globs()
             .iter()
@@ -3870,9 +3866,9 @@ mod tests {
             .collect();
         assert_eq!(glob_sources, vec!["LICENSE", "licenses/*.txt"]);
 
-        assert_eq!(late_bound.len(), 1);
+        assert_eq!(license_file_late_bound.len(), 1);
         assert_eq!(
-            late_bound[0].as_str(),
+            license_file_late_bound[0].as_str(),
             "${{ PREFIX }}/share/licenses/foo/LICENSE"
         );
     }
