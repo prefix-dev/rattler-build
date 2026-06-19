@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.67.0] - 2026-06-19
+### ✨ Highlights
+
+Test
+
+### Added
+
+- Support late-bound build directory variables in patches and license files by @wolfv in [#2554](https://github.com/prefix-dev/rattler-build/pull/2554)
+
+
+### Changed
+
+- Build llamacpp recipe with Ninja generator on Windows by @Hofer-Julian in [#2562](https://github.com/prefix-dev/rattler-build/pull/2562)
+
+
+
 ## [0.66.2] - 2026-06-17
 ### ✨ Highlights
 
