@@ -19,6 +19,8 @@ on:
       - "pixi.*"
       - "src/opt.rs"
       - "crates/rattler_build_docs/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
   workflow_dispatch:
     inputs:
       tag:
