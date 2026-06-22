@@ -80,6 +80,46 @@ def fetched_version() -> Version:
     return parse(tomllib.loads(cargo)["package"]["version"])
 
 
+def gh_token() -> str:
+    """A GitHub token from gh CLI auth, used to enrich git-cliff output."""
+    return subprocess.run(
+        ["gh", "auth", "token"], cwd=ROOT, text=True, capture_output=True
+    ).stdout.strip()
+
+
+def cliff_preview(tag: str) -> str:
+    """Render what git-cliff would add for the commits since `tag`."""
+    return subprocess.run(
+        [
+            "git-cliff",
+            "--strip",
+            "header",
+            "--github-token",
+            gh_token(),
+            f"{tag}..FETCH_HEAD",
+        ],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+    ).stdout.strip()
+
+
+def bump_changelog(version: str) -> None:
+    """Prepend the unreleased changes to CHANGELOG.md under a new version tag."""
+    run(
+        [
+            "git-cliff",
+            "--unreleased",
+            "--prepend",
+            str(CHANGELOG),
+            "--github-token",
+            gh_token(),
+            "--tag",
+            f"v{version}",
+        ]
+    )
+
+
 def latest_tag() -> str:
     tag = git_out("describe", "--tags", "--abbrev=0", "--match", "v*", "FETCH_HEAD")
     if not tag:
@@ -150,9 +190,8 @@ def main() -> None:
             f"({tag}); a release may already be pending"
         )
 
-    print(f"\nCommits since {tag}:")
-    log = git_out("log", f"{tag}..FETCH_HEAD", "--oneline")
-    print(log or "  (none)")
+    print(f"\nChangelog preview since {tag}:")
+    print(cliff_preview(tag) or "  (none)")
 
     version = select_version(current)
 
@@ -165,10 +204,7 @@ def main() -> None:
     run(["tbump", "--non-interactive", "--only-patch", version])
 
     print("Updating changelog...")
-    run(
-        ["pixi", "run", "bump-changelog"],
-        env={**os.environ, "RELEASE_VERSION": version},
-    )
+    bump_changelog(version)
     edit_highlights(interactive)
 
     print("Updating Cargo.lock (root)...")

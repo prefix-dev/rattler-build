@@ -169,7 +169,6 @@ questionary = ">=2.0.1,<3"
 [feature.dev.tasks]
 # Bump version by running `pixi run bump NEW_VERSION`
 bump = "tbump --only-patch"
-bump-changelog = { cmd = "python scripts/bump_changelog.py", description = "Update changelog with unreleased changes" }
 release = { cmd = "python scripts/release.py", description = "Bump version and update lock files" }
 
 [feature.packaging.dependencies]
