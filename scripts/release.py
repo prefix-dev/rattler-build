@@ -49,9 +49,14 @@ def fail(msg: str) -> None:
     sys.exit(1)
 
 
+def is_jj() -> bool:
+    """Whether ROOT is a colocated jj repo with the jj binary available."""
+    return (ROOT / ".jj").is_dir() and shutil.which("jj") is not None
+
+
 def sync_jj() -> None:
     """Import the git refs created by this script into a colocated jj repo."""
-    if not (ROOT / ".jj").is_dir() or shutil.which("jj") is None:
+    if not is_jj():
         return
     print("Importing git refs into jj...")
     run(["jj", "git", "import"])
@@ -124,7 +129,15 @@ def main() -> None:
     interactive = sys.stdin.isatty()
 
     if git_out("status", "--porcelain"):
-        fail("working directory is not clean; commit or stash first")
+        if is_jj():
+            # In a colocated jj repo, in-progress work lives committed in @ and
+            # shows as dirty to git. Set it aside with `jj new` so git sees a
+            # clean tree for the upcoming `git switch`; @- stays as a recoverable
+            # loose head.
+            print("Working copy is dirty; running `jj new` to set it aside...")
+            run(["jj", "new"])
+        else:
+            fail("working directory is not clean; commit or stash first")
 
     print("Fetching canonical main from prefix-dev/rattler-build...")
     run(["git", "fetch", REMOTE_URL, "main"])
