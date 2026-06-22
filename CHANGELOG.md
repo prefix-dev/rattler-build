@@ -5,6 +5,50 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.67.0] - 2026-06-22
+### ✨ Highlights
+
+This release introduces support for late-bound build directory variables (e.g., `${{ SRC_DIR }}`, `${{ PREFIX }}`) in recipe fields that are evaluated before build directories exist. This allows patches and license files to reference directories that are only known once the build has started.
+
+The supported variables are:
+
+- `${{ SRC_DIR }}` – the source working directory
+- `${{ RECIPE_DIR }}` – the recipe directory
+- `${{ BUILD_DIR }}` – the top-level build directory
+
+This is useful when a patch ships inside another source. Because sources are
+fetched in order into the shared `SRC_DIR`, a later source can apply a patch
+that was extracted from an earlier one:
+
+```yaml
+source:
+  - url: https://example.com/tool-{{ version }}.tar.gz  # ships patches under src/
+    sha256: "..."
+  - url: https://example.com/lib-{{ version }}.tar.gz
+    sha256: "..."
+    target_directory: lib_src
+    patches:
+      - ${{ SRC_DIR }}/src/patches/0001-fix.patch
+```
+
+
+
+### Added
+
+- Support late-bound build directory variables in patches and license files by @wolfv in [#2554](https://github.com/prefix-dev/rattler-build/pull/2554)
+
+
+### Changed
+
+- Build llamacpp recipe with Ninja generator on Windows by @Hofer-Julian in [#2562](https://github.com/prefix-dev/rattler-build/pull/2562)
+
+
+### Documentation
+
+- Update CLI docs by @Hofer-Julian in [#2568](https://github.com/prefix-dev/rattler-build/pull/2568)
+
+
+
 ## [0.66.2] - 2026-06-17
 ### ✨ Highlights
 
