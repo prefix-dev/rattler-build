@@ -14,9 +14,7 @@ Shows the commits since the last release and asks for a major / minor / patch
 bump.
 """
 
-import os
 import re
-import shlex
 import shutil
 import subprocess
 import sys
@@ -150,11 +148,7 @@ def edit_highlights(interactive: bool) -> None:
     """Let the user write the changelog Highlights before committing."""
     if not interactive:
         return
-    editor = os.environ.get("EDITOR")
-    if editor:
-        run([*shlex.split(editor), str(CHANGELOG)])
-    else:
-        input("Edit the 'Highlights' section in CHANGELOG.md, then press Enter...")
+    input("Edit the 'Highlights' section in CHANGELOG.md, then press Enter...")
 
 
 def changelog_section(version: str) -> str:
