@@ -1,0 +1,53 @@
+name: Update lock files
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: 0 5 1 * * # Runs at 05:00 on the first day of each month
+
+permissions:
+  contents: read
+
+jobs:
+  pixi-update:
+    permissions:
+      contents: write
+      pull-requests: write
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: rattler-build
+            manifest-path: pixi.toml
+            lockfile: pixi.lock
+            branch: update-pixi
+          - name: py-rattler-build
+            manifest-path: py-rattler-build/pixi.toml
+            lockfile: py-rattler-build/pixi.lock
+            branch: update-pixi-py-rattler-build
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - name: Set up pixi
+        uses: prefix-dev/setup-pixi@5185adfbffb4bd703da3010310260805d89ebb11 # v0.9.6
+        with:
+          run-install: false
+      - name: Update lock file
+        run: |
+          set -o pipefail
+          pixi update --json --no-install --manifest-path ${{ matrix.manifest-path }} \
+            | pixi exec pixi-diff-to-markdown >> diff.md
+      - name: Create pull request
+        uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676 # v7.0.11
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: Update ${{ matrix.name }} pixi lock file
+          title: Update ${{ matrix.name }} pixi lock file
+          body-path: diff.md
+          branch: ${{ matrix.branch }}
+          base: main
+          labels: pixi
+          delete-branch: true
+          add-paths: ${{ matrix.lockfile }}
