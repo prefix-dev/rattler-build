@@ -52,7 +52,7 @@ lua = "*"
 # Python 3.10 is the minimum supported version, so we use that for testing
 python = "3.10.*"
 
-mypy = "~=1.5.1"
+ty = "*"
 
 pytest = ">=8.3"
 pytest-asyncio = "1.2.*"
@@ -69,7 +69,7 @@ types-networkx = "*"
 [feature.test.tasks]
 check-cargo-lock = "cargo check --locked --manifest-path rust/Cargo.toml"
 test = { cmd = "pytest --durations=0 ./tests", depends-on = ["type-check"] }
-type-check = { cmd = "mypy" }
+type-check = { cmd = "ty check" }
 
 [feature.notebooks.dependencies]
 jupyter = ">=1.1.1,<2"

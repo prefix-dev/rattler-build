@@ -80,7 +80,7 @@ requirements:
     )
 
     with tarfile.open(result.packages[0]) as package:
-        index_json = json.load(package.extractfile("info/index.json"))  # type: ignore[arg-type]
+        index_json = json.load(package.extractfile("info/index.json"))  # ty: ignore[invalid-argument-type]
 
     assert index_json["repodata_revision"] == 3
     assert index_json["flags"] == ["cuda"]
