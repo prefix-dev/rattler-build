@@ -237,7 +237,7 @@ pub async fn conda_pypi_name_mapping() -> miette::Result<&'static HashMap<String
     }).await
 }
 
-fn format_requirement(req: &str) -> String {
+pub(crate) fn format_requirement(req: &str) -> String {
     // Split package name from version specifiers
     let req = req.trim();
     let (name, version) = if let Some(pos) =
@@ -390,7 +390,7 @@ async fn fetch_pypi_metadata(
     Err(miette::miette!(error_message))
 }
 
-async fn map_requirement(
+pub(crate) async fn map_requirement(
     req: &str,
     mapping: &HashMap<String, String>,
     use_mapping: bool,
