@@ -4914,7 +4914,7 @@ dependencies = [
 
 [[package]]
 name = "rattler_build_core"
-version = "0.2.7"
+version = "0.2.8"
 dependencies = [
  "anyhow",
  "arwen-codesign",
@@ -5036,7 +5036,7 @@ dependencies = [
 
 [[package]]
 name = "rattler_build_networking"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "astral-reqwest-middleware",
  "astral-reqwest-retry",
@@ -5172,7 +5172,7 @@ dependencies = [
 
 [[package]]
 name = "rattler_build_source_cache"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "astral-reqwest-middleware",
  "astral-reqwest-retry",
