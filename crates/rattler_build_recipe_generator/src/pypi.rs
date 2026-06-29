@@ -784,7 +784,7 @@ pub async fn create_recipe(
             .starts_with("https://files.pythonhosted.org/")
     {
         let simple_url = format!(
-            "https://pypi.org/packages/source/{}/{}/{}-{}.tar.gz",
+            "https://files.pythonhosted.org/packages/source/{}/{}/{}-{}.tar.gz",
             &metadata.info.name.to_lowercase()[..1],
             metadata.info.name.to_lowercase(),
             metadata.info.name.to_lowercase().replace("-", "_"),
