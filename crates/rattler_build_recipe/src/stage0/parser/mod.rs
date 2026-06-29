@@ -26,11 +26,9 @@ mod unit_tests;
 use marked_yaml::{Node as MarkedNode, types::MarkedScalarNode};
 use rattler_build_jinja::Variable;
 use rattler_build_yaml_parser::{
-    ParseError, ParseResult, helpers::contains_jinja_template, parse_yaml,
+    ParseError, ParseResult, helpers::contains_jinja_template, parse_yaml, yaml::load_error_span,
 };
 use rattler_conda_types::RepodataRevision;
-
-use crate::Span;
 
 // Re-export parsing functions
 pub use about::parse_about;
@@ -65,7 +63,7 @@ pub fn parse_recipe_or_multi_from_source_with_config(
     config: ParseConfig,
 ) -> ParseResult<crate::stage0::Recipe> {
     let yaml = parse_yaml(source).map_err(|e| {
-        ParseError::generic(format!("Failed to parse YAML: {}", e), Span::new_blank())
+        ParseError::generic(format!("Failed to parse YAML: {}", e), load_error_span(&e))
     })?;
 
     parse_recipe_or_multi_with_config(&yaml, config)
@@ -86,7 +84,7 @@ pub fn parse_recipe_from_source_with_config(
     config: ParseConfig,
 ) -> ParseResult<crate::stage0::Stage0Recipe> {
     let yaml = parse_yaml(source).map_err(|e| {
-        ParseError::generic(format!("Failed to parse YAML: {}", e), Span::new_blank())
+        ParseError::generic(format!("Failed to parse YAML: {}", e), load_error_span(&e))
     })?;
 
     parse_recipe_with_config(&yaml, config)
