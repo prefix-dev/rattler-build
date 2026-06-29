@@ -267,7 +267,9 @@ impl PackageContentsTestExt for PackageContentsTest {
                                     format!("lib/{{,lib}}{raw}.*.dylib"),
                                 ]
                             }
-                        } else if raw.ends_with(".so") || raw.contains(".so.") || raw.ends_with(".a")
+                        } else if raw.ends_with(".so")
+                            || raw.contains(".so.")
+                            || raw.ends_with(".a")
                         {
                             vec![format!("lib/{raw}")]
                         } else {
@@ -317,7 +319,9 @@ impl PackageContentsTestExt for PackageContentsTest {
                 } else {
                     self.files.not_exists.include_globs()
                 };
-                Self::match_files(raws, |source| Ok(vec![build_entry(vec![source.to_string()])?]))
+                Self::match_files(raws, |source| {
+                    Ok(vec![build_entry(vec![source.to_string()])?])
+                })
             }
         }
     }
