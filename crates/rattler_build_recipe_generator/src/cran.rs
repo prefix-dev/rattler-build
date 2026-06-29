@@ -512,7 +512,11 @@ mod tests {
             // `r-base` ships.
             ("GPL-3", "GPL-3.0-only", vec![bundled("GPL-3")]),
             ("MIT", "MIT", vec![bundled("MIT")]),
-            ("Apache License 2.0", "Apache-2.0", vec![bundled("Apache-2.0")]),
+            (
+                "Apache License 2.0",
+                "Apache-2.0",
+                vec![bundled("Apache-2.0")],
+            ),
             // Cases with `file LICENSE`: the bundled license comes first,
             // followed by the package-local file.
             (
@@ -591,11 +595,7 @@ mod tests {
                 "Failed for input: {}",
                 input
             );
-            assert_eq!(
-                license_files, expected_files,
-                "Failed for input: {}",
-                input
-            );
+            assert_eq!(license_files, expected_files, "Failed for input: {}", input);
         }
     }
 }
