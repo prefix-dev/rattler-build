@@ -112,7 +112,48 @@ pub struct Dependency {
     pub role: String,
 }
 
-fn map_license(license: &str) -> (Option<String>, Option<String>) {
+/// Prefix-relative directory that the `r-base` package installs the standard
+/// license texts into. Combined with a license id (see [`r_bundled_license`])
+/// this yields a [`LateBoundPath`]-style `${{ PREFIX }}` reference that
+/// rattler-build resolves at packaging time.
+///
+/// [`LateBoundPath`]: rattler_build_types::late_bound_path::LateBoundPath
+const R_LICENSE_DIR: &str = "${{ PREFIX }}/lib/R/share/licenses/";
+
+/// Map an SPDX license id to the matching license file shipped by `r-base`
+/// under `lib/R/share/licenses/`, if one exists.
+///
+/// R packages frequently only declare a standard license (e.g. `GPL-2`) without
+/// bundling the license text in their sources. conda-forge handles this by
+/// pointing `license_file` at the copy that `r-base` installs, which is what
+/// this mapping reproduces. `*-or-later` expressions map to the base version
+/// file, which is the one actually named by the license.
+fn r_bundled_license(spdx: &str) -> Option<&'static str> {
+    Some(match spdx {
+        "GPL-2.0-only" | "GPL-2.0-or-later" => "GPL-2",
+        "GPL-3.0-only" | "GPL-3.0-or-later" => "GPL-3",
+        "LGPL-2.0-only" | "LGPL-2.0-or-later" => "LGPL-2",
+        "LGPL-2.1-only" | "LGPL-2.1-or-later" => "LGPL-2.1",
+        "LGPL-3.0-only" | "LGPL-3.0-or-later" => "LGPL-3",
+        "AGPL-3.0-only" | "AGPL-3.0-or-later" => "AGPL-3",
+        "Artistic-2.0" => "Artistic-2.0",
+        "BSD-2-Clause" => "BSD_2_clause",
+        "BSD-3-Clause" => "BSD_3_clause",
+        "MIT" => "MIT",
+        "MPL-2.0" => "MPL-2.0",
+        "Apache-2.0" => "Apache-2.0",
+        "CC0-1.0" => "CC0",
+        _ => return None,
+    })
+}
+
+/// Parse a CRAN `License:` field into an SPDX expression and the list of
+/// license files to ship.
+///
+/// The returned license files are, in order, any standard licenses provided by
+/// `r-base` (referenced via `${{ PREFIX }}`) followed by any package-local file
+/// declared via `+ file LICENSE`.
+fn map_license(license: &str) -> (Option<String>, Vec<String>) {
     let license_replacements: HashMap<&str, &str> = [
         ("GPL-3", "GPL-3.0-only"),
         ("GPL-2", "GPL-2.0-only"),
@@ -152,17 +193,32 @@ fn map_license(license: &str) -> (Option<String>, Option<String>) {
     let parts: Vec<&str> = license.split(&['|', '+']).map(str::trim).collect();
 
     let mut final_licenses = Vec::new();
-    let mut license_file = None;
+    let mut license_files = Vec::new();
+    let mut package_license_file = None;
 
     for part in parts {
         if part.to_lowercase().contains("file") {
-            // This part contains the file specification
-            license_file = part.split_whitespace().last().map(|s| s.to_string());
+            // This part points at a license file shipped inside the package
+            // sources (e.g. `MIT + file LICENSE`).
+            package_license_file = part.split_whitespace().last().map(|s| s.to_string());
         } else {
             // This part is a license
             let mapped = license_replacements.get(part).map_or(part, |&s| s);
+            // If `r-base` ships the text for this license, reference its copy so
+            // the built package carries a license file even when the upstream
+            // sources do not include one.
+            if let Some(bundled) = r_bundled_license(mapped) {
+                let path = format!("{R_LICENSE_DIR}{bundled}");
+                if !license_files.contains(&path) {
+                    license_files.push(path);
+                }
+            }
             final_licenses.push(mapped.to_string());
         }
+    }
+
+    if let Some(file) = package_license_file {
+        license_files.push(file);
     }
 
     let final_license = if final_licenses.is_empty() {
@@ -171,7 +227,7 @@ fn map_license(license: &str) -> (Option<String>, Option<String>) {
         Some(final_licenses.join(" OR "))
     };
 
-    (final_license, license_file)
+    (final_license, license_files)
 }
 
 fn format_r_package(package: &str, version: Option<&String>) -> String {
@@ -211,11 +267,30 @@ const R_BUILTINS: &[&str] = &[
     "utils",
 ];
 
+/// Placeholder pushed into `requirements.build` for compiled packages. It is
+/// expanded by [`format_cran_recipe_with_suggests`] into a `build_platform !=
+/// target_platform` selector that pulls in `cross-r-base` when cross-compiling.
+///
+/// A plain identifier is used so that `serde_yaml` emits it unquoted, which
+/// keeps the post-processing match simple.
+const CROSS_R_BASE_MARKER: &str = "CROSS_R_BASE_PLACEHOLDER";
+
 fn format_cran_recipe_with_suggests(recipe: &serialize::Recipe) -> String {
     let recipe_str = format!("{}", recipe);
     let mut final_recipe = String::new();
     for line in recipe_str.lines() {
-        if line.contains("SUGGEST") {
+        if let Some(indent) = line
+            .strip_suffix(CROSS_R_BASE_MARKER)
+            .and_then(|prefix| prefix.strip_suffix("- "))
+        {
+            // Expand the placeholder into a cross-compilation selector. `r_base`
+            // is the conda-forge variant key pinning the R version.
+            final_recipe.push_str(&format!(
+                "{indent}- if: build_platform != target_platform\n\
+                 {indent}  then:\n\
+                 {indent}    - cross-r-base ${{{{ r_base }}}}\n"
+            ));
+        } else if line.contains("SUGGEST") {
             final_recipe.push_str(&format!(
                 "{}  # suggested\n",
                 line.replace(" - SUGGEST", " # - ")
@@ -291,61 +366,79 @@ async fn build_cran_recipe_and_deps(
     recipe.source.push(source.into());
 
     recipe.build.number = "${{ build_number }}".to_string();
-    recipe.build.script = "R CMD INSTALL --build .".to_string();
+    // `${R_ARGS}` lets the recipe author pass extra flags (e.g.
+    // `--configure-args=...`) through to `R CMD INSTALL`, matching the
+    // convention used by conda-forge's R build scripts.
+    recipe.build.script = "R CMD INSTALL --build . ${R_ARGS}".to_string();
 
-    let build_requirements = vec![
+    let build_tools = vec![
         "${{ compiler('c') }}".to_string(),
         "${{ compiler('cxx') }}".to_string(),
         "make".to_string(),
     ];
 
-    if package_info.NeedsCompilation == "yes" {
-        recipe.requirements.build.extend(build_requirements.clone());
-    }
+    // Whether the package contains code that has to be compiled. Packages that
+    // declare `LinkingTo` dependencies also compile against those headers, so
+    // they need a compiler even if `NeedsCompilation` is not set to `yes`.
+    let mut needs_compilation = package_info.NeedsCompilation == "yes";
 
-    recipe.requirements.host = vec!["r-base".to_string()];
-    recipe.requirements.run = vec!["r-base".to_string()];
+    // `r-base` itself, possibly carrying the version constraint from a
+    // `Depends: R (>= x.y.z)` entry. It is the first requirement in both `host`
+    // and `run`.
+    let mut r_base = "r-base".to_string();
+    let mut host = Vec::new();
+    let mut run = Vec::new();
 
     let mut remaining_deps = HashSet::new();
     for dep in package_info._dependencies.iter() {
-        // skip builtins
+        if dep.package == "R" {
+            // The R version constraint pins `r-base` in both host and run.
+            r_base = format_r_package("base", dep.version.as_ref());
+            continue;
+        }
+
+        // skip builtins (these ship as part of `r-base`)
         if R_BUILTINS.contains(&dep.package.as_str()) {
             continue;
         }
 
-        if dep.package == "R" {
-            // get r-base
-            let rbase = format_r_package("base", dep.version.as_ref());
-            recipe.requirements.host.push(rbase);
-        } else if dep.role == "LinkingTo" {
-            recipe
-                .requirements
-                .host
-                .push(format_r_package(&dep.package, dep.version.as_ref()));
-            recipe.requirements.build.extend(build_requirements.clone());
+        if dep.role == "LinkingTo" {
+            // Headers needed at build time; pulls in a compiler.
+            host.push(format_r_package(&dep.package, dep.version.as_ref()));
+            needs_compilation = true;
             remaining_deps.insert(dep.package.clone());
         } else if dep.role == "Imports" || dep.role == "Depends" {
-            recipe
-                .requirements
-                .run
-                .push(format_r_package(&dep.package, dep.version.as_ref()));
-            recipe
-                .requirements
-                .host
-                .push(format_r_package(&dep.package, dep.version.as_ref()));
+            let spec = format_r_package(&dep.package, dep.version.as_ref());
+            host.push(spec.clone());
+            run.push(spec);
             remaining_deps.insert(dep.package.clone());
         } else if dep.role == "Suggests" {
-            recipe.requirements.run.push(format!(
+            run.push(format!(
                 "SUGGEST {}",
                 format_r_package(&dep.package, dep.version.as_ref())
             ));
         }
     }
 
-    // make requirements unique
-    recipe.requirements.host = recipe.requirements.host.into_iter().unique().collect();
-    recipe.requirements.build = recipe.requirements.build.into_iter().unique().collect();
-    recipe.requirements.run = recipe.requirements.run.into_iter().unique().collect();
+    recipe.requirements.host = std::iter::once(r_base.clone())
+        .chain(host)
+        .unique()
+        .collect();
+    recipe.requirements.run = std::iter::once(r_base).chain(run).unique().collect();
+
+    if needs_compilation {
+        // Compiled packages need a toolchain, `cross-r-base` for cross builds,
+        // and rpaths so the linker can find R's shared libraries.
+        let mut build = vec![CROSS_R_BASE_MARKER.to_string()];
+        build.extend(build_tools);
+        recipe.requirements.build = build.into_iter().unique().collect();
+        recipe.build.dynamic_linking = Some(serialize::DynamicLinking {
+            rpaths: vec!["lib/R/lib/".to_string(), "lib/".to_string()],
+        });
+    } else {
+        // Pure-R packages are architecture independent.
+        recipe.build.noarch = Some("generic".to_string());
+    }
 
     if let Some(url) = package_info.URL.clone() {
         let url = url.split_once(',').unwrap_or((url.as_str(), "")).0;
@@ -354,9 +447,9 @@ async fn build_cran_recipe_and_deps(
 
     recipe.about.summary = Some(package_info.Title.clone());
     recipe.about.description = Some(package_info.Description.clone());
-    let (license, license_file) = map_license(&package_info.License);
+    let (license, license_files) = map_license(&package_info.License);
     recipe.about.license = license;
-    recipe.about.license_file = license_file.into_iter().collect();
+    recipe.about.license_file = license_files;
     recipe.about.repository = Some(package_info._upstream.clone());
     if let Some(pkgdocs) = &package_info._pkgdocs
         && url::Url::parse(pkgdocs).is_ok()
@@ -425,65 +518,99 @@ mod tests {
 
     #[test]
     fn test_license_mapping() {
+        // Helper to build the expected `${{ PREFIX }}`-relative path to a
+        // license shipped by `r-base`.
+        let bundled = |name: &str| format!("{R_LICENSE_DIR}{name}");
+
         let test_cases = vec![
-            // Simple cases
-            ("GPL-3", "GPL-3.0-only", None),
-            ("MIT", "MIT", None),
-            ("Apache License 2.0", "Apache-2.0", None),
-            // Cases with file LICENSE
-            ("GPL-3 + file LICENSE", "GPL-3.0-only", Some("LICENSE")),
-            ("MIT + file LICENCE", "MIT", Some("LICENCE")),
-            ("MIT + file LICENSE", "MIT", Some("LICENSE")),
+            // Simple cases: standard licenses gain a reference to the copy that
+            // `r-base` ships.
+            ("GPL-3", "GPL-3.0-only", vec![bundled("GPL-3")]),
+            ("MIT", "MIT", vec![bundled("MIT")]),
+            (
+                "Apache License 2.0",
+                "Apache-2.0",
+                vec![bundled("Apache-2.0")],
+            ),
+            // Cases with `file LICENSE`: the bundled license comes first,
+            // followed by the package-local file.
+            (
+                "GPL-3 + file LICENSE",
+                "GPL-3.0-only",
+                vec![bundled("GPL-3"), "LICENSE".to_string()],
+            ),
+            (
+                "MIT + file LICENCE",
+                "MIT",
+                vec![bundled("MIT"), "LICENCE".to_string()],
+            ),
+            (
+                "MIT + file LICENSE",
+                "MIT",
+                vec![bundled("MIT"), "LICENSE".to_string()],
+            ),
             // Compound licenses
-            ("GPL-2 | MIT", "GPL-2.0-only OR MIT", None),
+            (
+                "GPL-2 | MIT",
+                "GPL-2.0-only OR MIT",
+                vec![bundled("GPL-2"), bundled("MIT")],
+            ),
             (
                 "Apache License 2.0 | file LICENSE",
                 "Apache-2.0",
-                Some("LICENSE"),
+                vec![bundled("Apache-2.0"), "LICENSE".to_string()],
             ),
-            // Version ranges
-            ("GPL (>= 2)", "GPL-2.0-or-later", None),
-            ("LGPL (>= 3)", "LGPL-3.0-or-later", None),
+            // Version ranges (`*-or-later` maps to the base version file)
+            ("GPL (>= 2)", "GPL-2.0-or-later", vec![bundled("GPL-2")]),
+            ("LGPL (>= 3)", "LGPL-3.0-or-later", vec![bundled("LGPL-3")]),
             // More complex cases
             (
                 "GPL (>= 2) | BSD_3_clause + file LICENSE",
                 "GPL-2.0-or-later OR BSD-3-Clause",
-                Some("LICENSE"),
+                vec![
+                    bundled("GPL-2"),
+                    bundled("BSD_3_clause"),
+                    "LICENSE".to_string(),
+                ],
             ),
-            ("LGPL-2.1 | file LICENSE", "LGPL-2.1-only", Some("LICENSE")),
+            (
+                "LGPL-2.1 | file LICENSE",
+                "LGPL-2.1-only",
+                vec![bundled("LGPL-2.1"), "LICENSE".to_string()],
+            ),
             (
                 "GPL (>= 2.0) | file LICENCE",
                 "GPL-2.0-or-later",
-                Some("LICENCE"),
+                vec![bundled("GPL-2"), "LICENCE".to_string()],
             ),
-            // Cases that should remain unchanged
-            ("Unlimited", "Unlimited", None),
-            ("GPL (>= 2.15.1)", "GPL (>= 2.15.1)", None),
+            // Cases without a bundled license file
+            ("Unlimited", "Unlimited", vec![]),
+            ("GPL (>= 2.15.1)", "GPL (>= 2.15.1)", vec![]),
             // Creative Commons licenses
-            ("CC BY-SA 4.0", "CC-BY-SA-4.0", None),
-            ("CC BY-NC-ND 3.0 US", "CC BY-NC-ND 3.0 US", None), // This one doesn't have a direct SPDX mapping
+            ("CC BY-SA 4.0", "CC-BY-SA-4.0", vec![]),
+            ("CC BY-NC-ND 3.0 US", "CC BY-NC-ND 3.0 US", vec![]), // This one doesn't have a direct SPDX mapping
             // Multiple licenses with file
             (
                 "GPL-2 | GPL-3 | MIT + file LICENSE",
                 "GPL-2.0-only OR GPL-3.0-only OR MIT",
-                Some("LICENSE"),
+                vec![
+                    bundled("GPL-2"),
+                    bundled("GPL-3"),
+                    bundled("MIT"),
+                    "LICENSE".to_string(),
+                ],
             ),
         ];
 
-        for (input, expected_license, expected_file) in test_cases {
-            let (mapped_license, license_file) = map_license(input);
+        for (input, expected_license, expected_files) in test_cases {
+            let (mapped_license, license_files) = map_license(input);
             assert_eq!(
                 mapped_license.as_deref(),
                 Some(expected_license),
                 "Failed for input: {}",
                 input
             );
-            assert_eq!(
-                license_file.as_deref(),
-                expected_file,
-                "Failed for input: {}",
-                input
-            );
+            assert_eq!(license_files, expected_files, "Failed for input: {}", input);
         }
     }
 }
