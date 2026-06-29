@@ -286,6 +286,38 @@ html, body {
   position: relative;
   overflow: auto;
   background: var(--bg-editor);
+  display: flex;
+  align-items: flex-start;
+}
+
+/* Line-number gutter. Pinned to the left with position: sticky so it stays
+   visible while long lines scroll horizontally; scrolls vertically with the
+   code. Lines never wrap (white-space: pre on the code), so a single number
+   per logical line stays aligned with its row. */
+.line-numbers {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  flex: 0 0 auto;
+  min-height: 100%;
+  padding: 12px 8px 12px 12px;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: 1.5;
+  text-align: right;
+  white-space: pre;
+  color: var(--text-muted);
+  background: var(--bg-editor);
+  border-right: 1px solid var(--border);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.editor-code {
+  position: relative;
+  flex: 1 0 auto;
+  min-width: 0;
+  align-self: stretch;
 }
 
 .editor-highlight {
@@ -300,8 +332,7 @@ html, body {
   font-size: 14px;
   line-height: 1.5;
   tab-size: 2;
-  white-space: pre-wrap;
-  word-wrap: break-word;
+  white-space: pre;
   pointer-events: none;
   background: var(--bg-editor);
   color: var(--text-primary);
@@ -313,7 +344,7 @@ html, body {
   font-family: inherit;
 }
 
-.editor-container textarea {
+.editor-code textarea {
   display: block;
   position: relative;
   width: 100%;
@@ -328,14 +359,13 @@ html, body {
   font-family: var(--font-mono);
   font-size: 14px;
   line-height: 1.5;
-  white-space: pre-wrap;
-  word-wrap: break-word;
+  white-space: pre;
   resize: none;
   outline: none;
   tab-size: 2;
 }
 
-.editor-container textarea::placeholder {
+.editor-code textarea::placeholder {
   color: var(--text-muted);
 }
 
@@ -346,6 +376,7 @@ html, body {
   cursor: col-resize;
   flex-shrink: 0;
   transition: background 0.15s;
+  touch-action: none;
 }
 
 .divider-h:hover, .divider-h.active {
@@ -358,6 +389,7 @@ html, body {
   cursor: row-resize;
   flex-shrink: 0;
   transition: background 0.15s;
+  touch-action: none;
 }
 
 .divider-v:hover, .divider-v.active {
@@ -409,10 +441,6 @@ html, body {
   display: flex;
   flex-direction: column;
   min-height: 0;
-}
-
-.variables-panel .editor-container textarea {
-  field-sizing: fixed;
 }
 
 /* Used variables hint */
@@ -630,14 +658,81 @@ html, body {
   margin-bottom: 8px;
 }
 
-/* Responsive */
+/* Responsive / mobile (e.g. Safari on iOS) */
 @media (max-width: 768px) {
+  /* Let the page scroll naturally instead of locking everything into the
+     viewport height, which is cramped and unreliable with iOS Safari's
+     dynamic toolbar. */
+  html, body {
+    height: auto;
+    overflow: visible;
+  }
+  #app {
+    height: auto;
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+
+  .toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    padding-top: max(8px, env(safe-area-inset-top));
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+  }
+  .toolbar-controls {
+    margin-left: 0;
+    width: 100%;
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+
   .main {
     flex-direction: column;
+    flex: none;
   }
+  .panel-left,
+  .panel-right {
+    flex: none;
+  }
+  .recipe-pane {
+    min-height: 280px;
+  }
+  .variables-panel {
+    flex: none;
+    min-height: 160px;
+  }
+  .panel-right {
+    min-height: 320px;
+  }
+
+  .panel-header {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .generator-controls {
+    width: 100%;
+    margin-left: 0;
+    flex-wrap: wrap;
+  }
+  .generator-controls input {
+    flex: 1 1 120px;
+    width: auto;
+  }
+
   .divider-h {
     width: 100%;
     height: 4px;
     cursor: row-resize;
+  }
+
+  /* 16px keeps iOS Safari from auto-zooming when an editor is focused. */
+  .line-numbers,
+  .editor-highlight,
+  .editor-code textarea {
+    font-size: 16px;
   }
 }

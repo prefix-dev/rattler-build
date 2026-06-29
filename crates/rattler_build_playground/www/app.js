@@ -93,6 +93,8 @@ const recipeEditor = document.getElementById('recipe-editor');
 const variantsEditor = document.getElementById('variants-editor');
 const recipeHighlight = document.getElementById('recipe-highlight');
 const variantsHighlight = document.getElementById('variants-highlight');
+const recipeGutter = document.getElementById('recipe-gutter');
+const variantsGutter = document.getElementById('variants-gutter');
 const outputContainer = document.getElementById('output-container');
 const outputBadge = document.getElementById('output-badge');
 const platformSelect = document.getElementById('platform-select');
@@ -109,14 +111,38 @@ function highlightEditor(textarea, pre) {
   pre.innerHTML = highlight_source_yaml(textarea.value);
 }
 
+// Render the line-number gutter: one number per logical line. Lines never
+// wrap (white-space: pre), so each number stays aligned with its row.
+function updateGutter(textarea, gutter) {
+  const count = textarea.value.split('\n').length;
+  let out = '';
+  for (let i = 1; i <= count; i++) out += i === count ? i : i + '\n';
+  gutter.textContent = out;
+}
+
 // Fallback auto-resize for browsers without CSS field-sizing: content.
-// Sizes the textarea to its content so it never scrolls internally;
-// the parent .editor-container scrolls both textarea and highlight <pre>.
+// Sizes the textarea to its content so it never scrolls internally; the
+// parent .editor-container scrolls both textarea and highlight <pre> as one.
 function autoResize(textarea) {
   if (CSS.supports('field-sizing', 'content')) return;
+  const pre = textarea.previousElementSibling;
   textarea.style.height = 'auto';
   textarea.style.height = Math.max(textarea.scrollHeight, textarea.parentElement.clientHeight) + 'px';
+  // With white-space: pre, long lines also need horizontal room so the
+  // textarea and highlight stay aligned when the container scrolls sideways.
+  textarea.style.width = 'auto';
+  textarea.style.width = Math.max(pre.scrollWidth, textarea.parentElement.clientWidth) + 'px';
 }
+
+// Refresh a source editor: highlight (once WASM is ready), gutter, and size.
+function syncEditor(textarea, pre, gutter) {
+  if (wasmReady) highlightEditor(textarea, pre);
+  updateGutter(textarea, gutter);
+  autoResize(textarea);
+}
+
+const syncRecipe = () => syncEditor(recipeEditor, recipeHighlight, recipeGutter);
+const syncVariants = () => syncEditor(variantsEditor, variantsHighlight, variantsGutter);
 
 // ===== Rendering =====
 
@@ -273,6 +299,10 @@ function update() {
 recipeEditor.value = localStorage.getItem('playground-recipe') || DEFAULT_RECIPE;
 variantsEditor.value = localStorage.getItem('playground-variants') || DEFAULT_VARIANTS;
 
+// Show line numbers right away, before the WASM highlighter is ready.
+updateGutter(recipeEditor, recipeGutter);
+updateGutter(variantsEditor, variantsGutter);
+
 // Tab switching
 document.querySelectorAll('.tab-btn').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -316,15 +346,13 @@ if (savedFormat) {
 // Debounced update on input
 recipeEditor.addEventListener('input', () => {
   localStorage.setItem('playground-recipe', recipeEditor.value);
-  if (wasmReady) highlightEditor(recipeEditor, recipeHighlight);
-  autoResize(recipeEditor);
+  syncRecipe();
   scheduleUpdate();
 });
 
 variantsEditor.addEventListener('input', () => {
   localStorage.setItem('playground-variants', variantsEditor.value);
-  if (wasmReady) highlightEditor(variantsEditor, variantsHighlight);
-  autoResize(variantsEditor);
+  syncVariants();
   scheduleUpdate();
 });
 
@@ -377,8 +405,7 @@ async function runGenerator() {
     if (result.ok) {
       recipeEditor.value = result.result;
       localStorage.setItem('playground-recipe', recipeEditor.value);
-      if (wasmReady) highlightEditor(recipeEditor, recipeHighlight);
-      autoResize(recipeEditor);
+      syncRecipe();
       scheduleUpdate();
     } else {
       outputBadge.textContent = 'error';
@@ -424,8 +451,7 @@ loadPinningBtn.addEventListener('click', async () => {
     document.querySelectorAll('.variant-format-btn').forEach(b => {
       b.classList.toggle('active', b.dataset.format === variantFormat);
     });
-    if (wasmReady) highlightEditor(variantsEditor, variantsHighlight);
-    autoResize(variantsEditor);
+    syncVariants();
     scheduleUpdate();
   } catch (e) {
     alert(`Failed to load pinning: ${e.message}`);
@@ -457,9 +483,12 @@ const dividerH = document.getElementById('divider-h');
 const panelLeft = document.getElementById('panel-left');
 const panelRight = document.getElementById('panel-right');
 
-dividerH.addEventListener('mousedown', (e) => {
+dividerH.addEventListener('pointerdown', (e) => {
+  // On mobile the panels stack vertically and scroll with the page, so the
+  // horizontal (left/right) resize doesn't apply.
   if (window.innerWidth <= MOBILE_BREAKPOINT) return;
   e.preventDefault();
+  dividerH.setPointerCapture(e.pointerId);
   dividerH.classList.add('active');
   const startX = e.clientX;
   const startLeftWidth = panelLeft.offsetWidth;
@@ -475,18 +504,19 @@ dividerH.addEventListener('mousedown', (e) => {
 
   function onUp() {
     dividerH.classList.remove('active');
-    document.removeEventListener('mousemove', onMove);
-    document.removeEventListener('mouseup', onUp);
+    dividerH.removeEventListener('pointermove', onMove);
+    dividerH.removeEventListener('pointerup', onUp);
   }
 
-  document.addEventListener('mousemove', onMove);
-  document.addEventListener('mouseup', onUp);
+  dividerH.addEventListener('pointermove', onMove);
+  dividerH.addEventListener('pointerup', onUp);
 });
 
 const dividerV = document.getElementById('divider-v');
 
-dividerV.addEventListener('mousedown', (e) => {
+dividerV.addEventListener('pointerdown', (e) => {
   e.preventDefault();
+  dividerV.setPointerCapture(e.pointerId);
   dividerV.classList.add('active');
   const startY = e.clientY;
   const parent = dividerV.parentElement;
@@ -505,12 +535,12 @@ dividerV.addEventListener('mousedown', (e) => {
 
   function onUp() {
     dividerV.classList.remove('active');
-    document.removeEventListener('mousemove', onMove);
-    document.removeEventListener('mouseup', onUp);
+    dividerV.removeEventListener('pointermove', onMove);
+    dividerV.removeEventListener('pointerup', onUp);
   }
 
-  document.addEventListener('mousemove', onMove);
-  document.addEventListener('mouseup', onUp);
+  dividerV.addEventListener('pointermove', onMove);
+  dividerV.addEventListener('pointerup', onUp);
 });
 
 // ===== Initialize WASM =====
@@ -536,11 +566,9 @@ async function main() {
       platformSelect.appendChild(opt);
     }
 
-    // Initial editor highlighting and sizing
-    highlightEditor(recipeEditor, recipeHighlight);
-    highlightEditor(variantsEditor, variantsHighlight);
-    autoResize(recipeEditor);
-    autoResize(variantsEditor);
+    // Initial editor highlighting, gutters, and sizing
+    syncRecipe();
+    syncVariants();
 
     // Initial render
     update();

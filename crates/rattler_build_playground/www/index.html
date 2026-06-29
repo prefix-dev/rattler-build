@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>rattler-build Recipe Playground</title>
   <link rel="stylesheet" href="style.css">
 </head>
@@ -39,8 +39,11 @@
             </div>
           </div>
           <div class="editor-container">
-            <pre class="editor-highlight" id="recipe-highlight"></pre>
-            <textarea id="recipe-editor" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off"></textarea>
+            <div class="line-numbers" id="recipe-gutter" aria-hidden="true"></div>
+            <div class="editor-code">
+              <pre class="editor-highlight" id="recipe-highlight"></pre>
+              <textarea id="recipe-editor" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off"></textarea>
+            </div>
           </div>
         </div>
         <div class="divider-v" id="divider-v"></div>
@@ -54,10 +57,13 @@
             </div>
           </div>
           <div class="editor-container">
-            <pre class="editor-highlight" id="variants-highlight"></pre>
-            <textarea id="variants-editor" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" placeholder="python:
+            <div class="line-numbers" id="variants-gutter" aria-hidden="true"></div>
+            <div class="editor-code">
+              <pre class="editor-highlight" id="variants-highlight"></pre>
+              <textarea id="variants-editor" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" placeholder="python:
   - &quot;3.11&quot;
   - &quot;3.12&quot;"></textarea>
+            </div>
           </div>
           <div class="used-vars" id="used-vars"></div>
         </div>
