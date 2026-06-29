@@ -409,6 +409,7 @@ fn rockspec_to_recipe(rockspec: &LuarocksRockspec) -> miette::Result<Recipe> {
             script: "# Take the first `rockspec` we find (in non-deterministic places unfortunately)\nROCK=$(find . -name \"*.rockspec\" | sort -n -r | head -n 1)\nluarocks install ${ROCK} --tree=${{ PREFIX }}".to_string(),
             python: Python::default(),
             noarch: None,
+            dynamic_linking: None,
         },
         requirements: Requirements {
             build: vec!["luarocks".to_string()],

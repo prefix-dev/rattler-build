@@ -222,6 +222,65 @@ html, body {
   cursor: wait;
 }
 
+/* Recipe generator controls (PyPI / CRAN / CPAN) */
+.generator-controls {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+  align-items: center;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.generator-controls select,
+.generator-controls input {
+  background: var(--bg-editor);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 11px;
+  font-family: var(--font-sans);
+}
+
+.generator-controls input {
+  width: 110px;
+}
+
+.generator-controls input:focus,
+.generator-controls select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.generator-controls input::placeholder {
+  color: var(--text-muted);
+}
+
+.generator-controls button {
+  background: var(--bg-editor);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 10px;
+  font-size: 11px;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  text-transform: none;
+  letter-spacing: normal;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.generator-controls button:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.generator-controls button:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
 .editor-container {
   flex: 1;
   position: relative;

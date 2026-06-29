@@ -27,6 +27,16 @@
         <div class="recipe-pane">
           <div class="panel-header">
             Recipe YAML
+            <div class="generator-controls">
+              <select id="generator-source" title="Recipe source">
+                <option value="pypi">PyPI</option>
+                <option value="cran">CRAN</option>
+                <option value="cpan">CPAN</option>
+              </select>
+              <input id="generator-package" type="text" placeholder="package name" spellcheck="false" autocomplete="off">
+              <input id="generator-version" type="text" placeholder="version (optional)" spellcheck="false" autocomplete="off">
+              <button id="generator-btn" title="Fetch package metadata and generate a recipe">generate</button>
+            </div>
           </div>
           <div class="editor-container">
             <pre class="editor-highlight" id="recipe-highlight"></pre>
