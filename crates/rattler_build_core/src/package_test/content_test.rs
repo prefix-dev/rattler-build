@@ -12,6 +12,22 @@ fn build_glob(glob: String) -> Result<Glob, globset::Error> {
     GlobBuilder::new(&glob).empty_alternates(true).build()
 }
 
+/// Build a single glob entry from one or more expanded patterns.
+///
+/// The patterns are combined into a [`GlobSet`] (so the entry matches if *any*
+/// pattern matches) and joined into a human-readable string used in the
+/// success/failure messages. Using the expanded patterns for display - rather
+/// than the raw user-provided source - makes it clear which paths are actually
+/// being checked, including any platform-specific prefixes (e.g. `include/` or
+/// `Library/include/`) that are prepended automatically.
+fn build_entry(patterns: Vec<String>) -> Result<(String, GlobSet), globset::Error> {
+    let mut builder = GlobSet::builder();
+    for pattern in &patterns {
+        builder.add(build_glob(pattern.clone())?);
+    }
+    Ok((patterns.join(", "), builder.build()?))
+}
+
 fn display_success(matches: &[&PathBuf], glob: &str, section: &str) {
     tracing::info!(
         "{} {section}: \"{}\" matched:",
@@ -193,8 +209,7 @@ impl PackageContentsTestExt for PackageContentsTest {
                     } else {
                         format!("include/{}", source)
                     };
-                    let globset = GlobSet::builder().add(build_glob(pattern)?).build()?;
-                    Ok(vec![(source.to_string(), globset)])
+                    Ok(vec![build_entry(vec![pattern])?])
                 })
             }
             Section::Bin => {
@@ -204,27 +219,22 @@ impl PackageContentsTestExt for PackageContentsTest {
                     self.bin.not_exists.include_globs()
                 };
                 Self::match_files(raws, |bin_raw| {
-                    let globset = if target_platform.is_windows() {
+                    let patterns = if target_platform.is_windows() {
                         let ext = "{,.exe,.bat,.cmd,.com,.ps1}";
-                        GlobSet::builder()
-                            .add(build_glob(format!("Library/bin/{bin_raw}{ext}"))?)
-                            .add(build_glob(format!("Scripts/{bin_raw}{ext}"))?)
-                            .add(build_glob(format!("bin/{bin_raw}{ext}"))?)
-                            .add(build_glob(format!("Library/mingw-w64/bin/{bin_raw}{ext}"))?)
-                            .add(build_glob(format!("Library/usr/bin/{bin_raw}{ext}"))?)
-                            .add(build_glob(format!("{bin_raw}{ext}"))?)
-                            .build()
+                        vec![
+                            format!("Library/bin/{bin_raw}{ext}"),
+                            format!("Scripts/{bin_raw}{ext}"),
+                            format!("bin/{bin_raw}{ext}"),
+                            format!("Library/mingw-w64/bin/{bin_raw}{ext}"),
+                            format!("Library/usr/bin/{bin_raw}{ext}"),
+                            format!("{bin_raw}{ext}"),
+                        ]
                     } else if matches!(target_platform, &Platform::EmscriptenWasm32) {
-                        GlobSet::builder()
-                            .add(build_glob(format!("bin/{bin_raw}.js"))?)
-                            .add(build_glob(format!("bin/{bin_raw}.wasm"))?)
-                            .build()
+                        vec![format!("bin/{bin_raw}.js"), format!("bin/{bin_raw}.wasm")]
                     } else {
-                        GlobSet::builder()
-                            .add(Glob::new(&format!("bin/{bin_raw}"))?)
-                            .build()
-                    }?;
-                    Ok(vec![(bin_raw.to_string(), globset)])
+                        vec![format!("bin/{bin_raw}")]
+                    };
+                    Ok(vec![build_entry(patterns)?])
                 })
             }
             Section::Lib => {
@@ -237,61 +247,36 @@ impl PackageContentsTestExt for PackageContentsTest {
                     Self::match_files(raws, |raw| {
                         let mut res = Vec::new();
                         if raw.ends_with(".dll") {
-                            res.push((
-                                raw.to_string(),
-                                GlobSet::builder()
-                                    .add(Glob::new(&format!("Library/bin/{raw}"))?)
-                                    .build()?,
-                            ));
+                            res.push(build_entry(vec![format!("Library/bin/{raw}")])?);
                         } else if raw.ends_with(".lib") {
-                            res.push((
-                                raw.to_string(),
-                                GlobSet::builder()
-                                    .add(Glob::new(&format!("Library/lib/{raw}"))?)
-                                    .build()?,
-                            ));
+                            res.push(build_entry(vec![format!("Library/lib/{raw}")])?);
                         } else {
-                            res.push((
-                                raw.to_string(),
-                                GlobSet::builder()
-                                    .add(Glob::new(&format!("Library/bin/{raw}.dll"))?)
-                                    .build()?,
-                            ));
-                            res.push((
-                                raw.to_string(),
-                                GlobSet::builder()
-                                    .add(Glob::new(&format!("Library/lib/{raw}.lib"))?)
-                                    .build()?,
-                            ));
+                            res.push(build_entry(vec![format!("Library/bin/{raw}.dll")])?);
+                            res.push(build_entry(vec![format!("Library/lib/{raw}.lib")])?);
                         }
                         Ok(res)
                     })
                 } else {
                     Self::match_files(raws, |raw| {
-                        let globset = if target_platform.is_osx() {
+                        let patterns = if target_platform.is_osx() {
                             if raw.ends_with(".dylib") || raw.ends_with(".a") {
-                                GlobSet::builder()
-                                    .add(Glob::new(&format!("lib/{raw}"))?)
-                                    .build()
+                                vec![format!("lib/{raw}")]
                             } else {
-                                GlobSet::builder()
-                                    .add(build_glob(format!("lib/{{,lib}}{raw}.dylib"))?)
-                                    .add(build_glob(format!("lib/{{,lib}}{raw}.*.dylib"))?)
-                                    .build()
+                                vec![
+                                    format!("lib/{{,lib}}{raw}.dylib"),
+                                    format!("lib/{{,lib}}{raw}.*.dylib"),
+                                ]
                             }
+                        } else if raw.ends_with(".so") || raw.contains(".so.") || raw.ends_with(".a")
+                        {
+                            vec![format!("lib/{raw}")]
                         } else {
-                            if raw.ends_with(".so") || raw.contains(".so.") || raw.ends_with(".a") {
-                                GlobSet::builder()
-                                    .add(Glob::new(&format!("lib/{raw}"))?)
-                                    .build()
-                            } else {
-                                GlobSet::builder()
-                                    .add(build_glob(format!("lib/{{,lib}}{raw}.so"))?)
-                                    .add(build_glob(format!("lib/{{,lib}}{raw}.so.*"))?)
-                                    .build()
-                            }
-                        }?;
-                        Ok(vec![(raw.to_string(), globset)])
+                            vec![
+                                format!("lib/{{,lib}}{raw}.so"),
+                                format!("lib/{{,lib}}{raw}.so.*"),
+                            ]
+                        };
+                        Ok(vec![build_entry(patterns)?])
                     })
                 }
             }
@@ -309,9 +294,8 @@ impl PackageContentsTestExt for PackageContentsTest {
                     } else {
                         "lib/python*/site-packages"
                     };
-                    let mut builder = GlobSet::builder();
-                    if source.contains('/') {
-                        builder.add(build_glob(format!("{base}/{source}"))?);
+                    let patterns = if source.contains('/') {
+                        vec![format!("{base}/{source}")]
                     } else {
                         let mut parts = source.split('.').collect::<Vec<_>>();
                         let last = parts.pop().unwrap_or_default();
@@ -319,11 +303,12 @@ impl PackageContentsTestExt for PackageContentsTest {
                         if !path.is_empty() {
                             path.push('/');
                         }
-                        builder.add(build_glob(format!("{base}/{path}{last}.py"))?);
-                        builder.add(build_glob(format!("{base}/{path}{last}/__init__.py"))?);
-                    }
-                    let final_set = builder.build()?;
-                    Ok(vec![(source.to_string(), final_set)])
+                        vec![
+                            format!("{base}/{path}{last}.py"),
+                            format!("{base}/{path}{last}/__init__.py"),
+                        ]
+                    };
+                    Ok(vec![build_entry(patterns)?])
                 })
             }
             Section::Files => {
@@ -332,11 +317,7 @@ impl PackageContentsTestExt for PackageContentsTest {
                 } else {
                     self.files.not_exists.include_globs()
                 };
-                Self::match_files(raws, |source| {
-                    let g = Glob::new(source)?;
-                    let set = GlobSet::builder().add(g).build()?;
-                    Ok(vec![(source.to_string(), set)])
-                })
+                Self::match_files(raws, |source| Ok(vec![build_entry(vec![source.to_string()])?]))
             }
         }
     }
@@ -572,6 +553,21 @@ mod tests {
             .get_globs_for_section(Section::Include, true, &Platform::Linux64, false)
             .unwrap();
 
+        // The display string should reflect the *expanded* pattern (with the
+        // `include/` prefix that is prepended automatically), not just the raw
+        // user-provided source. See https://github.com/prefix-dev/rattler-build/issues/2584
+        let display: Vec<&str> = globs.iter().map(|(g, _)| g.as_str()).collect();
+        assert_eq!(display, vec!["include/foo", "include/bar"]);
+
+        let win_globs = package_contents
+            .get_globs_for_section(Section::Include, true, &Platform::Win64, false)
+            .unwrap();
+        let win_display: Vec<&str> = win_globs.iter().map(|(g, _)| g.as_str()).collect();
+        assert_eq!(
+            win_display,
+            vec!["Library/include/foo", "Library/include/bar"]
+        );
+
         let paths = &["include/foo".to_string(), "include/bar".to_string()];
         test_glob_matches(&globs, paths).unwrap();
 
@@ -598,6 +594,14 @@ mod tests {
         let globs = package_contents
             .get_globs_for_section(Section::Bin, true, &Platform::EmscriptenWasm32, false)
             .unwrap();
+
+        // For sections that expand into multiple candidate patterns, the display
+        // string joins them so the failure message shows every path that was tried.
+        let display: Vec<&str> = globs.iter().map(|(g, _)| g.as_str()).collect();
+        assert_eq!(
+            display,
+            vec!["bin/foo.js, bin/foo.wasm", "bin/bar.js, bin/bar.wasm"]
+        );
 
         let paths = &[
             "bin/foo.js".to_string(),
