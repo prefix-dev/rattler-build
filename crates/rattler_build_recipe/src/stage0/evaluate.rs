@@ -1616,7 +1616,20 @@ impl Evaluate for Stage0About {
             license_file_globs,
             license_file_late_bound,
         } = match self.license_file.as_ref() {
-            Some(lf) => evaluate_license_files(lf, context)?,
+            Some(lf) => {
+                let mut files = evaluate_license_files(lf, context)?;
+                // The `license_file` key was present in the recipe. If it
+                // evaluated to no ordinary globs and no late-bound entries
+                // (e.g. an explicit empty list `license_file: []`), represent
+                // it as an empty glob set rather than `None`. This preserves
+                // the distinction between "key absent" (inherit the top-level
+                // value during merge) and "key explicitly set to empty"
+                // (override the top-level value and copy no license files).
+                if files.license_file_globs.is_none() && files.license_file_late_bound.is_empty() {
+                    files.license_file_globs = Some(GlobVec::default());
+                }
+                files
+            }
             None => LicenseFiles::default(),
         };
 
@@ -4691,6 +4704,70 @@ outputs:
                     "Custom output summary"
                 ); // Overridden
                 assert!(output2.about.license.is_some()); // Inherited
+            }
+            _ => panic!("Expected MultiOutputRecipe"),
+        }
+    }
+
+    #[test]
+    fn test_output_can_override_license_file_with_empty_list() {
+        use crate::stage0::parser::parse_recipe_or_multi_from_source;
+
+        // Regression test for https://github.com/prefix-dev/rattler-build/issues/2598
+        // An output that sets `license_file: []` should override (clear) the
+        // inherited top-level `license_file` rather than fall back to it.
+        let recipe_yaml = r#"
+schema_version: 1
+
+recipe:
+  name: myproject
+  version: 1.0.0
+
+about:
+  license_file:
+    - LICENSE
+
+outputs:
+  - package:
+      name: output-clears-license
+      version: 1.0.0
+    about:
+      license_file: []
+
+  - package:
+      name: output-inherits-license
+      version: 1.0.0
+"#;
+
+        let parsed = parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+
+        match parsed {
+            stage0::Recipe::MultiOutput(multi) => {
+                let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
+
+                let recipes = multi.evaluate(&ctx).unwrap();
+                assert_eq!(recipes.len(), 2);
+
+                // First output explicitly clears the license files with `[]`.
+                // The merge must keep that empty override instead of inheriting
+                // the top-level `[LICENSE]`.
+                let cleared = &recipes[0];
+                assert!(
+                    cleared.about.license_file.is_some(),
+                    "explicit empty license_file should be preserved as Some(empty)"
+                );
+                assert!(cleared.about.license_file.as_ref().unwrap().is_empty());
+                assert!(cleared.about.license_file_late_bound.is_empty());
+
+                // Second output does not mention license_file, so it inherits
+                // the top-level value.
+                let inherited = &recipes[1];
+                let globs = inherited
+                    .about
+                    .license_file
+                    .as_ref()
+                    .expect("license_file should be inherited from top-level");
+                assert!(!globs.is_empty());
             }
             _ => panic!("Expected MultiOutputRecipe"),
         }
