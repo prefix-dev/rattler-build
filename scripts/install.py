@@ -32,7 +32,14 @@ def main() -> None:
     build_type = "debug" if args.debug else "release"
     exe_name = "rattler-build.exe" if sys.platform == "win32" else "rattler-build"
 
-    source = target_dir / build_type / exe_name
+    # When CARGO_BUILD_TARGET is set (the conda rust toolchain sets it to the
+    # host triple), cargo nests the binary under target_dir/<triple>/<build_type>.
+    build_target = os.environ.get("CARGO_BUILD_TARGET")
+    if build_target:
+        source = target_dir / build_target / build_type / exe_name
+    else:
+        source = target_dir / build_type / exe_name
+
     if not source.exists():
         print(f"Error: {source} does not exist. Run the build first.", file=sys.stderr)
         sys.exit(1)
