@@ -5,18 +5,28 @@ use clap::Parser;
 
 mod cpan;
 mod cran;
+#[cfg(not(target_arch = "wasm32"))]
 mod luarocks;
 mod pypi;
 mod serialize;
 
-pub use self::cpan::{CpanOpts, generate_cpan_recipe, generate_cpan_recipe_string};
-pub use self::cran::{CranOpts, generate_r_recipe, generate_r_recipe_string};
+pub use self::cpan::{CpanOpts, generate_cpan_recipe_string};
+pub use self::cran::{CranOpts, generate_r_recipe_string};
+pub use self::pypi::{PyPIOpts, generate_pypi_recipe_string};
+
+#[cfg(not(target_arch = "wasm32"))]
+pub use self::cpan::generate_cpan_recipe;
+#[cfg(not(target_arch = "wasm32"))]
+pub use self::cran::generate_r_recipe;
+#[cfg(not(target_arch = "wasm32"))]
 pub use self::luarocks::{LuarocksOpts, generate_luarocks_recipe, generate_luarocks_recipe_string};
-pub use self::pypi::{PyPIOpts, generate_pypi_recipe, generate_pypi_recipe_string};
+#[cfg(not(target_arch = "wasm32"))]
+pub use self::pypi::generate_pypi_recipe;
+#[cfg(not(target_arch = "wasm32"))]
 pub use serialize::write_recipe;
 
 /// The source of the package to generate a recipe for
-#[cfg(feature = "cli")]
+#[cfg(all(feature = "cli", not(target_arch = "wasm32")))]
 #[derive(Debug, Clone, Parser)]
 pub enum Source {
     /// Generate a recipe for a Python package from PyPI
@@ -33,7 +43,7 @@ pub enum Source {
 }
 
 /// Options for generating a recipe
-#[cfg(feature = "cli")]
+#[cfg(all(feature = "cli", not(target_arch = "wasm32")))]
 #[derive(Parser)]
 pub struct GenerateRecipeOpts {
     /// Type of package to generate a recipe for
@@ -42,7 +52,7 @@ pub struct GenerateRecipeOpts {
 }
 
 /// Generate a recipe for a package
-#[cfg(feature = "cli")]
+#[cfg(all(feature = "cli", not(target_arch = "wasm32")))]
 pub async fn generate_recipe(args: GenerateRecipeOpts) -> miette::Result<()> {
     match args.source {
         Source::Pypi(opts) => generate_pypi_recipe(&opts).await?,
