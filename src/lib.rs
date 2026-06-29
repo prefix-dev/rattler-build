@@ -433,6 +433,14 @@ pub async fn get_build_output(
             skipped
         );
 
+        // Display V3 package variant flags, if any. These are not variant keys,
+        // so they are shown below the build string rather than in the table.
+        let flags = &discovered_output.recipe.build().flags;
+        if !flags.is_empty() {
+            let flags = flags.iter().map(|flag| flag.as_str()).collect::<Vec<_>>();
+            tracing::info!("Flags: {}", flags.join(", "));
+        }
+
         let mut table = comfy_table::Table::new();
         table
             .load_preset(comfy_table::presets::UTF8_FULL_CONDENSED)
@@ -440,12 +448,6 @@ pub async fn get_build_output(
             .set_header(["Variant", "Version"]);
         for (key, value) in discovered_output.used_vars.iter() {
             table.add_row([key.normalize(), format!("{:?}", value)]);
-        }
-        // Display V3 package variant flags, if any.
-        let flags = &discovered_output.recipe.build().flags;
-        if !flags.is_empty() {
-            let flags = flags.iter().map(|flag| flag.as_str()).collect::<Vec<_>>();
-            table.add_row(["flags".to_string(), format!("{:?}", flags)]);
         }
         tracing::info!("\n{}\n", table);
     }
