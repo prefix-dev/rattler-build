@@ -29,6 +29,12 @@ pub struct About {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub license_file: Option<GlobVec>,
 
+    /// Whether `license_file` was explicitly present in the source recipe.
+    /// This preserves an explicit empty list so outputs can override inherited
+    /// top-level license files.
+    #[serde(default, skip)]
+    pub license_file_specified: bool,
+
     /// License file paths that reference late-bound build directory variables
     /// (e.g. `${{ PREFIX }}/share/licenses/LICENSE`). These are resolved during
     /// packaging once the build directories are known.
@@ -61,6 +67,7 @@ impl About {
             && self.documentation.is_none()
             && self.license.is_none()
             && self.license_file.is_none()
+            && !self.license_file_specified
             && self.license_file_late_bound.is_empty()
             && self.license_family.is_none()
             && self.summary.is_none()

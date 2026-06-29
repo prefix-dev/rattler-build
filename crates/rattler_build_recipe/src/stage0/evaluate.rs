@@ -1630,6 +1630,7 @@ impl Evaluate for Stage0About {
                 .map(|v| v.evaluate(context))
                 .transpose()?,
             license_file: license_file_globs,
+            license_file_specified: self.license_file.is_some(),
             license_file_late_bound,
             license_family: evaluate_optional_string_value(&self.license_family, context)?,
             summary: evaluate_optional_string_value(&self.summary, context)?,
@@ -2989,9 +2990,11 @@ fn merge_stage1_build(
 fn merge_stage1_about(toplevel: stage1::About, output: stage1::About) -> stage1::About {
     // `license_file` and `license_file_late_bound` are both derived from the
     // single `license_file` recipe key, so they are merged as a unit: if the
-    // output specified any license files, its values win entirely.
-    let use_output_license =
-        output.license_file.is_some() || !output.license_file_late_bound.is_empty();
+    // output specified `license_file`, its values win entirely, including an
+    // explicit empty list.
+    let use_output_license = output.license_file_specified
+        || output.license_file.is_some()
+        || !output.license_file_late_bound.is_empty();
 
     stage1::About {
         homepage: if output.homepage.is_some() {
@@ -3023,6 +3026,11 @@ fn merge_stage1_about(toplevel: stage1::About, output: stage1::About) -> stage1:
             output.license_file
         } else {
             toplevel.license_file
+        },
+        license_file_specified: if use_output_license {
+            true
+        } else {
+            toplevel.license_file_specified
         },
         license_file_late_bound: if use_output_license {
             output.license_file_late_bound
@@ -4691,6 +4699,47 @@ outputs:
                     "Custom output summary"
                 ); // Overridden
                 assert!(output2.about.license.is_some()); // Inherited
+            }
+            _ => panic!("Expected MultiOutputRecipe"),
+        }
+    }
+
+    #[test]
+    fn test_multi_output_empty_license_file_overrides_top_level() {
+        use crate::stage0::parser::parse_recipe_or_multi_from_source;
+
+        let recipe_yaml = r#"
+schema_version: 1
+
+recipe:
+  name: myproject
+  version: 1.0.0
+
+about:
+  license_file:
+    - LICENSE
+
+outputs:
+  - package:
+      name: output-no-license-file
+      version: 1.0.0
+    about:
+      license_file: []
+"#;
+
+        let parsed = parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+
+        match parsed {
+            stage0::Recipe::MultiOutput(multi) => {
+                let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
+
+                let recipes = multi.evaluate(&ctx).unwrap();
+                assert_eq!(recipes.len(), 1);
+
+                let output = &recipes[0];
+                assert!(output.about.license_file_specified);
+                assert!(output.about.license_file.is_none());
+                assert!(output.about.license_file_late_bound.is_empty());
             }
             _ => panic!("Expected MultiOutputRecipe"),
         }
