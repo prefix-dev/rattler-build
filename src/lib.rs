@@ -441,6 +441,12 @@ pub async fn get_build_output(
         for (key, value) in discovered_output.used_vars.iter() {
             table.add_row([key.normalize(), format!("{:?}", value)]);
         }
+        // Display V3 package variant flags, if any.
+        let flags = &discovered_output.recipe.build().flags;
+        if !flags.is_empty() {
+            let flags = flags.iter().map(|flag| flag.as_str()).collect::<Vec<_>>();
+            table.add_row(["flags".to_string(), format!("{:?}", flags)]);
+        }
         tracing::info!("\n{}\n", table);
     }
     drop(enter);
