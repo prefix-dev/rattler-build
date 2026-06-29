@@ -5,6 +5,28 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>rattler-build Recipe Playground</title>
   <link rel="stylesheet" href="style.css">
+
+  <!-- CodeMirror 6, loaded from a CDN as ES modules. Exact versions are
+       pinned and shared dependencies (@codemirror/state, @lezer/*, ...) are
+       marked `external` so every package resolves to the same singleton
+       through this import map — otherwise CodeMirror throws on duplicate
+       @codemirror/state instances. -->
+  <script type="importmap">
+  {
+    "imports": {
+      "@codemirror/state": "https://esm.sh/@codemirror/state@6.7.0",
+      "@codemirror/view": "https://esm.sh/@codemirror/view@6.43.4?external=@codemirror/state",
+      "@codemirror/language": "https://esm.sh/@codemirror/language@6.12.4?external=@codemirror/state,@codemirror/view,@lezer/common,@lezer/highlight,@lezer/lr",
+      "@codemirror/commands": "https://esm.sh/@codemirror/commands@6.10.4?external=@codemirror/state,@codemirror/view,@codemirror/language",
+      "@codemirror/search": "https://esm.sh/@codemirror/search@6.7.1?external=@codemirror/state,@codemirror/view",
+      "@codemirror/lang-yaml": "https://esm.sh/@codemirror/lang-yaml@6.1.3?external=@codemirror/state,@codemirror/view,@codemirror/language,@lezer/common,@lezer/highlight,@lezer/lr,@lezer/yaml",
+      "@lezer/common": "https://esm.sh/@lezer/common@1.5.2",
+      "@lezer/highlight": "https://esm.sh/@lezer/highlight@1.2.3?external=@lezer/common",
+      "@lezer/lr": "https://esm.sh/@lezer/lr@1.4.10?external=@lezer/common",
+      "@lezer/yaml": "https://esm.sh/@lezer/yaml@1.0.4?external=@lezer/common,@lezer/highlight,@lezer/lr"
+    }
+  }
+  </script>
 </head>
 <body>
   <div id="app">
@@ -38,13 +60,7 @@
               <button id="generator-btn" title="Fetch package metadata and generate a recipe">generate</button>
             </div>
           </div>
-          <div class="editor-container">
-            <div class="line-numbers" id="recipe-gutter" aria-hidden="true"></div>
-            <div class="editor-code">
-              <pre class="editor-highlight" id="recipe-highlight"></pre>
-              <textarea id="recipe-editor" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off"></textarea>
-            </div>
-          </div>
+          <div class="editor-host" id="recipe-editor"></div>
         </div>
         <div class="divider-v" id="divider-v"></div>
         <div class="variables-panel">
@@ -56,15 +72,7 @@
               <button class="variant-format-btn" data-format="conda_build_config">conda_build_config</button>
             </div>
           </div>
-          <div class="editor-container">
-            <div class="line-numbers" id="variants-gutter" aria-hidden="true"></div>
-            <div class="editor-code">
-              <pre class="editor-highlight" id="variants-highlight"></pre>
-              <textarea id="variants-editor" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" placeholder="python:
-  - &quot;3.11&quot;
-  - &quot;3.12&quot;"></textarea>
-            </div>
-          </div>
+          <div class="editor-host" id="variants-editor"></div>
           <div class="used-vars" id="used-vars"></div>
         </div>
       </div>

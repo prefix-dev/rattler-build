@@ -1,4 +1,12 @@
-import wasmInit, { parse_recipe, evaluate_recipe, get_used_variables, get_platforms, render_variants, get_theme_css, highlight_source_yaml, first_variant_values, generate_pypi_recipe, generate_cran_recipe, generate_cpan_recipe } from './rattler_build_playground.js';
+import wasmInit, { parse_recipe, evaluate_recipe, get_used_variables, get_platforms, render_variants, get_theme_css, first_variant_values, generate_pypi_recipe, generate_cran_recipe, generate_cpan_recipe } from './rattler_build_playground.js';
+
+import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, drawSelection, placeholder } from '@codemirror/view';
+import { EditorState, Compartment } from '@codemirror/state';
+import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
+import { searchKeymap, highlightSelectionMatches } from '@codemirror/search';
+import { yaml } from '@codemirror/lang-yaml';
+import { syntaxHighlighting, HighlightStyle, indentOnInput, bracketMatching, indentUnit } from '@codemirror/language';
+import { tags as t } from '@lezer/highlight';
 
 // ===== HTML utilities =====
 
@@ -89,12 +97,8 @@ let pinningCache = null;
 
 // ===== DOM elements =====
 
-const recipeEditor = document.getElementById('recipe-editor');
-const variantsEditor = document.getElementById('variants-editor');
-const recipeHighlight = document.getElementById('recipe-highlight');
-const variantsHighlight = document.getElementById('variants-highlight');
-const recipeGutter = document.getElementById('recipe-gutter');
-const variantsGutter = document.getElementById('variants-gutter');
+const recipeHost = document.getElementById('recipe-editor');
+const variantsHost = document.getElementById('variants-editor');
 const outputContainer = document.getElementById('output-container');
 const outputBadge = document.getElementById('output-badge');
 const platformSelect = document.getElementById('platform-select');
@@ -105,44 +109,119 @@ const generatorPackage = document.getElementById('generator-package');
 const generatorVersion = document.getElementById('generator-version');
 const generatorBtn = document.getElementById('generator-btn');
 
-// ===== Editor helpers =====
+// ===== CodeMirror editors =====
 
-function highlightEditor(textarea, pre) {
-  pre.innerHTML = highlight_source_yaml(textarea.value);
+// Catppuccin Mocha highlight style, mapped onto the tags produced by
+// @codemirror/lang-yaml (see its styleTags definition).
+const yamlHighlight = HighlightStyle.define([
+  { tag: [t.definition(t.propertyName), t.propertyName], color: '#89b4fa' }, // keys
+  { tag: [t.string, t.special(t.string), t.attributeValue], color: '#a6e3a1' }, // quoted & block scalars
+  { tag: t.content, color: '#cdd6f4' }, // plain scalar values
+  { tag: t.keyword, color: '#cba6f7' }, // directives
+  { tag: t.lineComment, color: '#6c7086', fontStyle: 'italic' },
+  { tag: [t.separator, t.punctuation, t.squareBracket, t.brace, t.meta], color: '#9399b2' },
+  { tag: t.labelName, color: '#f9e2af' }, // anchors / aliases
+  { tag: t.typeName, color: '#fab387' }, // tags
+]);
+
+const editorTheme = EditorView.theme({
+  '&': { height: '100%', backgroundColor: 'var(--bg-editor)', color: 'var(--text-primary)' },
+  '&.cm-focused': { outline: 'none' },
+  '.cm-scroller': { fontFamily: 'var(--font-mono)', lineHeight: '1.5', overflow: 'auto' },
+  '.cm-content': { caretColor: 'var(--text-primary)' },
+  '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'var(--text-primary)' },
+  '.cm-gutters': {
+    backgroundColor: 'var(--bg-secondary)',
+    color: 'var(--text-muted)',
+    border: 'none',
+    borderRight: '1px solid var(--border)',
+  },
+  '.cm-activeLine': { backgroundColor: 'rgba(205, 214, 244, 0.04)' },
+  '.cm-activeLineGutter': { backgroundColor: 'var(--bg-panel)', color: 'var(--text-secondary)' },
+  '.cm-selectionBackground, &.cm-focused .cm-selectionBackground, .cm-content ::selection': {
+    backgroundColor: 'rgba(116, 199, 236, 0.25)',
+  },
+  '.cm-selectionMatch': { backgroundColor: 'rgba(249, 226, 175, 0.18)' },
+  '.cm-matchingBracket, &.cm-focused .cm-matchingBracket': {
+    backgroundColor: 'rgba(116, 199, 236, 0.2)',
+    outline: '1px solid var(--accent)',
+  },
+  '.cm-placeholder': { color: 'var(--text-muted)' },
+  // Search panel (Ctrl/Cmd-F) styled to match the dark theme.
+  '.cm-panels': { backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' },
+  '.cm-panels.cm-panels-bottom': { borderTop: '1px solid var(--border)' },
+  '.cm-textfield': {
+    backgroundColor: 'var(--bg-editor)',
+    color: 'var(--text-primary)',
+    border: '1px solid var(--border)',
+  },
+  '.cm-button': {
+    backgroundColor: 'var(--bg-panel)',
+    color: 'var(--text-primary)',
+    border: '1px solid var(--border)',
+    backgroundImage: 'none',
+  },
+}, { dark: true });
+
+// 16px keeps iOS Safari from auto-zooming when an editor is focused; 14px is
+// nicer on a desktop. Swapped reactively via a compartment on viewport change.
+const fontCompartment = new Compartment();
+const mobileMedia = window.matchMedia('(max-width: 768px)');
+const fontTheme = () => EditorView.theme({ '.cm-scroller': { fontSize: mobileMedia.matches ? '16px' : '14px' } });
+
+function makeEditor(host, doc, { placeholderText, onChange } = {}) {
+  const extensions = [
+    lineNumbers(),
+    highlightActiveLineGutter(),
+    highlightActiveLine(),
+    history(),
+    drawSelection(),
+    indentOnInput(),
+    indentUnit.of('  '),
+    bracketMatching(),
+    highlightSelectionMatches(),
+    EditorView.lineWrapping,
+    yaml(),
+    syntaxHighlighting(yamlHighlight),
+    editorTheme,
+    fontCompartment.of(fontTheme()),
+    keymap.of([indentWithTab, ...defaultKeymap, ...historyKeymap, ...searchKeymap]),
+    EditorView.updateListener.of((u) => {
+      if (u.docChanged && onChange) onChange(u.state.doc.toString());
+    }),
+  ];
+  if (placeholderText) extensions.push(placeholder(placeholderText));
+  return new EditorView({ parent: host, state: EditorState.create({ doc, extensions }) });
 }
 
-// Render the line-number gutter: one number per logical line. Lines never
-// wrap (white-space: pre), so each number stays aligned with its row.
-function updateGutter(textarea, gutter) {
-  const count = textarea.value.split('\n').length;
-  let out = '';
-  for (let i = 1; i <= count; i++) out += i === count ? i : i + '\n';
-  gutter.textContent = out;
-}
+const recipeEditor = makeEditor(recipeHost, localStorage.getItem('playground-recipe') || DEFAULT_RECIPE, {
+  onChange: (text) => {
+    localStorage.setItem('playground-recipe', text);
+    scheduleUpdate();
+  },
+});
 
-// Fallback auto-resize for browsers without CSS field-sizing: content.
-// Sizes the textarea to its content so it never scrolls internally; the
-// parent .editor-container scrolls both textarea and highlight <pre> as one.
-function autoResize(textarea) {
-  if (CSS.supports('field-sizing', 'content')) return;
-  const pre = textarea.previousElementSibling;
-  textarea.style.height = 'auto';
-  textarea.style.height = Math.max(textarea.scrollHeight, textarea.parentElement.clientHeight) + 'px';
-  // With white-space: pre, long lines also need horizontal room so the
-  // textarea and highlight stay aligned when the container scrolls sideways.
-  textarea.style.width = 'auto';
-  textarea.style.width = Math.max(pre.scrollWidth, textarea.parentElement.clientWidth) + 'px';
-}
+const variantsEditor = makeEditor(variantsHost, localStorage.getItem('playground-variants') || DEFAULT_VARIANTS, {
+  placeholderText: 'python:\n  - "3.11"\n  - "3.12"',
+  onChange: (text) => {
+    localStorage.setItem('playground-variants', text);
+    scheduleUpdate();
+  },
+});
 
-// Refresh a source editor: highlight (once WASM is ready), gutter, and size.
-function syncEditor(textarea, pre, gutter) {
-  if (wasmReady) highlightEditor(textarea, pre);
-  updateGutter(textarea, gutter);
-  autoResize(textarea);
-}
+mobileMedia.addEventListener('change', () => {
+  for (const view of [recipeEditor, variantsEditor]) {
+    view.dispatch({ effects: fontCompartment.reconfigure(fontTheme()) });
+  }
+});
 
-const syncRecipe = () => syncEditor(recipeEditor, recipeHighlight, recipeGutter);
-const syncVariants = () => syncEditor(variantsEditor, variantsHighlight, variantsGutter);
+const getRecipe = () => recipeEditor.state.doc.toString();
+const getVariants = () => variantsEditor.state.doc.toString();
+
+// Replace an editor's whole document (used by the generator and pinning loader).
+function setEditorText(view, text) {
+  view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text } });
+}
 
 // ===== Rendering =====
 
@@ -237,8 +316,8 @@ function scheduleUpdate() {
 function update() {
   if (!wasmReady) return;
 
-  const yaml = recipeEditor.value;
-  const variantYaml = variantsEditor.value || '{}';
+  const yaml = getRecipe();
+  const variantYaml = getVariants() || '{}';
   const platform = platformSelect.value;
   const start = performance.now();
 
@@ -295,14 +374,6 @@ function update() {
 
 // ===== Event listeners =====
 
-// Load saved state or defaults
-recipeEditor.value = localStorage.getItem('playground-recipe') || DEFAULT_RECIPE;
-variantsEditor.value = localStorage.getItem('playground-variants') || DEFAULT_VARIANTS;
-
-// Show line numbers right away, before the WASM highlighter is ready.
-updateGutter(recipeEditor, recipeGutter);
-updateGutter(variantsEditor, variantsGutter);
-
 // Tab switching
 document.querySelectorAll('.tab-btn').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -342,19 +413,6 @@ if (savedFormat) {
     btn.classList.toggle('active', btn.dataset.format === variantFormat);
   });
 }
-
-// Debounced update on input
-recipeEditor.addEventListener('input', () => {
-  localStorage.setItem('playground-recipe', recipeEditor.value);
-  syncRecipe();
-  scheduleUpdate();
-});
-
-variantsEditor.addEventListener('input', () => {
-  localStorage.setItem('playground-variants', variantsEditor.value);
-  syncVariants();
-  scheduleUpdate();
-});
 
 platformSelect.addEventListener('change', () => {
   localStorage.setItem('playground-platform', platformSelect.value);
@@ -403,10 +461,8 @@ async function runGenerator() {
     const resultJson = await cfg.fn(pkg, arg2);
     const result = JSON.parse(resultJson);
     if (result.ok) {
-      recipeEditor.value = result.result;
-      localStorage.setItem('playground-recipe', recipeEditor.value);
-      syncRecipe();
-      scheduleUpdate();
+      // The editor's update listener persists the new text and schedules a render.
+      setEditorText(recipeEditor, result.result);
     } else {
       outputBadge.textContent = 'error';
       outputBadge.style.color = 'var(--error)';
@@ -443,15 +499,14 @@ loadPinningBtn.addEventListener('click', async () => {
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       pinningCache = await resp.text();
     }
-    variantsEditor.value = pinningCache;
-    localStorage.setItem('playground-variants', pinningCache);
+    // The editor's update listener persists the new text and schedules a render.
+    setEditorText(variantsEditor, pinningCache);
     // conda-forge pinning uses conda_build_config format
     variantFormat = 'conda_build_config';
     localStorage.setItem('playground-variant-format', variantFormat);
     document.querySelectorAll('.variant-format-btn').forEach(b => {
       b.classList.toggle('active', b.dataset.format === variantFormat);
     });
-    syncVariants();
     scheduleUpdate();
   } catch (e) {
     alert(`Failed to load pinning: ${e.message}`);
@@ -459,20 +514,6 @@ loadPinningBtn.addEventListener('click', async () => {
     loadPinningBtn.disabled = false;
     loadPinningBtn.textContent = 'insert conda-forge pinning';
   }
-});
-
-// Handle tab key in editors
-[recipeEditor, variantsEditor].forEach(editor => {
-  editor.addEventListener('keydown', (e) => {
-    if (e.key === 'Tab') {
-      e.preventDefault();
-      const start = editor.selectionStart;
-      const end = editor.selectionEnd;
-      editor.value = editor.value.substring(0, start) + '  ' + editor.value.substring(end);
-      editor.selectionStart = editor.selectionEnd = start + 2;
-      editor.dispatchEvent(new Event('input'));
-    }
-  });
 });
 
 // ===== Draggable dividers =====
@@ -565,10 +606,6 @@ async function main() {
       if (p === savedPlatform) opt.selected = true;
       platformSelect.appendChild(opt);
     }
-
-    // Initial editor highlighting, gutters, and sizing
-    syncRecipe();
-    syncVariants();
 
     // Initial render
     update();

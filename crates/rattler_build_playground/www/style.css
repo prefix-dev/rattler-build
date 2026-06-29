@@ -281,92 +281,23 @@ html, body {
   cursor: wait;
 }
 
-.editor-container {
+/* CodeMirror editor mount. The CodeMirror instance fills this box and
+   provides its own scrolling, line-number gutter, and syntax highlighting
+   (themed to match in app.js). */
+.editor-host {
   flex: 1;
-  position: relative;
-  overflow: auto;
+  min-height: 0;
+  overflow: hidden;
   background: var(--bg-editor);
-  display: flex;
-  align-items: flex-start;
 }
 
-/* Line-number gutter. Pinned to the left with position: sticky so it stays
-   visible while long lines scroll horizontally; scrolls vertically with the
-   code. Lines never wrap (white-space: pre on the code), so a single number
-   per logical line stays aligned with its row. */
-.line-numbers {
-  position: sticky;
-  left: 0;
-  z-index: 2;
-  flex: 0 0 auto;
-  min-height: 100%;
-  padding: 12px 8px 12px 12px;
-  font-family: var(--font-mono);
-  font-size: 14px;
-  line-height: 1.5;
-  text-align: right;
-  white-space: pre;
-  color: var(--text-muted);
-  background: var(--bg-editor);
-  border-right: 1px solid var(--border);
-  user-select: none;
-  -webkit-user-select: none;
+.editor-host .cm-editor {
+  height: 100%;
 }
 
-.editor-code {
-  position: relative;
-  flex: 1 0 auto;
-  min-width: 0;
-  align-self: stretch;
-}
-
-.editor-highlight {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  min-height: 100%;
-  margin: 0;
-  padding: 12px;
-  font-family: var(--font-mono);
-  font-size: 14px;
-  line-height: 1.5;
-  tab-size: 2;
-  white-space: pre;
-  pointer-events: none;
-  background: var(--bg-editor);
-  color: var(--text-primary);
-}
-
-.editor-highlight code,
 .output-yaml code {
   background: transparent;
   font-family: inherit;
-}
-
-.editor-code textarea {
-  display: block;
-  position: relative;
-  width: 100%;
-  min-height: 100%;
-  field-sizing: content;
-  overflow: hidden;
-  background: transparent;
-  color: transparent;
-  caret-color: var(--text-primary);
-  border: none;
-  padding: 12px;
-  font-family: var(--font-mono);
-  font-size: 14px;
-  line-height: 1.5;
-  white-space: pre;
-  resize: none;
-  outline: none;
-  tab-size: 2;
-}
-
-.editor-code textarea::placeholder {
-  color: var(--text-muted);
 }
 
 /* Dividers */
@@ -727,12 +658,5 @@ html, body {
     width: 100%;
     height: 4px;
     cursor: row-resize;
-  }
-
-  /* 16px keeps iOS Safari from auto-zooming when an editor is focused. */
-  .line-numbers,
-  .editor-highlight,
-  .editor-code textarea {
-    font-size: 16px;
   }
 }
