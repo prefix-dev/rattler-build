@@ -52,6 +52,15 @@ pub struct Build {
     pub python: Python,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub noarch: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dynamic_linking: Option<DynamicLinking>,
+}
+
+/// Dynamic linking settings for compiled packages (e.g. `rpaths`).
+#[derive(Default, Debug, Serialize)]
+pub struct DynamicLinking {
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub rpaths: Vec<String>,
 }
 
 #[derive(Default, Debug, Serialize)]
