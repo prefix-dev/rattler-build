@@ -1,0 +1,22 @@
+package:
+  name: source_filter_archive
+  version: 1.0.0
+
+source:
+  # Local tarball that gets extracted; the filter must be applied to the
+  # extracted contents (same code path as URL sources pointing to archives).
+  - path: ./archive.tar.gz
+    filter:
+      include:
+        - "cmake/*"
+        - "clang/*"
+      exclude:
+        - "third_party/*"
+
+build:
+  script:
+    - echo "running build (test)"
+    - test -f cmake/CMakeLists.txt
+    - test -f clang/main.cpp
+    - test ! -e third_party
+    - test ! -f README.md
