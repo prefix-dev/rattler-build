@@ -233,17 +233,11 @@ pub fn os_vars(
         }
     }
 
-    let shlib_ext = if target_platform.is_windows() {
-        ".dll"
-    } else if target_platform.is_osx() {
-        ".dylib"
-    } else if target_platform.is_linux() {
-        ".so"
-    } else {
-        ".not_implemented"
-    };
-
-    insert!(vars, "SHLIB_EXT", shlib_ext);
+    insert!(
+        vars,
+        "SHLIB_EXT",
+        rattler_build_types::shlib_ext(target_platform)
+    );
     vars.insert(path_var.to_string(), env::var(path_var).ok());
 
     if target_platform.is_windows() {
