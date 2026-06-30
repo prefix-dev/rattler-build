@@ -173,7 +173,8 @@ pub struct VariantKeyUsage {
     /// Variant keys to ignore
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub ignore_keys: Vec<String>,
-    /// Down-prioritize variant (negative priority value)
+    /// Down-prioritize this variant. Higher values make the variant less
+    /// preferred; the magnitude of the value is used (the sign is ignored).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub down_prioritize_variant: Option<i32>,
 }
