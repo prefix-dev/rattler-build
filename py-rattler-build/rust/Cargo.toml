@@ -23,7 +23,7 @@ rattler_build_variant_config = { path = "../../crates/rattler_build_variant_conf
 rattler_build_package = { path = "../../crates/rattler_build_package" }
 rattler_build_script = { path = "../../crates/rattler_build_script" }
 indexmap = "2.13.0"
-pyo3 = { version = "0.28.2", features = [
+pyo3 = { version = "0.29.0", features = [
   "abi3-py38",
   "extension-module",
   "multiple-pymethods",
@@ -50,7 +50,7 @@ miette = "7.6.0"
 tempfile = "3.27.0"
 serde_yaml = "0.9"
 serde_json = "1.0.149"
-pythonize = "0.28.0"
+pythonize = "0.29.0"
 thiserror = "2.0.18"
 fs-err = "3.3.0"
 tracing = "0.1"
@@ -58,7 +58,7 @@ tracing-subscriber = "0.3"
 indicatif = "0.18"
 
 [build-dependencies]
-pyo3-build-config = "0.28.2"
+pyo3-build-config = "0.29.0"
 
 # Prevent package from thinking it's in the workspace
 [workspace]
