@@ -49,6 +49,8 @@ pub struct GitSourceElement {
 #[derive(Default, Debug, Serialize)]
 pub struct Build {
     pub number: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub skip: Option<String>,
     pub script: String,
     #[serde(skip_serializing_if = "Python::is_default")]
     pub python: Python,

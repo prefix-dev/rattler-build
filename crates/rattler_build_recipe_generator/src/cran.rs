@@ -275,6 +275,30 @@ const R_BUILTINS: &[&str] = &[
 /// keeps the post-processing match simple.
 const CROSS_R_BASE_MARKER: &str = "CROSS_R_BASE_PLACEHOLDER";
 
+/// Placeholder stored in `build.script`. Expanded by
+/// [`format_cran_recipe_with_suggests`] into a platform-conditional list that
+/// uses `${R_ARGS}` on Unix and `%R_ARGS%` on Windows.
+const CRAN_R_SCRIPT_MARKER: &str = "CRAN_R_SCRIPT_PLACEHOLDER";
+
+/// Convert an R `Depends: R (>= x.y.z)` version string into a rattler-build
+/// `skip` expression. Only `>=` constraints are handled; returns `None` for
+/// anything else.
+fn r_dep_version_to_skip(version: &str) -> Option<String> {
+    let num = version
+        .trim()
+        .trim_start_matches(">=")
+        .trim_start_matches('>')
+        .trim();
+    let parts: Vec<&str> = num.splitn(3, '.').collect();
+    match parts.as_slice() {
+        [major, minor, ..] if !major.is_empty() => {
+            Some(format!("match(r_base, \"<{}.{}\")", major, minor))
+        }
+        [major] if !major.is_empty() => Some(format!("match(r_base, \"<{}\")", major)),
+        _ => None,
+    }
+}
+
 fn format_cran_recipe_with_suggests(recipe: &serialize::Recipe) -> String {
     let recipe_str = format!("{}", recipe);
     let mut final_recipe = String::new();
@@ -289,6 +313,20 @@ fn format_cran_recipe_with_suggests(recipe: &serialize::Recipe) -> String {
                 "{indent}- if: build_platform != target_platform\n\
                  {indent}  then:\n\
                  {indent}    - cross-r-base ${{{{ r_base }}}}\n"
+            ));
+        } else if line
+            .trim_start()
+            .starts_with(&format!("script: {CRAN_R_SCRIPT_MARKER}"))
+        {
+            // Expand into a platform-conditional script list.
+            let indent_len = line.len() - line.trim_start().len();
+            let indent = &line[..indent_len];
+            final_recipe.push_str(&format!(
+                "{indent}script:\n\
+                 {indent}  - if: unix\n\
+                 {indent}    then: R CMD INSTALL --build . ${{R_ARGS}}\n\
+                 {indent}  - if: win\n\
+                 {indent}    then: R CMD INSTALL --build . %R_ARGS%\n"
             ));
         } else if line.contains("SUGGEST") {
             final_recipe.push_str(&format!(
@@ -366,10 +404,9 @@ async fn build_cran_recipe_and_deps(
     recipe.source.push(source.into());
 
     recipe.build.number = "${{ build_number }}".to_string();
-    // `${R_ARGS}` lets the recipe author pass extra flags (e.g.
-    // `--configure-args=...`) through to `R CMD INSTALL`, matching the
-    // convention used by conda-forge's R build scripts.
-    recipe.build.script = "R CMD INSTALL --build . ${R_ARGS}".to_string();
+    // Expanded by `format_cran_recipe_with_suggests` into a platform-specific
+    // list (${R_ARGS} on Unix, %R_ARGS% on Windows).
+    recipe.build.script = CRAN_R_SCRIPT_MARKER.to_string();
 
     let build_tools = vec![
         "${{ compiler('c') }}".to_string(),
@@ -382,18 +419,19 @@ async fn build_cran_recipe_and_deps(
     // they need a compiler even if `NeedsCompilation` is not set to `yes`.
     let mut needs_compilation = package_info.NeedsCompilation == "yes";
 
-    // `r-base` itself, possibly carrying the version constraint from a
-    // `Depends: R (>= x.y.z)` entry. It is the first requirement in both `host`
-    // and `run`.
-    let mut r_base = "r-base".to_string();
+    // `r-base` is always listed without a version pin; instead a minimum-R
+    // constraint from `Depends: R (>= x.y.z)` is expressed as a `skip`
+    // condition so variant selectors (r_base) control it at solve time.
+    let r_base = "r-base".to_string();
     let mut host = Vec::new();
     let mut run = Vec::new();
 
     let mut remaining_deps = HashSet::new();
     for dep in package_info._dependencies.iter() {
         if dep.package == "R" {
-            // The R version constraint pins `r-base` in both host and run.
-            r_base = format_r_package("base", dep.version.as_ref());
+            if let Some(ver) = &dep.version {
+                recipe.build.skip = r_dep_version_to_skip(ver);
+            }
             continue;
         }
 
