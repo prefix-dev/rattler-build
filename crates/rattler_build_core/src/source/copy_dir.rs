@@ -809,7 +809,7 @@ mod test {
             .unwrap();
 
         let dest = dest_dir.path().join("nested").join("LICENSE");
-        assert_eq!(copy_dir.copied_paths(), [dest.clone()]);
+        assert_eq!(copy_dir.copied_paths(), std::slice::from_ref(&dest));
         // The symlink should have been materialized as real content, not a symlink.
         assert!(!dest.is_symlink());
         assert_eq!(
