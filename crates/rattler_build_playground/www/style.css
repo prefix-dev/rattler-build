@@ -1,8 +1,8 @@
-/* ===== Fonts ===== */
-@font-face { font-family: "Moranga"; src: url("fonts/Moranga-Light.otf") format("opentype"); font-weight: 300; font-style: normal; font-display: swap; }
-@font-face { font-family: "Moranga"; src: url("fonts/Moranga-Regular.otf") format("opentype"); font-weight: 400; font-style: normal; font-display: swap; }
-@font-face { font-family: "Moranga"; src: url("fonts/Moranga-Medium.otf") format("opentype"); font-weight: 500; font-style: normal; font-display: swap; }
-@font-face { font-family: "Moranga"; src: url("fonts/Moranga-Bold.otf") format("opentype"); font-weight: 700; font-style: normal; font-display: swap; }
+/* ===== Fonts =====
+   Moranga is prefix.dev's proprietary brand font and is intentionally NOT
+   bundled here. The brand wordmark falls back to a serif (see --font-brand);
+   if a self-hosted Moranga ever lands at a stable URL it can be added back as
+   an @font-face. Inter and JetBrains Mono load from Google Fonts (index.html). */
 
 /* ===== Theme tokens ===== */
 :root {
