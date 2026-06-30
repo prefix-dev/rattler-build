@@ -584,6 +584,7 @@ pub async fn get_build_output(
             finalized_cache_dependencies: None,
             finalized_cache_sources: None,
             staging_library_name_map: None,
+            is_staging_debug: false,
             system_tools: SystemTools::new("rattler-build", env!("CARGO_PKG_VERSION")),
             build_summary: Arc::new(Mutex::new(BuildSummary::default())),
             extra_meta: Some(
@@ -1582,27 +1583,53 @@ pub async fn debug_recipe(
 
     let mut outputs = get_build_output(&build_data, &recipe_path, &tool_config).await?;
 
-    if let Some(output_name) = &debug_data.output_name {
-        let original_count = outputs.len();
-        outputs.retain(|output| output.name().as_normalized() == output_name);
-
-        if outputs.is_empty() {
-            return Err(miette::miette!(
-                "Output with name '{}' not found in recipe. Available outputs: {}",
-                output_name,
-                original_count
-            ));
-        }
-    } else if outputs.len() > 1 {
-        let output_names: Vec<String> = outputs
+    // Names that can be passed to --output-name: the package outputs plus any
+    // staging (compile) caches they inherit from.
+    let debuggable_names = |outputs: &[Output]| -> Vec<String> {
+        let mut names: Vec<String> = outputs
             .iter()
             .map(|output| output.name().as_normalized().to_string())
             .collect();
+        names.extend(
+            outputs
+                .iter()
+                .flat_map(|output| output.recipe.staging_caches.iter())
+                .map(|cache| cache.name.clone()),
+        );
+        names.sort();
+        names.dedup();
+        names
+    };
 
+    if let Some(output_name) = &debug_data.output_name {
+        if outputs
+            .iter()
+            .any(|output| output.name().as_normalized() == output_name)
+        {
+            outputs.retain(|output| output.name().as_normalized() == output_name);
+        } else if let Some(staging_output) = outputs
+            .iter()
+            .find_map(|output| output.as_staging_debug_output(output_name))
+        {
+            // The requested name is a staging (compile) output rather than a
+            // package output: debug the shared build environment itself.
+            tracing::info!(
+                "Setting up debug environment for staging output '{}'",
+                output_name
+            );
+            outputs = vec![staging_output];
+        } else {
+            return Err(miette::miette!(
+                "Output with name '{}' not found in recipe. Available outputs: {}",
+                output_name,
+                debuggable_names(&outputs).join(", ")
+            ));
+        }
+    } else if outputs.len() > 1 {
         return Err(miette::miette!(
             "Multiple outputs found in recipe ({}). Please specify which output to debug using --output-name. Available outputs: {}",
             outputs.len(),
-            output_names.join(", ")
+            debuggable_names(&outputs).join(", ")
         ));
     }
 
