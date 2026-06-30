@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- The `split` filter now returns a fully materialized list instead of a lazy iterable, so negative indexing (e.g. `(version | split('.'))[-1]`) and slicing (e.g. `[-1:]`) behave like they do in Python and the v0 recipe syntax. Previously these produced `undefined`/empty results, surfacing as a confusing "undefined variable in expression" error. (#2582)
+
 ### Changed
 
 - Package content test failures now report the fully expanded glob(s) that were actually matched against the package (including automatically prepended platform prefixes such as `include/` or `Library/include/`), instead of only the raw user-provided pattern. This applies to all package content sections (`include`, `bin`, `lib`, `site_packages`, `files`), making it clearer why a pattern did not match. (#2584)

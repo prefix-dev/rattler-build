@@ -583,7 +583,70 @@ fn default_filters(env: &mut Environment) {
     env.add_filter("sort", minijinja::filters::sort);
     env.add_filter("trim", minijinja::filters::trim);
     env.add_filter("unique", minijinja::filters::unique);
-    env.add_filter("split", minijinja::filters::split);
+    env.add_filter("split", split);
+}
+
+/// Split a string into a list of substrings.
+///
+/// This mirrors minijinja's built-in `split` filter (separator, whitespace and
+/// `maxsplits` semantics are identical) but materializes the result into a real
+/// sequence instead of returning a lazy iterable. A lazy iterable only supports
+/// forward iteration, so `(x | split('.'))[-1]` evaluates to `undefined` and
+/// `(x | split('.'))[-1:]` to an empty list. Returning a `Vec` lets negative
+/// indexing and slicing behave like they do in Python / the v0 recipe syntax.
+fn split(s: Arc<str>, split: Option<Arc<str>>, maxsplits: Option<i64>) -> Vec<String> {
+    let maxsplits = maxsplits.and_then(|x| if x >= 0 { Some(x as usize + 1) } else { None });
+
+    match (split, maxsplits) {
+        (None, None) => s.split_whitespace().map(Into::into).collect(),
+        (Some(split), None) => s.split(&split as &str).map(Into::into).collect(),
+        (None, Some(n)) => splitn_whitespace(&s, n).map(Into::into).collect(),
+        (Some(split), Some(n)) => s.splitn(n, &split as &str).map(Into::into).collect(),
+    }
+}
+
+/// Split a string on whitespace into at most `maxsplits` segments.
+///
+/// Mirrors the (private) helper of the same name in minijinja so that `split`
+/// with a `maxsplits` argument and no explicit separator behaves identically to
+/// the built-in filter it replaces.
+fn splitn_whitespace(s: &str, maxsplits: usize) -> impl Iterator<Item = &str> + '_ {
+    let mut splits = 1;
+    let mut skip_ws = true;
+    let mut split_start = None;
+    let mut last_split_end = 0;
+    let mut chars = s.char_indices();
+
+    std::iter::from_fn(move || {
+        for (idx, c) in chars.by_ref() {
+            if splits >= maxsplits && !skip_ws {
+                continue;
+            } else if c.is_whitespace() {
+                if let Some(old) = split_start {
+                    let rv = &s[old..idx];
+                    split_start = None;
+                    last_split_end = idx;
+                    splits += 1;
+                    skip_ws = true;
+                    return Some(rv);
+                }
+            } else {
+                skip_ws = false;
+                if split_start.is_none() {
+                    split_start = Some(idx);
+                    last_split_end = idx;
+                }
+            }
+        }
+
+        let rest = &s[last_split_end..];
+        if !rest.is_empty() {
+            last_split_end = s.len();
+            Some(rest)
+        } else {
+            None
+        }
+    })
 }
 
 fn parse_platform(platform: &str) -> Result<Platform, minijinja::Error> {
@@ -1406,6 +1469,78 @@ mod tests {
     }
 
     #[test]
+    fn split_returns_indexable_sequence() {
+        let options = JinjaConfig {
+            target_platform: Platform::Linux64,
+            host_platform: Platform::Linux64,
+            build_platform: Platform::Linux64,
+            ..Default::default()
+        };
+        let jinja = Jinja::new(options);
+
+        // Forward indexing (already worked with the lazy iterable).
+        assert_eq!(
+            jinja.eval("('22.1.8' | split('.'))[0]").unwrap().to_string(),
+            "22"
+        );
+        assert_eq!(
+            jinja.eval("('22.1.8' | split('.'))[2]").unwrap().to_string(),
+            "8"
+        );
+
+        // Negative indexing now works (regression test for #2582).
+        assert_eq!(
+            jinja
+                .eval("('22.1.8' | split('.'))[-1]")
+                .unwrap()
+                .to_string(),
+            "8"
+        );
+        assert_eq!(
+            jinja
+                .eval("('23.1.0.rc1' | split('.'))[-1]")
+                .unwrap()
+                .to_string(),
+            "rc1"
+        );
+
+        // Slicing returns the expected non-empty list.
+        assert_eq!(
+            jinja
+                .eval("('22.1.8' | split('.'))[-1:][0]")
+                .unwrap()
+                .to_string(),
+            "8"
+        );
+
+        // `length` works because the sequence is materialized.
+        assert_eq!(
+            jinja.eval("'22.1.8' | split('.') | length").unwrap(),
+            minijinja::Value::from(3)
+        );
+
+        // Whitespace split (no separator) and `maxsplits` keep minijinja semantics.
+        assert_eq!(
+            jinja.eval("'a b  c' | split | length").unwrap(),
+            minijinja::Value::from(3)
+        );
+        assert_eq!(
+            jinja
+                .eval("('a b c d' | split(none, 1))[-1]")
+                .unwrap()
+                .to_string(),
+            "b c d"
+        );
+        assert_eq!(
+            jinja
+                .eval("('a.b.c.d' | split('.', 1))[-1]")
+                .unwrap()
+                .to_string(),
+            "b.c.d"
+        );
+    }
+
+    #[test]
     fn eval_noarch_unix_selector() {
         // When a noarch recipe is rendered, the variant sets target_platform
         // to NoArch. The unix/linux/osx/win selectors should still work
@@ -2158,3 +2293,4 @@ mod tests {
         );
     }
 }
+

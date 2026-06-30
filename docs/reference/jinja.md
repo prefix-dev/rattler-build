@@ -300,7 +300,7 @@ library:
 - `sort`: sort a list (e.g. `"${{ [3, 1, 2] | sort }}"` will return `[1, 2, 3]`)
 - `trim`: remove leading and trailing whitespace from a string (e.g. `"${{ ' foo ' | trim }}"` will return `"foo"`)
 - `unique`: remove duplicates from a list (e.g. `"${{ [1, 2, 1, 3] | unique }}"` will return `[1, 2, 3]`)
-- `split`: split a string into a list (e.g. `"${{ '1.2.3' | split('.') | list }}"` will return `['1', '2', '3']`). By default, splits on whitespace.
+- `split`: split a string into a list (e.g. `"${{ '1.2.3' | split('.') }}"` will return `['1', '2', '3']`). By default, splits on whitespace. The result is a regular list, so it can be indexed (including with negative indices, e.g. `"${{ ('1.2.3' | split('.'))[-1] }}"` returns `'3'`) and sliced.
 
 ??? "Removed filters"
 
@@ -411,4 +411,11 @@ For example, to slice a version string from `x.y.z` to `x.y`:
 
 ```jinja
 ${{ (version | split('.'))[:2] | join('.') }}
+```
+
+Negative indices and slices work as well, so the last component of a version
+can be selected with:
+
+```jinja
+${{ (version | split('.'))[-1] }}
 ```
