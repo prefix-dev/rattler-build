@@ -925,6 +925,9 @@ mod tests {
     #[test]
     fn bash_invocation_traces_commands_with_x_flag() {
         let args = super::bash::BashInvocation.args(Path::new("/tmp/conda_build.sh"));
-        assert_eq!(args, vec!["-x".to_string(), "/tmp/conda_build.sh".to_string()]);
+        assert_eq!(
+            args,
+            vec!["-x".to_string(), "/tmp/conda_build.sh".to_string()]
+        );
     }
 }
