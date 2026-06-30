@@ -1,8 +1,44 @@
 /* ===== Fonts =====
-   Moranga is prefix.dev's proprietary brand font and is intentionally NOT
-   bundled here. The brand wordmark falls back to a serif (see --font-brand);
-   if a self-hosted Moranga ever lands at a stable URL it can be added back as
-   an @font-face. Inter and JetBrains Mono load from Google Fonts (index.html). */
+   Moranga is prefix.dev's proprietary brand font, so it is not bundled in the
+   repo. It is loaded from prefix.dev's self-hosted font CDN, exactly as the
+   docs do (see docs/stylesheets/fonts.css); the wordmark falls back to a serif
+   (--font-brand) if the CDN is unavailable. Inter and JetBrains Mono load from
+   Google Fonts (see index.html). */
+@font-face {
+  font-family: "Moranga";
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+  src: url(https://fonts.prefix.dev/moranga/MorangaLight/font.woff2) format("woff2");
+}
+@font-face {
+  font-family: "Moranga";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(https://fonts.prefix.dev/moranga/MorangaRegular/font.woff2) format("woff2");
+}
+@font-face {
+  font-family: "Moranga";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url(https://fonts.prefix.dev/moranga/MorangaMedium/font.woff2) format("woff2");
+}
+@font-face {
+  font-family: "Moranga";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url(https://fonts.prefix.dev/moranga/MorangaBold/font.woff2) format("woff2");
+}
+@font-face {
+  font-family: "Moranga";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url(https://fonts.prefix.dev/moranga/MorangaBlack/font.woff2) format("woff2");
+}
 
 /* ===== Theme tokens ===== */
 :root {
