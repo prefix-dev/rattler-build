@@ -325,12 +325,6 @@ impl<'a> CopyDir<'a> {
                     let stripped_path = path.strip_prefix(self.from_path)?;
                     let dest_path = self.to_path.join(stripped_path);
 
-                    // When dereferencing, fall through to the regular file/dir
-                    // branches below: `is_dir()` and `reflink_or_copy` both follow
-                    // symlinks, so the actual target content gets copied. A symlink
-                    // that points to a file outside the copied set (e.g. a license
-                    // symlinked to `../../LICENSE`) is therefore materialized as real
-                    // content, and a broken symlink surfaces as a clear copy error.
                     if path.is_symlink() && !self.dereference_symlinks {
                         let link_target = fs_err::read_link(path)?;
 
@@ -340,34 +334,56 @@ impl<'a> CopyDir<'a> {
 
                         create_symlink(link_target, &dest_path)?;
                         Ok(Some(dest_path))
-                    } else if path.is_dir() {
-                        create_dir_all_cached(&dest_path, paths_created)?;
-                        Ok(Some(dest_path))
                     } else {
-                        // create dir if parent does not exist
-                        if let Some(parent) = dest_path.parent() {
-                            create_dir_all_cached(parent, paths_created)?;
-                        }
-
-                        if dest_path.exists() {
-                            if !(self.copy_options.overwrite || self.copy_options.skip_exist) {
-                                tracing::error!("File already exists: {:?}", dest_path);
-                            } else if self.copy_options.skip_exist {
-                                tracing::warn!(
-                                    "File already exists! Skipping file: {:?}",
-                                    dest_path
-                                );
-                            } else if self.copy_options.overwrite {
-                                tracing::warn!(
-                                    "File already exists! Overwriting file: {:?}",
-                                    dest_path
-                                );
+                        // When dereferencing, resolve the link target ourselves
+                        // instead of relying on the OS to follow it during the copy.
+                        // A relative target is resolved against the link's parent
+                        // directory so a symlinked file outside the copied set (e.g. a
+                        // license symlinked to `../../LICENSE`) is materialized as real
+                        // content. Resolving manually is also more portable: Windows
+                        // does not reliably follow a relative reparse target when a path
+                        // that traverses the link is opened directly. A broken symlink
+                        // resolves to a non-existent path and surfaces as a clear copy
+                        // error.
+                        let source = if path.is_symlink() {
+                            let link_target = fs_err::read_link(path)?;
+                            match (link_target.is_absolute(), path.parent()) {
+                                (false, Some(parent)) => parent.join(link_target),
+                                _ => link_target,
                             }
-                        }
-                        reflink_or_copy(path, &dest_path, &self.copy_options)
-                            .map_err(SourceError::FileSystemError)?;
+                        } else {
+                            path.to_path_buf()
+                        };
 
-                        Ok(Some(dest_path))
+                        if source.is_dir() {
+                            create_dir_all_cached(&dest_path, paths_created)?;
+                            Ok(Some(dest_path))
+                        } else {
+                            // create dir if parent does not exist
+                            if let Some(parent) = dest_path.parent() {
+                                create_dir_all_cached(parent, paths_created)?;
+                            }
+
+                            if dest_path.exists() {
+                                if !(self.copy_options.overwrite || self.copy_options.skip_exist) {
+                                    tracing::error!("File already exists: {:?}", dest_path);
+                                } else if self.copy_options.skip_exist {
+                                    tracing::warn!(
+                                        "File already exists! Skipping file: {:?}",
+                                        dest_path
+                                    );
+                                } else if self.copy_options.overwrite {
+                                    tracing::warn!(
+                                        "File already exists! Overwriting file: {:?}",
+                                        dest_path
+                                    );
+                                }
+                            }
+                            reflink_or_copy(&source, &dest_path, &self.copy_options)
+                                .map_err(SourceError::FileSystemError)?;
+
+                            Ok(Some(dest_path))
+                        }
                     }
                 },
             )
