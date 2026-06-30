@@ -920,14 +920,4 @@ mod tests {
             "echo Hello\necho World"
         );
     }
-
-    /// bash runs with `-x` so each command is traced before execution (#2264).
-    #[test]
-    fn bash_invocation_traces_commands_with_x_flag() {
-        let args = super::bash::BashInvocation.args(Path::new("/tmp/conda_build.sh"));
-        assert_eq!(
-            args,
-            vec!["-x".to_string(), "/tmp/conda_build.sh".to_string()]
-        );
-    }
 }

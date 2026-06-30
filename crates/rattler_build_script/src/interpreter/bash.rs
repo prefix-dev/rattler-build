@@ -22,8 +22,6 @@ impl InterpreterInvocation for BashInvocation {
     }
 
     fn args(&self, script_path: &std::path::Path) -> Vec<String> {
-        // Run with `-x` so each command is printed before execution, giving
-        // visibility into which command failed (see #2264).
-        vec!["-x".to_string(), script_path.to_string_lossy().into_owned()]
+        vec![script_path.to_string_lossy().into_owned()]
     }
 }
