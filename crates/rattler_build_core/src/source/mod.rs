@@ -11,7 +11,7 @@ use crate::{
 };
 
 use fs_err as fs;
-use rattler_build_recipe::stage1::{Source, source::GitRev};
+use rattler_build_recipe::stage1::{GlobVec, Source, source::GitRev};
 use rattler_build_source_cache::{Checksum, cache::is_tarball};
 use rattler_build_source_cache::{
     GitSource as CacheGitSource, Source as CacheSource, UrlSource as CacheUrlSource,
@@ -90,6 +90,7 @@ fn copy_from_cache(
     cache_path: &Path,
     dest_dir: &Path,
     file_name: Option<&str>,
+    filter: &GlobVec,
     tool_config: &tool_configuration::Configuration,
 ) -> Result<(), SourceError> {
     if cache_path.is_dir() {
@@ -103,6 +104,7 @@ fn copy_from_cache(
             || {
                 copy_dir::CopyDir::new(cache_path, dest_dir)
                     .use_gitignore(false)
+                    .with_globvec(filter)
                     .run()
             },
         )?;
@@ -316,7 +318,13 @@ async fn fetch_source(
             fs::create_dir_all(&dest_dir)?;
 
             let extracted_path = if result.path.is_dir() {
-                copy_from_cache(&result.path, &dest_dir, None, tool_configuration)?;
+                copy_from_cache(
+                    &result.path,
+                    &dest_dir,
+                    None,
+                    &url_src.filter,
+                    tool_configuration,
+                )?;
 
                 // Track the extracted path for create-patch functionality
                 result
@@ -335,6 +343,7 @@ async fn fetch_source(
                     &result.path,
                     &dest_dir,
                     Some(&file_name),
+                    &url_src.filter,
                     tool_configuration,
                 )?;
                 None
@@ -409,6 +418,7 @@ async fn fetch_source(
                         file_name: None,
                         target_directory: path_src.target_directory.clone(),
                         attestation: None,
+                        filter: path_src.filter.clone(),
                     };
 
                     let cache_url_source = convert_url_source(&temp_url_source)?;
@@ -421,6 +431,7 @@ async fn fetch_source(
                         &result.path,
                         &dest_dir,
                         Some(&file_name_string),
+                        &temp_url_source.filter,
                         tool_configuration,
                     )?;
                 } else {

@@ -2295,6 +2295,7 @@ impl Evaluate for Stage0UrlSource {
                 .map(|v| v.evaluate(context))
                 .transpose()?,
             attestation,
+            filter: evaluate_glob_vec(&self.filter, context)?,
         })
     }
 }

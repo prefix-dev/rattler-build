@@ -156,6 +156,10 @@ pub struct UrlSource {
     /// Optional attestation verification configuration
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub attestation: Option<AttestationConfig>,
+
+    /// Filter for files to include/exclude from the extracted source
+    #[serde(default)]
+    pub filter: IncludeExclude,
 }
 
 /// A local path source
@@ -361,6 +365,7 @@ impl UrlSource {
             patches,
             target_directory,
             attestation,
+            filter,
         } = self;
 
         let mut vars = Vec::new();
@@ -386,6 +391,7 @@ impl UrlSource {
         if let Some(attestation) = attestation {
             vars.extend(attestation.used_variables());
         }
+        vars.extend(filter.used_variables());
         vars.sort();
         vars.dedup();
         vars

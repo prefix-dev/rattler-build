@@ -95,6 +95,73 @@ build:
 }
 
 #[test]
+fn test_parse_recipe_with_url_source_filter() {
+    let yaml = r#"
+package:
+  name: test
+  version: 1.0.0
+
+source:
+  url: https://example.com/archive.tar.gz
+  sha256: e03c8123866dd68f129e8a29082011db418ce90863948f563c01b814670782c6
+  filter:
+    - "cmake/*"
+    - "clang/*"
+
+build:
+  number: 0
+"#;
+
+    let recipe = parse_recipe_from_source(yaml).unwrap();
+    assert_eq!(recipe.source.len(), 1);
+
+    let source = get_concrete_source(&recipe.source.as_slice()[0]).unwrap();
+    match source {
+        Source::Url(url_src) => match &url_src.filter {
+            IncludeExclude::List(list) => {
+                assert_eq!(list.len(), 2);
+            }
+            _ => panic!("Expected List variant for filter"),
+        },
+        _ => panic!("Expected URL source"),
+    }
+}
+
+#[test]
+fn test_parse_recipe_with_url_source_filter_include_exclude() {
+    let yaml = r#"
+package:
+  name: test
+  version: 1.0.0
+
+source:
+  url: https://example.com/archive.tar.gz
+  sha256: e03c8123866dd68f129e8a29082011db418ce90863948f563c01b814670782c6
+  filter:
+    exclude:
+      - "third_party/fmt/*"
+
+build:
+  number: 0
+"#;
+
+    let recipe = parse_recipe_from_source(yaml).unwrap();
+    assert_eq!(recipe.source.len(), 1);
+
+    let source = get_concrete_source(&recipe.source.as_slice()[0]).unwrap();
+    match source {
+        Source::Url(url_src) => match &url_src.filter {
+            IncludeExclude::Mapping { include, exclude } => {
+                assert_eq!(include.len(), 0);
+                assert_eq!(exclude.len(), 1);
+            }
+            _ => panic!("Expected Mapping variant for filter"),
+        },
+        _ => panic!("Expected URL source"),
+    }
+}
+
+#[test]
 fn test_parse_recipe_with_path_source() {
     let yaml = r#"
 package:

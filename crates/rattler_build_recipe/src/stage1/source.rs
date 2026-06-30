@@ -323,6 +323,10 @@ pub struct UrlSource {
     /// Optional attestation verification configuration
     #[serde(default, skip_serializing_if = "attestation_is_none_or_empty")]
     pub attestation: Option<AttestationConfig>,
+
+    /// Only take certain files from the extracted source (validated glob patterns)
+    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
+    pub filter: GlobVec,
 }
 
 /// A local path source (evaluated)

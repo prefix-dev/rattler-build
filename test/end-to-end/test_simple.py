@@ -1288,6 +1288,18 @@ def test_source_filter(rattler_build: RattlerBuild, recipes: Path, tmp_path: Pat
     rattler_build(*args)
 
 
+def test_source_filter_archive(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    # The filter is applied to the extracted contents of an archive source.
+    path_to_recipe = recipes / "source_filter_archive"
+    args = rattler_build.build_args(
+        path_to_recipe,
+        tmp_path,
+    )
+    rattler_build(*args)
+
+
 def test_nushell_script_detection(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):

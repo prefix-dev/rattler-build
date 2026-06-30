@@ -420,6 +420,31 @@ source:
       - include/**/private.h
 ```
 
+The `filter` field is also available for `url` sources. It is applied to the
+contents of the extracted archive, which is useful for trimming large source
+tarballs down to the parts you actually need to build:
+
+```yaml title="recipe.yaml"
+source:
+  - url: https://github.com/llvm/llvm-project/archive/refs/tags/llvmorg-${{ version }}.tar.gz
+    sha256: ad18b70e287954c3d62bc7e0b86e7b7af2adf87bcfce21c15fe717f101d7aace
+    filter:
+      # we don't want to accidentally build more than clang here
+      - cmake/*
+      - clang/*
+      - clang-tools-extra/*
+```
+
+```yaml title="recipe.yaml"
+source:
+  url: https://github.com/pytorch/pytorch/releases/download/v${{ version }}/pytorch-v${{ version }}.tar.gz
+  sha256: 757145cfd55c7c8c01f58c959f76230641cc67fdd1d8b6a130f93ad1bc116f5f
+  filter:
+    exclude:
+      # ensure we use our own fmt
+      - third_party/fmt/*
+```
+
 ## Build section
 
 Specifies build information.

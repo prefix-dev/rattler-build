@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- The `source.filter` field is now also supported for `url` sources (and for `path` sources that point to an archive). The filter is applied to the contents of the extracted archive, allowing large source tarballs to be trimmed down to the parts needed for the build.
+
 ### Changed
 
 - Improve CRAN (R) recipe generation: pass `${R_ARGS}` to `R CMD INSTALL`, add `cross-r-base` for cross-compilation, set `rpaths` for compiled packages, mark pure-R packages as `noarch: generic`, reference `r-base`'s bundled license files, and fix the `r-base` version constraint so it is applied to both `host` and `run` without duplication.

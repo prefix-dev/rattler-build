@@ -417,6 +417,7 @@ fn parse_url_source(
     let mut patches = ConditionalList::default();
     let mut target_directory = None;
     let mut attestation = None;
+    let mut filter = IncludeExclude::default();
 
     for (key_node, value_node) in mapping.iter() {
         let key = key_node.as_str();
@@ -458,6 +459,9 @@ fn parse_url_source(
                     ));
                 }
             }
+            "filter" => {
+                filter = parse_source_filter(value_node)?;
+            }
             _ => {
                 return Err(ParseError::invalid_value(
                     "url source",
@@ -465,7 +469,7 @@ fn parse_url_source(
                     *key_node.span(),
                 )
                 .with_suggestion(
-                    "Valid fields are: url, sha256, md5, file_name, patches, target_directory, attestation",
+                    "Valid fields are: url, sha256, md5, file_name, patches, target_directory, attestation, filter",
                 ));
             }
         }
@@ -486,6 +490,7 @@ fn parse_url_source(
         patches,
         target_directory,
         attestation,
+        filter,
     })
 }
 
