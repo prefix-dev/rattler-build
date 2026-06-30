@@ -5,7 +5,7 @@
 use std::{collections::HashMap, path::PathBuf, str::FromStr};
 
 use ::rattler_build::{
-    build_recipes,
+    BuildStringPrefix, build_recipes,
     opt::{BuildData, ChannelPriorityWrapper, CommonData, TestData},
     run_test,
     tool_configuration::{ContinueOnFailure, SkipExisting, TestStrategy},
@@ -116,6 +116,10 @@ pub fn build_recipes_py(
                 .collect::<PyResult<_>>()?,
         ),
     };
+    let build_string_prefix = build_string_prefix
+        .map(BuildStringPrefix::try_from)
+        .transpose()
+        .map_err(|e| RattlerBuildError::Other(e.to_string()))?;
 
     let build_data = BuildData::new(
         up_to,

@@ -31,7 +31,10 @@ pub use rattler_build_recipe_generator as recipe_generator;
 
 // Re-export types needed by Python bindings and external consumers
 pub use rattler_build_core::{BuildString, DiscoveredOutput, Recipe, RenderConfig, Variable};
-pub use rattler_build_recipe::stage1::{HashInfo, HashInput};
+pub use rattler_build_recipe::{
+    BuildStringPrefix,
+    stage1::{HashInfo, HashInput},
+};
 pub use rattler_build_types::NormalizedKey;
 
 use std::{
@@ -408,7 +411,7 @@ pub async fn get_build_output(
         recipe_path: Some(recipe_path.to_path_buf()),
         os_env_var_keys,
         build_number_override: build_data.build_num_override,
-        build_string_prefix: build_data.build_string_prefix.clone(),
+        build_string_prefix: build_data.build_string_prefix.clone().unwrap_or_default(),
         ..RenderConfig::default()
     };
 
@@ -1574,7 +1577,7 @@ pub async fn debug_recipe(
         allow_absolute_license_paths: false,
         exclude_newer: None,
         build_num_override: None,
-        build_string_prefix: None,
+        build_string_prefix: Default::default(),
         markdown_summary: None,
     };
 
