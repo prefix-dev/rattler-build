@@ -1490,7 +1490,7 @@ fn evaluate_sha256(
         ValueInner::Concrete(hash) => Ok(*hash),
         ValueInner::Template(template) => {
             let s = render_template(template.source(), context, value.span())?;
-            rattler_digest::parse_digest_from_hex::<rattler_digest::Sha256>(&s).ok_or_else(|| {
+            crate::stage0::source::parse_sha256_hex(&s).ok_or_else(|| {
                 ParseError::invalid_value(
                     "SHA256 checksum",
                     format!("Invalid SHA256 checksum: {}", s),

@@ -1,6 +1,6 @@
 use marked_yaml::Node;
 use rattler_build_yaml_parser::ParseError;
-use rattler_digest::{Md5, Md5Hash, Sha256, Sha256Hash};
+use rattler_digest::{Md5, Md5Hash, Sha256Hash};
 
 use crate::stage0::{
     parser::helpers::get_span,
@@ -26,8 +26,9 @@ fn parse_sha256_value(node: &Node) -> Result<Value<Sha256Hash>, ParseError> {
             return Ok(Value::new_template(template, Some(span)));
         }
 
-        // Otherwise parse as concrete SHA256 hash
-        let hash = rattler_digest::parse_digest_from_hex::<Sha256>(s).ok_or_else(|| {
+        // Otherwise parse as concrete SHA256 hash (an empty string is treated as
+        // an all-zeros placeholder, see `parse_sha256_hex`)
+        let hash = crate::stage0::source::parse_sha256_hex(s).ok_or_else(|| {
             ParseError::invalid_value("sha256", format!("Invalid SHA256 checksum: {}", s), span)
         })?;
         Ok(Value::new_concrete(hash, Some(span)))
