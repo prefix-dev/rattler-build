@@ -129,11 +129,11 @@ If an extracted archive contains only 1 folder at its top level, its contents
 will be moved 1 level up, so that the extracted package contents sit in the root
 of the work folder.
 
-An empty `sha256` (e.g. `sha256: ""`) is accepted as an all-zeros placeholder
-(`0000...0000`). This is handy while scaffolding a recipe before the real
-checksum is known: the build still downloads the source and reports the actual
-checksum in the resulting mismatch, which you can then paste back into the
-recipe.
+An empty `sha256` or `md5` (e.g. `sha256: ""`) is accepted as an all-zeros
+placeholder (`0000...0000`). This is handy while scaffolding a recipe before the
+real checksum is known: the build still downloads the source and reports the
+actual checksum in the resulting mismatch, which you can then paste back into
+the recipe.
 
 ##### Supported archive formats
 
