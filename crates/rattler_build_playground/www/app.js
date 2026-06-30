@@ -170,7 +170,7 @@ const state = {
   platform: localStorage.getItem('rbp-platform') || 'linux-64',
   mode: localStorage.getItem('rbp-mode') || 'variants',
   variantFormat: localStorage.getItem('rbp-format') || 'variants',
-  variantsView: localStorage.getItem('rbp-vview') || 'matrix',
+  variantsView: localStorage.getItem('rbp-variants-view') || 'matrix',
   theme: localStorage.getItem('rbp-theme') || 'light',
   layout: localStorage.getItem('rbp-dir') || 'a',
   genSource: localStorage.getItem('rbp-gensrc') || 'pypi',
@@ -528,7 +528,7 @@ function setMode(m) {
 
 function setVariantsView(v) {
   state.variantsView = v;
-  lsSet('rbp-vview', v);
+  lsSet('rbp-variants-view', v);
   setSegActive('view-seg', 'view', v);
   state.selectedVariant = null;
   paintOutput();
