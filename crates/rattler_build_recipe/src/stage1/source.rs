@@ -145,6 +145,10 @@ pub struct GitSource {
     /// Optionally an expected commit hash to verify after checkout
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub expected_commit: Option<String>,
+
+    /// Only take certain files from the checked-out tree (validated glob patterns)
+    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
+    pub filter: GlobVec,
 }
 
 fn is_false(value: &bool) -> bool {

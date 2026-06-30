@@ -276,6 +276,7 @@ fn parse_git_source(
     let mut lfs = None;
     let mut submodules = None;
     let mut expected_commit = None;
+    let mut filter = IncludeExclude::default();
 
     for (key_node, value_node) in mapping.iter() {
         let key = key_node.as_str();
@@ -320,6 +321,9 @@ fn parse_git_source(
             "expected_commit" => {
                 expected_commit = Some(parse_value(value_node)?);
             }
+            "filter" => {
+                filter = parse_source_filter(value_node)?;
+            }
             _ => {
                 return Err(ParseError::invalid_value(
                     "git source",
@@ -327,7 +331,7 @@ fn parse_git_source(
                     *key_node.span(),
                 )
                 .with_suggestion(
-                    "Valid fields are: git, rev, tag, branch, depth, patches, target_directory, lfs, submodules, expected_commit",
+                    "Valid fields are: git, rev, tag, branch, depth, patches, target_directory, lfs, submodules, expected_commit, filter",
                 ));
             }
         }
@@ -361,6 +365,7 @@ fn parse_git_source(
         lfs,
         submodules,
         expected_commit,
+        filter,
     })
 }
 

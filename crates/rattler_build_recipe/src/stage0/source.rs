@@ -78,6 +78,10 @@ pub struct GitSource {
     /// Optionally an expected commit hash to verify after checkout
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub expected_commit: Option<Value<String>>,
+
+    /// Filter for files to include/exclude from the checked-out tree
+    #[serde(default)]
+    pub filter: IncludeExclude,
 }
 
 /// Attestation verification configuration
@@ -318,6 +322,7 @@ impl GitSource {
             lfs,
             submodules,
             expected_commit,
+            filter,
         } = self;
 
         let mut vars = Vec::new();
@@ -348,6 +353,7 @@ impl GitSource {
         if let Some(ec) = expected_commit {
             vars.extend(ec.used_variables());
         }
+        vars.extend(filter.used_variables());
         vars.sort();
         vars.dedup();
         vars

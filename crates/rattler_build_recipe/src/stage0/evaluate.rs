@@ -2242,6 +2242,7 @@ impl Evaluate for Stage0GitSource {
                 .as_ref()
                 .map(|v| evaluate_string_value(v, context))
                 .transpose()?,
+            filter: evaluate_glob_vec(&self.filter, context)?,
         })
     }
 }

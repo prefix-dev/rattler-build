@@ -274,6 +274,7 @@ async fn fetch_source(
                 || {
                     copy_dir::CopyDir::new(&result.path, &dest_dir)
                         .use_gitignore(false)
+                        .with_globvec(&git_src.filter)
                         .run()
                 },
             )?;

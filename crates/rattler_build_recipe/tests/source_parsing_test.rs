@@ -95,6 +95,42 @@ build:
 }
 
 #[test]
+fn test_parse_recipe_with_git_source_filter() {
+    let yaml = r#"
+package:
+  name: test
+  version: 1.0.0
+
+source:
+  git: https://github.com/example/repo.git
+  tag: v1.0.0
+  filter:
+    include:
+      - "src/*"
+    exclude:
+      - "src/vendor/*"
+
+build:
+  number: 0
+"#;
+
+    let recipe = parse_recipe_from_source(yaml).unwrap();
+    assert_eq!(recipe.source.len(), 1);
+
+    let source = get_concrete_source(&recipe.source.as_slice()[0]).unwrap();
+    match source {
+        Source::Git(git) => match &git.filter {
+            IncludeExclude::Mapping { include, exclude } => {
+                assert_eq!(include.len(), 1);
+                assert_eq!(exclude.len(), 1);
+            }
+            _ => panic!("Expected Mapping variant for filter"),
+        },
+        _ => panic!("Expected Git source"),
+    }
+}
+
+#[test]
 fn test_parse_recipe_with_url_source_filter() {
     let yaml = r#"
 package:

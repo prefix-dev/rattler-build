@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- The `source.filter` field is now also supported for `url` sources (and for `path` sources that point to an archive). The filter is applied to the contents of the extracted archive, allowing large source tarballs to be trimmed down to the parts needed for the build.
+- The `source.filter` field is now also supported for `url` and `git` sources (it was previously only available for `path` sources). The filter is applied to the files copied into the work directory: the contents of the extracted archive for `url` sources (and `path` sources pointing to an archive) and the checked-out tree for `git` sources. This allows large sources to be trimmed down to the parts needed for the build.
 
 ### Changed
 

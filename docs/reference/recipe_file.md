@@ -420,9 +420,12 @@ source:
       - include/**/private.h
 ```
 
-The `filter` field is also available for `url` sources. It is applied to the
-contents of the extracted archive, which is useful for trimming large source
-tarballs down to the parts you actually need to build:
+The `filter` field is available for `path`, `url`, and `git` sources. It is
+applied to the files that are copied into the work directory — the copied tree
+for directory `path` sources, the contents of the extracted archive for `url`
+sources (and `path` sources pointing to an archive), and the checked-out tree
+for `git` sources. This is useful for trimming large sources down to the parts
+you actually need to build:
 
 ```yaml title="recipe.yaml"
 source:
