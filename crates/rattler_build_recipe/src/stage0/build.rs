@@ -17,7 +17,8 @@ pub struct VariantKeyUsage {
     #[serde(default)]
     pub ignore_keys: ConditionalList<String>,
 
-    /// Down-prioritize variant by setting priority to a negative value
+    /// Down-prioritize this variant. Higher values make the variant less
+    /// preferred; the magnitude of the value is used (the sign is ignored).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub down_prioritize_variant: Option<Value<i32>>,
 }

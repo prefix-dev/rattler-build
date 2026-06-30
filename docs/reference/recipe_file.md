@@ -911,7 +911,7 @@ build:
       - numpy
     ignore_keys:
       - python
-    down_prioritize_variant: -1
+    down_prioritize_variant: 1
 ```
 
 - **`use_keys`** - Variant keys that must be part of this build's variant
@@ -920,8 +920,10 @@ build:
   build's variant even if they are referenced. Packages built with
   `ignore_keys` will not get a separate output per value of that key.
 - **`down_prioritize_variant`** - Integer priority offset applied to this
-  variant during solving. Negative values make the variant less preferred
-  when multiple variants satisfy a dependency.
+  variant during solving (defaults to `0`). Higher values make the variant
+  less preferred when multiple variants satisfy a dependency. This is
+  implemented via `track_features`, so it is the magnitude of the value that
+  matters (the sign is ignored).
 
 ## Include build recipe
 
