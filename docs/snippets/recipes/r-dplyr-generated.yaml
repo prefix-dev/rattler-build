@@ -15,10 +15,9 @@ build:
   number: ${{ build_number }}
   skip: match(r_base, "<4.1")
   script:
-    - if: unix
-      then: R CMD INSTALL --build . ${R_ARGS}
     - if: win
       then: R CMD INSTALL --build . %R_ARGS%
+      else: R CMD INSTALL --build . ${R_ARGS}
   dynamic_linking:
     rpaths:
       - lib/R/lib/

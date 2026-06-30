@@ -323,10 +323,9 @@ fn format_cran_recipe_with_suggests(recipe: &serialize::Recipe) -> String {
             let indent = &line[..indent_len];
             final_recipe.push_str(&format!(
                 "{indent}script:\n\
-                 {indent}  - if: unix\n\
-                 {indent}    then: R CMD INSTALL --build . ${{R_ARGS}}\n\
                  {indent}  - if: win\n\
-                 {indent}    then: R CMD INSTALL --build . %R_ARGS%\n"
+                 {indent}    then: R CMD INSTALL --build . %R_ARGS%\n\
+                 {indent}    else: R CMD INSTALL --build . ${{R_ARGS}}\n"
             ));
         } else if line.contains("SUGGEST") {
             final_recipe.push_str(&format!(
