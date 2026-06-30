@@ -62,11 +62,14 @@ pub async fn solve_environment(
     tool_configuration: &tool_configuration::Configuration,
     channel_priority: ChannelPriority,
     solve_strategy: SolveStrategy,
-    exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
+    exclude_newer: Option<jiff::Timestamp>,
 ) -> miette::Result<Vec<RepoDataRecord>> {
+    let span_msg = format!("Resolving {name} environment");
+    let span = tracing::info_span!("", message = %span_msg);
+    let _enter = span.enter();
+
     let vp_string = format!("[{}]", target_platform.virtual_packages.iter().format(", "));
 
-    tracing::info!("\nResolving {name} environment:\n");
     tracing::info!(
         "  Platform: {} {}",
         target_platform.platform,
@@ -103,7 +106,7 @@ pub async fn solve_environment(
         specs: specs.to_vec(),
         channel_priority,
         strategy: solve_strategy,
-        exclude_newer,
+        exclude_newer: exclude_newer.map(Into::into),
         ..SolverTask::from_iter(&repo_data)
     };
 
@@ -131,7 +134,7 @@ pub async fn create_environment(
     tool_configuration: &tool_configuration::Configuration,
     channel_priority: ChannelPriority,
     solve_strategy: SolveStrategy,
-    exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
+    exclude_newer: Option<jiff::Timestamp>,
 ) -> miette::Result<Vec<RepoDataRecord>> {
     let required_packages = solve_environment(
         name,
@@ -215,6 +218,13 @@ pub async fn install_packages(
     target_prefix: &Path,
     tool_configuration: &tool_configuration::Configuration,
 ) -> miette::Result<()> {
+    let span_msg = format!("Installing {name} environment");
+    let span = tracing::info_span!("", message = %span_msg);
+    let _enter = span.enter();
+    // Trigger the lazy span header so it prints before indicatif progress bars.
+    // Empty string produces no visible output ("".lines() yields nothing).
+    tracing::info!("");
+
     // Make sure the target prefix exists, regardless of whether we'll actually
     // install anything in there.
     let prefix = rattler_conda_types::prefix::Prefix::create(target_prefix)
@@ -256,7 +266,6 @@ pub async fn install_packages(
         }
     }
 
-    tracing::info!("\nInstalling {name} environment\n");
     Installer::new()
         .with_download_client(tool_configuration.client.get_client().clone())
         .with_target_platform(target_platform)

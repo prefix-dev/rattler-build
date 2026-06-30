@@ -1,13 +1,11 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
 
 use rattler_conda_types::Platform;
 
-use crate::execution::ExecutionArgs;
+use super::{InterpreterError, InterpreterInvocation, InterpreterSearchScope};
 
-use super::{BashInterpreter, CmdExeInterpreter, Interpreter, InterpreterError, find_interpreter};
-
-pub(crate) struct PowerShellInterpreter;
+pub struct PowerShellInvocation;
 
 const POWERSHELL_PREAMBLE: &str = r#"
 $ErrorActionPreference = 'Stop'
@@ -21,7 +19,7 @@ foreach ($envVar in Get-ChildItem Env:) {
 
 "#;
 
-/// Check if the given pwsh binary is PowerShell 7.4+.
+/// Returns whether the given pwsh binary is PowerShell 7.4+.
 fn is_pwsh_new_enough(pwsh_path: &Path) -> bool {
     let result: Option<bool> = (|| {
         let out =
@@ -44,66 +42,46 @@ fn is_pwsh_new_enough(pwsh_path: &Path) -> bool {
     result.unwrap_or(false)
 }
 
-// PowerShell interpreter: writes a .ps1 script then delegates to cmd.exe (Windows) or bash (Unix)
-// to run it via the pwsh/powershell command.
-impl Interpreter for PowerShellInterpreter {
-    async fn run(&self, args: ExecutionArgs) -> Result<(), InterpreterError> {
-        // Try to find pwsh in the build prefix or system PATH for version checking.
-        // The actual command used in the script may rely on the activation script
-        // (build_env.sh) to put pwsh on PATH at runtime.
-        let pwsh_path =
-            find_interpreter("pwsh", args.build_prefix.as_ref(), &args.execution_platform)
-                .ok()
-                .flatten();
+impl InterpreterInvocation for PowerShellInvocation {
+    fn executable_names(&self, build_platform: &Platform) -> &'static [&'static str] {
+        if build_platform.is_windows() {
+            &["pwsh", "powershell"]
+        } else {
+            &["pwsh"]
+        }
+    }
 
-        let (shell_cmd, new_enough) = match &pwsh_path {
-            Some(path) => {
-                let new_enough = is_pwsh_new_enough(path);
-                (path.to_string_lossy().into_owned(), new_enough)
-            }
-            // Fall back to "pwsh" by name — the conda `powershell` package provides the
-            // `pwsh` binary, and the activation scripts will put it on PATH.
-            None => ("pwsh".to_owned(), false),
-        };
+    fn search_scope(&self, build_platform: &Platform) -> InterpreterSearchScope {
+        if build_platform.is_windows() {
+            InterpreterSearchScope::build_and_host_with_system_fallback()
+        } else {
+            InterpreterSearchScope::build_only()
+        }
+    }
 
-        if !new_enough {
+    fn extension(&self) -> &'static str {
+        "ps1"
+    }
+
+    fn script_contents(&self, raw: &str) -> String {
+        POWERSHELL_PREAMBLE.to_owned() + raw
+    }
+
+    fn is_usable_executable(&self, executable: &Path) -> Result<(), InterpreterError> {
+        if !is_pwsh_new_enough(executable) {
             tracing::warn!(
                 "rattler-build requires PowerShell 7.4+, \
                  otherwise it will skip native command errors!"
             );
         }
-
-        let ps1_script = args.work_dir.join("conda_build_script.ps1");
-        let contents = POWERSHELL_PREAMBLE.to_owned() + args.script.script();
-        tokio::fs::write(&ps1_script, contents).await?;
-
-        // Quote the shell command if it contains spaces (e.g. "C:\Program Files\...")
-        let quoted_shell_cmd = if shell_cmd.contains(' ') {
-            format!("\"{}\"", shell_cmd)
-        } else {
-            shell_cmd
-        };
-
-        let args = ExecutionArgs {
-            script: crate::execution::ResolvedScriptContents::Inline(format!(
-                "{} -NoLogo -NoProfile {:?}",
-                quoted_shell_cmd, ps1_script
-            )),
-            ..args
-        };
-
-        if cfg!(windows) {
-            CmdExeInterpreter.run(args).await
-        } else {
-            BashInterpreter.run(args).await
-        }
+        Ok(())
     }
 
-    async fn find_interpreter(
-        &self,
-        build_prefix: Option<&PathBuf>,
-        platform: &Platform,
-    ) -> Result<Option<PathBuf>, which::Error> {
-        find_interpreter("pwsh", build_prefix, platform)
+    fn args(&self, script_path: &Path) -> Vec<String> {
+        vec![
+            "-NoLogo".to_string(),
+            "-NoProfile".to_string(),
+            script_path.to_string_lossy().into_owned(),
+        ]
     }
 }

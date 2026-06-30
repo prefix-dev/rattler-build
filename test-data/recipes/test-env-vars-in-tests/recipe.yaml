@@ -1,0 +1,45 @@
+context:
+  version: "1.2.3"
+
+package:
+  name: test-env-vars-in-tests
+  version: ${{ version }}
+
+build:
+  script:
+    - if: unix
+      then: |
+        mkdir -p $PREFIX/bin
+        echo "#!/bin/sh" > $PREFIX/bin/test-env-vars-in-tests
+        echo "echo ok" >> $PREFIX/bin/test-env-vars-in-tests
+        chmod +x $PREFIX/bin/test-env-vars-in-tests
+      else: |
+        mkdir %PREFIX%\Scripts
+        echo @echo ok > %PREFIX%\Scripts\test-env-vars-in-tests.bat
+
+tests:
+  - script:
+      - if: unix
+        then: |
+          # Variant env var
+          test "$my_custom_variant" = "hello_from_variant"
+          # Platform env vars
+          test -n "$target_platform"
+          test -n "$SUBDIR"
+          test -n "$build_platform"
+          test -n "$host_platform"
+          # CONDA_BUILD
+          test "$CONDA_BUILD" = "1"
+          test "$CONDA_BUILD_STATE" = "TEST"
+          # Jinja expressions
+          test "${{ version }}" = "1.2.3"
+          test "${{ my_custom_variant }}" = "hello_from_variant"
+          test -n "${{ target_platform }}"
+          test -n "${{ build_platform }}"
+        else: |
+          if not "%my_custom_variant%"=="hello_from_variant" exit 1
+          if "%target_platform%"=="" exit 1
+          if "%CONDA_BUILD%"=="" exit 1
+          if not "${{ version }}"=="1.2.3" exit 1
+          if not "${{ my_custom_variant }}"=="hello_from_variant" exit 1
+          if "${{ target_platform }}"=="" exit 1

@@ -115,9 +115,10 @@ class VariantConfig:
 
         Example:
             ```python
-            from rattler_build import JinjaConfig
+            from rattler_build import JinjaConfig, PlatformConfig
 
-            jinja_config = JinjaConfig(target_platform="linux-64")
+            platform_config = PlatformConfig(target_platform="linux-64")
+            jinja_config = JinjaConfig(platform=platform_config)
             config = VariantConfig.from_file_with_context("variants.yaml", jinja_config)
             ```
         """
@@ -142,15 +143,103 @@ class VariantConfig:
 
         Example:
             ```python
-            from rattler_build import JinjaConfig
+            from rattler_build import JinjaConfig, PlatformConfig
 
-            jinja_config = JinjaConfig(target_platform="linux-64")
+            platform_config = PlatformConfig(target_platform="linux-64")
+            jinja_config = JinjaConfig(platform=platform_config)
             config = VariantConfig.from_conda_build_config("conda_build_config.yaml", jinja_config)
             ```
         """
         variant_config = cls.__new__(cls)
         variant_config._inner = _VariantConfig.from_conda_build_config(Path(path), jinja_config._config)
         return variant_config
+
+    @classmethod
+    def from_files(cls, paths: list[str | Path]) -> "VariantConfig":
+        """
+        Load multiple VariantConfig files and merge them.
+
+        Files are merged in order, with later files taking precedence
+        for overlapping keys. Zip keys from the last file that specifies
+        them will be used.
+
+        Args:
+            paths: List of paths to variant configuration YAML files
+
+        Returns:
+            A new VariantConfig instance with all files merged
+
+        Example:
+            ```python
+            config = VariantConfig.from_files([
+                "base_variants.yaml",
+                "override_variants.yaml",
+            ])
+            ```
+        """
+        variant_config = cls.__new__(cls)
+        variant_config._inner = _VariantConfig.from_files([Path(p) for p in paths])
+        return variant_config
+
+    @classmethod
+    def from_files_with_context(cls, paths: list[str | Path], jinja_config: JinjaConfig) -> "VariantConfig":
+        """
+        Load multiple VariantConfig files with a JinjaConfig context and merge them.
+
+        Files are merged in order, with later files taking precedence.
+        Files named ``conda_build_config.yaml`` are loaded using the legacy
+        loader which supports ``# [selector]`` syntax.
+
+        Args:
+            paths: List of paths to variant configuration YAML files
+            jinja_config: JinjaConfig providing context for evaluation
+
+        Returns:
+            A new VariantConfig instance with all files merged
+
+        Example:
+            ```python
+            from rattler_build import JinjaConfig, PlatformConfig
+
+            platform_config = PlatformConfig(target_platform="linux-64")
+            jinja_config = JinjaConfig(platform=platform_config)
+            config = VariantConfig.from_files_with_context(
+                ["base_variants.yaml", "conda_build_config.yaml"],
+                jinja_config,
+            )
+            ```
+        """
+        variant_config = cls.__new__(cls)
+        variant_config._inner = _VariantConfig.from_files_with_context([Path(p) for p in paths], jinja_config._config)
+        return variant_config
+
+    def merge(self, other: "VariantConfig") -> "VariantConfig":
+        """
+        Merge another VariantConfig into this one, returning a new VariantConfig.
+
+        Values from ``other`` take precedence for overlapping keys.
+        Zip keys from ``other`` replace those in ``self`` if present.
+
+        Args:
+            other: The VariantConfig to merge into this one
+
+        Returns:
+            A new VariantConfig with merged values
+
+        Example:
+            ```python
+            base = VariantConfig({"python": ["3.9", "3.10"]})
+            override = VariantConfig({"python": ["3.11"], "numpy": ["1.24"]})
+            merged = base.merge(override)
+            merged["python"]
+            # ['3.11']
+            merged["numpy"]
+            # ['1.24']
+            ```
+        """
+        merged = self.__class__.__new__(self.__class__)
+        merged._inner = self._inner.merge(other._inner)
+        return merged
 
     @classmethod
     def from_yaml(cls, yaml: str) -> "VariantConfig":
@@ -194,7 +283,7 @@ class VariantConfig:
 
         Example:
             ```python
-            from rattler_build import JinjaConfig
+            from rattler_build import JinjaConfig, PlatformConfig
 
             yaml_str = '''
             c_compiler:
@@ -203,7 +292,8 @@ class VariantConfig:
               - if: win
                 then: msvc
             '''
-            jinja_config = JinjaConfig(target_platform="linux-64")
+            platform_config = PlatformConfig(target_platform="linux-64")
+            jinja_config = JinjaConfig(platform=platform_config)
             config = VariantConfig.from_yaml_with_context(yaml_str, jinja_config)
             ```
         """

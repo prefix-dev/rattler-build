@@ -20,6 +20,7 @@ use std::{
 
 use crate::{
     console_utils::github_integration_enabled,
+    post_process::package_nature::LibraryNameMap,
     render::resolved_dependencies::FinalizedDependencies,
     system_tools::SystemTools,
     types::{BuildConfiguration, BuildSummary, PlatformWithVirtualPackages},
@@ -60,6 +61,12 @@ pub struct BuildOutput {
     /// that created this artifact
     #[serde(skip_serializing_if = "Option::is_none")]
     pub extra_meta: Option<BTreeMap<String, Value>>,
+
+    /// Library name map from the staging cache, used as a fallback during
+    /// overlinking checks when the staging cache's host dependencies are not
+    /// physically installed in the host prefix.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub staging_library_name_map: Option<LibraryNameMap>,
 }
 
 impl BuildOutput {
@@ -99,7 +106,7 @@ impl BuildOutput {
 
     /// Record the start of the build
     pub fn record_build_start(&self) {
-        self.build_summary.lock().unwrap().build_start = Some(chrono::Utc::now());
+        self.build_summary.lock().unwrap().build_start = Some(jiff::Timestamp::now());
     }
 
     /// Record the artifact that was created during the build
@@ -112,7 +119,7 @@ impl BuildOutput {
     /// Record the end of the build
     pub fn record_build_end(&self) {
         let mut summary = self.build_summary.lock().unwrap();
-        summary.build_end = Some(chrono::Utc::now());
+        summary.build_end = Some(jiff::Timestamp::now());
     }
 
     /// Shorthand to retrieve the variant configuration for this output

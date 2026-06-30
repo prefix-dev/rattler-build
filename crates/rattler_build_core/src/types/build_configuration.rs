@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 use rattler_build_jinja::{JinjaConfig, Variable};
 use rattler_build_recipe::stage1::HashInfo;
 use rattler_build_types::NormalizedKey;
-use rattler_conda_types::{ChannelUrl, PackageName, Platform};
+use rattler_conda_types::{ChannelUrl, PackageName, Platform, RepodataRevision};
 use rattler_solve::{ChannelPriority, SolveStrategy};
 use serde::{Deserialize, Serialize};
 
@@ -12,7 +12,7 @@ use crate::types::{
     Directories, PackageIdentifier, PackagingSettings, PlatformWithVirtualPackages,
 };
 
-use rattler_build_script::SandboxConfiguration;
+use rattler_build_script::{EnvironmentIsolation, SandboxConfiguration};
 
 /// Default value for store recipe for backwards compatibility
 fn default_true() -> bool {
@@ -41,7 +41,7 @@ pub struct BuildConfiguration {
     /// The solve strategy to use when resolving dependencies
     pub solve_strategy: SolveStrategy,
     /// The timestamp to use for the build
-    pub timestamp: chrono::DateTime<chrono::Utc>,
+    pub timestamp: jiff::Timestamp,
     /// All subpackages coming from this output or other outputs from the same
     /// recipe
     pub subpackages: BTreeMap<PackageName, PackageIdentifier>,
@@ -56,12 +56,19 @@ pub struct BuildConfiguration {
     #[serde(skip_serializing, default = "default_true")]
     pub force_colors: bool,
 
+    /// The environment isolation mode for build scripts
+    #[serde(skip_serializing, default)]
+    pub env_isolation: EnvironmentIsolation,
+
     /// The configuration for the sandbox
     #[serde(skip_serializing, default)]
     pub sandbox_config: Option<SandboxConfiguration>,
     /// Exclude packages newer than this date from the solver
     #[serde(skip_serializing, default)]
-    pub exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
+    pub exclude_newer: Option<jiff::Timestamp>,
+    /// Repodata revision to target when writing package metadata.
+    #[serde(skip_serializing, default)]
+    pub repodata_revision: RepodataRevision,
 }
 
 impl BuildConfiguration {

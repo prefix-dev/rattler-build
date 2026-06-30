@@ -7,6 +7,108 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.8](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.7...rattler_build_core-v0.2.8) - 2026-06-26
+
+### Other
+
+- update Cargo.toml dependencies
+
+## [0.2.7](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.6...rattler_build_core-v0.2.7) - 2026-06-18
+
+### Added
+
+- support late-bound build directory variables in patches and license files ([#2554](https://github.com/prefix-dev/rattler-build/pull/2554))
+- Add brush interpreter support ([#2527](https://github.com/prefix-dev/rattler-build/pull/2527))
+
+### Fixed
+
+- separate build env vars and host env vars ([#2558](https://github.com/prefix-dev/rattler-build/pull/2558))
+- useful error messages for typos in `interpreter` ([#2540](https://github.com/prefix-dev/rattler-build/pull/2540))
+- honor io_concurrency_limit ([#2525](https://github.com/prefix-dev/rattler-build/pull/2525))
+
+### Other
+
+- update rattler to latest releases ([#2559](https://github.com/prefix-dev/rattler-build/pull/2559))
+- streamline script interpreters through a native shell wrapper ([#2535](https://github.com/prefix-dev/rattler-build/pull/2535))
+- bump rattler crates to latest versions ([#2528](https://github.com/prefix-dev/rattler-build/pull/2528))
+
+## [0.2.6](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.5...rattler_build_core-v0.2.6) - 2026-05-27
+
+### Other
+
+- use `RepodataRevision` enum instead of new `v3` boolean ([#2517](https://github.com/prefix-dev/rattler-build/pull/2517))
+
+## [0.2.5](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.4...rattler_build_core-v0.2.5) - 2026-05-20
+
+### Added
+
+- Allow build scripts to override package contents ([#2476](https://github.com/prefix-dev/rattler-build/pull/2476))
+- add warn when repodata unsupported ([#2472](https://github.com/prefix-dev/rattler-build/pull/2472))
+- v3 packages ([#2452](https://github.com/prefix-dev/rattler-build/pull/2452))
+
+### Fixed
+
+- validate source attestations ([#2338](https://github.com/prefix-dev/rattler-build/pull/2338))
+- improve error handling in DependencyResolutionError ([#2485](https://github.com/prefix-dev/rattler-build/pull/2485))
+- respect `.orig`-only sources in patch application ([#2470](https://github.com/prefix-dev/rattler-build/pull/2470))
+- variant tracking and env vars for staging cache inheritance ([#2455](https://github.com/prefix-dev/rattler-build/pull/2455))
+- remove PKG_* environment variables in staging cache, set variant values ([#2449](https://github.com/prefix-dev/rattler-build/pull/2449))
+- use force directory removal to handle Windows file locks ([#2444](https://github.com/prefix-dev/rattler-build/pull/2444))
+- prevent stacking of pending-rm suffixes on Windows cleanup ([#2439](https://github.com/prefix-dev/rattler-build/pull/2439))
+- set CONDA_BUILD env var in build_env.sh to fix env-isolation none ([#2433](https://github.com/prefix-dev/rattler-build/pull/2433))
+- include default env vars also in test environment ([#2425](https://github.com/prefix-dev/rattler-build/pull/2425))
+
+### Other
+
+- bump rattler crates ([#2502](https://github.com/prefix-dev/rattler-build/pull/2502))
+- bump rattler crates and migrate to reqwest 0.13 ([#2493](https://github.com/prefix-dev/rattler-build/pull/2493))
+- lazily initialize the `BaseClient` ([#2456](https://github.com/prefix-dev/rattler-build/pull/2456))
+- bump rattler dependencies ([#2457](https://github.com/prefix-dev/rattler-build/pull/2457))
+
+## [0.2.4](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.3...rattler_build_core-v0.2.4) - 2026-04-13
+
+### Added
+
+- enforce clean build environment with configurable isolation modes ([#2372](https://github.com/prefix-dev/rattler-build/pull/2372))
+
+### Fixed
+
+- resolve overlinking false positives for staging outputs ([#2402](https://github.com/prefix-dev/rattler-build/pull/2402))
+- exclude new files from strip level guessing in patch application ([#2400](https://github.com/prefix-dev/rattler-build/pull/2400))
+
+## [0.2.3](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.2...rattler_build_core-v0.2.3) - 2026-03-31
+
+### Fixed
+
+- skip empty command tests during packaging ([#2390](https://github.com/prefix-dev/rattler-build/pull/2390))
+- "built with" metadata ([#2377](https://github.com/prefix-dev/rattler-build/pull/2377))
+- reindex all platform subdirs in build_reindexed_channels ([#2383](https://github.com/prefix-dev/rattler-build/pull/2383))
+- set variant and platform env vars in test scripts ([#2365](https://github.com/prefix-dev/rattler-build/pull/2365))
+
+### Other
+
+- Fix obsolete `min_pin` and `max_pin` references ([#2380](https://github.com/prefix-dev/rattler-build/pull/2380))
+
+## [0.2.2](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.1...rattler_build_core-v0.2.2) - 2026-03-25
+
+### Added
+
+- Add Python API for `debug` ([#2337](https://github.com/prefix-dev/rattler-build/pull/2337))
+
+### Fixed
+
+- use platform-specific script extensions for test scripts ([#2354](https://github.com/prefix-dev/rattler-build/pull/2354))
+
+### Other
+
+- improve table output ([#2369](https://github.com/prefix-dev/rattler-build/pull/2369))
+
+## [0.2.1](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.0...rattler_build_core-v0.2.1) - 2026-03-18
+
+### Fixed
+
+- expected commit usage ([#2335](https://github.com/prefix-dev/rattler-build/pull/2335))
+
 ## [0.2.0](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.1.1...rattler_build_core-v0.2.0) - 2026-03-17
 
 ### Added

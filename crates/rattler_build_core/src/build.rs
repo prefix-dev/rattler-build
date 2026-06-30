@@ -136,10 +136,12 @@ pub async fn run_build(
     // This will build or restore staging caches and return their dependencies/sources if inherited
     let staging_result = output.process_staging_caches(tool_configuration).await?;
 
-    // If we inherit from a staging cache, store its dependencies and sources
-    if let Some((deps, sources)) = staging_result {
+    // If we inherit from a staging cache, store its dependencies, sources, and
+    // library name map for overlinking checks
+    if let Some((deps, sources, library_name_map)) = staging_result {
         output.finalized_cache_dependencies = Some(deps);
         output.finalized_cache_sources = Some(sources);
+        output.staging_library_name_map = Some(library_name_map);
     }
 
     // Fetch sources for this output
@@ -186,6 +188,35 @@ pub async fn run_build(
         Err(InterpreterError::ExecutionFailed(_)) => {
             return Err(miette::miette!("Script failed to execute"));
         }
+        Err(InterpreterError::InterpreterNotFound(interpreter)) => {
+            return Err(miette::miette!(
+                help = format!(
+                    "Add `{interpreter}` to the `requirements/build` section of your recipe so it is provided by the build environment."
+                ),
+                "interpreter `{interpreter}` was not found in the build environment"
+            ));
+        }
+        Err(InterpreterError::InvalidInterpreter {
+            interpreter,
+            reason,
+        }) => {
+            return Err(miette::miette!(
+                "interpreter `{interpreter}` was found but is not valid: {reason}"
+            ));
+        }
+        Err(InterpreterError::UnsupportedInterpreter(interpreter)) => {
+            return Err(
+                match rattler_build_script::closest_interpreter(&interpreter) {
+                    Some(suggestion) => miette::miette!(
+                        help = format!("Did you mean `{suggestion}`?"),
+                        "unsupported interpreter `{interpreter}` in `build.script.interpreter`"
+                    ),
+                    None => miette::miette!(
+                        "unsupported interpreter `{interpreter}` in `build.script.interpreter`"
+                    ),
+                },
+            );
+        }
     }
 
     // Package all the new files
@@ -224,10 +255,6 @@ pub async fn run_build(
                 .run_test(&paths_json, &output)
                 .into_diagnostic()?;
         }
-    }
-
-    if !tool_configuration.no_clean {
-        directories.clean().into_diagnostic()?;
     }
 
     drop(enter);

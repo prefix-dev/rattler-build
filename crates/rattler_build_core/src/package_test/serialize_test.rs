@@ -4,6 +4,7 @@ use fs_err as fs;
 use rattler_build_recipe::stage1::{TestType, requirements::Dependency, tests::CommandsTest};
 use rattler_build_script::{
     ResolvedScriptContents, ScriptContent, determine_interpreter_from_path,
+    platform_script_extensions,
 };
 use rattler_conda_types::{MatchSpec, PackageNameMatcher};
 
@@ -142,7 +143,7 @@ pub(crate) fn write_test_files(
             let contents = command_test.script.resolve_content(
                 &output.build_configuration.directories.recipe_dir,
                 Some(jinja_renderer),
-                &["sh", "bat"],
+                platform_script_extensions(),
             )?;
 
             // Replace with rendered contents
@@ -156,12 +157,33 @@ pub(crate) fn write_test_files(
                     }
                     command_test.script.content = ScriptContent::Command(contents);
                 }
+                ResolvedScriptContents::Commands(commands) => {
+                    command_test.script.content = ScriptContent::Commands(commands);
+                }
                 ResolvedScriptContents::Missing => {
                     command_test.script.content = ScriptContent::Command("".to_string());
                 }
             }
         }
     }
+
+    // Remove command tests that resolved to empty (no script content, no
+    // requirements, no test files). This happens when all commands were
+    // filtered out by conditionals (e.g. `if: not build_win`).
+    tests.retain(|test| {
+        if let TestType::Commands(cmd) = test {
+            let has_content = match &cmd.script.content {
+                ScriptContent::Command(s) => !s.is_empty(),
+                ScriptContent::Commands(c) => !c.is_empty(),
+                _ => true,
+            };
+            let has_requirements = !cmd.requirements.is_empty();
+            let has_files = !cmd.files.is_empty();
+            has_content || has_requirements || has_files
+        } else {
+            true
+        }
+    });
 
     let test_file_dir = tmp_dir_path.join("info/tests");
     fs::create_dir_all(&test_file_dir)?;

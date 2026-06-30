@@ -2,7 +2,7 @@
 //! All the metadata that makes up a recipe file
 use std::{iter, path::PathBuf, str::FromStr};
 
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use rattler_conda_types::{
     Channel, ChannelUrl, GenericVirtualPackage, PackageName, Platform, VersionWithSource,
     compression_level::CompressionLevel,
@@ -129,9 +129,9 @@ pub struct PackageIdentifier {
 #[derive(Debug, Clone, Default)]
 pub struct BuildSummary {
     /// The start time of the build
-    pub build_start: Option<DateTime<Utc>>,
+    pub build_start: Option<Timestamp>,
     /// The end time of the build
-    pub build_end: Option<DateTime<Utc>>,
+    pub build_end: Option<Timestamp>,
 
     /// The path to the artifact
     pub artifact: Option<PathBuf>,
@@ -152,24 +152,23 @@ pub async fn build_reindexed_channels(
     let output_channel = Channel::from_directory(output_dir);
 
     // Clear the repodata gateway of any cached values for the output channel.
+    // Clear all subdirs so that packages from other platforms (e.g. a linux-64
+    // dependency of a noarch package) are visible after reindexing.
     tool_configuration.repodata_gateway.clear_repodata_cache(
         &output_channel,
-        SubdirSelection::Some(
-            [build_configuration.target_platform]
-                .iter()
-                .map(ToString::to_string)
-                .collect(),
-        ),
+        SubdirSelection::All,
         // In memory is enough because this is a "file" channel
         CacheClearMode::InMemoryOnly,
     )?;
 
     let index_config = IndexFsConfig {
         channel: output_dir.clone(),
-        target_platform: Some(build_configuration.target_platform),
+        target_platform: None,
         repodata_patch: None,
         write_zst: false,
         write_shards: false,
+        repodata_revisions: Vec::new(),
+        package_revision_assignment: Default::default(),
         force: false,
         max_parallel: num_cpus::get_physical(),
         multi_progress: None,

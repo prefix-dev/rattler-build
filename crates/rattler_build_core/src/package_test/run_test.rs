@@ -7,11 +7,13 @@
 //! * `imports` - import a list of modules and check if they can be imported
 //! * `files` - check if a list of files exist
 use fs_err as fs;
+use rattler_build_jinja::Variable;
 use rattler_build_recipe::stage1::{
     TestType,
     tests::{CommandsTest, DownstreamTest, PerlTest, PythonTest, PythonVersion, RTest, RubyTest},
 };
-use rattler_build_script::{Script, ScriptContent};
+use rattler_build_script::{EnvironmentIsolation, Script, ScriptContent};
+use rattler_build_types::NormalizedKey;
 use rattler_conda_types::{
     Channel, ChannelUrl, MatchSpec, ParseStrictness, Platform,
     compression_level::CompressionLevel,
@@ -24,6 +26,7 @@ use rattler_shell::{
     shell::{Shell, ShellEnum},
 };
 use rattler_solve::{ChannelPriority, SolveStrategy};
+use std::collections::BTreeMap;
 use std::fmt::Write;
 use std::{
     collections::HashMap,
@@ -155,22 +158,18 @@ impl Tests {
         cwd: &Path,
         pkg_vars: &HashMap<String, String>,
         resolved_records: &[rattler_conda_types::RepoDataRecord],
+        config: &TestConfiguration,
     ) -> Result<(), TestError> {
         tracing::info!("Testing commands:");
 
-        let platform = Platform::current();
-        let mut env_vars = env_vars::os_vars(environment, &platform);
-        env_vars.retain(|key, _| key != ShellEnum::default().path_var(&platform));
-        env_vars.extend(env_vars::python_vars_from_records(
-            resolved_records,
-            environment,
-            platform,
-        ));
-        env_vars.extend(pkg_vars.iter().map(|(k, v)| (k.clone(), Some(v.clone()))));
-        env_vars.insert(
-            "PREFIX".to_string(),
-            Some(environment.to_string_lossy().to_string()),
-        );
+        let target_platform = config.target_platform.unwrap_or(Platform::current());
+        let build_platform = config.current_platform.platform;
+        let host_platform = config
+            .host_platform
+            .as_ref()
+            .map(|p| p.platform)
+            .unwrap_or(target_platform);
+
         let tmp_dir = tempfile::tempdir()?;
 
         // copy all test files to a temporary directory and set it as the working
@@ -181,6 +180,28 @@ impl Tests {
                 e
             )))
         })?;
+
+        let platform = Platform::current();
+        let mut env_vars =
+            env_vars::os_vars(environment, &platform, config.env_isolation, tmp_dir.path());
+        if config.env_isolation == EnvironmentIsolation::None {
+            env_vars.retain(|key, _| key != ShellEnum::default().path_var(&platform));
+        }
+        env_vars.extend(env_vars::test_vars(
+            target_platform,
+            build_platform,
+            host_platform,
+        ));
+        env_vars.extend(env_vars::python_vars_from_records(
+            resolved_records,
+            environment,
+            platform,
+        ));
+        env_vars.extend(pkg_vars.iter().map(|(k, v)| (k.clone(), Some(v.clone()))));
+        env_vars.insert(
+            "PREFIX".to_string(),
+            Some(environment.to_string_lossy().to_string()),
+        );
 
         match self {
             Tests::Commands(path) => {
@@ -198,6 +219,7 @@ impl Tests {
                         None,
                         None::<fn(&str) -> Result<String, String>>,
                         None,
+                        config.env_isolation,
                     )
                     .await
                     .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -218,6 +240,7 @@ impl Tests {
                         None,
                         None::<fn(&str) -> Result<String, String>>,
                         None,
+                        config.env_isolation,
                     )
                     .await
                     .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -287,7 +310,9 @@ pub struct TestConfiguration {
     /// The output directory to create the test prefixes in (will be `output_dir/test`)
     pub output_dir: PathBuf,
     /// Exclude packages newer than this date from the solver
-    pub exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
+    pub exclude_newer: Option<jiff::Timestamp>,
+    /// The environment isolation mode for test scripts
+    pub env_isolation: EnvironmentIsolation,
 }
 
 fn env_vars_from_package(index_json: &IndexJson) -> HashMap<String, String> {
@@ -309,6 +334,19 @@ fn env_vars_from_package(index_json: &IndexJson) -> HashMap<String, String> {
     );
 
     res
+}
+
+/// Read variant environment variables from `info/hash_input.json` in the
+/// package directory.  This file contains the full variant map that was used
+/// to build the package.  We expose every key as an environment variable
+/// (matching the behaviour of build scripts) except for language-specific
+/// keys which are already handled via `python_vars_from_records` and friends.
+fn env_vars_from_hash_input(package_folder: &Path) -> HashMap<String, Option<String>> {
+    let hash_input_path = package_folder.join("info/hash_input.json");
+    let content = fs::read_to_string(&hash_input_path).unwrap_or_default();
+    let variant: BTreeMap<NormalizedKey, Variable> =
+        serde_json::from_str(&content).unwrap_or_default();
+    env_vars::env_vars_from_variant(&variant)
 }
 
 /// Run a test for a single package
@@ -407,6 +445,8 @@ pub async fn run_test(
         repodata_patch: None,
         write_zst: false,
         write_shards: false,
+        repodata_revisions: Vec::new(),
+        package_revision_assignment: Default::default(),
         force: false,
         max_parallel: num_cpus::get_physical(),
         multi_progress: None,
@@ -438,7 +478,7 @@ pub async fn run_test(
     // Use the package cache to extract the package for reading test metadata.
     // This avoids manual extraction and reuses the cache properly.
     let cache_metadata = temp_package_cache
-        .get_or_fetch_from_path(package_file, None)
+        .get_or_fetch_from_path(package_file, None, None)
         .await
         .map_err(|e| TestError::TestFailed(format!("failed to cache package: {e}")))?;
     let package_folder = cache_metadata.path().to_path_buf();
@@ -471,7 +511,12 @@ pub async fn run_test(
     tracing::info!("Collecting tests from '{}'", package_folder.display());
 
     let index_json = IndexJson::from_package_directory(&package_folder)?;
-    let env = env_vars_from_package(&index_json);
+    let mut env = env_vars_from_package(&index_json);
+    env.extend(
+        env_vars_from_hash_input(&package_folder)
+            .into_iter()
+            .filter_map(|(k, v)| v.map(|v| (k, v))),
+    );
 
     let has_legacy_tests = package_folder.join("info/test").exists();
     let has_modern_tests = package_folder.join("info/tests/tests.yaml").exists();
@@ -525,7 +570,7 @@ pub async fn run_test(
         let (test_folder, tests) = legacy_tests_from_folder(&package_folder).await?;
 
         for test in tests {
-            test.run(&prefix, &test_folder, &env, &resolved_records)
+            test.run(&prefix, &test_folder, &env, &resolved_records, &config)
                 .await?;
         }
 
@@ -733,17 +778,21 @@ async fn run_python_test_inner(
         ..Script::default()
     };
 
+    let platform = Platform::current();
     let test_dir = prefix.join("test");
     fs::create_dir_all(&test_dir)?;
+    let test_env_vars = env_vars::os_vars(&test_prefix, &platform, config.env_isolation, &test_dir);
+
     script
         .run_script(
-            Default::default(),
+            test_env_vars.clone(),
             &test_dir,
             path,
             &test_prefix,
             None,
             None::<fn(&str) -> Result<String, String>>,
             None,
+            config.env_isolation,
         )
         .await
         .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -760,13 +809,14 @@ async fn run_python_test_inner(
         };
         script
             .run_script(
-                Default::default(),
+                test_env_vars,
                 path,
                 path,
                 &test_prefix,
                 None,
                 None::<fn(&str) -> Result<String, String>>,
                 None,
+                config.env_isolation,
             )
             .await
             .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -840,15 +890,21 @@ async fn run_perl_test(
 
     let test_folder = prefix.join("test_files");
     fs::create_dir_all(&test_folder)?;
+
+    let platform = Platform::current();
+    let test_env_vars =
+        env_vars::os_vars(&test_prefix, &platform, config.env_isolation, &test_folder);
+
     script
         .run_script(
-            Default::default(),
+            test_env_vars,
             &test_folder,
             path,
             &test_prefix,
             None,
             None::<fn(&str) -> Result<String, String>>,
             None,
+            config.env_isolation,
         )
         .await
         .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -932,19 +988,13 @@ async fn run_commands_test(
     .await
     .map_err(|e| TestError::TestEnvironmentSetup(format!("{e:?}")))?;
 
-    let platform = Platform::current();
-    let mut env_vars = env_vars::os_vars(&run_prefix, &platform);
-    env_vars.retain(|key, _| key != ShellEnum::default().path_var(&platform));
-    env_vars.extend(env_vars::python_vars_from_records(
-        &resolved_records,
-        &run_prefix,
-        platform,
-    ));
-    env_vars.extend(pkg_vars.iter().map(|(k, v)| (k.clone(), Some(v.clone()))));
-    env_vars.insert(
-        "PREFIX".to_string(),
-        Some(run_prefix.to_string_lossy().to_string()),
-    );
+    let target_platform = config.target_platform.unwrap_or(Platform::current());
+    let build_platform = config.current_platform.platform;
+    let host_platform = config
+        .host_platform
+        .as_ref()
+        .map(|p| p.platform)
+        .unwrap_or(target_platform);
 
     // copy all test files to a temporary directory and set it as the working
     // directory
@@ -956,8 +1006,28 @@ async fn run_commands_test(
         )))
     })?;
 
-    tracing::info!("Testing commands:");
+    let platform = Platform::current();
+    let mut env_vars = env_vars::os_vars(&run_prefix, &platform, config.env_isolation, &test_dir);
+    if config.env_isolation == EnvironmentIsolation::None {
+        env_vars.retain(|key, _| key != ShellEnum::default().path_var(&platform));
+    }
+    env_vars.extend(env_vars::test_vars(
+        target_platform,
+        build_platform,
+        host_platform,
+    ));
+    env_vars.extend(env_vars::python_vars_from_records(
+        &resolved_records,
+        &run_prefix,
+        platform,
+    ));
+    env_vars.extend(pkg_vars.iter().map(|(k, v)| (k.clone(), Some(v.clone()))));
+    env_vars.insert(
+        "PREFIX".to_string(),
+        Some(run_prefix.to_string_lossy().to_string()),
+    );
 
+    tracing::info!("Testing commands:");
     commands_test
         .script
         .run_script(
@@ -968,6 +1038,7 @@ async fn run_commands_test(
             build_prefix.as_ref(),
             None::<fn(&str) -> Result<String, String>>,
             None,
+            config.env_isolation,
         )
         .await
         .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -1142,15 +1213,21 @@ async fn run_r_test(
 
     let test_folder = prefix.join("test_files");
     fs::create_dir_all(&test_folder)?;
+
+    let platform = Platform::current();
+    let test_env_vars =
+        env_vars::os_vars(&test_prefix, &platform, config.env_isolation, &test_folder);
+
     script
         .run_script(
-            Default::default(),
+            test_env_vars,
             &test_folder,
             path,
             &test_prefix,
             None,
             None::<fn(&str) -> Result<String, String>>,
             None,
+            config.env_isolation,
         )
         .await
         .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -1219,15 +1296,21 @@ async fn run_ruby_test(
 
     let test_folder = prefix.join("test_files");
     fs::create_dir_all(&test_folder)?;
+
+    let platform = Platform::current();
+    let test_env_vars =
+        env_vars::os_vars(&test_prefix, &platform, config.env_isolation, &test_folder);
+
     script
         .run_script(
-            Default::default(),
+            test_env_vars,
             &test_folder,
             path,
             &test_prefix,
             None,
             None::<fn(&str) -> Result<String, String>>,
             None,
+            config.env_isolation,
         )
         .await
         .map_err(|e| TestError::TestFailed(e.to_string()))?;

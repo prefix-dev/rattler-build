@@ -1,0 +1,6 @@
+// Conda launcher (Anaconda variant)
+#include <stdlib.h>
+
+int main(void) {
+    return 0;
+}

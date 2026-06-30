@@ -1,5 +1,7 @@
 //! Stage0 requirements - unrendered requirements with templates and conditionals
 
+use std::collections::BTreeMap;
+
 use rattler_conda_types::PackageName;
 use serde::{Deserialize, Serialize};
 
@@ -28,6 +30,10 @@ pub struct Requirements {
     #[serde(default, skip_serializing_if = "ConditionalList::is_empty")]
     pub run_constraints: ConditionalList<SerializableMatchSpec>,
 
+    /// Optional dependency groups selected by MatchSpec extras.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub extras: BTreeMap<String, ConditionalList<SerializableMatchSpec>>,
+
     /// Run exports configuration
     #[serde(default, skip_serializing_if = "RunExports::is_empty")]
     pub run_exports: RunExports,
@@ -44,6 +50,7 @@ impl Requirements {
             && self.host.is_empty()
             && self.run.is_empty()
             && self.run_constraints.is_empty()
+            && self.extras.is_empty()
             && self.run_exports.is_empty()
             && self.ignore_run_exports.is_empty()
     }
@@ -55,6 +62,7 @@ impl Requirements {
             host,
             run,
             run_constraints,
+            extras,
             run_exports,
             ignore_run_exports,
         } = self;
@@ -65,6 +73,9 @@ impl Requirements {
         vars.extend(host.used_variables());
         vars.extend(run.used_variables());
         vars.extend(run_constraints.used_variables());
+        for deps in extras.values() {
+            vars.extend(deps.used_variables());
+        }
         vars.extend(run_exports.used_variables());
         vars.extend(ignore_run_exports.used_variables());
 
@@ -105,6 +116,20 @@ impl Requirements {
                         // A spec is "free" if it has no version and no build constraints
                         if matchspec.version.is_none()
                             && matchspec.build.is_none()
+                            && matchspec.build_number.is_none()
+                            && matchspec.channel.is_none()
+                            && matchspec.subdir.is_none()
+                            && matchspec.namespace.is_none()
+                            && matchspec.md5.is_none()
+                            && matchspec.sha256.is_none()
+                            && matchspec.file_name.is_none()
+                            && matchspec.extras.is_none()
+                            && matchspec.flags.is_none()
+                            && matchspec.url.is_none()
+                            && matchspec.license.is_none()
+                            && matchspec.license_family.is_none()
+                            && matchspec.condition.is_none()
+                            && matchspec.track_features.is_none()
                             && let Some(pkg_name) = extract_name(&matchspec.name)
                         {
                             specs.push(pkg_name);

@@ -1,261 +1,240 @@
-"""Interactive release script: bump version and update all lock files.
+"""Cut a rattler-build release.
+
+Branches from prefix-dev/rattler-build@main, bumps the version, updates the
+changelog and lock files, commits, and opens a PR.
+
+Because it always branches from the canonical remote's main, it behaves the
+same in a plain git clone or a colocated jj repo, regardless of which branch
+(or detached HEAD) you happen to be on.
 
 Usage:
     pixi run release
+
+Shows the commits since the last release and asks for a major / minor / patch
+bump.
 """
 
-import atexit
-import os
 import re
+import shutil
 import subprocess
 import sys
 import tomllib
-from enum import Enum
 from pathlib import Path
 
+import questionary
+
 ROOT = Path(__file__).resolve().parent.parent
+REPO = "prefix-dev/rattler-build"
+REMOTE_URL = f"https://github.com/{REPO}.git"
+CHANGELOG = ROOT / "CHANGELOG.md"
 
-VERSION_FILES: list[tuple[Path, list[str]]] = [
-    (ROOT / "Cargo.toml", ["package", "version"]),
-    (ROOT / "py-rattler-build/rust/Cargo.toml", ["package", "version"]),
-    (ROOT / "py-rattler-build/pyproject.toml", ["project", "version"]),
-]
-
-VERSION_PATTERN = re.compile(r"^\d+\.\d+\.\d+$")
-
-STEPS = [
-    "Pre-flight checks",
-    "Patch version files with tbump",
-    "Verify version files are in sync",
-    "Update changelog",
-    "Update Cargo.lock (root)",
-    "Update Cargo.lock (py-rattler-build/rust/)",
-    "Update pixi.lock (root)",
-    "Update pixi.lock (py-rattler-build/)",
-]
-
-completed: list[str] = []
+Version = tuple[int, int, int]
 
 
-class Color(str, Enum):
-    YELLOW = "\033[93m"
-    MAGENTA = "\033[95m"
-    RESET = "\033[0m"
+def run(cmd: list[str], *, cwd: Path = ROOT, env: dict[str, str] | None = None) -> None:
+    print(f"  → {' '.join(cmd)}")
+    subprocess.run(cmd, check=True, cwd=cwd, text=True, env=env)
 
 
-def cprint(msg: str, color: Color = Color.YELLOW) -> None:
-    print(f"{color.value}{msg}{Color.RESET.value}")
-
-
-def cinput(prompt: str, color: Color = Color.MAGENTA) -> str:
-    return input(f"{color.value}{prompt}{Color.RESET.value}")
-
-
-def run(
-    cmd: list[str], *, cwd: Path = ROOT, capture: bool = False
-) -> subprocess.CompletedProcess[str]:
-    cprint(f"  → {' '.join(cmd)}")
-    return subprocess.run(cmd, check=True, cwd=cwd, text=True, capture_output=capture)
+def git_out(*args: str) -> str:
+    return subprocess.run(
+        ["git", *args], cwd=ROOT, text=True, capture_output=True
+    ).stdout.strip()
 
 
 def fail(msg: str) -> None:
-    print(f"\nError: {msg}", file=sys.stderr)
+    print(f"\nerror: {msg}", file=sys.stderr)
     sys.exit(1)
 
 
-def print_summary() -> None:
-    if completed:
-        cprint("\nCompleted steps:")
-        for step in completed:
-            cprint(f"  - {step}")
+def is_jj() -> bool:
+    """Whether ROOT is a colocated jj repo with the jj binary available."""
+    return (ROOT / ".jj").is_dir() and shutil.which("jj") is not None
 
 
-atexit.register(print_summary)
+def sync_jj() -> None:
+    """Import the git refs created by this script into a colocated jj repo."""
+    if not is_jj():
+        return
+    print("Importing git refs into jj...")
+    run(["jj", "git", "import"])
 
 
-# --- Pre-flight checks ---
+def parse(version: str) -> Version:
+    parts = version.split(".")
+    if len(parts) != 3 or not all(p.isdigit() for p in parts):
+        fail(f"cannot parse version '{version}' as X.Y.Z")
+    major, minor, patch = (int(p) for p in parts)
+    return major, minor, patch
 
 
-def check_clean_worktree() -> None:
-    """Ensure there are no uncommitted changes."""
-    result = run(["git", "status", "--porcelain"], capture=True)
-    if result.stdout.strip():
-        fail("working directory is not clean. Commit or stash your changes first.")
+def fmt(version: Version) -> str:
+    return ".".join(str(n) for n in version)
 
 
-def check_on_main() -> None:
-    """Ensure we're on the main branch."""
-    result = run(["git", "rev-parse", "--abbrev-ref", "HEAD"], capture=True)
-    branch = result.stdout.strip()
-    # jj may report HEAD for detached state; also check via symbolic-ref
-    if branch == "HEAD":
-        # In jj colocated repos, HEAD is often an empty commit on top of main.
-        # Check that main is an ancestor of HEAD (i.e. HEAD is at or just above main).
-        result = subprocess.run(
-            ["git", "merge-base", "--is-ancestor", "main", "HEAD"],
-            cwd=ROOT,
-        )
-        if result.returncode != 0:
-            main_rev = run(["git", "rev-parse", "main"], capture=True).stdout.strip()
-            head_rev = run(["git", "rev-parse", "HEAD"], capture=True).stdout.strip()
-            fail(
-                f"not on main (HEAD={head_rev[:12]}, main={main_rev[:12]}). Switch to main first."
-            )
-    elif branch != "main":
-        fail(f"not on main branch (currently on '{branch}'). Switch to main first.")
+def fetched_version() -> Version:
+    """Version in Cargo.toml on the freshly fetched canonical main."""
+    cargo = git_out("show", "FETCH_HEAD:Cargo.toml")
+    return parse(tomllib.loads(cargo)["package"]["version"])
 
 
-def check_no_existing_tag(version: str) -> None:
-    """Ensure the target tag doesn't already exist."""
-    tag = f"v{version}"
-    result = subprocess.run(
-        ["git", "tag", "--list", tag],
-        capture_output=True,
-        text=True,
+def gh_token() -> str:
+    """A GitHub token from gh CLI auth, used to enrich git-cliff output."""
+    return subprocess.run(
+        ["gh", "auth", "token"], cwd=ROOT, text=True, capture_output=True
+    ).stdout.strip()
+
+
+def cliff_preview(tag: str) -> str:
+    """Render what git-cliff would add for the commits since `tag`."""
+    return subprocess.run(
+        [
+            "git-cliff",
+            "--strip",
+            "header",
+            "--github-token",
+            gh_token(),
+            f"{tag}..FETCH_HEAD",
+        ],
         cwd=ROOT,
+        text=True,
+        capture_output=True,
+    ).stdout.strip()
+
+
+def bump_changelog(version: str) -> None:
+    """Prepend the unreleased changes to CHANGELOG.md under a new version tag."""
+    run(
+        [
+            "git-cliff",
+            "--unreleased",
+            "--prepend",
+            str(CHANGELOG),
+            "--github-token",
+            gh_token(),
+            "--tag",
+            f"v{version}",
+        ]
     )
-    if tag in result.stdout.strip().splitlines():
-        fail(
-            f"tag '{tag}' already exists. Choose a different version or delete the existing tag."
-        )
 
 
-# --- Version helpers ---
+def latest_tag() -> str:
+    tag = git_out("describe", "--tags", "--abbrev=0", "--match", "v*", "FETCH_HEAD")
+    if not tag:
+        fail("no v* tag reachable from canonical main")
+    return tag
 
 
-def get_current_version() -> str | None:
-    """Read the current version from the root Cargo.toml."""
-    path, keys = VERSION_FILES[0]
-    data = tomllib.loads(path.read_text())
-    value = data
-    for key in keys:
-        value = value.get(key)
-        if value is None:
-            return None
-    return value
+def select_version(current: Version) -> str:
+    major, minor, patch = current
+    options: dict[str, Version] = {
+        "major": (major + 1, 0, 0),
+        "minor": (major, minor + 1, 0),
+        "patch": (major, minor, patch + 1),
+    }
+    choices = [
+        questionary.Choice(f"{kind:<5} → {fmt(version)}", value=fmt(version))
+        for kind, version in options.items()
+    ]
+    answer = questionary.select(
+        "Select the bump:", choices=choices, default=choices[-1]
+    ).ask()
+    if answer is None:
+        fail("aborted")
+    return answer
 
 
-def get_release_version() -> str:
-    """Interactively prompt for the release version."""
-    current = get_current_version()
-    while True:
-        prompt = (
-            f"Enter the release version (X.Y.Z) [{current}]: "
-            if current
-            else "Enter the release version (X.Y.Z): "
-        )
-        version = cinput(prompt).strip() or (current or "")
-        if VERSION_PATTERN.match(version):
-            return version
-        cprint("Invalid format. Please enter the version as X.Y.Z (e.g. 0.59.0).")
+def edit_highlights(interactive: bool) -> None:
+    """Let the user write the changelog Highlights before committing."""
+    if not interactive:
+        return
+    input("Edit the 'Highlights' section in CHANGELOG.md, then press Enter...")
 
 
-def check_versions_in_sync(expected: str) -> None:
-    """Verify all version files contain the expected version."""
-    mismatches: list[str] = []
-    for path, keys in VERSION_FILES:
-        data = tomllib.loads(path.read_text())
-        version = data
-        for key in keys:
-            version = version.get(key)
-            if version is None:
-                break
-        if version is None:
-            mismatches.append(f"  {path.relative_to(ROOT)}: version not found")
-        elif version != expected:
-            mismatches.append(
-                f"  {path.relative_to(ROOT)}: {version} (expected {expected})"
-            )
-    if mismatches:
-        fail("version files are out of sync after bump:\n" + "\n".join(mismatches))
-
-
-# --- Main ---
-
-
-def select_start_step() -> int:
-    """Prompt the user to select which step to start from."""
-    cprint("Select the step to start from:")
-    for i, step in enumerate(STEPS, 1):
-        cprint(f"  {i}. {step}")
-    while True:
-        try:
-            choice = int(cinput("Enter the step number: "))
-            if 1 <= choice <= len(STEPS):
-                return choice
-            cprint(f"Please enter a number between 1 and {len(STEPS)}.")
-        except ValueError:
-            cprint("Invalid input. Please enter a number.")
+def changelog_section(version: str) -> str:
+    """Extract the section for `version` from CHANGELOG.md for the PR body."""
+    content = CHANGELOG.read_text()
+    pattern = rf"(## \[{re.escape(version)}\].*?)(?=\n## \[|\n---|\Z)"
+    match = re.search(pattern, content, re.DOTALL)
+    return match.group(1).strip() if match else f"Release {version}"
 
 
 def main() -> None:
-    start_step = select_start_step()
-    version = get_release_version()
+    interactive = sys.stdin.isatty()
 
-    cprint(f"\n=== Releasing {version} ===\n")
+    if git_out("status", "--porcelain"):
+        if is_jj():
+            # In a colocated jj repo, in-progress work lives committed in @ and
+            # shows as dirty to git. Set it aside with `jj new` so git sees a
+            # clean tree for the upcoming `git switch`; @- stays as a recoverable
+            # loose head.
+            print("Working copy is dirty; running `jj new` to set it aside...")
+            run(["jj", "new"])
+        else:
+            fail("working directory is not clean; commit or stash first")
 
-    try:
-        if start_step <= 1:
-            cprint("1. Running pre-flight checks...")
-            check_clean_worktree()
-            check_on_main()
-            check_no_existing_tag(version)
-            cprint("  All checks passed.")
-            completed.append("Pre-flight checks")
+    print("Fetching canonical main from prefix-dev/rattler-build...")
+    run(["git", "fetch", REMOTE_URL, "main"])
 
-        if start_step <= 2:
-            cprint("\n2. Patching version files with tbump...")
-            run(["tbump", "--non-interactive", "--only-patch", version])
-            completed.append("Patched version files")
+    current = fetched_version()
+    tag = latest_tag()
+    if parse(tag.lstrip("v")) != current:
+        fail(
+            f"Cargo.toml on main ({fmt(current)}) is ahead of the latest tag "
+            f"({tag}); a release may already be pending"
+        )
 
-        if start_step <= 3:
-            cprint("\n3. Verifying version files are in sync...")
-            check_versions_in_sync(version)
-            cprint("  All version files match.")
-            completed.append("Verified version files")
+    print(f"\nChangelog preview since {tag}:")
+    print(cliff_preview(tag) or "  (none)")
 
-        if start_step <= 4:
-            cprint("\n4. Updating changelog...")
-            env = {**os.environ, "RELEASE_VERSION": version}
-            cprint("  → pixi run bump-changelog")
-            subprocess.run(
-                ["pixi", "run", "bump-changelog"], check=True, cwd=ROOT, env=env
-            )
-            cinput(
-                "Update the 'Highlights' section in CHANGELOG.md, then press Enter to continue..."
-            )
-            completed.append("Updated changelog")
+    version = select_version(current)
 
-        if start_step <= 5:
-            cprint("\n5. Updating Cargo.lock (root)...")
-            run(["cargo", "update", "--workspace"])
-            completed.append("Updated Cargo.lock (root)")
+    print(f"\n=== Releasing {version} ===\n")
 
-        if start_step <= 6:
-            cprint("\n6. Updating Cargo.lock (py-rattler-build/rust/)...")
-            run(
-                ["cargo", "update", "--workspace"],
-                cwd=ROOT / "py-rattler-build" / "rust",
-            )
-            completed.append("Updated Cargo.lock (py-rattler-build/rust/)")
+    branch = f"release-{version}"
+    run(["git", "switch", "-C", branch, "FETCH_HEAD"])
 
-        if start_step <= 7:
-            cprint("\n7. Updating pixi.lock (root)...")
-            run(["pixi", "lock"])
-            completed.append("Updated pixi.lock (root)")
+    print("Patching version files...")
+    run(["tbump", "--non-interactive", "--only-patch", version])
 
-        if start_step <= 8:
-            cprint("\n8. Updating pixi.lock (py-rattler-build/)...")
-            run(["pixi", "lock"], cwd=ROOT / "py-rattler-build")
-            completed.append("Updated pixi.lock (py-rattler-build/)")
+    print("Updating changelog...")
+    bump_changelog(version)
+    edit_highlights(interactive)
 
-        cprint("\n=== Done ===")
-        cprint(f"Version bumped to {version}.")
-        cprint("Review the changes and open a PR.")
-        cprint("After merge, trigger the Release workflow via workflow_dispatch.")
+    print("Updating Cargo.lock (root)...")
+    run(["cargo", "update", "--workspace"])
+    print("Updating Cargo.lock (py-rattler-build/rust)...")
+    run(["cargo", "update", "--workspace"], cwd=ROOT / "py-rattler-build" / "rust")
+    print("Updating pixi.lock (root)...")
+    run(["pixi", "lock"])
+    print("Updating pixi.lock (py-rattler-build)...")
+    run(["pixi", "lock"], cwd=ROOT / "py-rattler-build")
 
-    except KeyboardInterrupt:
-        cprint("\nInterrupted.")
+    print("Committing...")
+    run(["git", "commit", "--all", "--message", f"chore: release {version}"])
+
+    print("Opening pull request...")
+    run(
+        [
+            "gh",
+            "pr",
+            "create",
+            "--repo",
+            REPO,
+            "--base",
+            "main",
+            "--title",
+            f"chore: release {version}",
+            "--body",
+            changelog_section(version),
+        ]
+    )
+
+    sync_jj()
+
+    print("\n=== Done ===")
+    print(f"Opened release PR for {version}.")
+    print("After merge, run the 'Release artifacts' workflow via workflow_dispatch.")
 
 
 if __name__ == "__main__":

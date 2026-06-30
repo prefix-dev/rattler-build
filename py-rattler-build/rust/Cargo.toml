@@ -1,6 +1,6 @@
 [package]
 name = "py-rattler-build"
-version = "0.60.0"
+version = "0.67.0"
 edition = "2024"
 license = "BSD-3-Clause"
 publish = false
@@ -10,9 +10,9 @@ name = "rattler_build"
 crate-type = ["cdylib"]
 
 [features]
-default = ["rustls-tls"]
+default = ["rustls"]
 native-tls = ["rattler-build/native-tls"]
-rustls-tls = ["rattler-build/rustls-tls"]
+rustls = ["rattler-build/rustls"]
 
 [dependencies]
 rattler-build = { path = "../../" }
@@ -21,12 +21,13 @@ rattler_build_jinja = { path = "../../crates/rattler_build_jinja" }
 rattler_build_types = { path = "../../crates/rattler_build_types" }
 rattler_build_variant_config = { path = "../../crates/rattler_build_variant_config" }
 rattler_build_package = { path = "../../crates/rattler_build_package" }
+rattler_build_script = { path = "../../crates/rattler_build_script" }
 indexmap = "2.13.0"
 pyo3 = { version = "0.28.2", features = [
   "abi3-py38",
   "extension-module",
   "multiple-pymethods",
-  "chrono",
+  "jiff-02",
 ] }
 tokio = { version = "1.50.0", features = [
   "rt",
@@ -34,16 +35,17 @@ tokio = { version = "1.50.0", features = [
   "rt-multi-thread",
   "process",
 ] }
-rattler_conda_types = "0.44.0"
-rattler_config = "0.3.3"
-rattler_networking = { version = "0.26.3" }
-rattler_solve = "5.0.0"
-rattler_virtual_packages = "2.3.12"
+rattler_conda_types = "0.47.2"
+rattler_config = "0.5.2"
+rattler_networking = { version = "0.30.0" }
+rattler_solve = "7.1.4"
+rattler_virtual_packages = "3.0.2"
 clap = "4.6.0"
 url = "2.5.8"
-chrono = "0.4.44"
-rattler_upload = "0.5.0"
-rattler_package_streaming = { version = "0.24.3", default-features = false }
+jiff = "0.2.27"
+hex = "0.4.3"
+rattler_upload = "0.8.2"
+rattler_package_streaming = { version = "0.26.6", default-features = false }
 miette = "7.6.0"
 tempfile = "3.27.0"
 serde_yaml = "0.9"

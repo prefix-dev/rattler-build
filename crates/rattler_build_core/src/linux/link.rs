@@ -510,7 +510,7 @@ mod test {
             encoded_prefix,
             &[],
             &globvec,
-            &SystemTools::default(),
+            &SystemTools::new("rattler-build", "0.0.0"),
         )?;
         let object = SharedObject::new(&binary_path)?;
         assert!(SharedObject::test_file(&binary_path)?);
@@ -556,7 +556,7 @@ mod test {
             encoded_prefix,
             &[String::from("lib/")],
             &GlobVec::default(),
-            &SystemTools::default(),
+            &SystemTools::new("rattler-build", "0.0.0"),
         )?;
         let object = SharedObject::new(&binary_path)?;
         assert_eq!(

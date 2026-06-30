@@ -1,5 +1,5 @@
 ---
-source: src/metadata.rs
+source: crates/rattler_build_core/src/metadata.rs
 expression: output
 ---
 recipe:
@@ -67,7 +67,7 @@ build_configuration:
     - "https://conda.anaconda.org/conda-forge"
   channel_priority: strict
   solve_strategy: highest
-  timestamp: "2023-12-13T18:40:12.845800Z"
+  timestamp: "2023-12-13T18:40:12.8458Z"
   subpackages:
     rich:
       name: rich

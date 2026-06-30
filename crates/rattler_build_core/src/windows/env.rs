@@ -39,10 +39,7 @@ fn to_cygdrive(path: &Path) -> String {
     }
 }
 
-pub fn default_env_vars(
-    prefix: &Path,
-    target_platform: &Platform,
-) -> HashMap<String, Option<String>> {
+pub fn default_env_vars_target(prefix: &Path) -> HashMap<String, Option<String>> {
     let library_prefix = prefix.join("Library");
     let mut vars = HashMap::<String, Option<String>>::new();
     vars.insert(
@@ -82,6 +79,12 @@ pub fn default_env_vars(
         Some(format!("{};{}", library_inc.display(), include_var)),
     );
 
+    vars.insert("CYGWIN_PREFIX".to_string(), Some(to_cygdrive(prefix)));
+    vars
+}
+
+pub fn default_env_vars_build(build_platform: &Platform) -> HashMap<String, Option<String>> {
+    let mut vars = HashMap::<String, Option<String>>::new();
     let default_vars = vec![
         "ALLUSERSPROFILE",
         "APPDATA",
@@ -124,7 +127,7 @@ pub fn default_env_vars(
     // Do we need to get these from the variant configuration?
     let win_msvc = "19.0.0";
 
-    let win_arch = match target_platform {
+    let win_arch = match build_platform {
         Platform::Win32 => "i386",
         Platform::Win64 => "amd64",
         Platform::WinArm64 => "arm64",
@@ -139,8 +142,6 @@ pub fn default_env_vars(
                 .unwrap_or_else(|_| format!("{}-pc-windows-{}", win_arch, win_msvc)),
         ),
     );
-
-    vars.insert("CYGWIN_PREFIX".to_string(), Some(to_cygdrive(prefix)));
 
     let re_vs_comntools = Regex::new(r"^VS[0-9]{2,3}COMNTOOLS$").unwrap();
     let re_vs_installdir = Regex::new(r"^VS[0-9]{4}INSTALLDIR$").unwrap();

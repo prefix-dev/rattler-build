@@ -90,7 +90,7 @@ From here, you can manually run the build script to debug issues:
 code .
 
 # Create a patch after editing the files
-rattler-build create-patch ...
+rattler-build debug create-patch ...
 ```
 
 This lets you inspect the environment, test commands interactively, and iterate quickly

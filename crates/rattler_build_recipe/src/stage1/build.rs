@@ -2,7 +2,7 @@
 use rattler_build_jinja::Variable;
 use rattler_build_script::Script;
 use rattler_build_yaml_parser::ParseError;
-use rattler_conda_types::{NoArchType, package::EntryPoint};
+use rattler_conda_types::{Flag, NoArchType, package::EntryPoint};
 use serde::{Deserialize, Serialize};
 
 use crate::stage1::HashInfo;
@@ -173,7 +173,8 @@ pub struct VariantKeyUsage {
     /// Variant keys to ignore
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub ignore_keys: Vec<String>,
-    /// Down-prioritize variant (negative priority value)
+    /// Down-prioritize this variant. Higher values make the variant less
+    /// preferred; the magnitude of the value is used (the sign is ignored).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub down_prioritize_variant: Option<i32>,
 }
@@ -313,6 +314,10 @@ pub struct Build {
     /// Noarch type - "python" or "generic" if set
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub noarch: Option<NoArchType>,
+
+    /// V3 package variant flags.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub flags: Vec<Flag>,
 
     /// Python-specific configuration
     #[serde(default, skip_serializing_if = "PythonBuild::is_default")]
@@ -503,6 +508,7 @@ impl Build {
             && matches!(self.string, BuildString::Default)
             && self.script.is_default()
             && self.noarch.is_none()
+            && self.flags.is_empty()
             && self.python.entry_points.is_empty()
             && self.python.skip_pyc_compilation.is_empty()
             && !self.python.use_python_app_entrypoint

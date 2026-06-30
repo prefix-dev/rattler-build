@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "py-rattler-build"
-version = "0.60.0"
+version = "0.67.0"
 requires-python = ">=3.10"
 description = "The fastest way to build conda packages programatically"
 readme = "README.md"
@@ -36,25 +36,15 @@ line-length = 120
 target-version = "py310"
 lint.extend-select = ["UP"]
 
-[tool.mypy]
-python_version = "3.10"
-files = ["src/rattler_build", "tests", "examples"]
-strict = true
-enable_error_code = ["redundant-expr", "truthy-bool", "ignore-without-code"]
-disable_error_code = ["empty-body"]
+# Tutorial notebooks introduce imports inline next to where they are used.
+[tool.ruff.lint.per-file-ignores]
+"notebooks/*.ipynb" = ["E402"]
 
-[[tool.mypy.overrides]]
-module = ["rattler_build._rattler_build"]
-ignore_missing_imports = true
+[tool.ty.environment]
+python-version = "3.10"
 
-[[tool.mypy.overrides]]
-module = ["rattler_build.*"]
-# We exclude the rattler module from warn_return_any, because the PyO3 api does not have Python
-# type annotations. See https://github.com/PyO3/pyo3/issues/1112 for a discussion on adding
-# this capability. We could add a stub file for rattler_build.rattler_build (the PyO3 api), but that
-# amounts to duplicating almost all type annotations on our api, as the Python api itself is a
-# thin wrapper around the PyO3 api to start with.
-warn_return_any = false
+[tool.ty.src]
+include = ["src/rattler_build", "tests", "examples"]
 
 [tool.ty.rules]
 unresolved-import = "ignore" # Ignore until ty can deal with the Rust shared lib

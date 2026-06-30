@@ -1,0 +1,24 @@
+package:
+  name: late-bound-license
+  version: "0.1.0"
+
+build:
+  script:
+    # Simulate a package (e.g. an R package) that installs its license file
+    # into the host prefix during the build.
+    - if: unix
+      then:
+        - mkdir -p $PREFIX/share/licenses/late-bound-license
+        - echo "late bound license content" > $PREFIX/share/licenses/late-bound-license/LICENSE
+    - if: win
+      then:
+        - if not exist "%PREFIX%\share\licenses\late-bound-license" mkdir "%PREFIX%\share\licenses\late-bound-license"
+        - echo late bound license content > "%PREFIX%\share\licenses\late-bound-license\LICENSE"
+
+about:
+  license: MIT
+  # The license file lives inside the prefix and is referenced via the
+  # late-bound ${{ PREFIX }} variable. This does not require
+  # --allow-absolute-license-paths.
+  license_file:
+    - ${{ PREFIX }}/share/licenses/late-bound-license/LICENSE

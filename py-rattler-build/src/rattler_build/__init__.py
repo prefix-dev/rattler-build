@@ -1,13 +1,16 @@
 from rattler_build._rattler_build import (
     AuthError,
+    BuildError,
     ChannelError,
     ChannelPriorityError,
+    EnvironmentIsolation,
     IoError,
     JsonError,
     PackageFormatError,
     PlatformParseError,
     RattlerBuildError,
     RecipeParseError,
+    RepodataRevision,
     UploadError,
     UrlParseError,
     VariantError,
@@ -55,13 +58,19 @@ from rattler_build.tool_config import PlatformConfig, ToolConfiguration
 from rattler_build.upload import (
     upload_package_to_anaconda,
     upload_package_to_artifactory,
+    upload_package_to_cloudsmith,
     upload_package_to_prefix,
     upload_package_to_quetz,
     upload_packages_to_conda_forge,
 )
+from rattler_build.debug import DebugPaths, DebugSession, ScriptResult
 from rattler_build.variant_config import VariantConfig
 
 __all__ = [
+    # Debug
+    "DebugSession",
+    "DebugPaths",
+    "ScriptResult",
     # Core API
     "rattler_build_version",
     "build_recipes",
@@ -77,15 +86,18 @@ __all__ = [
     "upload_package_to_artifactory",
     "upload_package_to_prefix",
     "upload_package_to_anaconda",
+    "upload_package_to_cloudsmith",
     "upload_packages_to_conda_forge",
     # Recipe generation
     "generate_pypi_recipe",
     "generate_cran_recipe",
     "generate_cpan_recipe",
     "generate_luarocks_recipe",
-    # Configuration
+    # Build configuration
+    "EnvironmentIsolation",
     "BuildResult",
     "JinjaConfig",
+    "RepodataRevision",
     "VariantConfig",
     "ToolConfiguration",
     "PlatformConfig",
@@ -113,6 +125,7 @@ __all__ = [
     "RebuildResult",
     # Exceptions
     "RattlerBuildError",
+    "BuildError",
     "AuthError",
     "ChannelError",
     "ChannelPriorityError",

@@ -240,6 +240,20 @@ impl ScriptContent {
     }
 }
 
+/// Returns the platform-appropriate script file extensions, in priority order.
+///
+/// On Windows this returns `&["bat", "ps1"]`, on Unix `&["sh"]`.
+/// Used by both build-time and test-time script resolution so that the
+/// same extension preference is applied consistently everywhere
+/// (see <https://github.com/prefix-dev/rattler-build/issues/2199>).
+pub fn platform_script_extensions() -> &'static [&'static str] {
+    if cfg!(windows) {
+        &["bat", "ps1"]
+    } else {
+        &["sh"]
+    }
+}
+
 /// Helper function to determine interpreter based on file extension
 pub fn determine_interpreter_from_path(path: &Path) -> Option<String> {
     path.extension()

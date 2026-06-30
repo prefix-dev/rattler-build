@@ -1,9 +1,9 @@
-use rattler_digest::{Md5Hash, Sha256Hash};
+use rattler_digest::{Md5, Md5Hash, Sha256, Sha256Hash};
 use serde::{Deserialize, Serialize};
 use serde_with::{OneOrMany, formats::PreferMany, serde_as};
 use std::path::PathBuf;
 
-use crate::stage0::types::{ConditionalList, IncludeExclude, Value};
+use crate::stage0::types::{ConditionalList, IncludeExclude, JinjaTemplate, Value};
 
 /// Source information - can be Git, Url, or Path
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -78,6 +78,10 @@ pub struct GitSource {
     /// Optionally an expected commit hash to verify after checkout
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub expected_commit: Option<Value<String>>,
+
+    /// Filter for files to include/exclude from the checked-out tree
+    #[serde(default)]
+    pub filter: IncludeExclude,
 }
 
 /// Attestation verification configuration
@@ -127,7 +131,8 @@ pub struct UrlSource {
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        serialize_with = "sha256_serialization::serialize"
+        serialize_with = "sha256_serialization::serialize",
+        deserialize_with = "sha256_serialization::deserialize"
     )]
     pub sha256: Option<Value<Sha256Hash>>,
 
@@ -135,7 +140,8 @@ pub struct UrlSource {
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        serialize_with = "md5_serialization::serialize"
+        serialize_with = "md5_serialization::serialize",
+        deserialize_with = "md5_serialization::deserialize"
     )]
     pub md5: Option<Value<Md5Hash>>,
 
@@ -154,6 +160,10 @@ pub struct UrlSource {
     /// Optional attestation verification configuration
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub attestation: Option<AttestationConfig>,
+
+    /// Filter for files to include/exclude from the extracted source
+    #[serde(default)]
+    pub filter: IncludeExclude,
 }
 
 /// A local path source
@@ -166,7 +176,8 @@ pub struct PathSource {
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        serialize_with = "sha256_serialization::serialize"
+        serialize_with = "sha256_serialization::serialize",
+        deserialize_with = "sha256_serialization::deserialize"
     )]
     pub sha256: Option<Value<Sha256Hash>>,
 
@@ -174,7 +185,8 @@ pub struct PathSource {
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        serialize_with = "md5_serialization::serialize"
+        serialize_with = "md5_serialization::serialize",
+        deserialize_with = "md5_serialization::deserialize"
     )]
     pub md5: Option<Value<Md5Hash>>,
 
@@ -207,10 +219,10 @@ fn is_true(value: &bool) -> bool {
     *value
 }
 
-/// Serialize a SHA256 hash Value as a hex string
+/// Serialize/deserialize a SHA256 hash Value as a hex string (or Jinja template)
 mod sha256_serialization {
     use super::*;
-    use serde::Serializer;
+    use serde::{Deserializer, Serializer};
 
     pub fn serialize<S>(value: &Option<Value<Sha256Hash>>, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -219,7 +231,7 @@ mod sha256_serialization {
         match value {
             None => serializer.serialize_none(),
             Some(v) if v.is_concrete() => {
-                serializer.serialize_str(&format!("{:x}", v.as_concrete().unwrap()))
+                serializer.serialize_str(&hex::encode(v.as_concrete().unwrap()))
             }
             Some(v) if v.is_template() => {
                 serializer.serialize_str(v.as_template().unwrap().source())
@@ -227,12 +239,29 @@ mod sha256_serialization {
             _ => unreachable!("Value must be either concrete or template"),
         }
     }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<Value<Sha256Hash>>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let Some(s) = Option::<String>::deserialize(deserializer)? else {
+            return Ok(None);
+        };
+        if s.contains("${{") {
+            let template = JinjaTemplate::new(s).map_err(serde::de::Error::custom)?;
+            Ok(Some(Value::new_template(template, None)))
+        } else {
+            let hash = rattler_digest::parse_digest_from_hex::<Sha256>(&s)
+                .ok_or_else(|| serde::de::Error::custom(format!("Invalid SHA256 checksum: {s}")))?;
+            Ok(Some(Value::new_concrete(hash, None)))
+        }
+    }
 }
 
-/// Serialize an MD5 hash Value as a hex string
+/// Serialize/deserialize an MD5 hash Value as a hex string (or Jinja template)
 mod md5_serialization {
     use super::*;
-    use serde::Serializer;
+    use serde::{Deserializer, Serializer};
 
     pub fn serialize<S>(value: &Option<Value<Md5Hash>>, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -241,12 +270,29 @@ mod md5_serialization {
         match value {
             None => serializer.serialize_none(),
             Some(v) if v.is_concrete() => {
-                serializer.serialize_str(&format!("{:x}", v.as_concrete().unwrap()))
+                serializer.serialize_str(&hex::encode(v.as_concrete().unwrap()))
             }
             Some(v) if v.is_template() => {
                 serializer.serialize_str(v.as_template().unwrap().source())
             }
             _ => unreachable!("Value must be either concrete or template"),
+        }
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<Value<Md5Hash>>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let Some(s) = Option::<String>::deserialize(deserializer)? else {
+            return Ok(None);
+        };
+        if s.contains("${{") {
+            let template = JinjaTemplate::new(s).map_err(serde::de::Error::custom)?;
+            Ok(Some(Value::new_template(template, None)))
+        } else {
+            let hash = rattler_digest::parse_digest_from_hex::<Md5>(&s)
+                .ok_or_else(|| serde::de::Error::custom(format!("Invalid MD5 checksum: {s}")))?;
+            Ok(Some(Value::new_concrete(hash, None)))
         }
     }
 }
@@ -276,6 +322,7 @@ impl GitSource {
             lfs,
             submodules,
             expected_commit,
+            filter,
         } = self;
 
         let mut vars = Vec::new();
@@ -306,6 +353,7 @@ impl GitSource {
         if let Some(ec) = expected_commit {
             vars.extend(ec.used_variables());
         }
+        vars.extend(filter.used_variables());
         vars.sort();
         vars.dedup();
         vars
@@ -323,6 +371,7 @@ impl UrlSource {
             patches,
             target_directory,
             attestation,
+            filter,
         } = self;
 
         let mut vars = Vec::new();
@@ -348,6 +397,7 @@ impl UrlSource {
         if let Some(attestation) = attestation {
             vars.extend(attestation.used_variables());
         }
+        vars.extend(filter.used_variables());
         vars.sort();
         vars.dedup();
         vars

@@ -284,20 +284,17 @@ fn collect_variables_from_call(
                 // pin_subpackage(name) expands to the name variable (unless it's a string literal)
                 // pin_subpackage("literal") doesn't expand
                 for arg in &call.args {
-                    if let minijinja::machinery::ast::CallArg::Pos(expr) = arg {
-                        // Don't add string literals as variables
-                        if !matches!(expr, Expr::Const(_)) {
-                            collect_variables_from_expr(expr, variables);
-                        }
+                    let expr = call_arg_expr(arg);
+                    if !matches!(expr, Expr::Const(_)) {
+                        collect_variables_from_expr(expr, variables);
                     }
                 }
             }
             "pin_compatible" => {
                 // pin_compatible(name) expands to the name variable (unless it's a string literal)
                 for arg in &call.args {
-                    if let minijinja::machinery::ast::CallArg::Pos(expr) = arg
-                        && !matches!(expr, Expr::Const(_))
-                    {
+                    let expr = call_arg_expr(arg);
+                    if !matches!(expr, Expr::Const(_)) {
                         collect_variables_from_expr(expr, variables);
                     }
                 }
@@ -305,10 +302,7 @@ fn collect_variables_from_call(
             "match" => {
                 // match(var, spec) - first arg is a variable, second is a string
                 for arg in &call.args {
-                    if let minijinja::machinery::ast::CallArg::Pos(expr) = arg {
-                        // Both arguments could be variables
-                        collect_variables_from_expr(expr, variables);
-                    }
+                    collect_variables_from_expr(call_arg_expr(arg), variables);
                 }
             }
             "cdt" => {
@@ -345,22 +339,28 @@ fn extract_first_string_arg(args: &[minijinja::machinery::ast::CallArg]) -> Opti
     None
 }
 
+/// Return the inner expression of any CallArg variant.
+///
+/// Exhaustive on purpose: if minijinja adds a new CallArg variant, this fails
+/// to compile rather than silently dropping variables passed via that form.
+fn call_arg_expr<'a, 'b>(
+    arg: &'a minijinja::machinery::ast::CallArg<'b>,
+) -> &'a minijinja::machinery::ast::Expr<'b> {
+    use minijinja::machinery::ast::CallArg;
+    match arg {
+        CallArg::Pos(expr)
+        | CallArg::Kwarg(_, expr)
+        | CallArg::PosSplat(expr)
+        | CallArg::KwargSplat(expr) => expr,
+    }
+}
+
 /// Collect variables from a CallArg
 fn collect_variables_from_call_arg(
     arg: &minijinja::machinery::ast::CallArg,
     variables: &mut BTreeSet<String>,
 ) {
-    use minijinja::machinery::ast::CallArg;
-
-    // Match based on the CallArg variants available
-    match arg {
-        CallArg::Pos(expr) => {
-            collect_variables_from_expr(expr, variables);
-        }
-        _ => {
-            // Handle other CallArg variants if they exist
-        }
-    }
+    collect_variables_from_expr(call_arg_expr(arg), variables);
 }
 
 /// Recursively collect variable names from expressions
@@ -383,6 +383,12 @@ fn collect_variables_from_expr(
         Expr::BinOp(binop) => {
             collect_variables_from_expr(&binop.left, variables);
             collect_variables_from_expr(&binop.right, variables);
+        }
+        Expr::Compare(compare) => {
+            collect_variables_from_expr(&compare.expr, variables);
+            for op in &compare.ops {
+                collect_variables_from_expr(&op.expr, variables);
+            }
         }
         Expr::IfExpr(if_expr) => {
             collect_variables_from_expr(&if_expr.test_expr, variables);
@@ -545,5 +551,33 @@ mod tests {
         let mut vars = template.used_variables().to_vec();
         vars.sort();
         assert_eq!(vars, vec!["a", "b", "c"]);
+    }
+
+    #[test]
+    fn test_template_with_chained_comparison() {
+        // Chained comparison `a < b < c` parses to a single Expr::Compare node
+        // in minijinja 2.20+ (previously two BinOps). Regression guard for the
+        // Expr enum gaining new variants.
+        let template = JinjaTemplate::new("${{ lo <= n < hi }}".to_string()).unwrap();
+        let mut vars = template.used_variables().to_vec();
+        vars.sort();
+        assert_eq!(vars, vec!["hi", "lo", "n"]);
+    }
+
+    #[test]
+    fn test_pin_subpackage_kwarg_form() {
+        let template =
+            JinjaTemplate::new("${{ pin_subpackage(name=somevar) }}".to_string()).unwrap();
+        assert_eq!(template.used_variables(), &["somevar"]);
+    }
+
+    #[test]
+    fn test_generic_call_with_kwarg_and_splat() {
+        // Kwarg and splat args must contribute their inner variables.
+        let template =
+            JinjaTemplate::new("${{ my_fn(foo, bar=baz, *args, **kwargs) }}".to_string()).unwrap();
+        let mut vars = template.used_variables().to_vec();
+        vars.sort();
+        assert_eq!(vars, vec!["args", "baz", "foo", "kwargs", "my_fn"]);
     }
 }

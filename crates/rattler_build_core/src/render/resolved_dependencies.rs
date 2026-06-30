@@ -1,6 +1,6 @@
 use std::{
     borrow::Cow,
-    collections::HashMap,
+    collections::{BTreeMap, HashMap},
     fmt::{Display, Formatter},
     sync::Arc,
 };
@@ -235,6 +235,8 @@ pub struct FinalizedRunDependencies {
     pub depends: Vec<DependencyInfo>,
     #[serde(default)]
     pub constraints: Vec<DependencyInfo>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub extra_depends: BTreeMap<String, Vec<DependencyInfo>>,
     #[serde(default, skip_serializing_if = "RunExportsJson::is_empty")]
     pub run_exports: RunExportsJson,
 }
@@ -361,24 +363,42 @@ impl Display for ResolvedDependencies {
     }
 }
 
+fn split_rendered_dependency(d: &DependencyInfo, long: bool) -> (String, String) {
+    let rendered = d.render(long);
+
+    if let Some(name) = d.spec().name.as_exact() {
+        let name = name.as_normalized();
+        if let Some(rest) = rendered.strip_prefix(name) {
+            return (name.to_string(), rest.trim_start().to_string());
+        }
+
+        if let Some(channel_name_end) = rendered
+            .find(&format!("::{name}"))
+            .map(|idx| idx + 2 + name.len())
+        {
+            let (name, rest) = rendered.split_at(channel_name_end);
+            return (name.to_string(), rest.trim_start().to_string());
+        }
+    }
+
+    if let Some(split_at) = rendered
+        .char_indices()
+        .find_map(|(idx, ch)| (ch == '[' || ch.is_whitespace()).then_some(idx))
+    {
+        let (name, rest) = rendered.split_at(split_at);
+        (name.to_string(), rest.trim_start().to_string())
+    } else {
+        (rendered, String::new())
+    }
+}
+
 /// Render dependencies as (name, rest) pairs, sorted by name.
 /// When multiple dependencies have the same name, they will be grouped together.
 /// Empty specs are shown as "*" to indicate "any version".
 fn render_grouped_dependencies(deps: &[DependencyInfo], long: bool) -> Vec<(String, String)> {
-    // Collect all dependencies as (name, rest) pairs
-    // The rendered string format is "name spec (annotation)" so we split on first space
     let mut items: Vec<(String, String)> = deps
         .iter()
-        .map(|d| {
-            let rendered = d.render(long);
-            // Split on first space to separate name from the rest
-            if let Some((name, rest)) = rendered.split_once(' ') {
-                (name.to_string(), rest.to_string())
-            } else {
-                // No space means just a name with no version spec
-                (rendered.clone(), String::new())
-            }
-        })
+        .map(|d| split_rendered_dependency(d, long))
         .collect();
 
     // Replace empty specs with "*" to indicate "any version"
@@ -503,8 +523,8 @@ pub enum ResolveError {
     #[error("Failed to get finalized dependencies")]
     FinalizedDependencyNotFound,
 
-    #[error("Failed to resolve dependencies: {0}")]
-    DependencyResolutionError(String),
+    #[error("Failed to resolve dependencies")]
+    DependencyResolutionError(#[source] Box<dyn std::error::Error + Send + Sync + 'static>),
 
     #[error("Could not collect run exports")]
     CouldNotCollectRunExports(#[from] RunExportExtractorError),
@@ -711,7 +731,7 @@ pub async fn install_environments(
         tool_configuration,
     )
     .await
-    .map_err(|e| ResolveError::DependencyResolutionError(e.to_string()))?;
+    .map_err(|e| ResolveError::DependencyResolutionError(e.into()))?;
 
     install_packages(
         "host",
@@ -725,7 +745,7 @@ pub async fn install_environments(
         tool_configuration,
     )
     .await
-    .map_err(|e| ResolveError::DependencyResolutionError(e.to_string()))?;
+    .map_err(|e| ResolveError::DependencyResolutionError(e.into()))?;
 
     Ok(())
 }
@@ -789,9 +809,10 @@ pub(crate) async fn resolve_dependencies(
     let gateway = if download_missing_run_exports == RunExportsDownload::DownloadMissing {
         let client = tool_configuration.client.get_client().clone();
         let package_cache = tool_configuration.package_cache.clone();
+        let io_concurrency_limit = tool_configuration.io_concurrency_limit.unwrap_or(50);
         Some(
             Gateway::builder()
-                .with_max_concurrent_requests(50)
+                .with_max_concurrent_requests(io_concurrency_limit)
                 .with_client(client)
                 .with_package_cache(package_cache)
                 .finish(),
@@ -837,7 +858,7 @@ pub(crate) async fn resolve_dependencies(
             output.build_configuration.exclude_newer,
         )
         .await
-        .map_err(|e| ResolveError::DependencyResolutionError(e.to_string()))?;
+        .map_err(|e| ResolveError::DependencyResolutionError(e.into()))?;
 
         // Optionally add run exports to records that don't have them yet by
         // downloading packages and extracting run_exports.json
@@ -926,7 +947,7 @@ pub(crate) async fn resolve_dependencies(
             output.build_configuration.exclude_newer,
         )
         .await
-        .map_err(|e| ResolveError::DependencyResolutionError(e.to_string()))?;
+        .map_err(|e| ResolveError::DependencyResolutionError(e.into()))?;
 
         // Optionally add run exports to records that don't have them yet by
         // downloading packages and extracting run_exports.json
@@ -1021,6 +1042,22 @@ pub(crate) async fn resolve_dependencies(
 
     let rendered_run_exports = render_run_exports(output, &compatibility_specs)?;
 
+    let extra_depends = requirements
+        .extras
+        .iter()
+        .map(|(name, deps)| {
+            Ok((
+                name.clone(),
+                apply_variant(
+                    deps,
+                    &output.build_configuration,
+                    &compatibility_specs,
+                    false,
+                )?,
+            ))
+        })
+        .collect::<Result<BTreeMap<_, _>, ResolveError>>()?;
+
     let mut host_run_exports = HashMap::new();
 
     // Grab the host run exports from the cache
@@ -1049,6 +1086,7 @@ pub(crate) async fn resolve_dependencies(
     let run_specs = FinalizedRunDependencies {
         depends,
         constraints,
+        extra_depends,
         run_exports: rendered_run_exports,
     };
 
@@ -1077,9 +1115,6 @@ impl Output {
         tool_configuration: &tool_configuration::Configuration,
         download_missing_run_exports: RunExportsDownload,
     ) -> Result<Output, ResolveError> {
-        let span = tracing::info_span!("Resolving environments");
-        let _enter = span.enter();
-
         if self.finalized_dependencies.is_some() {
             return Ok(self);
         }
@@ -1149,7 +1184,7 @@ impl Output {
 
 #[cfg(test)]
 mod tests {
-    use rattler_conda_types::ParseStrictness;
+    use rattler_conda_types::{ParseMatchSpecOptions, ParseStrictness, RepodataRevision};
 
     // test rendering of DependencyInfo
     use super::*;
@@ -1199,5 +1234,29 @@ mod tests {
         assert!(matches!(dep_info[1], DependencyInfo::Variant(_)));
         assert!(matches!(dep_info[2], DependencyInfo::PinSubpackage(_)));
         assert!(matches!(dep_info[3], DependencyInfo::PinCompatible(_)));
+    }
+
+    #[test]
+    fn test_render_grouped_dependencies_keeps_v3_condition_in_spec_column() {
+        let options = ParseMatchSpecOptions::strict().with_repodata_revision(RepodataRevision::V3);
+        let deps = vec![
+            SourceDependency {
+                spec: MatchSpec::from_str(r#"scipy[when="python >=3.10"]"#, options).unwrap(),
+            }
+            .into(),
+            SourceDependency {
+                spec: MatchSpec::from_str("python", options).unwrap(),
+            }
+            .into(),
+        ];
+
+        let rendered = render_grouped_dependencies(&deps, false);
+        assert_eq!(
+            rendered,
+            vec![
+                ("python".to_string(), "*".to_string()),
+                ("scipy".to_string(), r#"[when="python>=3.10"]"#.to_string()),
+            ]
+        );
     }
 }

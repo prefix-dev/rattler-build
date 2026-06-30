@@ -5,7 +5,6 @@ pub use crate::types::{
 
 #[cfg(test)]
 mod test {
-    use chrono::TimeZone;
     use fs_err as fs;
     use insta::assert_yaml_snapshot;
     use rattler_conda_types::{
@@ -38,6 +37,7 @@ mod test {
                     constrains: vec![],
                     depends: vec![],
                     features: None,
+                    flags: Vec::new(),
                     legacy_bz2_md5: None,
                     legacy_bz2_size: None,
                     license: Some("MIT".into()),
@@ -51,13 +51,15 @@ mod test {
                     ),
                     size: Some(123123),
                     subdir: "linux-64".into(),
-                    timestamp: Some(chrono::Utc.timestamp_opt(123123, 0).unwrap().into()),
+                    timestamp: Some(rattler_conda_types::utils::TimestampMs::from(
+                        jiff::Timestamp::from_second(123123).unwrap(),
+                    )),
                     track_features: vec![],
                     version: VersionWithSource::from_str("1.2.3").unwrap(),
                     purls: None,
                     run_exports: None,
                     python_site_packages_path: None,
-                    experimental_extra_depends: Default::default(),
+                    extra_depends: Default::default(),
                 },
                 identifier: "test-1.2.3-h123.tar.bz2".parse().unwrap(),
                 url: Url::from_str("https://test.com/test/linux-64/test-1.2.3-h123.tar.bz2")

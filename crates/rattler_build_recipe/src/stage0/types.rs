@@ -10,6 +10,7 @@ pub use rattler_build_jinja::{JinjaExpression, JinjaTemplate};
 // Re-export all basic parsing types from the shared parser
 pub use rattler_build_yaml_parser::{
     Conditional, ConditionalList, ConditionalListOrItem, Item, ListOrItem, NestedItemList, Value,
+    ValueInner,
 };
 
 // Additional recipe-specific types below
@@ -120,6 +121,28 @@ impl Display for Script {
 }
 
 impl Script {
+    /// Create a script from inline content string
+    pub fn from_content(content: impl Into<String>) -> Self {
+        Self {
+            content: Some(ConditionalList::new(vec![Item::Value(
+                Value::new_concrete(content.into(), None),
+            )])),
+            ..Default::default()
+        }
+    }
+
+    /// Set environment variables for the script
+    pub fn with_env(mut self, env: indexmap::IndexMap<String, Value<String>>) -> Self {
+        self.env = env;
+        self
+    }
+
+    /// Set secrets to expose to the script
+    pub fn with_secrets(mut self, secrets: Vec<String>) -> Self {
+        self.secrets = secrets;
+        self
+    }
+
     /// Check if this script is default (all fields empty/none)
     pub fn is_default(&self) -> bool {
         self.content.is_none()

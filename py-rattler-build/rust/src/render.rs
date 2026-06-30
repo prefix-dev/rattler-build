@@ -10,7 +10,10 @@ use rattler_build_recipe::variant_render::{
 };
 use rattler_conda_types::Platform;
 
+use rattler_build_script::EnvironmentIsolation;
+
 use crate::error::RattlerBuildError;
+use crate::repodata_revision::PyRepodataRevision;
 use crate::stage0::PyStage0Recipe;
 use crate::stage1::PyStage1Recipe;
 use crate::variant_config::PyVariantConfig;
@@ -25,15 +28,19 @@ pub struct PyRenderConfig {
 #[pymethods]
 impl PyRenderConfig {
     /// Create a new render configuration with default settings
+    #[allow(clippy::too_many_arguments)]
     #[new]
-    #[pyo3(signature = (target_platform=None, build_platform=None, host_platform=None, experimental=false, recipe_path=None, extra_context=None))]
+    #[pyo3(signature = (target_platform=None, build_platform=None, host_platform=None, experimental=false, repodata_revision=None, recipe_path=None, extra_context=None, build_string_prefix=None, build_number_override=None))]
     fn new(
         target_platform: Option<String>,
         build_platform: Option<String>,
         host_platform: Option<String>,
         experimental: bool,
+        repodata_revision: Option<PyRepodataRevision>,
         recipe_path: Option<PathBuf>,
         extra_context: Option<Bound<'_, PyDict>>,
+        build_string_prefix: Option<String>,
+        build_number_override: Option<u64>,
     ) -> PyResult<Self> {
         let target_platform = target_platform
             .map(|p| p.parse::<Platform>())
@@ -68,21 +75,28 @@ impl PyRenderConfig {
 
         // Get OS environment variable keys that can be overridden by variant config
         // We use an empty prefix path since we just need the keys, not the values
-        let os_env_var_keys =
-            rattler_build::env_vars::os_vars(&std::path::PathBuf::new(), &host_platform)
-                .keys()
-                .cloned()
-                .collect();
+        let os_env_var_keys = rattler_build::env_vars::os_vars(
+            &std::path::PathBuf::new(),
+            &host_platform,
+            EnvironmentIsolation::default(),
+            &std::path::PathBuf::new(),
+        )
+        .keys()
+        .cloned()
+        .collect();
 
         Ok(Self {
             inner: RustRenderConfig {
                 extra_context,
                 experimental,
+                repodata_revision: repodata_revision.unwrap_or_default().into(),
                 recipe_path,
                 target_platform,
                 build_platform,
                 host_platform,
                 os_env_var_keys,
+                build_string_prefix,
+                build_number_override,
             },
         })
     }
@@ -125,6 +139,12 @@ impl PyRenderConfig {
         self.inner.experimental
     }
 
+    /// Get the repodata revision controlling which recipe fields and
+    /// MatchSpec syntax are accepted.
+    fn repodata_revision(&self) -> PyRepodataRevision {
+        self.inner.repodata_revision.into()
+    }
+
     /// Get the recipe path
     fn recipe_path(&self) -> Option<PathBuf> {
         self.inner.recipe_path.clone()
@@ -132,11 +152,12 @@ impl PyRenderConfig {
 
     fn __repr__(&self) -> String {
         format!(
-            "RenderConfig(target_platform='{}', build_platform='{}', host_platform='{}', experimental={})",
+            "RenderConfig(target_platform='{}', build_platform='{}', host_platform='{}', experimental={}, repodata_revision={:?})",
             self.inner.target_platform,
             self.inner.build_platform,
             self.inner.host_platform,
-            self.inner.experimental
+            self.inner.experimental,
+            PyRepodataRevision::from(self.inner.repodata_revision),
         )
     }
 }

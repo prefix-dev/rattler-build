@@ -32,7 +32,7 @@ jobs:
       run:
         working-directory: ${{ matrix.working-directory || github.workspace }}
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           submodules: recursive
           persist-credentials: false
@@ -42,12 +42,12 @@ jobs:
           Copy-Item D:/a/rattler-build/rattler-build/* ${{ matrix.working-directory }} -Recurse -Force
         working-directory: "D:/"
         if: ${{ matrix.os=='windows-latest' }}
-      - uses: prefix-dev/setup-pixi@a0af7a228712d6121d37aba47adf55c1332c9c2e # v0.9.4
+      - uses: prefix-dev/setup-pixi@5185adfbffb4bd703da3010310260805d89ebb11 # v0.9.6
         with:
           environments: packaging
           manifest-path: ${{ matrix.working-directory && format('{0}\pixi.toml', matrix.working-directory) || 'pixi.toml' }}
       - name: Configure sccache
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             core.exportVariable('ACTIONS_RESULTS_URL', process.env.ACTIONS_RESULTS_URL || '');
@@ -59,4 +59,5 @@ jobs:
       - name: Upload package
         run: pixi run --environment=packaging upload-package
       - name: Show sccache stats
-        run: pixi run --environment=packaging sccache --stop-server
+        run: pixi run --environment=packaging sccache --stop-server || true
+        continue-on-error: true

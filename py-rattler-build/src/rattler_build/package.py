@@ -40,6 +40,8 @@ from rattler_build._rattler_build import _package
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
+    from rattler_build.progress import ProgressCallback
+
 # Type alias for test union
 PackageTestType = Union[
     "PythonTest",
@@ -229,6 +231,7 @@ class Package:
         use_bz2: bool = True,
         use_zstd: bool = True,
         use_sharded: bool = True,
+        progress_callback: "ProgressCallback | None" = None,
     ) -> "TestResult":
         """Run a specific test by index.
 
@@ -242,6 +245,7 @@ class Package:
             use_bz2: Enable bz2 repodata
             use_zstd: Enable zstd repodata
             use_sharded: Enable sharded repodata
+            progress_callback: Optional callback for streaming log output in real-time
 
         Returns:
             TestResult with success status and output
@@ -267,6 +271,7 @@ class Package:
                 use_bz2=use_bz2,
                 use_zstd=use_zstd,
                 use_sharded=use_sharded,
+                progress_callback=progress_callback,
             )
         )
 
@@ -281,6 +286,7 @@ class Package:
         use_bz2: bool = True,
         use_zstd: bool = True,
         use_sharded: bool = True,
+        progress_callback: "ProgressCallback | None" = None,
     ) -> list["TestResult"]:
         """Run all tests in the package.
 
@@ -293,6 +299,7 @@ class Package:
             use_bz2: Enable bz2 repodata
             use_zstd: Enable zstd repodata
             use_sharded: Enable sharded repodata
+            progress_callback: Optional callback for streaming log output in real-time
 
         Returns:
             List of TestResult objects, one per test
@@ -303,6 +310,13 @@ class Package:
             for r in results:
                 status = "PASS" if r.success else "FAIL"
                 print(f"Test {r.test_index}: {status}")
+
+            # With streaming output:
+            from rattler_build.progress import SimpleProgressCallback
+            results = pkg.run_tests(
+                channel=["conda-forge"],
+                progress_callback=SimpleProgressCallback(),
+            )
             ```
         """
         return [
@@ -316,6 +330,7 @@ class Package:
                 use_bz2=use_bz2,
                 use_zstd=use_zstd,
                 use_sharded=use_sharded,
+                progress_callback=progress_callback,
             )
         ]
 

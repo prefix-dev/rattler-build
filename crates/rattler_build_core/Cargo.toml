@@ -1,6 +1,6 @@
 [package]
 name = "rattler_build_core"
-version = "0.2.0"
+version = "0.2.8"
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -9,7 +9,7 @@ repository.workspace = true
 description = "The core engine of rattler-build, providing recipe rendering, source fetching, script execution, package building, testing, and publishing"
 
 [features]
-default = ['rustls-tls', 's3']
+default = ['rustls', 's3']
 native-tls = [
   'reqwest/native-tls',
   'rattler/native-tls',
@@ -22,19 +22,18 @@ native-tls = [
   'rattler_build_networking/native-tls',
   'rattler_build_source_cache/native-tls',
 ]
-rustls-tls = [
-  'reqwest/rustls-tls',
-  'reqwest-middleware/rustls-tls',
-  'reqwest/rustls-tls-native-roots',
-  'rattler/rustls-tls',
-  'rattler_repodata_gateway/rustls-tls',
-  'rattler_networking/rustls-tls',
-  'rattler_package_streaming/rustls-tls',
-  'rattler_index/rustls-tls',
-  'rattler_redaction/rustls-tls',
-  'rattler_upload/rustls-tls',
-  'rattler_build_networking/rustls-tls',
-  'rattler_build_source_cache/rustls-tls',
+rustls = [
+  'reqwest/rustls',
+  'reqwest-middleware/rustls',
+  'rattler/rustls',
+  'rattler_repodata_gateway/rustls',
+  'rattler_networking/rustls',
+  'rattler_package_streaming/rustls',
+  'rattler_index/rustls',
+  'rattler_redaction/rustls',
+  'rattler_upload/rustls',
+  'rattler_build_networking/rustls',
+  'rattler_build_source_cache/rustls',
 ]
 s3 = [
   'rattler_networking/s3',
@@ -83,7 +82,7 @@ indicatif = { workspace = true, features = ["in_memory"] }
 console = { workspace = true }
 thiserror = { workspace = true }
 tempfile = { workspace = true }
-chrono = { workspace = true }
+jiff = { workspace = true }
 ignore = { workspace = true }
 globset = { workspace = true }
 text-stub-library = { workspace = true }
@@ -141,14 +140,10 @@ rattler_git = { workspace = true }
 rattler_build_types = { workspace = true }
 rattler_build_jinja = { workspace = true }
 rattler_build_recipe = { workspace = true, features = ["variant-config"] }
-rattler_build_networking = { workspace = true, features = ["middleware"] }
+rattler_build_networking = { workspace = true }
 rattler_build_source_cache = { workspace = true }
 rattler_build_script = { workspace = true, features = ["execution"] }
 
-[target.'cfg(not(target_os = "windows"))'.dependencies]
-sha2 = { workspace = true, features = ["asm"] }
-
-[target.'cfg(target_os = "windows")'.dependencies]
 sha2 = { workspace = true }
 
 [dev-dependencies]

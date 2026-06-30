@@ -4,8 +4,8 @@ use pyo3::prelude::*;
 use rattler_build::tool_configuration;
 use rattler_upload::upload;
 use rattler_upload::upload::opt::{
-    AnacondaData, ArtifactoryData, AttestationSource, CondaForgeData, ForceOverwrite, PrefixData,
-    QuetzData, SkipExisting as UploadSkipExisting,
+    AnacondaData, ArtifactoryData, AttestationSource, CloudsmithData, CondaForgeData,
+    ForceOverwrite, PrefixData, QuetzData, SkipExisting as UploadSkipExisting,
 };
 use url::Url;
 
@@ -113,6 +113,30 @@ pub fn upload_package_to_anaconda_py(
 
     run_async_task(async {
         upload::upload_package_to_anaconda(&store, &package_files, anaconda_data).await?;
+        Ok(())
+    })
+}
+
+#[pyfunction]
+#[pyo3(signature = (package_files, owner, repo, api_key, url, auth_file))]
+pub fn upload_package_to_cloudsmith_py(
+    package_files: Vec<PathBuf>,
+    owner: String,
+    repo: String,
+    api_key: Option<String>,
+    url: Option<String>,
+    auth_file: Option<PathBuf>,
+) -> PyResult<()> {
+    let store = tool_configuration::get_auth_store(auth_file).map_err(RattlerBuildError::Auth)?;
+
+    let url = url
+        .map(|u| Url::parse(&u))
+        .transpose()
+        .map_err(RattlerBuildError::from)?;
+    let cloudsmith_data = CloudsmithData::new(owner, repo, api_key, url);
+
+    run_async_task(async {
+        upload::upload_package_to_cloudsmith(&store, &package_files, cloudsmith_data).await?;
         Ok(())
     })
 }

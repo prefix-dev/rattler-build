@@ -668,6 +668,30 @@ def test_always_include_files(
     assert "Force include new file" in (pkg_force / "hello.txt").read_text()
 
 
+@pytest.mark.skipif(
+    os.name == "nt", reason="recipe does not support execution on windows"
+)
+def test_package_files_override(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """The build script writes an explicit list of paths to
+    $RATTLER_BUILD_PACKAGE_FILES; only those should end up in the package."""
+    rattler_build.build(
+        recipes / "package_files_override/recipe.yaml",
+        tmp_path,
+    )
+
+    pkg = get_extracted_package(tmp_path, "package_files_override")
+    paths = json.loads((pkg / "info/paths.json").read_text())
+    listed = sorted(p["_path"] for p in paths["paths"])
+
+    assert listed == ["bin/also-keep.sh", "bin/keep.sh"]
+    assert (pkg / "bin/keep.sh").exists()
+    assert (pkg / "bin/also-keep.sh").exists()
+    assert not (pkg / "bin/skip.sh").exists()
+    assert not (pkg / "share/doc/skip.txt").exists()
+
+
 def test_script_env_in_recipe(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
@@ -870,6 +894,20 @@ def test_console_logging(rattler_build: RattlerBuild, recipes: Path, tmp_path: P
     assert "hahaha" not in output
     assert "I am hahaha" not in output
     assert "I am ********" in output
+
+
+def test_secret_passthrough(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    """Verify that secrets declared in the recipe are available as env vars
+    inside the build script, even in strict isolation mode."""
+    os.environ["BUILD_SECRET"] = "s3cret_token_42"
+    rattler_build.build(recipes / "secret_passthrough", tmp_path)
+    pkg = get_extracted_package(tmp_path, "secret_passthrough")
+    value_file = pkg / "secret_check" / "value.txt"
+    assert value_file.exists(), "build script did not write secret value file"
+    contents = value_file.read_text().strip()
+    assert contents == "s3cret_token_42", (
+        f"secret was not passed through to build script, got: {contents!r}"
+    )
 
 
 @pytest.mark.skipif(
@@ -1250,6 +1288,18 @@ def test_source_filter(rattler_build: RattlerBuild, recipes: Path, tmp_path: Pat
     rattler_build(*args)
 
 
+def test_source_filter_archive(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    # The filter is applied to the extracted contents of an archive source.
+    path_to_recipe = recipes / "source_filter_archive"
+    args = rattler_build.build_args(
+        path_to_recipe,
+        tmp_path,
+    )
+    rattler_build(*args)
+
+
 def test_nushell_script_detection(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
@@ -1262,6 +1312,21 @@ def test_nushell_script_detection(
     assert (pkg / "info/paths.json").exists()
     content = (pkg / "hello.txt").read_text()
     assert "Hello, world!" == content
+
+
+def test_brush(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    # Builds a recipe with `interpreter: brush`. `brush` is pulled from the
+    # build environment (requirements/build), the bash wrapper activates the
+    # environment, and brush then runs the bash-syntax script.
+    rattler_build.build(
+        recipes / "brush-test/recipe.yaml",
+        tmp_path,
+    )
+    pkg = get_extracted_package(tmp_path, "brush-test")
+
+    assert (pkg / "info/paths.json").exists()
+    content = (pkg / "hello.txt").read_text()
+    assert "Hello from brush!" == content.strip()
 
 
 def test_channel_specific(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
@@ -1344,12 +1409,10 @@ def test_noarch_flask(
 
     assert (pkg / "info/tests/tests.yaml").exists()
 
-    # check that the snapshot matches (different on windows vs. unix)
+    # The serialized test script stores the command list verbatim (the same on
+    # all platforms); per-command error handling is applied when the test runs.
     test_yaml = (pkg / "info/tests/tests.yaml").read_text()
-    if os.name == "nt":
-        assert "if %errorlevel% neq 0 exit /b %errorlevel%" in test_yaml
-    else:
-        assert test_yaml == snapshot
+    assert test_yaml == snapshot
 
     # make sure that the entry point does not exist
     assert not (pkg / "python-scripts/flask").exists()
@@ -1663,6 +1726,20 @@ def test_cycle_detection(rattler_build: RattlerBuild, recipes: Path, tmp_path: P
     assert "Cycle detected in recipe outputs: bazbus, foobar" in stdout
 
 
+def test_sibling_run_dep_ordering(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Test that outputs with plain run deps on sibling outputs are built in the right order.
+
+    repro-wrapper has a run dep on repro-runtime but is listed first in the recipe.
+    The build should succeed because repro-runtime must be built before repro-wrapper's
+    test environment is solved.
+    """
+    rattler_build.build(
+        recipes / "race-condition" / "recipe-sibling-run-dep.yaml", tmp_path
+    )
+
+
 def test_python_min_render(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
 ):
@@ -1851,7 +1928,9 @@ def test_relink_rpath(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
     rattler_build.build(recipes / "test-relink", tmp_path)
 
 
-def test_ignore_run_exports(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+def test_ignore_run_exports(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, clean_path_on_win32
+):
     rattler_build.build(
         recipes / "test-parsing/recipe_ignore_run_exports.yaml",
         tmp_path,
@@ -1869,7 +1948,7 @@ def test_ignore_run_exports(rattler_build: RattlerBuild, recipes: Path, tmp_path
     elif current_subdir.startswith("osx"):
         expected_compiler = f"clangxx_{current_subdir}"
     elif current_subdir.startswith("win"):
-        expected_compiler = f"vs2017_{current_subdir}"
+        expected_compiler = f"vs2022_{current_subdir}"
     else:
         pytest.fail(f"Unsupported platform for compiler check: {current_subdir}")
 
@@ -3124,6 +3203,53 @@ def test_absolute_path_license_with_flag(
     assert (pkg / "info/licenses/external_license.txt").exists()
 
 
+def test_late_bound_license_path(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    # A license file installed into ${{ PREFIX }} during the build is collected
+    # without requiring --allow-absolute-license-paths.
+    rattler_build.build(recipes / "late_bound_license", tmp_path)
+    pkg = get_extracted_package(tmp_path, "late-bound-license")
+    license_file = pkg / "info/licenses/LICENSE"
+    assert license_file.exists()
+    assert "late bound license content" in license_file.read_text()
+
+
+def test_late_bound_license_glob(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    # A glob rooted at a late-bound ${{ PREFIX }} path collects every matching
+    # license file, preserving the directory structure under info/licenses.
+    rattler_build.build(recipes / "late_bound_license_glob", tmp_path)
+    pkg = get_extracted_package(tmp_path, "late-bound-license-glob")
+    foo_license = pkg / "info/licenses/foo/LICENSE"
+    bar_license = pkg / "info/licenses/bar/LICENSE"
+    assert foo_license.exists()
+    assert bar_license.exists()
+    assert "foo license content" in foo_license.read_text()
+    assert "bar license content" in bar_license.read_text()
+
+
+def test_late_bound_license_traversal_rejected(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    # A late-bound license path that escapes the build directories via `..` must
+    # be rejected, otherwise it would be an absolute-path backdoor around
+    # --allow-absolute-license-paths.
+    with pytest.raises(CalledProcessError):
+        rattler_build.build(recipes / "late_bound_license_traversal", tmp_path)
+
+
+def test_patch_from_other_source(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    # A patch that ships inside another source can be applied by referencing it
+    # through the late-bound ${{ SRC_DIR }} variable. The build script fails if
+    # the patch was not applied.
+    rattler_build.build(recipes / "patch_from_other_source", tmp_path)
+    get_extracted_package(tmp_path, "patch-from-other-source")
+
+
 def test_sourceforge_redirects(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
@@ -3151,3 +3277,23 @@ def test_target_platform_in_variant_config_warning(
         in combined
     )
     assert "Please use the '--target-platform' command-line flag" in combined
+
+
+def test_c_compilation(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, clean_path_on_win32
+):
+    rattler_build.build(recipes / "c_compilation", tmp_path)
+    pkg = get_extracted_package(tmp_path, "c_compilation")
+    if platform.system() == "Windows":
+        assert (pkg / "bin/hello.exe").exists()
+    else:
+        assert (pkg / "bin/hello").exists()
+
+
+def test_rust_compilation(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(recipes / "rust_compilation", tmp_path)
+    pkg = get_extracted_package(tmp_path, "rust_compilation")
+    if platform.system() == "Windows":
+        assert (pkg / "bin/hello-rust.exe").exists()
+    else:
+        assert (pkg / "bin/hello-rust").exists()

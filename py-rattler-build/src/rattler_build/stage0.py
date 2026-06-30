@@ -15,7 +15,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from rattler_build._rattler_build import render as _render
+from rattler_build._rattler_build import EnvironmentIsolation, RepodataRevision, render as _render
 from rattler_build._rattler_build import stage0 as _stage0
 from rattler_build.render import RenderConfig, RenderedVariant
 from rattler_build.tool_config import ToolConfiguration
@@ -45,6 +45,7 @@ class Stage0Recipe(ABC):
     _inner: _stage0.SingleOutputRecipe | _stage0.MultiOutputRecipe
     _wrapper: _stage0.Stage0Recipe
     _recipe_path: Path
+    _repodata_revision: RepodataRevision
 
     @property
     def recipe_path(self) -> Path:
@@ -74,32 +75,50 @@ class Stage0Recipe(ABC):
         return recipe_path
 
     @classmethod
-    def from_yaml(cls, yaml: str, *, recipe_dir: Path | str | None = None) -> Stage0Recipe:
+    def from_yaml(
+        cls,
+        yaml: str,
+        *,
+        recipe_dir: Path | str | None = None,
+        repodata_revision: RepodataRevision = RepodataRevision.LEGACY,
+    ) -> Stage0Recipe:
         """Parse a recipe from a YAML string.
 
         Args:
             yaml: The YAML recipe content.
             recipe_dir: Directory to write the recipe file into.  When
                 ``None`` (the default) a temporary directory is created.
+            repodata_revision: Repodata revision controlling which recipe fields and
+                MatchSpec syntax are accepted. Defaults to ``RepodataRevision.LEGACY``.
 
         Returns:
             SingleOutputRecipe or MultiOutputRecipe depending on the recipe type.
         """
         recipe_path = cls._write_recipe(yaml, recipe_dir)
 
-        wrapper = _stage0.Stage0Recipe.from_yaml(yaml)
+        wrapper = _stage0.Stage0Recipe.from_yaml(yaml, repodata_revision=repodata_revision)
         if wrapper.is_single_output():
             single_inner = wrapper.as_single_output()
-            return SingleOutputRecipe(single_inner, wrapper, recipe_path)
+            return SingleOutputRecipe(single_inner, wrapper, recipe_path, repodata_revision=repodata_revision)
         else:
             multi_inner = wrapper.as_multi_output()
-            return MultiOutputRecipe(multi_inner, wrapper, recipe_path)
+            return MultiOutputRecipe(multi_inner, wrapper, recipe_path, repodata_revision=repodata_revision)
 
     @classmethod
-    def from_file(cls, path: str | Path) -> Stage0Recipe:
+    def from_file(
+        cls,
+        path: str | Path,
+        *,
+        repodata_revision: RepodataRevision = RepodataRevision.LEGACY,
+    ) -> Stage0Recipe:
         """Parse a recipe from a YAML file.
 
         The file path is used as the recipe path directly — no copy is made.
+
+        Args:
+            path: Path to the recipe file.
+            repodata_revision: Repodata revision controlling which recipe fields and
+                MatchSpec syntax are accepted. Defaults to ``RepodataRevision.LEGACY``.
 
         Returns:
             SingleOutputRecipe or MultiOutputRecipe depending on the recipe type.
@@ -108,16 +127,22 @@ class Stage0Recipe(ABC):
         with open(path, encoding="utf-8") as f:
             yaml = f.read()
 
-        wrapper = _stage0.Stage0Recipe.from_yaml(yaml)
+        wrapper = _stage0.Stage0Recipe.from_yaml(yaml, repodata_revision=repodata_revision)
         if wrapper.is_single_output():
             single_inner = wrapper.as_single_output()
-            return SingleOutputRecipe(single_inner, wrapper, path)
+            return SingleOutputRecipe(single_inner, wrapper, path, repodata_revision=repodata_revision)
         else:
             multi_inner = wrapper.as_multi_output()
-            return MultiOutputRecipe(multi_inner, wrapper, path)
+            return MultiOutputRecipe(multi_inner, wrapper, path, repodata_revision=repodata_revision)
 
     @classmethod
-    def from_dict(cls, recipe_dict: dict[str, Any], *, recipe_dir: Path | str | None = None) -> Stage0Recipe:
+    def from_dict(
+        cls,
+        recipe_dict: dict[str, Any],
+        *,
+        recipe_dir: Path | str | None = None,
+        repodata_revision: RepodataRevision = RepodataRevision.LEGACY,
+    ) -> Stage0Recipe:
         """Create a recipe from a Python dictionary.
 
         This method validates the dictionary structure and provides detailed error
@@ -127,6 +152,8 @@ class Stage0Recipe(ABC):
             recipe_dict: Dictionary containing recipe data (must match recipe schema).
             recipe_dir: Directory to write the recipe file into.  When
                 ``None`` (the default) a temporary directory is created.
+            repodata_revision: Repodata revision controlling which recipe fields and
+                MatchSpec syntax are accepted. Defaults to ``RepodataRevision.LEGACY``.
 
         Returns:
             SingleOutputRecipe or MultiOutputRecipe depending on the recipe type.
@@ -150,13 +177,13 @@ class Stage0Recipe(ABC):
         """
         recipe_path = cls._write_recipe(json.dumps(recipe_dict, indent=2), recipe_dir)
 
-        wrapper = _stage0.Stage0Recipe.from_dict(recipe_dict)
+        wrapper = _stage0.Stage0Recipe.from_dict(recipe_dict, repodata_revision=repodata_revision)
         if wrapper.is_single_output():
             single_inner = wrapper.as_single_output()
-            return SingleOutputRecipe(single_inner, wrapper, recipe_path)
+            return SingleOutputRecipe(single_inner, wrapper, recipe_path, repodata_revision=repodata_revision)
         else:
             multi_inner = wrapper.as_multi_output()
-            return MultiOutputRecipe(multi_inner, wrapper, recipe_path)
+            return MultiOutputRecipe(multi_inner, wrapper, recipe_path, repodata_revision=repodata_revision)
 
     def as_single_output(self) -> SingleOutputRecipe:
         """
@@ -244,6 +271,9 @@ class Stage0Recipe(ABC):
             variant_config = VariantConfig()
 
         # Build a RenderConfig with the recipe_path injected
+        if render_config is None:
+            render_config = RenderConfig(repodata_revision=self._repodata_revision)
+
         render_config_inner = RenderConfig._with_recipe_path(render_config, self._recipe_path)
 
         # Unwrap variant_config to get inner Rust object
@@ -252,7 +282,12 @@ class Stage0Recipe(ABC):
         # Render the recipe using the wrapper
         rendered = _render.render_recipe(self._wrapper, variant_config_inner, render_config_inner)
 
-        return [RenderedVariant(r, self._recipe_path) for r in rendered]
+        variants = [
+            RenderedVariant(r, self._recipe_path, repodata_revision=render_config.repodata_revision) for r in rendered
+        ]
+        for variant in variants:
+            variant._siblings = variants
+        return variants
 
     def run_build(
         self,
@@ -265,6 +300,7 @@ class Stage0Recipe(ABC):
         package_format: str | None = None,
         no_include_recipe: bool = False,
         exclude_newer: datetime | None = None,
+        env_isolation: EnvironmentIsolation = EnvironmentIsolation.STRICT,
     ) -> list[BuildResult]:
         """Build this recipe.
 
@@ -283,6 +319,7 @@ class Stage0Recipe(ABC):
             package_format: Package format ("conda" or "tar.bz2").
             no_include_recipe: Don't include recipe in the output package.
             exclude_newer: Exclude packages newer than this timestamp.
+            env_isolation: Environment isolation mode. Defaults to ``EnvironmentIsolation.STRICT``.
 
         Returns:
             list[BuildResult]: List of build results, one per variant built.
@@ -318,6 +355,7 @@ class Stage0Recipe(ABC):
                 package_format=package_format,
                 no_include_recipe=no_include_recipe,
                 exclude_newer=exclude_newer,
+                env_isolation=env_isolation,
             )
             results.append(result)
 
@@ -327,10 +365,18 @@ class Stage0Recipe(ABC):
 class SingleOutputRecipe(Stage0Recipe):
     """A single-output recipe at stage0 (parsed, not yet evaluated)."""
 
-    def __init__(self, inner: _stage0.SingleOutputRecipe, wrapper: _stage0.Stage0Recipe, recipe_path: Path):
+    def __init__(
+        self,
+        inner: _stage0.SingleOutputRecipe,
+        wrapper: _stage0.Stage0Recipe,
+        recipe_path: Path,
+        *,
+        repodata_revision: RepodataRevision = RepodataRevision.LEGACY,
+    ):
         self._inner = inner
         self._wrapper = wrapper
         self._recipe_path = recipe_path
+        self._repodata_revision = repodata_revision
 
     @property
     def schema_version(self) -> int:
@@ -414,10 +460,18 @@ class StagingOutput:
 class MultiOutputRecipe(Stage0Recipe):
     """A multi-output recipe at stage0 (parsed, not yet evaluated)."""
 
-    def __init__(self, inner: _stage0.MultiOutputRecipe, wrapper: _stage0.Stage0Recipe, recipe_path: Path):
+    def __init__(
+        self,
+        inner: _stage0.MultiOutputRecipe,
+        wrapper: _stage0.Stage0Recipe,
+        recipe_path: Path,
+        *,
+        repodata_revision: RepodataRevision = RepodataRevision.LEGACY,
+    ):
         self._inner = inner
         self._wrapper = wrapper
         self._recipe_path = recipe_path
+        self._repodata_revision = repodata_revision
 
     @property
     def schema_version(self) -> int:

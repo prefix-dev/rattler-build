@@ -417,14 +417,20 @@ fn default_compiler(platform: Platform, language: &str) -> Option<Variable> {
     Some(
         match language {
             // Platform agnostic compilers
-            "fortran" => "gfortran",
+            "fortran" => {
+                if platform.is_windows() {
+                    "flang"
+                } else {
+                    "gfortran"
+                }
+            }
             lang if !["c", "cxx"].contains(&lang) => lang,
             // Platform specific compilers
             _ => {
                 if platform.is_windows() {
                     match language {
-                        "c" => "vs2017",
-                        "cxx" => "vs2017",
+                        "c" => "vs2022",
+                        "cxx" => "vs2022",
                         _ => unreachable!(),
                     }
                 } else if platform.is_osx() {
@@ -763,30 +769,29 @@ fn set_jinja(
     );
 
     env.add_function("match", |a: &Value, spec: &str| {
-        if let Some(variant) = a.as_str() {
-            // check if version matches spec
-            let (version, _) = variant.split_once(' ').unwrap_or((variant, ""));
-            // remove trailing .* or *
-            let version = version.trim_end_matches(".*").trim_end_matches('*');
-
-            let version = Version::from_str(version).map_err(|e| {
-                minijinja::Error::new(
-                    minijinja::ErrorKind::CannotDeserialize,
-                    format!("Failed to deserialize `version`: {}", e),
-                )
-            })?;
-            let version_spec =
-                VersionSpec::from_str(spec, ParseStrictness::Strict).map_err(|e| {
-                    minijinja::Error::new(
-                        minijinja::ErrorKind::SyntaxError,
-                        format!("Bad syntax for `spec`: {}", e),
-                    )
-                })?;
-            Ok(version_spec.matches(&version))
-        } else {
+        if a.is_undefined() || a.is_none() {
             // if a is undefined, we are currently searching for all variants and thus return true
-            Ok(true)
+            return Ok(true);
         }
+        let variant = a.to_string();
+        // check if version matches spec
+        let (version, _) = variant.split_once(' ').unwrap_or((&variant, ""));
+        // remove trailing .* or *
+        let version = version.trim_end_matches(".*").trim_end_matches('*');
+
+        let version = Version::from_str(version).map_err(|e| {
+            minijinja::Error::new(
+                minijinja::ErrorKind::CannotDeserialize,
+                format!("Failed to deserialize `version`: {}", e),
+            )
+        })?;
+        let version_spec = VersionSpec::from_str(spec, ParseStrictness::Strict).map_err(|e| {
+            minijinja::Error::new(
+                minijinja::ErrorKind::SyntaxError,
+                format!("Bad syntax for `spec`: {}", e),
+            )
+        })?;
+        Ok(version_spec.matches(&version))
     });
 
     let variant_clone = variant.clone();
@@ -1030,9 +1035,17 @@ mod tests {
                     .unwrap()
             );
             assert_eq!(
+                jinja
+                    .eval(&format!("git.latest_tag_distance({:?})", path))
+                    .expect("test 2")
+                    .as_str()
+                    .unwrap(),
+                "0"
+            );
+            assert_eq!(
                 jinja_wo_experimental
                     .eval(&format!("git.latest_tag({:?})", path))
-                    .expect_err("test 2")
+                    .expect_err("test 3")
                     .to_string(),
                 "invalid operation: Experimental feature: provide the `--experimental` flag to enable this feature (in <expression>:1)",
             );
@@ -1102,10 +1115,154 @@ mod tests {
                 .unwrap(),
             head.as_str().unwrap()
         );
+
+        // Test latest_tag_distance with relative path
+        assert_eq!(
+            jinja
+                .eval("git.latest_tag_distance(\"../repo\")")
+                .expect("relative path latest_tag_distance")
+                .as_str()
+                .unwrap(),
+            "0"
+        );
     }
 
     #[test]
+    // git version is too old in cross container for aarch64
+    #[cfg(not(all(
+        any(target_arch = "aarch64", target_arch = "powerpc64"),
+        target_os = "linux"
+    )))]
+    fn eval_git_latest_tag_distance_nonzero() {
+        // Verifies that the distance increments correctly when commits are added
+        // after the tag. This catches any regression where the wrong field of
+        // `git describe --tags --long` output is extracted.
+        let options = JinjaConfig {
+            target_platform: Platform::Linux64,
+            build_platform: Platform::Linux64,
+            host_platform: Platform::Linux64,
+            experimental: true,
+            ..Default::default()
+        };
+        let jinja = Jinja::new(options);
 
+        with_temp_dir("rattler_build_recipe_jinja_tag_distance_nonzero", |path| {
+            create_repo_with_tag(path, "v1.0.0").expect("failed to create repo with tag v1.0.0");
+
+            // Sanity check: distance is 0 right at the tag.
+            assert_eq!(
+                jinja
+                    .eval(&format!("git.latest_tag_distance({:?})", path))
+                    .expect("distance at tag")
+                    .as_str()
+                    .unwrap(),
+                "0"
+            );
+
+            // Add one more commit after the tag.
+            let git = |arg: &str, args: &[&str]| {
+                Command::new("git")
+                    .current_dir(path)
+                    .arg(arg)
+                    .args(args)
+                    .output()
+                    .expect("git failed")
+                    .status
+                    .success()
+            };
+            fs::write(path.join("extra.md"), "extra commit").unwrap();
+            assert!(git("add", &["."]));
+            assert!(git("commit", &["-m", "extra commit", "--no-gpg-sign"]));
+
+            // Distance must now be 1.
+            assert_eq!(
+                jinja
+                    .eval(&format!("git.latest_tag_distance({:?})", path))
+                    .expect("distance after one commit")
+                    .as_str()
+                    .unwrap(),
+                "1"
+            );
+        });
+    }
+
+    #[test]
+    // git version is too old in cross container for aarch64
+    #[cfg(not(all(
+        any(target_arch = "aarch64", target_arch = "powerpc64"),
+        target_os = "linux"
+    )))]
+    fn eval_git_latest_tag_distance_dashed_tags() {
+        // Exercises tags whose names contain dashes, e.g. "v0.18.0-1" and "v1.0-rc1".
+        // The distance field must be extracted by splitting from the RIGHT, not the left.
+        // "v0.18.0-1" -> git describe output "v0.18.0-1-0-g<hash>"
+        //   splitn(3,'-')[1]  = "1"   (wrong – part of the tag name)
+        //   rsplitn(3,'-')[1] = "0"   (correct)
+        // "v1.0-rc1" -> git describe output "v1.0-rc1-5-g<hash>"
+        //   splitn(3,'-')[1]  = "rc1" (wrong)
+        //   rsplitn(3,'-')[1] = "5"   (correct, after 5 extra commits)
+        let options = JinjaConfig {
+            target_platform: Platform::Linux64,
+            build_platform: Platform::Linux64,
+            host_platform: Platform::Linux64,
+            experimental: true,
+            ..Default::default()
+        };
+        let jinja = Jinja::new(options);
+
+        // Case 1: tag "v0.18.0-1", zero additional commits -> distance must be "0"
+        with_temp_dir(
+            "rattler_build_recipe_jinja_tag_distance_v0_18_0_1",
+            |path| {
+                create_repo_with_tag(path, "v0.18.0-1")
+                    .expect("failed to create repo with tag v0.18.0-1");
+                assert_eq!(
+                    jinja
+                        .eval(&format!("git.latest_tag_distance({:?})", path))
+                        .expect("v0.18.0-1 distance")
+                        .as_str()
+                        .unwrap(),
+                    "0",
+                    "distance should be 0 for tag v0.18.0-1 at HEAD"
+                );
+            },
+        );
+
+        // Case 2: tag "v1.0-rc1", zero additional commits -> distance must be "0"
+        with_temp_dir("rattler_build_recipe_jinja_tag_distance_v1_0_rc1", |path| {
+            create_repo_with_tag(path, "v1.0-rc1")
+                .expect("failed to create repo with tag v1.0-rc1");
+            assert_eq!(
+                jinja
+                    .eval(&format!("git.latest_tag_distance({:?})", path))
+                    .expect("v1.0-rc1 distance")
+                    .as_str()
+                    .unwrap(),
+                "0",
+                "distance should be 0 for tag v1.0-rc1 at HEAD"
+            );
+        });
+
+        // Case 3: tag "v2.3.0-beta.1", zero additional commits -> distance must be "0"
+        with_temp_dir(
+            "rattler_build_recipe_jinja_tag_distance_v2_3_0_beta_1",
+            |path| {
+                create_repo_with_tag(path, "v2.3.0-beta.1")
+                    .expect("failed to create repo with tag v2.3.0-beta.1");
+                assert_eq!(
+                    jinja
+                        .eval(&format!("git.latest_tag_distance({:?})", path))
+                        .expect("v2.3.0-beta.1 distance")
+                        .as_str()
+                        .unwrap(),
+                    "0",
+                    "distance should be 0 for tag v2.3.0-beta.1 at HEAD"
+                );
+            },
+        );
+    }
+
+    #[test]
     fn eval_load_from_file() {
         let options = JinjaConfig {
             target_platform: Platform::Linux64,
@@ -1984,16 +2141,20 @@ mod tests {
 
         let platform = Platform::Win64;
         assert_eq!(
-            "vs2017",
+            "vs2022",
             default_compiler(platform, "cxx").unwrap().to_string()
         );
         assert_eq!(
-            "vs2017",
+            "vs2022",
             default_compiler(platform, "c").unwrap().to_string()
         );
         assert_eq!(
             "cuda",
             default_compiler(platform, "cuda").unwrap().to_string()
+        );
+        assert_eq!(
+            "flang",
+            default_compiler(platform, "fortran").unwrap().to_string()
         );
     }
 }

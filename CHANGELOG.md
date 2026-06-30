@@ -5,6 +5,434 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- The `source.filter` field is now also supported for `url` and `git` sources (it was previously only available for `path` sources). The filter is applied to the files copied into the work directory: the contents of the extracted archive for `url` sources (and `path` sources pointing to an archive) and the checked-out tree for `git` sources. This allows large sources to be trimmed down to the parts needed for the build.
+
+### Changed
+
+- Package content test failures now report the fully expanded glob(s) that were actually matched against the package (including automatically prepended platform prefixes such as `include/` or `Library/include/`), instead of only the raw user-provided pattern. This applies to all package content sections (`include`, `bin`, `lib`, `site_packages`, `files`), making it clearer why a pattern did not match. (#2584)
+- Improve CRAN (R) recipe generation: pass `${R_ARGS}` to `R CMD INSTALL`, add `cross-r-base` for cross-compilation, set `rpaths` for compiled packages, mark pure-R packages as `noarch: generic`, reference `r-base`'s bundled license files, and fix the `r-base` version constraint so it is applied to both `host` and `run` without duplication.
+
+
+## [0.67.0] - 2026-06-22
+### ✨ Highlights
+
+This release introduces support for late-bound build directory variables (e.g., `${{ SRC_DIR }}`, `${{ PREFIX }}`) in recipe fields that are evaluated before build directories exist. This allows patches and license files to reference directories that are only known once the build has started.
+
+The supported variables are:
+
+- `${{ SRC_DIR }}` – the source working directory
+- `${{ RECIPE_DIR }}` – the recipe directory
+- `${{ BUILD_DIR }}` – the top-level build directory
+
+This is useful when a patch ships inside another source. Because sources are
+fetched in order into the shared `SRC_DIR`, a later source can apply a patch
+that was extracted from an earlier one:
+
+```yaml
+source:
+  - url: https://example.com/tool-{{ version }}.tar.gz  # ships patches under src/
+    sha256: "..."
+  - url: https://example.com/lib-{{ version }}.tar.gz
+    sha256: "..."
+    target_directory: lib_src
+    patches:
+      - ${{ SRC_DIR }}/src/patches/0001-fix.patch
+```
+
+
+
+### Added
+
+- Support late-bound build directory variables in patches and license files by @wolfv in [#2554](https://github.com/prefix-dev/rattler-build/pull/2554)
+
+
+### Changed
+
+- Build llamacpp recipe with Ninja generator on Windows by @Hofer-Julian in [#2562](https://github.com/prefix-dev/rattler-build/pull/2562)
+
+
+### Documentation
+
+- Update CLI docs by @Hofer-Julian in [#2568](https://github.com/prefix-dev/rattler-build/pull/2568)
+
+
+
+## [0.66.2] - 2026-06-17
+### ✨ Highlights
+
+This release includes an important fix for how we define default environment variables during the build,
+and updates the default windows compiler to VS2022
+
+### Added
+
+- Update default windows compiler by @Glatzel in [#2136](https://github.com/prefix-dev/rattler-build/pull/2136)
+
+
+### Fixed
+
+- Separate build env vars and host env vars by @isuruf in [#2558](https://github.com/prefix-dev/rattler-build/pull/2558)
+
+
+
+## [0.66.1] - 2026-06-13
+
+### Fixed
+
+- Don't resolve the native wrapper shell as a build-env interpreter by @wolfv in [#2545](https://github.com/prefix-dev/rattler-build/pull/2545)
+
+## [0.66.0] - 2026-06-11
+### ✨ Highlights
+
+This release features a couple of nice improvements to the interpreter feature of Rattler-Build.
+We now support the `brush` interpreter and have a consistent way of activating all interpreters
+
+### Added
+
+- Add brush interpreter support by @baszalmstra in [#2527](https://github.com/prefix-dev/rattler-build/pull/2527)
+
+
+### Changed
+
+- Rattler-build binary detection by @Hofer-Julian in [#2542](https://github.com/prefix-dev/rattler-build/pull/2542)
+
+
+### Fixed
+
+- Honor io_concurrency_limit by @nehaljwani in [#2525](https://github.com/prefix-dev/rattler-build/pull/2525)
+- Useful error messages for typos in `interpreter` by @baszalmstra in [#2540](https://github.com/prefix-dev/rattler-build/pull/2540)
+
+
+### Refactor
+
+- Align nushell interpreter with brush approach by @baszalmstra in [#2533](https://github.com/prefix-dev/rattler-build/pull/2533)
+- Streamline script interpreters through a native shell wrapper by @baszalmstra in [#2535](https://github.com/prefix-dev/rattler-build/pull/2535)
+
+
+### New Contributors
+* @nehaljwani made their first contribution in [#2525](https://github.com/prefix-dev/rattler-build/pull/2525)
+
+## [0.65.1] - 2026-05-29
+### ✨ Highlights
+
+This release includes a small py-rattler-build fix.
+
+### Fixed
+
+- Forward recipe_path to DebugSession by @Hofer-Julian in [#2515](https://github.com/prefix-dev/rattler-build/pull/2515)
+
+
+
+## [0.65.0] - 2026-05-19
+### ✨ Highlights
+
+Just some minor changes, and a release to pull in the latest `rattler` release.
+
+### Added
+
+- Add warning when new repodata format is unsupported by @wolfv in [#2472](https://github.com/prefix-dev/rattler-build/pull/2472)
+- Allow build scripts to override package contents by @baszalmstra in [#2476](https://github.com/prefix-dev/rattler-build/pull/2476)
+- `git.latest_tag_distance` by @casperdcl in [#2484](https://github.com/prefix-dev/rattler-build/pull/2484)
+
+
+### Fixed
+
+- Respect `.orig`-only sources in patch application by @wolfv in [#2470](https://github.com/prefix-dev/rattler-build/pull/2470)
+- Correct `git.latest_tag_distance` parsing for dashed tag names by @pb01ka in [#2491](https://github.com/prefix-dev/rattler-build/pull/2491)
+- Improve error handling in DependencyResolutionError by @wolfv in [#2485](https://github.com/prefix-dev/rattler-build/pull/2485)
+- Validate source attestations by @wolfv in [#2338](https://github.com/prefix-dev/rattler-build/pull/2338)
+
+
+### New Contributors
+* @pb01ka made their first contribution in [#2491](https://github.com/prefix-dev/rattler-build/pull/2491)
+* @casperdcl made their first contribution in [#2484](https://github.com/prefix-dev/rattler-build/pull/2484)
+
+## [0.64.1] - 2026-05-04
+### ✨ Highlights
+
+
+
+### Added
+
+- Handle 501 in sharded repodata by @pavelzw in [#2468](https://github.com/prefix-dev/rattler-build/pull/2468)
+
+
+
+## [0.64.0] - 2026-05-04
+### ✨ Highlights
+
+We added _experimental_ support for v3 packages, which means you can define extras, conditional dependencies and flags.
+
+- `extras`: define optional dependency groups, a well known concept from PyPI
+- `when`: define conditions under which dependencies should appear (e.g. `foo[when="python>=3.10"])
+- `flags`: make variants easy to select by adding `flags` to your variant output, e.g. `foo[flags=['blas', 'cuda']]`
+
+Example recipe:
+
+```yaml
+package:
+  name: v3-explore
+  version: 0.1.0
+
+build:
+  flags:
+    - ${{ "cuda" if cuda else "blas" }}
+    - "release"
+
+requirements:
+  run:
+    - python
+    # pull in scipy only when `python >=3.10`
+    - scipy [when="python >=3.10"]
+
+  extras:
+    scipy:
+      - numpy
+```
+
+### Added
+
+- V3 packages by @wolfv in [#2452](https://github.com/prefix-dev/rattler-build/pull/2452)
+
+
+### Documentation
+
+- Outdated variants examples by @schuylermartin45 in [#2459](https://github.com/prefix-dev/rattler-build/pull/2459)
+- Improve docs for env vars, source archive types, attestations, v3 by @wolfv in [#2464](https://github.com/prefix-dev/rattler-build/pull/2464)
+
+
+### Fixed
+
+- Variant tracking and env vars for staging cache inheritance by @wolfv in [#2455](https://github.com/prefix-dev/rattler-build/pull/2455)
+- Inherit build number for cache outputs by @wolfv in [#2460](https://github.com/prefix-dev/rattler-build/pull/2460)
+
+
+### Performance
+
+- Lazily initialize the `BaseClient` by @baszalmstra in [#2456](https://github.com/prefix-dev/rattler-build/pull/2456)
+
+
+
+## [0.63.1] - 2026-04-27
+### ✨ Highlights
+
+
+
+### Fixed
+
+- Use force directory removal to handle Windows file locks by @wolfv in [#2444](https://github.com/prefix-dev/rattler-build/pull/2444)
+- Remove PKG_* environment variables in staging cache, set variant values by @wolfv in [#2449](https://github.com/prefix-dev/rattler-build/pull/2449)
+
+
+
+## [0.63.0] - 2026-04-22
+### ✨ Highlights
+
+The staging output is no longer experimental! 🎉
+
+> [!WARNING]
+> Multi-output recipes no longer auto-discover `build.sh` / `build.bat` files. Each output must now explicitly reference its build script. To preserve current behavior use `script: build` (which auto-selects `.sh` or `.bat`) in the output.
+
+### Added
+
+- Remove experimental guard for staging outputs by @Hofer-Julian in [#2432](https://github.com/prefix-dev/rattler-build/pull/2432)
+
+
+### Documentation
+
+- Fix warning syntax and more tweaks by @salim-b in [#2435](https://github.com/prefix-dev/rattler-build/pull/2435)
+
+
+### Fixed
+
+- Fix zizmor lint by @Hofer-Julian in [#2434](https://github.com/prefix-dev/rattler-build/pull/2434)
+- Set CONDA_BUILD env var in build_env.sh to fix env-isolation none by @Hofer-Julian in [#2433](https://github.com/prefix-dev/rattler-build/pull/2433)
+- Disable build file auto-discovery for multi-output recipes by @Hofer-Julian in [#2436](https://github.com/prefix-dev/rattler-build/pull/2436)
+- Prevent stacking of pending-rm suffixes on Windows cleanup by @wolfv in [#2439](https://github.com/prefix-dev/rattler-build/pull/2439)
+
+
+
+## [0.62.2] - 2026-04-16
+### ✨ Highlights
+
+This release contains a fix that properly sets env vars for test environments when environment isolation is enabled.
+
+### Fixed
+
+- Include default env vars also in test environment by @Hofer-Julian in [#2425](https://github.com/prefix-dev/rattler-build/pull/2425)
+
+
+
+## [0.62.1] - 2026-04-15
+### ✨ Highlights
+
+Fix macOS signing and notarisation of release artifacts
+
+
+### Documentation
+
+- Document release process by @Hofer-Julian in [#2415](https://github.com/prefix-dev/rattler-build/pull/2415)
+- Extend recipe reference by @Hofer-Julian in [#2416](https://github.com/prefix-dev/rattler-build/pull/2416)
+
+
+### Fixed
+
+- Fix zizmor ref-version-mismatch warnings in python-build.yml by @Hofer-Julian in [#2417](https://github.com/prefix-dev/rattler-build/pull/2417)
+- Fix macOs signing, add sha file and move back to tar.gz by @Hofer-Julian in [#2418](https://github.com/prefix-dev/rattler-build/pull/2418)
+
+
+
+## [0.62.0] - 2026-04-13
+### ✨ Highlights
+
+The biggest change of this release is that we now clean environment variables before executing the build script.
+This makes build scripts more reproducible and also matches what conda-build is doing.
+However, we went for a more strict approach than conda-build since we also re-map the home directory to the working directory.
+Both the CLI and Python API allow to opt for the conda-build behaviour or no environment variable isolation instead.
+With the CLI a new flag `--env-isolation` is available which takes `strict` (default), `conda-build` or `none` as option.
+
+
+### Added
+
+- Allow for build_string_prefix passed into packages by @hunger in [#2384](https://github.com/prefix-dev/rattler-build/pull/2384)
+- Enforce clean build environment with configurable isolation modes by @Hofer-Julian in [#2372](https://github.com/prefix-dev/rattler-build/pull/2372)
+
+
+### Documentation
+
+- Fix meta.yaml leftover by @salim-b in [#2398](https://github.com/prefix-dev/rattler-build/pull/2398)
+- Mention skill-forge in building your own forge section by @pavelzw in [#2409](https://github.com/prefix-dev/rattler-build/pull/2409)
+
+
+### Fixed
+
+- Integers in skip/match conditions from variants.yaml by @wolfv in [#2395](https://github.com/prefix-dev/rattler-build/pull/2395)
+- Exclude new files from strip level guessing in patch application by @Hofer-Julian in [#2400](https://github.com/prefix-dev/rattler-build/pull/2400)
+- Reset origin URL and sync submodules before update by @Hofer-Julian in [#2401](https://github.com/prefix-dev/rattler-build/pull/2401)
+- Bump zip by @lucascolley in [#2405](https://github.com/prefix-dev/rattler-build/pull/2405)
+- Resolve overlinking false positives for staging outputs by @Hofer-Julian in [#2402](https://github.com/prefix-dev/rattler-build/pull/2402)
+
+
+### New Contributors
+* @salim-b made their first contribution in [#2398](https://github.com/prefix-dev/rattler-build/pull/2398)
+
+## [0.61.4] - 2026-03-31
+
+### Documentation
+
+- Fix create-patch command references by @Hofer-Julian in [#2393](https://github.com/prefix-dev/rattler-build/pull/2393)
+
+
+### Fixed
+
+- Skip empty command tests during packaging by @Hofer-Julian in [#2390](https://github.com/prefix-dev/rattler-build/pull/2390)
+- Resolve pin_subpackage in py-rattler-build multi-output builds by @Hofer-Julian in [#2389](https://github.com/prefix-dev/rattler-build/pull/2389)
+- Stop running lefthook in parallel by @Hofer-Julian in [#2387](https://github.com/prefix-dev/rattler-build/pull/2387)
+
+
+
+## [0.61.3] - 2026-03-30
+### ✨ Highlights
+
+This release brings a couple of important fixes and documentation updates.
+
+### Documentation
+
+- Update documentation references from conda-build to rattler-build by @wolfv in [#2360](https://github.com/prefix-dev/rattler-build/pull/2360)
+- Clarify the documentation of pin functions by @mgorny in [#2382](https://github.com/prefix-dev/rattler-build/pull/2382)
+- Fix obsolete `min_pin` and `max_pin` references by @mgorny in [#2380](https://github.com/prefix-dev/rattler-build/pull/2380)
+- Mention `stdlib()` function in the recipe doc by @mgorny in [#2381](https://github.com/prefix-dev/rattler-build/pull/2381)
+
+
+### Fixed
+
+- Set variant and platform env vars in test scripts by @Hofer-Julian in [#2365](https://github.com/prefix-dev/rattler-build/pull/2365)
+- Reindex all platform subdirs in build_reindexed_channels by @Hofer-Julian in [#2383](https://github.com/prefix-dev/rattler-build/pull/2383)
+- Fix "built with" metadata by @Hofer-Julian in [#2377](https://github.com/prefix-dev/rattler-build/pull/2377)
+- Add `cmake` as build dependency by @ruben-arts in [#2376](https://github.com/prefix-dev/rattler-build/pull/2376)
+
+
+### Refactor
+
+- Improve table output by @Hofer-Julian in [#2369](https://github.com/prefix-dev/rattler-build/pull/2369)
+- Adapt recipe stage 0 to fit Pixi's needs by @Hofer-Julian in [#2373](https://github.com/prefix-dev/rattler-build/pull/2373)
+
+
+
+## [0.61.2] - 2026-03-24
+### ✨ Highlights
+
+This release brings Cloudsmith upload for Python and the CLI.
+
+### Added
+
+- Add Cloudsmith upload bindings by @benmoss in [#2368](https://github.com/prefix-dev/rattler-build/pull/2368)
+
+
+### Documentation
+
+- Update CLI docs by @Hofer-Julian in [#2370](https://github.com/prefix-dev/rattler-build/pull/2370)
+
+
+
+## [0.61.1] - 2026-03-23
+### ✨ Highlights
+
+This release mostly contains fixes for our Python API.
+
+
+### Added
+
+- Add progress_callback to run_tests by @Hofer-Julian in [#2356](https://github.com/prefix-dev/rattler-build/pull/2356)
+- Remove log from `__str__` of `BuildError` by @Hofer-Julian in [#2364](https://github.com/prefix-dev/rattler-build/pull/2364)
+
+
+### Fixed
+
+- Remove publish-crates-io task, CI job, and script by @Hofer-Julian in [#2350](https://github.com/prefix-dev/rattler-build/pull/2350)
+- Reduce zizmor output by @Hofer-Julian in [#2353](https://github.com/prefix-dev/rattler-build/pull/2353)
+- Use platform-specific script extensions for test scripts by @Hofer-Julian in [#2354](https://github.com/prefix-dev/rattler-build/pull/2354)
+
+
+
+## [0.61.0] - 2026-03-19
+### ✨ Highlights
+
+In this release, the Python API got a lot of love:
+- Added a Python API for `rattler-build debug`
+- Allow loading and merging of multiple variants
+
+**⚠️ Breaking:** On the CLI side we removed the `--debug` flag from multiple subcommands since this is sufficiently covered by `rattler-build debug`.
+
+
+### Added
+
+- Update crates, move to workspace, drop tui by @wolfv in [#2331](https://github.com/prefix-dev/rattler-build/pull/2331)
+- Add Python API for `debug` by @Hofer-Julian in [#2337](https://github.com/prefix-dev/rattler-build/pull/2337)
+- Allow loading and merging of multiple variant configs by @Hofer-Julian in [#2348](https://github.com/prefix-dev/rattler-build/pull/2348)
+
+
+### Fixed
+
+- Use correct api for trusted publishers by @Hofer-Julian in [#2325](https://github.com/prefix-dev/rattler-build/pull/2325)
+- Expected commit usage by @wolfv in [#2335](https://github.com/prefix-dev/rattler-build/pull/2335)
+- Pre-release building by @wolfv in [#2345](https://github.com/prefix-dev/rattler-build/pull/2345)
+
+
+### Refactor
+
+- Update mininjinja and remove custom undefined variable handling by @Hofer-Julian in [#2300](https://github.com/prefix-dev/rattler-build/pull/2300)
+
+
+### Removed
+
+- Remove `--debug` from CLI and Python API by @Hofer-Julian in [#2329](https://github.com/prefix-dev/rattler-build/pull/2329)
+
+
+
 ## [0.60.0] - 2026-03-16
 
 ### Fixed

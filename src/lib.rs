@@ -6,6 +6,7 @@
 pub use rattler_build_core::build;
 pub use rattler_build_core::bump_recipe;
 pub use rattler_build_core::console_utils;
+pub use rattler_build_core::debug;
 pub use rattler_build_core::env_vars;
 pub use rattler_build_core::metadata;
 pub use rattler_build_core::migrate_recipe;
@@ -53,7 +54,7 @@ use rattler_build_core::consts;
 use rattler_build_recipe::{stage0, stage1::TestType};
 use rattler_build_variant_config::VariantConfig;
 use rattler_conda_types::{
-    MatchSpec, NamedChannelOrUrl, NoArchType, PackageName, Platform,
+    MatchSpec, NamedChannelOrUrl, NoArchType, PackageName, Platform, RepodataRevision,
     compression_level::CompressionLevel, package::CondaArchiveType,
 };
 use rattler_config::config::build::PackageFormatAndCompression;
@@ -63,7 +64,6 @@ use rattler_index::ensure_channel_initialized_s3;
 use rattler_solve::SolveStrategy;
 use rattler_virtual_packages::VirtualPackageOverrides;
 use render::resolved_dependencies::RunExportsDownload;
-use source::patch::apply_patch_custom;
 use system_tools::SystemTools;
 use tool_configuration::{Configuration, ContinueOnFailure, SkipExisting, TestStrategy};
 use types::Directories;
@@ -80,6 +80,15 @@ use crate::publish::{
 use indexmap::IndexSet;
 use rattler_build_recipe::topological_sort_by_dependencies;
 
+/// Convert the CLI `--v3` boolean flag into a [`RepodataRevision`].
+fn repodata_revision_from_v3_flag(v3: bool) -> RepodataRevision {
+    if v3 {
+        RepodataRevision::V3
+    } else {
+        RepodataRevision::Legacy
+    }
+}
+
 /// Result of finding variants, including the top-level recipe name if available
 struct FoundVariants {
     outputs: IndexSet<DiscoveredOutput>,
@@ -92,18 +101,20 @@ fn find_variants(
     variant_config: &VariantConfig,
     recipe_path: &std::path::Path,
     recipe_content: &str,
-    target_platform: Platform,
-    build_platform: Platform,
-    host_platform: Platform,
-    experimental: bool,
+    render_config: RenderConfig,
 ) -> Result<FoundVariants, miette::Error> {
     // Parse the recipe
     let source = rattler_build_recipe::source_code::Source::from_string(
         recipe_path.display().to_string(),
         recipe_content.to_string(),
     );
-    let stage0_recipe =
-        rattler_build_recipe::parse_recipe(&source).wrap_err("Failed to parse recipe")?;
+    let stage0_recipe = rattler_build_recipe::parse_recipe_with_config(
+        &source,
+        rattler_build_recipe::stage0::ParseConfig {
+            repodata_revision: render_config.repodata_revision,
+        },
+    )
+    .wrap_err("Failed to parse recipe")?;
 
     // Extract the top-level recipe name from multi-output recipes (if concrete)
     let recipe_name = match &stage0_recipe {
@@ -112,25 +123,11 @@ fn find_variants(
             .name
             .as_ref()
             .and_then(|v| v.as_concrete())
-            .map(|name| name.0.as_normalized().to_string()),
+            .map(|name| name.as_str().to_string()),
         stage0::Recipe::SingleOutput(_) => None,
     };
 
-    // Get OS environment variable keys that can be overridden by variant config
-    // We use an empty prefix path since we just need the keys, not the values
-    let os_env_var_keys = env_vars::os_vars(&std::path::PathBuf::new(), &host_platform)
-        .keys()
-        .cloned()
-        .collect();
-
-    // Build render config with platform information, experimental flag, and recipe path
-    let render_config = RenderConfig::new()
-        .with_target_platform(target_platform)
-        .with_build_platform(build_platform)
-        .with_host_platform(host_platform)
-        .with_experimental(experimental)
-        .with_recipe_path(recipe_path)
-        .with_os_env_var_keys(os_env_var_keys);
+    let target_platform = render_config.target_platform;
 
     // Render with variant config (handles both single and multi-output recipes)
     let rendered_variants =
@@ -391,18 +388,34 @@ pub async fn get_build_output(
         variant_config.variants.insert(normalized_key, variables);
     }
 
+    // Get OS environment variable keys that can be overridden by variant config
+    let os_env_var_keys = env_vars::os_vars(
+        &std::path::PathBuf::new(),
+        &build_data.host_platform,
+        build_data.env_isolation,
+        &std::path::PathBuf::new(),
+    )
+    .keys()
+    .cloned()
+    .collect();
+
+    let render_config = RenderConfig {
+        target_platform: build_data.target_platform,
+        build_platform: build_data.build_platform,
+        host_platform: build_data.host_platform,
+        experimental: build_data.common.experimental,
+        repodata_revision: repodata_revision_from_v3_flag(build_data.common.v3),
+        recipe_path: Some(recipe_path.to_path_buf()),
+        os_env_var_keys,
+        build_number_override: build_data.build_num_override,
+        build_string_prefix: build_data.build_string_prefix.clone(),
+        ..RenderConfig::default()
+    };
+
     let FoundVariants {
         outputs: outputs_and_variants,
         recipe_name,
-    } = find_variants(
-        &variant_config,
-        recipe_path,
-        &recipe_content,
-        build_data.target_platform,
-        build_data.build_platform,
-        build_data.host_platform,
-        build_data.common.experimental,
-    )?;
+    } = find_variants(&variant_config, recipe_path, &recipe_content, render_config)?;
 
     tracing::info!("Found {} variants\n", outputs_and_variants.len());
     for discovered_output in &outputs_and_variants {
@@ -419,6 +432,14 @@ pub async fn get_build_output(
             discovered_output.build_string,
             skipped
         );
+
+        // Display V3 package variant flags, if any. These are not variant keys,
+        // so they are shown below the build string rather than in the table.
+        let flags = &discovered_output.recipe.build().flags;
+        if !flags.is_empty() {
+            let flags = flags.iter().map(|flag| flag.as_str()).collect::<Vec<_>>();
+            tracing::info!("Flags: {}", flags.join(", "));
+        }
 
         let mut table = comfy_table::Table::new();
         table
@@ -442,7 +463,7 @@ pub async fn get_build_output(
         .or_else(|| outputs_and_variants.first().map(|o| o.name.clone()))
         .unwrap_or_else(|| "build".to_string());
 
-    let timestamp = chrono::Utc::now();
+    let timestamp = jiff::Timestamp::now();
 
     for discovered_output in outputs_and_variants {
         let recipe = &discovered_output.recipe;
@@ -553,14 +574,17 @@ pub async fn get_build_output(
                 ),
                 store_recipe: !build_data.no_include_recipe,
                 force_colors: build_data.color_build_log && console::colors_enabled(),
+                env_isolation: build_data.env_isolation,
                 sandbox_config: build_data.sandbox_configuration.clone(),
                 exclude_newer: build_data.exclude_newer,
+                repodata_revision: repodata_revision_from_v3_flag(build_data.common.v3),
             },
             finalized_dependencies: None,
             finalized_sources: None,
             finalized_cache_dependencies: None,
             finalized_cache_sources: None,
-            system_tools: SystemTools::new(),
+            staging_library_name_map: None,
+            system_tools: SystemTools::new("rattler-build", env!("CARGO_PKG_VERSION")),
             build_summary: Arc::new(Mutex::new(BuildSummary::default())),
             extra_meta: Some(
                 build_data
@@ -573,35 +597,6 @@ pub async fn get_build_output(
         };
 
         outputs.push(output);
-    }
-
-    // Override build numbers if --build-num was specified
-    if let Some(build_num_override) = build_data.build_num_override {
-        tracing::info!(
-            "Overriding build number to {} for all outputs",
-            build_num_override
-        );
-        for output in &mut outputs {
-            // Update the build number
-            output.recipe.build.number = Some(build_num_override);
-
-            // Extract the hash from the current build string and recompute with new build number
-            // Build string format is: {hash}_{build_number}
-            let current_build_string = output
-                .recipe
-                .build
-                .string
-                .as_resolved()
-                .expect("Build string should be resolved at this point");
-
-            // Split on last '_' to separate hash from build number
-            // TODO should we fail if we do not have a "standard" build string with build number at the end?
-            if let Some(last_underscore) = current_build_string.rfind('_') {
-                let hash_part = &current_build_string[..last_underscore];
-                let new_build_string = format!("{}_{}", hash_part, build_num_override);
-                output.recipe.build.string = BuildString::Resolved(new_build_string);
-            }
-        }
     }
 
     Ok(outputs)
@@ -788,6 +783,7 @@ pub async fn run_build_from_args(
                         test_index: None,
                         output_dir: output.build_configuration.directories.output_dir.clone(),
                         exclude_newer: output.build_configuration.exclude_newer,
+                        env_isolation: output.build_configuration.env_isolation,
                     },
                     None,
                 )
@@ -949,6 +945,7 @@ pub async fn run_test(
         tool_configuration: tool_config,
         output_dir: test_data.common.output_dir,
         exclude_newer: None,
+        env_isolation: rattler_build_script::EnvironmentIsolation::default(),
     };
 
     let package_name = package_file
@@ -1011,6 +1008,7 @@ pub async fn rebuild_package_core(
 
             let response = reqwest_client
                 .get_client()
+                .client()
                 .get(url.as_str())
                 .send()
                 .await
@@ -1050,7 +1048,7 @@ pub async fn rebuild_package_core(
     let original_sha = rattler_digest::compute_file_digest::<rattler_digest::Sha256>(&package_path)
         .into_diagnostic()?;
 
-    tracing::info!("Original package SHA256: {:x}", original_sha);
+    tracing::info!("Original package SHA256: {}", hex::encode(original_sha));
     tracing::info!("Rebuilding \"{}\"", package_path.display());
 
     // we extract the recipe folder from the package file (info/recipe/*)
@@ -1068,6 +1066,13 @@ pub async fn rebuild_package_core(
         fs::read_to_string(temp_dir.join("rendered_recipe.yaml")).into_diagnostic()?;
 
     let mut output: Output = serde_yaml::from_str(&rendered_recipe).into_diagnostic()?;
+
+    let current_build_tool = system_tools::BuildToolInfo {
+        name: "rattler-build".to_string(),
+        version: env!("CARGO_PKG_VERSION").to_string(),
+    };
+    output.system_tools.warn_if_changed(&current_build_tool);
+    output.system_tools = SystemTools::new("rattler-build", env!("CARGO_PKG_VERSION"));
 
     // set recipe dir to the temp folder
     output.build_configuration.directories.recipe_dir = temp_dir;
@@ -1097,7 +1102,7 @@ pub async fn rebuild_package_core(
         run_build(output, &tool_config, WorkingDirectoryBehavior::Cleanup).await?;
 
     // Generate timestamp for the rebuilt package
-    let timestamp = chrono::Utc::now().format("%Y%m%d-%H%M%S");
+    let timestamp = jiff::Timestamp::now().strftime("%Y%m%d-%H%M%S");
 
     // Create final output directory
     let final_output_dir = rebuild_data.common.output_dir.clone();
@@ -1136,14 +1141,14 @@ pub async fn rebuild_package_core(
     let rebuilt_sha = rattler_digest::compute_file_digest::<rattler_digest::Sha256>(&rebuilt_path)
         .into_diagnostic()?;
 
-    tracing::info!("Rebuilt package SHA256: {:x}", rebuilt_sha);
+    tracing::info!("Rebuilt package SHA256: {}", hex::encode(rebuilt_sha));
     tracing::info!("Rebuilt package saved to: \"{:?}\"", rebuilt_path);
 
     Ok(RebuildOutput {
         original_path: package_path,
         rebuilt_path,
-        original_sha256: format!("{:x}", original_sha),
-        rebuilt_sha256: format!("{:x}", rebuilt_sha),
+        original_sha256: hex::encode(original_sha),
+        rebuilt_sha256: hex::encode(rebuilt_sha),
     })
 }
 
@@ -1558,6 +1563,7 @@ pub async fn debug_recipe(
         io_concurrency_limit: num_cpus::get(),
         no_include_recipe: false,
         color_build_log: true,
+        env_isolation: rattler_build_script::EnvironmentIsolation::default(),
         skip_existing: SkipExisting::None,
         noarch_build_platform: None,
         extra_meta: None,
@@ -1568,6 +1574,7 @@ pub async fn debug_recipe(
         allow_absolute_license_paths: false,
         exclude_newer: None,
         build_num_override: None,
+        build_string_prefix: None,
         markdown_summary: None,
     };
 
@@ -1602,25 +1609,7 @@ pub async fn debug_recipe(
     tracing::info!("Build and/or host environments created for debugging.");
 
     for output in outputs {
-        output
-            .build_configuration
-            .directories
-            .recreate_directories()
-            .into_diagnostic()?;
-        let output = output
-            .fetch_sources(&tool_config, apply_patch_custom)
-            .await
-            .into_diagnostic()?;
-        let output = output
-            .resolve_dependencies(&tool_config, RunExportsDownload::DownloadMissing)
-            .await
-            .into_diagnostic()?;
-        output
-            .install_environments(&tool_config)
-            .await
-            .into_diagnostic()?;
-
-        output.create_build_script().await.into_diagnostic()?;
+        let output = output.setup_debug_environment(&tool_config).await?;
 
         if let Some(deps) = &output.finalized_dependencies {
             if deps.build.is_some() {

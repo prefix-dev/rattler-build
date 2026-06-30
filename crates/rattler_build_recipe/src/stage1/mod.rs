@@ -13,7 +13,7 @@ use std::{
 };
 
 use rattler_build_jinja::{Jinja, JinjaConfig, Variable};
-use rattler_conda_types::Platform;
+use rattler_conda_types::{Platform, RepodataRevision};
 
 pub mod about;
 pub mod build;
@@ -55,6 +55,8 @@ pub struct EvaluationContext {
     /// OS environment variable keys that can be overridden by variant configuration.
     /// These should be included in the used_variant even if not directly accessed during evaluation.
     os_env_var_keys: HashSet<String>,
+    /// Repodata revision controlling which MatchSpec syntax and recipe fields are accepted.
+    repodata_revision: RepodataRevision,
 }
 
 impl Default for EvaluationContext {
@@ -64,6 +66,7 @@ impl Default for EvaluationContext {
             jinja_config: JinjaConfig::default(),
             accessed_variables: Arc::new(Mutex::new(HashSet::new())),
             os_env_var_keys: HashSet::new(),
+            repodata_revision: RepodataRevision::Legacy,
         }
     }
 }
@@ -102,6 +105,7 @@ impl EvaluationContext {
             jinja_config: JinjaConfig::default(),
             accessed_variables: Arc::new(Mutex::new(HashSet::new())),
             os_env_var_keys: HashSet::new(),
+            repodata_revision: RepodataRevision::Legacy,
         }
     }
 
@@ -112,6 +116,7 @@ impl EvaluationContext {
             jinja_config: JinjaConfig::default(),
             accessed_variables: Arc::new(Mutex::new(HashSet::new())),
             os_env_var_keys: HashSet::new(),
+            repodata_revision: RepodataRevision::Legacy,
         }
     }
 
@@ -126,6 +131,7 @@ impl EvaluationContext {
             jinja_config,
             accessed_variables: Arc::new(Mutex::new(HashSet::new())),
             os_env_var_keys: HashSet::new(),
+            repodata_revision: RepodataRevision::Legacy,
         }
     }
 
@@ -135,11 +141,27 @@ impl EvaluationContext {
         jinja_config: JinjaConfig,
         os_env_var_keys: HashSet<String>,
     ) -> Self {
+        Self::with_variables_config_os_env_keys_and_repodata_revision(
+            variables,
+            jinja_config,
+            os_env_var_keys,
+            RepodataRevision::Legacy,
+        )
+    }
+
+    /// Create an evaluation context with variables, config, OS env var keys, and a repodata revision.
+    pub fn with_variables_config_os_env_keys_and_repodata_revision(
+        variables: IndexMap<String, Variable>,
+        jinja_config: JinjaConfig,
+        os_env_var_keys: HashSet<String>,
+        repodata_revision: RepodataRevision,
+    ) -> Self {
         Self {
             variables,
             jinja_config,
             accessed_variables: Arc::new(Mutex::new(HashSet::new())),
             os_env_var_keys,
+            repodata_revision,
         }
     }
 
@@ -153,6 +175,7 @@ impl EvaluationContext {
             jinja_config,
             accessed_variables: Arc::new(Mutex::new(HashSet::new())),
             os_env_var_keys: HashSet::new(),
+            repodata_revision: RepodataRevision::Legacy,
         }
     }
 
@@ -164,6 +187,17 @@ impl EvaluationContext {
     /// Get the OS environment variable keys
     pub fn os_env_var_keys(&self) -> &HashSet<String> {
         &self.os_env_var_keys
+    }
+
+    /// Returns the repodata revision controlling which MatchSpec syntax and recipe fields are accepted.
+    pub fn repodata_revision(&self) -> RepodataRevision {
+        self.repodata_revision
+    }
+
+    /// Set the repodata revision on this context.
+    pub fn with_repodata_revision(mut self, repodata_revision: RepodataRevision) -> Self {
+        self.repodata_revision = repodata_revision;
+        self
     }
 
     /// Check if a variable exists in the context

@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.8](https://github.com/prefix-dev/rattler-build/compare/rattler_build_networking-v0.1.7...rattler_build_networking-v0.1.8) - 2026-06-26
+
+### Other
+
+- update Cargo.toml dependencies
+
+## [0.1.7](https://github.com/prefix-dev/rattler-build/compare/rattler_build_networking-v0.1.6...rattler_build_networking-v0.1.7) - 2026-06-18
+
+### Other
+
+- update Cargo.toml dependencies
+
+## [0.1.6](https://github.com/prefix-dev/rattler-build/compare/rattler_build_networking-v0.1.5...rattler_build_networking-v0.1.6) - 2026-05-20
+
+### Other
+
+- bump rattler crates and migrate to reqwest 0.13 ([#2493](https://github.com/prefix-dev/rattler-build/pull/2493))
+- lazily initialize the `BaseClient` ([#2456](https://github.com/prefix-dev/rattler-build/pull/2456))
+
+## [0.1.5](https://github.com/prefix-dev/rattler-build/compare/rattler_build_networking-v0.1.4...rattler_build_networking-v0.1.5) - 2026-04-13
+
+### Other
+
+- update Cargo.toml dependencies
+
+## [0.1.4](https://github.com/prefix-dev/rattler-build/compare/rattler_build_networking-v0.1.3...rattler_build_networking-v0.1.4) - 2026-03-25
+
+### Other
+
+- update Cargo.toml dependencies
+
+## [0.1.3](https://github.com/prefix-dev/rattler-build/compare/rattler_build_networking-v0.1.2...rattler_build_networking-v0.1.3) - 2026-03-18
+
+### Other
+
+- update Cargo.toml dependencies
+
 ## [0.1.2](https://github.com/prefix-dev/rattler-build/compare/rattler_build_networking-v0.1.1...rattler_build_networking-v0.1.2) - 2026-03-17
 
 ### Other

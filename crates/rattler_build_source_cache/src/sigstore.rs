@@ -6,7 +6,9 @@
 
 use std::path::Path;
 
+use sha2::{Digest, Sha256};
 use sigstore_trust_root::TrustedRoot;
+use sigstore_types::SignatureContent;
 use sigstore_verify::{VerificationPolicy, verify};
 
 use crate::error::CacheError;
@@ -31,16 +33,22 @@ fn derive_pypi_provenance_url(source_url: &url::Url) -> Option<url::Url> {
     let path = source_url.path();
     let filename = path.rsplit('/').next()?;
 
-    // Extract project name and version from filename
-    // Filenames are typically: {project}-{version}.tar.gz or {project}-{version}.whl etc.
-    let stem = filename
-        .strip_suffix(".tar.gz")
-        .or_else(|| filename.strip_suffix(".tar.bz2"))
-        .or_else(|| filename.strip_suffix(".zip"))
-        .or_else(|| filename.strip_suffix(".whl"))?;
-
-    // Split on the last '-' to separate project from version
-    let (project, version) = stem.rsplit_once('-')?;
+    // Extract project name and version from the filename. Source distribution
+    // filenames are project-version archives; wheel filenames are
+    // project-version-python-abi-platform per PEP 427.
+    let (project, version) = if let Some(stem) = filename.strip_suffix(".whl") {
+        let mut parts = stem.splitn(3, '-');
+        let project = parts.next()?;
+        let version = parts.next()?;
+        parts.next()?;
+        (project, version)
+    } else {
+        let stem = filename
+            .strip_suffix(".tar.gz")
+            .or_else(|| filename.strip_suffix(".tar.bz2"))
+            .or_else(|| filename.strip_suffix(".zip"))?;
+        stem.rsplit_once('-')?
+    };
 
     // Normalize project name (PEP 503: replace [-_.] with -)
     let normalized_project = project.to_lowercase().replace(['-', '_', '.'], "-");
@@ -192,6 +200,7 @@ async fn download_attestation_bundle(
 ) -> Result<String, CacheError> {
     let response = client
         .for_host(url)
+        .client()
         .get(url.clone())
         .send()
         .await
@@ -216,14 +225,104 @@ async fn download_attestation_bundle(
         })
 }
 
+/// Verify that an artifact's SHA-256 digest matches at least one subject in
+/// the in-toto statement of at least one bundle.
+///
+/// This is a critical security check: without it, an attestation for a
+/// *different* artifact (e.g. a different release) would be accepted as valid.
+fn verify_artifact_subject(
+    artifact_sha256_hex: &str,
+    bundles: &[sigstore_types::Bundle],
+) -> Result<(), CacheError> {
+    let mut found_any_subjects = false;
+    let mut found_subject_digests: Vec<String> = Vec::new();
+
+    for bundle in bundles {
+        // Extract the DSSE envelope from the bundle
+        let envelope = match &bundle.content {
+            SignatureContent::DsseEnvelope(envelope) => envelope,
+            _ => continue,
+        };
+
+        // Only check in-toto statements
+        if envelope.payload_type != "application/vnd.in-toto+json" {
+            continue;
+        }
+
+        // Decode and parse the in-toto statement
+        let payload_bytes = envelope.decode_payload();
+
+        let statement: sigstore_types::Statement = match serde_json::from_slice(&payload_bytes) {
+            Ok(s) => s,
+            Err(_) => continue,
+        };
+
+        if statement.subject.is_empty() {
+            continue;
+        }
+
+        found_any_subjects = true;
+
+        // Check if the artifact hash matches any subject's sha256 digest
+        if statement.matches_sha256(artifact_sha256_hex) {
+            return Ok(());
+        }
+
+        // Collect subject digests for error reporting
+        for subject in &statement.subject {
+            if let Some(sha256) = subject.digest.sha256.as_ref() {
+                found_subject_digests.push(format!("{}  (name: {})", sha256, subject.name));
+            }
+        }
+    }
+
+    if !found_any_subjects {
+        return Err(CacheError::AttestationVerification(
+            "attestation bundle does not contain any in-toto subjects to verify against"
+                .to_string(),
+        ));
+    }
+
+    let mut msg = format!(
+        "artifact SHA-256 ({}) does not match any subject in the attestation",
+        artifact_sha256_hex,
+    );
+    if !found_subject_digests.is_empty() {
+        msg.push_str("\n  subjects in attestation:");
+        for digest in &found_subject_digests {
+            msg.push_str(&format!("\n    - {}", digest));
+        }
+    }
+    Err(CacheError::AttestationVerification(msg))
+}
+
 /// Verify an attestation for a downloaded artifact.
 ///
 /// Downloads the attestation bundle (either from an explicit URL or auto-derived
 /// from PyPI), loads the Sigstore trusted root, and verifies each identity check.
 ///
-/// Identity matching uses **prefix** semantics: the expected identity (e.g.
-/// `https://github.com/pallets/flask`) must be a prefix of the actual certificate
+/// Always verifies that the artifact's SHA-256 digest matches a subject in the
+/// attestation's in-toto statement — regardless of whether publisher identity
+/// checks are configured.
+///
+/// Identity matching uses repository-boundary prefix semantics: the expected
+/// identity (e.g. `https://github.com/pallets/flask`) must either equal the
+/// actual certificate identity or be followed by `/` or `@` in the actual
 /// identity (e.g. `https://github.com/pallets/flask/.github/workflows/release.yml@refs/tags/3.1.1`).
+fn identity_matches(expected: &str, actual: &str) -> bool {
+    if actual == expected {
+        return true;
+    }
+
+    let Some(suffix) = actual.strip_prefix(expected) else {
+        return false;
+    };
+
+    // Require a repository boundary so `github:pallets/flask` does not match
+    // identities for repositories such as `pallets/flask-cors`.
+    suffix.starts_with('/') || suffix.starts_with('@')
+}
+
 pub(crate) async fn verify_attestation(
     client: &BaseClient,
     file_path: &Path,
@@ -246,9 +345,13 @@ pub(crate) async fn verify_attestation(
     tracing::info!("Downloading attestation bundle from {}", bundle_url);
     let response_json = download_attestation_bundle(client, &bundle_url).await?;
 
-    // Load the production Sigstore trusted root (embedded, no network needed)
-    let trusted_root = TrustedRoot::production().map_err(|e| {
-        CacheError::SigstoreTrustRoot(format!("Failed to load Sigstore trusted root: {}", e))
+    // Load the production Sigstore trusted root through TUF so verification
+    // uses fresh trust material instead of the embedded snapshot.
+    let trusted_root = TrustedRoot::production().await.map_err(|e| {
+        CacheError::SigstoreTrustRoot(format!(
+            "Failed to load Sigstore trusted root via TUF: {}",
+            e
+        ))
     })?;
 
     // Read the artifact for verification
@@ -256,6 +359,12 @@ pub(crate) async fn verify_attestation(
 
     // Parse the response: could be a plain sigstore bundle or a PyPI provenance response
     let parsed = parse_attestation_response(&response_json)?;
+
+    // Always verify the artifact's digest matches a subject in the attestation.
+    // This prevents accepting an attestation for a different file (e.g., from a
+    // different release or a different artifact entirely).
+    let artifact_sha256_hex = hex::encode(Sha256::digest(&artifact_bytes));
+    verify_artifact_subject(&artifact_sha256_hex, &parsed.bundles)?;
 
     // For each required identity check, find a matching bundle and verify it
     for check in &attestation_config.identity_checks {
@@ -275,8 +384,7 @@ pub(crate) async fn verify_attestation(
             match verify(artifact_bytes.as_slice(), bundle, &policy, &trusted_root) {
                 Ok(result) => {
                     if let Some(ref actual_identity) = result.identity {
-                        // Prefix match: expected identity must be a prefix of the actual identity
-                        if actual_identity.starts_with(&check.identity) {
+                        if identity_matches(&check.identity, actual_identity) {
                             tracing::info!(
                                 "\u{2714} Attestation verified (identity={})",
                                 actual_identity,
@@ -388,6 +496,19 @@ mod tests {
     }
 
     #[test]
+    fn test_derive_pypi_provenance_url_wheel() {
+        let url = url::Url::parse(
+            "https://files.pythonhosted.org/packages/aa/bb/charset_normalizer-3.4.0-py3-none-any.whl",
+        )
+        .unwrap();
+        let result = derive_pypi_provenance_url(&url).unwrap();
+        assert_eq!(
+            result.as_str(),
+            "https://pypi.org/integrity/charset-normalizer/3.4.0/charset_normalizer-3.4.0-py3-none-any.whl/provenance"
+        );
+    }
+
+    #[test]
     fn test_parse_attestation_response_sigstore_bundle() {
         // A sigstore bundle has a "mediaType" field
         let json = r#"{
@@ -441,5 +562,115 @@ mod tests {
     fn test_parse_attestation_response_unrecognized_format() {
         let json = r#"{ "foo": "bar" }"#;
         assert!(parse_attestation_response(json).is_err());
+    }
+
+    #[test]
+    fn test_identity_matches_github_workflow_identity() {
+        assert!(identity_matches(
+            "https://github.com/pallets/flask",
+            "https://github.com/pallets/flask/.github/workflows/release.yml@refs/tags/3.1.1"
+        ));
+    }
+
+    #[test]
+    fn test_identity_matches_exact_identity() {
+        assert!(identity_matches(
+            "https://github.com/pallets/flask",
+            "https://github.com/pallets/flask"
+        ));
+    }
+
+    #[test]
+    fn test_identity_rejects_repository_prefix_collision() {
+        assert!(!identity_matches(
+            "https://github.com/pallets/flask",
+            "https://github.com/pallets/flask-cors/.github/workflows/release.yml@refs/tags/4.0.0"
+        ));
+    }
+
+    /// Helper to create a minimal sigstore bundle with an in-toto statement
+    /// that attests to the given subjects (name, sha256_hex pairs).
+    fn make_bundle_with_subjects(subjects: &[(&str, &str)]) -> sigstore_types::Bundle {
+        use base64::{Engine, engine::general_purpose::STANDARD};
+
+        let subject_json: Vec<serde_json::Value> = subjects
+            .iter()
+            .map(|(name, sha256)| {
+                serde_json::json!({
+                    "name": name,
+                    "digest": { "sha256": sha256 }
+                })
+            })
+            .collect();
+
+        let statement = serde_json::json!({
+            "_type": "https://in-toto.io/Statement/v1",
+            "subject": subject_json,
+            "predicateType": "https://in-toto.io/attestation/release/v0.2",
+            "predicate": {}
+        });
+
+        let payload = STANDARD.encode(serde_json::to_string(&statement).unwrap());
+
+        let bundle_json = serde_json::json!({
+            "mediaType": "application/vnd.dev.sigstore.bundle.v0.3+json",
+            "verificationMaterial": {
+                "certificate": { "rawBytes": "dGVzdA==" },
+                "tlogEntries": [],
+                "timestampVerificationData": {}
+            },
+            "dsseEnvelope": {
+                "payload": payload,
+                "payloadType": "application/vnd.in-toto+json",
+                "signatures": [{ "sig": "dGVzdA==" }]
+            }
+        });
+
+        sigstore_types::Bundle::from_json(&serde_json::to_string(&bundle_json).unwrap()).unwrap()
+    }
+
+    #[test]
+    fn test_verify_artifact_subject_matching_digest() {
+        let artifact = b"hello world";
+        let sha256_hex = hex::encode(Sha256::digest(artifact));
+        let bundle = make_bundle_with_subjects(&[("test.tar.gz", &sha256_hex)]);
+        assert!(verify_artifact_subject(&sha256_hex, &[bundle]).is_ok());
+    }
+
+    #[test]
+    fn test_verify_artifact_subject_mismatched_digest() {
+        let sha256_hex = hex::encode(Sha256::digest(b"hello world"));
+        let wrong_hash = "0000000000000000000000000000000000000000000000000000000000000000";
+        let bundle = make_bundle_with_subjects(&[("test.tar.gz", wrong_hash)]);
+        let err = verify_artifact_subject(&sha256_hex, &[bundle]).unwrap_err();
+        assert!(
+            err.to_string().contains("does not match any subject"),
+            "unexpected error: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn test_verify_artifact_subject_multiple_subjects_one_matches() {
+        let sha256_hex = hex::encode(Sha256::digest(b"my artifact"));
+        let wrong_hash = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        let bundle = make_bundle_with_subjects(&[
+            ("other.tar.gz", wrong_hash),
+            ("correct.tar.gz", &sha256_hex),
+        ]);
+        assert!(verify_artifact_subject(&sha256_hex, &[bundle]).is_ok());
+    }
+
+    #[test]
+    fn test_verify_artifact_subject_empty_subjects() {
+        let sha256_hex = hex::encode(Sha256::digest(b"test"));
+        let bundle = make_bundle_with_subjects(&[]);
+        let err = verify_artifact_subject(&sha256_hex, &[bundle]).unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("does not contain any in-toto subjects"),
+            "unexpected error: {}",
+            err
+        );
     }
 }

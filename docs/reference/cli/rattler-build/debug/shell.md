@@ -17,6 +17,8 @@ rattler-build debug shell [OPTIONS]
 - <a id="arg---experimental" href="#arg---experimental">`--experimental`</a>
 :  Enable experimental features
 <br>**env**: `RATTLER_BUILD_EXPERIMENTAL`
+- <a id="arg---v3" href="#arg---v3">`--v3`</a>
+:  Enable V3 recipe fields and MatchSpec syntax
 - <a id="arg---allow-insecure-host" href="#arg---allow-insecure-host">`--allow-insecure-host <ALLOW_INSECURE_HOST>`</a>
 :  List of hosts for which SSL certificate verification should be skipped
 <br>May be provided more than once.

@@ -1,12 +1,12 @@
 use std::path::{Path, PathBuf};
 
-use chrono::{DateTime, Utc};
 use fs_err as fs;
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 
 use dunce::canonicalize;
 
-use crate::utils::remove_dir_all_force;
+use crate::utils::{is_pending_removal, remove_dir_all_force};
 
 /// Builder for creating [`Directories`] with a fluent API.
 #[derive(Debug, Clone)]
@@ -14,7 +14,7 @@ pub struct DirectoriesBuilder<'a> {
     name: &'a str,
     recipe_path: &'a Path,
     output_dir: &'a Path,
-    timestamp: &'a DateTime<Utc>,
+    timestamp: &'a Timestamp,
     no_build_id: bool,
     merge_build_and_host: bool,
     skip_directory_creation: bool,
@@ -26,7 +26,7 @@ impl<'a> DirectoriesBuilder<'a> {
         name: &'a str,
         recipe_path: &'a Path,
         output_dir: &'a Path,
-        timestamp: &'a DateTime<Utc>,
+        timestamp: &'a Timestamp,
     ) -> Self {
         Self {
             name,
@@ -104,9 +104,9 @@ fn get_build_dir(
     output_dir: &Path,
     name: &str,
     no_build_id: bool,
-    timestamp: &DateTime<Utc>,
+    timestamp: &Timestamp,
 ) -> Result<PathBuf, std::io::Error> {
-    let since_the_epoch = timestamp.timestamp();
+    let since_the_epoch = timestamp.as_second();
 
     let dirname = if no_build_id {
         format!("rattler-build_{}", name)
@@ -122,7 +122,7 @@ impl Directories {
         name: &'a str,
         recipe_path: &'a Path,
         output_dir: &'a Path,
-        timestamp: &'a DateTime<Utc>,
+        timestamp: &'a Timestamp,
     ) -> DirectoriesBuilder<'a> {
         DirectoriesBuilder::new(name, recipe_path, output_dir, timestamp)
     }
@@ -133,7 +133,7 @@ impl Directories {
         recipe_path: &Path,
         output_dir: &Path,
         no_build_id: bool,
-        timestamp: &DateTime<Utc>,
+        timestamp: &Timestamp,
         merge_build_and_host: bool,
         skip_directory_creation: bool,
     ) -> Result<Directories, std::io::Error> {
@@ -206,19 +206,39 @@ impl Directories {
         Ok(directories)
     }
 
+    /// Path to the file pointed at by the `RATTLER_BUILD_PACKAGE_FILES`
+    /// environment variable. Build scripts may write paths to this file (one
+    /// per line) to override the default mechanism that determines which files
+    /// end up in the final package.
+    pub fn package_files_list_path(&self) -> PathBuf {
+        self.build_dir.join(crate::consts::PACKAGE_FILES_LIST_NAME)
+    }
+
     /// Remove all directories except for the cache directory
     pub fn clean(&self) -> Result<(), std::io::Error> {
         if self.build_dir.exists() {
-            let folders = self.build_dir.read_dir()?;
+            // Snapshot entries before iterating: on Windows the rename-before-
+            // delete path in `remove_dir_all_force` creates new sibling trash
+            // dirs (`.{name}.pending-rm-{nanos}`), and we don't want the
+            // iterator to pick them up and process them recursively.
+            let folders: Vec<_> = self.build_dir.read_dir()?.collect::<Result<_, _>>()?;
             for folder in folders {
-                let folder = folder?;
+                let path = folder.path();
 
-                if folder.path() == self.cache_dir {
+                if path == self.cache_dir {
+                    continue;
+                }
+
+                // Leave pending-rm trash dirs (from this or a previous run)
+                // alone. Re-cleaning them stacks `.pending-rm-*` suffixes and
+                // can blow past Windows' MAX_PATH, and the underlying files
+                // are still locked by whatever blocked removal originally.
+                if is_pending_removal(&path) {
                     continue;
                 }
 
                 if folder.file_type()?.is_dir() {
-                    remove_dir_all_force(&folder.path())?;
+                    remove_dir_all_force(&path)?;
                 }
             }
         }
@@ -301,16 +321,49 @@ mod tests {
     fn setup_build_dir_test() {
         // without build_id (aka timestamp)
         let dir = tempfile::tempdir().unwrap();
-        let p1 = get_build_dir(dir.path(), "name", true, &Utc::now()).unwrap();
+        let p1 = get_build_dir(dir.path(), "name", true, &Timestamp::now()).unwrap();
         let f1 = p1.file_name().unwrap();
         assert!(f1.eq("rattler-build_name"));
 
         // with build_id (aka timestamp)
-        let timestamp = &Utc::now();
+        let timestamp = &Timestamp::now();
         let p2 = get_build_dir(dir.path(), "name", false, timestamp).unwrap();
         let f2 = p2.file_name().unwrap();
-        let epoch = timestamp.timestamp();
+        let epoch = timestamp.as_second();
         assert!(f2.eq(format!("rattler-build_name_{epoch}").as_str()));
+    }
+
+    #[test]
+    fn test_clean_skips_pending_rm_dirs() {
+        let tempdir = tempfile::tempdir().unwrap();
+
+        let directories = Directories::builder(
+            "name",
+            &tempdir.path().join("recipe"),
+            &tempdir.path().join("output"),
+            &Timestamp::now(),
+        )
+        .build()
+        .unwrap();
+        directories.recreate_directories().unwrap();
+
+        // Simulate a leftover trash dir from a previous rename-before-delete
+        // attempt. `clean()` must leave it alone — attempting to remove it
+        // would stack another `.pending-rm-*` suffix on Windows and waste
+        // retries on files the OS still holds open.
+        let trash = directories
+            .build_dir
+            .join(".work.pending-rm-1776529982099702900");
+        fs::create_dir_all(&trash).unwrap();
+        fs::write(trash.join("locked.txt"), b"content").unwrap();
+
+        directories.clean().unwrap();
+
+        assert!(trash.exists(), "pending-rm trash dir must be preserved");
+        assert!(
+            !directories.work_dir.exists(),
+            "regular work dir should still be cleaned"
+        );
     }
 
     #[test]
@@ -321,7 +374,7 @@ mod tests {
             "name",
             &tempdir.path().join("recipe"),
             &tempdir.path().join("output"),
-            &chrono::Utc::now(),
+            &Timestamp::now(),
         )
         .build()
         .unwrap();

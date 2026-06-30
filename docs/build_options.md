@@ -98,6 +98,51 @@ build:
   always_copy_files: list of globs
 ```
 
+## Override package contents from the build script
+
+By default, the package contents are determined by walking `$PREFIX` and
+removing every file that is recorded as belonging to an installed host
+dependency (read from the `conda-meta` records in the prefix). Whatever
+remains is what ends up in the package.
+
+If you need full control, the build script can write an explicit list of paths
+to the file pointed at by the `$RATTLER_BUILD_PACKAGE_FILES` environment
+variable. When this file is non-empty after the build, its entries are used
+as the package contents instead of the conda-meta diff. The `build.files` and
+`build.always_include_files` globs still apply on top of that list, so you can
+combine an explicit selection with the usual filtering.
+
+Each line must reference a file rooted in `$PREFIX`:
+
+- an absolute path under `$PREFIX`, or
+- a relative path that is resolved against `$PREFIX`.
+
+Empty lines are ignored. Paths that escape the prefix or do not exist on disk
+cause the build to fail. The file is appendable, so
+`echo path >> $RATTLER_BUILD_PACKAGE_FILES` works correctly across multiple
+script invocations. If the file is empty or never created, rattler-build
+falls back to the default behavior.
+
+```bash title="build.sh"
+mkdir -p $PREFIX/bin
+echo "hello" > $PREFIX/bin/included.sh
+echo "hello" > $PREFIX/bin/excluded.sh
+
+# Only `included.sh` will end up in the package.
+echo "$PREFIX/bin/included.sh" >> $RATTLER_BUILD_PACKAGE_FILES
+# Relative paths are also supported (resolved against $PREFIX):
+# echo "bin/included.sh" >> $RATTLER_BUILD_PACKAGE_FILES
+```
+
+```batch title="build.bat"
+mkdir %PREFIX%\bin
+echo hello > %PREFIX%\bin\included.txt
+echo hello > %PREFIX%\bin\excluded.txt
+
+@rem Only `included.txt` will end up in the package.
+echo %PREFIX%\bin\included.txt >> %RATTLER_BUILD_PACKAGE_FILES%
+```
+
 ## Merge build and host environments
 
 In very rare cases you might want to merge the build and host environments to
@@ -285,9 +330,9 @@ being automatically compiled from `.py` to `.pyc`. Note that `noarch: python`
 packages never contain `.pyc` files. Some packages ship .py files that cannot be
 compiled, such as those that contain templates. Some packages also ship .py
 files that should not be compiled yet, because the Python interpreter that will
-be used is not known at build time. In these cases, conda-build can skip
-attempting to compile these files. The patterns used in this section do not need
-the ** to handle recursive paths.
+be used is not known at build time. In these cases, rattler-build can skip
+attempting to compile these files. The patterns used are glob patterns — use
+`**` to match files in nested directories (e.g. `foo/**/*.py`).
 
 The `site_packages_path` is a specific option that is only used when build
 `python` itself. It will add metadata to the package record of the python

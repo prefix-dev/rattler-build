@@ -53,6 +53,13 @@ def test_conditional_script_empty(
     assert snapshot == content
 
 
+def test_env_vars_in_test_scripts(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Test that variant env vars, platform vars, and CONDA_BUILD are set in test scripts (issue #1317)."""
+    rattler_build.build(recipes / "test-env-vars-in-tests", tmp_path)
+
+
 @pytest.mark.skipif(
     os.name != "nt", reason="recipe does not support execution on windows"
 )
@@ -68,3 +75,19 @@ def test_win_errorlevel_injection(
     content = (pkg / "info" / "tests" / "tests.yaml").read_text()
 
     assert snapshot == content
+
+
+@pytest.mark.skipif(os.name == "nt", reason="recipe uses unix commands")
+def test_noarch_variant_test_skip(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Test that noarch packages with platform-conditional tests don't fail.
+
+    When a noarch package has variants (e.g., build_win: [true, false]) that add
+    platform-specific virtual package dependencies (__win / __unix), the test for
+    the variant whose virtual package is unavailable on the build platform must
+    not attempt to create a test environment.
+
+    Regression test for https://github.com/prefix-dev/rattler-build/issues/2388
+    """
+    rattler_build.build(recipes / "noarch-test-skip", tmp_path)
