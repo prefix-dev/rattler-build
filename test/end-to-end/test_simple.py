@@ -3209,6 +3209,13 @@ def test_target_platform_in_variant_config_warning(
         tmp_path,
         variant_config=variant_config,
         raw=True,
+        # Use JSON log style so the warning is emitted on stderr as plain ASCII
+        # on a single line. The default "fancy" style wraps lines to the
+        # terminal width and uses box-drawing characters, which breaks the
+        # substring check (and capture) on the Windows CI console.
+        extra_args=["--log-style=json"],
+        encoding="utf-8",
+        errors="replace",
     )
     combined = (result.stdout or "") + "\n" + (result.stderr or "")
     assert (
