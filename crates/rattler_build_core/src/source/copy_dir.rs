@@ -812,7 +812,10 @@ mod test {
         assert_eq!(copy_dir.copied_paths(), [dest.clone()]);
         // The symlink should have been materialized as real content, not a symlink.
         assert!(!dest.is_symlink());
-        assert_eq!(fs::read_to_string(&dest).unwrap(), "the actual license text");
+        assert_eq!(
+            fs::read_to_string(&dest).unwrap(),
+            "the actual license text"
+        );
     }
 
     #[test]
