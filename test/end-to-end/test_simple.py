@@ -46,9 +46,7 @@ def test_license_glob(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 @pytest.mark.skipif(
     os.name == "nt", reason="creating the symlink in the build script uses `ln -s`"
 )
-def test_symlinked_license(
-    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
-):
+def test_symlinked_license(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     """A license_file that is a symlink should be packaged as real content
     rather than a (potentially dangling) symlink (see issue #2575)."""
     rattler_build.build(recipes / "symlinked_license", tmp_path)
