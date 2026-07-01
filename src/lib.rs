@@ -75,7 +75,7 @@ use types::{
 use crate::metadata::{Output, PlatformWithVirtualPackages};
 use crate::publish::{
     BuildNumberOverride, PublishConfig, apply_build_number_override, fetch_highest_build_numbers,
-    upload_and_index_channel,
+    resolve_channel_for_repodata, upload_and_index_channel,
 };
 use indexmap::IndexSet;
 use rattler_build_recipe::topological_sort_by_dependencies;
@@ -1320,9 +1320,12 @@ pub async fn publish_packages(
     // Create tool configuration for cache clearing and building
     let tool_config = get_tool_config(&publish_data.build, log_handler)?;
 
-    // Convert target to a channel URL
+    // The raw target (e.g. `cloudsmith://owner/repo`) drives upload backend dispatch, while
+    // repodata operations (channel init, build-number lookups, indexing) need a channel URL
+    // the resolver understands. Resolve once and reuse it for every repodata-facing step.
     let target_url = publish_data.to.clone();
-    let channel_url = target_url
+    let channel_target = resolve_channel_for_repodata(&target_url);
+    let channel_url = channel_target
         .clone()
         .into_base_url(&tool_config.channel_config)
         .into_diagnostic()?;
@@ -1438,7 +1441,7 @@ pub async fn publish_packages(
             let highest_build_numbers = match &build_number_override {
                 BuildNumberOverride::Relative(_) => {
                     fetch_highest_build_numbers(
-                        &target_url,
+                        &channel_target,
                         &outputs,
                         publish_data.build.target_platform,
                         &tool_config,

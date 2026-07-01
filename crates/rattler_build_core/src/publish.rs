@@ -313,9 +313,11 @@ pub async fn upload_and_index_channel(
         )),
     }?;
 
-    // Clear repodata cache for the target channel after publishing
-    let channel = match target_url {
-        NamedChannelOrUrl::Url(url) => Channel::from_url(ChannelUrl::from(url.clone())),
+    // Clear repodata cache for the target channel after publishing. Resolve the target
+    // first so schemes the gateway can't read (e.g. `cloudsmith://`) map to the same
+    // channel URL that was used while building, and the correct cache is invalidated.
+    let channel = match resolve_channel_for_repodata(target_url) {
+        NamedChannelOrUrl::Url(url) => Channel::from_url(ChannelUrl::from(url)),
         NamedChannelOrUrl::Path(path) => {
             let url = url::Url::from_file_path(path.as_str())
                 .map_err(|_| miette::miette!("Invalid path: {}", path))?;
@@ -340,6 +342,57 @@ pub async fn upload_and_index_channel(
     Ok(())
 }
 
+/// Default host serving Cloudsmith conda channels. Override with `CLOUDSMITH_CHANNEL_HOST`.
+const DEFAULT_CLOUDSMITH_CHANNEL_HOST: &str = "conda.cloudsmith.io";
+
+/// Parse a `cloudsmith://owner/repo` URL into its `(owner, repo)` components.
+///
+/// Returns `None` unless the URL has exactly an owner (host) and a single non-empty
+/// repo path segment, letting callers decide how to handle a malformed target.
+fn parse_cloudsmith_owner_repo(url: &url::Url) -> Option<(String, String)> {
+    let owner = url.host_str()?.to_string();
+    let mut segments = url
+        .path_segments()
+        .map(|s| s.filter(|seg| !seg.is_empty()))?;
+    let repo = segments.next()?.to_string();
+    if segments.next().is_some() {
+        return None;
+    }
+    Some((owner, repo))
+}
+
+/// Resolve a publish target to the channel URL used for repodata operations: build-time
+/// dependency resolution, build-number lookups, and repodata cache clearing.
+///
+/// The repodata resolver can't read the `cloudsmith://` scheme, so a
+/// `cloudsmith://owner/repo` target is rewritten to `https://<host>/owner/repo` (host from
+/// `CLOUDSMITH_CHANNEL_HOST`, default [`DEFAULT_CLOUDSMITH_CHANNEL_HOST`]). The original
+/// `cloudsmith://` target is kept as the upload target elsewhere so upload dispatch stays
+/// host-independent. Any target that isn't a well-formed `cloudsmith://owner/repo` URL is
+/// returned unchanged.
+pub fn resolve_channel_for_repodata(target: &NamedChannelOrUrl) -> NamedChannelOrUrl {
+    let NamedChannelOrUrl::Url(url) = target else {
+        return target.clone();
+    };
+    if url.scheme() != "cloudsmith" {
+        return target.clone();
+    }
+    let Some((owner, repo)) = parse_cloudsmith_owner_repo(url) else {
+        return target.clone();
+    };
+
+    let host = std::env::var("CLOUDSMITH_CHANNEL_HOST")
+        .unwrap_or_else(|_| DEFAULT_CLOUDSMITH_CHANNEL_HOST.to_string());
+
+    match url::Url::parse(&format!(
+        "https://{}/{owner}/{repo}",
+        host.trim_end_matches('/')
+    )) {
+        Ok(converted) => NamedChannelOrUrl::Url(converted),
+        Err(_) => target.clone(),
+    }
+}
+
 /// Upload packages to Cloudsmith.
 async fn upload_to_cloudsmith(
     url: &url::Url,
@@ -351,26 +404,12 @@ async fn upload_to_cloudsmith(
 
     tracing::info!("Uploading packages to Cloudsmith: {}", url);
 
-    let owner = url
-        .host_str()
-        .ok_or_else(|| miette::miette!("Invalid Cloudsmith URL: missing owner"))?
-        .to_string();
-
-    let mut segments = url
-        .path_segments()
-        .ok_or_else(|| miette::miette!("Invalid Cloudsmith URL: missing repo"))?
-        .filter(|s| !s.is_empty());
-
-    let repo = segments
-        .next()
-        .ok_or_else(|| miette::miette!("Invalid Cloudsmith URL: missing repo"))?
-        .to_string();
-
-    if segments.next().is_some() {
-        return Err(miette::miette!(
-            "Invalid Cloudsmith URL: expected cloudsmith://owner/repo"
-        ));
-    }
+    let (owner, repo) = parse_cloudsmith_owner_repo(url).ok_or_else(|| {
+        miette::miette!(
+            "Invalid Cloudsmith URL '{}': expected cloudsmith://owner/repo",
+            url
+        )
+    })?;
 
     let api_key = std::env::var("CLOUDSMITH_API_KEY").ok();
     let api_url = std::env::var("CLOUDSMITH_API_URL")
@@ -759,4 +798,89 @@ async fn upload_to_local_filesystem(
 
     tracing::info!("Successfully indexed local channel");
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serial_test::serial;
+    use std::str::FromStr;
+
+    fn resolve(raw: &str) -> NamedChannelOrUrl {
+        resolve_channel_for_repodata(&NamedChannelOrUrl::from_str(raw).unwrap())
+    }
+
+    #[test]
+    fn parse_cloudsmith_owner_repo_extracts_components() {
+        let url = url::Url::parse("cloudsmith://my-org/my-repo").unwrap();
+        assert_eq!(
+            parse_cloudsmith_owner_repo(&url),
+            Some(("my-org".to_string(), "my-repo".to_string()))
+        );
+        // Missing repo or an extra segment is not a valid owner/repo pair.
+        assert_eq!(
+            parse_cloudsmith_owner_repo(&url::Url::parse("cloudsmith://my-org").unwrap()),
+            None
+        );
+        assert_eq!(
+            parse_cloudsmith_owner_repo(
+                &url::Url::parse("cloudsmith://my-org/my-repo/extra").unwrap()
+            ),
+            None
+        );
+    }
+
+    #[test]
+    #[serial]
+    fn resolve_channel_rewrites_cloudsmith_with_default_host() {
+        unsafe { std::env::remove_var("CLOUDSMITH_CHANNEL_HOST") };
+        assert_eq!(
+            resolve("cloudsmith://my-org/my-repo"),
+            NamedChannelOrUrl::Url(
+                url::Url::parse("https://conda.cloudsmith.io/my-org/my-repo").unwrap()
+            )
+        );
+    }
+
+    #[test]
+    #[serial]
+    fn resolve_channel_honors_custom_host_and_trailing_slash() {
+        unsafe { std::env::set_var("CLOUDSMITH_CHANNEL_HOST", "conda.example.com/") };
+        let resolved = resolve("cloudsmith://my-org/my-repo");
+        unsafe { std::env::remove_var("CLOUDSMITH_CHANNEL_HOST") };
+        assert_eq!(
+            resolved,
+            NamedChannelOrUrl::Url(
+                url::Url::parse("https://conda.example.com/my-org/my-repo").unwrap()
+            )
+        );
+    }
+
+    // Malformed cloudsmith targets short-circuit before the env var is read, so they need
+    // no `#[serial]`. They are passed through unchanged and rejected later by the upload.
+    #[test]
+    fn resolve_channel_passes_through_malformed_cloudsmith_targets() {
+        for raw in ["cloudsmith://my-org/my-repo/extra", "cloudsmith://my-org"] {
+            assert_eq!(
+                resolve(raw),
+                NamedChannelOrUrl::from_str(raw).unwrap(),
+                "{raw} should be passed through unchanged"
+            );
+        }
+    }
+
+    #[test]
+    fn resolve_channel_leaves_other_targets_untouched() {
+        for raw in [
+            "https://prefix.dev/my-channel",
+            "s3://my-bucket",
+            "conda-forge",
+        ] {
+            assert_eq!(
+                resolve(raw),
+                NamedChannelOrUrl::from_str(raw).unwrap(),
+                "{raw} should be unchanged"
+            );
+        }
+    }
 }
