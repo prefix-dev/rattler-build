@@ -2538,6 +2538,8 @@ impl Evaluate for Stage0CommandsTest {
 
         Ok(Stage1CommandsTest {
             script,
+            script_win: None,
+            script_unix: None,
             requirements,
             files,
         })

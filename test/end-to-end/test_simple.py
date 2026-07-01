@@ -1420,6 +1420,35 @@ def test_noarch_flask(
     assert (pkg / "info/link.json").exists()
 
 
+def test_noarch_script_file_dual_platform(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """A noarch package with a file-based test script should serialize both the
+    Unix and Windows variants so it can be tested on either platform (#2064)."""
+    rattler_build.build(recipes / "noarch-script-file-test", tmp_path)
+    pkg = get_extracted_package(tmp_path, "noarch-script-file-test")
+
+    tests_yaml = (pkg / "info/tests/tests.yaml").read_text()
+    tests = yaml.safe_load(tests_yaml)
+
+    # There should be a single command test with both platform variants.
+    command_test = next(t for t in tests if "script" in t)
+
+    # On a Unix build host the primary script is the `.sh` variant and the
+    # Windows `.bat` variant is stored under `script_win`. On a Windows build
+    # host the roles are swapped (`script` = bat, `script_unix` = sh).
+    if os.name == "nt":
+        primary, alternate = command_test["script"], command_test["script_unix"]
+        assert "exit /b 1" in primary["content"]
+        assert 'test -f "$PREFIX/hello.txt"' in alternate["content"]
+    else:
+        primary, alternate = command_test["script"], command_test["script_win"]
+        assert 'test -f "$PREFIX/hello.txt"' in primary["content"]
+        assert "exit /b 1" in alternate["content"]
+        # The Windows variant is run with cmd.
+        assert alternate["interpreter"] == "cmd"
+
+
 def test_downstream_test(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
 ):

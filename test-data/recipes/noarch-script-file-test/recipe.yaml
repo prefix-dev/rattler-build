@@ -1,0 +1,20 @@
+package:
+  name: noarch-script-file-test
+  version: "1.0.0"
+
+build:
+  noarch: generic
+  number: 0
+  script:
+    - if: unix
+      then:
+        - echo "hello" > $PREFIX/hello.txt
+      else:
+        - echo hello > %PREFIX%\hello.txt
+
+tests:
+  # A file-based test script for a noarch package. Both the Unix (`run_test.sh`)
+  # and Windows (`run_test.bat`) variants live next to the recipe and should
+  # both be serialized so the package can be tested on either platform.
+  - script:
+      file: run_test

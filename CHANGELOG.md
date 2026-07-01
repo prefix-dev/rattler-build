@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Script tests (`tests: - script: ...`) for `noarch` packages that reference a script *file* now serialize both the Unix and Windows variant into `info/tests/tests.yaml`. Previously only the build platform's version was stored, so a `noarch` package built on Linux could not be reliably tested on Windows (and vice versa). At test time the variant matching the current platform is selected. (#2064)
 - The `source.filter` field is now also supported for `url` and `git` sources (it was previously only available for `path` sources). The filter is applied to the files copied into the work directory: the contents of the extracted archive for `url` sources (and `path` sources pointing to an archive) and the checked-out tree for `git` sources. This allows large sources to be trimmed down to the parts needed for the build.
 
 ### Changed

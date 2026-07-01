@@ -1,4 +1,5 @@
 use rattler_build_script::Script;
+use rattler_conda_types::Platform;
 use serde::{Deserialize, Serialize};
 
 use crate::stage1::Dependency;
@@ -114,6 +115,24 @@ pub struct CommandsTest {
     /// This field is required to distinguish CommandsTest from other test types during deserialization.
     pub script: Script,
 
+    /// Windows-specific test script.
+    ///
+    /// A `noarch` package's test script is resolved from a single file at
+    /// build time, but the package can be tested on a different operating
+    /// system than the one it was built on. When the test script is provided
+    /// as a file we therefore also serialize the Windows variant (e.g.
+    /// `run_test.bat`) here so the package can be tested reliably on both
+    /// Unix and Windows. When running on Windows this takes precedence over
+    /// [`CommandsTest::script`]. See <https://github.com/prefix-dev/rattler-build/issues/2064>.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub script_win: Option<Script>,
+
+    /// Unix-specific test script, the counterpart to
+    /// [`CommandsTest::script_win`] used when the package was built on
+    /// Windows but is being tested on Unix.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub script_unix: Option<Script>,
+
     /// The (extra) requirements for the test.
     #[serde(default, skip_serializing_if = "CommandsTestRequirements::is_empty")]
     pub requirements: CommandsTestRequirements,
@@ -121,6 +140,22 @@ pub struct CommandsTest {
     /// Extra files to include in the test
     #[serde(default, skip_serializing_if = "CommandsTestFiles::is_empty")]
     pub files: CommandsTestFiles,
+}
+
+impl CommandsTest {
+    /// Return the script to execute for the given `platform`.
+    ///
+    /// Prefers a platform-specific variant ([`CommandsTest::script_win`] /
+    /// [`CommandsTest::script_unix`]) when one was serialized for a `noarch`
+    /// package, falling back to [`CommandsTest::script`] otherwise.
+    pub fn script_for_platform(&self, platform: Platform) -> &Script {
+        let variant = if platform.is_windows() {
+            self.script_win.as_ref()
+        } else {
+            self.script_unix.as_ref()
+        };
+        variant.unwrap_or(&self.script)
+    }
 }
 
 /// A test that runs the tests of a downstream package (evaluated)
@@ -303,6 +338,8 @@ mod tests {
                 content: ScriptContent::Command("echo 'test'".to_string()),
                 ..Default::default()
             },
+            script_win: None,
+            script_unix: None,
             requirements: CommandsTestRequirements::default(),
             files: CommandsTestFiles::default(),
         });
@@ -350,6 +387,8 @@ mod tests {
                     content: ScriptContent::Commands(vec!["echo 'test'".to_string()]),
                     ..Default::default()
                 },
+                script_win: None,
+                script_unix: None,
                 requirements: CommandsTestRequirements {
                     run: vec![Dependency::Spec(Box::new("pytest".parse().unwrap()))],
                     build: vec![],
@@ -389,5 +428,101 @@ mod tests {
         assert!(matches!(tests[0], TestType::Commands(_)));
         assert!(matches!(tests[1], TestType::Downstream(_)));
         assert!(matches!(tests[2], TestType::Python { .. }));
+    }
+
+    /// A `noarch` command test can carry a Windows-specific script that is
+    /// selected when running on Windows (issue #2064).
+    #[test]
+    fn test_script_for_platform_selects_variant() {
+        let test = CommandsTest {
+            script: Script {
+                content: ScriptContent::Command("echo unix".to_string()),
+                ..Default::default()
+            },
+            script_win: Some(Script {
+                content: ScriptContent::Command("echo win".to_string()),
+                interpreter: Some("cmd".to_string()),
+                ..Default::default()
+            }),
+            script_unix: None,
+            requirements: CommandsTestRequirements::default(),
+            files: CommandsTestFiles::default(),
+        };
+
+        assert_eq!(
+            test.script_for_platform(Platform::Win64).content,
+            ScriptContent::Command("echo win".to_string())
+        );
+        // Unix falls back to the primary script when no unix-specific variant.
+        assert_eq!(
+            test.script_for_platform(Platform::Linux64).content,
+            ScriptContent::Command("echo unix".to_string())
+        );
+    }
+
+    /// When only the primary script is present, both platforms use it.
+    #[test]
+    fn test_script_for_platform_fallback() {
+        let test = CommandsTest {
+            script: Script {
+                content: ScriptContent::Commands(vec!["echo hi".to_string()]),
+                ..Default::default()
+            },
+            script_win: None,
+            script_unix: None,
+            requirements: CommandsTestRequirements::default(),
+            files: CommandsTestFiles::default(),
+        };
+        assert_eq!(
+            test.script_for_platform(Platform::Win64),
+            test.script_for_platform(Platform::Linux64)
+        );
+    }
+
+    /// The platform-specific script fields round-trip through YAML and are
+    /// omitted when empty.
+    #[test]
+    fn test_platform_scripts_roundtrip() {
+        let original = TestType::Commands(CommandsTest {
+            script: Script {
+                content: ScriptContent::Command("echo unix".to_string()),
+                ..Default::default()
+            },
+            script_win: Some(Script {
+                content: ScriptContent::Command("echo win".to_string()),
+                interpreter: Some("cmd".to_string()),
+                ..Default::default()
+            }),
+            script_unix: None,
+            requirements: CommandsTestRequirements::default(),
+            files: CommandsTestFiles::default(),
+        });
+
+        let yaml = serde_yaml::to_string(&original).unwrap();
+        assert!(yaml.contains("script_win"));
+        assert!(!yaml.contains("script_unix"));
+
+        let deserialized: TestType = serde_yaml::from_str(&yaml).unwrap();
+        match deserialized {
+            TestType::Commands(cmd) => {
+                assert!(cmd.script_unix.is_none());
+                let win = cmd
+                    .script_win
+                    .as_ref()
+                    .expect("script_win should round-trip");
+                assert_eq!(win.interpreter.as_deref(), Some("cmd"));
+                assert_eq!(win.content, ScriptContent::Command("echo win".to_string()));
+                // On Windows the windows variant is selected; on Unix the primary.
+                assert_eq!(
+                    cmd.script_for_platform(Platform::Win64).content,
+                    ScriptContent::Command("echo win".to_string())
+                );
+                assert_eq!(
+                    cmd.script_for_platform(Platform::Linux64).content,
+                    ScriptContent::Command("echo unix".to_string())
+                );
+            }
+            other => panic!("expected Commands, got {other:?}"),
+        }
     }
 }

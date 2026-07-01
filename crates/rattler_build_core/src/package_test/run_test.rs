@@ -1028,8 +1028,10 @@ async fn run_commands_test(
     );
 
     tracing::info!("Testing commands:");
+    // For noarch packages a platform-specific script variant may have been
+    // serialized; pick the one matching the platform we are testing on.
     commands_test
-        .script
+        .script_for_platform(platform)
         .run_script(
             env_vars,
             &test_dir,
