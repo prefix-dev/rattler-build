@@ -441,6 +441,19 @@ noted, no variables are inherited from the shell environment in which you invoke
 : Represents the hash of the package being built, excluding the
   leading 'h' (e.g. 21422ab).
 
+`PATHS_JSON`
+
+: Only set during the test phase. The path to the `info/paths.json` file of
+  the package under test, resolved from its `conda-meta` `PrefixRecord` once
+  the package has been linked into the test prefix. Lets test scripts inspect
+  the exact list of files the package installed without having to locate and
+  parse the `PrefixRecord` themselves.
+
+`INDEX_JSON`
+
+: Only set during the test phase. The path to the `info/index.json` file of
+  the package under test, resolved the same way as `PATHS_JSON`.
+
 `PYTHON`
 
 : The path to the Python executable in the host prefix. Python is
