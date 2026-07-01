@@ -15,9 +15,11 @@ use rattler_build_recipe::stage1::{
 use rattler_build_script::{EnvironmentIsolation, Script, ScriptContent};
 use rattler_build_types::NormalizedKey;
 use rattler_conda_types::{
-    Channel, ChannelUrl, MatchSpec, ParseStrictness, Platform,
+    Channel, ChannelUrl, MatchSpec, PackageName, PackageNameMatcher, ParseStrictness, Platform,
+    StringMatcher, Version, VersionSpec,
     compression_level::CompressionLevel,
-    package::{CondaArchiveIdentifier, IndexJson, PackageFile},
+    package::{ArchiveIdentifier, CondaArchiveIdentifier, IndexJson, PackageFile},
+    version_spec::EqualityOperator,
 };
 use rattler_index::{IndexFsConfig, index_fs};
 use rattler_package_streaming::write::write_conda_package;
@@ -44,6 +46,27 @@ use crate::{
     env_vars, metadata::PlatformWithVirtualPackages, render::solver::create_environment,
     source::copy_dir::CopyDir, tool_configuration,
 };
+
+/// Builds a `MatchSpec` that exactly matches the just-built artifact from its
+/// archive identifier (name, version, build string).
+fn match_spec_for_identifier(identifier: &ArchiveIdentifier) -> Result<MatchSpec, TestError> {
+    // Parse the name and version as typed values to avoid any ambiguity that a
+    // string re-parse could introduce.
+    let name = PackageName::try_from(identifier.name.as_str())
+        .map_err(|e| TestError::MatchSpecParse(e.to_string()))?;
+    let version = Version::from_str(&identifier.version)
+        .map_err(|e| TestError::MatchSpecParse(e.to_string()))?;
+
+    Ok(MatchSpec {
+        name: PackageNameMatcher::Exact(name),
+        // Match the version exactly (==); VersionOrder already supports the
+        // trailing-underscore convention.
+        version: Some(VersionSpec::Exact(EqualityOperator::Equals, version)),
+        // Match the build string literally, without glob/regex interpretation.
+        build: Some(StringMatcher::Exact(identifier.build_string.clone())),
+        ..Default::default()
+    })
+}
 
 #[allow(missing_docs)]
 #[derive(thiserror::Error, Debug)]
@@ -541,15 +564,7 @@ pub async fn run_test(
             .map(|s| MatchSpec::from_str(s, ParseStrictness::Lenient))
             .collect::<Result<Vec<_>, _>>()?;
 
-        let match_spec = MatchSpec::from_str(
-            format!(
-                "{}={}={}",
-                pkg.identifier.name, pkg.identifier.version, pkg.identifier.build_string
-            )
-            .as_str(),
-            ParseStrictness::Lenient,
-        )
-        .map_err(|e| TestError::MatchSpecParse(e.to_string()))?;
+        let match_spec = match_spec_for_identifier(&pkg.identifier)?;
         dependencies.push(match_spec);
 
         let resolved_records = create_environment(
@@ -670,14 +685,7 @@ async fn run_python_test(
     let _guard = span.enter();
 
     // The version spec of the package being built
-    let match_spec = MatchSpec::from_str(
-        format!(
-            "{}={}={}",
-            pkg.identifier.name, pkg.identifier.version, pkg.identifier.build_string
-        )
-        .as_str(),
-        ParseStrictness::Lenient,
-    )?;
+    let match_spec = match_spec_for_identifier(&pkg.identifier)?;
 
     // The dependencies for the test environment
     // - python_version: null -> { "": ["mypackage=xx=xx"]}
@@ -844,14 +852,7 @@ async fn run_perl_test(
     let span = tracing::info_span!("Running perl test", span_color = pkg_id);
     let _guard = span.enter();
 
-    let match_spec = MatchSpec::from_str(
-        format!(
-            "{}={}={}",
-            pkg.identifier.name, pkg.identifier.version, pkg.identifier.build_string
-        )
-        .as_str(),
-        ParseStrictness::Lenient,
-    )?;
+    let match_spec = match_spec_for_identifier(&pkg.identifier)?;
 
     let dependencies = vec!["perl".parse().unwrap(), match_spec];
 
@@ -959,14 +960,7 @@ async fn run_commands_test(
         deps.run.iter().map(|d| d.as_match_spec().clone()).collect();
 
     // create environment with the test dependencies
-    dependencies.push(MatchSpec::from_str(
-        format!(
-            "{}={}={}",
-            pkg.identifier.name, pkg.identifier.version, pkg.identifier.build_string
-        )
-        .as_str(),
-        ParseStrictness::Lenient,
-    )?);
+    dependencies.push(match_spec_for_identifier(&pkg.identifier)?);
 
     let platform = config
         .host_platform
@@ -1071,14 +1065,7 @@ async fn run_downstream_test(
     // current package
     let match_specs = [
         MatchSpec::from_str(&downstream_spec, ParseStrictness::Lenient)?,
-        MatchSpec::from_str(
-            format!(
-                "{}={}={}",
-                pkg.identifier.name, pkg.identifier.version, pkg.identifier.build_string
-            )
-            .as_str(),
-            ParseStrictness::Lenient,
-        )?,
+        match_spec_for_identifier(&pkg.identifier)?,
     ];
 
     let resolved = create_environment(
@@ -1168,14 +1155,7 @@ async fn run_r_test(
     let span = tracing::info_span!("Running R test", span_color = pkg_id);
     let _guard = span.enter();
 
-    let match_spec = MatchSpec::from_str(
-        format!(
-            "{}={}={}",
-            pkg.identifier.name, pkg.identifier.version, pkg.identifier.build_string
-        )
-        .as_str(),
-        ParseStrictness::Lenient,
-    )?;
+    let match_spec = match_spec_for_identifier(&pkg.identifier)?;
 
     let dependencies = vec!["r-base".parse().unwrap(), match_spec];
     let test_prefix = prefix.join("test_env");
@@ -1250,14 +1230,7 @@ async fn run_ruby_test(
     let span = tracing::info_span!("Running Ruby test", span_color = pkg_id);
     let _guard = span.enter();
 
-    let match_spec = MatchSpec::from_str(
-        format!(
-            "{}={}={}",
-            pkg.identifier.name, pkg.identifier.version, pkg.identifier.build_string
-        )
-        .as_str(),
-        ParseStrictness::Lenient,
-    )?;
+    let match_spec = match_spec_for_identifier(&pkg.identifier)?;
 
     let dependencies = vec!["ruby".parse().unwrap(), match_spec];
 
@@ -1316,4 +1289,166 @@ async fn run_ruby_test(
         .map_err(|e| TestError::TestFailed(e.to_string()))?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Verifies that a trailing-underscore version (the openssl ordering
+    /// convention, e.g. `3.7_`) is assembled into a `MatchSpec` that matches the
+    /// exact version, without degrading into the broken string re-parse result.
+    /// Reproduces and guards <https://github.com/prefix-dev/rattler-build/issues/2590>.
+    #[test]
+    fn match_spec_for_trailing_underscore_version() {
+        let identifier = ArchiveIdentifier {
+            name: "tmux".to_string(),
+            version: "3.7_".to_string(),
+            build_string: "hd811a6c_0".to_string(),
+        };
+
+        let spec = match_spec_for_identifier(&identifier).expect("should build a MatchSpec");
+
+        // Name matches exactly.
+        assert_eq!(
+            spec.name,
+            PackageNameMatcher::Exact(PackageName::try_from("tmux").unwrap())
+        );
+
+        // The version must equal `3.7_` exactly, not be truncated to `3.7`.
+        let expected_version = Version::from_str("3.7_").unwrap();
+        assert_eq!(
+            spec.version,
+            Some(VersionSpec::Exact(
+                EqualityOperator::Equals,
+                expected_version.clone()
+            ))
+        );
+
+        // The build string must be preserved fully, without swallowing the `_`.
+        assert_eq!(
+            spec.build,
+            Some(StringMatcher::Exact("hd811a6c_0".to_string()))
+        );
+
+        // Key regression point: `3.7_` and `3.7` are different versions; the
+        // trailing underscore must not be dropped.
+        assert_ne!(expected_version, Version::from_str("3.7").unwrap());
+    }
+
+    /// Same trailing-underscore bug, but with a letter before the underscore
+    /// (e.g. `3.7a_`). The old string round-trip truncates the version to `3.7a`
+    /// and swallows `_=` into the build string; the typed path must keep the
+    /// full `3.7a_` version and the intact build string.
+    /// Reproduces and guards <https://github.com/prefix-dev/rattler-build/issues/2590>.
+    #[test]
+    fn match_spec_for_trailing_underscore_after_letter_version() {
+        let identifier = ArchiveIdentifier {
+            name: "tmux".to_string(),
+            version: "3.7a_".to_string(),
+            build_string: "hd811a6c_0".to_string(),
+        };
+
+        let spec = match_spec_for_identifier(&identifier).expect("should build a MatchSpec");
+
+        // The version must equal `3.7a_` exactly, not be truncated to `3.7a`.
+        let expected_version = Version::from_str("3.7a_").unwrap();
+        assert_eq!(
+            spec.version,
+            Some(VersionSpec::Exact(
+                EqualityOperator::Equals,
+                expected_version.clone()
+            ))
+        );
+
+        // The build string must be preserved fully, without swallowing the `_`.
+        assert_eq!(
+            spec.build,
+            Some(StringMatcher::Exact("hd811a6c_0".to_string()))
+        );
+
+        // `3.7a_` and `3.7a` are different versions; the trailing underscore
+        // must not be dropped.
+        assert_ne!(expected_version, Version::from_str("3.7a").unwrap());
+    }
+
+    /// Directly compares the old "string round-trip parse" path against the new
+    /// typed-assembly path to pin down the root cause.
+    ///
+    /// The old path `MatchSpec::from_str("tmux=3.7_=hd811a6c_0")` tokenizes
+    /// the `_=` incorrectly, yielding `version=3.7` (underscore dropped) and
+    /// `build="_=hd811a6c_0"` (the `_=` swallowed), which then fails to match the
+    /// real artifact `version=3.7_`, `build=hd811a6c_0` and makes the solver
+    /// report "No candidates were found". The new path must avoid both errors.
+    /// See <https://github.com/prefix-dev/rattler-build/issues/2590>.
+    #[test]
+    fn old_string_roundtrip_is_buggy_new_path_fixes_it() {
+        let (name, version, build) = ("tmux", "3.7_", "hd811a6c_0");
+
+        // Old path: reproduce the incorrectly tokenized spec.
+        let legacy = MatchSpec::from_str(
+            &format!("{name}={version}={build}"),
+            ParseStrictness::Lenient,
+        )
+        .expect("old path parses (but is semantically wrong)");
+        assert_eq!(
+            legacy.version,
+            Some(VersionSpec::Exact(
+                EqualityOperator::Equals,
+                Version::from_str("3.7").unwrap()
+            )),
+            "old path truncates the version to 3.7 (drops the underscore) — this is the bug"
+        );
+        assert_eq!(
+            legacy.build,
+            Some(StringMatcher::Exact("_=hd811a6c_0".to_string())),
+            "old path swallows `_=` into the build string — this is the bug"
+        );
+
+        // New path: semantically correct — no dropped underscore, no swallowed `_=`.
+        let fixed = match_spec_for_identifier(&ArchiveIdentifier {
+            name: name.to_string(),
+            version: version.to_string(),
+            build_string: build.to_string(),
+        })
+        .expect("new path builds a MatchSpec");
+        assert_eq!(
+            fixed.version,
+            Some(VersionSpec::Exact(
+                EqualityOperator::Equals,
+                Version::from_str("3.7_").unwrap()
+            ))
+        );
+        assert_eq!(fixed.build, Some(StringMatcher::Exact(build.to_string())));
+
+        // The two paths produce semantically different specs — proving the fix
+        // has an effect.
+        assert_ne!(legacy.version, fixed.version);
+        assert_ne!(legacy.build, fixed.build);
+    }
+
+    /// A regular version (no trailing underscore) must also assemble correctly,
+    /// ensuring the fix introduces no regression.
+    #[test]
+    fn match_spec_for_regular_version() {
+        let identifier = ArchiveIdentifier {
+            name: "python".to_string(),
+            version: "3.12.1".to_string(),
+            build_string: "h1234567_0".to_string(),
+        };
+
+        let spec = match_spec_for_identifier(&identifier).expect("should build a MatchSpec");
+
+        assert_eq!(
+            spec.version,
+            Some(VersionSpec::Exact(
+                EqualityOperator::Equals,
+                Version::from_str("3.12.1").unwrap()
+            ))
+        );
+        assert_eq!(
+            spec.build,
+            Some(StringMatcher::Exact("h1234567_0".to_string()))
+        );
+    }
 }
