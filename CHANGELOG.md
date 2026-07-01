@@ -308,6 +308,7 @@ Feel free to find out more details by looking at the linked PRs below.
 - An empty `sha256` or `md5` (e.g. `sha256: ""`) is now accepted and treated as an all-zeros placeholder (`0000...0000`). This makes it easier to scaffold a recipe before the real checksum is known: the build downloads the source and reports the actual checksum in the resulting mismatch. (#2524)
 - The build summary now prints a section for each `requirements.extras` group (optional dependency group) in the run dependencies table, so the resolved contents of each extra are visible. The section is omitted when the recipe defines no extras.
 - Patches that are already fully applied to the source (e.g. because the change was merged upstream) are now detected, reported with a warning, and skipped instead of being silently "applied". This makes it easy to spot patches that can be removed from the recipe. (#1953)
+- `PATHS_JSON` and `INDEX_JSON` environment variables are now set during the test phase, pointing at the tested package's `info/paths.json` and `info/index.json` respectively. Test scripts can use these to inspect the package's installed files without having to load its `PrefixRecord` from `conda-meta` themselves. (#1263)
 
 ### Changed
 
