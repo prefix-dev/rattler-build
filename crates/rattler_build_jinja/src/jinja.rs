@@ -180,6 +180,14 @@ impl Jinja {
             Value::from(config.host_platform.is_unix()),
         );
 
+        // Shared library extension for the target platform (e.g. `.so`, `.dylib`,
+        // `.dll`). Mirrors the `SHLIB_EXT` build-script environment variable so it
+        // can be used in templated fields such as `build.files`.
+        context.insert(
+            "SHLIB_EXT".to_string(),
+            Value::from(rattler_build_types::shlib_ext(&config.target_platform)),
+        );
+
         // Derive the host platform's family name (e.g., "linux" from "linux-64",
         // "emscripten" from "emscripten-wasm32")
         let host_family = config.host_platform.only_platform();
@@ -1504,6 +1512,34 @@ mod tests {
         assert!(!jinja.eval("linux").expect("host is not linux").is_true());
         assert!(!jinja.eval("osx").expect("host is not osx").is_true());
         assert!(jinja.eval("x86_64").expect("host is x86_64").is_true());
+    }
+
+    #[test]
+    fn eval_shlib_ext() {
+        // `SHLIB_EXT` should be available in the Jinja context and resolve to the
+        // target platform's shared library extension (see issue #2532).
+        let cases = [
+            (Platform::Linux64, ".so"),
+            (Platform::LinuxAarch64, ".so"),
+            (Platform::OsxArm64, ".dylib"),
+            (Platform::Osx64, ".dylib"),
+            (Platform::Win64, ".dll"),
+        ];
+        for (target_platform, expected) in cases {
+            let jinja = Jinja::new(JinjaConfig {
+                target_platform,
+                host_platform: target_platform,
+                build_platform: target_platform,
+                ..Default::default()
+            });
+            assert_eq!(
+                jinja
+                    .render_str("foo${{ SHLIB_EXT }}")
+                    .expect("SHLIB_EXT should be defined"),
+                format!("foo{expected}"),
+                "unexpected SHLIB_EXT for {target_platform}"
+            );
+        }
     }
 
     #[test]
