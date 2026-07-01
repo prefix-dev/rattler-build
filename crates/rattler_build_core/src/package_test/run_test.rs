@@ -19,7 +19,7 @@ use rattler_build_script::{
 use rattler_build_types::NormalizedKey;
 use rattler_conda_types::{
     Channel, ChannelUrl, MatchSpec, PackageName, PackageNameMatcher, ParseStrictness, Platform,
-    StringMatcher, Version, VersionSpec,
+    PrefixRecord, StringMatcher, Version, VersionSpec,
     compression_level::CompressionLevel,
     package::{ArchiveIdentifier, CondaArchiveIdentifier, IndexJson, PackageFile},
     version_spec::EqualityOperator,
@@ -406,6 +406,56 @@ fn env_vars_from_package(index_json: &IndexJson) -> HashMap<String, String> {
     res
 }
 
+/// Once the tested package has been linked into `prefix`, locate its
+/// `conda-meta/<name>-<version>-<build>.json` (the `PrefixRecord`) and derive
+/// the `PATHS_JSON` and `INDEX_JSON` env vars from its `extracted_package_dir`.
+///
+/// This spares test scripts from having to load the `PrefixRecord` themselves
+/// to find these files (see <https://github.com/prefix-dev/rattler-build/issues/1263>).
+fn env_vars_from_prefix_record(
+    prefix: &Path,
+    pkg: &CondaArchiveIdentifier,
+) -> HashMap<String, String> {
+    let mut res = HashMap::new();
+
+    let conda_meta_file = prefix.join("conda-meta").join(format!(
+        "{}-{}-{}.json",
+        pkg.identifier.name, pkg.identifier.version, pkg.identifier.build_string
+    ));
+
+    let prefix_record = match PrefixRecord::from_path(&conda_meta_file) {
+        Ok(record) => record,
+        Err(e) => {
+            tracing::debug!(
+                "could not read prefix record at '{}': {e}",
+                conda_meta_file.display()
+            );
+            return res;
+        }
+    };
+
+    let Some(extracted_package_dir) = &prefix_record.extracted_package_dir else {
+        return res;
+    };
+
+    res.insert(
+        "PATHS_JSON".to_string(),
+        extracted_package_dir
+            .join("info/paths.json")
+            .to_string_lossy()
+            .to_string(),
+    );
+    res.insert(
+        "INDEX_JSON".to_string(),
+        extracted_package_dir
+            .join("info/index.json")
+            .to_string_lossy()
+            .to_string(),
+    );
+
+    res
+}
+
 /// Read variant environment variables from `info/hash_input.json` in the
 /// package directory.  This file contains the full variant map that was used
 /// to build the package.  We expose every key as an environment variable
@@ -637,9 +687,18 @@ pub async fn run_test(
         // These are the legacy tests
         let (test_folder, tests) = legacy_tests_from_folder(&package_folder).await?;
 
+        let mut legacy_env = env.clone();
+        legacy_env.extend(env_vars_from_prefix_record(&prefix, &pkg));
+
         for test in tests {
-            test.run(&prefix, &test_folder, &env, &resolved_records, &config)
-                .await?;
+            test.run(
+                &prefix,
+                &test_folder,
+                &legacy_env,
+                &resolved_records,
+                &config,
+            )
+            .await?;
         }
 
         tracing::info!(
@@ -783,6 +842,7 @@ async fn run_python_test(
     for (python_version, dependencies) in dependencies_map {
         run_python_test_inner(
             python_test,
+            pkg,
             python_version,
             dependencies,
             path,
@@ -797,6 +857,7 @@ async fn run_python_test(
 
 async fn run_python_test_inner(
     python_test: &PythonTest,
+    pkg: &CondaArchiveIdentifier,
     python_version: String,
     dependencies: Vec<MatchSpec>,
     path: &Path,
@@ -843,7 +904,7 @@ async fn run_python_test_inner(
     let (target_platform, build_platform, host_platform) = configured_test_platforms(config);
     let test_dir = prefix.join("test");
     fs::create_dir_all(&test_dir)?;
-    let test_env_vars = env_vars::os_vars(
+    let mut test_env_vars = env_vars::os_vars(
         &test_prefix,
         &target_platform,
         &host_platform,
@@ -851,6 +912,11 @@ async fn run_python_test_inner(
         config.env_isolation,
         &test_dir,
         &RuntimeEnv::current(),
+    );
+    test_env_vars.extend(
+        env_vars_from_prefix_record(&test_prefix, pkg)
+            .into_iter()
+            .map(|(k, v)| (k, Some(v))),
     );
 
     let context = shared_test_context(&test_prefix, host_platform);
@@ -956,7 +1022,7 @@ async fn run_perl_test(
     fs::create_dir_all(&test_folder)?;
 
     let (target_platform, build_platform, host_platform) = configured_test_platforms(config);
-    let test_env_vars = env_vars::os_vars(
+    let mut test_env_vars = env_vars::os_vars(
         &test_prefix,
         &target_platform,
         &host_platform,
@@ -964,6 +1030,11 @@ async fn run_perl_test(
         config.env_isolation,
         &test_folder,
         &RuntimeEnv::current(),
+    );
+    test_env_vars.extend(
+        env_vars_from_prefix_record(&test_prefix, pkg)
+            .into_iter()
+            .map(|(k, v)| (k, Some(v))),
     );
     let context = shared_test_context(&test_prefix, host_platform);
 
@@ -1095,6 +1166,11 @@ async fn run_commands_test(
         host_platform,
     ));
     env_vars.extend(pkg_vars.iter().map(|(k, v)| (k.clone(), Some(v.clone()))));
+    env_vars.extend(
+        env_vars_from_prefix_record(&run_prefix, pkg)
+            .into_iter()
+            .map(|(k, v)| (k, Some(v))),
+    );
     env_vars.insert(
         "PREFIX".to_string(),
         Some(run_prefix.to_string_lossy().to_string()),
@@ -1286,7 +1362,7 @@ async fn run_r_test(
     fs::create_dir_all(&test_folder)?;
 
     let (target_platform, build_platform, host_platform) = configured_test_platforms(config);
-    let test_env_vars = env_vars::os_vars(
+    let mut test_env_vars = env_vars::os_vars(
         &test_prefix,
         &target_platform,
         &host_platform,
@@ -1294,6 +1370,11 @@ async fn run_r_test(
         config.env_isolation,
         &test_folder,
         &RuntimeEnv::current(),
+    );
+    test_env_vars.extend(
+        env_vars_from_prefix_record(&test_prefix, pkg)
+            .into_iter()
+            .map(|(k, v)| (k, Some(v))),
     );
     let context = shared_test_context(&test_prefix, host_platform);
 
@@ -1370,7 +1451,7 @@ async fn run_ruby_test(
     fs::create_dir_all(&test_folder)?;
 
     let (target_platform, build_platform, host_platform) = configured_test_platforms(config);
-    let test_env_vars = env_vars::os_vars(
+    let mut test_env_vars = env_vars::os_vars(
         &test_prefix,
         &target_platform,
         &host_platform,
@@ -1378,6 +1459,11 @@ async fn run_ruby_test(
         config.env_isolation,
         &test_folder,
         &RuntimeEnv::current(),
+    );
+    test_env_vars.extend(
+        env_vars_from_prefix_record(&test_prefix, pkg)
+            .into_iter()
+            .map(|(k, v)| (k, Some(v))),
     );
     let context = shared_test_context(&test_prefix, host_platform);
 
