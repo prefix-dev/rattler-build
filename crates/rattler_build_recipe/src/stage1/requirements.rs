@@ -197,6 +197,16 @@ impl RunExports {
             && self.weak.is_empty()
             && self.weak_constraints.is_empty()
     }
+
+    /// Iterate over all run export dependencies across every strength.
+    pub fn iter(&self) -> impl Iterator<Item = &Dependency> {
+        self.noarch
+            .iter()
+            .chain(self.strong.iter())
+            .chain(self.strong_constraints.iter())
+            .chain(self.weak.iter())
+            .chain(self.weak_constraints.iter())
+    }
 }
 
 /// Ignore run exports configuration
@@ -295,12 +305,7 @@ impl Requirements {
 
     pub fn run_exports_and_constraints(&self) -> impl Iterator<Item = &Dependency> {
         self.run_exports
-            .noarch
             .iter()
-            .chain(self.run_exports.strong.iter())
-            .chain(self.run_exports.strong_constraints.iter())
-            .chain(self.run_exports.weak.iter())
-            .chain(self.run_exports.weak_constraints.iter())
             .chain(self.run_constraints.iter())
             .chain(self.run.iter())
     }
