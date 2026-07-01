@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Package content test failures now report the fully expanded glob(s) that were actually matched against the package (including automatically prepended platform prefixes such as `include/` or `Library/include/`), instead of only the raw user-provided pattern. This applies to all package content sections (`include`, `bin`, `lib`, `site_packages`, `files`), making it clearer why a pattern did not match. (#2584)
 - Improve CRAN (R) recipe generation: pass `${R_ARGS}` to `R CMD INSTALL`, add `cross-r-base` for cross-compilation, set `rpaths` for compiled packages, mark pure-R packages as `noarch: generic`, reference `r-base`'s bundled license files, and fix the `r-base` version constraint so it is applied to both `host` and `run` without duplication.
 
+### Fixed
+
+- Conditional `build.noarch` and `build.variant.down_prioritize_variant` expressions no longer fail when they reference a variant key that is only defined on some platforms. A `noarch` expression that renders to an empty or null-like value (e.g. `noarch: ${{ "python" if use_noarch }}` when `use_noarch` is false, or `noarch: null`/`~`) is now treated as "not a noarch package", identical to omitting the key. Likewise, a `down_prioritize_variant` expression that references an undefined variant key (e.g. `${{ 0 if my_level == 1 else 1 }}` on a platform where `my_level` is not set) now falls back to no down-prioritization instead of erroring. Invalid noarch types and genuine template errors are still reported. (#2291, #2544)
+
 
 ## [0.67.0] - 2026-06-22
 ### ✨ Highlights

@@ -573,6 +573,19 @@ fn track_template_variables(value: &Value<String>, context: &EvaluationContext) 
     }
 }
 
+/// Whether a [`ParseError`] was caused by referencing an undefined Jinja variable.
+///
+/// Since the v0.58 parser rewrite, undefined variables are a hard error. A few
+/// contexts want to react to that specific failure rather than propagate it
+/// (e.g. preserving build-time templates, or falling back to a field default for
+/// variant keys that only exist on some platforms).
+fn is_undefined_variable_error(error: &ParseError) -> bool {
+    let error_msg = error.to_string();
+    error_msg.contains("undefined value")
+        || error_msg.contains("undefined variable")
+        || error_msg.contains("not defined in the evaluation context")
+}
+
 /// Try to evaluate a template string, but preserve it if there are undefined variables
 /// This is specifically for build script content where environment variables like ${{ PYTHON }}
 /// are only available at build time.
@@ -589,12 +602,7 @@ fn evaluate_or_preserve_template(
     match evaluate_string_value(value, context) {
         Ok(result) => Ok(result),
         Err(e) => {
-            // Check if this error was due to undefined variables
-            // The error message will contain "undefined value" or we can check the tracked undefined vars
-            let error_msg = e.to_string();
-            if error_msg.contains("undefined value")
-                || error_msg.contains("not defined in the evaluation context")
-            {
+            if is_undefined_variable_error(&e) {
                 // This is an undefined variable error - preserve the template
                 Ok(extract_template_source(value).unwrap_or_default())
             } else {
@@ -603,6 +611,63 @@ fn evaluate_or_preserve_template(
             }
         }
     }
+}
+
+/// Render an optional, templated build field that may reference variant keys
+/// which only exist on *some* target platforms.
+///
+/// Both `build.noarch` (`${{ "python" if use_noarch }}`) and
+/// `build.variant.down_prioritize_variant` (`${{ 0 if my_level == 1 else 1 }}`)
+/// routinely reference variant keys that are conditionally defined in
+/// `variants.yaml` (the standard conda-forge pattern). Before the v0.58
+/// strict-undefined change these rendered leniently; afterwards an undefined
+/// reference became a hard error, breaking every platform where the key is
+/// absent (see prefix-dev/rattler-build#2291 and #2544).
+///
+/// Both fields have a well-defined "absent" meaning (no noarch / no
+/// down-prioritization), so this helper collapses a missing value to `None`:
+/// - a template that references an undefined variable → `Ok(None)`
+/// - a template that renders to an empty string → `Ok(None)`
+/// - anything else → `Ok(Some(rendered))`, for the caller to parse/validate.
+///
+/// Only *undefined-variable* failures are swallowed; genuine template errors
+/// (syntax errors, failing function calls, ...) are still propagated. Concrete
+/// (non-template) values are handled by the callers, since their types differ.
+fn render_optional_variant_template(
+    template_source: &str,
+    span: Option<&Span>,
+    context: &EvaluationContext,
+) -> Result<Option<String>, ParseError> {
+    match render_template(template_source, context, span) {
+        Ok(s) if s.trim().is_empty() => Ok(None),
+        Ok(s) => Ok(Some(s)),
+        Err(e) if is_undefined_variable_error(&e) => Ok(None),
+        Err(e) => Err(e),
+    }
+}
+
+/// Interpret a rendered `noarch` string, treating "null-like" values as *no
+/// noarch* (`None`).
+///
+/// This lets `noarch: null`/`~` and conditional templates such as
+/// `${{ "python" if use_noarch else "~" }}` behave the same as omitting the
+/// `noarch` key entirely (see prefix-dev/rattler-build#2291). Valid noarch
+/// types (`python`, `generic`) are parsed via serde.
+fn parse_noarch_string(s: &str, span: Option<&Span>) -> Result<Option<NoArchType>, ParseError> {
+    let trimmed = s.trim();
+    if matches!(trimmed, "" | "~" | "null" | "none" | "None") {
+        return Ok(None);
+    }
+
+    serde_json::from_value::<NoArchType>(serde_json::Value::String(trimmed.to_string()))
+        .map(|nt| if nt.is_none() { None } else { Some(nt) })
+        .map_err(|_| {
+            ParseError::invalid_value(
+                "noarch type",
+                format!("Invalid noarch type '{}'. Expected 'python' or 'generic'", s),
+                span.copied().unwrap_or_else(Span::new_blank),
+            )
+        })
 }
 
 /// Evaluate an optional Value<T: ToString> into an Option<T> by parsing the string result
@@ -1804,20 +1869,32 @@ impl Evaluate for Stage0VariantKeyUsage {
     type Output = Stage1VariantKeyUsage;
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
+        // A `down_prioritize_variant` expression frequently compares against a
+        // variant key that is only defined on some platforms, e.g.
+        // `${{ 0 if my_level == 1 else 1 }}`. On platforms where the key is
+        // absent there is only a single variant, so the priority is irrelevant:
+        // treat an undefined reference (or an empty render) as "no
+        // down-prioritization" instead of a hard error (#2544).
         let down_prioritize_variant = match &self.down_prioritize_variant {
             None => None,
             Some(val) => {
-                let s = evaluate_value_to_string(val, context)?;
-                if s.is_empty() {
-                    None
+                let rendered = if let Some(n) = val.as_concrete() {
+                    Some(n.to_string())
+                } else if let Some(template) = val.as_template() {
+                    render_optional_variant_template(template.source(), val.span(), context)?
                 } else {
-                    Some(s.parse::<i32>().map_err(|_| {
+                    unreachable!("Value must be either concrete or template")
+                };
+
+                match rendered {
+                    None => None,
+                    Some(s) => Some(s.trim().parse::<i32>().map_err(|_| {
                         ParseError::invalid_value(
                             "down_prioritize_variant",
                             format!("Invalid integer value for down_prioritize_variant: '{}'", s),
-                            Span::new_blank(),
+                            val.span().copied().unwrap_or_else(Span::new_blank),
                         )
-                    })?)
+                    })?),
                 }
             }
         };
@@ -2039,28 +2116,24 @@ impl Evaluate for Stage0Build {
         let script = evaluate_script(&self.script, context)?;
 
         // Evaluate noarch
+        //
+        // A conditional template such as `${{ "python" if use_noarch }}` renders
+        // to an empty string when the condition is false; `noarch: null`/`~`
+        // renders to a null-like token. Both mean "no noarch" and must behave the
+        // same as omitting the key, rather than erroring (#2291). References to
+        // variant keys that only exist on some platforms are likewise treated as
+        // "no noarch" instead of a hard undefined-variable error.
         let noarch = match &self.noarch {
             None => None,
             Some(v) => {
-                // NoArchType is already validated during parsing, we just need to evaluate templates
                 if let Some(value) = v.as_concrete() {
-                    Some(*value)
+                    // NoArchType is already validated during parsing.
+                    if value.is_none() { None } else { Some(*value) }
                 } else if let Some(template) = v.as_template() {
-                    // If it's a template, we need to render it and parse as NoArchType
-                    let s = render_template(template.source(), context, v.span())?;
-                    // Parse the string as NoArchType using serde
-                    serde_json::from_value::<NoArchType>(serde_json::Value::String(s.clone()))
-                        .map(Some)
-                        .map_err(|_| {
-                            ParseError::invalid_value(
-                                "noarch type",
-                                format!(
-                                    "Invalid noarch type '{}'. Expected 'python' or 'generic'",
-                                    s
-                                ),
-                                v.span().copied().unwrap_or(Span::new_blank()),
-                            )
-                        })?
+                    match render_optional_variant_template(template.source(), v.span(), context)? {
+                        None => None,
+                        Some(s) => parse_noarch_string(&s, v.span())?,
+                    }
                 } else {
                     unreachable!("Value must be either concrete or template")
                 }
@@ -3954,6 +4027,172 @@ requirements:
             }
             _ => panic!("Expected single recipe"),
         }
+    }
+
+    /// Evaluate a single-output recipe with the given variant variables set,
+    /// returning the stage1 recipe (or the evaluation error).
+    fn evaluate_recipe_with_vars(
+        recipe_yaml: &str,
+        vars: &[(&str, Variable)],
+    ) -> Result<Stage1Recipe, ParseError> {
+        use crate::stage0::parser::parse_recipe_or_multi_from_source;
+
+        let parsed = parse_recipe_or_multi_from_source(recipe_yaml).expect("recipe should parse");
+        match parsed {
+            stage0::Recipe::SingleOutput(recipe) => {
+                let mut ctx = EvaluationContext::new();
+                for (key, value) in vars {
+                    ctx.insert((*key).to_string(), value.clone());
+                }
+                recipe.evaluate(&ctx)
+            }
+            _ => panic!("Expected single recipe"),
+        }
+    }
+
+    /// #2291: `noarch: ${{ "python" if use_noarch }}` must render to "no noarch"
+    /// (rather than erroring on the empty string) when the condition is false,
+    /// while still producing `python` when true.
+    #[test]
+    fn test_conditional_noarch_toggles_with_variant() {
+        let recipe_yaml = r#"schema_version: 1
+
+package:
+  name: coverage
+  version: "1.0"
+
+build:
+  number: 1
+  noarch: ${{ "python" if use_noarch }}
+"#;
+
+        let noarch_on = evaluate_recipe_with_vars(recipe_yaml, &[("use_noarch", Variable::from(true))])
+            .unwrap()
+            .build
+            .noarch;
+        assert_eq!(noarch_on, Some(NoArchType::python()));
+
+        let noarch_off =
+            evaluate_recipe_with_vars(recipe_yaml, &[("use_noarch", Variable::from(false))])
+                .unwrap()
+                .build
+                .noarch;
+        assert_eq!(noarch_off, None, "false condition means no noarch");
+    }
+
+    /// #2291: a conditional `noarch` that references a variant key which is not
+    /// defined on this platform must fall back to "no noarch" instead of failing
+    /// with an undefined-variable error.
+    #[test]
+    fn test_conditional_noarch_undefined_key_is_none() {
+        let recipe_yaml = r#"schema_version: 1
+
+package:
+  name: coverage
+  version: "1.0"
+
+build:
+  noarch: ${{ "python" if use_noarch }}
+"#;
+        // `use_noarch` intentionally not set.
+        let noarch = evaluate_recipe_with_vars(recipe_yaml, &[])
+            .unwrap()
+            .build
+            .noarch;
+        assert_eq!(noarch, None);
+    }
+
+    /// #2291 (wolfv's suggestion): `noarch: null`/`~` and a `"~"` fallback in a
+    /// template are accepted and mean "no noarch".
+    #[test]
+    fn test_noarch_null_like_values() {
+        for literal in ["null", "~", "none"] {
+            let recipe_yaml = format!(
+                "schema_version: 1\n\npackage:\n  name: p\n  version: \"1.0\"\n\nbuild:\n  noarch: {literal}\n"
+            );
+            let noarch = evaluate_recipe_with_vars(&recipe_yaml, &[])
+                .unwrap()
+                .build
+                .noarch;
+            assert_eq!(noarch, None, "`noarch: {literal}` should mean no noarch");
+        }
+
+        // `${{ "python" if use_noarch else "~" }}` — the `~` else-branch is a
+        // null-like token that means "no noarch".
+        let recipe_yaml = r#"schema_version: 1
+
+package:
+  name: p
+  version: "1.0"
+
+build:
+  noarch: ${{ "python" if use_noarch else "~" }}
+"#;
+        let noarch =
+            evaluate_recipe_with_vars(recipe_yaml, &[("use_noarch", Variable::from(false))])
+                .unwrap()
+                .build
+                .noarch;
+        assert_eq!(noarch, None);
+    }
+
+    /// An invalid (non-null-like) noarch value must still be rejected.
+    #[test]
+    fn test_invalid_noarch_still_errors() {
+        let recipe_yaml = r#"schema_version: 1
+
+package:
+  name: p
+  version: "1.0"
+
+build:
+  noarch: ${{ "banana" }}
+"#;
+        assert!(evaluate_recipe_with_vars(recipe_yaml, &[]).is_err());
+    }
+
+    /// #2544: `down_prioritize_variant` referencing a variant key that only
+    /// exists on some platforms must not error where the key is absent; where it
+    /// is defined, the expression is evaluated normally.
+    #[test]
+    fn test_down_prioritize_variant_undefined_key() {
+        let recipe_yaml = r#"schema_version: 1
+
+package:
+  name: repro
+  version: "1.0"
+
+build:
+  number: 0
+  variant:
+    use_keys:
+      - my_level
+    down_prioritize_variant: ${{ 0 if my_level == 1 else 1 }}
+"#;
+
+        // Key absent (e.g. osx-arm64): no down-prioritization, no error.
+        let absent = evaluate_recipe_with_vars(recipe_yaml, &[])
+            .unwrap()
+            .build
+            .variant
+            .down_prioritize_variant;
+        assert_eq!(absent, None);
+
+        // Key defined and matching → 0.
+        let matching = evaluate_recipe_with_vars(recipe_yaml, &[("my_level", Variable::from(1i64))])
+            .unwrap()
+            .build
+            .variant
+            .down_prioritize_variant;
+        assert_eq!(matching, Some(0));
+
+        // Key defined and not matching → 1.
+        let other = evaluate_recipe_with_vars(recipe_yaml, &[("my_level", Variable::from(3i64))])
+            .unwrap()
+            .build
+            .variant
+            .down_prioritize_variant;
+        assert_eq!(other, Some(1));
     }
 
     #[test]
