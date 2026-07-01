@@ -121,13 +121,20 @@ contain patches.
 source:
   url: https://pypi.python.org/packages/source/b/bsdiff4/bsdiff4-1.1.4.tar.gz
   md5: 29f6089290505fc1a852e176bd276c43
-  sha1: f0a2c9a30073449cfb7d171c57552f3109d93894
   sha256: 5a022ff4c1d1de87232b1c70bde50afbb98212fd246be4a867d8737173cf1f8f
 ```
+
+A source may be verified with `sha256` and/or `md5`; `sha1` is not supported.
 
 If an extracted archive contains only 1 folder at its top level, its contents
 will be moved 1 level up, so that the extracted package contents sit in the root
 of the work folder.
+
+An empty `sha256` or `md5` (e.g. `sha256: ""`) is accepted as an all-zeros
+placeholder (`0000...0000`). This is handy while scaffolding a recipe before the
+real checksum is known: the build still downloads the source and reports the
+actual checksum in the resulting mismatch, which you can then paste back into
+the recipe.
 
 ##### Supported archive formats
 

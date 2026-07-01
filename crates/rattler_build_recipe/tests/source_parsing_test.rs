@@ -95,6 +95,78 @@ build:
 }
 
 #[test]
+fn test_parse_recipe_with_empty_sha256() {
+    // An empty sha256 string is accepted as an all-zeros placeholder so that
+    // recipes can be scaffolded before the real checksum is known (issue #2524).
+    let yaml = r#"
+package:
+  name: test
+  version: 1.0.0
+
+source:
+  url: https://example.com/archive.tar.gz
+  sha256: ""
+
+build:
+  number: 0
+"#;
+
+    let recipe = parse_recipe_from_source(yaml).unwrap();
+    let source = get_concrete_source(&recipe.source.as_slice()[0]).unwrap();
+    match source {
+        Source::Url(url_src) => {
+            let hash = url_src
+                .sha256
+                .as_ref()
+                .expect("sha256 should be present")
+                .as_concrete()
+                .expect("sha256 should be concrete");
+            assert!(
+                hash.iter().all(|&b| b == 0),
+                "empty sha256 should parse to all zeros"
+            );
+        }
+        _ => panic!("Expected URL source"),
+    }
+}
+
+#[test]
+fn test_parse_recipe_with_empty_md5() {
+    // An empty md5 string is accepted as an all-zeros placeholder, mirroring the
+    // sha256 behavior (issue #2524).
+    let yaml = r#"
+package:
+  name: test
+  version: 1.0.0
+
+source:
+  url: https://example.com/archive.tar.gz
+  md5: ""
+
+build:
+  number: 0
+"#;
+
+    let recipe = parse_recipe_from_source(yaml).unwrap();
+    let source = get_concrete_source(&recipe.source.as_slice()[0]).unwrap();
+    match source {
+        Source::Url(url_src) => {
+            let hash = url_src
+                .md5
+                .as_ref()
+                .expect("md5 should be present")
+                .as_concrete()
+                .expect("md5 should be concrete");
+            assert!(
+                hash.iter().all(|&b| b == 0),
+                "empty md5 should parse to all zeros"
+            );
+        }
+        _ => panic!("Expected URL source"),
+    }
+}
+
+#[test]
 fn test_parse_recipe_with_git_source_filter() {
     let yaml = r#"
 package:

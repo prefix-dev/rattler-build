@@ -5,6 +5,31 @@ use std::path::PathBuf;
 
 use crate::stage0::types::{ConditionalList, IncludeExclude, JinjaTemplate, Value};
 
+/// Parse a concrete SHA256 checksum from a hex string.
+///
+/// An empty string is treated as a placeholder of all zeros
+/// (`0000...0000`), so recipe authors can scaffold a recipe before they have
+/// computed the real checksum. The source download later verifies the hash and
+/// reports a mismatch that includes the actual checksum. See issue #2524.
+pub(crate) fn parse_sha256_hex(s: &str) -> Option<Sha256Hash> {
+    if s.is_empty() {
+        return Some(Sha256Hash::default());
+    }
+    rattler_digest::parse_digest_from_hex::<Sha256>(s)
+}
+
+/// Parse a concrete MD5 checksum from a hex string.
+///
+/// As with [`parse_sha256_hex`], an empty string is treated as an all-zeros
+/// placeholder (`0000...0000`) so recipes can be scaffolded before the real
+/// checksum is known. See issue #2524.
+pub(crate) fn parse_md5_hex(s: &str) -> Option<Md5Hash> {
+    if s.is_empty() {
+        return Some(Md5Hash::default());
+    }
+    rattler_digest::parse_digest_from_hex::<Md5>(s)
+}
+
 /// Source information - can be Git, Url, or Path
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
@@ -251,7 +276,7 @@ mod sha256_serialization {
             let template = JinjaTemplate::new(s).map_err(serde::de::Error::custom)?;
             Ok(Some(Value::new_template(template, None)))
         } else {
-            let hash = rattler_digest::parse_digest_from_hex::<Sha256>(&s)
+            let hash = parse_sha256_hex(&s)
                 .ok_or_else(|| serde::de::Error::custom(format!("Invalid SHA256 checksum: {s}")))?;
             Ok(Some(Value::new_concrete(hash, None)))
         }
@@ -290,7 +315,7 @@ mod md5_serialization {
             let template = JinjaTemplate::new(s).map_err(serde::de::Error::custom)?;
             Ok(Some(Value::new_template(template, None)))
         } else {
-            let hash = rattler_digest::parse_digest_from_hex::<Md5>(&s)
+            let hash = parse_md5_hex(&s)
                 .ok_or_else(|| serde::de::Error::custom(format!("Invalid MD5 checksum: {s}")))?;
             Ok(Some(Value::new_concrete(hash, None)))
         }
