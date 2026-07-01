@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.8](https://github.com/prefix-dev/rattler-build/compare/rattler_build_recipe_generator-v0.1.7...rattler_build_recipe_generator-v0.1.8) - 2026-07-01
+
+### Added
+
+- improve CRAN recipe generation for R packages ([#2597](https://github.com/prefix-dev/rattler-build/pull/2597))
+- *(playground)* add PyPI/CRAN/CPAN recipe generator ([#2538](https://github.com/prefix-dev/rattler-build/pull/2538))
+
+### Fixed
+
+- use `skip` condition and platform-split script in generated R recipes ([#2609](https://github.com/prefix-dev/rattler-build/pull/2609))
+- switch PyPI sources to use `files.pythonhosted.org` ([#2586](https://github.com/prefix-dev/rattler-build/pull/2586))
+
 ## [0.1.7](https://github.com/prefix-dev/rattler-build/compare/rattler_build_recipe_generator-v0.1.6...rattler_build_recipe_generator-v0.1.7) - 2026-06-18
 
 ### Other

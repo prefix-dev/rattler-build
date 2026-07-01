@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.9](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.8...rattler_build_core-v0.2.9) - 2026-07-01
+
+### Added
+
+- adds support to publish --to cloudsmith ([#2516](https://github.com/prefix-dev/rattler-build/pull/2516))
+- make SHLIB_EXT available in Jinja templates ([#2612](https://github.com/prefix-dev/rattler-build/pull/2612))
+- support `source.filter` for URL and archive path sources ([#2608](https://github.com/prefix-dev/rattler-build/pull/2608))
+- improve package content test failure messages with expanded globs ([#2602](https://github.com/prefix-dev/rattler-build/pull/2602))
+
+### Fixed
+
+- build test MatchSpec from typed components to support trailing-underscore versions ([#2618](https://github.com/prefix-dev/rattler-build/pull/2618))
+- write github output to stderr ([#2550](https://github.com/prefix-dev/rattler-build/pull/2550))
+
 ## [0.2.8](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.7...rattler_build_core-v0.2.8) - 2026-06-26
 
 ### Other
