@@ -49,3 +49,14 @@ tests:
           - if not "%PKG_BUILDNUM%" == "0" (exit 1)
           # make sure that the build string is not empty
           - if "%PKG_BUILD_STRING%" == "" (exit 1)
+  - script:
+      # PATHS_JSON and INDEX_JSON should point at the `info/paths.json` and
+      # `info/index.json` of the package that was just installed for testing.
+      - if: unix
+        then:
+          - test -f "$PATHS_JSON"
+          - test -f "$INDEX_JSON"
+          - grep -q "test-execution" "$INDEX_JSON"
+        else:
+          - if not exist "%PATHS_JSON%" (exit 1)
+          - if not exist "%INDEX_JSON%" (exit 1)
