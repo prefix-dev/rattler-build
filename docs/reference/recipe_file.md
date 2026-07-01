@@ -498,8 +498,11 @@ Fields (all optional):
 - **`binary_relocation`** - Controls which binaries get their prefixes
   rewritten during installation. Accepts `true` (all binaries, default),
   `false` (none) or a list of glob patterns to include.
-- **`rpath_allowlist`** - Glob patterns of RPATH entries that may point
-  outside the package prefix without triggering an overlinking warning.
+- **`rpath_allowlist`** - Glob patterns of RPATH/RUNPATH entries that are
+  allowed to point outside the package prefix. Matching entries are kept during
+  relocation instead of being stripped. This also covers relative entries that
+  resolve outside the prefix, such as `$ORIGIN/../..` (Linux) or
+  `@loader_path/../..` (macOS).
 - **`missing_dso_allowlist`** - Glob patterns of dynamic libraries that are
   allowed to be missing from the host environment without failing the
   overlinking check.

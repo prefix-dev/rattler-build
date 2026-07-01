@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Package content test failures now report the fully expanded glob(s) that were actually matched against the package (including automatically prepended platform prefixes such as `include/` or `Library/include/`), instead of only the raw user-provided pattern. This applies to all package content sections (`include`, `bin`, `lib`, `site_packages`, `files`), making it clearer why a pattern did not match. (#2584)
 - Improve CRAN (R) recipe generation: pass `${R_ARGS}` to `R CMD INSTALL`, add `cross-r-base` for cross-compilation, set `rpaths` for compiled packages, mark pure-R packages as `noarch: generic`, reference `r-base`'s bundled license files, and fix the `r-base` version constraint so it is applied to both `host` and `run` without duplication.
 
+### Fixed
+
+- On macOS, relinking no longer logs the misleading "Rpath not in prefix or allow-listed ... removing it" message for `@loader_path`-relative entries that are actually kept (because they resolve inside the prefix or match the `rpath_allowlist`). Documented that `rpath_allowlist` can be used to keep relative entries that resolve outside of the prefix such as `$ORIGIN/../..` (Linux) or `@loader_path/../..` (macOS), and added regression tests for both platforms. (#816)
+
 
 ## [0.67.0] - 2026-06-22
 ### ✨ Highlights
