@@ -43,6 +43,23 @@ def test_license_glob(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
     assert len(list(pkg.glob("info/licenses/**/*"))) == 8
 
 
+@pytest.mark.skipif(
+    os.name == "nt", reason="creating the symlink in the build script uses `ln -s`"
+)
+def test_symlinked_license(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    """A license_file that is a symlink should be packaged as real content
+    rather than a (potentially dangling) symlink (see issue #2575)."""
+    rattler_build.build(recipes / "symlinked_license", tmp_path)
+    pkg = get_extracted_package(tmp_path, "symlinked-license")
+
+    license_file = pkg / "info/licenses/subdir/LICENSE"
+    assert license_file.exists()
+    # The symlink target lives outside the matched set, so the old behavior
+    # produced a dangling symlink. It must now be materialized as real content.
+    assert not license_file.is_symlink()
+    assert license_file.read_text().strip() == "the actual license text"
+
+
 def test_missing_license_file(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):

@@ -142,6 +142,7 @@ pub(crate) struct CopyDir<'a> {
     use_condapackageignore: bool,
     hidden: bool,
     exclude_git_dirs: bool,
+    dereference_symlinks: bool,
     copy_options: CopyOptions,
 }
 
@@ -161,6 +162,8 @@ impl<'a> CopyDir<'a> {
             hidden: false,
             // exclude .git directories by default for path sources
             exclude_git_dirs: false,
+            // copy symlinks verbatim by default (do not follow them)
+            dereference_symlinks: false,
             copy_options: CopyOptions::default(),
         }
     }
@@ -210,6 +213,16 @@ impl<'a> CopyDir<'a> {
     #[allow(unused)]
     pub fn exclude_git_dirs(mut self, b: bool) -> Self {
         self.exclude_git_dirs = b;
+        self
+    }
+
+    /// Follow symlinks and copy the file (or directory) they point to instead of
+    /// copying the symlink itself. This is used when copying license files so that
+    /// a symlinked license ends up as actual content in the package rather than a
+    /// (potentially dangling) symlink.
+    #[allow(unused)]
+    pub fn dereference_symlinks(mut self, b: bool) -> Self {
+        self.dereference_symlinks = b;
         self
     }
 
@@ -312,7 +325,7 @@ impl<'a> CopyDir<'a> {
                     let stripped_path = path.strip_prefix(self.from_path)?;
                     let dest_path = self.to_path.join(stripped_path);
 
-                    if path.is_symlink() {
+                    if path.is_symlink() && !self.dereference_symlinks {
                         let link_target = fs_err::read_link(path)?;
 
                         if let Some(parent) = dest_path.parent() {
@@ -321,34 +334,56 @@ impl<'a> CopyDir<'a> {
 
                         create_symlink(link_target, &dest_path)?;
                         Ok(Some(dest_path))
-                    } else if path.is_dir() {
-                        create_dir_all_cached(&dest_path, paths_created)?;
-                        Ok(Some(dest_path))
                     } else {
-                        // create dir if parent does not exist
-                        if let Some(parent) = dest_path.parent() {
-                            create_dir_all_cached(parent, paths_created)?;
-                        }
-
-                        if dest_path.exists() {
-                            if !(self.copy_options.overwrite || self.copy_options.skip_exist) {
-                                tracing::error!("File already exists: {:?}", dest_path);
-                            } else if self.copy_options.skip_exist {
-                                tracing::warn!(
-                                    "File already exists! Skipping file: {:?}",
-                                    dest_path
-                                );
-                            } else if self.copy_options.overwrite {
-                                tracing::warn!(
-                                    "File already exists! Overwriting file: {:?}",
-                                    dest_path
-                                );
+                        // When dereferencing, resolve the link target ourselves
+                        // instead of relying on the OS to follow it during the copy.
+                        // A relative target is resolved against the link's parent
+                        // directory so a symlinked file outside the copied set (e.g. a
+                        // license symlinked to `../../LICENSE`) is materialized as real
+                        // content. Resolving manually is also more portable: Windows
+                        // does not reliably follow a relative reparse target when a path
+                        // that traverses the link is opened directly. A broken symlink
+                        // resolves to a non-existent path and surfaces as a clear copy
+                        // error.
+                        let source = if path.is_symlink() {
+                            let link_target = fs_err::read_link(path)?;
+                            match (link_target.is_absolute(), path.parent()) {
+                                (false, Some(parent)) => parent.join(link_target),
+                                _ => link_target,
                             }
-                        }
-                        reflink_or_copy(path, &dest_path, &self.copy_options)
-                            .map_err(SourceError::FileSystemError)?;
+                        } else {
+                            path.to_path_buf()
+                        };
 
-                        Ok(Some(dest_path))
+                        if source.is_dir() {
+                            create_dir_all_cached(&dest_path, paths_created)?;
+                            Ok(Some(dest_path))
+                        } else {
+                            // create dir if parent does not exist
+                            if let Some(parent) = dest_path.parent() {
+                                create_dir_all_cached(parent, paths_created)?;
+                            }
+
+                            if dest_path.exists() {
+                                if !(self.copy_options.overwrite || self.copy_options.skip_exist) {
+                                    tracing::error!("File already exists: {:?}", dest_path);
+                                } else if self.copy_options.skip_exist {
+                                    tracing::warn!(
+                                        "File already exists! Skipping file: {:?}",
+                                        dest_path
+                                    );
+                                } else if self.copy_options.overwrite {
+                                    tracing::warn!(
+                                        "File already exists! Overwriting file: {:?}",
+                                        dest_path
+                                    );
+                                }
+                            }
+                            reflink_or_copy(&source, &dest_path, &self.copy_options)
+                                .map_err(SourceError::FileSystemError)?;
+
+                            Ok(Some(dest_path))
+                        }
                     }
                 },
             )
@@ -753,6 +788,84 @@ mod test {
                 .join("file_in_target.txt")
                 .exists()
         );
+    }
+
+    #[test]
+    fn test_dereference_symlinked_file() {
+        #[cfg(windows)]
+        {
+            // check if we have permissions to create symlinks
+            let tmp_dir = tempfile::TempDir::new().unwrap();
+            let test_symlink = tmp_dir.path().join("test_symlink");
+            if std::os::windows::fs::symlink_file("does_not_exist", &test_symlink).is_err() {
+                return;
+            }
+        }
+
+        let tmp_dir = tempfile::TempDir::new().unwrap();
+        let dir = tmp_dir.path().join("test_copy_dir");
+        fs::create_dir_all(dir.join("nested")).unwrap();
+
+        // Create the real license content outside of what the glob will match.
+        fs::write(dir.join("LICENSE"), "the actual license text").unwrap();
+
+        // A symlink that points at the real file via a relative path.
+        let symlink = dir.join("nested").join("LICENSE");
+        #[cfg(unix)]
+        std::os::unix::fs::symlink("../LICENSE", &symlink).unwrap();
+        #[cfg(windows)]
+        std::os::windows::fs::symlink_file("../LICENSE", &symlink).unwrap();
+
+        let dest_dir = tempfile::TempDir::new().unwrap();
+        let copy_dir = super::CopyDir::new(&dir, dest_dir.path())
+            .with_globvec(&GlobVec::from_vec(vec!["nested/LICENSE"], None))
+            .use_gitignore(false)
+            .dereference_symlinks(true)
+            .run()
+            .unwrap();
+
+        let dest = dest_dir.path().join("nested").join("LICENSE");
+        assert_eq!(copy_dir.copied_paths(), std::slice::from_ref(&dest));
+        // The symlink should have been materialized as real content, not a symlink.
+        assert!(!dest.is_symlink());
+        assert_eq!(
+            fs::read_to_string(&dest).unwrap(),
+            "the actual license text"
+        );
+    }
+
+    #[test]
+    fn test_dereference_broken_symlink_errors() {
+        #[cfg(windows)]
+        {
+            // check if we have permissions to create symlinks
+            let tmp_dir = tempfile::TempDir::new().unwrap();
+            let test_symlink = tmp_dir.path().join("test_symlink");
+            if std::os::windows::fs::symlink_file("does_not_exist", &test_symlink).is_err() {
+                return;
+            }
+        }
+
+        let tmp_dir = tempfile::TempDir::new().unwrap();
+        let dir = tmp_dir.path().join("test_copy_dir");
+        fs::create_dir_all(&dir).unwrap();
+
+        let symlink = dir.join("LICENSE");
+        #[cfg(unix)]
+        std::os::unix::fs::symlink("does/not/exist", &symlink).unwrap();
+        #[cfg(windows)]
+        std::os::windows::fs::symlink_file("does/not/exist", &symlink).unwrap();
+
+        let dest_dir = tempfile::TempDir::new().unwrap();
+        let result = super::CopyDir::new(&dir, dest_dir.path())
+            .with_globvec(&GlobVec::from_vec(vec!["LICENSE"], None))
+            .use_gitignore(false)
+            .dereference_symlinks(true)
+            .run();
+
+        // A dangling symlink cannot be dereferenced, so copying fails loudly
+        // instead of silently emitting a broken symlink.
+        assert!(result.is_err());
     }
 
     #[test]
