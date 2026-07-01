@@ -54,7 +54,7 @@ use rattler_build_core::consts;
 use rattler_build_recipe::{stage0, stage1::TestType};
 use rattler_build_variant_config::VariantConfig;
 use rattler_conda_types::{
-    MatchSpec, NamedChannelOrUrl, NoArchType, PackageName, Platform,
+    MatchSpec, NamedChannelOrUrl, NoArchType, PackageName, Platform, RepodataRevision,
     compression_level::CompressionLevel, package::CondaArchiveType,
 };
 use rattler_config::config::build::PackageFormatAndCompression;
@@ -80,6 +80,15 @@ use crate::publish::{
 use indexmap::IndexSet;
 use rattler_build_recipe::topological_sort_by_dependencies;
 
+/// Convert the CLI `--v3` boolean flag into a [`RepodataRevision`].
+fn repodata_revision_from_v3_flag(v3: bool) -> RepodataRevision {
+    if v3 {
+        RepodataRevision::V3
+    } else {
+        RepodataRevision::Legacy
+    }
+}
+
 /// Result of finding variants, including the top-level recipe name if available
 struct FoundVariants {
     outputs: IndexSet<DiscoveredOutput>,
@@ -102,7 +111,7 @@ fn find_variants(
     let stage0_recipe = rattler_build_recipe::parse_recipe_with_config(
         &source,
         rattler_build_recipe::stage0::ParseConfig {
-            v3: render_config.v3,
+            repodata_revision: render_config.repodata_revision,
         },
     )
     .wrap_err("Failed to parse recipe")?;
@@ -395,7 +404,7 @@ pub async fn get_build_output(
         build_platform: build_data.build_platform,
         host_platform: build_data.host_platform,
         experimental: build_data.common.experimental,
-        v3: build_data.common.v3,
+        repodata_revision: repodata_revision_from_v3_flag(build_data.common.v3),
         recipe_path: Some(recipe_path.to_path_buf()),
         os_env_var_keys,
         build_number_override: build_data.build_num_override,
@@ -424,6 +433,14 @@ pub async fn get_build_output(
             skipped
         );
 
+        // Display V3 package variant flags, if any. These are not variant keys,
+        // so they are shown below the build string rather than in the table.
+        let flags = &discovered_output.recipe.build().flags;
+        if !flags.is_empty() {
+            let flags = flags.iter().map(|flag| flag.as_str()).collect::<Vec<_>>();
+            tracing::info!("Flags: {}", flags.join(", "));
+        }
+
         let mut table = comfy_table::Table::new();
         table
             .load_preset(comfy_table::presets::UTF8_FULL_CONDENSED)
@@ -446,7 +463,7 @@ pub async fn get_build_output(
         .or_else(|| outputs_and_variants.first().map(|o| o.name.clone()))
         .unwrap_or_else(|| "build".to_string());
 
-    let timestamp = chrono::Utc::now();
+    let timestamp = jiff::Timestamp::now();
 
     for discovered_output in outputs_and_variants {
         let recipe = &discovered_output.recipe;
@@ -560,7 +577,7 @@ pub async fn get_build_output(
                 env_isolation: build_data.env_isolation,
                 sandbox_config: build_data.sandbox_configuration.clone(),
                 exclude_newer: build_data.exclude_newer,
-                v3: build_data.common.v3,
+                repodata_revision: repodata_revision_from_v3_flag(build_data.common.v3),
             },
             finalized_dependencies: None,
             finalized_sources: None,
@@ -1031,7 +1048,7 @@ pub async fn rebuild_package_core(
     let original_sha = rattler_digest::compute_file_digest::<rattler_digest::Sha256>(&package_path)
         .into_diagnostic()?;
 
-    tracing::info!("Original package SHA256: {:x}", original_sha);
+    tracing::info!("Original package SHA256: {}", hex::encode(original_sha));
     tracing::info!("Rebuilding \"{}\"", package_path.display());
 
     // we extract the recipe folder from the package file (info/recipe/*)
@@ -1085,7 +1102,7 @@ pub async fn rebuild_package_core(
         run_build(output, &tool_config, WorkingDirectoryBehavior::Cleanup).await?;
 
     // Generate timestamp for the rebuilt package
-    let timestamp = chrono::Utc::now().format("%Y%m%d-%H%M%S");
+    let timestamp = jiff::Timestamp::now().strftime("%Y%m%d-%H%M%S");
 
     // Create final output directory
     let final_output_dir = rebuild_data.common.output_dir.clone();
@@ -1124,14 +1141,14 @@ pub async fn rebuild_package_core(
     let rebuilt_sha = rattler_digest::compute_file_digest::<rattler_digest::Sha256>(&rebuilt_path)
         .into_diagnostic()?;
 
-    tracing::info!("Rebuilt package SHA256: {:x}", rebuilt_sha);
+    tracing::info!("Rebuilt package SHA256: {}", hex::encode(rebuilt_sha));
     tracing::info!("Rebuilt package saved to: \"{:?}\"", rebuilt_path);
 
     Ok(RebuildOutput {
         original_path: package_path,
         rebuilt_path,
-        original_sha256: format!("{:x}", original_sha),
-        rebuilt_sha256: format!("{:x}", rebuilt_sha),
+        original_sha256: hex::encode(original_sha),
+        rebuilt_sha256: hex::encode(rebuilt_sha),
     })
 }
 

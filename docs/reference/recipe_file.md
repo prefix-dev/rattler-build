@@ -121,13 +121,20 @@ contain patches.
 source:
   url: https://pypi.python.org/packages/source/b/bsdiff4/bsdiff4-1.1.4.tar.gz
   md5: 29f6089290505fc1a852e176bd276c43
-  sha1: f0a2c9a30073449cfb7d171c57552f3109d93894
   sha256: 5a022ff4c1d1de87232b1c70bde50afbb98212fd246be4a867d8737173cf1f8f
 ```
+
+A source may be verified with `sha256` and/or `md5`; `sha1` is not supported.
 
 If an extracted archive contains only 1 folder at its top level, its contents
 will be moved 1 level up, so that the extracted package contents sit in the root
 of the work folder.
+
+An empty `sha256` or `md5` (e.g. `sha256: ""`) is accepted as an all-zeros
+placeholder (`0000...0000`). This is handy while scaffolding a recipe before the
+real checksum is known: the build still downloads the source and reports the
+actual checksum in the resulting mismatch, which you can then paste back into
+the recipe.
 
 ##### Supported archive formats
 
@@ -304,6 +311,32 @@ Patches may optionally be applied to the source.
 
 <!-- boa (conda-build) automatically determines the patch strip level. -->
 
+Patch paths are resolved relative to the recipe directory. They may also refer
+to a restricted set of build-time directory variables that are only known once
+the build has started:
+
+- `${{ SRC_DIR }}` – the source working directory
+- `${{ RECIPE_DIR }}` – the recipe directory
+- `${{ BUILD_DIR }}` – the top-level build directory
+
+This is useful when a patch ships inside another source. Because sources are
+fetched in order into the shared `SRC_DIR`, a later source can apply a patch
+that was extracted from an earlier one:
+
+```yaml
+source:
+  - url: https://example.com/tool-{{ version }}.tar.gz  # ships patches under src/
+    sha256: "..."
+  - url: https://example.com/lib-{{ version }}.tar.gz
+    sha256: "..."
+    target_directory: lib_src
+    patches:
+      - ${{ SRC_DIR }}/src/patches/0001-fix.patch
+```
+
+Only the variables listed above are allowed in `patches`; any other variable
+is treated as undefined and produces an error.
+
 #### Destination path
 
 Within Rattler-Build's work directory, you may specify a particular folder to
@@ -392,6 +425,34 @@ source:
       - include/**/*.h
     exclude:
       - include/**/private.h
+```
+
+The `filter` field is available for `path`, `url`, and `git` sources. It is
+applied to the files that are copied into the work directory — the copied tree
+for directory `path` sources, the contents of the extracted archive for `url`
+sources (and `path` sources pointing to an archive), and the checked-out tree
+for `git` sources. This is useful for trimming large sources down to the parts
+you actually need to build:
+
+```yaml title="recipe.yaml"
+source:
+  - url: https://github.com/llvm/llvm-project/archive/refs/tags/llvmorg-${{ version }}.tar.gz
+    sha256: ad18b70e287954c3d62bc7e0b86e7b7af2adf87bcfce21c15fe717f101d7aace
+    filter:
+      # we don't want to accidentally build more than clang here
+      - cmake/*
+      - clang/*
+      - clang-tools-extra/*
+```
+
+```yaml title="recipe.yaml"
+source:
+  url: https://github.com/pytorch/pytorch/releases/download/v${{ version }}/pytorch-v${{ version }}.tar.gz
+  sha256: 757145cfd55c7c8c01f58c959f76230641cc67fdd1d8b6a130f93ad1bc116f5f
+  filter:
+    exclude:
+      # ensure we use our own fmt
+      - third_party/fmt/*
 ```
 
 ## Build section
@@ -530,23 +591,36 @@ with the following fields (all optional):
   the rendered recipe. The variables must already be set in the environment
   running `rattler-build`.
 - **`interpreter`** - Explicit interpreter to run `content` with. Supported
-  values are `bash` (default on Unix), `cmd.exe` (default on Windows), `nu`
-  (nushell), `python`, `perl`, `rscript`, `ruby` and `node`/`nodejs`. When
-  unset, the interpreter is auto-detected from the script's file extension
-  (`.sh`, `.bat`, `.nu`, `.py`, `.pl`, `.r`, `.rb`, `.js`).
+  values are `bash` (default on Unix), `cmd.exe` (default on Windows),
+  `powershell`, `nu` (nushell), `brush`, `python`, `perl`, `rscript`, `ruby`
+  and `node`/`nodejs`. When unset, the interpreter is auto-detected from the
+  script's file extension (`.sh`/`.bash`, `.bat`/`.cmd`, `.ps1`, `.nu`, `.py`,
+  `.pl`, `.r`, `.rb`, `.js`).
 - **`cwd`** - Working directory for the script, relative to the
   `[build folder]/work` directory. Defaults to the `[build folder]/work`
   directory itself.
 
-!!! warning "Non-default interpreters need a build dependency"
+!!! note "Where interpreters come from"
 
-    Only `bash` and `cmd.exe` are assumed to exist on the build machine.
-    Every other interpreter must be added to `requirements.build` (or
-    otherwise be available on `PATH`) so the build environment actually
-    has it. For example:
-     - `interpreter: nu` requires `nushell` in `requirements.build`
-     - `interpreter: python` requires `python`
-     - `interpreter: node` requires `nodejs`
+    Every build and test script is launched through a native shell wrapper
+    (`bash` on Unix, `cmd.exe` on Windows) that activates the build/host
+    prefixes and then invokes the chosen interpreter as a command.
+
+    An interpreter that runs the build script is a build-time tool, so add it to
+    `requirements.build` (for example `interpreter: nu` → `nushell`,
+    `interpreter: rscript` → `r-base`, `interpreter: node` → `nodejs`). It is
+    resolved from the activated environment in the same order the `PATH` would:
+    the **build** prefix, then the **host** prefix, and for most interpreters the
+    system `PATH` as a last resort. So a `host` dependency is also found, but
+    `build` is the correct place; relying on a system copy works but makes builds
+    non-reproducible. When the build and host environments are merged
+    (`build.merge_build_and_host_envs`), that single environment is used.
+
+    Two interpreters are resolved differently:
+     - `bash`/`cmd.exe` (and `powershell` on Windows) may be taken from the
+       system `PATH` on their native platform.
+     - `brush` is resolved **only** from the build environment (not the host
+       prefix or the system `PATH`), so it must be in `requirements.build`.
 
 ```yaml title="recipe.yaml"
 build:
@@ -872,7 +946,7 @@ build:
       - numpy
     ignore_keys:
       - python
-    down_prioritize_variant: -1
+    down_prioritize_variant: 1
 ```
 
 - **`use_keys`** - Variant keys that must be part of this build's variant
@@ -881,8 +955,10 @@ build:
   build's variant even if they are referenced. Packages built with
   `ignore_keys` will not get a separate output per value of that key.
 - **`down_prioritize_variant`** - Integer priority offset applied to this
-  variant during solving. Negative values make the variant less preferred
-  when multiple variants satisfy a dependency.
+  variant during solving (defaults to `0`). Higher values make the variant
+  less preferred when multiple variants satisfy a dependency. This is
+  implemented via `track_features`, so it is the magnitude of the value that
+  matters (the sign is ignored).
 
 ## Include build recipe
 
@@ -1686,6 +1762,30 @@ about:
     - LICENSE
     - vendor-licenses/
 ```
+
+License file entries may also refer to a restricted set of build-time directory
+variables that are only known once the build has finished. These are resolved
+during packaging:
+
+- `${{ PREFIX }}` – the host prefix
+- `${{ BUILD_PREFIX }}` – the build prefix
+- `${{ SRC_DIR }}` – the source working directory
+- `${{ RECIPE_DIR }}` – the recipe directory
+- `${{ BUILD_DIR }}` – the top-level build directory
+
+This is useful for packages (such as R packages) that install their license
+files into `${{ PREFIX }}` during the build:
+
+```yaml
+about:
+  license_file:
+    - LICENSE
+    - ${{ PREFIX }}/lib/R/library/mypkg/LICENSE
+```
+
+Entries that reference one of these variables may contain glob patterns
+(e.g. `${{ PREFIX }}/share/licenses/*/LICENSE`) and are always allowed — unlike
+plain absolute paths they do not require `--allow-absolute-license-paths`.
 
 
 ## Extra section

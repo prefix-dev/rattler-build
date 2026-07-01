@@ -1,6 +1,6 @@
 [package]
 name = "rattler_build_source_cache"
-version = "0.1.5"
+version = "0.1.8"
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
@@ -14,6 +14,8 @@ sigstore = [
   "dep:sigstore-verify",
   "dep:sigstore-trust-root",
   "dep:sigstore-types",
+  "sigstore-verify/tuf",
+  "sigstore-trust-root/tuf",
 ]
 native-tls = [
   "rattler_build_networking/native-tls",
@@ -23,7 +25,7 @@ rustls = ["rattler_build_networking/rustls", "sigstore-verify?/rustls"]
 
 [dependencies]
 async-trait = { workspace = true }
-chrono = { workspace = true, features = ["serde"] }
+jiff = { workspace = true }
 fs-err = { workspace = true, features = ["tokio"] }
 futures = { workspace = true }
 rattler_prefix_guard = { workspace = true }
@@ -59,10 +61,11 @@ tempfile = { workspace = true }
 dunce = { workspace = true }
 rattler_git = { workspace = true }
 hex = { workspace = true }
-sigstore-verify = { version = "0.6.4", default-features = false, optional = true }
-sigstore-trust-root = { version = "0.6.4", default-features = false, optional = true }
-sigstore-types = { version = "0.6.4", optional = true }
+sigstore-verify = { version = "0.9.0", default-features = false, optional = true }
+sigstore-trust-root = { version = "0.9.0", default-features = false, optional = true }
+sigstore-types = { version = "0.9.0", optional = true }
 
 [dev-dependencies]
+base64 = "0.22"
 tokio = { workspace = true, features = ["rt", "macros", "test-util"] }
 tempfile.workspace = true

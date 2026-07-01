@@ -1,4 +1,6 @@
-use std::{fmt, path::PathBuf};
+use std::fmt;
+#[cfg(not(target_arch = "wasm32"))]
+use std::path::PathBuf;
 
 use indexmap::IndexMap;
 use serde::Serialize;
@@ -47,11 +49,22 @@ pub struct GitSourceElement {
 #[derive(Default, Debug, Serialize)]
 pub struct Build {
     pub number: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub skip: Option<String>,
     pub script: String,
     #[serde(skip_serializing_if = "Python::is_default")]
     pub python: Python,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub noarch: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dynamic_linking: Option<DynamicLinking>,
+}
+
+/// Dynamic linking settings for compiled packages (e.g. `rpaths`).
+#[derive(Default, Debug, Serialize)]
+pub struct DynamicLinking {
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub rpaths: Vec<String>,
 }
 
 #[derive(Default, Debug, Serialize)]
@@ -164,6 +177,7 @@ impl fmt::Display for Recipe {
 }
 
 /// Write a recipe to "{package_name}/recipe.yaml"
+#[cfg(not(target_arch = "wasm32"))]
 pub fn write_recipe(package_name: &str, recipe: &str) -> std::io::Result<()> {
     let path = PathBuf::from(&format!("{}/recipe.yaml", &package_name));
     fs_err::create_dir_all(path.parent().unwrap())?;

@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.5](https://github.com/prefix-dev/rattler-build/compare/rattler_build_script-v0.2.4...rattler_build_script-v0.2.5) - 2026-06-18
+
+### Added
+
+- Add brush interpreter support ([#2527](https://github.com/prefix-dev/rattler-build/pull/2527))
+
+### Fixed
+
+- don't resolve the native wrapper shell as a build-env interpreter ([#2545](https://github.com/prefix-dev/rattler-build/pull/2545))
+- useful error messages for typos in `interpreter` ([#2540](https://github.com/prefix-dev/rattler-build/pull/2540))
+
+### Other
+
+- streamline script interpreters through a native shell wrapper ([#2535](https://github.com/prefix-dev/rattler-build/pull/2535))
+- Align nushell interpreter with brush approach ([#2533](https://github.com/prefix-dev/rattler-build/pull/2533))
+- bump rattler crates to latest versions ([#2528](https://github.com/prefix-dev/rattler-build/pull/2528))
+
+## [0.2.4](https://github.com/prefix-dev/rattler-build/compare/rattler_build_script-v0.2.3...rattler_build_script-v0.2.4) - 2026-05-20
+
+### Fixed
+
+- set CONDA_BUILD env var in build_env.sh to fix env-isolation none ([#2433](https://github.com/prefix-dev/rattler-build/pull/2433))
+
+### Other
+
+- bump rattler crates and migrate to reqwest 0.13 ([#2493](https://github.com/prefix-dev/rattler-build/pull/2493))
+
 ## [0.2.3](https://github.com/prefix-dev/rattler-build/compare/rattler_build_script-v0.2.2...rattler_build_script-v0.2.3) - 2026-04-13
 
 ### Added

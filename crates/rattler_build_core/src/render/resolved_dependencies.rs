@@ -809,9 +809,10 @@ pub(crate) async fn resolve_dependencies(
     let gateway = if download_missing_run_exports == RunExportsDownload::DownloadMissing {
         let client = tool_configuration.client.get_client().clone();
         let package_cache = tool_configuration.package_cache.clone();
+        let io_concurrency_limit = tool_configuration.io_concurrency_limit.unwrap_or(50);
         Some(
             Gateway::builder()
-                .with_max_concurrent_requests(50)
+                .with_max_concurrent_requests(io_concurrency_limit)
                 .with_client(client)
                 .with_package_cache(package_cache)
                 .finish(),
@@ -1254,7 +1255,7 @@ mod tests {
             rendered,
             vec![
                 ("python".to_string(), "*".to_string()),
-                ("scipy".to_string(), r#"[when="python >=3.10"]"#.to_string()),
+                ("scipy".to_string(), r#"[when="python>=3.10"]"#.to_string()),
             ]
         );
     }

@@ -1,6 +1,6 @@
 use marked_yaml::Node;
 use rattler_build_yaml_parser::ParseError;
-use rattler_digest::{Md5, Md5Hash, Sha256, Sha256Hash};
+use rattler_digest::{Md5Hash, Sha256Hash};
 
 use crate::stage0::{
     parser::helpers::get_span,
@@ -26,8 +26,9 @@ fn parse_sha256_value(node: &Node) -> Result<Value<Sha256Hash>, ParseError> {
             return Ok(Value::new_template(template, Some(span)));
         }
 
-        // Otherwise parse as concrete SHA256 hash
-        let hash = rattler_digest::parse_digest_from_hex::<Sha256>(s).ok_or_else(|| {
+        // Otherwise parse as concrete SHA256 hash (an empty string is treated as
+        // an all-zeros placeholder, see `parse_sha256_hex`)
+        let hash = crate::stage0::source::parse_sha256_hex(s).ok_or_else(|| {
             ParseError::invalid_value("sha256", format!("Invalid SHA256 checksum: {}", s), span)
         })?;
         Ok(Value::new_concrete(hash, Some(span)))
@@ -54,8 +55,9 @@ fn parse_md5_value(node: &Node) -> Result<Value<Md5Hash>, ParseError> {
             return Ok(Value::new_template(template, Some(span)));
         }
 
-        // Otherwise parse as concrete MD5 hash
-        let hash = rattler_digest::parse_digest_from_hex::<Md5>(s).ok_or_else(|| {
+        // Otherwise parse as concrete MD5 hash (an empty string is treated as
+        // an all-zeros placeholder, see `parse_md5_hex`)
+        let hash = crate::stage0::source::parse_md5_hex(s).ok_or_else(|| {
             ParseError::invalid_value("md5", format!("Invalid MD5 checksum: {}", s), span)
         })?;
         Ok(Value::new_concrete(hash, Some(span)))
@@ -276,6 +278,7 @@ fn parse_git_source(
     let mut lfs = None;
     let mut submodules = None;
     let mut expected_commit = None;
+    let mut filter = IncludeExclude::default();
 
     for (key_node, value_node) in mapping.iter() {
         let key = key_node.as_str();
@@ -320,6 +323,9 @@ fn parse_git_source(
             "expected_commit" => {
                 expected_commit = Some(parse_value(value_node)?);
             }
+            "filter" => {
+                filter = parse_source_filter(value_node)?;
+            }
             _ => {
                 return Err(ParseError::invalid_value(
                     "git source",
@@ -327,7 +333,7 @@ fn parse_git_source(
                     *key_node.span(),
                 )
                 .with_suggestion(
-                    "Valid fields are: git, rev, tag, branch, depth, patches, target_directory, lfs, submodules, expected_commit",
+                    "Valid fields are: git, rev, tag, branch, depth, patches, target_directory, lfs, submodules, expected_commit, filter",
                 ));
             }
         }
@@ -361,6 +367,7 @@ fn parse_git_source(
         lfs,
         submodules,
         expected_commit,
+        filter,
     })
 }
 
@@ -417,6 +424,7 @@ fn parse_url_source(
     let mut patches = ConditionalList::default();
     let mut target_directory = None;
     let mut attestation = None;
+    let mut filter = IncludeExclude::default();
 
     for (key_node, value_node) in mapping.iter() {
         let key = key_node.as_str();
@@ -458,6 +466,9 @@ fn parse_url_source(
                     ));
                 }
             }
+            "filter" => {
+                filter = parse_source_filter(value_node)?;
+            }
             _ => {
                 return Err(ParseError::invalid_value(
                     "url source",
@@ -465,7 +476,7 @@ fn parse_url_source(
                     *key_node.span(),
                 )
                 .with_suggestion(
-                    "Valid fields are: url, sha256, md5, file_name, patches, target_directory, attestation",
+                    "Valid fields are: url, sha256, md5, file_name, patches, target_directory, attestation, filter",
                 ));
             }
         }
@@ -486,6 +497,7 @@ fn parse_url_source(
         patches,
         target_directory,
         attestation,
+        filter,
     })
 }
 

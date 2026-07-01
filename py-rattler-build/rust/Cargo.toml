@@ -1,6 +1,6 @@
 [package]
 name = "py-rattler-build"
-version = "0.64.1"
+version = "0.67.0"
 edition = "2024"
 license = "BSD-3-Clause"
 publish = false
@@ -23,11 +23,11 @@ rattler_build_variant_config = { path = "../../crates/rattler_build_variant_conf
 rattler_build_package = { path = "../../crates/rattler_build_package" }
 rattler_build_script = { path = "../../crates/rattler_build_script" }
 indexmap = "2.13.0"
-pyo3 = { version = "0.28.2", features = [
+pyo3 = { version = "0.29.0", features = [
   "abi3-py38",
   "extension-module",
   "multiple-pymethods",
-  "chrono",
+  "jiff-02",
 ] }
 tokio = { version = "1.50.0", features = [
   "rt",
@@ -35,21 +35,22 @@ tokio = { version = "1.50.0", features = [
   "rt-multi-thread",
   "process",
 ] }
-rattler_conda_types = "0.46.0"
-rattler_config = "0.3.8"
-rattler_networking = { version = "0.27.0" }
-rattler_solve = "7.0.0"
-rattler_virtual_packages = "2.3.19"
+rattler_conda_types = "0.47.2"
+rattler_config = "0.5.2"
+rattler_networking = { version = "0.30.0" }
+rattler_solve = "7.1.4"
+rattler_virtual_packages = "3.0.2"
 clap = "4.6.0"
 url = "2.5.8"
-chrono = "0.4.44"
-rattler_upload = "0.7.0"
-rattler_package_streaming = { version = "0.26.0", default-features = false }
+jiff = "0.2.27"
+hex = "0.4.3"
+rattler_upload = "0.8.2"
+rattler_package_streaming = { version = "0.26.6", default-features = false }
 miette = "7.6.0"
 tempfile = "3.27.0"
 serde_yaml = "0.9"
 serde_json = "1.0.149"
-pythonize = "0.28.0"
+pythonize = "0.29.0"
 thiserror = "2.0.18"
 fs-err = "3.3.0"
 tracing = "0.1"
@@ -57,7 +58,7 @@ tracing-subscriber = "0.3"
 indicatif = "0.18"
 
 [build-dependencies]
-pyo3-build-config = "0.28.2"
+pyo3-build-config = "0.29.0"
 
 # Prevent package from thinking it's in the workspace
 [workspace]

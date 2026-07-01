@@ -18,7 +18,7 @@ use miette::Diagnostic;
 use petgraph::graph::{DiGraph, NodeIndex};
 use rattler_build_variant_config::VariantExpandError;
 use rattler_build_yaml_parser::ParseError;
-use rattler_conda_types::NoArchType;
+use rattler_conda_types::{NoArchType, RepodataRevision};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -93,8 +93,8 @@ pub struct RenderConfig {
     pub extra_context: IndexMap<String, Variable>,
     /// Whether experimental features are enabled
     pub experimental: bool,
-    /// Whether V3 recipe fields and MatchSpec syntax are enabled
-    pub v3: bool,
+    /// Repodata revision controlling which recipe fields and MatchSpec syntax are accepted.
+    pub repodata_revision: RepodataRevision,
     /// Path to the recipe file (for relative path resolution in Jinja functions)
     pub recipe_path: Option<PathBuf>,
     /// Target platform for the build
@@ -121,7 +121,7 @@ impl Default for RenderConfig {
         Self {
             extra_context: IndexMap::new(),
             experimental: false,
-            v3: false,
+            repodata_revision: RepodataRevision::Legacy,
             recipe_path: None,
             target_platform: rattler_conda_types::Platform::current(),
             build_platform: rattler_conda_types::Platform::current(),
@@ -151,9 +151,9 @@ impl RenderConfig {
         self
     }
 
-    /// Enable V3 recipe fields and MatchSpec syntax
-    pub fn with_v3(mut self, v3: bool) -> Self {
-        self.v3 = v3;
+    /// Set the repodata revision controlling which recipe fields and MatchSpec syntax are accepted.
+    pub fn with_repodata_revision(mut self, repodata_revision: RepodataRevision) -> Self {
+        self.repodata_revision = repodata_revision;
         self
     }
 
@@ -913,12 +913,14 @@ fn build_evaluation_context(
     // NOTE: Do NOT call with_context() here - that will be done by Stage0Recipe::evaluate()
     // Calling it here would cause double-evaluation of context templates, leading to bugs
     // where e.g., `mpi: ${{ mpi ~ "foobar" }}` would evaluate to "blafoobarfoobar" instead of "blafoobar"
-    Ok(EvaluationContext::with_variables_config_os_env_keys_and_v3(
-        context_map,
-        jinja_config,
-        config.os_env_var_keys.clone(),
-        config.v3,
-    ))
+    Ok(
+        EvaluationContext::with_variables_config_os_env_keys_and_repodata_revision(
+            context_map,
+            jinja_config,
+            config.os_env_var_keys.clone(),
+            config.repodata_revision,
+        ),
+    )
 }
 
 /// Helper function to evaluate a recipe (handles both single and multi-output)
@@ -943,7 +945,7 @@ fn render_with_empty_combinations(
     let jinja_config = create_jinja_config(config, &empty_variant);
     let context =
         EvaluationContext::with_variables_and_config(config.extra_context.clone(), jinja_config)
-            .with_v3(config.v3);
+            .with_repodata_revision(config.repodata_revision);
 
     // Evaluate the recipe
     let outputs = evaluate_recipe(stage0_recipe, &context)?;
@@ -1220,7 +1222,9 @@ pub fn render_recipe_with_variants(
 
     let stage0_recipe = stage0::parse_recipe_or_multi_from_source_with_config(
         &yaml_content,
-        stage0::ParseConfig { v3: config.v3 },
+        stage0::ParseConfig {
+            repodata_revision: config.repodata_revision,
+        },
     )?;
 
     // Load variant configuration
@@ -1531,7 +1535,9 @@ requirements:
 
         let stage0_recipe = stage0::parse_recipe_or_multi_from_source_with_config(
             recipe_yaml,
-            stage0::ParseConfig { v3: true },
+            stage0::ParseConfig {
+                repodata_revision: RepodataRevision::V3,
+            },
         )
         .unwrap();
         let variant_config = VariantConfig::default();
@@ -1544,7 +1550,7 @@ requirements:
         let rendered = render_recipe_with_variant_config(
             &stage0_recipe,
             &variant_config,
-            RenderConfig::new().with_v3(true),
+            RenderConfig::new().with_repodata_revision(RepodataRevision::V3),
         )
         .unwrap();
         assert_eq!(rendered.len(), 1);
@@ -1582,7 +1588,7 @@ requirements:
         let rendered = render_recipe_with_variant_config(
             &stage0_recipe,
             &variant_config,
-            RenderConfig::new().with_v3(true),
+            RenderConfig::new().with_repodata_revision(RepodataRevision::V3),
         )
         .unwrap();
         assert_eq!(rendered.len(), 1);

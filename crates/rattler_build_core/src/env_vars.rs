@@ -233,32 +233,33 @@ pub fn os_vars(
         }
     }
 
-    let shlib_ext = if target_platform.is_windows() {
-        ".dll"
-    } else if target_platform.is_osx() {
-        ".dylib"
-    } else if target_platform.is_linux() {
-        ".so"
-    } else {
-        ".not_implemented"
-    };
-
-    insert!(vars, "SHLIB_EXT", shlib_ext);
+    insert!(
+        vars,
+        "SHLIB_EXT",
+        rattler_build_types::shlib_ext(target_platform)
+    );
     vars.insert(path_var.to_string(), env::var(path_var).ok());
 
     if target_platform.is_windows() {
-        vars.extend(windows::env::default_env_vars(prefix, target_platform));
+        vars.extend(windows::env::default_env_vars_target(prefix));
     } else if target_platform.is_osx() {
-        vars.extend(macos::env::default_env_vars(prefix, target_platform));
+        vars.extend(macos::env::default_env_vars_target(prefix, target_platform));
     } else if target_platform.is_linux() {
-        vars.extend(linux::env::default_env_vars(
+        vars.extend(linux::env::default_env_vars_target(
             prefix,
             target_platform,
             env_isolation,
         ));
     }
-
     let build_platform = Platform::current();
+    if build_platform.is_windows() {
+        vars.extend(windows::env::default_env_vars_build(&build_platform));
+    } else if build_platform.is_osx() {
+        vars.extend(macos::env::default_env_vars_build(&build_platform));
+    } else if build_platform.is_linux() {
+        vars.extend(linux::env::default_env_vars_build(&build_platform));
+    }
+
     if build_platform.is_windows() {
         match env_isolation {
             EnvironmentIsolation::Strict => {
@@ -419,7 +420,7 @@ pub fn vars(output: &Output, build_state: &str) -> HashMap<String, Option<String
 
     // for reproducibility purposes, set the SOURCE_DATE_EPOCH to the configured timestamp
     // this value will be taken from the previous package for rebuild purposes
-    let timestamp_epoch_secs = output.build_configuration.timestamp.timestamp();
+    let timestamp_epoch_secs = output.build_configuration.timestamp.as_second();
     insert!(vars, "SOURCE_DATE_EPOCH", timestamp_epoch_secs);
 
     vars

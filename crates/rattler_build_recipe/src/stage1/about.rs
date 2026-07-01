@@ -1,5 +1,6 @@
 //! Stage 1 About - evaluated package metadata with concrete values
 
+use rattler_build_types::LateBoundPath;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
@@ -28,6 +29,12 @@ pub struct About {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub license_file: Option<GlobVec>,
 
+    /// License file paths that reference late-bound build directory variables
+    /// (e.g. `${{ PREFIX }}/share/licenses/LICENSE`). These are resolved during
+    /// packaging once the build directories are known.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub license_file_late_bound: Vec<LateBoundPath>,
+
     /// License family (e.g., MIT, BSD, etc.)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub license_family: Option<String>,
@@ -54,6 +61,7 @@ impl About {
             && self.documentation.is_none()
             && self.license.is_none()
             && self.license_file.is_none()
+            && self.license_file_late_bound.is_empty()
             && self.license_family.is_none()
             && self.summary.is_none()
             && self.description.is_none()

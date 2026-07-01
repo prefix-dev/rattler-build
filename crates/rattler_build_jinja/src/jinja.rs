@@ -180,6 +180,14 @@ impl Jinja {
             Value::from(config.host_platform.is_unix()),
         );
 
+        // Shared library extension for the target platform (e.g. `.so`, `.dylib`,
+        // `.dll`). Mirrors the `SHLIB_EXT` build-script environment variable so it
+        // can be used in templated fields such as `build.files`.
+        context.insert(
+            "SHLIB_EXT".to_string(),
+            Value::from(rattler_build_types::shlib_ext(&config.target_platform)),
+        );
+
         // Derive the host platform's family name (e.g., "linux" from "linux-64",
         // "emscripten" from "emscripten-wasm32")
         let host_family = config.host_platform.only_platform();
@@ -417,14 +425,20 @@ fn default_compiler(platform: Platform, language: &str) -> Option<Variable> {
     Some(
         match language {
             // Platform agnostic compilers
-            "fortran" => "gfortran",
+            "fortran" => {
+                if platform.is_windows() {
+                    "flang"
+                } else {
+                    "gfortran"
+                }
+            }
             lang if !["c", "cxx"].contains(&lang) => lang,
             // Platform specific compilers
             _ => {
                 if platform.is_windows() {
                     match language {
-                        "c" => "vs2017",
-                        "cxx" => "vs2017",
+                        "c" => "vs2022",
+                        "cxx" => "vs2022",
                         _ => unreachable!(),
                     }
                 } else if platform.is_osx() {
@@ -1501,6 +1515,34 @@ mod tests {
     }
 
     #[test]
+    fn eval_shlib_ext() {
+        // `SHLIB_EXT` should be available in the Jinja context and resolve to the
+        // target platform's shared library extension (see issue #2532).
+        let cases = [
+            (Platform::Linux64, ".so"),
+            (Platform::LinuxAarch64, ".so"),
+            (Platform::OsxArm64, ".dylib"),
+            (Platform::Osx64, ".dylib"),
+            (Platform::Win64, ".dll"),
+        ];
+        for (target_platform, expected) in cases {
+            let jinja = Jinja::new(JinjaConfig {
+                target_platform,
+                host_platform: target_platform,
+                build_platform: target_platform,
+                ..Default::default()
+            });
+            assert_eq!(
+                jinja
+                    .render_str("foo${{ SHLIB_EXT }}")
+                    .expect("SHLIB_EXT should be defined"),
+                format!("foo{expected}"),
+                "unexpected SHLIB_EXT for {target_platform}"
+            );
+        }
+    }
+
+    #[test]
     #[should_panic]
     fn eval2() {
         let options = JinjaConfig {
@@ -2135,16 +2177,20 @@ mod tests {
 
         let platform = Platform::Win64;
         assert_eq!(
-            "vs2017",
+            "vs2022",
             default_compiler(platform, "cxx").unwrap().to_string()
         );
         assert_eq!(
-            "vs2017",
+            "vs2022",
             default_compiler(platform, "c").unwrap().to_string()
         );
         assert_eq!(
             "cuda",
             default_compiler(platform, "cuda").unwrap().to_string()
+        );
+        assert_eq!(
+            "flang",
+            default_compiler(platform, "fortran").unwrap().to_string()
         );
     }
 }

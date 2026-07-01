@@ -1,99 +1,63 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use rattler_conda_types::Platform;
-use rattler_shell::shell;
 
-use crate::execution::{ExecutionArgs, run_process_with_replacements};
+use super::{InterpreterInvocation, InterpreterSearchScope};
+use crate::runtime::RuntimeEnv;
 
-use super::{CMDEXE_PREAMBLE, Interpreter, InterpreterError, find_interpreter};
+pub struct CmdExeInvocation;
 
-fn print_debug_info(args: &ExecutionArgs) -> String {
-    let mut output = String::new();
-
-    output.push_str("\nScript execution failed.\n\n");
-
-    output.push_str(&format!("  Work directory: {}\n", args.work_dir.display()));
-    output.push_str(&format!("  Prefix: {}\n", args.run_prefix.display()));
-
-    if let Some(build_prefix) = &args.build_prefix {
-        output.push_str(&format!("  Build prefix: {}\n", build_prefix.display()));
-    } else {
-        output.push_str("  Build prefix: None\n");
+impl InterpreterInvocation for CmdExeInvocation {
+    fn executable_names(&self, _build_platform: &Platform) -> &'static [&'static str] {
+        &["cmd"]
     }
 
-    output.push_str("\nTo run the script manually, use the following command:\n");
-    output.push_str(&format!(
-        "  cd {:?} && ./conda_build.bat\n\n",
-        args.work_dir
-    ));
-    output.push_str("To run commands interactively in the build environment:\n");
-    output.push_str(&format!("  cd {:?} && call build_env.bat", args.work_dir));
-
-    output
-}
-
-pub struct CmdExeInterpreter;
-
-impl Interpreter for CmdExeInterpreter {
-    async fn run(&self, args: ExecutionArgs) -> Result<(), InterpreterError> {
-        let script = self.get_script(&args, shell::CmdExe).unwrap();
-
-        let build_env_path = args.work_dir.join("build_env.bat");
-        let build_script_path = args.work_dir.join("conda_build.bat");
-
-        tokio::fs::write(&build_env_path, script).await?;
-
-        let build_script = format!(
-            "{}\n{}",
-            CMDEXE_PREAMBLE.replace("((script_path))", &build_env_path.to_string_lossy()),
-            args.script.script()
-        );
-        tokio::fs::write(
-            &build_script_path,
-            &build_script.replace('\n', "\r\n").as_bytes(),
-        )
-        .await?;
-
-        let build_script_path_str = build_script_path.to_string_lossy().to_string();
-        let cmd_args = ["cmd.exe", "/d", "/c", &build_script_path_str];
-
-        let output = run_process_with_replacements(
-            &cmd_args,
-            &args.work_dir,
-            &args.replacements("%((var))%"),
-            &args.env_vars,
-            &args.secrets,
-            args.env_isolation,
-            None,
-        )
-        .await?;
-
-        if !output.status.success() {
-            let status_code = output.status.code().unwrap_or(1);
-            let debug_info = print_debug_info(&args);
-            tracing::error!("Script failed with status {}", status_code);
-            tracing::error!("{}", debug_info);
-            return Err(InterpreterError::ExecutionFailed(std::io::Error::other(
-                format!("Script failed with status {}{}", status_code, debug_info),
-            )));
+    fn search_scope(&self, build_platform: &Platform) -> InterpreterSearchScope {
+        if build_platform.is_windows() {
+            InterpreterSearchScope::build_and_host_with_system_fallback()
+        } else {
+            InterpreterSearchScope::build_only()
         }
-
-        Ok(())
     }
 
-    async fn find_interpreter(
+    fn extension(&self) -> &'static str {
+        "bat"
+    }
+
+    fn join_commands(&self, commands: &[String]) -> String {
+        // `cmd` has no `set -e`, so propagate a non-zero exit between commands.
+        commands
+            .iter()
+            .map(|c| format!("{c}\nif %errorlevel% neq 0 exit /b %errorlevel%"))
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    fn resolve_executable(
         &self,
-        build_prefix: Option<&PathBuf>,
-        platform: &Platform,
-    ) -> Result<Option<PathBuf>, which::Error> {
-        // check if COMSPEC is set to cmd.exe
-        if let Ok(comspec) = std::env::var("COMSPEC")
+        build_prefix: Option<&Path>,
+        run_prefix: &Path,
+        runtime: &RuntimeEnv,
+    ) -> Result<PathBuf, super::InterpreterError> {
+        let platform = runtime.platform();
+        let scope = self.search_scope(&platform);
+        if platform.is_windows()
+            && scope.allows_system_fallback()
+            && let Some(comspec) = runtime.var("COMSPEC")
             && comspec.to_lowercase().contains("cmd.exe")
         {
-            return Ok(Some(PathBuf::from(comspec)));
+            return Ok(PathBuf::from(comspec));
         }
 
-        // check if cmd.exe is in PATH
-        find_interpreter("cmd", build_prefix, platform)
+        super::find_interpreter("cmd", build_prefix, run_prefix, runtime, scope)
+            .ok_or_else(|| super::InterpreterError::InterpreterNotFound("cmd".to_string()))
+    }
+
+    fn args(&self, script_path: &Path) -> Vec<String> {
+        vec![
+            "/d".to_string(),
+            "/c".to_string(),
+            script_path.to_string_lossy().into_owned(),
+        ]
     }
 }

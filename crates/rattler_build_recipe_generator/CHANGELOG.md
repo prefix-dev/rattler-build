@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.7](https://github.com/prefix-dev/rattler-build/compare/rattler_build_recipe_generator-v0.1.6...rattler_build_recipe_generator-v0.1.7) - 2026-06-18
+
+### Other
+
+- bump rattler crates to latest versions ([#2528](https://github.com/prefix-dev/rattler-build/pull/2528))
+
+## [0.1.6](https://github.com/prefix-dev/rattler-build/compare/rattler_build_recipe_generator-v0.1.5...rattler_build_recipe_generator-v0.1.6) - 2026-05-20
+
+### Other
+
+- bump rattler crates and migrate to reqwest 0.13 ([#2493](https://github.com/prefix-dev/rattler-build/pull/2493))
+
 ## [0.1.5](https://github.com/prefix-dev/rattler-build/compare/rattler_build_recipe_generator-v0.1.4...rattler_build_recipe_generator-v0.1.5) - 2026-04-13
 
 ### Other

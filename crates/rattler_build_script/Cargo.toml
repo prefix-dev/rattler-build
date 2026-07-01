@@ -1,6 +1,6 @@
 [package]
 name = "rattler_build_script"
-version = "0.2.3"
+version = "0.2.5"
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -22,6 +22,7 @@ execution = [
   "fs-err",
   "which",
   "minijinja",
+  "strsim",
 ]
 
 [dependencies]
@@ -49,6 +50,7 @@ rattler_shell = { workspace = true, optional = true }
 fs-err = { workspace = true, optional = true }
 which = { workspace = true, optional = true }
 minijinja = { workspace = true, optional = true }
+strsim = { workspace = true, optional = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["rt", "macros", "fs"] }

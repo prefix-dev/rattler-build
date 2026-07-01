@@ -9,24 +9,19 @@ use std::{fmt::Display, str::FromStr};
 pub struct SerializableMatchSpec(pub MatchSpec);
 
 impl SerializableMatchSpec {
-    pub(crate) fn parse_with_v3(
+    pub(crate) fn parse_with_repodata_revision(
         s: &str,
         strictness: ParseStrictness,
-        v3: bool,
+        revision: RepodataRevision,
     ) -> Result<Self, ParseMatchSpecError> {
-        MatchSpec::from_str(s, matchspec_parse_options(strictness, v3)).map(Self)
+        MatchSpec::from_str(s, matchspec_parse_options(strictness, revision)).map(Self)
     }
 }
 
 pub(crate) fn matchspec_parse_options(
     strictness: ParseStrictness,
-    v3: bool,
+    revision: RepodataRevision,
 ) -> ParseMatchSpecOptions {
-    let revision = if v3 {
-        RepodataRevision::V3
-    } else {
-        RepodataRevision::Legacy
-    };
     ParseMatchSpecOptions::new(strictness).with_repodata_revision(revision)
 }
 
@@ -45,9 +40,12 @@ impl<'de> Deserialize<'de> for SerializableMatchSpec {
         D: Deserializer<'de>,
     {
         let s = String::deserialize(deserializer)?;
-        MatchSpec::from_str(&s, matchspec_parse_options(ParseStrictness::Strict, false))
-            .map(SerializableMatchSpec)
-            .map_err(serde::de::Error::custom)
+        MatchSpec::from_str(
+            &s,
+            matchspec_parse_options(ParseStrictness::Strict, RepodataRevision::Legacy),
+        )
+        .map(SerializableMatchSpec)
+        .map_err(serde::de::Error::custom)
     }
 }
 
@@ -60,8 +58,11 @@ impl From<MatchSpec> for SerializableMatchSpec {
 impl From<&str> for SerializableMatchSpec {
     fn from(s: &str) -> Self {
         SerializableMatchSpec(
-            MatchSpec::from_str(s, matchspec_parse_options(ParseStrictness::Strict, false))
-                .expect("Invalid MatchSpec"),
+            MatchSpec::from_str(
+                s,
+                matchspec_parse_options(ParseStrictness::Strict, RepodataRevision::Legacy),
+            )
+            .expect("Invalid MatchSpec"),
         )
     }
 }
@@ -69,8 +70,11 @@ impl From<&str> for SerializableMatchSpec {
 impl From<String> for SerializableMatchSpec {
     fn from(s: String) -> Self {
         SerializableMatchSpec(
-            MatchSpec::from_str(&s, matchspec_parse_options(ParseStrictness::Strict, false))
-                .expect("Invalid MatchSpec"),
+            MatchSpec::from_str(
+                &s,
+                matchspec_parse_options(ParseStrictness::Strict, RepodataRevision::Legacy),
+            )
+            .expect("Invalid MatchSpec"),
         )
     }
 }
@@ -85,7 +89,10 @@ impl FromStr for SerializableMatchSpec {
     type Err = ParseMatchSpecError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        MatchSpec::from_str(s, matchspec_parse_options(ParseStrictness::Strict, false))
-            .map(SerializableMatchSpec)
+        MatchSpec::from_str(
+            s,
+            matchspec_parse_options(ParseStrictness::Strict, RepodataRevision::Legacy),
+        )
+        .map(SerializableMatchSpec)
     }
 }

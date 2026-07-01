@@ -188,6 +188,35 @@ pub async fn run_build(
         Err(InterpreterError::ExecutionFailed(_)) => {
             return Err(miette::miette!("Script failed to execute"));
         }
+        Err(InterpreterError::InterpreterNotFound(interpreter)) => {
+            return Err(miette::miette!(
+                help = format!(
+                    "Add `{interpreter}` to the `requirements/build` section of your recipe so it is provided by the build environment."
+                ),
+                "interpreter `{interpreter}` was not found in the build environment"
+            ));
+        }
+        Err(InterpreterError::InvalidInterpreter {
+            interpreter,
+            reason,
+        }) => {
+            return Err(miette::miette!(
+                "interpreter `{interpreter}` was found but is not valid: {reason}"
+            ));
+        }
+        Err(InterpreterError::UnsupportedInterpreter(interpreter)) => {
+            return Err(
+                match rattler_build_script::closest_interpreter(&interpreter) {
+                    Some(suggestion) => miette::miette!(
+                        help = format!("Did you mean `{suggestion}`?"),
+                        "unsupported interpreter `{interpreter}` in `build.script.interpreter`"
+                    ),
+                    None => miette::miette!(
+                        "unsupported interpreter `{interpreter}` in `build.script.interpreter`"
+                    ),
+                },
+            );
+        }
     }
 
     // Package all the new files

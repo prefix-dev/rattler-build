@@ -5,7 +5,7 @@
 
 use std::path::PathBuf;
 
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use pyo3::prelude::*;
 use rattler_build_package::{ArchiveType, FileCollector, FileEntry, PackageBuilder, PackageConfig};
 use rattler_conda_types::package::IndexJson;
@@ -262,7 +262,7 @@ pub fn assemble_package_py(
     // Build options
     compression_level: u8,
     archive_type: Option<PyArchiveType>,
-    timestamp: Option<DateTime<Utc>>,
+    timestamp: Option<Timestamp>,
     compression_threads: Option<usize>,
     detect_prefix: bool,
 ) -> PyResult<PyPackageOutput> {
@@ -369,7 +369,7 @@ pub fn assemble_package_py(
         features: None,
         python_site_packages_path: None,
         purls: None,
-        experimental_extra_depends: Default::default(),
+        extra_depends: Default::default(),
         repodata_revision: None,
     };
     builder = builder.with_index(index);

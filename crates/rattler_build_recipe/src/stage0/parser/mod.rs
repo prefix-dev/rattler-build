@@ -26,10 +26,9 @@ mod unit_tests;
 use marked_yaml::{Node as MarkedNode, types::MarkedScalarNode};
 use rattler_build_jinja::Variable;
 use rattler_build_yaml_parser::{
-    ParseError, ParseResult, helpers::contains_jinja_template, parse_yaml,
+    ParseError, ParseResult, helpers::contains_jinja_template, parse_yaml, yaml::load_error_span,
 };
-
-use crate::Span;
+use rattler_conda_types::RepodataRevision;
 
 // Re-export parsing functions
 pub use about::parse_about;
@@ -46,8 +45,8 @@ pub(crate) use helpers::get_span;
 /// Configuration used while parsing recipe source.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct ParseConfig {
-    /// Enable V3-only recipe fields and MatchSpec syntax.
-    pub v3: bool,
+    /// Repodata revision controlling which recipe fields and MatchSpec syntax are accepted.
+    pub repodata_revision: RepodataRevision,
 }
 
 /// Parse a recipe (single or multi-output) from YAML source string
@@ -64,7 +63,7 @@ pub fn parse_recipe_or_multi_from_source_with_config(
     config: ParseConfig,
 ) -> ParseResult<crate::stage0::Recipe> {
     let yaml = parse_yaml(source).map_err(|e| {
-        ParseError::generic(format!("Failed to parse YAML: {}", e), Span::new_blank())
+        ParseError::generic(format!("Failed to parse YAML: {}", e), load_error_span(&e))
     })?;
 
     parse_recipe_or_multi_with_config(&yaml, config)
@@ -85,7 +84,7 @@ pub fn parse_recipe_from_source_with_config(
     config: ParseConfig,
 ) -> ParseResult<crate::stage0::Stage0Recipe> {
     let yaml = parse_yaml(source).map_err(|e| {
-        ParseError::generic(format!("Failed to parse YAML: {}", e), Span::new_blank())
+        ParseError::generic(format!("Failed to parse YAML: {}", e), load_error_span(&e))
     })?;
 
     parse_recipe_with_config(&yaml, config)

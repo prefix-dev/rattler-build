@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.8](https://github.com/prefix-dev/rattler-build/compare/rattler_build_source_cache-v0.1.7...rattler_build_source_cache-v0.1.8) - 2026-06-26
+
+### Other
+
+- updated the following local packages: rattler_build_networking
+
+## [0.1.7](https://github.com/prefix-dev/rattler-build/compare/rattler_build_source_cache-v0.1.6...rattler_build_source_cache-v0.1.7) - 2026-06-18
+
+### Other
+
+- update rattler to latest releases ([#2559](https://github.com/prefix-dev/rattler-build/pull/2559))
+- bump rattler crates to latest versions ([#2528](https://github.com/prefix-dev/rattler-build/pull/2528))
+
+## [0.1.6](https://github.com/prefix-dev/rattler-build/compare/rattler_build_source_cache-v0.1.5...rattler_build_source_cache-v0.1.6) - 2026-05-20
+
+### Fixed
+
+- validate source attestations ([#2338](https://github.com/prefix-dev/rattler-build/pull/2338))
+
+### Other
+
+- bump rattler crates and migrate to reqwest 0.13 ([#2493](https://github.com/prefix-dev/rattler-build/pull/2493))
+- lazily initialize the `BaseClient` ([#2456](https://github.com/prefix-dev/rattler-build/pull/2456))
+
 ## [0.1.5](https://github.com/prefix-dev/rattler-build/compare/rattler_build_source_cache-v0.1.4...rattler_build_source_cache-v0.1.5) - 2026-04-13
 
 ### Fixed

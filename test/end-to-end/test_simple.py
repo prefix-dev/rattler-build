@@ -1288,6 +1288,18 @@ def test_source_filter(rattler_build: RattlerBuild, recipes: Path, tmp_path: Pat
     rattler_build(*args)
 
 
+def test_source_filter_archive(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    # The filter is applied to the extracted contents of an archive source.
+    path_to_recipe = recipes / "source_filter_archive"
+    args = rattler_build.build_args(
+        path_to_recipe,
+        tmp_path,
+    )
+    rattler_build(*args)
+
+
 def test_nushell_script_detection(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
@@ -1300,6 +1312,21 @@ def test_nushell_script_detection(
     assert (pkg / "info/paths.json").exists()
     content = (pkg / "hello.txt").read_text()
     assert "Hello, world!" == content
+
+
+def test_brush(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    # Builds a recipe with `interpreter: brush`. `brush` is pulled from the
+    # build environment (requirements/build), the bash wrapper activates the
+    # environment, and brush then runs the bash-syntax script.
+    rattler_build.build(
+        recipes / "brush-test/recipe.yaml",
+        tmp_path,
+    )
+    pkg = get_extracted_package(tmp_path, "brush-test")
+
+    assert (pkg / "info/paths.json").exists()
+    content = (pkg / "hello.txt").read_text()
+    assert "Hello from brush!" == content.strip()
 
 
 def test_channel_specific(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
@@ -1382,12 +1409,10 @@ def test_noarch_flask(
 
     assert (pkg / "info/tests/tests.yaml").exists()
 
-    # check that the snapshot matches (different on windows vs. unix)
+    # The serialized test script stores the command list verbatim (the same on
+    # all platforms); per-command error handling is applied when the test runs.
     test_yaml = (pkg / "info/tests/tests.yaml").read_text()
-    if os.name == "nt":
-        assert "if %errorlevel% neq 0 exit /b %errorlevel%" in test_yaml
-    else:
-        assert test_yaml == snapshot
+    assert test_yaml == snapshot
 
     # make sure that the entry point does not exist
     assert not (pkg / "python-scripts/flask").exists()
@@ -1903,7 +1928,9 @@ def test_relink_rpath(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
     rattler_build.build(recipes / "test-relink", tmp_path)
 
 
-def test_ignore_run_exports(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+def test_ignore_run_exports(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, clean_path_on_win32
+):
     rattler_build.build(
         recipes / "test-parsing/recipe_ignore_run_exports.yaml",
         tmp_path,
@@ -1921,7 +1948,7 @@ def test_ignore_run_exports(rattler_build: RattlerBuild, recipes: Path, tmp_path
     elif current_subdir.startswith("osx"):
         expected_compiler = f"clangxx_{current_subdir}"
     elif current_subdir.startswith("win"):
-        expected_compiler = f"vs2017_{current_subdir}"
+        expected_compiler = f"vs2022_{current_subdir}"
     else:
         pytest.fail(f"Unsupported platform for compiler check: {current_subdir}")
 
@@ -3176,6 +3203,53 @@ def test_absolute_path_license_with_flag(
     assert (pkg / "info/licenses/external_license.txt").exists()
 
 
+def test_late_bound_license_path(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    # A license file installed into ${{ PREFIX }} during the build is collected
+    # without requiring --allow-absolute-license-paths.
+    rattler_build.build(recipes / "late_bound_license", tmp_path)
+    pkg = get_extracted_package(tmp_path, "late-bound-license")
+    license_file = pkg / "info/licenses/LICENSE"
+    assert license_file.exists()
+    assert "late bound license content" in license_file.read_text()
+
+
+def test_late_bound_license_glob(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    # A glob rooted at a late-bound ${{ PREFIX }} path collects every matching
+    # license file, preserving the directory structure under info/licenses.
+    rattler_build.build(recipes / "late_bound_license_glob", tmp_path)
+    pkg = get_extracted_package(tmp_path, "late-bound-license-glob")
+    foo_license = pkg / "info/licenses/foo/LICENSE"
+    bar_license = pkg / "info/licenses/bar/LICENSE"
+    assert foo_license.exists()
+    assert bar_license.exists()
+    assert "foo license content" in foo_license.read_text()
+    assert "bar license content" in bar_license.read_text()
+
+
+def test_late_bound_license_traversal_rejected(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    # A late-bound license path that escapes the build directories via `..` must
+    # be rejected, otherwise it would be an absolute-path backdoor around
+    # --allow-absolute-license-paths.
+    with pytest.raises(CalledProcessError):
+        rattler_build.build(recipes / "late_bound_license_traversal", tmp_path)
+
+
+def test_patch_from_other_source(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    # A patch that ships inside another source can be applied by referencing it
+    # through the late-bound ${{ SRC_DIR }} variable. The build script fails if
+    # the patch was not applied.
+    rattler_build.build(recipes / "patch_from_other_source", tmp_path)
+    get_extracted_package(tmp_path, "patch-from-other-source")
+
+
 def test_sourceforge_redirects(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
@@ -3196,6 +3270,13 @@ def test_target_platform_in_variant_config_warning(
         tmp_path,
         variant_config=variant_config,
         raw=True,
+        # Use JSON log style so the warning is emitted on stderr as plain ASCII
+        # on a single line. The default "fancy" style wraps lines to the
+        # terminal width and uses box-drawing characters, which breaks the
+        # substring check (and capture) on the Windows CI console.
+        extra_args=["--log-style=json"],
+        encoding="utf-8",
+        errors="replace",
     )
     combined = (result.stdout or "") + "\n" + (result.stderr or "")
     assert (
@@ -3205,7 +3286,9 @@ def test_target_platform_in_variant_config_warning(
     assert "Please use the '--target-platform' command-line flag" in combined
 
 
-def test_c_compilation(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+def test_c_compilation(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, clean_path_on_win32
+):
     rattler_build.build(recipes / "c_compilation", tmp_path)
     pkg = get_extracted_package(tmp_path, "c_compilation")
     if platform.system() == "Windows":

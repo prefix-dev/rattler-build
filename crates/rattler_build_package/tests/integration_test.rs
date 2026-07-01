@@ -46,7 +46,7 @@ fn test_complete_package_creation() -> Result<(), Box<dyn std::error::Error>> {
     let config = PackageConfig {
         compression_level: 1, // Use low compression for faster tests
         archive_type: ArchiveType::TarBz2,
-        timestamp: Some(chrono::Utc::now()),
+        timestamp: Some(jiff::Timestamp::now()),
         compression_threads: 1,
         detect_prefix: true,
         store_recipe: false,

@@ -13,6 +13,7 @@ use rattler_conda_types::Platform;
 use rattler_build_script::EnvironmentIsolation;
 
 use crate::error::RattlerBuildError;
+use crate::repodata_revision::PyRepodataRevision;
 use crate::stage0::PyStage0Recipe;
 use crate::stage1::PyStage1Recipe;
 use crate::variant_config::PyVariantConfig;
@@ -29,13 +30,13 @@ impl PyRenderConfig {
     /// Create a new render configuration with default settings
     #[allow(clippy::too_many_arguments)]
     #[new]
-    #[pyo3(signature = (target_platform=None, build_platform=None, host_platform=None, experimental=false, v3=false, recipe_path=None, extra_context=None, build_string_prefix=None, build_number_override=None))]
+    #[pyo3(signature = (target_platform=None, build_platform=None, host_platform=None, experimental=false, repodata_revision=None, recipe_path=None, extra_context=None, build_string_prefix=None, build_number_override=None))]
     fn new(
         target_platform: Option<String>,
         build_platform: Option<String>,
         host_platform: Option<String>,
         experimental: bool,
-        v3: bool,
+        repodata_revision: Option<PyRepodataRevision>,
         recipe_path: Option<PathBuf>,
         extra_context: Option<Bound<'_, PyDict>>,
         build_string_prefix: Option<String>,
@@ -88,7 +89,7 @@ impl PyRenderConfig {
             inner: RustRenderConfig {
                 extra_context,
                 experimental,
-                v3,
+                repodata_revision: repodata_revision.unwrap_or_default().into(),
                 recipe_path,
                 target_platform,
                 build_platform,
@@ -138,9 +139,10 @@ impl PyRenderConfig {
         self.inner.experimental
     }
 
-    /// Get whether V3 recipe fields and MatchSpec syntax are enabled
-    fn v3(&self) -> bool {
-        self.inner.v3
+    /// Get the repodata revision controlling which recipe fields and
+    /// MatchSpec syntax are accepted.
+    fn repodata_revision(&self) -> PyRepodataRevision {
+        self.inner.repodata_revision.into()
     }
 
     /// Get the recipe path
@@ -150,12 +152,12 @@ impl PyRenderConfig {
 
     fn __repr__(&self) -> String {
         format!(
-            "RenderConfig(target_platform='{}', build_platform='{}', host_platform='{}', experimental={}, v3={})",
+            "RenderConfig(target_platform='{}', build_platform='{}', host_platform='{}', experimental={}, repodata_revision={:?})",
             self.inner.target_platform,
             self.inner.build_platform,
             self.inner.host_platform,
             self.inner.experimental,
-            self.inner.v3
+            PyRepodataRevision::from(self.inner.repodata_revision),
         )
     }
 }

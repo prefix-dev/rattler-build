@@ -4,7 +4,7 @@ use marked_yaml::Node as MarkedNode;
 use rattler_build_yaml_parser::{
     NodeConverter, ParseMapping, parse_conditional_list_with_converter,
 };
-use rattler_conda_types::{MatchSpec, PackageName, ParseStrictness};
+use rattler_conda_types::{MatchSpec, PackageName, ParseStrictness, RepodataRevision};
 
 use crate::{
     error::{ParseError, ParseResult},
@@ -17,7 +17,7 @@ use crate::{
 };
 
 struct MatchSpecConverter {
-    v3: bool,
+    repodata_revision: RepodataRevision,
 }
 
 impl NodeConverter<SerializableMatchSpec> for MatchSpecConverter {
@@ -30,18 +30,24 @@ impl NodeConverter<SerializableMatchSpec> for MatchSpecConverter {
             .as_scalar()
             .ok_or_else(|| ParseError::expected_type("scalar", "non-scalar", get_span(node)))?;
 
-        SerializableMatchSpec::parse_with_v3(scalar.as_str(), ParseStrictness::Strict, self.v3)
-            .map_err(|e| {
-                let reason = e.to_string();
-                let err = ParseError::invalid_value(field_name, &reason, *scalar.span());
-                if !self.v3 && reason.contains("invalid bracket key") {
-                    err.with_suggestion(
-                        "Enable --v3 to use V3 MatchSpec keys such as extras, flags, or when.",
-                    )
-                } else {
-                    err
-                }
-            })
+        SerializableMatchSpec::parse_with_repodata_revision(
+            scalar.as_str(),
+            ParseStrictness::Strict,
+            self.repodata_revision,
+        )
+        .map_err(|e| {
+            let reason = e.to_string();
+            let err = ParseError::invalid_value(field_name, &reason, *scalar.span());
+            if self.repodata_revision != RepodataRevision::V3
+                && reason.contains("invalid bracket key")
+            {
+                err.with_suggestion(
+                    "Enable --v3 to use V3 MatchSpec keys such as extras, flags, or when.",
+                )
+            } else {
+                err
+            }
+        })
     }
 }
 
@@ -86,7 +92,9 @@ pub(crate) fn parse_requirements_with_config(
     )?;
 
     let mut requirements = Requirements::default();
-    let matchspec_converter = MatchSpecConverter { v3: config.v3 };
+    let matchspec_converter = MatchSpecConverter {
+        repodata_revision: config.repodata_revision,
+    };
 
     if let Some(build) = yaml.try_get_conditional_list_with("build", &matchspec_converter)? {
         requirements.build = build;
@@ -339,7 +347,13 @@ mod tests {
 
         assert!(parse_requirements(&yaml).is_err());
 
-        let reqs = parse_requirements_with_config(&yaml, ParseConfig { v3: true }).unwrap();
+        let reqs = parse_requirements_with_config(
+            &yaml,
+            ParseConfig {
+                repodata_revision: RepodataRevision::V3,
+            },
+        )
+        .unwrap();
         assert_eq!(reqs.run.len(), 1);
     }
 

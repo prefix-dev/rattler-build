@@ -12,7 +12,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from rattler_build import stage1
-from rattler_build._rattler_build import EnvironmentIsolation, build_rendered_variant_py
+from rattler_build._rattler_build import (
+    EnvironmentIsolation,
+    RepodataRevision,
+    build_rendered_variant_py,
+)
 from rattler_build._rattler_build import render as _render
 from rattler_build.build_result import BuildResult
 from rattler_build.tool_config import PlatformConfig, ToolConfiguration
@@ -130,7 +134,9 @@ class RenderConfig:
 
     Args:
         platform: Platform configuration (target, build, host platforms, experimental flag)
-        v3: Enable V3 recipe fields and MatchSpec syntax.
+        repodata_revision: Repodata revision controlling which recipe fields and
+            MatchSpec syntax are accepted (``RepodataRevision.LEGACY`` or
+            ``RepodataRevision.V3``). Defaults to ``RepodataRevision.LEGACY``.
         extra_context: Dictionary of extra context variables for Jinja rendering
 
     Example:
@@ -151,18 +157,18 @@ class RenderConfig:
         self,
         platform: PlatformConfig | None = None,
         extra_context: dict[str, ContextValue] | None = None,
-        v3: bool = False,
+        repodata_revision: RepodataRevision = RepodataRevision.LEGACY,
     ):
         """Create a new render configuration."""
         self.platform = platform
-        self._v3 = v3
+        self._repodata_revision = repodata_revision
         self._extra_context = extra_context
         self._config = _render.RenderConfig(
             target_platform=platform.target_platform if platform else None,
             build_platform=platform.build_platform if platform else None,
             host_platform=platform.host_platform if platform else None,
             experimental=platform.experimental if platform else False,
-            v3=v3,
+            repodata_revision=repodata_revision,
             recipe_path=None,
             extra_context=extra_context,
         )
@@ -180,11 +186,11 @@ class RenderConfig:
         """
         if render_config is not None:
             platform = render_config.platform
-            v3 = render_config._v3
+            repodata_revision = render_config._repodata_revision
             extra_context = render_config._extra_context
         else:
             platform = None
-            v3 = False
+            repodata_revision = RepodataRevision.LEGACY
             extra_context = None
 
         return _render.RenderConfig(
@@ -192,7 +198,7 @@ class RenderConfig:
             build_platform=platform.build_platform if platform else None,
             host_platform=platform.host_platform if platform else None,
             experimental=platform.experimental if platform else False,
-            v3=v3,
+            repodata_revision=repodata_revision,
             recipe_path=recipe_path,
             extra_context=extra_context,
         )
@@ -233,9 +239,10 @@ class RenderConfig:
         return self._config.experimental()
 
     @property
-    def v3(self) -> bool:
-        """Get whether V3 recipe fields and MatchSpec syntax are enabled."""
-        return self._config.v3()
+    def repodata_revision(self) -> RepodataRevision:
+        """Get the repodata revision controlling which recipe fields and
+        MatchSpec syntax are accepted."""
+        return self._config.repodata_revision()
 
     def __repr__(self) -> str:
         return repr(self._config)
@@ -267,11 +274,16 @@ class RenderedVariant:
         ```
     """
 
-    def __init__(self, inner: _render.RenderedVariant, recipe_path: Path, v3: bool = False):
+    def __init__(
+        self,
+        inner: _render.RenderedVariant,
+        recipe_path: Path,
+        repodata_revision: RepodataRevision = RepodataRevision.LEGACY,
+    ):
         """Create a RenderedVariant from the Rust object."""
         self._inner = inner
         self._recipe_path = recipe_path
-        self._v3 = v3
+        self._repodata_revision = repodata_revision
         self._siblings: list[RenderedVariant] = []
 
     @property
@@ -411,7 +423,7 @@ class RenderedVariant:
             exclude_newer=exclude_newer,
             env_isolation=env_isolation,
             sibling_variants=rust_siblings,
-            v3=self._v3,
+            repodata_revision=self._repodata_revision,
         )
 
         # Convert Rust BuildResult to Python BuildResult

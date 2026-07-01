@@ -14,9 +14,8 @@
       - flask
       - flask.json
   - script:
-      content: |-
-        flask --help
-        pip check
+    - flask --help
+    - pip check
     requirements:
       run:
       - pip
