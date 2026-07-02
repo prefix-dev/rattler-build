@@ -208,6 +208,7 @@ fn copy_license_files(
         )
         .with_globvec(&relative_globvec)
         .use_gitignore(false)
+        .dereference_symlinks(true)
         .run()?;
 
         let copied_files_work_dir = copy_dir_work.copied_paths();
@@ -218,6 +219,7 @@ fn copy_license_files(
         .with_globvec(&relative_globvec)
         .use_gitignore(false)
         .overwrite(true)
+        .dereference_symlinks(true)
         .run()?;
 
         let copied_files_recipe_dir = copy_dir_recipe.copied_paths();
@@ -330,6 +332,7 @@ fn copy_license_files(
                 let copy_result = copy_dir::CopyDir::new(&base_dir, &licenses_folder)
                     .with_globvec(&glob_vec)
                     .use_gitignore(false)
+                    .dereference_symlinks(true)
                     .run()?;
                 let copied = copy_result.copied_paths();
                 if copied.is_empty() {

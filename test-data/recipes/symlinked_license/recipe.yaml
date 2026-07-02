@@ -1,0 +1,16 @@
+package:
+  name: symlinked-license
+  version: "0.1.0"
+
+build:
+  script:
+    # Create a real license file and a symlink that points at it from a
+    # subdirectory. `license_file` references the symlink, whose target lives
+    # outside the matched set (mirrors a license symlinked to `../../LICENSE`).
+    - echo "the actual license text" > LICENSE
+    - mkdir -p subdir
+    - ln -s ../LICENSE subdir/LICENSE
+
+about:
+  license_file:
+    - subdir/LICENSE
