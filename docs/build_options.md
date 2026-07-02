@@ -247,6 +247,22 @@ locations outside of the environment. This is useful if you want to link against
 libraries that are not part of the conda environment (e.g. proprietary
 software).
 
+During relocation, Rattler-Build strips any `rpath`/`runpath` entry that points
+outside of the install prefix. This includes relative entries that resolve
+outside of the prefix, such as `$ORIGIN/../..` on Linux or
+`@loader_path/../..` on macOS. To keep such an entry, add a glob pattern that
+matches it to `rpath_allowlist`, e.g.:
+
+```yaml title="recipe.yaml"
+build:
+  dynamic_linking:
+    rpath_allowlist:
+      # keep an absolute system location
+      - /opt/vendor/lib/**
+      # keep a relative entry that points outside of the prefix
+      - $ORIGIN/../..        # on macOS use @loader_path/../..
+```
+
 If you want to stop Rattler-Build from relocating the binaries, you can set
 `binary_relocation` to `false`. If you want to only relocate some binaries, you
 can select the relevant ones with a glob pattern.

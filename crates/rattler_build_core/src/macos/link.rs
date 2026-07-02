@@ -215,11 +215,12 @@ impl Relinker for Dylib {
                 } else if rpath_allowlist.is_match(rpath) {
                     tracing::info!("Rpath in allow list: {}", rpath.display());
                     final_rpaths.push(rpath.clone());
+                } else {
+                    tracing::info!(
+                        "Rpath not in prefix or allow-listed: {} - removing it",
+                        rpath.display()
+                    );
                 }
-                tracing::info!(
-                    "Rpath not in prefix or allow-listed: {} - removing it",
-                    rpath.display()
-                );
             } else if let Ok(rel) = rpath.strip_prefix(encoded_prefix) {
                 let new_rpath = prefix.join(rel);
 
@@ -922,6 +923,106 @@ mod tests {
 
         let object = Dylib::new(&binary_path)?;
         assert_eq!(vec![PathBuf::from("@loader_path/../lib")], object.rpaths);
+
+        Ok(())
+    }
+
+    // Regression test for https://github.com/prefix-dev/rattler-build/issues/816
+    // (macOS equivalent): a `@loader_path`-relative rpath that resolves outside
+    // of the prefix is removed by default, but kept when it matches an entry of
+    // the `rpath_allowlist`.
+    #[rstest]
+    #[case::subprocess_codesign(false)]
+    #[case::builtin_codesign(true)]
+    fn test_loader_path_rpath_allowlist(#[case] builtin_codesign: bool) -> Result<(), RelinkError> {
+        if which::which("install_name_tool").is_err() {
+            println!("install_name_tool not found, skipping test");
+            return Ok(());
+        }
+
+        // A `@loader_path`-relative rpath that points well above the prefix, so
+        // that it can only be kept via the allowlist.
+        let outside_rpath = PathBuf::from("@loader_path/../../../../../../outside");
+        let encoded_prefix = PathBuf::from("/encoded/long_install_prefix/bla/bin");
+
+        let prefix = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/binary_files");
+
+        // Set up a fresh binary whose only rpath is `outside_rpath`.
+        let setup = |name: &str| -> Result<(tempfile::TempDir, PathBuf), RelinkError> {
+            let tmp_dir = tempdir_in(&prefix)?;
+            fs::create_dir(tmp_dir.path().join("bin"))?;
+            let binary_path = tmp_dir.path().join("bin").join(name);
+            fs::copy(prefix.join("zlink-macos"), &binary_path)?;
+
+            let object = Dylib::new(&binary_path)?;
+            let changes = DylibChanges {
+                change_rpath: object
+                    .rpaths
+                    .iter()
+                    .map(|p| (Some(p.clone()), None))
+                    .chain(std::iter::once((None, Some(outside_rpath.clone()))))
+                    .collect(),
+                change_id: None,
+                change_dylib: HashMap::default(),
+            };
+            install_name_tool(
+                &binary_path,
+                &changes,
+                &SystemTools::new("rattler-build", "0.0.0"),
+            )?;
+            let object = Dylib::new(&binary_path)?;
+            assert_eq!(object.rpaths, vec![outside_rpath.clone()]);
+            Ok((tmp_dir, binary_path))
+        };
+
+        let env_val = if builtin_codesign { Some("1") } else { None };
+
+        // Without an allowlist the out-of-prefix rpath is stripped.
+        let (tmp_dir, binary_path) = setup("zlink-816-drop")?;
+        let object = Dylib::new(&binary_path)?;
+        with_env_var("RATTLER_BUILD_BUILTIN_CODESIGN", env_val, || {
+            object
+                .relink(
+                    tmp_dir.path(),
+                    &encoded_prefix,
+                    &[],
+                    &GlobVec::default(),
+                    &SystemTools::new("rattler-build", "0.0.0"),
+                )
+                .unwrap();
+        });
+        let object = Dylib::new(&binary_path)?;
+        assert!(
+            !object.rpaths.contains(&outside_rpath),
+            "expected the out-of-prefix rpath to be removed, got {:?}",
+            object.rpaths
+        );
+
+        // With a matching allowlist entry the rpath is preserved.
+        let (tmp_dir, binary_path) = setup("zlink-816-keep")?;
+        let allowlist = GlobVec::from_strings(
+            vec!["@loader_path/../../../../../../outside".to_string()],
+            vec![],
+        )
+        .unwrap();
+        let object = Dylib::new(&binary_path)?;
+        with_env_var("RATTLER_BUILD_BUILTIN_CODESIGN", env_val, || {
+            object
+                .relink(
+                    tmp_dir.path(),
+                    &encoded_prefix,
+                    &[],
+                    &allowlist,
+                    &SystemTools::new("rattler-build", "0.0.0"),
+                )
+                .unwrap();
+        });
+        let object = Dylib::new(&binary_path)?;
+        assert!(
+            object.rpaths.contains(&outside_rpath),
+            "expected the allow-listed rpath to be kept, got {:?}",
+            object.rpaths
+        );
 
         Ok(())
     }

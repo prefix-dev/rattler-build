@@ -640,4 +640,73 @@ mod test {
 
         Ok(())
     }
+
+    // Regression test for https://github.com/prefix-dev/rattler-build/issues/816
+    // A `$ORIGIN`-relative rpath that resolves outside of the prefix is removed
+    // by default, but kept when it matches an entry of the `rpath_allowlist`.
+    #[test]
+    fn relink_origin_rpath_allowlist() -> Result<(), RelinkError> {
+        let prefix = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/binary_files");
+        let tmp_dir = tempdir_in(&prefix)?.keep();
+        let binary_path = tmp_dir.join("zlink");
+
+        // The default rpath of the binary lives inside the (encoded) prefix. We
+        // point it one level *above* the prefix with `$ORIGIN/../..` so that it
+        // can only be kept via the allowlist. The builtin relinker can do this
+        // because the replacement is shorter than the original rpath.
+        let set_origin_rpath = |path: &Path| -> Result<(), RelinkError> {
+            fs::copy(prefix.join("zlink"), path)?;
+            super::builtin_relink(path, &[PathBuf::from("$ORIGIN/../..")])?;
+            Ok(())
+        };
+
+        let encoded_prefix = Path::new("/rattler-build_zlink/host_env_placehold");
+
+        // Without an allowlist the out-of-prefix rpath is stripped.
+        set_origin_rpath(&binary_path)?;
+        let object = SharedObject::new(&binary_path)?;
+        object.relink(
+            &prefix,
+            encoded_prefix,
+            &[],
+            &GlobVec::default(),
+            &SystemTools::new("rattler-build", "0.0.0"),
+        )?;
+        let object = SharedObject::new(&binary_path)?;
+        assert!(
+            !object
+                .rpaths
+                .iter()
+                .flat_map(|r| r.split(':'))
+                .any(|r| r == "$ORIGIN/../.."),
+            "expected the out-of-prefix rpath to be removed, got {:?}",
+            object.rpaths
+        );
+
+        // With a matching allowlist entry the rpath is preserved.
+        set_origin_rpath(&binary_path)?;
+        let allowlist = GlobVec::from_strings(vec!["$ORIGIN/../..".to_string()], vec![]).unwrap();
+        let object = SharedObject::new(&binary_path)?;
+        object.relink(
+            &prefix,
+            encoded_prefix,
+            &[],
+            &allowlist,
+            &SystemTools::new("rattler-build", "0.0.0"),
+        )?;
+        let object = SharedObject::new(&binary_path)?;
+        assert!(
+            object
+                .rpaths
+                .iter()
+                .flat_map(|r| r.split(':'))
+                .any(|r| r == "$ORIGIN/../.."),
+            "expected the allow-listed rpath to be kept, got {:?}",
+            object.rpaths
+        );
+
+        fs::remove_dir_all(tmp_dir)?;
+
+        Ok(())
+    }
 }
