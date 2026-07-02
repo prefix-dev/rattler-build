@@ -355,7 +355,11 @@ impl BuildOutput {
                 writeln!(f, "{}\n", host.to_table(template(), long))?;
             }
 
-            if !finalized_dependencies.run.depends.is_empty() {
+            let run = &finalized_dependencies.run;
+            if !run.depends.is_empty()
+                || !run.constraints.is_empty()
+                || !run.extra_depends.is_empty()
+            {
                 writeln!(f, "Run dependencies:")?;
                 writeln!(
                     f,

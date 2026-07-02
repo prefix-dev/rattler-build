@@ -475,6 +475,20 @@ impl FinalizedRunDependencies {
             has_previous_section = true;
         }
 
+        // Add a section for each extra (optional dependency group)
+        for (extra_name, extra_deps) in &self.extra_depends {
+            let extra_rendered = render_grouped_dependencies(extra_deps, long);
+            if extra_rendered.is_empty() {
+                continue;
+            }
+            if has_previous_section {
+                table.add_row(vec!["", ""]);
+            }
+            add_section_header(&mut table, &format!("Extra ({extra_name})"));
+            add_grouped_items(&mut table, &extra_rendered);
+            has_previous_section = true;
+        }
+
         // Add run exports sections if not empty
         if !self.run_exports.is_empty() {
             let sections = [
@@ -1258,5 +1272,34 @@ mod tests {
                 ("scipy".to_string(), r#"[when="python>=3.10"]"#.to_string()),
             ]
         );
+    }
+
+    #[test]
+    fn test_to_table_renders_extras() {
+        let source_dep = |spec: &str| -> DependencyInfo {
+            SourceDependency {
+                spec: MatchSpec::from_str(spec, ParseStrictness::Strict).unwrap(),
+            }
+            .into()
+        };
+
+        let mut extra_depends = BTreeMap::new();
+        extra_depends.insert("science".to_string(), vec![source_dep("numpy")]);
+        extra_depends.insert("plot".to_string(), vec![source_dep("matplotlib")]);
+
+        let run = FinalizedRunDependencies {
+            depends: vec![source_dep("python")],
+            constraints: vec![],
+            extra_depends,
+            run_exports: Default::default(),
+        };
+
+        let table = comfy_table::Table::new();
+        let rendered = run.to_table(table, false).to_string();
+
+        assert!(rendered.contains("Extra (science)"));
+        assert!(rendered.contains("numpy"));
+        assert!(rendered.contains("Extra (plot)"));
+        assert!(rendered.contains("matplotlib"));
     }
 }
