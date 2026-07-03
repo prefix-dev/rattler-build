@@ -232,6 +232,16 @@ build:
     down_prioritize_variant: ${{ 1 if cuda else 0 }}
 ```
 
+!!! note "Variant keys that only exist on some platforms"
+    The `down_prioritize_variant` expression may reference a variant key that
+    is only defined for some platforms in the variant configuration (e.g. a
+    microarchitecture level that only exists on `linux` + `x86_64`). On
+    platforms where the key is undefined there is only a single variant and
+    nothing to prioritize between, so the expression is skipped and no
+    down-prioritization is applied — the recipe still renders. If you prefer
+    an explicit fallback, `${{ 0 if (my_level | default(1)) == 1 else 1 }}`
+    works as well.
+
 ???+ example "Example: CUDA / CPU variant with automatic fallback"
 
     A common pattern is to build both GPU and CPU variants, where the solver

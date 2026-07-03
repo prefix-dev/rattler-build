@@ -713,6 +713,26 @@ build:
     evaluate to `true` in the platform it is built on, which probably will result
     in incorrect/incomplete installation in other platforms.
 
+#### Conditional `noarch`
+
+The `noarch` key can be set conditionally from a variant variable, which is
+useful for recipes that build a `noarch: python` package in some variants and
+an arch-specific package in others:
+
+```yaml
+build:
+  # no noarch when `use_noarch` is false or undefined
+  noarch: ${{ "python" if use_noarch }}
+  # or, with an explicit else branch:
+  noarch: ${{ "python" if use_noarch else none }}
+```
+
+An expression that renders to an empty or null-like value (`none`, `null`,
+`~`, or the empty string) — as well as a literal `noarch: null` — is treated
+the same as omitting the `noarch` key entirely. If the expression references a
+variant key that is not defined for the current platform, the package is also
+treated as non-`noarch` rather than failing to render.
+
 ### Include only certain files in the package
 
 Sometimes you may want to include only a subset of the files installed by the
