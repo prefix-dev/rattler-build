@@ -719,49 +719,88 @@ pub fn is_tarball(file_name: &str) -> bool {
 
 /// Iterates over the entries of a tar archive and unpacks each one into `target`.
 ///
-/// On Windows, symlink entries that fail to unpack are skipped with a warning instead of
-/// aborting the whole extraction. Creating symlinks on Windows requires Developer Mode or
-/// administrator privileges; skipping them gracefully means the rest of the archive is
-/// still extracted and the build can proceed (a missing symlink will surface as a build
-/// error only if it is actually needed).
+/// This mirrors [`tar::Archive::unpack`] (canonicalizing the target so Windows long
+/// paths get the `\\?\` prefix, and applying directory entries last in reverse-sorted
+/// order so directory permissions/mtimes do not interfere with descendant extraction),
+/// but adds one behavior: on Windows, symlink entries that fail to unpack are skipped
+/// with a warning instead of aborting the whole extraction. Creating symlinks on Windows
+/// requires Developer Mode or administrator privileges; skipping them gracefully means
+/// the rest of the archive is still extracted and the build can proceed (a missing
+/// symlink will surface as a build error only if it is actually needed).
 fn unpack_tar_entries<R: std::io::Read>(
     archive: &mut tar::Archive<R>,
     target: &Path,
 ) -> Result<(), CacheError> {
+    // Ensure the destination exists, then canonicalize it. On Windows this prepends the
+    // `\\?\` extended-length prefix, which is what lets paths longer than 260 characters be
+    // created. `tar::Archive::unpack` does the same; without it, long paths fail on Windows.
+    if target.symlink_metadata().is_err() {
+        fs_err::create_dir_all(target).map_err(|e| {
+            CacheError::ExtractionError(format!("Failed to create target directory: {}", e))
+        })?;
+    }
+    let canonical_target = target.canonicalize().unwrap_or_else(|_| target.to_path_buf());
+    let target = canonical_target.as_path();
+
     let entries = archive.entries().map_err(|e| {
         CacheError::ExtractionError(format!("Failed to read archive entries: {}", e))
     })?;
 
+    // Delay directory entries until the end so that (potentially restrictive) directory
+    // permissions do not block writing their descendants, and directory mtimes are not
+    // clobbered by files written into them afterwards.
+    let mut directories = Vec::new();
+
     for entry in entries {
-        let mut entry = entry.map_err(|e| {
+        let entry = entry.map_err(|e| {
             CacheError::ExtractionError(format!("Failed to read archive entry: {}", e))
         })?;
 
-        match entry.unpack_in(target) {
-            Ok(_) => {}
-            Err(e) => {
-                // On Windows, creating symlinks requires Developer Mode or admin
-                // privileges. If unpacking a symlink fails, warn and skip the entry
-                // rather than failing the whole extraction.
-                #[cfg(target_os = "windows")]
-                if entry.header().entry_type().is_symlink() {
-                    tracing::warn!(
-                        "skipping symlink in tar archive: {}: {e}",
-                        entry
-                            .path()
-                            .map(|p| p.display().to_string())
-                            .unwrap_or_default()
-                    );
-                    continue;
-                }
-                return Err(CacheError::ExtractionError(format!(
-                    "Failed to unpack archive entry: {e}"
-                )));
-            }
+        if entry.header().entry_type() == tar::EntryType::Directory {
+            directories.push(entry);
+        } else {
+            unpack_entry(entry, target)?;
         }
     }
 
+    // Apply directories in reverse-sorted (topological) order so parents are created
+    // with the correct permissions after their children. Matches `tar::Archive::unpack`.
+    directories.sort_by(|a, b| b.path_bytes().cmp(&a.path_bytes()));
+    for dir in directories {
+        unpack_entry(dir, target)?;
+    }
+
     Ok(())
+}
+
+/// Unpacks a single tar entry into `target`, skipping symlinks that fail to unpack on
+/// Windows (see [`unpack_tar_entries`]).
+fn unpack_entry<R: std::io::Read>(
+    mut entry: tar::Entry<'_, R>,
+    target: &Path,
+) -> Result<(), CacheError> {
+    match entry.unpack_in(target) {
+        Ok(_) => Ok(()),
+        Err(e) => {
+            // On Windows, creating symlinks requires Developer Mode or admin
+            // privileges. If unpacking a symlink fails, warn and skip the entry
+            // rather than failing the whole extraction.
+            #[cfg(target_os = "windows")]
+            if entry.header().entry_type().is_symlink() {
+                tracing::warn!(
+                    "skipping symlink in tar archive: {}: {e}",
+                    entry
+                        .path()
+                        .map(|p| p.display().to_string())
+                        .unwrap_or_default()
+                );
+                return Ok(());
+            }
+            Err(CacheError::ExtractionError(format!(
+                "Failed to unpack archive entry: {e}"
+            )))
+        }
+    }
 }
 
 pub(crate) fn extract_tar(archive: &Path, target: &Path) -> Result<(), CacheError> {
