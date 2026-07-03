@@ -307,6 +307,35 @@ def test_render_only_does_not_create_output_dir(
     assert result.returncode == 0, f"render-only failed: {result.stderr}"
 
 
+def test_render_only_with_solve_missing_output_dir(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Test that --render-only --with-solve works when the output directory
+    does not exist yet.
+
+    Solving registers the output directory as a local channel, which requires
+    the directory to exist on disk. Previously this panicked with
+    "path is a not a valid absolute path" (see issue #2611); it should now
+    create the directory and solve successfully.
+    """
+    output_dir = tmp_path / "does" / "not" / "exist"
+    assert not output_dir.exists()
+
+    result = rattler_build.render(
+        recipes / "toml",
+        output_dir,
+        with_solve=True,
+        custom_channels=["conda-forge"],
+        raw=True,
+    )
+
+    assert result.returncode == 0, f"render-only with solve failed: {result.stderr}"
+    assert "is a not a valid absolute path" not in (result.stderr or "")
+
+    outputs = json.loads(result.stdout or "[]")
+    assert isinstance(outputs, list) and len(outputs) >= 1
+
+
 def test_run_exports(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
 ):

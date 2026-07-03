@@ -149,6 +149,15 @@ pub async fn build_reindexed_channels(
     tool_configuration: &tool_configuration::Configuration,
 ) -> Result<Vec<ChannelUrl>, std::io::Error> {
     let output_dir = &build_configuration.directories.output_dir;
+
+    // Ensure the output directory exists before turning it into a channel.
+    // `Channel::from_directory` canonicalizes the path and panics if it does not
+    // exist, which happens e.g. when running `--render-only --with-solve` without
+    // a pre-existing output directory (see issue #2611).
+    if !output_dir.exists() {
+        fs_err::create_dir_all(output_dir)?;
+    }
+
     let output_channel = Channel::from_directory(output_dir);
 
     // Clear the repodata gateway of any cached values for the output channel.
