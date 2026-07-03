@@ -857,4 +857,51 @@ mod test {
                 .all(|p| !p.to_string_lossy().contains("ignored_dir"))
         );
     }
+
+    /// Regression test for <https://github.com/prefix-dev/rattler-build/issues/1130>.
+    ///
+    /// Repositories such as DeepSpeed contain relative symlinks to sibling
+    /// directories (e.g. `deepspeed/accelerator -> ../accelerator/` and
+    /// `deepspeed/ops/csrc -> ../../csrc`). Copying the source must preserve
+    /// these as relative symlinks so they keep resolving in the build
+    /// environment, instead of dropping the linked directory entirely.
+    #[cfg(unix)]
+    #[test]
+    fn test_copy_relative_directory_symlinks() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let src = tmp.path().join("src");
+        fs::create_dir_all(src.join("csrc")).unwrap();
+        fs::create_dir_all(src.join("accelerator")).unwrap();
+        fs::create_dir_all(src.join("deepspeed/ops")).unwrap();
+        fs::write(src.join("csrc/kernel.cpp"), "k").unwrap();
+        fs::write(src.join("accelerator/real_accelerator.py"), "r").unwrap();
+        fs::write(src.join("deepspeed/__init__.py"), "").unwrap();
+        // Note the trailing slash on the first target, matching DeepSpeed.
+        std::os::unix::fs::symlink("../accelerator/", src.join("deepspeed/accelerator")).unwrap();
+        std::os::unix::fs::symlink("../../csrc", src.join("deepspeed/ops/csrc")).unwrap();
+
+        let dest = tmp.path().join("dest");
+        super::CopyDir::new(&src, &dest)
+            .use_gitignore(false)
+            .run()
+            .unwrap();
+
+        let accelerator = dest.join("deepspeed/accelerator");
+        assert!(accelerator.is_symlink());
+        assert_eq!(
+            fs::read_link(&accelerator).unwrap(),
+            std::path::PathBuf::from("../accelerator/")
+        );
+        // The relative symlink must resolve to the sibling directory,
+        // reproducing the `ls deepspeed/accelerator` from the issue.
+        assert!(accelerator.join("real_accelerator.py").exists());
+
+        let csrc = dest.join("deepspeed/ops/csrc");
+        assert!(csrc.is_symlink());
+        assert_eq!(
+            fs::read_link(&csrc).unwrap(),
+            std::path::PathBuf::from("../../csrc")
+        );
+        assert!(csrc.join("kernel.cpp").exists());
+    }
 }

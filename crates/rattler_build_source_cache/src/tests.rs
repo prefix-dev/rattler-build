@@ -344,6 +344,107 @@ mod source_cache_tests {
         );
     }
 
+    /// Regression test for <https://github.com/prefix-dev/rattler-build/issues/1130>.
+    ///
+    /// A git repository can contain relative symlinks that point to sibling
+    /// directories, e.g. `deepspeed/accelerator -> ../accelerator/`. These must
+    /// survive the `git clone --local` + `git reset --hard` checkout the source
+    /// cache performs, otherwise the checked-out tree (and everything copied
+    /// from it into the build environment) is missing the linked directory.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn test_git_relative_symlink() {
+        use crate::GitReference;
+        use crate::source::{GitSource, Source};
+        use std::path::Path;
+        use std::process::Command;
+
+        let tmp = TempDir::new().unwrap();
+        let repos_dir = tmp.path().join("repos");
+        fs_err::create_dir_all(&repos_dir).unwrap();
+
+        let git = |dir: &Path, args: &[&str]| -> std::process::Output {
+            let out = Command::new("git")
+                .current_dir(dir)
+                .arg("-c")
+                .arg("user.name=test")
+                .arg("-c")
+                .arg("user.email=test@test")
+                .args(args)
+                .output()
+                .unwrap();
+            assert!(
+                out.status.success(),
+                "git {} failed: {}",
+                args.join(" "),
+                String::from_utf8_lossy(&out.stderr),
+            );
+            out
+        };
+
+        // Build a repo whose layout mirrors DeepSpeed: a package directory that
+        // contains a relative symlink to a sibling top-level directory.
+        let repo = repos_dir.join("main.git");
+        git(&repos_dir, &["init", "--bare", repo.to_str().unwrap()]);
+        let work = tmp.path().join("work");
+        git(
+            &repos_dir,
+            &["clone", repo.to_str().unwrap(), work.to_str().unwrap()],
+        );
+
+        fs_err::create_dir_all(work.join("accelerator")).unwrap();
+        fs_err::write(work.join("accelerator/real_accelerator.py"), "x = 1\n").unwrap();
+        fs_err::create_dir_all(work.join("deepspeed")).unwrap();
+        fs_err::write(work.join("deepspeed/__init__.py"), "").unwrap();
+        // Relative symlink to a sibling directory, with a trailing slash just
+        // like DeepSpeed's `deepspeed/accelerator -> ../accelerator/`.
+        std::os::unix::fs::symlink("../accelerator/", work.join("deepspeed/accelerator")).unwrap();
+
+        git(&work, &["add", "-A"]);
+        git(&work, &["commit", "-m", "init with relative symlink"]);
+        git(&work, &["push"]);
+
+        let out = git(&work, &["rev-parse", "HEAD"]);
+        let commit = String::from_utf8(out.stdout).unwrap().trim().to_string();
+
+        let cache_dir = tmp.path().join("cache");
+        let url = url::Url::from_file_path(&repo).unwrap();
+
+        let cache = SourceCacheBuilder::new()
+            .cache_dir(&cache_dir)
+            .build()
+            .await
+            .unwrap();
+
+        let source = Source::Git(GitSource::with_expected_commit(
+            url,
+            GitReference::from_rev(commit.clone()),
+            None,
+            false,
+            false,
+            Some(commit),
+        ));
+
+        let result = cache.get_source(&source).await.unwrap();
+
+        // The symlink must be checked out as a symlink...
+        let link = result.path.join("deepspeed/accelerator");
+        assert!(
+            link.symlink_metadata().unwrap().file_type().is_symlink(),
+            "deepspeed/accelerator should be a symlink"
+        );
+        assert_eq!(
+            fs_err::read_link(&link).unwrap(),
+            Path::new("../accelerator/"),
+        );
+        // ...and it must resolve to the sibling directory's contents,
+        // reproducing the failing `ls deepspeed/accelerator` from the issue.
+        assert!(
+            link.join("real_accelerator.py").exists(),
+            "relative symlink should resolve to ../accelerator/"
+        );
+    }
+
     #[test]
     fn test_extract_filename_from_header_strips_path_components() {
         use crate::cache::extract_filename_from_header;
