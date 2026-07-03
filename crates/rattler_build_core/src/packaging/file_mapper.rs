@@ -2,12 +2,50 @@
 
 use crate::metadata::Output;
 use fs_err as fs;
+use line_ending::LineEnding;
+use rattler_conda_types::Platform;
 use std::{
     collections::HashSet,
     path::{Component, Path, PathBuf},
 };
 
 use super::PackagingError;
+
+/// Copy `src` to `dst`, normalizing line endings to LF for UTF-8 text files.
+///
+/// `noarch` packages must be reproducible regardless of the operating system they are
+/// built on. Text files that are checked out or generated on Windows often carry CRLF
+/// (or bare CR) line endings, which would otherwise leak into the package and make the
+/// resulting archive differ from one built on Unix (see
+/// <https://github.com/prefix-dev/rattler-build/issues/837>).
+///
+/// To keep the transformation safe we only rewrite files that are valid UTF-8 text.
+/// Binary files and other text encodings (e.g. UTF-16/UTF-32, where a naive byte-level
+/// CRLF rewrite could corrupt multi-byte code units such as `U+0A0D`) are copied
+/// verbatim. Files that already use LF exclusively are also copied verbatim, which
+/// preserves the fast copy path and the original file metadata.
+fn copy_normalizing_line_endings(src: &Path, dst: &Path) -> Result<(), PackagingError> {
+    let content = fs::read(src)?;
+
+    // Inspect the leading bytes to decide whether the file looks like text, mirroring
+    // how content types are detected elsewhere in the packaging code.
+    let is_text = content_inspector::inspect(&content[..content.len().min(1024)]).is_text();
+
+    if is_text && let Ok(text) = std::str::from_utf8(&content) {
+        let normalized = LineEnding::normalize(text);
+        if normalized.as_bytes() != content.as_slice() {
+            fs::write(dst, normalized.as_bytes())?;
+            // Preserve the permissions (e.g. the executable bit) that `fs::copy`
+            // would otherwise carry over.
+            fs::set_permissions(dst, fs::metadata(src)?.permissions())?;
+            return Ok(());
+        }
+    }
+
+    // Binary, non-UTF-8, or already LF-normalized files are copied unchanged.
+    fs::copy(src, dst)?;
+    Ok(())
+}
 
 /// We check the (new) `pyc` files against the old files from the environment.
 /// This is a temporary measure to avoid packaging `pyc` files that are not
@@ -92,6 +130,8 @@ impl Output {
     ///   `Scripts` is replaced with `python-scripts` (on Windows only). All other files are included
     ///   as-is.
     /// * Absolute symlinks are made relative so that they are easily relocatable.
+    /// * For any `noarch` package (generic or python), UTF-8 text file line endings are
+    ///   normalized to LF so that packages are reproducible across Windows and Unix builds.
     pub fn write_to_dest(
         &self,
         path: &Path,
@@ -274,7 +314,13 @@ impl Output {
             Ok(None)
         } else {
             tracing::trace!("Copying file {:?} to {:?}", path, dest_path);
-            fs::copy(path, &dest_path)?;
+            if target_platform == &Platform::NoArch {
+                // Normalize text-file line endings to LF for noarch packages so that
+                // builds are reproducible across Windows and Unix (issue #837).
+                copy_normalizing_line_endings(path, &dest_path)?;
+            } else {
+                fs::copy(path, &dest_path)?;
+            }
             Ok(Some(dest_path))
         }
     }
@@ -288,6 +334,63 @@ mod test {
     };
 
     use crate::packaging::file_mapper::filter_pyc;
+
+    #[test]
+    fn test_copy_normalizing_line_endings() {
+        let temp_dir = tempfile::tempdir().unwrap();
+
+        // (name, input, expected output) — all line endings collapse to LF.
+        let cases: &[(&str, &[u8], &[u8])] = &[
+            ("crlf.txt", b"line1\r\nline2\r\n", b"line1\nline2\n"),
+            ("cr.txt", b"line1\rline2\r", b"line1\nline2\n"),
+            ("lf.txt", b"line1\nline2\n", b"line1\nline2\n"),
+            ("mixed.txt", b"a\r\nb\rc\n", b"a\nb\nc\n"),
+        ];
+        for (name, input, expected) in cases {
+            let src = temp_dir.path().join(name);
+            let dst = temp_dir.path().join(format!("out_{name}"));
+            std::fs::write(&src, input).unwrap();
+            super::copy_normalizing_line_endings(&src, &dst).unwrap();
+            assert_eq!(&std::fs::read(&dst).unwrap(), expected, "text case {name}");
+        }
+
+        // Binary data (contains a NUL and a CR/LF byte pair) must be copied verbatim.
+        let binary: &[u8] = &[0x00, 0x01, 0x02, 0x0D, 0x0A, 0xFF];
+        let src = temp_dir.path().join("data.bin");
+        let dst = temp_dir.path().join("data_out.bin");
+        std::fs::write(&src, binary).unwrap();
+        super::copy_normalizing_line_endings(&src, &dst).unwrap();
+        assert_eq!(std::fs::read(&dst).unwrap(), binary, "binary preserved");
+
+        // UTF-16LE (BOM `FF FE`): `U+0A0D` encodes as bytes `0D 0A`. A naive byte-level
+        // CRLF rewrite would corrupt it, so non-UTF-8 encodings are copied verbatim.
+        let utf16: &[u8] = &[0xFF, 0xFE, 0x0D, 0x0A, 0x41, 0x00];
+        let src = temp_dir.path().join("u16.txt");
+        let dst = temp_dir.path().join("u16_out.txt");
+        std::fs::write(&src, utf16).unwrap();
+        super::copy_normalizing_line_endings(&src, &dst).unwrap();
+        assert_eq!(std::fs::read(&dst).unwrap(), utf16, "utf-16 preserved");
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn test_copy_normalizing_line_endings_preserves_mode() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let temp_dir = tempfile::tempdir().unwrap();
+        let src = temp_dir.path().join("script.sh");
+        std::fs::write(&src, b"#!/bin/sh\r\necho hi\r\n").unwrap();
+        std::fs::set_permissions(&src, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        let dst = temp_dir.path().join("script_out.sh");
+        super::copy_normalizing_line_endings(&src, &dst).unwrap();
+
+        // The file went through the rewrite path (CRLF was normalized) ...
+        assert_eq!(std::fs::read(&dst).unwrap(), b"#!/bin/sh\necho hi\n");
+        // ... and the executable bit was preserved.
+        let mode = std::fs::metadata(&dst).unwrap().permissions().mode();
+        assert_eq!(mode & 0o777, 0o755);
+    }
 
     #[test]
     fn test_filter_file() {
