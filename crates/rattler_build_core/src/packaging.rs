@@ -10,6 +10,7 @@ use fs_err as fs;
 use fs_err::File;
 use indicatif::HumanBytes;
 use metadata::clean_url;
+use rattler_build_recipe::stage1::LicenseFiles;
 use rattler_build_types::GlobVec;
 use rattler_conda_types::{
     ChannelUrl, Platform,
@@ -137,14 +138,16 @@ fn copy_license_files(
     allow_absolute_license_paths: bool,
 ) -> Result<Option<HashSet<PathBuf>>, PackagingError> {
     let about = output.recipe.about();
-    let late_bound_license_files = &about.license_file_late_bound;
 
-    // `license_file` holds the ordinary (relative/absolute) glob patterns, while
-    // late-bound entries (e.g. `${{ PREFIX }}/...`) are tracked separately.
-    let empty_globs = GlobVec::default();
-    let license_file = about.license_file.as_ref().unwrap_or(&empty_globs);
+    // `license_file` holds the ordinary (relative/absolute) glob patterns
+    // together with late-bound entries (e.g. `${{ PREFIX }}/...`); the two are
+    // resolved differently below but come from a single recipe key.
+    let empty_license_files = LicenseFiles::default();
+    let license_files = about.license_file.as_ref().unwrap_or(&empty_license_files);
+    let license_file = license_files.globs();
+    let late_bound_license_files = license_files.late_bound();
 
-    if license_file.is_empty() && late_bound_license_files.is_empty() {
+    if license_files.is_empty() {
         return Ok(None);
     }
 

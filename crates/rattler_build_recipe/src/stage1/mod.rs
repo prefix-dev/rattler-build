@@ -28,7 +28,7 @@ pub mod tests;
 #[cfg(test)]
 mod variant_tests;
 
-pub use about::About;
+pub use about::{About, LicenseFiles};
 pub use build::{Build, Rpaths};
 pub use extra::Extra;
 pub use hash::{HashInfo, HashInput, compute_hash};
