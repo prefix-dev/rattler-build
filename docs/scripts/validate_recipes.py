@@ -3,15 +3,20 @@
 import sys
 from pathlib import Path
 
-from rattler_build import Stage0Recipe
+from rattler_build import Stage0Recipe, VariantConfig
 
 recipes_dir = Path("docs/snippets/recipes")
+# recipes that need a variant configuration have a file with the same name in
+# the `variants` subdirectory
+variants_dir = recipes_dir / "variants"
 failed = []
 
 for recipe_path in sorted(recipes_dir.glob("*.yaml")):
     try:
         recipe = Stage0Recipe.from_file(recipe_path)
-        recipe.render()
+        variants_path = variants_dir / recipe_path.name
+        variant_config = VariantConfig.from_file(variants_path) if variants_path.exists() else None
+        recipe.render(variant_config)
         print(f"  OK:   {recipe_path}")
     except Exception as e:
         failed.append((recipe_path, str(e)))
