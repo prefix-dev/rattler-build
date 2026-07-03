@@ -72,6 +72,27 @@ The following known authentication methods are supported:
 - `BasicHTTP`: artifactory
 - `S3Credentials`: S3 buckets
 
+### How authentication is resolved
+
+Rattler-Build uses the same authentication machinery as `rattler`, `pixi` and
+other tools built on it. When it needs credentials for a host, it consults the
+following storage backends in order and uses the first match:
+
+1. The file pointed to by the `RATTLER_AUTH_FILE` environment variable, if set.
+2. The operating system keyring, where credentials from `rattler-build auth
+   login` are stored (macOS Keychain, Windows Credential Manager, or the
+   Secret Service / `libsecret` on Linux).
+3. The fallback credentials file at `~/.rattler/credentials.json`. This is used
+   when a keyring is not available (for example on headless Linux machines) and
+   has the exact same JSON format as `RATTLER_AUTH_FILE`.
+4. A [`.netrc`](https://everything.curl.dev/usingcurl/netrc.html) file in your
+   home directory (or the file pointed to by the `NETRC` environment variable),
+   which provides `BasicHTTP` credentials.
+
+Because all of these backends share the same JSON format, the credentials
+written by `rattler-build auth login` can also be read by other rattler-based
+tools such as `pixi`, and vice versa.
+
 ## Uploading packages
 
 If you want to upload packages, then Rattler-Build comes with a built-in
