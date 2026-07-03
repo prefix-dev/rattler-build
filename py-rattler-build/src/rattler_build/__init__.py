@@ -30,6 +30,7 @@ from rattler_build.package_assembler import (
 )
 from rattler_build.jinja_config import JinjaConfig
 from rattler_build.package import (
+    AbiCheckTest,
     CommandsTest,
     DownstreamTest,
     FileChecks,
@@ -119,6 +120,7 @@ __all__ = [
     "RubyTest",
     "DownstreamTest",
     "PackageContentsTest",
+    "AbiCheckTest",
     "FileChecks",
     "TestResult",
     "PathEntry",
