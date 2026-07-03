@@ -252,6 +252,77 @@ fn custom_patch_stripped_paths(
     normalize_backup_paths(original_path, modified_path, work_dir)
 }
 
+/// Determine whether a single diff already appears to be applied to the work
+/// directory.
+///
+/// This is the same idea GNU `patch` uses when it reports "Reversed (or
+/// previously applied) patch detected":
+///
+/// * For an in-place modification, the diff is considered already applied when
+///   reversing it produces a different pre-image that, patched forward again,
+///   reproduces the current content exactly (a reverse round-trip).
+/// * For a file creation, it is already applied when the target already exists
+///   with exactly the content the patch would produce.
+/// * For a deletion, it is already applied when the file is already gone.
+/// * For a rename, it is already applied when the source is gone and the
+///   destination exists.
+fn diff_already_applied(diff: &Diff<'_, [u8]>, strip_level: usize, work_dir: &Path) -> bool {
+    let (orig, modif) = custom_patch_stripped_paths(diff, strip_level, work_dir);
+    match (orig, modif) {
+        // Nothing references an on-disk file; we cannot tell, so assume not applied.
+        (None, None) => false,
+        // New file creation: applied if the target exists with the exact
+        // content the patch produces from an empty base.
+        (None, Some(m)) => {
+            let Ok(existing) = fs_err::read(work_dir.join(&m)) else {
+                return false;
+            };
+            apply(&[], diff)
+                .map(|produced| produced == existing)
+                .unwrap_or(false)
+        }
+        // Deletion: applied if the file is already gone.
+        (Some(o), None) => !work_dir.join(&o).exists(),
+        (Some(o), Some(m)) => {
+            let orig_abs = work_dir.join(&o);
+            if o != m {
+                // Rename: applied if the source is gone and the destination exists.
+                return !orig_abs.exists() && work_dir.join(&m).exists();
+            }
+            // In-place modification. Fuzzy matching means a forward apply can
+            // succeed as a no-op on already-patched content, so a forward
+            // failure is not a reliable signal. Instead we round-trip through
+            // the reverse patch: if reversing the diff produces a *different*
+            // pre-image and forward-applying that pre-image reproduces the
+            // current content exactly, then the current content already is the
+            // patched state.
+            let Ok(current) = fs_err::read(&orig_abs) else {
+                return false;
+            };
+            match apply(&current, &diff.reverse()) {
+                Ok(pre) if pre != current => {
+                    apply(&pre, diff).map(|re| re == current).unwrap_or(false)
+                }
+                _ => false,
+            }
+        }
+    }
+}
+
+/// Determine whether every diff in a patch already appears to be applied to the
+/// work directory. Returns `false` for an empty patch (there is nothing that
+/// could have been applied).
+fn patch_already_applied(patch: &Patch<[u8]>, strip_level: usize, work_dir: &Path) -> bool {
+    let mut saw_diff = false;
+    for diff in patch {
+        if !diff_already_applied(diff, strip_level, work_dir) {
+            return false;
+        }
+        saw_diff = true;
+    }
+    saw_diff
+}
+
 fn write_patch_content(content: &[u8], path: &Path) -> Result<(), SourceError> {
     if let Some(parent) = path.parent() {
         fs_err::create_dir_all(parent).map_err(SourceError::Io)?;
@@ -358,6 +429,16 @@ pub fn apply_patch_custom(work_dir: &Path, patch_file_path: &Path) -> Result<(),
     let patch = patch_from_bytes(&patch_file_content)
         .map_err(|_| SourceError::PatchParseFailed(patch_file_path.to_path_buf()))?;
     let strip_level = guess_strip_level(&patch, work_dir)?;
+
+    // Skip patches that are already fully applied (e.g. the change has been
+    // merged upstream) instead of silently claiming to apply them.
+    if patch_already_applied(&patch, strip_level, work_dir) {
+        tracing::warn!(
+            "Patch '{}' appears to be already applied; skipping. It may no longer be necessary and can likely be removed from the recipe.",
+            patch_file_path.display()
+        );
+        return Ok(());
+    }
 
     for diff in patch {
         let file_paths = custom_patch_stripped_paths(&diff, strip_level, work_dir);
@@ -561,6 +642,80 @@ mod tests {
         let text_md = tempdir.path().join("workdir/text.md");
         let text_md = fs_err::read_to_string(&text_md).unwrap();
         assert!(text_md.contains("Oh, wow, I was patched! Thank you soooo much!"));
+    }
+
+    #[test]
+    fn test_already_applied_patch_is_skipped() {
+        // Applying the same patch a second time should be detected as
+        // already-applied and skipped, leaving the file untouched rather than
+        // corrupting it or erroring out.
+        let (tempdir, _) = setup_patch_test_dir();
+        let work_dir = tempdir.path().join("workdir");
+        let patches_dir = tempdir.path().join("patches");
+
+        apply_patches(
+            &[LateBoundPath::new(
+                "0001-increase-minimum-cmake-version.patch",
+            )],
+            &work_dir,
+            &patches_dir,
+            &patches_dir,
+            &patches_dir,
+            apply_patch_custom,
+        )
+        .expect("first application should succeed");
+
+        let cmake_list = work_dir.join("CMakeLists.txt");
+        let after_first = fs_err::read_to_string(&cmake_list).unwrap();
+        assert!(after_first.contains("cmake_minimum_required(VERSION 3.12)"));
+
+        // The patch is now fully applied: it should be detected and skipped.
+        let patch_content =
+            fs_err::read(patches_dir.join("0001-increase-minimum-cmake-version.patch")).unwrap();
+        let patch = patch_from_bytes(&patch_content).unwrap();
+        let strip_level = guess_strip_level(&patch, &work_dir).unwrap();
+        assert!(
+            patch_already_applied(&patch, strip_level, &work_dir),
+            "patch should be detected as already applied"
+        );
+
+        apply_patches(
+            &[LateBoundPath::new(
+                "0001-increase-minimum-cmake-version.patch",
+            )],
+            &work_dir,
+            &patches_dir,
+            &patches_dir,
+            &patches_dir,
+            apply_patch_custom,
+        )
+        .expect("re-applying an already-applied patch should not error");
+
+        // The file must be byte-for-byte identical after the second (skipped)
+        // application.
+        let after_second = fs_err::read_to_string(&cmake_list).unwrap();
+        assert_eq!(
+            after_first, after_second,
+            "already-applied patch must not modify the file again"
+        );
+    }
+
+    #[test]
+    fn test_not_yet_applied_patch_is_not_flagged() {
+        // A patch that has not been applied yet must not be treated as
+        // already-applied.
+        let (tempdir, _) = setup_patch_test_dir();
+        let work_dir = tempdir.path().join("workdir");
+        let patches_dir = tempdir.path().join("patches");
+
+        let patch_content =
+            fs_err::read(patches_dir.join("0001-increase-minimum-cmake-version.patch")).unwrap();
+        let patch = patch_from_bytes(&patch_content).unwrap();
+        let strip_level = guess_strip_level(&patch, &work_dir).unwrap();
+        assert!(
+            !patch_already_applied(&patch, strip_level, &work_dir),
+            "a fresh patch should not be detected as already applied"
+        );
     }
 
     #[test]
