@@ -613,27 +613,25 @@ fn evaluate_or_preserve_template(
     }
 }
 
-/// Render an optional, templated build field that may reference variant keys
-/// which only exist on *some* target platforms.
+/// Render an optional, templated build field where an empty render means
+/// "field absent".
 ///
 /// Both `build.noarch` (`${{ "python" if use_noarch }}`) and
-/// `build.variant.down_prioritize_variant` (`${{ 0 if my_level == 1 else 1 }}`)
-/// routinely reference variant keys that are conditionally defined in
-/// `variants.yaml` (the standard conda-forge pattern). Before the v0.58
-/// strict-undefined change these rendered leniently; afterwards an undefined
-/// reference became a hard error, breaking every platform where the key is
-/// absent (see prefix-dev/rattler-build#2291 and #2544).
+/// `build.variant.down_prioritize_variant` (`${{ 0 if cuda else 1 }}`) are
+/// commonly written as conditional expressions that render to an empty string
+/// when the condition is false. Both fields have a well-defined "absent"
+/// meaning (no noarch / no down-prioritization), so an empty render collapses
+/// to `Ok(None)` instead of failing validation on the empty string
+/// (see prefix-dev/rattler-build#2291).
 ///
-/// Both fields have a well-defined "absent" meaning (no noarch / no
-/// down-prioritization), so this helper collapses a missing value to `None`:
-/// - a template that references an undefined variable → `Ok(None)`
-/// - a template that renders to an empty string → `Ok(None)`
-/// - anything else → `Ok(Some(rendered))`, for the caller to parse/validate.
-///
-/// Only *undefined-variable* failures are swallowed; genuine template errors
-/// (syntax errors, failing function calls, ...) are still propagated. Concrete
-/// (non-template) values are handled by the callers, since their types differ.
+/// Undefined variables remain a hard error, consistent with strict-undefined
+/// checking everywhere else. Since these fields often reference variant keys
+/// that are only defined on some platforms (see prefix-dev/rattler-build#2544),
+/// the error is enriched with a suggestion to use the `default` filter as an
+/// explicit fallback. Concrete (non-template) values are handled by the
+/// callers, since their types differ.
 fn render_optional_variant_template(
+    field: &str,
     template_source: &str,
     span: Option<&Span>,
     context: &EvaluationContext,
@@ -641,7 +639,14 @@ fn render_optional_variant_template(
     match render_template(template_source, context, span) {
         Ok(s) if s.trim().is_empty() => Ok(None),
         Ok(s) => Ok(Some(s)),
-        Err(e) if is_undefined_variable_error(&e) => Ok(None),
+        Err(e) if is_undefined_variable_error(&e) => {
+            let span = *e.span();
+            Err(ParseError::invalid_value(field, e.to_string(), span).with_suggestion(
+                "If this expression references a variant key that is only defined on some \
+                 platforms, provide an explicit fallback with the `default` filter, e.g. \
+                 `${{ my_key | default(0) }}`.",
+            ))
+        }
         Err(e) => Err(e),
     }
 }
@@ -1869,19 +1874,22 @@ impl Evaluate for Stage0VariantKeyUsage {
     type Output = Stage1VariantKeyUsage;
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
-        // A `down_prioritize_variant` expression frequently compares against a
-        // variant key that is only defined on some platforms, e.g.
-        // `${{ 0 if my_level == 1 else 1 }}`. On platforms where the key is
-        // absent there is only a single variant, so the priority is irrelevant:
-        // treat an undefined reference (or an empty render) as "no
-        // down-prioritization" instead of a hard error (#2544).
+        // An empty render (e.g. `${{ 1 if cuda }}` with `cuda` false) means "no
+        // down-prioritization". Undefined variant keys are a hard error with a
+        // hint to use `| default(...)` for keys that are only defined on some
+        // platforms (#2544).
         let down_prioritize_variant = match &self.down_prioritize_variant {
             None => None,
             Some(val) => {
                 let rendered = if let Some(n) = val.as_concrete() {
                     Some(n.to_string())
                 } else if let Some(template) = val.as_template() {
-                    render_optional_variant_template(template.source(), val.span(), context)?
+                    render_optional_variant_template(
+                        "variant.down_prioritize_variant",
+                        template.source(),
+                        val.span(),
+                        context,
+                    )?
                 } else {
                     unreachable!("Value must be either concrete or template")
                 };
@@ -2120,9 +2128,7 @@ impl Evaluate for Stage0Build {
         // A conditional template such as `${{ "python" if use_noarch }}` renders
         // to an empty string when the condition is false; `noarch: null`/`~`
         // renders to a null-like token. Both mean "no noarch" and must behave the
-        // same as omitting the key, rather than erroring (#2291). References to
-        // variant keys that only exist on some platforms are likewise treated as
-        // "no noarch" instead of a hard undefined-variable error.
+        // same as omitting the key, rather than erroring (#2291).
         let noarch = match &self.noarch {
             None => None,
             Some(v) => {
@@ -2130,7 +2136,12 @@ impl Evaluate for Stage0Build {
                     // NoArchType is already validated during parsing.
                     if value.is_none() { None } else { Some(*value) }
                 } else if let Some(template) = v.as_template() {
-                    match render_optional_variant_template(template.source(), v.span(), context)? {
+                    match render_optional_variant_template(
+                        "noarch",
+                        template.source(),
+                        v.span(),
+                        context,
+                    )? {
                         None => None,
                         Some(s) => parse_noarch_string(&s, v.span())?,
                     }
@@ -4080,11 +4091,10 @@ build:
         assert_eq!(noarch_off, None, "false condition means no noarch");
     }
 
-    /// #2291: a conditional `noarch` that references a variant key which is not
-    /// defined on this platform must fall back to "no noarch" instead of failing
-    /// with an undefined-variable error.
+    /// A conditional `noarch` that references an undefined variable is still a
+    /// hard error (strict-undefined checking), with a hint to use `| default()`.
     #[test]
-    fn test_conditional_noarch_undefined_key_is_none() {
+    fn test_conditional_noarch_undefined_key_errors_with_hint() {
         let recipe_yaml = r#"schema_version: 1
 
 package:
@@ -4095,11 +4105,8 @@ build:
   noarch: ${{ "python" if use_noarch }}
 "#;
         // `use_noarch` intentionally not set.
-        let noarch = evaluate_recipe_with_vars(recipe_yaml, &[])
-            .unwrap()
-            .build
-            .noarch;
-        assert_eq!(noarch, None);
+        let err = evaluate_recipe_with_vars(recipe_yaml, &[]).unwrap_err();
+        assert_undefined_with_default_hint(&err);
     }
 
     /// #2291 (wolfv's suggestion): `noarch: null`/`~` and a `"~"` fallback in a
@@ -4151,9 +4158,32 @@ build:
         assert!(evaluate_recipe_with_vars(recipe_yaml, &[]).is_err());
     }
 
-    /// #2544: `down_prioritize_variant` referencing a variant key that only
-    /// exists on some platforms must not error where the key is absent; where it
-    /// is defined, the expression is evaluated normally.
+    /// Assert that an error is an undefined-variable `InvalidValue` carrying the
+    /// `| default(...)` suggestion.
+    fn assert_undefined_with_default_hint(err: &ParseError) {
+        match err {
+            ParseError::InvalidValue {
+                reason, suggestion, ..
+            } => {
+                assert!(
+                    reason.contains("undefined"),
+                    "expected an undefined-variable reason, got: {reason}"
+                );
+                let suggestion = suggestion
+                    .as_deref()
+                    .expect("undefined-variable error should carry a suggestion");
+                assert!(
+                    suggestion.contains("default"),
+                    "suggestion should point at the `default` filter, got: {suggestion}"
+                );
+            }
+            other => panic!("expected InvalidValue with suggestion, got: {other:?}"),
+        }
+    }
+
+    /// #2544: `down_prioritize_variant` referencing a variant key that is not
+    /// defined on this platform errors with a hint to use `| default(...)`;
+    /// where the key is defined, the expression is evaluated normally.
     #[test]
     fn test_down_prioritize_variant_undefined_key() {
         let recipe_yaml = r#"schema_version: 1
@@ -4170,13 +4200,9 @@ build:
     down_prioritize_variant: ${{ 0 if my_level == 1 else 1 }}
 "#;
 
-        // Key absent (e.g. osx-arm64): no down-prioritization, no error.
-        let absent = evaluate_recipe_with_vars(recipe_yaml, &[])
-            .unwrap()
-            .build
-            .variant
-            .down_prioritize_variant;
-        assert_eq!(absent, None);
+        // Key absent (e.g. osx-arm64): strict undefined error with a fix-it hint.
+        let err = evaluate_recipe_with_vars(recipe_yaml, &[]).unwrap_err();
+        assert_undefined_with_default_hint(&err);
 
         // Key defined and matching → 0.
         let matching = evaluate_recipe_with_vars(recipe_yaml, &[("my_level", Variable::from(1i64))])
@@ -4193,6 +4219,31 @@ build:
             .variant
             .down_prioritize_variant;
         assert_eq!(other, Some(1));
+    }
+
+    /// The documented `| default(...)` fallback works for variant keys that are
+    /// only defined on some platforms.
+    #[test]
+    fn test_down_prioritize_variant_default_filter_fallback() {
+        let recipe_yaml = r#"schema_version: 1
+
+package:
+  name: repro
+  version: "1.0"
+
+build:
+  variant:
+    use_keys:
+      - my_level
+    down_prioritize_variant: ${{ 0 if (my_level | default(1)) == 1 else 1 }}
+"#;
+        // `my_level` intentionally not set: the default(1) fallback kicks in.
+        let value = evaluate_recipe_with_vars(recipe_yaml, &[])
+            .unwrap()
+            .build
+            .variant
+            .down_prioritize_variant;
+        assert_eq!(value, Some(0));
     }
 
     #[test]

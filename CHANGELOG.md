@@ -20,7 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Conditional `build.noarch` and `build.variant.down_prioritize_variant` expressions no longer fail when they reference a variant key that is only defined on some platforms. A `noarch` expression that renders to an empty or null-like value (e.g. `noarch: ${{ "python" if use_noarch }}` when `use_noarch` is false, or `noarch: null`/`~`) is now treated as "not a noarch package", identical to omitting the key. Likewise, a `down_prioritize_variant` expression that references an undefined variant key (e.g. `${{ 0 if my_level == 1 else 1 }}` on a platform where `my_level` is not set) now falls back to no down-prioritization instead of erroring. Invalid noarch types and genuine template errors are still reported. (#2291, #2544)
+- A conditional `build.noarch` expression that renders to an empty or null-like value (e.g. `noarch: ${{ "python" if use_noarch }}` when `use_noarch` is false, or `noarch: null`/`~`/`${{ "python" if use_noarch else none }}`) is now treated as "not a noarch package", identical to omitting the key, instead of failing with `Invalid noarch type ''`. Invalid noarch types are still rejected. (#2291)
+- `build.noarch` and `build.variant.down_prioritize_variant` expressions that reference an undefined variable (e.g. a variant key that is only defined on some platforms) now report an error with a suggestion to use the `default` filter as an explicit fallback, e.g. `${{ 0 if (my_level | default(1)) == 1 else 1 }}`. (#2544)
 
 
 ## [0.67.0] - 2026-06-22

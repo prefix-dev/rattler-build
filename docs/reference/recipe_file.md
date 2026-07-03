@@ -729,9 +729,10 @@ build:
 
 An expression that renders to an empty or null-like value (`none`, `null`,
 `~`, or the empty string) — as well as a literal `noarch: null` — is treated
-the same as omitting the `noarch` key entirely. If the expression references a
-variant key that is not defined for the current platform, the package is also
-treated as non-`noarch` rather than failing to render.
+the same as omitting the `noarch` key entirely. Referencing an undefined
+variable is still an error: if the variable is only defined on some platforms,
+provide an explicit fallback with the `default` filter, e.g.
+`${{ "python" if use_noarch | default(false) }}`.
 
 ### Include only certain files in the package
 
