@@ -313,10 +313,11 @@ def test_render_only_with_solve_missing_output_dir(
     """Test that --render-only --with-solve works when the output directory
     does not exist yet.
 
-    Solving registers the output directory as a local channel, which requires
-    the directory to exist on disk. Previously this panicked with
-    "path is a not a valid absolute path" (see issue #2611); it should now
-    create the directory and solve successfully.
+    Solving used to register the output directory as a local channel
+    unconditionally, which panicked with "path is a not a valid absolute path"
+    when the directory was missing (see issue #2611). It should now solve
+    successfully and, consistent with plain --render-only, not create the
+    output directory.
     """
     output_dir = tmp_path / "does" / "not" / "exist"
     assert not output_dir.exists()
@@ -331,6 +332,9 @@ def test_render_only_with_solve_missing_output_dir(
 
     assert result.returncode == 0, f"render-only with solve failed: {result.stderr}"
     assert "is a not a valid absolute path" not in (result.stderr or "")
+    assert not output_dir.exists(), (
+        "output directory should not be created with --render-only"
+    )
 
     outputs = json.loads(result.stdout or "[]")
     assert isinstance(outputs, list) and len(outputs) >= 1

@@ -21,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- `--render-only --with-solve` no longer panics with `path is a not a valid absolute path` when the output directory does not exist yet. The output directory is now created before it is registered as a local channel for solving. (#2611)
+- `--render-only --with-solve` no longer panics with `path is a not a valid absolute path` when the output directory does not exist yet. A missing output directory is now skipped as a local channel during solving instead of being canonicalized. (#2611)
 
 
 ## [0.67.0] - 2026-06-22

@@ -150,12 +150,15 @@ pub async fn build_reindexed_channels(
 ) -> Result<Vec<ChannelUrl>, std::io::Error> {
     let output_dir = &build_configuration.directories.output_dir;
 
-    // Ensure the output directory exists before turning it into a channel.
-    // `Channel::from_directory` canonicalizes the path and panics if it does not
-    // exist, which happens e.g. when running `--render-only --with-solve` without
-    // a pre-existing output directory (see issue #2611).
+    // If the output directory does not exist yet there are no locally built
+    // packages to index, so there is nothing to add as a local channel. Skip it
+    // and return only the configured channels. `Channel::from_directory` would
+    // otherwise panic with "path is a not a valid absolute path" while trying to
+    // canonicalize the missing path, which happened e.g. when running
+    // `--render-only --with-solve` without a pre-existing output directory
+    // (see issue #2611).
     if !output_dir.exists() {
-        fs_err::create_dir_all(output_dir)?;
+        return Ok(build_configuration.channels.clone());
     }
 
     let output_channel = Channel::from_directory(output_dir);
