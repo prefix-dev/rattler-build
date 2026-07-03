@@ -351,6 +351,8 @@ mod test {
         path::{Path, PathBuf},
     };
 
+    use fs_err as fs;
+
     use crate::packaging::file_mapper::filter_pyc;
 
     #[test]
@@ -367,27 +369,27 @@ mod test {
         for (name, input, expected) in cases {
             let src = temp_dir.path().join(name);
             let dst = temp_dir.path().join(format!("out_{name}"));
-            std::fs::write(&src, input).unwrap();
+            fs::write(&src, input).unwrap();
             super::copy_normalizing_line_endings(&src, &dst).unwrap();
-            assert_eq!(&std::fs::read(&dst).unwrap(), expected, "text case {name}");
+            assert_eq!(&fs::read(&dst).unwrap(), expected, "text case {name}");
         }
 
         // Binary data (contains a NUL and a CR/LF byte pair) must be copied verbatim.
         let binary: &[u8] = &[0x00, 0x01, 0x02, 0x0D, 0x0A, 0xFF];
         let src = temp_dir.path().join("data.bin");
         let dst = temp_dir.path().join("data_out.bin");
-        std::fs::write(&src, binary).unwrap();
+        fs::write(&src, binary).unwrap();
         super::copy_normalizing_line_endings(&src, &dst).unwrap();
-        assert_eq!(std::fs::read(&dst).unwrap(), binary, "binary preserved");
+        assert_eq!(fs::read(&dst).unwrap(), binary, "binary preserved");
 
         // UTF-16LE (BOM `FF FE`): `U+0A0D` encodes as bytes `0D 0A`. A naive byte-level
         // CRLF rewrite would corrupt it, so non-UTF-8 encodings are copied verbatim.
         let utf16: &[u8] = &[0xFF, 0xFE, 0x0D, 0x0A, 0x41, 0x00];
         let src = temp_dir.path().join("u16.txt");
         let dst = temp_dir.path().join("u16_out.txt");
-        std::fs::write(&src, utf16).unwrap();
+        fs::write(&src, utf16).unwrap();
         super::copy_normalizing_line_endings(&src, &dst).unwrap();
-        assert_eq!(std::fs::read(&dst).unwrap(), utf16, "utf-16 preserved");
+        assert_eq!(fs::read(&dst).unwrap(), utf16, "utf-16 preserved");
     }
 
     #[test]
@@ -397,16 +399,16 @@ mod test {
 
         let temp_dir = tempfile::tempdir().unwrap();
         let src = temp_dir.path().join("script.sh");
-        std::fs::write(&src, b"#!/bin/sh\r\necho hi\r\n").unwrap();
-        std::fs::set_permissions(&src, std::fs::Permissions::from_mode(0o755)).unwrap();
+        fs::write(&src, b"#!/bin/sh\r\necho hi\r\n").unwrap();
+        fs::set_permissions(&src, std::fs::Permissions::from_mode(0o755)).unwrap();
 
         let dst = temp_dir.path().join("script_out.sh");
         super::copy_normalizing_line_endings(&src, &dst).unwrap();
 
         // The file went through the rewrite path (CRLF was normalized) ...
-        assert_eq!(std::fs::read(&dst).unwrap(), b"#!/bin/sh\necho hi\n");
+        assert_eq!(fs::read(&dst).unwrap(), b"#!/bin/sh\necho hi\n");
         // ... and the executable bit was preserved.
-        let mode = std::fs::metadata(&dst).unwrap().permissions().mode();
+        let mode = fs::metadata(&dst).unwrap().permissions().mode();
         assert_eq!(mode & 0o777, 0o755);
     }
 
