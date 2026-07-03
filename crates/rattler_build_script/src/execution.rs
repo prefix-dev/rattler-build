@@ -767,6 +767,17 @@ pub(crate) async fn run_process_with_replacements(
 
     configure_subprocess_env(&mut command, env_vars, secrets, env_isolation, runtime);
 
+    // Point both stdout and stderr of the child at a single OS pipe so that the
+    // two streams are interleaved by the kernel in the exact order the process
+    // wrote them. Reading them as two separate pipes (and picking whichever has
+    // a line ready) cannot recover the true ordering, because the streams are
+    // buffered independently — the lines racing in `tokio::select!` is what made
+    // the build output appear in random order (issue #2511). Merging is the
+    // same thing the documented `exec 2>&1` workaround does, applied uniformly
+    // regardless of the interpreter running inside the wrapper.
+    let (pipe_reader, pipe_writer) = os_pipe::pipe()?;
+    let pipe_writer_clone = pipe_writer.try_clone()?;
+
     command
         .current_dir(cwd)
         // when using `pixi global install bash` the current work dir
@@ -774,44 +785,46 @@ pub(crate) async fn run_process_with_replacements(
         .env("PWD", cwd)
         .args(&args[1..])
         .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
+        .stdout(Stdio::from(pipe_writer))
+        .stderr(Stdio::from(pipe_writer_clone));
 
-    let mut child = command.spawn()?;
+    let child = command.spawn();
 
-    let stdout = child.stdout.take().expect("Failed to take stdout");
-    let stderr = child.stderr.take().expect("Failed to take stderr");
+    // Drop the parent's copies of the pipe's write end (held by `command`)
+    // *before* reading from it. If any writer is left open on our side the read
+    // end never observes EOF and the loop below would hang forever.
+    drop(command);
+    let mut child = child?;
 
-    let stdout_wrapped = normalize_crlf(stdout);
-    let stderr_wrapped = normalize_crlf(stderr);
+    // Wrap the read end of the merged pipe as an async reader. `tokio::fs::File`
+    // performs the (blocking) pipe reads on the blocking thread pool, which
+    // keeps this cross-platform without a dedicated async pipe abstraction.
+    let merged_std: std::fs::File = {
+        #[cfg(unix)]
+        {
+            use std::os::unix::io::OwnedFd;
+            OwnedFd::from(pipe_reader).into()
+        }
+        #[cfg(windows)]
+        {
+            use std::os::windows::io::OwnedHandle;
+            OwnedHandle::from(pipe_reader).into()
+        }
+    };
+    let merged = normalize_crlf(tokio::fs::File::from_std(merged_std));
+    let mut lines = tokio::io::BufReader::new(merged).lines();
 
-    let mut stdout_lines = tokio::io::BufReader::new(stdout_wrapped).lines();
-    let mut stderr_lines = tokio::io::BufReader::new(stderr_wrapped).lines();
-
-    let mut stdout_log = String::new();
-    let mut stderr_log = String::new();
-    let mut closed = (false, false);
+    let mut output_log = String::new();
 
     loop {
-        let (line, is_stderr) = tokio::select! {
-            line = stdout_lines.next_line() => (line, false),
-            line = stderr_lines.next_line() => (line, true),
-            else => break,
-        };
-
-        match line {
+        match lines.next_line().await {
             Ok(Some(line)) => {
                 let filtered_line = replacements
                     .iter()
                     .fold(line, |acc, (from, to)| acc.replace(from, to));
 
-                if is_stderr {
-                    stderr_log.push_str(&filtered_line);
-                    stderr_log.push('\n');
-                } else {
-                    stdout_log.push_str(&filtered_line);
-                    stdout_log.push('\n');
-                }
+                output_log.push_str(&filtered_line);
+                output_log.push('\n');
 
                 // Write to log file
                 if let Err(e) = log_file.write_all(filtered_line.as_bytes()).await {
@@ -823,17 +836,11 @@ pub(crate) async fn run_process_with_replacements(
 
                 tracing::info!("{}", filtered_line);
             }
-            Ok(None) if !is_stderr => closed.0 = true,
-            Ok(None) if is_stderr => closed.1 = true,
-            Ok(None) => unreachable!(),
+            Ok(None) => break,
             Err(e) => {
                 tracing::warn!("Error reading output: {:?}", e);
                 break;
             }
-        };
-        // make sure we close the loop when both stdout and stderr are closed
-        if closed == (true, true) {
-            break;
         }
     }
 
@@ -846,8 +853,8 @@ pub(crate) async fn run_process_with_replacements(
 
     Ok(std::process::Output {
         status,
-        stdout: stdout_log.into_bytes(),
-        stderr: stderr_log.into_bytes(),
+        stdout: output_log.into_bytes(),
+        stderr: Vec::new(),
     })
 }
 
@@ -856,6 +863,43 @@ mod tests {
     use super::*;
     use rattler_conda_types::Platform;
     use tokio_util::bytes::BytesMut;
+
+    /// Regression test for <https://github.com/prefix-dev/rattler-build/issues/2511>
+    ///
+    /// stdout and stderr must be interleaved in the order the process wrote
+    /// them. Reading them as two separate pipes raced the streams and produced
+    /// random ordering; merging them into a single OS pipe preserves order.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn test_stdout_stderr_interleaved_in_write_order() {
+        let tmp = tempfile::tempdir().unwrap();
+        let script = "echo 1 err >&2; echo 2 out; echo 3 err >&2; echo 4 out";
+        let args = ["bash", "-c", script];
+
+        // Run repeatedly: the previous select!-based reader produced a different
+        // (random) order across runs, so a single pass could pass by luck.
+        for _ in 0..20 {
+            let output = run_process_with_replacements(
+                &args,
+                tmp.path(),
+                &HashMap::new(),
+                &IndexMap::new(),
+                &IndexMap::new(),
+                EnvironmentIsolation::None,
+                None,
+                &RuntimeEnv::current(),
+            )
+            .await
+            .unwrap();
+
+            assert!(output.status.success());
+            assert_eq!(
+                String::from_utf8_lossy(&output.stdout),
+                "1 err\n2 out\n3 err\n4 out\n",
+                "stdout/stderr must stay interleaved in write order"
+            );
+        }
+    }
 
     /// `CONDA_BUILD=1` must live inside the sourced activation script so that
     /// nested shells inherit it while the outer subprocess starts without it.

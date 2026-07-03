@@ -61,6 +61,7 @@ libc = "0.2"
 md-5 = "0.11"
 lazy_static = "1.5.0"
 miette = "7.6.0"
+os_pipe = "1.2.3"
 minijinja = { version = "2.18.0", features = [
   "unstable_machinery",
   "custom_syntax",
