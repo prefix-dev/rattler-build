@@ -4061,103 +4061,6 @@ requirements:
         }
     }
 
-    /// #2291: `noarch: ${{ "python" if use_noarch }}` must render to "no noarch"
-    /// (rather than erroring on the empty string) when the condition is false,
-    /// while still producing `python` when true.
-    #[test]
-    fn test_conditional_noarch_toggles_with_variant() {
-        let recipe_yaml = r#"schema_version: 1
-
-package:
-  name: coverage
-  version: "1.0"
-
-build:
-  number: 1
-  noarch: ${{ "python" if use_noarch }}
-"#;
-
-        let noarch_on = evaluate_recipe_with_vars(recipe_yaml, &[("use_noarch", Variable::from(true))])
-            .unwrap()
-            .build
-            .noarch;
-        assert_eq!(noarch_on, Some(NoArchType::python()));
-
-        let noarch_off =
-            evaluate_recipe_with_vars(recipe_yaml, &[("use_noarch", Variable::from(false))])
-                .unwrap()
-                .build
-                .noarch;
-        assert_eq!(noarch_off, None, "false condition means no noarch");
-    }
-
-    /// A conditional `noarch` that references an undefined variable is still a
-    /// hard error (strict-undefined checking), with a hint to use `| default()`.
-    #[test]
-    fn test_conditional_noarch_undefined_key_errors_with_hint() {
-        let recipe_yaml = r#"schema_version: 1
-
-package:
-  name: coverage
-  version: "1.0"
-
-build:
-  noarch: ${{ "python" if use_noarch }}
-"#;
-        // `use_noarch` intentionally not set.
-        let err = evaluate_recipe_with_vars(recipe_yaml, &[]).unwrap_err();
-        assert_undefined_with_default_hint(&err);
-    }
-
-    /// #2291 (wolfv's suggestion): `noarch: null`/`~` and a `"~"` fallback in a
-    /// template are accepted and mean "no noarch".
-    #[test]
-    fn test_noarch_null_like_values() {
-        for literal in ["null", "~", "none"] {
-            let recipe_yaml = format!(
-                "schema_version: 1\n\npackage:\n  name: p\n  version: \"1.0\"\n\nbuild:\n  noarch: {literal}\n"
-            );
-            let noarch = evaluate_recipe_with_vars(&recipe_yaml, &[])
-                .unwrap()
-                .build
-                .noarch;
-            assert_eq!(noarch, None, "`noarch: {literal}` should mean no noarch");
-        }
-
-        // `${{ "python" if use_noarch else "~" }}` — the `~` else-branch is a
-        // null-like token that means "no noarch".
-        let recipe_yaml = r#"schema_version: 1
-
-package:
-  name: p
-  version: "1.0"
-
-build:
-  noarch: ${{ "python" if use_noarch else "~" }}
-"#;
-        let noarch =
-            evaluate_recipe_with_vars(recipe_yaml, &[("use_noarch", Variable::from(false))])
-                .unwrap()
-                .build
-                .noarch;
-        assert_eq!(noarch, None);
-    }
-
-    /// An invalid (non-null-like) noarch value must still be rejected.
-    #[test]
-    fn test_invalid_noarch_still_errors() {
-        let recipe_yaml = r#"schema_version: 1
-
-package:
-  name: p
-  version: "1.0"
-
-build:
-  noarch: ${{ "banana" }}
-"#;
-        assert!(evaluate_recipe_with_vars(recipe_yaml, &[]).is_err());
-    }
-
     /// Assert that an error is an undefined-variable `InvalidValue` carrying the
     /// `| default(...)` suggestion.
     fn assert_undefined_with_default_hint(err: &ParseError) {
@@ -4181,69 +4084,61 @@ build:
         }
     }
 
-    /// #2544: `down_prioritize_variant` referencing a variant key that is not
-    /// defined on this platform errors with a hint to use `| default(...)`;
-    /// where the key is defined, the expression is evaluated normally.
+    /// #2291: conditional `noarch` expressions.
     #[test]
-    fn test_down_prioritize_variant_undefined_key() {
-        let recipe_yaml = r#"schema_version: 1
+    fn test_conditional_noarch() {
+        let eval = |noarch: &str, vars: &[(&str, Variable)]| {
+            let recipe = format!(
+                "schema_version: 1\n\npackage:\n  name: p\n  version: \"1.0\"\n\nbuild:\n  noarch: {noarch}\n"
+            );
+            evaluate_recipe_with_vars(&recipe, vars).map(|r| r.build.noarch)
+        };
+        let cond = r#"${{ "python" if use_noarch }}"#;
+        let on = &[("use_noarch", Variable::from(true))][..];
+        let off = &[("use_noarch", Variable::from(false))][..];
 
-package:
-  name: repro
-  version: "1.0"
-
-build:
-  number: 0
-  variant:
-    use_keys:
-      - my_level
-    down_prioritize_variant: ${{ 0 if my_level == 1 else 1 }}
-"#;
-
-        // Key absent (e.g. osx-arm64): strict undefined error with a fix-it hint.
-        let err = evaluate_recipe_with_vars(recipe_yaml, &[]).unwrap_err();
-        assert_undefined_with_default_hint(&err);
-
-        // Key defined and matching → 0.
-        let matching = evaluate_recipe_with_vars(recipe_yaml, &[("my_level", Variable::from(1i64))])
-            .unwrap()
-            .build
-            .variant
-            .down_prioritize_variant;
-        assert_eq!(matching, Some(0));
-
-        // Key defined and not matching → 1.
-        let other = evaluate_recipe_with_vars(recipe_yaml, &[("my_level", Variable::from(3i64))])
-            .unwrap()
-            .build
-            .variant
-            .down_prioritize_variant;
-        assert_eq!(other, Some(1));
+        assert_eq!(eval(cond, on).unwrap(), Some(NoArchType::python()));
+        // A false condition renders empty → same as omitting the key.
+        assert_eq!(eval(cond, off).unwrap(), None);
+        // Null-like literals and template renders also mean "no noarch".
+        for expr in [
+            "null",
+            "~",
+            "none",
+            r#"${{ "python" if use_noarch else none }}"#,
+            r#"${{ "python" if use_noarch else "~" }}"#,
+        ] {
+            assert_eq!(eval(expr, off).unwrap(), None, "`noarch: {expr}`");
+        }
+        // Undefined variables are still a hard error, with a `default` hint.
+        assert_undefined_with_default_hint(&eval(cond, &[]).unwrap_err());
+        // Invalid noarch types are still rejected.
+        assert!(eval(r#"${{ "banana" }}"#, &[]).is_err());
     }
 
-    /// The documented `| default(...)` fallback works for variant keys that are
-    /// only defined on some platforms.
+    /// #2544: `down_prioritize_variant` referencing a variant key that is only
+    /// defined on some platforms.
     #[test]
-    fn test_down_prioritize_variant_default_filter_fallback() {
-        let recipe_yaml = r#"schema_version: 1
+    fn test_down_prioritize_variant_conditional_key() {
+        let eval = |expr: &str, vars: &[(&str, Variable)]| {
+            let recipe = format!(
+                "schema_version: 1\n\npackage:\n  name: p\n  version: \"1.0\"\n\nbuild:\n  variant:\n    use_keys:\n      - my_level\n    down_prioritize_variant: {expr}\n"
+            );
+            evaluate_recipe_with_vars(&recipe, vars)
+                .map(|r| r.build.variant.down_prioritize_variant)
+        };
+        let cond = "${{ 0 if my_level == 1 else 1 }}";
 
-package:
-  name: repro
-  version: "1.0"
-
-build:
-  variant:
-    use_keys:
-      - my_level
-    down_prioritize_variant: ${{ 0 if (my_level | default(1)) == 1 else 1 }}
-"#;
-        // `my_level` intentionally not set: the default(1) fallback kicks in.
-        let value = evaluate_recipe_with_vars(recipe_yaml, &[])
-            .unwrap()
-            .build
-            .variant
-            .down_prioritize_variant;
-        assert_eq!(value, Some(0));
+        // Key defined: evaluated normally.
+        assert_eq!(eval(cond, &[("my_level", Variable::from(1i64))]).unwrap(), Some(0));
+        assert_eq!(eval(cond, &[("my_level", Variable::from(3i64))]).unwrap(), Some(1));
+        // Key absent (e.g. osx-arm64): strict undefined error with a fix-it hint.
+        assert_undefined_with_default_hint(&eval(cond, &[]).unwrap_err());
+        // The documented `| default(...)` fallback renders with the key absent.
+        assert_eq!(
+            eval("${{ 0 if (my_level | default(1)) == 1 else 1 }}", &[]).unwrap(),
+            Some(0)
+        );
     }
 
     #[test]
