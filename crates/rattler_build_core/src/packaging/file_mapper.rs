@@ -19,22 +19,40 @@ use super::PackagingError;
 /// resulting archive differ from one built on Unix (see
 /// <https://github.com/prefix-dev/rattler-build/issues/837>).
 ///
-/// To keep the transformation safe we only rewrite files that are valid UTF-8 text.
-/// Binary files and other text encodings (e.g. UTF-16/UTF-32, where a naive byte-level
-/// CRLF rewrite could corrupt multi-byte code units such as `U+0A0D`) are copied
-/// verbatim. Files that already use LF exclusively are also copied verbatim, which
-/// preserves the fast copy path and the original file metadata.
+/// To keep the transformation safe (and cheap) we only rewrite UTF-8 text files that
+/// actually contain a carriage return. Everything else is streamed straight through
+/// `fs::copy` without being read into memory:
+///
+/// * Binary files and other text encodings (e.g. UTF-16/UTF-32, where a naive byte-level
+///   CRLF rewrite could corrupt multi-byte code units such as `U+0A0D`) are classified
+///   from the first kilobyte and copied verbatim.
+/// * UTF-8 files that already use LF exclusively are copied verbatim too, which preserves
+///   the fast copy path and the original file metadata.
 fn copy_normalizing_line_endings(src: &Path, dst: &Path) -> Result<(), PackagingError> {
-    let content = fs::read(src)?;
+    use std::io::Read;
 
-    // Inspect the leading bytes to decide whether the file looks like text, mirroring
-    // how content types are detected elsewhere in the packaging code.
-    let is_text = content_inspector::inspect(&content[..content.len().min(1024)]).is_text();
+    // Classify the file from its first kilobyte so that large binary files are never
+    // read fully into memory just to be copied back out unchanged.
+    let mut file = fs::File::open(src)?;
+    let mut buffer = vec![0u8; 1024];
+    let read = file.read(&mut buffer)?;
+    buffer.truncate(read);
+    let content_type = content_inspector::inspect(&buffer);
 
-    if is_text && let Ok(text) = std::str::from_utf8(&content) {
-        let normalized = LineEnding::normalize(text);
-        if normalized.as_bytes() != content.as_slice() {
-            fs::write(dst, normalized.as_bytes())?;
+    // Only genuine UTF-8 (with or without BOM) is a candidate for normalization.
+    if matches!(
+        content_type,
+        content_inspector::ContentType::UTF_8 | content_inspector::ContentType::UTF_8_BOM
+    ) {
+        // Read the rest of the file, reusing the bytes we already inspected.
+        file.read_to_end(&mut buffer)?;
+
+        // Only touch files that actually contain a carriage return, and only if the
+        // whole file is valid UTF-8 (the leading kilobyte can be misleading).
+        if memchr::memchr(b'\r', &buffer).is_some()
+            && let Ok(text) = std::str::from_utf8(&buffer)
+        {
+            fs::write(dst, LineEnding::normalize(text).as_bytes())?;
             // Preserve the permissions (e.g. the executable bit) that `fs::copy`
             // would otherwise carry over.
             fs::set_permissions(dst, fs::metadata(src)?.permissions())?;
@@ -42,7 +60,7 @@ fn copy_normalizing_line_endings(src: &Path, dst: &Path) -> Result<(), Packaging
         }
     }
 
-    // Binary, non-UTF-8, or already LF-normalized files are copied unchanged.
+    // Binary, non-UTF-8, or already LF-only files are copied unchanged.
     fs::copy(src, dst)?;
     Ok(())
 }
