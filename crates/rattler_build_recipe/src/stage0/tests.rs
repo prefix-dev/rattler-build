@@ -102,6 +102,26 @@ pub struct DownstreamTest {
     pub downstream: Value<String>,
 }
 
+/// A test that checks the ABI of the shared libraries in the package against a
+/// previously published version of the same package
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AbiCheckTest {
+    /// The pin expression (`x.x` syntax, as used in pinnings) that selects the range of
+    /// previously published versions that must remain ABI compatible. The lowest published
+    /// version matching the pin is used as the comparison baseline. Defaults to `x.x`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pin: Option<Value<String>>,
+
+    /// Glob patterns that select the libraries to check (defaults to all shared libraries
+    /// found in the package)
+    #[serde(default, skip_serializing_if = "ConditionalList::is_empty")]
+    pub libraries: ConditionalList<String>,
+
+    /// Glob patterns for exported symbol names that should be ignored in the comparison
+    #[serde(default, skip_serializing_if = "ConditionalList::is_empty")]
+    pub ignore_symbols: ConditionalList<String>,
+}
+
 /// Package content test that compares the contents of the package with the expected contents
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PackageContentsTest {
@@ -180,6 +200,12 @@ pub enum TestType {
         /// The package contents to test against
         package_contents: PackageContentsTest,
     },
+    /// A test that checks the ABI of the shared libraries in the package against a
+    /// previously published version of the same package
+    AbiCheck {
+        /// The ABI check to run
+        abi_check: AbiCheckTest,
+    },
 }
 
 impl TestType {
@@ -249,6 +275,13 @@ impl TestType {
                     vars.extend(include.exists.used_variables());
                     vars.extend(include.not_exists.used_variables());
                 }
+            }
+            TestType::AbiCheck { abi_check } => {
+                if let Some(pin) = &abi_check.pin {
+                    vars.extend(pin.used_variables());
+                }
+                vars.extend(abi_check.libraries.used_variables());
+                vars.extend(abi_check.ignore_symbols.used_variables());
             }
         }
         vars.sort();

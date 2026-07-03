@@ -56,7 +56,8 @@ use crate::{
             UrlSource as Stage0UrlSource,
         },
         tests::{
-            CommandsTest as Stage0CommandsTest, CommandsTestFiles as Stage0CommandsTestFiles,
+            AbiCheckTest as Stage0AbiCheckTest, CommandsTest as Stage0CommandsTest,
+            CommandsTestFiles as Stage0CommandsTestFiles,
             CommandsTestRequirements as Stage0CommandsTestRequirements,
             DownstreamTest as Stage0DownstreamTest,
             PackageContentsCheckFiles as Stage0PackageContentsCheckFiles,
@@ -85,7 +86,8 @@ use crate::{
             Source as Stage1Source, UrlSource as Stage1UrlSource, parse_publisher_string,
         },
         tests::{
-            CommandsTest as Stage1CommandsTest, CommandsTestFiles as Stage1CommandsTestFiles,
+            AbiCheckTest as Stage1AbiCheckTest, CommandsTest as Stage1CommandsTest,
+            CommandsTestFiles as Stage1CommandsTestFiles,
             CommandsTestRequirements as Stage1CommandsTestRequirements,
             DownstreamTest as Stage1DownstreamTest,
             PackageContentsCheckFiles as Stage1PackageContentsCheckFiles,
@@ -2554,6 +2556,37 @@ impl Evaluate for Stage0DownstreamTest {
     }
 }
 
+impl Evaluate for Stage0AbiCheckTest {
+    type Output = Stage1AbiCheckTest;
+
+    fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
+        let pin = match &self.pin {
+            None => Stage1AbiCheckTest::default().pin,
+            Some(value) => {
+                let evaluated = evaluate_string_value(value, context)?;
+                evaluated
+                    .parse::<rattler_build_types::PinExpression>()
+                    .map_err(|e| {
+                        ParseError::invalid_value(
+                            "pin",
+                            format!("invalid pin expression '{}': {}", evaluated, e),
+                            value.span().cloned().unwrap_or_else(Span::new_blank),
+                        )
+                        .with_suggestion(
+                            "The pin must use the `x.x` syntax (e.g. `x`, `x.x` or `x.x.x`)",
+                        )
+                    })?
+            }
+        };
+
+        Ok(Stage1AbiCheckTest {
+            pin,
+            libraries: evaluate_glob_vec_simple(&self.libraries, context)?,
+            ignore_symbols: evaluate_glob_vec_simple(&self.ignore_symbols, context)?,
+        })
+    }
+}
+
 // Note: Can't use macro for PackageContentsCheckFiles because fields need GlobVec conversion
 
 impl Evaluate for Stage0PackageContentsCheckFiles {
@@ -2660,6 +2693,9 @@ fn evaluate_test_type(
                 package_contents: package_contents.evaluate(context)?,
             })
         }
+        Stage0TestType::AbiCheck { abi_check } => Ok(Stage1TestType::AbiCheck {
+            abi_check: abi_check.evaluate(context)?,
+        }),
     }
 }
 
@@ -4586,6 +4622,122 @@ outputs:
             }
             _ => panic!("Expected MultiOutputRecipe"),
         }
+    }
+
+    #[test]
+    fn test_evaluate_abi_check_test() {
+        use crate::stage0::parser::parse_recipe_or_multi_from_source;
+
+        let recipe_yaml = r#"
+package:
+  name: test-package
+  version: 1.0.0
+
+tests:
+  - abi_check:
+      pin: x.x.x
+      libraries:
+        - lib/libfoo*
+      ignore_symbols:
+        - _internal_*
+  - abi_check:
+      pin: ${{ abi_pin }}
+  - abi_check: {}
+"#;
+
+        let parsed = parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let stage0::Recipe::SingleOutput(recipe) = parsed else {
+            panic!("Expected single output recipe");
+        };
+
+        let mut ctx = EvaluationContext::new();
+        ctx.insert("abi_pin".to_string(), Variable::from_string("x.x"));
+
+        let tests: Vec<Stage1TestType> = recipe
+            .tests
+            .as_slice()
+            .iter()
+            .flat_map(|item| evaluate_test(item, &ctx).unwrap())
+            .collect();
+        assert_eq!(tests.len(), 3);
+
+        // Fully specified test
+        let Stage1TestType::AbiCheck { abi_check } = &tests[0] else {
+            panic!("Expected AbiCheck test");
+        };
+        assert_eq!(abi_check.pin.to_string(), "x.x.x");
+        assert!(
+            abi_check
+                .libraries
+                .is_match(std::path::Path::new("lib/libfoo.so.1"))
+        );
+        assert!(
+            !abi_check
+                .libraries
+                .is_match(std::path::Path::new("lib/libbar.so.1"))
+        );
+        assert!(
+            abi_check
+                .ignore_symbols
+                .is_match(std::path::Path::new("_internal_free"))
+        );
+
+        // Pin coming from a Jinja variable
+        let Stage1TestType::AbiCheck { abi_check } = &tests[1] else {
+            panic!("Expected AbiCheck test");
+        };
+        assert_eq!(abi_check.pin.to_string(), "x.x");
+
+        // All defaults
+        let Stage1TestType::AbiCheck { abi_check } = &tests[2] else {
+            panic!("Expected AbiCheck test");
+        };
+        assert_eq!(abi_check.pin.to_string(), "x.x");
+        assert!(abi_check.libraries.is_empty());
+        assert!(abi_check.ignore_symbols.is_empty());
+    }
+
+    #[test]
+    fn test_parse_abi_check_test_unknown_field() {
+        use crate::stage0::parser::parse_recipe_or_multi_from_source;
+
+        let recipe_yaml = r#"
+package:
+  name: test-package
+  version: 1.0.0
+
+tests:
+  - abi_check:
+      pin: x.x
+      symbols: foo
+"#;
+
+        let err = parse_recipe_or_multi_from_source(recipe_yaml).unwrap_err();
+        assert!(err.to_string().contains("unknown field 'symbols'"));
+    }
+
+    #[test]
+    fn test_evaluate_abi_check_test_invalid_pin() {
+        use crate::stage0::parser::parse_recipe_or_multi_from_source;
+
+        let recipe_yaml = r#"
+package:
+  name: test-package
+  version: 1.0.0
+
+tests:
+  - abi_check:
+      pin: not-a-pin
+"#;
+
+        let parsed = parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let stage0::Recipe::SingleOutput(recipe) = parsed else {
+            panic!("Expected single output recipe");
+        };
+
+        let ctx = EvaluationContext::new();
+        let err = evaluate_test(&recipe.tests.as_slice()[0], &ctx).unwrap_err();
+        assert!(err.to_string().contains("invalid pin expression"));
     }
 
     #[test]
