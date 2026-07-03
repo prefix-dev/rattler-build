@@ -385,14 +385,13 @@ pub fn evaluate_late_bound_path_list(
     })
 }
 
-/// Evaluate license file patterns into a single [`stage1::LicenseFiles`],
-/// keeping entries that reference late-bound build directory variables (e.g.
-/// `${{ PREFIX }}/share/licenses/LICENSE`) apart from ordinary relative globs
-/// internally while presenting them as one unit.
+/// Evaluate license file patterns into a single [`stage1::LateBoundGlobVec`]
+/// that mixes ordinary globs and entries referencing late-bound build directory
+/// variables (e.g. `${{ PREFIX }}/share/licenses/LICENSE`) in one list.
 pub fn evaluate_license_files(
     list: &ConditionalList<String>,
     context: &EvaluationContext,
-) -> Result<stage1::LicenseFiles, ParseError> {
+) -> Result<stage1::LateBoundGlobVec, ParseError> {
     let entries = evaluate_conditional_list(list.as_slice(), context, |value, ctx| {
         let rendered = evaluate_value_late_bound(value, ctx, rattler_build_types::LICENSE_VARS)?;
 
@@ -418,25 +417,15 @@ pub fn evaluate_license_files(
         Ok(Some(rendered))
     })?;
 
-    let mut glob_sources = Vec::new();
-    let mut late_bound = Vec::new();
-    for entry in entries {
-        if entry.is_late_bound() {
-            late_bound.push(entry);
-        } else {
-            glob_sources.push(entry.as_str().to_string());
-        }
-    }
+    let sources: Vec<String> = entries.iter().map(|e| e.as_str().to_string()).collect();
 
-    let globs = GlobVec::from_strings(glob_sources, Vec::new()).map_err(|e| {
+    stage1::LateBoundGlobVec::from_sources(sources, Vec::new()).map_err(|e| {
         ParseError::invalid_value(
             "glob set",
             format!("Failed to build glob set: {}", e),
             Span::new_blank(),
         )
-    })?;
-
-    Ok(stage1::LicenseFiles::new(globs, late_bound))
+    })
 }
 
 /// Evaluate a simple conditional expression
@@ -3829,17 +3818,30 @@ mod tests {
         ]);
         let license_files = evaluate_license_files(&list, &ctx).unwrap();
 
+        // The full list preserves declaration order, mixing both kinds.
+        let sources: Vec<_> = license_files.entries().iter().map(|g| g.source()).collect();
+        assert_eq!(
+            sources,
+            vec![
+                "LICENSE",
+                "${{ PREFIX }}/share/licenses/foo/LICENSE",
+                "licenses/*.txt"
+            ]
+        );
+
+        // Only the token-free entries are compiled into the glob set.
         let glob_sources: Vec<_> = license_files
-            .globs()
+            .ordinary_globs()
             .include_globs()
             .iter()
             .map(|g| g.source().to_string())
             .collect();
         assert_eq!(glob_sources, vec!["LICENSE", "licenses/*.txt"]);
 
-        assert_eq!(license_files.late_bound().len(), 1);
+        let late_bound: Vec<_> = license_files.late_bound().collect();
+        assert_eq!(late_bound.len(), 1);
         assert_eq!(
-            license_files.late_bound()[0].as_str(),
+            late_bound[0].source(),
             "${{ PREFIX }}/share/licenses/foo/LICENSE"
         );
     }
