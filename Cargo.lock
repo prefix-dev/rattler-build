@@ -2232,9 +2232,9 @@ dependencies = [
 
 [[package]]
 name = "flickzeug"
-version = "0.5.1"
+version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c95ac51c7950d711fb128681fccb1dddd41c81eb230d78251e600a0296fdd30c"
+checksum = "c80b84a6c2a0750383008cd384de902d69b4a9c5009f784e092259b98803bc45"
 dependencies = [
  "nu-ansi-term",
  "strsim",

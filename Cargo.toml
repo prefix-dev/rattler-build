@@ -114,7 +114,7 @@ unicode-normalization = "0.1.25"
 # Dependencies used in subcrates (workspace-level)
 clap-verbosity-flag = "3.0.4"
 comfy-table = "7.2.2"
-flickzeug = "0.5.1"
+flickzeug = "0.5.2"
 goblin = "0.10.5"
 ignore = "0.4.25"
 num_cpus = "1.17.0"
