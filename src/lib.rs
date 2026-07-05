@@ -23,6 +23,7 @@ pub use rattler_build_core::tool_configuration;
 pub use rattler_build_core::types;
 pub use rattler_build_core::utils;
 
+pub mod config;
 pub mod opt;
 
 // Re-export recipe generator

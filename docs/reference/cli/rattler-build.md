@@ -41,7 +41,7 @@ rattler-build [OPTIONS] [COMMAND]
 <br>**env**: `RATTLER_BUILD_WRAP_LOG_LINES`
 <br>**options**: `true`, `false`
 - <a id="arg---config-file" href="#arg---config-file">`--config-file <CONFIG_FILE>`</a>
-:  The Rattler-Build configuration file to use
+:  The Rattler-Build configuration file to use. If not set, configuration is loaded from the default locations (the system-wide and global pixi configuration files as well as rattler-build's own configuration files)
 - <a id="arg---color" href="#arg---color">`--color <COLOR>`</a>
 :  Enable or disable colored output from Rattler-Build. Also honors the `CLICOLOR` and `CLICOLOR_FORCE` environment variable
 <br>**env**: `RATTLER_BUILD_COLOR`

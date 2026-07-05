@@ -15,6 +15,7 @@ use std::{
 
 use clap::{CommandFactory, Parser};
 use miette::IntoDiagnostic;
+use rattler_build::config::{Config, load_default_config};
 use rattler_build::{
     build_recipes, bump_recipe,
     console_utils::init_logging,
@@ -26,7 +27,6 @@ use rattler_build::{
     publish_packages, rebuild, run_test, show_package_info,
     tool_configuration::APP_USER_AGENT,
 };
-use rattler_config::config::ConfigBase;
 use rattler_upload::upload_from_args;
 use tempfile::{TempDir, tempdir};
 
@@ -153,9 +153,14 @@ async fn async_main() -> miette::Result<()> {
     .into_diagnostic()?;
 
     let config = if let Some(config_path) = app.config_file {
-        Some(ConfigBase::<()>::load_from_files(&[config_path]).into_diagnostic()?)
+        // An explicitly passed configuration file disables the automatic
+        // discovery and is used as-is.
+        Some(Config::load_from_files(&[config_path]).into_diagnostic()?)
     } else {
-        None
+        // Otherwise, load and merge the configuration from the default
+        // locations (system-wide and global pixi configuration as well as
+        // rattler-build's own configuration files).
+        load_default_config().into_diagnostic()?
     };
 
     match app.subcommand {

@@ -4,6 +4,7 @@
 
 use std::{collections::HashMap, path::PathBuf, str::FromStr};
 
+use ::rattler_build::config::Config;
 use ::rattler_build::{
     build_recipes,
     opt::{BuildData, ChannelPriorityWrapper, CommonData, TestData},
@@ -14,7 +15,7 @@ use clap::ValueEnum;
 use pyo3::prelude::*;
 use rattler_build_script::EnvironmentIsolation;
 use rattler_conda_types::{NamedChannelOrUrl, Platform};
-use rattler_config::config::{ConfigBase, build::PackageFormatAndCompression};
+use rattler_config::config::build::PackageFormatAndCompression;
 
 use crate::error::RattlerBuildError;
 use crate::repodata_revision::PyRepodataRevision;
@@ -64,7 +65,7 @@ pub fn build_recipes_py(
         .map(|c| ChannelPriorityWrapper::from_str(&c).map(|c| c.value))
         .transpose()
         .map_err(|e| RattlerBuildError::ChannelPriority(e.to_string()))?;
-    let config = ConfigBase::<()>::default();
+    let config = Config::default();
     let v3 = matches!(
         repodata_revision.unwrap_or_default(),
         PyRepodataRevision::V3
@@ -176,7 +177,7 @@ pub fn test_package_py(
         .map(|c| ChannelPriorityWrapper::from_str(&c).map(|c| c.value))
         .transpose()
         .map_err(|e| RattlerBuildError::ChannelPriority(e.to_string()))?;
-    let config = ConfigBase::<()>::default();
+    let config = Config::default();
     let common = CommonData::new(
         None,
         false,

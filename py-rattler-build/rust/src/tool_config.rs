@@ -87,7 +87,7 @@ impl PyToolConfiguration {
             })
             .transpose()?;
 
-        let config = rattler_config::config::ConfigBase::<()>::default();
+        let config = rattler_build::config::Config::default();
 
         let mut builder = Configuration::builder()
             .with_keep_build(keep_build)
