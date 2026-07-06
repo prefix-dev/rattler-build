@@ -3122,12 +3122,6 @@ fn evaluate_package_output_to_recipe(
         // output does not set itself, EXCEPT the script (the cache has its own
         // script; a cache-inheriting output packages the restored files and
         // does not need to re-run the top-level script).
-        //
-        // We reuse `merge_stage1_build` as the single source of truth for which
-        // build fields are inheritable, then restore the output's own script.
-        // Maintaining a separate hand-written field list here caused top-level
-        // settings (build number, `files`, ...) to be silently dropped whenever
-        // a new field was added but not mirrored into this branch (see #2497).
         let toplevel_build = recipe.build.evaluate(context)?;
         let output_build = output.build.evaluate(context)?;
         let output_script = output_build.script.clone();
