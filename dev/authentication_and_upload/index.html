@@ -1538,6 +1538,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#how-authentication-is-resolved" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How authentication is resolved
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2852,6 +2863,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#how-authentication-is-resolved" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How authentication is resolved
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3015,6 +3037,25 @@ channels that you have access to.</p>
 <li><code>BasicHTTP</code>: artifactory</li>
 <li><code>S3Credentials</code>: S3 buckets</li>
 </ul>
+<h3 id="how-authentication-is-resolved">How authentication is resolved<a class="headerlink" href="#how-authentication-is-resolved" title="Permanent link">#</a></h3>
+<p>Rattler-Build uses the same authentication machinery as <code>rattler</code>, <code>pixi</code> and
+other tools built on it. When it needs credentials for a host, it consults the
+following storage backends in order and uses the first match:</p>
+<ol>
+<li>The file pointed to by the <code>RATTLER_AUTH_FILE</code> environment variable, if set.</li>
+<li>The operating system keyring, where credentials from <code>rattler-build auth
+   login</code> are stored (macOS Keychain, Windows Credential Manager, or the
+   Secret Service / <code>libsecret</code> on Linux).</li>
+<li>The fallback credentials file at <code>~/.rattler/credentials.json</code>. This is used
+   when a keyring is not available (for example on headless Linux machines) and
+   has the exact same JSON format as <code>RATTLER_AUTH_FILE</code>.</li>
+<li>A <a href="https://everything.curl.dev/usingcurl/netrc.html"><code>.netrc</code></a> file in your
+   home directory (or the file pointed to by the <code>NETRC</code> environment variable),
+   which provides <code>BasicHTTP</code> credentials.</li>
+</ol>
+<p>Because all of these backends share the same JSON format, the credentials
+written by <code>rattler-build auth login</code> can also be read by other rattler-based
+tools such as <code>pixi</code>, and vice versa.</p>
 <h2 id="uploading-packages">Uploading packages<a class="headerlink" href="#uploading-packages" title="Permanent link">#</a></h2>
 <p>If you want to upload packages, then Rattler-Build comes with a built-in
 <code>upload</code> command. There are the following options:</p>

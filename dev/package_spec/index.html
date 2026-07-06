@@ -1787,6 +1787,39 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#inforun_exportsjson" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        info/run_exports.json
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#infolinkjson" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        info/link.json
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#infohash_inputjson" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        info/hash_input.json
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#inforecipe" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1799,6 +1832,17 @@
         
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#differences-from-conda-build-packages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Differences from conda-build packages
+      
+    </span>
+  </a>
   
 </li>
       
@@ -2880,6 +2924,39 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#inforun_exportsjson" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        info/run_exports.json
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#infolinkjson" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        info/link.json
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#infohash_inputjson" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        info/hash_input.json
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#inforecipe" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2892,6 +2969,17 @@
         
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#differences-from-conda-build-packages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Differences from conda-build packages
+      
+    </span>
+  </a>
   
 </li>
       
@@ -3120,6 +3208,17 @@ use different names in the recipe.</p>
 <p>(this field is not used anymore as we rely on SPDX license identifiers)</p>
 </dd>
 </dl>
+<h3 id="inforun_exportsjson"><code>info/run_exports.json</code><a class="headerlink" href="#inforun_exportsjson" title="Permanent link">#</a></h3>
+<p>Optional file. Contains the <code>run_exports</code> that this package defines (the
+requirements that are automatically added to packages that depend on this one).
+It is only written when the recipe actually defines any run exports.</p>
+<h3 id="infolinkjson"><code>info/link.json</code><a class="headerlink" href="#infolinkjson" title="Permanent link">#</a></h3>
+<p>Contains information used at link (install) time, such as the <code>noarch</code> type and
+the version of the tool that created the package.</p>
+<h3 id="infohash_inputjson"><code>info/hash_input.json</code><a class="headerlink" href="#infohash_inputjson" title="Permanent link">#</a></h3>
+<p>Contains the variant configuration that was used to compute the build hash of
+the package. This is the same information that conda-build stores and can be
+used to reproduce or inspect why a certain build hash was chosen.</p>
 <h3 id="inforecipe"><code>info/recipe/&lt;...&gt;</code><a class="headerlink" href="#inforecipe" title="Permanent link">#</a></h3>
 <p>A directory containing the full contents of the build recipe. This folder also
 contains a rendered version of the recipe (<code>rendered_recipe.yaml</code>). This
@@ -3127,6 +3226,29 @@ rendered version is used for the <code>rebuild</code> command. However, note tha
 this format is still in flux and can change at any time.</p>
 <p>You can also use <code>--no-include-recipe</code> to disable the inclusion of the recipe in
 the package.</p>
+<h2 id="differences-from-conda-build-packages">Differences from <code>conda-build</code> packages<a class="headerlink" href="#differences-from-conda-build-packages" title="Permanent link">#</a></h2>
+<p>Packages built with Rattler-Build are fully installable with <code>conda</code>, <code>mamba</code>
+and <code>pixi</code>, but the set of files under <code>info/</code> differs slightly from what
+<code>conda-build</code> produces. Rattler-Build intentionally does <strong>not</strong> write the
+following legacy files:</p>
+<ul>
+<li><code>info/files</code>: a newline-separated list of all files in the package. This
+  information is fully contained in <code>info/paths.json</code> (in the <code>_path</code> field of
+  each entry), so the file is redundant.</li>
+<li><code>info/has_prefix</code>: the list of files that contain a build prefix that needs to
+  be replaced at install time. This is also captured in <code>info/paths.json</code> (via
+  the <code>prefix_placeholder</code> and <code>file_mode</code> fields of each entry).</li>
+<li><code>info/git</code>: information about the git source of the package. Rattler-Build
+  instead records the exact git reference that was used in the rendered recipe
+  (<code>info/recipe/rendered_recipe.yaml</code>).</li>
+</ul>
+<p>Modern versions of <code>conda</code>, <code>mamba</code> and <code>pixi</code> read <code>info/paths.json</code> and do not
+need these files. However, some older tooling still expects them. For example,
+older versions of the <a href="https://github.com/mamba-org/quetz">Quetz</a> server relied
+on <code>info/files</code> when accepting uploads. If you run into a tool that fails on a
+Rattler-Build package because one of these files is missing, updating that tool
+to read <code>info/paths.json</code> is the recommended fix (see
+<a href="https://github.com/prefix-dev/rattler-build/issues/335">#335</a> for background).</p>
 
 
 

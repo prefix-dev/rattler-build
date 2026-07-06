@@ -2815,11 +2815,10 @@
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">rattler_build</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">MultiOutputRecipe</span><span class="p">,</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">PlatformConfig</span><span class="p">,</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">RenderConfig</span><span class="p">,</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">Stage0Recipe</span><span class="p">,</span>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">VariantConfig</span><span class="p">,</span>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="p">)</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">RenderConfig</span><span class="p">,</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">Stage0Recipe</span><span class="p">,</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">VariantConfig</span><span class="p">,</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="p">)</span>
 </span></code></pre></div>
 <h2 id="example-1-multi-output-with-inter-output-dependencies">Example 1: Multi-Output with Inter-Output Dependencies<a class="headerlink" href="#example-1-multi-output-with-inter-output-dependencies" title="Permanent link">#</a></h2>
 <p>Multi-output recipes build multiple packages from one recipe. When one output needs another, you list it as a <strong>host</strong> (or build) <strong>dependency</strong>. The dependency package is installed into the build environment, and your build script can use its files.</p>
@@ -2961,32 +2960,30 @@ Package: myproject-tools 2.0.0
 </span></code></pre></div>
 <div class="language-text highlight"><pre><span></span><code>Building Example 1 packages...
 ============================================================
-Recipe path: /tmp/rattler_build_zg6ycsnq/recipe.yaml
+Recipe path: /tmp/rattler_build_58769ny7/recipe.yaml
 
 Building variant 1/2
   Package: myproject-lib
   Version: 2.0.0
   Build string: hb0f4dca_0
-  Build complete in 1.30s!
-  Package: /tmp/rattler_build_zg6ycsnq/output/linux-64/myproject-lib-2.0.0-hb0f4dca_0.conda
+  Build complete in 0.37s!
+  Package: /tmp/rattler_build_58769ny7/output/linux-64/myproject-lib-2.0.0-hb0f4dca_0.conda
   Variant: {&#39;target_platform&#39;: &#39;linux-64&#39;}
-  Build log: 54 messages captured
+  Build log: 55 messages captured
 
 Building variant 2/2
   Package: myproject-tools
   Version: 2.0.0
   Build string: hb0f4dca_0
-
-
-  Build complete in 0.43s!
-  Package: /tmp/rattler_build_zg6ycsnq/output/linux-64/myproject-tools-2.0.0-hb0f4dca_0.conda
+  Build complete in 0.36s!
+  Package: /tmp/rattler_build_58769ny7/output/linux-64/myproject-tools-2.0.0-hb0f4dca_0.conda
   Variant: {&#39;target_platform&#39;: &#39;linux-64&#39;}
-  Build log: 59 messages captured
+  Build log: 60 messages captured
 
 ============================================================
 Example 1 builds completed successfully!
 
-Built packages are available in: /tmp/rattler_build_zg6ycsnq/output
+Built packages are available in: /tmp/rattler_build_58769ny7/output
 </code></pre></div>
 <h2 id="example-2-staging-outputs-shared-build-artifacts">Example 2: Staging Outputs - Shared Build Artifacts<a class="headerlink" href="#example-2-staging-outputs-shared-build-artifacts" title="Permanent link">#</a></h2>
 <p>Staging is different from regular dependencies (Example 1). A staging output runs its build script once, then <strong>copies its files directly into each inheriting package's prefix</strong>. Since these are "new" files in the prefix, they will be included in the final package.</p>
@@ -3161,34 +3158,32 @@ compiled-project-cli 1.5.0
 </span></code></pre></div>
 <div class="language-text highlight"><pre><span></span><code>Building Example 2 packages (with staging)...
 ============================================================
-Recipe path: /tmp/rattler_build_72gwmqyk/recipe.yaml
+Recipe path: /tmp/rattler_build_4f_9qzu6/recipe.yaml
 
 Building variant 1/2
   Package: compiled-project-python
   Version: 1.5.0
   Build string: hb0f4dca_0
   Staging caches: [&#39;shared-build&#39;]
-  Build complete in 0.56s!
-  Package: /tmp/rattler_build_72gwmqyk/output/linux-64/compiled-project-python-1.5.0-hb0f4dca_0.conda
+  Build complete in 0.46s!
+  Package: /tmp/rattler_build_4f_9qzu6/output/linux-64/compiled-project-python-1.5.0-hb0f4dca_0.conda
   Variant: {&#39;target_platform&#39;: &#39;linux-64&#39;}
-  Build log: 71 messages captured
+  Build log: 72 messages captured
 
 Building variant 2/2
   Package: compiled-project-cli
   Version: 1.5.0
   Build string: hb0f4dca_0
   Staging caches: [&#39;shared-build&#39;]
-
-
-  Build complete in 0.54s!
-  Package: /tmp/rattler_build_72gwmqyk/output/linux-64/compiled-project-cli-1.5.0-hb0f4dca_0.conda
+  Build complete in 0.46s!
+  Package: /tmp/rattler_build_4f_9qzu6/output/linux-64/compiled-project-cli-1.5.0-hb0f4dca_0.conda
   Variant: {&#39;target_platform&#39;: &#39;linux-64&#39;}
-  Build log: 74 messages captured
+  Build log: 75 messages captured
 
 ============================================================
 Example 2 builds completed successfully!
 
-Built packages are available in: /tmp/rattler_build_72gwmqyk/output
+Built packages are available in: /tmp/rattler_build_4f_9qzu6/output
 </code></pre></div>
 <h2 id="summary">Summary<a class="headerlink" href="#summary" title="Permanent link">#</a></h2>
 <p>In this tutorial, you learned about multi-output recipes and staging:</p>

@@ -2923,7 +2923,7 @@
 <h1 id="publishing-packages-to-your-own-channel">Publishing packages to your own channel<a class="headerlink" href="#publishing-packages-to-your-own-channel" title="Permanent link">#</a></h1>
 <p>Rattler-Build comes with an intuitive <code>publish</code> subcommand, that will publish a package to a channel.</p>
 <p>You can either point to an already built package, or to a recipe and <code>publish</code> them into your channel.
-The channel can be either on prefix.dev, anaconda.org, an S3 bucket, a local filesystem folder (or network mount), or a Quetz or Artifactory instance.</p>
+The channel can be on prefix.dev, anaconda.org, Cloudsmith, an S3 bucket, a local filesystem folder (or network mount), or a Quetz or Artifactory instance.</p>
 <p>Publishing a package is a convenience short hand for:</p>
 <ol>
 <li>Building the package from a recipe.yaml</li>
@@ -2938,18 +2938,22 @@ The channel can be either on prefix.dev, anaconda.org, an S3 bucket, a local fil
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>rattler-build<span class="w"> </span>publish<span class="w"> </span>./some/recipe.yaml<span class="w"> </span>--to<span class="w"> </span>artifactory://my-secret.company.com/package-channel
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="c1"># on prefix.dev you can also automatically add a sigstore attestation</span>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>rattler-build<span class="w"> </span>publish<span class="w"> </span>./my-recipe.yaml<span class="w"> </span>--to<span class="w"> </span>https://prefix.dev/my-channel<span class="w"> </span>--generate-attestation
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>rattler-build<span class="w"> </span>publish<span class="w"> </span>./some/recipe.yaml<span class="w"> </span>--to<span class="w"> </span>cloudsmith://my-org/my-repo
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="c1"># on prefix.dev you can also automatically add a sigstore attestation</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>rattler-build<span class="w"> </span>publish<span class="w"> </span>./my-recipe.yaml<span class="w"> </span>--to<span class="w"> </span>https://prefix.dev/my-channel<span class="w"> </span>--generate-attestation
 </span></code></pre></div>
 <p>The following schema is used:</p>
 <ul>
 <li>prefix.dev: <code>https://prefix.dev/&lt;channel-name&gt;</code></li>
 <li>anaconda.org: <code>https://anaconda.org/&lt;owner&gt;/&lt;label (optional)&gt;</code> (e.g. <code>https://anaconda.org/foobar</code>)</li>
+<li>Cloudsmith: <code>cloudsmith://&lt;owner&gt;/&lt;repository&gt;</code></li>
 <li>S3: <code>s3://bucket-name</code> (note: we read the standard S3 configuration / environment variables for region, authentication, etc.)</li>
 <li>Filesystem: <code>file:///path/to/channel</code></li>
 <li>Quetz: <code>quetz://server.my-company.com/&lt;channel&gt;</code></li>
 <li>Articatory: <code>artifactory://server.my-company.com/&lt;channel&gt;</code></li>
 </ul>
+<p>For Cloudsmith, pass <code>cloudsmith://&lt;owner&gt;/&lt;repository&gt;</code>, not the API URL. Authentication uses <code>CLOUDSMITH_API_KEY</code> or credentials from the auth store for <code>https://api.cloudsmith.io/v1</code>; set <code>CLOUDSMITH_API_URL</code> only when targeting a custom Cloudsmith API endpoint.</p>
 <h2 id="options">Options<a class="headerlink" href="#options" title="Permanent link">#</a></h2>
 <p>The <code>--to</code> option selects the channel to publish the package into. This channel will also be used as the <em>highest priority</em> channel in the list of channels. Other channels can be added using the usual <code>-c conda-forge -c bioconda ...</code> syntax or configured using a <code>config.toml</code> file.</p>
 <p>When using <code>publish</code> with a recipe, you can use the same options as when normally building packages.</p>
