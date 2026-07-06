@@ -24,6 +24,9 @@ if [ -z ${{CONDA_BUILD+x}} ]; then
     source "{}"
 fi
 ## End of preamble
+# Trace each command as it runs so a failing line is visible (see #2264).
+# Placed after activation so the sourced environment setup is not traced.
+set -x
 "#,
             activation_script_path.to_string_lossy()
         )
