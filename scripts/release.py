@@ -1,11 +1,15 @@
 """Cut a rattler-build release.
 
 Branches from prefix-dev/rattler-build@main, bumps the version, updates the
-changelog and lock files, commits, and opens a PR.
+changelog and lock files, commits, pushes the branch to prefix-dev, and opens
+a PR.
 
-Because it always branches from the canonical remote's main, it behaves the
-same in a plain git clone or a colocated jj repo, regardless of which branch
-(or detached HEAD) you happen to be on.
+The branch is pushed with upstream tracking, and in a colocated jj repo the
+bookmark is tracked as well, so follow-up commits to the release PR are a
+plain `git push` or `jj git push` away.
+
+Because it always branches from the prefix-dev remote's main, it behaves the
+same regardless of which branch (or detached HEAD) you happen to be on.
 
 Usage:
     pixi run release
@@ -25,7 +29,6 @@ import questionary
 
 ROOT = Path(__file__).resolve().parent.parent
 REPO = "prefix-dev/rattler-build"
-REMOTE_URL = f"https://github.com/{REPO}.git"
 CHANGELOG = ROOT / "CHANGELOG.md"
 
 Version = tuple[int, int, int]
@@ -52,12 +55,30 @@ def is_jj() -> bool:
     return (ROOT / ".jj").is_dir() and shutil.which("jj") is not None
 
 
-def sync_jj() -> None:
-    """Import the git refs created by this script into a colocated jj repo."""
+def prefix_dev_remote() -> str:
+    """Name of the first git remote pointing at prefix-dev/rattler-build."""
+    for name in git_out("remote").splitlines():
+        url = git_out("remote", "get-url", name)
+        normalized = url.removesuffix(".git").replace(":", "/")
+        if normalized.endswith(f"github.com/{REPO}"):
+            print(f"Using remote '{name}' for {REPO}.")
+            return name
+    fail(f"no git remote points at {REPO}; add one first")
+    raise AssertionError("unreachable")
+
+
+def sync_jj(branch: str, remote: str) -> None:
+    """Track the pushed branch in a colocated jj repo and start a change on it.
+
+    Tracking the remote bookmark keeps the release commit mutable (untracked
+    remote bookmarks are immutable by default) and makes `jj git push` work.
+    """
     if not is_jj():
         return
     print("Importing git refs into jj...")
     run(["jj", "git", "import"])
+    run(["jj", "bookmark", "track", f"{branch}@{remote}"])
+    run(["jj", "new", branch])
 
 
 def parse(version: str) -> Version:
@@ -72,9 +93,9 @@ def fmt(version: Version) -> str:
     return ".".join(str(n) for n in version)
 
 
-def fetched_version() -> Version:
+def fetched_version(main_ref: str) -> Version:
     """Version in Cargo.toml on the freshly fetched canonical main."""
-    cargo = git_out("show", "FETCH_HEAD:Cargo.toml")
+    cargo = git_out("show", f"{main_ref}:Cargo.toml")
     return parse(tomllib.loads(cargo)["package"]["version"])
 
 
@@ -85,7 +106,7 @@ def gh_token() -> str:
     ).stdout.strip()
 
 
-def cliff_preview(tag: str) -> str:
+def cliff_preview(tag: str, main_ref: str) -> str:
     """Render what git-cliff would add for the commits since `tag`."""
     return subprocess.run(
         [
@@ -94,7 +115,7 @@ def cliff_preview(tag: str) -> str:
             "header",
             "--github-token",
             gh_token(),
-            f"{tag}..FETCH_HEAD",
+            f"{tag}..{main_ref}",
         ],
         cwd=ROOT,
         text=True,
@@ -118,8 +139,8 @@ def bump_changelog(version: str) -> None:
     )
 
 
-def latest_tag() -> str:
-    tag = git_out("describe", "--tags", "--abbrev=0", "--match", "v*", "FETCH_HEAD")
+def latest_tag(main_ref: str) -> str:
+    tag = git_out("describe", "--tags", "--abbrev=0", "--match", "v*", main_ref)
     if not tag:
         fail("no v* tag reachable from canonical main")
     return tag
@@ -173,11 +194,14 @@ def main() -> None:
         else:
             fail("working directory is not clean; commit or stash first")
 
-    print("Fetching canonical main from prefix-dev/rattler-build...")
-    run(["git", "fetch", REMOTE_URL, "main"])
+    remote = prefix_dev_remote()
+    main_ref = f"{remote}/main"
 
-    current = fetched_version()
-    tag = latest_tag()
+    print(f"Fetching canonical main from {REPO}...")
+    run(["git", "fetch", remote, "main"])
+
+    current = fetched_version(main_ref)
+    tag = latest_tag(main_ref)
     if parse(tag.lstrip("v")) != current:
         fail(
             f"Cargo.toml on main ({fmt(current)}) is ahead of the latest tag "
@@ -185,14 +209,14 @@ def main() -> None:
         )
 
     print(f"\nChangelog preview since {tag}:")
-    print(cliff_preview(tag) or "  (none)")
+    print(cliff_preview(tag, main_ref) or "  (none)")
 
     version = select_version(current)
 
     print(f"\n=== Releasing {version} ===\n")
 
     branch = f"release-{version}"
-    run(["git", "switch", "-C", branch, "FETCH_HEAD"])
+    run(["git", "switch", "-C", branch, "--no-track", main_ref])
 
     print("Patching version files...")
     run(["tbump", "--non-interactive", "--only-patch", version])
@@ -213,6 +237,9 @@ def main() -> None:
     print("Committing...")
     run(["git", "commit", "--all", "--message", f"chore: release {version}"])
 
+    print("Pushing branch...")
+    run(["git", "push", "--set-upstream", remote, branch])
+
     print("Opening pull request...")
     run(
         [
@@ -223,6 +250,8 @@ def main() -> None:
             REPO,
             "--base",
             "main",
+            "--head",
+            branch,
             "--title",
             f"chore: release {version}",
             "--body",
@@ -230,10 +259,11 @@ def main() -> None:
         ]
     )
 
-    sync_jj()
+    sync_jj(branch, remote)
 
     print("\n=== Done ===")
     print(f"Opened release PR for {version}.")
+    print("Push follow-ups with `git push` or `jj git push`.")
     print("After merge, run the 'Release artifacts' workflow via workflow_dispatch.")
 
 
