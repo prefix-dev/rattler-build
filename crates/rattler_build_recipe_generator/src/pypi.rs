@@ -252,14 +252,24 @@ fn format_requirement(req: &str) -> String {
 
     // Handle markers separately
     if let Some((version, marker)) = version.split_once(';') {
-        format!(
-            "{} {} ;MARKER; {}",
-            name.to_lowercase(),
-            version.trim(),
-            marker.trim()
-        )
+        let version = version.trim();
+        if version.is_empty() {
+            format!("{} ;MARKER; {}", name.to_lowercase(), marker.trim())
+        } else {
+            format!(
+                "{} {} ;MARKER; {}",
+                name.to_lowercase(),
+                version,
+                marker.trim()
+            )
+        }
     } else {
-        format!("{} {}", name.to_lowercase(), version.trim())
+        let version = version.trim();
+        if version.is_empty() {
+            name.to_lowercase()
+        } else {
+            format!("{} {}", name.to_lowercase(), version)
+        }
     }
 }
 
@@ -977,6 +987,20 @@ pub async fn generate_pypi_recipe(opts: &PyPIOpts) -> miette::Result<()> {
 mod tests {
     use super::*;
     use insta::assert_yaml_snapshot;
+
+    #[test]
+    fn test_format_requirement_no_trailing_space() {
+        assert_eq!(format_requirement("docopt"), "docopt");
+        assert_eq!(format_requirement("numpy>=2.0.0"), "numpy >=2.0.0");
+        assert_eq!(
+            format_requirement("requests; extra == 'foo'"),
+            "requests ;MARKER; extra == 'foo'"
+        );
+        assert_eq!(
+            format_requirement("numpy>=2.0.0; extra == 'foo'"),
+            "numpy >=2.0.0 ;MARKER; extra == 'foo'"
+        );
+    }
 
     #[tokio::test]
     async fn test_recipe_generation() {
