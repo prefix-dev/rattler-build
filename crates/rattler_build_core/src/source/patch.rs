@@ -12,8 +12,9 @@ use std::{
 };
 
 use flickzeug::{
-    ApplyConfig, ApplyError, Diff, FuzzyConfig, HunkRangeStrategy, ParsePatchError, ParserConfig,
-    Patch, apply_bytes_with_config, patch_from_bytes_with_config,
+    ApplyConfig, ApplyError, ApplyOutcome, Diff, FuzzyConfig, HunkRangeStrategy, ParsePatchError,
+    ParserConfig, Patch, apply_bytes_reporting, apply_bytes_with_config,
+    patch_from_bytes_with_config,
 };
 use fs_err::File;
 use itertools::Itertools;
@@ -166,20 +167,21 @@ fn patch_from_bytes_raw(input: &[u8]) -> Result<Patch<'_, [u8]>, ParsePatchError
     )
 }
 
-fn apply(base_image: &[u8], diff: &Diff<'_, [u8]>) -> Result<Vec<u8>, ApplyError> {
-    apply_bytes_with_config(
-        base_image,
-        diff,
-        &ApplyConfig {
-            fuzzy_config: FuzzyConfig {
-                max_fuzz: 2,
-                ignore_whitespace: true,
-                ignore_case: false,
-            },
-            ..Default::default()
+/// The fuzzy-matching configuration used for all patch application. Shared by
+/// `apply` and the already-applied detection so both agree on what "applies".
+fn apply_config() -> ApplyConfig {
+    ApplyConfig {
+        fuzzy_config: FuzzyConfig {
+            max_fuzz: 2,
+            ignore_whitespace: true,
+            ignore_case: false,
         },
-    )
-    .map(|(content, _stats)| content)
+        ..Default::default()
+    }
+}
+
+fn apply(base_image: &[u8], diff: &Diff<'_, [u8]>) -> Result<Vec<u8>, ApplyError> {
+    apply_bytes_with_config(base_image, diff, &apply_config()).map(|(content, _stats)| content)
 }
 
 // Returns number by which all patch paths must be stripped to be
@@ -359,6 +361,13 @@ pub fn apply_patch_custom(work_dir: &Path, patch_file_path: &Path) -> Result<(),
         .map_err(|_| SourceError::PatchParseFailed(patch_file_path.to_path_buf()))?;
     let strip_level = guess_strip_level(&patch, work_dir)?;
 
+    // Track whether every diff in the patch turned out to be a no-op because it
+    // was already applied (e.g. the change was merged upstream). If so, we warn
+    // that the patch can likely be dropped from the recipe rather than silently
+    // claiming to have applied it.
+    let mut saw_diff = false;
+    let mut all_already_applied = true;
+
     for diff in patch {
         let file_paths = custom_patch_stripped_paths(&diff, strip_level, work_dir);
         let absolute_file_paths = (
@@ -375,33 +384,66 @@ pub fn apply_patch_custom(work_dir: &Path, patch_file_path: &Path) -> Result<(),
         match absolute_file_paths {
             (None, None) => continue,
             (None, Some(m)) => {
+                saw_diff = true;
                 let new_file_content = apply(&[], &diff).map_err(SourceError::PatchApplyError)?;
+                // Already applied if the target already holds the produced content.
+                if fs_err::read(&m).is_ok_and(|existing| existing == new_file_content) {
+                    continue;
+                }
+                all_already_applied = false;
                 write_patch_content(&new_file_content, &m)?;
             }
             (Some(o), None) => {
-                fs_err::remove_file(work_dir.join(o)).map_err(SourceError::Io)?;
+                saw_diff = true;
+                // Already applied if the file to delete is already gone.
+                if o.exists() {
+                    all_already_applied = false;
+                    fs_err::remove_file(&o).map_err(SourceError::Io)?;
+                }
             }
             (Some(o), Some(m)) => {
+                saw_diff = true;
                 // Check if the original file exists
                 // If it doesn't, treat this as creating a new file
                 if !o.exists() {
+                    // A rename whose source is already gone and whose
+                    // destination exists is already applied; otherwise create
+                    // the new file from scratch.
+                    if o != m && m.exists() {
+                        continue;
+                    }
+                    all_already_applied = false;
                     let new_file_content =
                         apply(&[], &diff).map_err(SourceError::PatchApplyError)?;
                     write_patch_content(&new_file_content, &m)?;
                 } else {
                     let old_file_content = fs_err::read(&o).map_err(SourceError::Io)?;
 
-                    let new_file_content =
-                        apply(&old_file_content, &diff).map_err(SourceError::PatchApplyError)?;
-
-                    if o != m {
-                        fs_err::remove_file(&o).map_err(SourceError::Io)?;
+                    // `apply_bytes_reporting` reports whether the file already
+                    // reflects the patched state, which is reliable even under
+                    // the fuzzy matching we enable (a plain forward apply can
+                    // silently succeed as a no-op on already-patched content).
+                    match apply_bytes_reporting(&old_file_content, &diff, &apply_config()) {
+                        ApplyOutcome::AlreadyApplied(_) => continue,
+                        ApplyOutcome::Applied(new_file_content, _stats) => {
+                            all_already_applied = false;
+                            if o != m {
+                                fs_err::remove_file(&o).map_err(SourceError::Io)?;
+                            }
+                            write_patch_content(&new_file_content, &m)?;
+                        }
+                        ApplyOutcome::Failed(e) => return Err(SourceError::PatchApplyError(e)),
                     }
-
-                    write_patch_content(&new_file_content, &m)?;
                 }
             }
         }
+    }
+
+    if saw_diff && all_already_applied {
+        tracing::warn!(
+            "Patch '{}' appears to be already applied; skipping. It may no longer be necessary and can likely be removed from the recipe.",
+            patch_file_path.display()
+        );
     }
 
     Ok(())
@@ -561,6 +603,54 @@ mod tests {
         let text_md = tempdir.path().join("workdir/text.md");
         let text_md = fs_err::read_to_string(&text_md).unwrap();
         assert!(text_md.contains("Oh, wow, I was patched! Thank you soooo much!"));
+    }
+
+    #[test]
+    fn test_already_applied_patch_is_skipped() {
+        // Applying the same patch a second time should be detected as
+        // already-applied and skipped, leaving the file untouched rather than
+        // corrupting it or erroring out.
+        let (tempdir, _) = setup_patch_test_dir();
+        let work_dir = tempdir.path().join("workdir");
+        let patches_dir = tempdir.path().join("patches");
+
+        apply_patches(
+            &[LateBoundPath::new(
+                "0001-increase-minimum-cmake-version.patch",
+            )],
+            &work_dir,
+            &patches_dir,
+            &patches_dir,
+            &patches_dir,
+            apply_patch_custom,
+        )
+        .expect("first application should succeed");
+
+        let cmake_list = work_dir.join("CMakeLists.txt");
+        let after_first = fs_err::read_to_string(&cmake_list).unwrap();
+        assert!(after_first.contains("cmake_minimum_required(VERSION 3.12)"));
+
+        // The patch is now fully applied. Re-applying it must be detected as a
+        // no-op and skipped rather than corrupting the file or erroring.
+        apply_patches(
+            &[LateBoundPath::new(
+                "0001-increase-minimum-cmake-version.patch",
+            )],
+            &work_dir,
+            &patches_dir,
+            &patches_dir,
+            &patches_dir,
+            apply_patch_custom,
+        )
+        .expect("re-applying an already-applied patch should not error");
+
+        // The file must be byte-for-byte identical after the second (skipped)
+        // application.
+        let after_second = fs_err::read_to_string(&cmake_list).unwrap();
+        assert_eq!(
+            after_first, after_second,
+            "already-applied patch must not modify the file again"
+        );
     }
 
     #[test]

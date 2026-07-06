@@ -62,6 +62,7 @@ Feel free to find out more details by looking at the linked PRs below.
 - The `source.filter` field is now also supported for `url` and `git` sources (it was previously only available for `path` sources). The filter is applied to the files copied into the work directory: the contents of the extracted archive for `url` sources (and `path` sources pointing to an archive) and the checked-out tree for `git` sources. This allows large sources to be trimmed down to the parts needed for the build.
 - An empty `sha256` or `md5` (e.g. `sha256: ""`) is now accepted and treated as an all-zeros placeholder (`0000...0000`). This makes it easier to scaffold a recipe before the real checksum is known: the build downloads the source and reports the actual checksum in the resulting mismatch. (#2524)
 - The build summary now prints a section for each `requirements.extras` group (optional dependency group) in the run dependencies table, so the resolved contents of each extra are visible. The section is omitted when the recipe defines no extras.
+- Patches that are already fully applied to the source (e.g. because the change was merged upstream) are now detected, reported with a warning, and skipped instead of being silently "applied". This makes it easy to spot patches that can be removed from the recipe. (#1953)
 
 ### Changed
 
