@@ -5,6 +5,55 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.68.0] - 2026-07-06
+### ✨ Highlights
+
+This release adds a lot of exciting features and bugfixes. Here a few highlights:
+- A lot of R and CRAN improvements
+- New, mobile-friendly design for https://playground.rattler.build/
+- Fixes for many sharp edges
+
+Feel free to find out more details by looking at the linked PRs below.
+
+
+### Added
+
+- Add PyPI/CRAN/CPAN recipe generator to https://playground.rattler.build by @wolfv in [#2538](https://github.com/prefix-dev/rattler-build/pull/2538)
+- Improve CRAN recipe generation for R packages by @wolfv in [#2597](https://github.com/prefix-dev/rattler-build/pull/2597)
+- Display v3 package variant flags in build output by @wolfv in [#2601](https://github.com/prefix-dev/rattler-build/pull/2601)
+- Improve package content test failure messages with expanded globs by @wolfv in [#2602](https://github.com/prefix-dev/rattler-build/pull/2602)
+- Support `source.filter` for URL and archive path sources by @wolfv in [#2608](https://github.com/prefix-dev/rattler-build/pull/2608)
+- Redesign UI with themes, layouts and CodeMirror editor by @wolfv in [#2604](https://github.com/prefix-dev/rattler-build/pull/2604)
+- Make SHLIB_EXT available in Jinja templates by @wolfv in [#2612](https://github.com/prefix-dev/rattler-build/pull/2612)
+- Allow empty sha256 as all-zeros placeholder for recipe scaffolding by @wolfv in [#2610](https://github.com/prefix-dev/rattler-build/pull/2610)
+- Adds support to publish --to cloudsmith by @jmayes-rx in [#2516](https://github.com/prefix-dev/rattler-build/pull/2516)
+- Display optional dependency groups (extras) in dependency tables by @wolfv in [#2621](https://github.com/prefix-dev/rattler-build/pull/2621)
+- Warn about problematic entry point configurations by @wolfv in [#2623](https://github.com/prefix-dev/rattler-build/pull/2623)
+- Show executed commands for failing test scripts by @mohitdebian in [#2266](https://github.com/prefix-dev/rattler-build/pull/2266)
+
+
+### Documentation
+
+- Fix down_prioritize_variant documentation and example value by @wolfv in [#2606](https://github.com/prefix-dev/rattler-build/pull/2606)
+
+
+### Fixed
+
+- Report YAML parse error location for malformed Jinja by @wolfv in [#2603](https://github.com/prefix-dev/rattler-build/pull/2603)
+- Preserve explicit empty license_file in output packages by @wolfv in [#2600](https://github.com/prefix-dev/rattler-build/pull/2600)
+- Switch PyPI sources to use `files.pythonhosted.org` by @mgorny in [#2586](https://github.com/prefix-dev/rattler-build/pull/2586)
+- Write github output to stderr by @pavelzw in [#2550](https://github.com/prefix-dev/rattler-build/pull/2550)
+- Build test MatchSpec from typed components to support trailing-underscore versions by @XhstormR in [#2618](https://github.com/prefix-dev/rattler-build/pull/2618)
+- Use `skip` condition and platform-split script in generated R recipes by @pb01ka in [#2609](https://github.com/prefix-dev/rattler-build/pull/2609)
+- Don't treat non-exact run_constraints pins as build-order edges by @baszalmstra in [#2537](https://github.com/prefix-dev/rattler-build/pull/2537)
+- `--render-only --with-solve` panic when output dir missing by @wolfv in [#2631](https://github.com/prefix-dev/rattler-build/pull/2631)
+- CRAN recipe generation by @Hofer-Julian in [#2637](https://github.com/prefix-dev/rattler-build/pull/2637)
+
+
+### New Contributors
+* @jmayes-rx made their first contribution in [#2516](https://github.com/prefix-dev/rattler-build/pull/2516)
+* @XhstormR made their first contribution in [#2618](https://github.com/prefix-dev/rattler-build/pull/2618)
+
 ## [Unreleased]
 
 ### Added
@@ -19,6 +68,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Package content test failures now report the fully expanded glob(s) that were actually matched against the package (including automatically prepended platform prefixes such as `include/` or `Library/include/`), instead of only the raw user-provided pattern. This applies to all package content sections (`include`, `bin`, `lib`, `site_packages`, `files`), making it clearer why a pattern did not match. (#2584)
 - Improve CRAN (R) recipe generation: pass `${R_ARGS}` to `R CMD INSTALL`, add `cross-r-base` for cross-compilation, set `rpaths` for compiled packages, mark pure-R packages as `noarch: generic`, reference `r-base`'s bundled license files, and fix the `r-base` version constraint so it is applied to both `host` and `run` without duplication.
+
+### Fixed
+
+- `--render-only --with-solve` no longer panics with `path is a not a valid absolute path` when the output directory does not exist yet. A missing output directory is now skipped as a local channel during solving instead of being canonicalized. (#2611)
 
 
 ## [0.67.0] - 2026-06-22

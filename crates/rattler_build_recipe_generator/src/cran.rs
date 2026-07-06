@@ -31,7 +31,7 @@ pub struct PackageInfo {
     pub Repository: String,
     #[serde(rename = "Date/Publication")]
     pub DatePublication: Option<String>,
-    pub MD5sum: String,
+    pub MD5sum: Option<String>,
     pub _user: String,
     pub _type: String,
     pub _file: String,
@@ -391,7 +391,7 @@ async fn build_cran_recipe_and_deps(
                 package_info._file,
                 e
             );
-            (None, Some(package_info.MD5sum.clone()))
+            (None, package_info.MD5sum.clone())
         }
     };
 
