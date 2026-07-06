@@ -641,11 +641,13 @@ fn render_optional_variant_template(
         Ok(s) => Ok(Some(s)),
         Err(e) if is_undefined_variable_error(&e) => {
             let span = *e.span();
-            Err(ParseError::invalid_value(field, e.to_string(), span).with_suggestion(
-                "If this expression references a variant key that is only defined on some \
+            Err(
+                ParseError::invalid_value(field, e.to_string(), span).with_suggestion(
+                    "If this expression references a variant key that is only defined on some \
                  platforms, provide an explicit fallback with the `default` filter, e.g. \
                  `${{ my_key | default(0) }}`.",
-            ))
+                ),
+            )
         }
         Err(e) => Err(e),
     }
@@ -669,7 +671,10 @@ fn parse_noarch_string(s: &str, span: Option<&Span>) -> Result<Option<NoArchType
         .map_err(|_| {
             ParseError::invalid_value(
                 "noarch type",
-                format!("Invalid noarch type '{}'. Expected 'python' or 'generic'", s),
+                format!(
+                    "Invalid noarch type '{}'. Expected 'python' or 'generic'",
+                    s
+                ),
                 span.copied().unwrap_or_else(Span::new_blank),
             )
         })
@@ -4130,8 +4135,14 @@ requirements:
         let cond = "${{ 0 if my_level == 1 else 1 }}";
 
         // Key defined: evaluated normally.
-        assert_eq!(eval(cond, &[("my_level", Variable::from(1i64))]).unwrap(), Some(0));
-        assert_eq!(eval(cond, &[("my_level", Variable::from(3i64))]).unwrap(), Some(1));
+        assert_eq!(
+            eval(cond, &[("my_level", Variable::from(1i64))]).unwrap(),
+            Some(0)
+        );
+        assert_eq!(
+            eval(cond, &[("my_level", Variable::from(3i64))]).unwrap(),
+            Some(1)
+        );
         // Key absent (e.g. osx-arm64): strict undefined error with a fix-it hint.
         assert_undefined_with_default_hint(&eval(cond, &[]).unwrap_err());
         // The documented `| default(...)` fallback renders with the key absent.
