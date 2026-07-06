@@ -30,9 +30,11 @@ on:
 
 permissions: {}
 
-# Allow one concurrent deployment
+# Serialize runs per ref: a new commit on a branch/PR cancels its own
+# in-progress run, but runs for different refs (other PRs, main deploys)
+# no longer cancel each other.
 concurrency:
-  group: "pages"
+  group: pages-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
