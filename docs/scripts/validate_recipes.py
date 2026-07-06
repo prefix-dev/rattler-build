@@ -15,7 +15,9 @@ for recipe_path in sorted(recipes_dir.glob("*.yaml")):
     try:
         recipe = Stage0Recipe.from_file(recipe_path)
         variants_path = variants_dir / recipe_path.name
-        variant_config = VariantConfig.from_file(variants_path) if variants_path.exists() else None
+        variant_config = (
+            VariantConfig.from_file(variants_path) if variants_path.exists() else None
+        )
         recipe.render(variant_config)
         print(f"  OK:   {recipe_path}")
     except Exception as e:
