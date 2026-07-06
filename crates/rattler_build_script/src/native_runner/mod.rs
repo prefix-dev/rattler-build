@@ -99,6 +99,22 @@ mod tests {
     }
 
     #[test]
+    fn bash_preamble_enables_tracing_after_activation() {
+        let preamble =
+            native_runner(Platform::Linux64).preamble(std::path::Path::new("build_env.sh"));
+        let activation = preamble
+            .find("source")
+            .expect("preamble sources activation");
+        let trace = preamble.find("set -x").expect("preamble enables tracing");
+        // `set -x` must come after activation so the sourced environment setup
+        // (which may expand secrets) is not traced (#2264).
+        assert!(
+            trace > activation,
+            "set -x must follow activation, got:\n{preamble}"
+        );
+    }
+
+    #[test]
     fn quotes_only_when_needed() {
         let bash = shell::Bash::default().into();
         // No whitespace: left untouched (flags must not be quoted).

@@ -5,6 +5,55 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.68.0] - 2026-07-06
+### ✨ Highlights
+
+This release adds a lot of exciting features and bugfixes. Here a few highlights:
+- A lot of R and CRAN improvements
+- New, mobile-friendly design for https://playground.rattler.build/
+- Fixes for many sharp edges
+
+Feel free to find out more details by looking at the linked PRs below.
+
+
+### Added
+
+- Add PyPI/CRAN/CPAN recipe generator to https://playground.rattler.build by @wolfv in [#2538](https://github.com/prefix-dev/rattler-build/pull/2538)
+- Improve CRAN recipe generation for R packages by @wolfv in [#2597](https://github.com/prefix-dev/rattler-build/pull/2597)
+- Display v3 package variant flags in build output by @wolfv in [#2601](https://github.com/prefix-dev/rattler-build/pull/2601)
+- Improve package content test failure messages with expanded globs by @wolfv in [#2602](https://github.com/prefix-dev/rattler-build/pull/2602)
+- Support `source.filter` for URL and archive path sources by @wolfv in [#2608](https://github.com/prefix-dev/rattler-build/pull/2608)
+- Redesign UI with themes, layouts and CodeMirror editor by @wolfv in [#2604](https://github.com/prefix-dev/rattler-build/pull/2604)
+- Make SHLIB_EXT available in Jinja templates by @wolfv in [#2612](https://github.com/prefix-dev/rattler-build/pull/2612)
+- Allow empty sha256 as all-zeros placeholder for recipe scaffolding by @wolfv in [#2610](https://github.com/prefix-dev/rattler-build/pull/2610)
+- Adds support to publish --to cloudsmith by @jmayes-rx in [#2516](https://github.com/prefix-dev/rattler-build/pull/2516)
+- Display optional dependency groups (extras) in dependency tables by @wolfv in [#2621](https://github.com/prefix-dev/rattler-build/pull/2621)
+- Warn about problematic entry point configurations by @wolfv in [#2623](https://github.com/prefix-dev/rattler-build/pull/2623)
+- Show executed commands for failing test scripts by @mohitdebian in [#2266](https://github.com/prefix-dev/rattler-build/pull/2266)
+
+
+### Documentation
+
+- Fix down_prioritize_variant documentation and example value by @wolfv in [#2606](https://github.com/prefix-dev/rattler-build/pull/2606)
+
+
+### Fixed
+
+- Report YAML parse error location for malformed Jinja by @wolfv in [#2603](https://github.com/prefix-dev/rattler-build/pull/2603)
+- Preserve explicit empty license_file in output packages by @wolfv in [#2600](https://github.com/prefix-dev/rattler-build/pull/2600)
+- Switch PyPI sources to use `files.pythonhosted.org` by @mgorny in [#2586](https://github.com/prefix-dev/rattler-build/pull/2586)
+- Write github output to stderr by @pavelzw in [#2550](https://github.com/prefix-dev/rattler-build/pull/2550)
+- Build test MatchSpec from typed components to support trailing-underscore versions by @XhstormR in [#2618](https://github.com/prefix-dev/rattler-build/pull/2618)
+- Use `skip` condition and platform-split script in generated R recipes by @pb01ka in [#2609](https://github.com/prefix-dev/rattler-build/pull/2609)
+- Don't treat non-exact run_constraints pins as build-order edges by @baszalmstra in [#2537](https://github.com/prefix-dev/rattler-build/pull/2537)
+- `--render-only --with-solve` panic when output dir missing by @wolfv in [#2631](https://github.com/prefix-dev/rattler-build/pull/2631)
+- CRAN recipe generation by @Hofer-Julian in [#2637](https://github.com/prefix-dev/rattler-build/pull/2637)
+
+
+### New Contributors
+* @jmayes-rx made their first contribution in [#2516](https://github.com/prefix-dev/rattler-build/pull/2516)
+* @XhstormR made their first contribution in [#2618](https://github.com/prefix-dev/rattler-build/pull/2618)
+
 ## [Unreleased]
 
 ### Added
@@ -12,6 +61,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `SHLIB_EXT` variable (shared library extension for the target platform, e.g. `.so`, `.dylib`, `.dll`) is now available in Jinja templates, so it can be used in fields such as `build.files` (e.g. `foo${{ SHLIB_EXT }}`). It previously was only set as a build-script environment variable. (#2532)
 - The `source.filter` field is now also supported for `url` and `git` sources (it was previously only available for `path` sources). The filter is applied to the files copied into the work directory: the contents of the extracted archive for `url` sources (and `path` sources pointing to an archive) and the checked-out tree for `git` sources. This allows large sources to be trimmed down to the parts needed for the build.
 - An empty `sha256` or `md5` (e.g. `sha256: ""`) is now accepted and treated as an all-zeros placeholder (`0000...0000`). This makes it easier to scaffold a recipe before the real checksum is known: the build downloads the source and reports the actual checksum in the resulting mismatch. (#2524)
+- The build summary now prints a section for each `requirements.extras` group (optional dependency group) in the run dependencies table, so the resolved contents of each extra are visible. The section is omitted when the recipe defines no extras.
 
 ### Changed
 
@@ -22,6 +72,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - A conditional `build.noarch` expression that renders to an empty or null-like value (e.g. `noarch: ${{ "python" if use_noarch }}` when `use_noarch` is false, or `noarch: null`/`~`/`${{ "python" if use_noarch else none }}`) is now treated as "not a noarch package", identical to omitting the key, instead of failing with `Invalid noarch type ''`. Invalid noarch types are still rejected. (#2291)
 - `build.noarch` and `build.variant.down_prioritize_variant` expressions that reference an undefined variable (e.g. a variant key that is only defined on some platforms) now report an error with a suggestion to use the `default` filter as an explicit fallback, e.g. `${{ 0 if (my_level | default(1)) == 1 else 1 }}`. (#2544)
+- `--render-only --with-solve` no longer panics with `path is a not a valid absolute path` when the output directory does not exist yet. A missing output directory is now skipped as a local channel during solving instead of being canonicalized. (#2611)
 
 
 ## [0.67.0] - 2026-06-22

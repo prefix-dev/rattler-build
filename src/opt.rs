@@ -739,6 +739,7 @@ pub struct PublishOpts {
     /// Examples:
     /// - prefix.dev: https://prefix.dev/my-channel
     /// - anaconda.org: https://anaconda.org/my-org
+    /// - Cloudsmith: cloudsmith://my-org/my-repository
     /// - S3: s3://my-bucket
     /// - Filesystem: file:///path/to/channel or /path/to/channel
     /// - Quetz: quetz://server.company.com/channel
@@ -846,14 +847,14 @@ impl PublishData {
 
         // Prepend the --to channel to the list of channels for dependency resolution
         let mut build_opts = opts.build;
-        let to_channel = opts.to.clone();
+        let to_channel = rattler_build_core::publish::resolve_channel_for_repodata(&opts.to);
 
         // Add the to channel as the first channel (highest priority)
         let channels = if let Some(mut channels) = build_opts.channels.take() {
-            channels.insert(0, to_channel.clone());
+            channels.insert(0, to_channel);
             Some(channels)
         } else {
-            Some(vec![to_channel.clone()])
+            Some(vec![to_channel])
         };
 
         build_opts.channels = channels;

@@ -3,7 +3,7 @@
 Rattler-Build comes with an intuitive `publish` subcommand, that will publish a package to a channel.
 
 You can either point to an already built package, or to a recipe and `publish` them into your channel.
-The channel can be either on prefix.dev, anaconda.org, an S3 bucket, a local filesystem folder (or network mount), or a Quetz or Artifactory instance.
+The channel can be on prefix.dev, anaconda.org, Cloudsmith, an S3 bucket, a local filesystem folder (or network mount), or a Quetz or Artifactory instance.
 
 Publishing a package is a convenience short hand for:
 
@@ -21,6 +21,8 @@ rattler-build publish ./output/linux-64/my-package-0.1.2-h123_0.conda --to s3://
 
 rattler-build publish ./some/recipe.yaml --to artifactory://my-secret.company.com/package-channel
 
+rattler-build publish ./some/recipe.yaml --to cloudsmith://my-org/my-repo
+
 # on prefix.dev you can also automatically add a sigstore attestation
 rattler-build publish ./my-recipe.yaml --to https://prefix.dev/my-channel --generate-attestation
 ```
@@ -29,10 +31,13 @@ The following schema is used:
 
 - prefix.dev: `https://prefix.dev/<channel-name>`
 - anaconda.org: `https://anaconda.org/<owner>/<label (optional)>` (e.g. `https://anaconda.org/foobar`)
+- Cloudsmith: `cloudsmith://<owner>/<repository>`
 - S3: `s3://bucket-name` (note: we read the standard S3 configuration / environment variables for region, authentication, etc.)
 - Filesystem: `file:///path/to/channel`
 - Quetz: `quetz://server.my-company.com/<channel>`
 - Articatory: `artifactory://server.my-company.com/<channel>`
+
+For Cloudsmith, pass `cloudsmith://<owner>/<repository>`, not the API URL. Authentication uses `CLOUDSMITH_API_KEY` or credentials from the auth store for `https://api.cloudsmith.io/v1`; set `CLOUDSMITH_API_URL` only when targeting a custom Cloudsmith API endpoint.
 
 ## Options
 
