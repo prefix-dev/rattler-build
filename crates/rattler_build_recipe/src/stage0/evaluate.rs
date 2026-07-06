@@ -3118,48 +3118,22 @@ fn evaluate_package_output_to_recipe(
         let output_build = output.build.evaluate(context)?;
         merge_stage1_build(toplevel_build, output_build)
     } else {
-        // Cache inheritance: only merge non-script build settings
+        // Cache inheritance: inherit all top-level build settings that the
+        // output does not set itself, EXCEPT the script (the cache has its own
+        // script; a cache-inheriting output packages the restored files and
+        // does not need to re-run the top-level script).
+        //
+        // We reuse `merge_stage1_build` as the single source of truth for which
+        // build fields are inheritable, then restore the output's own script.
+        // Maintaining a separate hand-written field list here caused top-level
+        // settings (build number, `files`, ...) to be silently dropped whenever
+        // a new field was added but not mirrored into this branch (see #2497).
         let toplevel_build = recipe.build.evaluate(context)?;
-        let mut output_build = output.build.evaluate(context)?;
-
-        // Only inherit specific build settings from top-level, not the script
-        if output_build.dynamic_linking.is_default() {
-            output_build.dynamic_linking = toplevel_build.dynamic_linking;
-        }
-        if output_build.prefix_detection.is_default() {
-            output_build.prefix_detection = toplevel_build.prefix_detection;
-        }
-        if output_build.variant.is_default() {
-            output_build.variant = toplevel_build.variant;
-        }
-        if matches!(output_build.string, BuildString::Default) {
-            output_build.string = toplevel_build.string;
-        }
-        if output_build.number.is_none() {
-            output_build.number = toplevel_build.number;
-        }
-        if output_build.noarch.is_none() {
-            output_build.noarch = toplevel_build.noarch;
-        }
-        if output_build.python.is_default() {
-            output_build.python = toplevel_build.python;
-        }
-        if output_build.always_copy_files.is_empty() {
-            output_build.always_copy_files = toplevel_build.always_copy_files;
-        }
-        if output_build.always_include_files.is_empty() {
-            output_build.always_include_files = toplevel_build.always_include_files;
-        }
-        if !toplevel_build.merge_build_and_host_envs && output_build.merge_build_and_host_envs {
-            output_build.merge_build_and_host_envs = toplevel_build.merge_build_and_host_envs;
-        }
-        if output_build.post_process.is_empty() {
-            output_build.post_process = toplevel_build.post_process;
-        }
-        // Combine skip with OR logic
-        output_build.skip = output_build.skip || toplevel_build.skip;
-
-        output_build
+        let output_build = output.build.evaluate(context)?;
+        let output_script = output_build.script.clone();
+        let mut merged = merge_stage1_build(toplevel_build, output_build);
+        merged.script = output_script;
+        merged
     };
 
     // Multi-output recipes do not auto-discover `build.sh`/`build.bat`: a single
