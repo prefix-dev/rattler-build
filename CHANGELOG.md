@@ -71,6 +71,8 @@ Feel free to find out more details by looking at the linked PRs below.
 
 ### Fixed
 
+- A conditional `build.noarch` expression that renders to an empty or null-like value (e.g. `noarch: ${{ "python" if use_noarch }}` when `use_noarch` is false, or `noarch: null`/`~`/`${{ "python" if use_noarch else none }}`) is now treated as "not a noarch package", identical to omitting the key, instead of failing with `Invalid noarch type ''`. Invalid noarch types are still rejected. (#2291)
+- `build.noarch` and `build.variant.down_prioritize_variant` expressions that reference an undefined variable (e.g. a variant key that is only defined on some platforms) now report an error with a suggestion to use the `default` filter as an explicit fallback, e.g. `${{ 0 if (my_level | default(1)) == 1 else 1 }}`. (#2544)
 - `--render-only --with-solve` no longer panics with `path is a not a valid absolute path` when the output directory does not exist yet. A missing output directory is now skipped as a local channel during solving instead of being canonicalized. (#2611)
 
 

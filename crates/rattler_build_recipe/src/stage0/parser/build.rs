@@ -138,6 +138,8 @@ fn parse_bool_or_patterns<T>(
 ///
 /// Noarch can be either:
 /// - A scalar string: "python" or "generic"
+/// - A null-like value (`null`, `~`, `none`, empty) meaning "no noarch", which
+///   behaves the same as omitting the key (see prefix-dev/rattler-build#2291)
 /// - A template: "${{ noarch_type }}"
 fn parse_noarch(node: &Node) -> Result<Value<NoArchType>, ParseError> {
     let scalar = node.as_scalar().ok_or_else(|| {
@@ -158,6 +160,9 @@ fn parse_noarch(node: &Node) -> Result<Value<NoArchType>, ParseError> {
     let noarch = match str_val {
         "python" => NoArchType::python(),
         "generic" => NoArchType::generic(),
+        // `noarch: null` / `~` / `none` (and the empty scalar) explicitly mean
+        // "not a noarch package", identical to leaving the key out entirely.
+        "" | "~" | "null" | "none" | "None" => NoArchType::none(),
         _ => {
             return Err(ParseError::invalid_value(
                 "noarch",
