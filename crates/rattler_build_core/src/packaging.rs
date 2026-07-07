@@ -10,7 +10,7 @@ use fs_err as fs;
 use fs_err::File;
 use indicatif::HumanBytes;
 use metadata::clean_url;
-use rattler_build_types::GlobVec;
+use rattler_build_types::{GlobVec, LateBoundGlobVec};
 use rattler_conda_types::{
     ChannelUrl, Platform,
     compression_level::CompressionLevel,
@@ -137,14 +137,16 @@ fn copy_license_files(
     allow_absolute_license_paths: bool,
 ) -> Result<Option<HashSet<PathBuf>>, PackagingError> {
     let about = output.recipe.about();
-    let late_bound_license_files = &about.license_file_late_bound;
 
-    // `license_file` holds the ordinary (relative/absolute) glob patterns, while
-    // late-bound entries (e.g. `${{ PREFIX }}/...`) are tracked separately.
-    let empty_globs = GlobVec::default();
-    let license_file = about.license_file.as_ref().unwrap_or(&empty_globs);
+    // `license_file` is a single list mixing ordinary (relative/absolute) glob
+    // patterns with late-bound entries (e.g. `${{ PREFIX }}/...`); the two are
+    // resolved differently below but come from a single recipe key.
+    let empty_license_files = LateBoundGlobVec::default();
+    let license_files = about.license_file.as_ref().unwrap_or(&empty_license_files);
+    let license_file = license_files.ordinary_globs();
+    let late_bound_license_files: Vec<_> = license_files.late_bound().collect();
 
-    if license_file.is_empty() && late_bound_license_files.is_empty() {
+    if license_files.is_empty() {
         return Ok(None);
     }
 
@@ -300,7 +302,7 @@ fn copy_license_files(
                 .any(|root| normalized.starts_with(root))
             {
                 return Err(PackagingError::LicenseFileTraversal(
-                    late_bound.as_str().to_string(),
+                    late_bound.source().to_string(),
                     resolved,
                 ));
             }
@@ -322,7 +324,7 @@ fn copy_license_files(
                     fs::copy(&resolved, &dest_path)?;
                     copied_files.insert(dest_path);
                 } else {
-                    missing_globs.push(late_bound.as_str().to_string());
+                    missing_globs.push(late_bound.source().to_string());
                 }
             } else {
                 // A glob pattern rooted at the resolved base directory.
@@ -333,7 +335,7 @@ fn copy_license_files(
                     .run()?;
                 let copied = copy_result.copied_paths();
                 if copied.is_empty() {
-                    missing_globs.push(late_bound.as_str().to_string());
+                    missing_globs.push(late_bound.source().to_string());
                 } else {
                     copied_files.extend(copied.iter().map(PathBuf::from));
                 }

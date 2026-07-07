@@ -1,10 +1,10 @@
 //! Stage 1 About - evaluated package metadata with concrete values
 
-use rattler_build_types::LateBoundPath;
+use rattler_build_types::LateBoundGlobVec;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
-use crate::{stage0::License, stage1::GlobVec};
+use crate::stage0::License;
 
 /// Evaluated package metadata with all templates and conditionals resolved
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -25,15 +25,14 @@ pub struct About {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub license: Option<License>,
 
-    /// License file paths
+    /// License file patterns.
+    ///
+    /// A single list that mixes ordinary globs and late-bound patterns (e.g.
+    /// `${{ PREFIX }}/share/licenses/LICENSE`), so the rendered recipe exposes
+    /// one `license_file` key. `None` means the key was absent from the recipe;
+    /// `Some` (possibly empty) means it was explicitly set.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub license_file: Option<GlobVec>,
-
-    /// License file paths that reference late-bound build directory variables
-    /// (e.g. `${{ PREFIX }}/share/licenses/LICENSE`). These are resolved during
-    /// packaging once the build directories are known.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub license_file_late_bound: Vec<LateBoundPath>,
+    pub license_file: Option<LateBoundGlobVec>,
 
     /// License family (e.g., MIT, BSD, etc.)
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -61,7 +60,6 @@ impl About {
             && self.documentation.is_none()
             && self.license.is_none()
             && self.license_file.is_none()
-            && self.license_file_late_bound.is_empty()
             && self.license_family.is_none()
             && self.summary.is_none()
             && self.description.is_none()
@@ -99,5 +97,38 @@ mod tests {
         );
         assert_eq!(about.summary, Some("A test package".to_string()));
         assert_eq!(about.repository, None);
+    }
+
+    #[test]
+    fn test_license_file_serialize_single_key() {
+        // A mix of ordinary globs and late-bound patterns must render as a
+        // single `license_file` list, never a separate late-bound key.
+        let about = About {
+            license_file: Some(
+                LateBoundGlobVec::from_sources(
+                    vec![
+                        "LICENSE".to_string(),
+                        "${{ PREFIX }}/share/licenses/LICENSE".to_string(),
+                    ],
+                    Vec::new(),
+                )
+                .unwrap(),
+            ),
+            ..Default::default()
+        };
+
+        let yaml = serde_yaml::to_string(&about).unwrap();
+        assert!(
+            !yaml.contains("late_bound"),
+            "rendered recipe leaked a late-bound key:\n{yaml}"
+        );
+        assert_eq!(yaml.matches("license_file").count(), 1);
+
+        // Round-trips back into the same value.
+        let parsed: About = serde_yaml::from_str(&yaml).unwrap();
+        assert_eq!(parsed, about);
+        let lf = parsed.license_file.unwrap();
+        assert_eq!(lf.ordinary_globs().include_globs().len(), 1);
+        assert_eq!(lf.late_bound().count(), 1);
     }
 }

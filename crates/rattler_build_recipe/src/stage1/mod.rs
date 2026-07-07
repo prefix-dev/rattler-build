@@ -41,7 +41,9 @@ pub use source::Source;
 pub use tests::TestType;
 
 // Re-export glob types from rattler_build_types
-pub use rattler_build_types::{AllOrGlobVec, GlobCheckerVec, GlobVec, GlobWithSource};
+pub use rattler_build_types::{
+    AllOrGlobVec, GlobCheckerVec, GlobVec, GlobWithSource, LateBoundGlob, LateBoundGlobVec,
+};
 
 /// Evaluation context containing variables for template rendering and conditional evaluation
 #[derive(Debug, Clone)]

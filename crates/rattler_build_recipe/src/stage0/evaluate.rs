@@ -385,24 +385,13 @@ pub fn evaluate_late_bound_path_list(
     })
 }
 
-/// The evaluated `about.license_file` entries, split by how they are resolved.
-#[derive(Debug, Default)]
-pub struct LicenseFiles {
-    /// Ordinary relative globs, matched against the work and recipe directories
-    /// during packaging.
-    pub license_file_globs: Option<GlobVec>,
-    /// Entries referencing late-bound build directory variables, resolved
-    /// against the build directories at packaging time.
-    pub license_file_late_bound: Vec<rattler_build_types::LateBoundPath>,
-}
-
-/// Evaluate license file patterns, splitting entries that reference late-bound
-/// build directory variables (e.g. `${{ PREFIX }}/share/licenses/LICENSE`) from
-/// ordinary relative globs.
+/// Evaluate license file patterns into a single [`stage1::LateBoundGlobVec`]
+/// that mixes ordinary globs and entries referencing late-bound build directory
+/// variables (e.g. `${{ PREFIX }}/share/licenses/LICENSE`) in one list.
 pub fn evaluate_license_files(
     list: &ConditionalList<String>,
     context: &EvaluationContext,
-) -> Result<LicenseFiles, ParseError> {
+) -> Result<stage1::LateBoundGlobVec, ParseError> {
     let entries = evaluate_conditional_list(list.as_slice(), context, |value, ctx| {
         let rendered = evaluate_value_late_bound(value, ctx, rattler_build_types::LICENSE_VARS)?;
 
@@ -428,33 +417,14 @@ pub fn evaluate_license_files(
         Ok(Some(rendered))
     })?;
 
-    let mut glob_sources = Vec::new();
-    let mut license_file_late_bound = Vec::new();
-    for entry in entries {
-        if entry.is_late_bound() {
-            license_file_late_bound.push(entry);
-        } else {
-            glob_sources.push(entry.as_str().to_string());
-        }
-    }
+    let sources: Vec<String> = entries.iter().map(|e| e.as_str().to_string()).collect();
 
-    let license_file_globs = if glob_sources.is_empty() {
-        None
-    } else {
-        Some(
-            GlobVec::from_strings(glob_sources, Vec::new()).map_err(|e| {
-                ParseError::invalid_value(
-                    "glob set",
-                    format!("Failed to build glob set: {}", e),
-                    Span::new_blank(),
-                )
-            })?,
+    stage1::LateBoundGlobVec::from_sources(sources, Vec::new()).map_err(|e| {
+        ParseError::invalid_value(
+            "glob set",
+            format!("Failed to build glob set: {}", e),
+            Span::new_blank(),
         )
-    };
-
-    Ok(LicenseFiles {
-        license_file_globs,
-        license_file_late_bound,
     })
 }
 
@@ -1612,25 +1582,13 @@ impl Evaluate for Stage0About {
     type Output = Stage1About;
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
-        let LicenseFiles {
-            license_file_globs,
-            license_file_late_bound,
-        } = match self.license_file.as_ref() {
-            Some(lf) => {
-                let mut files = evaluate_license_files(lf, context)?;
-                // The `license_file` key was present in the recipe. If it
-                // evaluated to no ordinary globs and no late-bound entries
-                // (e.g. an explicit empty list `license_file: []`), represent
-                // it as an empty glob set rather than `None`. This preserves
-                // the distinction between "key absent" (inherit the top-level
-                // value during merge) and "key explicitly set to empty"
-                // (override the top-level value and copy no license files).
-                if files.license_file_globs.is_none() && files.license_file_late_bound.is_empty() {
-                    files.license_file_globs = Some(GlobVec::default());
-                }
-                files
-            }
-            None => LicenseFiles::default(),
+        // `None` when the `license_file` key is absent (inherit the top-level
+        // value during merge); `Some` (possibly empty) when it is explicitly
+        // set, e.g. `license_file: []` overrides the top-level value and copies
+        // no license files.
+        let license_file = match self.license_file.as_ref() {
+            Some(lf) => Some(evaluate_license_files(lf, context)?),
+            None => None,
         };
 
         Ok(Stage1About {
@@ -1642,8 +1600,7 @@ impl Evaluate for Stage0About {
                 .as_ref()
                 .map(|v| v.evaluate(context))
                 .transpose()?,
-            license_file: license_file_globs,
-            license_file_late_bound,
+            license_file,
             license_family: evaluate_optional_string_value(&self.license_family, context)?,
             summary: evaluate_optional_string_value(&self.summary, context)?,
             description: evaluate_optional_string_value(&self.description, context)?,
@@ -3002,12 +2959,6 @@ fn merge_stage1_build(
 /// Merge two Stage1 About configurations
 /// The output about takes precedence for non-empty fields
 fn merge_stage1_about(toplevel: stage1::About, output: stage1::About) -> stage1::About {
-    // `license_file` and `license_file_late_bound` are both derived from the
-    // single `license_file` recipe key, so they are merged as a unit: if the
-    // output specified any license files, its values win entirely.
-    let use_output_license =
-        output.license_file.is_some() || !output.license_file_late_bound.is_empty();
-
     stage1::About {
         homepage: if output.homepage.is_some() {
             output.homepage
@@ -3034,15 +2985,12 @@ fn merge_stage1_about(toplevel: stage1::About, output: stage1::About) -> stage1:
         } else {
             toplevel.license_family
         },
-        license_file: if use_output_license {
+        // `license_file` is a single unit derived from one recipe key: if the
+        // output specified it at all, its value wins entirely.
+        license_file: if output.license_file.is_some() {
             output.license_file
         } else {
             toplevel.license_file
-        },
-        license_file_late_bound: if use_output_license {
-            output.license_file_late_bound
-        } else {
-            toplevel.license_file_late_bound
         },
         summary: if output.summary.is_some() {
             output.summary
@@ -3868,22 +3816,32 @@ mod tests {
             "${{ PREFIX }}/share/licenses/foo/LICENSE",
             "licenses/*.txt",
         ]);
-        let LicenseFiles {
-            license_file_globs,
-            license_file_late_bound,
-        } = evaluate_license_files(&list, &ctx).unwrap();
+        let license_files = evaluate_license_files(&list, &ctx).unwrap();
 
-        let globs = license_file_globs.expect("expected ordinary globs");
-        let glob_sources: Vec<_> = globs
+        // The full list preserves declaration order, mixing both kinds.
+        let sources: Vec<_> = license_files.entries().iter().map(|g| g.source()).collect();
+        assert_eq!(
+            sources,
+            vec![
+                "LICENSE",
+                "${{ PREFIX }}/share/licenses/foo/LICENSE",
+                "licenses/*.txt"
+            ]
+        );
+
+        // Only the token-free entries are compiled into the glob set.
+        let glob_sources: Vec<_> = license_files
+            .ordinary_globs()
             .include_globs()
             .iter()
             .map(|g| g.source().to_string())
             .collect();
         assert_eq!(glob_sources, vec!["LICENSE", "licenses/*.txt"]);
 
-        assert_eq!(license_file_late_bound.len(), 1);
+        let late_bound: Vec<_> = license_files.late_bound().collect();
+        assert_eq!(late_bound.len(), 1);
         assert_eq!(
-            license_file_late_bound[0].as_str(),
+            late_bound[0].source(),
             "${{ PREFIX }}/share/licenses/foo/LICENSE"
         );
     }
@@ -4759,7 +4717,6 @@ outputs:
                     "explicit empty license_file should be preserved as Some(empty)"
                 );
                 assert!(cleared.about.license_file.as_ref().unwrap().is_empty());
-                assert!(cleared.about.license_file_late_bound.is_empty());
 
                 // Second output does not mention license_file, so it inherits
                 // the top-level value.
