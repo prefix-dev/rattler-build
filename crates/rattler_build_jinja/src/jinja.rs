@@ -591,7 +591,29 @@ fn default_filters(env: &mut Environment) {
     env.add_filter("sort", minijinja::filters::sort);
     env.add_filter("trim", minijinja::filters::trim);
     env.add_filter("unique", minijinja::filters::unique);
-    env.add_filter("split", minijinja::filters::split);
+    // Reimplement `split` so that it returns an eagerly materialized sequence
+    // instead of the lazy iterable that upstream minijinja produces. The lazy
+    // iterable does not support (negative) indexing or slicing, so expressions
+    // like `(version | split('.'))[-1]` fail. Materializing into a real list
+    // restores regular Python-style indexing on the result.
+    // See https://github.com/prefix-dev/rattler-build/issues/2582 (remove once
+    // fixed upstream in minijinja).
+    env.add_filter(
+        "split",
+        |s: Arc<str>,
+         sep: Option<Arc<str>>,
+         maxsplits: Option<i64>|
+         -> Result<Value, minijinja::Error> {
+            materialize_iterable(minijinja::filters::split(s, sep, maxsplits))
+        },
+    );
+}
+
+/// Collect a (potentially lazy) iterable [`Value`] into a real sequence so that
+/// indexing (including negative indices) and slicing work as expected.
+fn materialize_iterable(value: Value) -> Result<Value, minijinja::Error> {
+    let items = value.try_iter()?.collect::<Vec<Value>>();
+    Ok(Value::from(items))
 }
 
 fn parse_platform(platform: &str) -> Result<Platform, minijinja::Error> {
@@ -1870,6 +1892,32 @@ mod tests {
 
         assert_eq!(
             jinja.eval("(var | split('.'))[2]").unwrap().to_string(),
+            "3"
+        );
+
+        // Regression test for https://github.com/prefix-dev/rattler-build/issues/2582:
+        // negative indexing and slicing must work on the result of `split`.
+        assert_eq!(
+            jinja.eval("(var | split('.'))[-1]").unwrap().to_string(),
+            "3"
+        );
+        assert_eq!(
+            jinja.eval("(var | split('.'))[-2]").unwrap().to_string(),
+            "2"
+        );
+        assert_eq!(
+            jinja.eval("(var | split('.'))[-1:]").unwrap().to_string(),
+            "[\"3\"]"
+        );
+        assert_eq!(
+            jinja.eval("(var | split('.'))[1:]").unwrap().to_string(),
+            "[\"2\", \"3\"]"
+        );
+        assert_eq!(
+            jinja
+                .eval("(var | split('.'))[-1] | int")
+                .unwrap()
+                .to_string(),
             "3"
         );
     }
