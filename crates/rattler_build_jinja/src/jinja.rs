@@ -1922,6 +1922,40 @@ mod tests {
         );
     }
 
+    /// The other sequence-producing filters we register already return
+    /// indexable sequences in the current minijinja version. This test guards
+    /// against a future minijinja update turning any of them into a lazy
+    /// iterable (which would break negative indexing / slicing, see
+    /// https://github.com/prefix-dev/rattler-build/issues/2582). If it does,
+    /// wrap the affected filter with `materialize_iterable` like `split`.
+    #[test]
+    fn test_sequence_filters_support_negative_indexing() {
+        let jinja = Jinja::new(JinjaConfig::default());
+
+        // `reverse` on a sequence
+        assert_eq!(
+            jinja.eval("([1, 2, 3] | reverse)[-1]").unwrap().to_string(),
+            "1"
+        );
+        // `reverse` on a string still yields a reversed string
+        assert_eq!(jinja.eval("'abc' | reverse").unwrap().to_string(), "cba");
+        // `unique`
+        assert_eq!(
+            jinja
+                .eval("([1, 2, 2, 3] | unique)[-1]")
+                .unwrap()
+                .to_string(),
+            "3"
+        );
+        // `sort`
+        assert_eq!(
+            jinja.eval("([3, 1, 2] | sort)[-1]").unwrap().to_string(),
+            "3"
+        );
+        // `list`
+        assert_eq!(jinja.eval("('abc' | list)[-1]").unwrap().to_string(), "c");
+    }
+
     #[test]
     fn eval_env() {
         let options = JinjaConfig {
