@@ -1,6 +1,8 @@
+use std::fmt::Write as _;
 use std::path::Path;
 
-use rattler_shell::shell;
+use indexmap::IndexMap;
+use rattler_shell::shell::{self, Shell};
 
 use super::NativeShellRunner;
 
@@ -38,6 +40,34 @@ set -x
 
     fn replacements_template(&self) -> &'static str {
         "$((var))"
+    }
+
+    /// Subshell scope. Inherited `set -e` aborts on failure, so no guard is
+    /// needed — but it must stay a bare statement (chaining `||`/`&&` would
+    /// suppress `set -e`).
+    fn scope_section(
+        &self,
+        label: Option<&str>,
+        env: &IndexMap<String, String>,
+        body: &str,
+    ) -> Result<String, std::io::Error> {
+        let shell = shell::Bash::default();
+        let mut out = String::new();
+        if let Some(label) = label {
+            let _ = writeln!(out, "# === {label} ===");
+        }
+        out.push_str("(\n");
+        for (key, value) in env {
+            shell
+                .set_env_var(&mut out, key, value)
+                .map_err(std::io::Error::other)?;
+        }
+        out.push_str(body);
+        if !body.ends_with('\n') {
+            out.push('\n');
+        }
+        out.push(')');
+        Ok(out)
     }
 
     /// Returns reproduction instructions for the failed bash wrapper script.
