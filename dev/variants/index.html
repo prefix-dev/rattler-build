@@ -3195,6 +3195,16 @@ the solver will automatically prefer the variant with the highest Python version
 </span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a><span class="w">    </span><span class="c1"># this will down-prioritize the cuda variant versus other variants of the package</span>
 </span><span id="__span-14-7"><a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a><span class="hll"><span class="w">    </span><span class="nt">down_prioritize_variant</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ 1 if cuda else 0 }}</span>
 </span></span></code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Variant keys that only exist on some platforms</p>
+<p>The <code>down_prioritize_variant</code> expression may reference a variant key that
+is only defined for some platforms in the variant configuration (e.g. a
+microarchitecture level that only exists on <code>linux</code> + <code>x86_64</code>). Since
+referencing an undefined variable is an error, provide an explicit
+fallback with the <code>default</code> filter:
+<code>${{ 0 if (my_level | default(1)) == 1 else 1 }}</code>. On platforms where the
+key is absent there is only a single variant, so any fallback value works.</p>
+</div>
 <details class="example" open="open">
 <summary>Example: CUDA / CPU variant with automatic fallback</summary>
 <p>A common pattern is to build both GPU and CPU variants, where the solver
