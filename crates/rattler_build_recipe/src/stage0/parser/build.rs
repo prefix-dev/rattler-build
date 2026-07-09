@@ -5,8 +5,8 @@ use rattler_conda_types::NoArchType;
 use crate::stage0::{
     Conditional, ConditionalList, Item, JinjaExpression, NestedItemList,
     build::{
-        BinaryRelocation, Build, DynamicLinking, ForceFileType, PostProcess, PrefixDetection,
-        PrefixIgnore, PythonBuild, RunStep, Step, VariantKeyUsage,
+        BinaryRelocation, Build, BuildPlan, DynamicLinking, ForceFileType, PostProcess,
+        PrefixDetection, PrefixIgnore, PythonBuild, RunStep, Step, VariantKeyUsage,
     },
     parser::helpers::get_span,
     types::{IncludeExclude, JinjaTemplate, Value},
@@ -517,6 +517,7 @@ pub fn parse_build(node: &Node) -> Result<Build, ParseError> {
 
 fn parse_build_from_mapping(mapping: &MarkedMappingNode) -> Result<Build, ParseError> {
     let mut build = Build::default();
+    let mut script_seen = false;
     let mut steps_span = None;
 
     for (key_node, value_node) in mapping.iter() {
@@ -530,12 +531,12 @@ fn parse_build_from_mapping(mapping: &MarkedMappingNode) -> Result<Build, ParseE
                 build.string = Some(parse_field!("build.string", value_node));
             }
             "script" => {
-                build.script = parse_script(value_node)?;
+                script_seen = true;
+                build.plan = BuildPlan::Script(parse_script(value_node)?);
             }
             "steps" => {
                 steps_span = Some(*key_node.span());
-                build.steps_explicit = true;
-                build.steps = parse_steps(value_node)?;
+                build.plan = BuildPlan::Steps(parse_steps(value_node)?);
             }
             "noarch" => {
                 build.noarch = Some(parse_noarch(value_node)?);
@@ -586,10 +587,7 @@ fn parse_build_from_mapping(mapping: &MarkedMappingNode) -> Result<Build, ParseE
 
     // A build unit uses either `script` or `steps`, never both. Even an empty
     // `steps: []` list explicitly selects steps mode.
-    if !build.script.is_default()
-        && build.steps_explicit
-        && let Some(span) = steps_span
-    {
+    if script_seen && let Some(span) = steps_span {
         return Err(ParseError::invalid_value(
             "build",
             "`script` and `steps` are mutually exclusive; use one or the other",
@@ -972,7 +970,7 @@ mod tests {
         // When number is not specified, it should be None (inherit from top-level)
         assert!(build.number.is_none());
         assert!(build.string.is_none());
-        assert!(build.script.is_default());
+        assert!(build.plan.is_default());
     }
 
     #[test]
@@ -1000,8 +998,9 @@ script:
 "#;
         let node = marked_yaml::parse_yaml(0, yaml).unwrap();
         let build = parse_build(&node).unwrap();
-        assert!(build.script.content.is_some());
-        assert_eq!(build.script.content.as_ref().unwrap().len(), 2);
+        let script = build.plan.script().expect("script mode");
+        assert!(script.content.is_some());
+        assert_eq!(script.content.as_ref().unwrap().len(), 2);
     }
 
     #[test]
@@ -1019,10 +1018,10 @@ steps:
         let node = marked_yaml::parse_yaml(0, yaml).unwrap();
         let build = parse_build(&node).unwrap();
 
-        assert!(build.steps_explicit);
-        assert_eq!(build.steps.len(), 2);
+        let steps = build.plan.steps().expect("steps mode");
+        assert_eq!(steps.len(), 2);
 
-        match &build.steps[0] {
+        match &steps[0] {
             Step::Run(first) => {
                 assert_eq!(first.run.len(), 1);
                 assert!(first.condition.is_none());
@@ -1031,7 +1030,7 @@ steps:
             }
         }
 
-        match &build.steps[1] {
+        match &steps[1] {
             Step::Run(second) => {
                 assert!(second.condition.is_some());
                 assert!(second.interpreter.is_some());

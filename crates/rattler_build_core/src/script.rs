@@ -17,6 +17,7 @@ use crate::{
     env_vars::{self},
     metadata::Output,
 };
+use rattler_build_recipe::stage1::build::BuildPlan;
 
 impl Output {
     /// Helper function to get a jinja renderer for the output's recipe context.
@@ -36,7 +37,6 @@ impl Output {
         let target_platform = self.build_configuration.target_platform;
         let env_isolation = self.build_configuration.env_isolation;
         let build = self.recipe.build();
-        let steps_mode = build.steps_explicit || !build.steps.is_empty();
 
         let mut env_vars = env_vars::vars(self, "BUILD");
         env_vars.extend(env_vars::os_vars(
@@ -50,8 +50,8 @@ impl Output {
             .into_iter()
             .filter_map(|(k, v)| v.map(|v| (k, v)))
             .collect();
-        if !steps_mode {
-            env_vars.extend(build.script.env().clone());
+        if let BuildPlan::Script(script) = &build.plan {
+            env_vars.extend(script.env().clone());
         }
 
         // Renderer for script content, with the build environment variables
@@ -77,14 +77,12 @@ impl Output {
         // plain `script` is a single section. When steps mode was not selected,
         // always resolve the script even if it is default so legacy build.sh /
         // build.bat auto-discovery still works.
-        let scripts: Vec<(&Script, Option<usize>)> = if steps_mode {
-            build
-                .steps
+        let scripts: Vec<(&Script, Option<usize>)> = match &build.plan {
+            BuildPlan::Steps(steps) => steps
                 .iter()
                 .map(|step| (&step.script, Some(step.source_index)))
-                .collect()
-        } else {
-            vec![(&build.script, None)]
+                .collect(),
+            BuildPlan::Script(script) => vec![(script, None)],
         };
 
         let runtime = RuntimeEnv::current();

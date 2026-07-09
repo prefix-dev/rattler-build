@@ -1539,7 +1539,11 @@ feature_enabled:
             .collect::<Vec<_>>();
         assert!(variants.contains(&"true".to_string()), "{variants:?}");
         assert!(variants.contains(&"false".to_string()), "{variants:?}");
-        assert!(rendered.iter().all(|r| r.recipe.build.steps_explicit));
+        assert!(
+            rendered
+                .iter()
+                .all(|r| r.recipe.build.plan.steps().is_some())
+        );
     }
 
     #[test]

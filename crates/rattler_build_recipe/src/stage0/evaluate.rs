@@ -41,11 +41,11 @@ use crate::{
         Package as Stage0Package, Requirements as Stage0Requirements, Source as Stage0Source,
         Stage0Recipe, TestType as Stage0TestType,
         build::{
-            BinaryRelocation as Stage0BinaryRelocation, DynamicLinking as Stage0DynamicLinking,
-            ForceFileType as Stage0ForceFileType, PostProcess as Stage0PostProcess,
-            PrefixDetection as Stage0PrefixDetection, PrefixIgnore as Stage0PrefixIgnore,
-            PythonBuild as Stage0PythonBuild, Step as Stage0Step,
-            VariantKeyUsage as Stage0VariantKeyUsage,
+            BinaryRelocation as Stage0BinaryRelocation, BuildPlan as Stage0BuildPlan,
+            DynamicLinking as Stage0DynamicLinking, ForceFileType as Stage0ForceFileType,
+            PostProcess as Stage0PostProcess, PrefixDetection as Stage0PrefixDetection,
+            PrefixIgnore as Stage0PrefixIgnore, PythonBuild as Stage0PythonBuild,
+            Step as Stage0Step, VariantKeyUsage as Stage0VariantKeyUsage,
         },
         match_spec::matchspec_parse_options,
         requirements::{
@@ -72,10 +72,11 @@ use crate::{
         Extra as Stage1Extra, GlobVec, Package as Stage1Package, Recipe as Stage1Recipe,
         Requirements as Stage1Requirements, Rpaths,
         build::{
-            Build as Stage1Build, BuildString, DynamicLinking as Stage1DynamicLinking,
-            ForceFileType as Stage1ForceFileType, PostProcess as Stage1PostProcess,
-            PrefixDetection as Stage1PrefixDetection, PythonBuild as Stage1PythonBuild,
-            Step as Stage1Step, VariantKeyUsage as Stage1VariantKeyUsage,
+            Build as Stage1Build, BuildPlan as Stage1BuildPlan, BuildString,
+            DynamicLinking as Stage1DynamicLinking, ForceFileType as Stage1ForceFileType,
+            PostProcess as Stage1PostProcess, PrefixDetection as Stage1PrefixDetection,
+            PythonBuild as Stage1PythonBuild, Step as Stage1Step,
+            VariantKeyUsage as Stage1VariantKeyUsage,
         },
         requirements::{
             IgnoreRunExports as Stage1IgnoreRunExports, RunExports as Stage1RunExports,
@@ -2228,26 +2229,24 @@ impl Evaluate for Stage0Build {
         // Track the variables used in the script to count towards "actually used" variables,
         // but defer actual evaluation until build time.
         //
-        // `steps` and `script` are mutually exclusive (enforced during parsing). When
-        // steps mode is selected each included step becomes a scoped section of the
-        // generated wrapper; otherwise the single `script` is used. Preserve steps
-        // mode even if the list is empty or all steps filter out so outputs don't
-        // accidentally inherit a top-level script.
-        let steps_explicit = self.steps_explicit || !self.steps.is_empty();
-        let (script, steps) = if steps_explicit {
-            if !context.jinja_config().experimental {
-                return Err(ParseError::invalid_value(
-                    "build.steps",
-                    "`build.steps` is an experimental feature: provide the `--experimental` flag to enable it",
-                    Span::new_blank(),
-                ));
+        // The build plan is either legacy script mode or explicit steps mode
+        // (enforced during parsing). Steps mode is preserved even if the list is
+        // empty or all steps filter out, so outputs don't accidentally inherit a
+        // top-level script.
+        let plan = match &self.plan {
+            Stage0BuildPlan::Steps(steps) => {
+                if !context.jinja_config().experimental {
+                    return Err(ParseError::invalid_value(
+                        "build.steps",
+                        "`build.steps` is an experimental feature: provide the `--experimental` flag to enable it",
+                        Span::new_blank(),
+                    ));
+                }
+                Stage1BuildPlan::Steps(evaluate_steps(steps, context)?)
             }
-            (
-                rattler_build_script::Script::default(),
-                evaluate_steps(&self.steps, context)?,
-            )
-        } else {
-            (evaluate_script(&self.script, context)?, Vec::new())
+            Stage0BuildPlan::Script(script) => {
+                Stage1BuildPlan::Script(evaluate_script(script, context)?)
+            }
         };
 
         // Evaluate noarch
@@ -2353,9 +2352,7 @@ impl Evaluate for Stage0Build {
         Ok(Stage1Build {
             number,
             string,
-            script,
-            steps,
-            steps_explicit,
+            plan,
             noarch,
             flags,
             python,
@@ -3106,19 +3103,12 @@ fn merge_stage1_build(
 ) -> crate::stage1::Build {
     // Build-authoring mode (`script` vs `steps`) is mutually exclusive and is
     // determined per build unit. If the output specifies either, it fully owns
-    // the mode; only when the output sets neither do we inherit from top-level.
-    let (script, steps, steps_explicit) = if output.steps_explicit || !output.steps.is_empty() {
-        (rattler_build_script::Script::default(), output.steps, true)
-    } else if !output.script.is_default() {
-        (output.script, Vec::new(), false)
-    } else if toplevel.steps_explicit || !toplevel.steps.is_empty() {
-        (
-            rattler_build_script::Script::default(),
-            toplevel.steps,
-            true,
-        )
+    // the mode; only the default legacy script-discovery plan inherits from
+    // top-level.
+    let plan = if output.plan.is_default() {
+        toplevel.plan
     } else {
-        (toplevel.script, Vec::new(), false)
+        output.plan
     };
 
     // Build string: use output unless it's Default, then inherit from top-level
@@ -3204,9 +3194,7 @@ fn merge_stage1_build(
     };
 
     stage1::Build {
-        script,
-        steps,
-        steps_explicit,
+        plan,
         number,
         string,
         noarch,
@@ -3384,8 +3372,10 @@ fn evaluate_package_output_to_recipe(
     // as a no-op; users must set `build.script` explicitly on the output or
     // top-level to run anything.
     let mut build = build;
-    if build.script.content.is_default() {
-        build.script.content = ScriptContent::Commands(Vec::new());
+    if let Stage1BuildPlan::Script(script) = &mut build.plan
+        && script.content.is_default()
+    {
+        script.content = ScriptContent::Commands(Vec::new());
     }
 
     // Check if this output is skipped (already eagerly evaluated during Build::evaluate).
@@ -3595,7 +3585,7 @@ impl Evaluate for crate::stage0::MultiOutputRecipe {
                 // Evaluate staging output components
                 let script = evaluate_script(&staging_output.build.script, &context_with_vars)?;
                 let build = crate::stage1::Build {
-                    script,
+                    plan: Stage1BuildPlan::Script(script),
                     ..crate::stage1::Build::default()
                 };
 
@@ -5207,7 +5197,7 @@ outputs:
                 // multi-output outputs never auto-discover `build.sh`/`build.bat`,
                 // so the resolved script is an explicit no-op.
                 assert_eq!(
-                    cache_output.build.script.content,
+                    cache_output.build.plan.script().unwrap().content,
                     ScriptContent::Commands(Vec::new())
                 );
 
@@ -5227,7 +5217,7 @@ outputs:
 
                 // Build section: should inherit everything including script
                 assert!(!toplevel_output.build.dynamic_linking.is_default()); // Inherited
-                assert!(!toplevel_output.build.script.is_default()); // Inherited (top-level has script)
+                assert!(!toplevel_output.build.plan.is_default()); // Inherited (top-level has script)
             }
             _ => panic!("Expected MultiOutputRecipe"),
         }
@@ -5262,7 +5252,7 @@ outputs:
                 assert_eq!(recipes.len(), 2);
                 for recipe in &recipes {
                     assert_eq!(
-                        recipe.build.script.content,
+                        recipe.build.plan.script().unwrap().content,
                         ScriptContent::Commands(Vec::new()),
                         "multi-output recipe must not default script to build.sh/build.bat (output: {})",
                         recipe.package.name.as_normalized()
@@ -6203,7 +6193,7 @@ package:
     #[test]
     fn test_build_steps_requires_experimental() {
         let build = Stage0Build {
-            steps: vec![run_step("echo a")],
+            plan: Stage0BuildPlan::Steps(vec![run_step("echo a")]),
             ..Default::default()
         };
         let ctx = EvaluationContext::new();
@@ -6215,7 +6205,7 @@ package:
     #[test]
     fn test_build_evaluate_uses_steps() {
         let build = Stage0Build {
-            steps: vec![run_step("echo a"), run_step("echo b")],
+            plan: Stage0BuildPlan::Steps(vec![run_step("echo a"), run_step("echo b")]),
             ..Default::default()
         };
         let ctx = EvaluationContext::with_variables_and_config(
@@ -6228,16 +6218,14 @@ package:
 
         let stage1 = build.evaluate(&ctx).unwrap();
 
-        // Steps populate `steps`, not the single `script`.
-        assert!(stage1.script.is_default());
-        assert!(stage1.steps_explicit);
-        assert_eq!(stage1.steps.len(), 2);
+        let steps = stage1.plan.steps().expect("steps mode");
+        assert_eq!(steps.len(), 2);
         assert_eq!(
-            stage1.steps[0].content,
+            steps[0].content,
             ScriptContent::Commands(vec!["echo a".to_string()])
         );
         assert_eq!(
-            stage1.steps[1].content,
+            steps[1].content,
             ScriptContent::Commands(vec!["echo b".to_string()])
         );
     }
@@ -6253,9 +6241,7 @@ package:
             ..Default::default()
         });
         let build = Stage0Build {
-            script: crate::stage0::types::Script::from_content("echo fallback"),
-            steps: vec![false_step],
-            steps_explicit: true,
+            plan: Stage0BuildPlan::Steps(vec![false_step]),
             ..Default::default()
         };
         let mut ctx = EvaluationContext::with_variables_and_config(
@@ -6269,36 +6255,26 @@ package:
 
         let stage1 = build.evaluate(&ctx).unwrap();
 
-        assert!(stage1.steps_explicit);
-        assert!(stage1.steps.is_empty());
-        assert!(
-            stage1.script.is_default(),
-            "explicit steps mode must not fall back to build.script"
-        );
+        assert_eq!(stage1.plan.steps().map(<[_]>::len), Some(0));
     }
 
     #[test]
     fn test_merge_stage1_build_filtered_empty_steps_do_not_inherit_script() {
         let toplevel = stage1::Build {
-            script: rattler_build_script::Script {
+            plan: Stage1BuildPlan::Script(rattler_build_script::Script {
                 content: ScriptContent::Command("echo top-level".to_string()),
                 ..Default::default()
-            },
+            }),
             ..Default::default()
         };
         let output = stage1::Build {
-            steps_explicit: true,
+            plan: Stage1BuildPlan::Steps(Vec::new()),
             ..Default::default()
         };
 
         let merged = merge_stage1_build(toplevel, output);
 
-        assert!(merged.steps_explicit);
-        assert!(merged.steps.is_empty());
-        assert!(
-            merged.script.is_default(),
-            "explicit empty/filtered steps must not inherit the top-level script"
-        );
+        assert_eq!(merged.plan.steps().map(<[_]>::len), Some(0));
     }
 
     #[test]

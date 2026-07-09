@@ -330,7 +330,9 @@ impl Output {
 
         staging
             .build
-            .script
+            .plan
+            .script()
+            .expect("staging builds use script mode")
             .run_script(
                 env_vars,
                 &self.build_configuration.directories.work_dir,

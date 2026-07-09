@@ -354,7 +354,7 @@ impl Script {
             let render = |script: &str| -> Result<String, std::io::Error> {
                 renderer(script).map_err(|e| {
                     std::io::Error::other(format!(
-                        "Failed to render jinja template in build `script`: {}",
+                        "Failed to render jinja template in build script content: {}",
                         e
                     ))
                 })

@@ -281,6 +281,47 @@ impl From<DeserializableStepRun> for ScriptContent {
     }
 }
 
+/// The executable build plan: either a single legacy script, or explicit
+/// ordered build steps.
+#[derive(Debug, Clone, PartialEq)]
+pub enum BuildPlan {
+    /// Legacy `build.script` mode. `Script::default()` preserves default
+    /// `build.sh` / `build.bat` discovery.
+    Script(Script),
+    /// Explicit `build.steps` mode. An empty vector is meaningful: it disables
+    /// legacy default script discovery.
+    Steps(Vec<Step>),
+}
+
+impl Default for BuildPlan {
+    fn default() -> Self {
+        Self::Script(Script::default())
+    }
+}
+
+impl BuildPlan {
+    /// Returns true if this is the default script-discovery plan.
+    pub fn is_default(&self) -> bool {
+        matches!(self, Self::Script(script) if script.is_default())
+    }
+
+    /// Returns the script in legacy script mode.
+    pub fn script(&self) -> Option<&Script> {
+        match self {
+            Self::Script(script) => Some(script),
+            Self::Steps(_) => None,
+        }
+    }
+
+    /// Returns the steps in explicit steps mode.
+    pub fn steps(&self) -> Option<&[Step]> {
+        match self {
+            Self::Script(_) => None,
+            Self::Steps(steps) => Some(steps.as_slice()),
+        }
+    }
+}
+
 /// Variant key usage configuration (evaluated)
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct VariantKeyUsage {
@@ -413,7 +454,7 @@ impl<'de> serde::Deserialize<'de> for PostProcess {
 
 /// Evaluated build configuration with all templates and conditionals resolved
 #[derive(Default, Debug, Clone, PartialEq, Deserialize)]
-#[serde(from = "BuildDeserialize")]
+#[serde(try_from = "BuildDeserialize")]
 pub struct Build {
     /// Build number (increments with each rebuild)
     /// None means inherit from top-level, Some(n) means use n (even if n is 0)
@@ -425,21 +466,9 @@ pub struct Build {
     #[serde(default)]
     pub string: BuildString,
 
-    /// Build script - contains script content, interpreter, environment variables, etc.
-    #[serde(default, skip_serializing_if = "Script::is_default")]
-    pub script: Script,
-
-    /// Ordered build steps. Each step is an independent script (its own
-    /// interpreter and step-local `env`) that becomes one scoped section of the
-    /// generated build wrapper. Mutually exclusive with a non-default `script`.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub steps: Vec<Step>,
-
-    /// Whether the recipe explicitly selected `build.steps` mode, even if all
-    /// steps were filtered out. Internal-only sentinel used for output
-    /// inheritance and wrapper generation.
-    #[serde(default, skip)]
-    pub steps_explicit: bool,
+    /// Executable build plan: either a single legacy script or explicit steps.
+    #[serde(skip)]
+    pub plan: BuildPlan,
 
     /// Noarch type - "python" or "generic" if set
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -492,6 +521,37 @@ pub struct Build {
     pub post_process: Vec<PostProcess>,
 }
 
+enum PresentField<T> {
+    Missing,
+    Present(T),
+}
+
+impl<T> Default for PresentField<T> {
+    fn default() -> Self {
+        Self::Missing
+    }
+}
+
+impl<'de, T> Deserialize<'de> for PresentField<T>
+where
+    T: serde::de::DeserializeOwned,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        use serde::de::Error as _;
+
+        let value = serde_yaml::Value::deserialize(deserializer)?;
+        if value.is_null() {
+            return Err(D::Error::custom("null is not a valid value for this field"));
+        }
+        T::deserialize(value)
+            .map(Self::Present)
+            .map_err(D::Error::custom)
+    }
+}
+
 #[derive(Default, Deserialize)]
 struct BuildDeserialize {
     #[serde(default)]
@@ -499,8 +559,9 @@ struct BuildDeserialize {
     #[serde(default)]
     string: BuildString,
     #[serde(default)]
-    script: Script,
-    steps: Option<Vec<Step>>,
+    script: PresentField<Script>,
+    #[serde(default)]
+    steps: PresentField<Vec<Step>>,
     #[serde(default)]
     noarch: Option<NoArchType>,
     #[serde(default)]
@@ -527,20 +588,30 @@ struct BuildDeserialize {
     post_process: Vec<PostProcess>,
 }
 
-impl From<BuildDeserialize> for Build {
-    fn from(raw: BuildDeserialize) -> Self {
-        let steps_explicit = raw.steps.is_some();
-        let mut steps = raw.steps.unwrap_or_default();
-        for (index, step) in steps.iter_mut().enumerate() {
-            step.source_index = index;
-        }
+impl TryFrom<BuildDeserialize> for Build {
+    type Error = String;
 
-        Self {
+    fn try_from(raw: BuildDeserialize) -> Result<Self, Self::Error> {
+        let plan = match (raw.script, raw.steps) {
+            (PresentField::Present(_), PresentField::Present(_)) => {
+                return Err(
+                    "`script` and `steps` are mutually exclusive; use one or the other".to_string(),
+                );
+            }
+            (PresentField::Missing, PresentField::Present(mut steps)) => {
+                for (index, step) in steps.iter_mut().enumerate() {
+                    step.source_index = index;
+                }
+                BuildPlan::Steps(steps)
+            }
+            (PresentField::Present(script), PresentField::Missing) => BuildPlan::Script(script),
+            (PresentField::Missing, PresentField::Missing) => BuildPlan::Script(Script::default()),
+        };
+
+        Ok(Self {
             number: raw.number,
             string: raw.string,
-            script: raw.script,
-            steps,
-            steps_explicit,
+            plan,
             noarch: raw.noarch,
             flags: raw.flags,
             python: raw.python,
@@ -553,7 +624,7 @@ impl From<BuildDeserialize> for Build {
             variant: raw.variant,
             prefix_detection: raw.prefix_detection,
             post_process: raw.post_process,
-        }
+        })
     }
 }
 
@@ -598,8 +669,14 @@ impl Serialize for Build {
         BuildSerialize {
             number: self.number.as_ref(),
             string: &self.string,
-            script: (!self.script.is_default()).then_some(&self.script),
-            steps: (self.steps_explicit || !self.steps.is_empty()).then_some(&self.steps),
+            script: match &self.plan {
+                BuildPlan::Script(script) if !script.is_default() => Some(script),
+                _ => None,
+            },
+            steps: match &self.plan {
+                BuildPlan::Steps(steps) => Some(steps),
+                BuildPlan::Script(_) => None,
+            },
             noarch: self.noarch.as_ref(),
             flags: (!self.flags.is_empty()).then_some(&self.flags),
             python: (!self.python.is_default()).then_some(&self.python),
@@ -781,9 +858,7 @@ impl Build {
     pub fn is_default(&self) -> bool {
         self.number.is_none()
             && matches!(self.string, BuildString::Default)
-            && self.script.is_default()
-            && self.steps.is_empty()
-            && !self.steps_explicit
+            && self.plan.is_default()
             && self.noarch.is_none()
             && self.flags.is_empty()
             && self.python.entry_points.is_empty()
@@ -836,18 +911,18 @@ mod tests {
         use rattler_build_script::ScriptContent;
 
         let build = Build {
-            script: Script {
+            plan: BuildPlan::Script(Script {
                 content: ScriptContent::Commands(vec![
                     "echo hello".to_string(),
                     "make install".to_string(),
                 ]),
                 ..Default::default()
-            },
+            }),
             ..Default::default()
         };
 
         assert!(!build.is_default());
-        assert!(!build.script.is_default());
+        assert!(!build.plan.is_default());
     }
 
     #[test]
@@ -855,7 +930,7 @@ mod tests {
         use rattler_build_script::ScriptContent;
 
         let build = Build {
-            steps: vec![Step::new(
+            plan: BuildPlan::Steps(vec![Step::new(
                 Script {
                     interpreter: Some("bash".to_string()),
                     env: [("FOO".to_string(), "bar".to_string())]
@@ -866,8 +941,7 @@ mod tests {
                     ..Default::default()
                 },
                 0,
-            )],
-            steps_explicit: true,
+            )]),
             ..Default::default()
         };
 
@@ -886,22 +960,50 @@ mod tests {
                 .collect::<String>()
         );
         let parsed = crate::stage0::parse_recipe_from_source(&recipe_yaml).unwrap();
-        assert!(parsed.build.steps_explicit);
-        assert_eq!(parsed.build.steps.len(), 1);
+        assert_eq!(parsed.build.plan.steps().map(<[_]>::len), Some(1));
 
         let roundtripped: Build = serde_yaml::from_str(&yaml).unwrap();
-        assert!(roundtripped.steps_explicit);
-        assert_eq!(roundtripped.steps.len(), 1);
+        let steps = roundtripped.plan.steps().expect("steps mode");
+        assert_eq!(steps.len(), 1);
         assert_eq!(
-            roundtripped.steps[0].content,
+            steps[0].content,
             ScriptContent::Commands(vec!["echo step".to_string()])
         );
     }
 
     #[test]
+    fn test_build_deserialize_rejects_script_and_steps() {
+        let yaml = r#"
+script: echo script
+steps:
+  - run: echo step
+"#;
+
+        let result = serde_yaml::from_str::<Build>(yaml);
+        assert!(result.is_err(), "expected script+steps to be rejected");
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("mutually exclusive")
+        );
+    }
+
+    #[test]
+    fn test_build_deserialize_rejects_null_script_or_steps() {
+        for yaml in ["script:\n", "steps:\n", "script:\nsteps: []\n"] {
+            let result = serde_yaml::from_str::<Build>(yaml);
+            assert!(
+                result.is_err(),
+                "expected null script/steps to be rejected: {yaml:?}"
+            );
+        }
+    }
+
+    #[test]
     fn test_explicit_empty_steps_serializes_steps_mode() {
         let build = Build {
-            steps_explicit: true,
+            plan: BuildPlan::Steps(Vec::new()),
             ..Default::default()
         };
 
@@ -910,7 +1012,6 @@ mod tests {
         assert!(yaml.contains("steps: []"), "{yaml}");
 
         let roundtripped: Build = serde_yaml::from_str(&yaml).unwrap();
-        assert!(roundtripped.steps_explicit);
-        assert!(roundtripped.steps.is_empty());
+        assert_eq!(roundtripped.plan.steps().map(<[_]>::len), Some(0));
     }
 }

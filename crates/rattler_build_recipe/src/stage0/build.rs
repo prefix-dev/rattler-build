@@ -103,8 +103,94 @@ impl RunStep {
     }
 }
 
+/// The executable build plan before evaluation.
+#[derive(Debug, Clone, PartialEq)]
+pub enum BuildPlan {
+    /// Legacy `build.script` mode. `Script::default()` preserves default
+    /// `build.sh` / `build.bat` discovery.
+    Script(Script),
+    /// Explicit `build.steps` mode. An empty vector is meaningful: it disables
+    /// legacy default script discovery.
+    Steps(Vec<Step>),
+}
+
+impl Default for BuildPlan {
+    fn default() -> Self {
+        Self::Script(Script::default())
+    }
+}
+
+impl BuildPlan {
+    /// Returns the script in legacy script mode.
+    pub fn script(&self) -> Option<&Script> {
+        match self {
+            Self::Script(script) => Some(script),
+            Self::Steps(_) => None,
+        }
+    }
+
+    /// Returns a mutable script in legacy script mode.
+    pub fn script_mut(&mut self) -> Option<&mut Script> {
+        match self {
+            Self::Script(script) => Some(script),
+            Self::Steps(_) => None,
+        }
+    }
+
+    /// Returns the steps in explicit steps mode.
+    pub fn steps(&self) -> Option<&[Step]> {
+        match self {
+            Self::Script(_) => None,
+            Self::Steps(steps) => Some(steps.as_slice()),
+        }
+    }
+
+    /// Returns true if this is default legacy script discovery.
+    pub fn is_default(&self) -> bool {
+        matches!(self, Self::Script(script) if script.is_default())
+    }
+
+    /// Collect all variables used in the build plan.
+    pub fn used_variables(&self) -> Vec<String> {
+        let mut vars = Vec::new();
+        match self {
+            Self::Script(script) => vars.extend(script.used_variables()),
+            Self::Steps(steps) => {
+                for step in steps {
+                    vars.extend(step.used_variables());
+                }
+            }
+        }
+        vars.sort();
+        vars.dedup();
+        vars
+    }
+}
+
+impl Serialize for BuildPlan {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+
+        match self {
+            Self::Script(script) => {
+                let mut state = serializer.serialize_struct("BuildPlan", 1)?;
+                state.serialize_field("script", script)?;
+                state.end()
+            }
+            Self::Steps(steps) => {
+                let mut state = serializer.serialize_struct("BuildPlan", 1)?;
+                state.serialize_field("steps", steps)?;
+                state.end()
+            }
+        }
+    }
+}
+
 /// Stage0 Build configuration - contains templates and conditionals
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Clone, PartialEq)]
 pub struct Build {
     /// Build number (increments with each rebuild)
     /// None means inherit from top-level, Some(n) means use n (even if n is 0)
@@ -115,21 +201,9 @@ pub struct Build {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub string: Option<Value<String>>,
 
-    /// Build script - contains script content, interpreter, environment variables, etc.
-    /// Default is `build.sh` on Unix, `build.bat` on Windows
-    #[serde(default)]
-    pub script: Script,
-
-    /// Ordered build steps. An alternative to `script`; the two are mutually
-    /// exclusive for a single build unit.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub steps: Vec<Step>,
-
-    /// Whether `steps` was explicitly specified, even if the list is empty or
-    /// later filters to zero runnable steps. This preserves authoring mode
-    /// during evaluation and output inheritance.
-    #[serde(default, skip)]
-    pub steps_explicit: bool,
+    /// Executable build plan: either a single legacy script or explicit steps.
+    #[serde(default, flatten)]
+    pub plan: BuildPlan,
 
     /// Noarch type - python or generic
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -185,9 +259,7 @@ impl Default for Build {
         Self {
             number: None,
             string: None,
-            script: Script::default(),
-            steps: Vec::new(),
-            steps_explicit: false,
+            plan: BuildPlan::default(),
             noarch: None,
             flags: ConditionalList::default(),
             python: PythonBuild::default(),
@@ -352,7 +424,10 @@ impl Display for Build {
                 .map(|v| format!("{}", v))
                 .unwrap_or_else(|| "inherited".to_string()),
             self.string.as_ref().into_iter().format(", "),
-            self.script,
+            match &self.plan {
+                BuildPlan::Script(script) => script.to_string(),
+                BuildPlan::Steps(steps) => format!("{} steps", steps.len()),
+            },
             self.noarch
                 .as_ref()
                 .map(|v| format!("{:?}", v))
@@ -368,9 +443,7 @@ impl Build {
         let Build {
             number,
             string,
-            script,
-            steps,
-            steps_explicit: _,
+            plan,
             noarch,
             flags,
             python,
@@ -395,11 +468,7 @@ impl Build {
             vars.extend(string.used_variables());
         }
 
-        vars.extend(script.used_variables());
-
-        for step in steps {
-            vars.extend(step.used_variables());
-        }
+        vars.extend(plan.used_variables());
 
         if let Some(noarch) = noarch {
             vars.extend(noarch.used_variables());

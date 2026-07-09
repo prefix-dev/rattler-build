@@ -538,9 +538,14 @@ class Build:
         return self._inner.string
 
     @property
-    def script(self) -> Any:
-        """Get the build script configuration."""
+    def script(self) -> Any | None:
+        """Get the build script configuration, if this build uses script mode."""
         return self._inner.script
+
+    @property
+    def steps(self) -> Any | None:
+        """Get the build steps, if this build uses steps mode."""
+        return self._inner.steps
 
     @property
     def noarch(self) -> Any | None:
