@@ -246,6 +246,7 @@ impl<'de> Deserialize<'de> for Step {
         D: serde::Deserializer<'de>,
     {
         #[derive(Deserialize)]
+        #[serde(deny_unknown_fields)]
         struct RawStep {
             run: DeserializableStepRun,
             #[serde(default)]
@@ -443,6 +444,7 @@ impl<'de> serde::Deserialize<'de> for PostProcess {
         D: serde::Deserializer<'de>,
     {
         #[derive(Deserialize)]
+        #[serde(deny_unknown_fields)]
         struct PostProcessHelper {
             files: GlobVec,
             regex: String,
@@ -561,6 +563,7 @@ where
 }
 
 #[derive(Default, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct BuildDeserialize {
     #[serde(default)]
     number: Option<u64>,
@@ -1002,6 +1005,51 @@ mod tests {
         let roundtripped: Build = serde_yaml::from_str(&yaml).unwrap();
         let steps = roundtripped.plan.steps().expect("steps mode");
         assert_eq!(steps[0].source_index, 2);
+    }
+
+    #[test]
+    fn test_build_deserialize_rejects_unknown_step_fields() {
+        let yaml = r#"
+steps:
+  - if: win
+    run: echo windows
+"#;
+
+        let result = serde_yaml::from_str::<Build>(yaml);
+        assert!(
+            result.is_err(),
+            "expected unknown step fields to be rejected"
+        );
+        assert!(result.unwrap_err().to_string().contains("unknown field"));
+    }
+
+    #[test]
+    fn test_build_deserialize_rejects_unknown_build_fields() {
+        let result = serde_yaml::from_str::<Build>("unexpected: true\n");
+        assert!(
+            result.is_err(),
+            "expected unknown build fields to be rejected"
+        );
+        assert!(result.unwrap_err().to_string().contains("unknown field"));
+    }
+
+    #[test]
+    fn test_build_deserialize_rejects_unknown_post_process_fields() {
+        let yaml = r#"
+post_process:
+  - files:
+      - bin/*
+    regex: foo
+    replacement: bar
+    unexpected: true
+"#;
+
+        let result = serde_yaml::from_str::<Build>(yaml);
+        assert!(
+            result.is_err(),
+            "expected unknown post_process fields to be rejected"
+        );
+        assert!(result.unwrap_err().to_string().contains("unknown field"));
     }
 
     #[test]

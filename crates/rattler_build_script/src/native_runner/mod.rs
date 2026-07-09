@@ -85,7 +85,8 @@ pub(crate) fn write_shell_script(
 /// metacharacters, whitespace, or is empty. `rattler_shell::Shell::run_command`
 /// joins arguments with spaces without quoting, so a resolved interpreter,
 /// script path, or `cwd` containing characters like spaces or `&` would
-/// otherwise be split or interpreted by the shell.
+/// otherwise be split or interpreted by the shell. For cmd batch files, literal
+/// `%` characters are also escaped to avoid environment-variable expansion.
 pub(crate) fn quote_arg(shell: &ShellEnum, arg: &str) -> String {
     fn posix_needs_quotes(arg: &str) -> bool {
         arg.is_empty()
@@ -104,8 +105,14 @@ pub(crate) fn quote_arg(shell: &ShellEnum, arg: &str) -> String {
     }
 
     match shell {
-        ShellEnum::CmdExe(_) if cmd_needs_quotes(arg) => format!("\"{arg}\""),
-        ShellEnum::CmdExe(_) => arg.to_string(),
+        ShellEnum::CmdExe(_) => {
+            let escaped = arg.replace('%', "%%");
+            if cmd_needs_quotes(&escaped) {
+                format!("\"{escaped}\"")
+            } else {
+                escaped
+            }
+        }
         _ if posix_needs_quotes(arg) => format!("'{}'", arg.replace('\'', r"'\''")),
         _ => arg.to_string(),
     }
@@ -259,5 +266,13 @@ endlocal & if %RB_SECTION_ERRORLEVEL% neq 0 exit /b %RB_SECTION_ERRORLEVEL%
         assert_eq!(quote_arg(&cmd, r"C:\tmp\a;b"), "\"C:\\tmp\\a;b\"");
         assert_eq!(quote_arg(&cmd, r"C:\tmp\a,b"), "\"C:\\tmp\\a,b\"");
         assert_eq!(quote_arg(&cmd, r"C:\tmp\a=b"), "\"C:\\tmp\\a=b\"");
+        assert_eq!(
+            quote_arg(&cmd, r"C:\tmp\%NO_SUCH_VAR%\script.bat"),
+            r"C:\tmp\%%NO_SUCH_VAR%%\script.bat"
+        );
+        assert_eq!(
+            quote_arg(&cmd, r"C:\tmp\%NO_SUCH_VAR% dir\script.bat"),
+            r#""C:\tmp\%%NO_SUCH_VAR%% dir\script.bat""#
+        );
     }
 }
