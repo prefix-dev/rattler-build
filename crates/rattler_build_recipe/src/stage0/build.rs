@@ -105,7 +105,8 @@ impl RunStep {
 }
 
 /// The executable build plan before evaluation.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Serialize, Clone, PartialEq)]
+#[serde(rename_all = "snake_case")]
 pub enum BuildPlan {
     /// Legacy `build.script` mode. `Script::default()` preserves default
     /// `build.sh` / `build.bat` discovery.
@@ -165,28 +166,6 @@ impl BuildPlan {
         vars.sort();
         vars.dedup();
         vars
-    }
-}
-
-impl Serialize for BuildPlan {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        use serde::ser::SerializeStruct;
-
-        match self {
-            Self::Script(script) => {
-                let mut state = serializer.serialize_struct("BuildPlan", 1)?;
-                state.serialize_field("script", script)?;
-                state.end()
-            }
-            Self::Steps(steps) => {
-                let mut state = serializer.serialize_struct("BuildPlan", 1)?;
-                state.serialize_field("steps", steps)?;
-                state.end()
-            }
-        }
     }
 }
 

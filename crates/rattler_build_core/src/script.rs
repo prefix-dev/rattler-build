@@ -72,12 +72,13 @@ impl Output {
         // plain `script` is a single section. When steps mode was not selected,
         // always resolve the script even if it is default so legacy build.sh /
         // build.bat auto-discovery still works.
-        let scripts: Vec<(&Script, Option<usize>)> = match &build.plan {
+        let scripts: Vec<(Script, Option<usize>)> = match &build.plan {
             BuildPlan::Steps(steps) => steps
                 .iter()
-                .map(|step| (&step.script, Some(step.source_index)))
+                .enumerate()
+                .map(|(index, step)| (step.to_script(), Some(index)))
                 .collect(),
-            BuildPlan::Script(script) => vec![(script, None)],
+            BuildPlan::Script(script) => vec![(script.clone(), None)],
         };
 
         let runtime = RuntimeEnv::current();
@@ -85,7 +86,7 @@ impl Output {
         let work_dir = self.build_configuration.directories.work_dir.clone();
         let mut sections = Vec::with_capacity(scripts.len());
 
-        for (script, source_index) in scripts {
+        for (script, step_index) in scripts {
             // Render each section with both the whole-build environment and
             // that section's scoped env. This preserves legacy `build.script`
             // behavior and makes step-local env visible to that step's `run`
@@ -123,12 +124,12 @@ impl Output {
             sections.push(BuildScriptSection {
                 interpreter: script.interpreter.clone(),
                 content,
-                env: source_index
+                env: step_index
                     .is_some()
                     .then(|| script.env().clone())
                     .unwrap_or_default(),
                 cwd,
-                label: source_index.map(|index| format!("step {index}")),
+                label: step_index.map(|index| format!("step {index}")),
             });
         }
 

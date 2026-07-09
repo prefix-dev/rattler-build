@@ -1358,7 +1358,7 @@ pub fn evaluate_steps(
 ) -> Result<Vec<Stage1Step>, ParseError> {
     let mut scripts = Vec::new();
 
-    for (source_index, step) in steps.iter().enumerate() {
+    for step in steps {
         match step {
             Stage0Step::Run(run) => {
                 for var in run.used_variables() {
@@ -1385,16 +1385,13 @@ pub fn evaluate_steps(
                     None => None,
                 };
 
-                scripts.push(Stage1Step::new(
-                    rattler_build_script::Script {
-                        interpreter,
-                        env: evaluate_env_map("steps.env", &run.env, context)?,
-                        content: ScriptContent::Commands(commands),
-                        cwd,
-                        ..Default::default()
-                    },
-                    source_index,
-                ));
+                scripts.push(Stage1Step::new(rattler_build_script::Script {
+                    interpreter,
+                    env: evaluate_env_map("steps.env", &run.env, context)?,
+                    content: ScriptContent::Commands(commands),
+                    cwd,
+                    ..Default::default()
+                }));
             }
         }
     }
@@ -3728,6 +3725,7 @@ mod tests {
         parser::parse_recipe_or_multi_from_source,
         types::{Conditional, ConditionalList, Item, JinjaTemplate, NestedItemList, Value},
     };
+    use crate::stage1::build::StepRun as Stage1StepRun;
 
     #[test]
     fn test_evaluate_condition_simple() {
@@ -6005,12 +6003,12 @@ package:
 
         assert_eq!(scripts.len(), 2);
         assert_eq!(
-            scripts[0].content,
-            ScriptContent::Commands(vec!["echo a".to_string()])
+            scripts[0].run,
+            Stage1StepRun::Commands(vec!["echo a".to_string()])
         );
         assert_eq!(
-            scripts[1].content,
-            ScriptContent::Commands(vec!["echo b".to_string()])
+            scripts[1].run,
+            Stage1StepRun::Commands(vec!["echo b".to_string()])
         );
     }
 
@@ -6034,30 +6032,9 @@ package:
 
         assert_eq!(scripts.len(), 1);
         assert_eq!(
-            scripts[0].content,
-            ScriptContent::Commands(vec!["echo always".to_string()])
+            scripts[0].run,
+            Stage1StepRun::Commands(vec!["echo always".to_string()])
         );
-        assert_eq!(scripts[0].source_index, 0);
-    }
-
-    #[test]
-    fn test_evaluate_steps_preserves_source_index_after_filtering() {
-        let false_step = Stage0Step::Run(Stage0RunStep {
-            run: ConditionalList::new(vec![Item::Value(Value::new_concrete(
-                "echo filtered".to_string(),
-                None,
-            ))]),
-            condition: Some(step_condition("win")),
-            ..Default::default()
-        });
-        let steps = vec![false_step, run_step("echo kept")];
-        let mut ctx = EvaluationContext::new();
-        ctx.insert("win".to_string(), Variable::from(false));
-
-        let scripts = evaluate_steps(&steps, &ctx).unwrap();
-
-        assert_eq!(scripts.len(), 1);
-        assert_eq!(scripts[0].source_index, 1);
     }
 
     #[test]
@@ -6176,8 +6153,8 @@ package:
         assert_eq!(scripts[0].interpreter.as_deref(), Some("bash"));
         assert_eq!(scripts[0].env.get("FOO").map(String::as_str), Some("bar"));
         assert_eq!(
-            scripts[0].content,
-            ScriptContent::Commands(vec!["make install".to_string()])
+            scripts[0].run,
+            Stage1StepRun::Commands(vec!["make install".to_string()])
         );
     }
 
@@ -6296,12 +6273,12 @@ package:
         let steps = stage1.plan.steps().expect("steps mode");
         assert_eq!(steps.len(), 2);
         assert_eq!(
-            steps[0].content,
-            ScriptContent::Commands(vec!["echo a".to_string()])
+            steps[0].run,
+            Stage1StepRun::Commands(vec!["echo a".to_string()])
         );
         assert_eq!(
-            steps[1].content,
-            ScriptContent::Commands(vec!["echo b".to_string()])
+            steps[1].run,
+            Stage1StepRun::Commands(vec!["echo b".to_string()])
         );
     }
 
