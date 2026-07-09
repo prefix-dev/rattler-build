@@ -167,6 +167,8 @@ impl AsRef<str> for BuildString {
     }
 }
 
+const SOURCE_INDEX_UNSET: usize = usize::MAX;
+
 /// A stage1 build step with evaluated metadata and script content.
 ///
 /// This is deliberately separate from [`Script`]: rendered recipes use
@@ -218,6 +220,7 @@ impl Serialize for Step {
         len += usize::from(script.interpreter.is_some());
         len += usize::from(!script.env.is_empty());
         len += usize::from(script.cwd.is_some());
+        len += usize::from(self.source_index != 0 && self.source_index != SOURCE_INDEX_UNSET);
 
         let mut state = serializer.serialize_struct("RunStep", len)?;
         state.serialize_field("run", &SerializableStepRun(&script.content))?;
@@ -229,6 +232,9 @@ impl Serialize for Step {
         }
         if let Some(cwd) = &script.cwd {
             state.serialize_field("cwd", cwd)?;
+        }
+        if self.source_index != 0 && self.source_index != SOURCE_INDEX_UNSET {
+            state.serialize_field("source_index", &self.source_index)?;
         }
         state.end()
     }
@@ -248,6 +254,8 @@ impl<'de> Deserialize<'de> for Step {
             cwd: Option<PathBuf>,
             #[serde(default)]
             env: IndexMap<String, String>,
+            #[serde(default)]
+            source_index: Option<usize>,
         }
 
         let raw = RawStep::deserialize(deserializer)?;
@@ -260,7 +268,7 @@ impl<'de> Deserialize<'de> for Step {
                 cwd: raw.cwd,
                 content_explicit: false,
             },
-            0,
+            raw.source_index.unwrap_or(SOURCE_INDEX_UNSET),
         ))
     }
 }
@@ -600,7 +608,9 @@ impl TryFrom<BuildDeserialize> for Build {
             }
             (PresentField::Missing, PresentField::Present(mut steps)) => {
                 for (index, step) in steps.iter_mut().enumerate() {
-                    step.source_index = index;
+                    if step.source_index == SOURCE_INDEX_UNSET {
+                        step.source_index = index;
+                    }
                 }
                 BuildPlan::Steps(steps)
             }
@@ -969,6 +979,29 @@ mod tests {
             steps[0].content,
             ScriptContent::Commands(vec!["echo step".to_string()])
         );
+    }
+
+    #[test]
+    fn test_build_with_steps_preserves_source_index_on_roundtrip() {
+        use rattler_build_script::ScriptContent;
+
+        let build = Build {
+            plan: BuildPlan::Steps(vec![Step::new(
+                Script {
+                    content: ScriptContent::Commands(vec!["echo filtered".to_string()]),
+                    ..Default::default()
+                },
+                2,
+            )]),
+            ..Default::default()
+        };
+
+        let yaml = serde_yaml::to_string(&build).unwrap();
+        assert!(yaml.contains("source_index: 2"), "{yaml}");
+
+        let roundtripped: Build = serde_yaml::from_str(&yaml).unwrap();
+        let steps = roundtripped.plan.steps().expect("steps mode");
+        assert_eq!(steps[0].source_index, 2);
     }
 
     #[test]

@@ -97,9 +97,10 @@ pub(crate) fn quote_arg(shell: &ShellEnum, arg: &str) -> String {
 
     fn cmd_needs_quotes(arg: &str) -> bool {
         arg.is_empty()
-            || arg
-                .chars()
-                .any(|c| c.is_whitespace() || matches!(c, '&' | '|' | '<' | '>' | '(' | ')' | '^'))
+            || arg.chars().any(|c| {
+                c.is_whitespace()
+                    || matches!(c, '&' | '|' | '<' | '>' | '(' | ')' | '^' | ';' | ',' | '=')
+            })
     }
 
     match shell {
@@ -255,5 +256,8 @@ endlocal & if %RB_SECTION_ERRORLEVEL% neq 0 exit /b %RB_SECTION_ERRORLEVEL%
             "\"C:\\Program Files\\nodejs\\node.exe\""
         );
         assert_eq!(quote_arg(&cmd, r"C:\tmp\a&b"), "\"C:\\tmp\\a&b\"");
+        assert_eq!(quote_arg(&cmd, r"C:\tmp\a;b"), "\"C:\\tmp\\a;b\"");
+        assert_eq!(quote_arg(&cmd, r"C:\tmp\a,b"), "\"C:\\tmp\\a,b\"");
+        assert_eq!(quote_arg(&cmd, r"C:\tmp\a=b"), "\"C:\\tmp\\a=b\"");
     }
 }
