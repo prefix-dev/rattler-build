@@ -1658,7 +1658,7 @@ echo hi
 setlocal
 pushd .
 if %errorlevel% neq 0 exit /b %errorlevel%
-@call $WORK_DIR/conda_build_script.bat
+@cmd.exe /d /c call $WORK_DIR/conda_build_script.bat
 set "RB_SECTION_ERRORLEVEL=%errorlevel%"
 popd
 if %RB_SECTION_ERRORLEVEL% equ 0 if %errorlevel% neq 0 set "RB_SECTION_ERRORLEVEL=%errorlevel%"
@@ -1666,8 +1666,9 @@ endlocal & if %RB_SECTION_ERRORLEVEL% neq 0 exit /b %RB_SECTION_ERRORLEVEL%
 "###);
     }
 
-    /// Native cmd sections are invoked through `call` so `exit /b` inside a
-    /// section script returns to the wrapper instead of skipping later steps.
+    /// Native cmd sections are invoked through a nested `cmd /c call` so `exit /b`
+    /// and bare `exit` inside a section script return to the wrapper instead of
+    /// skipping later steps.
     #[tokio::test]
     async fn test_cmd_sections_use_call_indirection() {
         let tmp = tempfile::tempdir().unwrap();
@@ -1708,7 +1709,7 @@ endlocal & if %RB_SECTION_ERRORLEVEL% neq 0 exit /b %RB_SECTION_ERRORLEVEL%
 setlocal
 pushd .
 if %errorlevel% neq 0 exit /b %errorlevel%
-@call $WORK_DIR/conda_build_step0.bat
+@cmd.exe /d /c call $WORK_DIR/conda_build_step0.bat
 set "RB_SECTION_ERRORLEVEL=%errorlevel%"
 popd
 if %RB_SECTION_ERRORLEVEL% equ 0 if %errorlevel% neq 0 set "RB_SECTION_ERRORLEVEL=%errorlevel%"
@@ -1717,12 +1718,84 @@ endlocal & if %RB_SECTION_ERRORLEVEL% neq 0 exit /b %RB_SECTION_ERRORLEVEL%
 setlocal
 pushd .
 if %errorlevel% neq 0 exit /b %errorlevel%
-@call $WORK_DIR/conda_build_step1.bat
+@cmd.exe /d /c call $WORK_DIR/conda_build_step1.bat
 set "RB_SECTION_ERRORLEVEL=%errorlevel%"
 popd
 if %RB_SECTION_ERRORLEVEL% equ 0 if %errorlevel% neq 0 set "RB_SECTION_ERRORLEVEL=%errorlevel%"
 endlocal & if %RB_SECTION_ERRORLEVEL% neq 0 exit /b %RB_SECTION_ERRORLEVEL%
 "###);
+    }
+
+    #[tokio::test]
+    async fn test_cmd_call_indirection_escapes_percent_paths() {
+        let tmp = tempfile::tempdir().unwrap();
+        let work_dir = tmp.path().join("%NO_SUCH_VAR%");
+        let prefix = work_dir.join("prefix");
+        fs::create_dir_all(&prefix).unwrap();
+        let args = execution_args(
+            work_dir.clone(),
+            prefix,
+            ResolvedScriptContents::Inline("echo hi".to_string()),
+            None,
+        );
+        let args = ExecutionArgs {
+            runtime: RuntimeEnv::for_test(Platform::Win64),
+            ..args
+        };
+
+        generate_build_script(&args).await.unwrap();
+        let wrapper = fs::read_to_string(work_dir.join("conda_build.bat")).unwrap();
+
+        assert!(
+            wrapper.contains("cmd.exe /d /c call"),
+            "native cmd sections should use nested cmd call indirection:\n{wrapper}"
+        );
+        assert!(
+            wrapper.contains("%%NO_SUCH_VAR%%"),
+            "percent signs in call paths must be escaped for the outer batch context:\n{wrapper}"
+        );
+    }
+
+    #[cfg(windows)]
+    #[tokio::test]
+    async fn test_cmd_bare_exit_does_not_skip_later_sections() {
+        let tmp = tempfile::tempdir().unwrap();
+        let prefix = tmp.path().join("prefix");
+        fs::create_dir_all(&prefix).unwrap();
+        let base = execution_args(
+            tmp.path().to_path_buf(),
+            prefix,
+            ResolvedScriptContents::Missing,
+            None,
+        );
+
+        let args = ExecutionArgs {
+            runtime: RuntimeEnv::for_test(Platform::Win64),
+            sections: vec![
+                BuildScriptSection {
+                    interpreter: None,
+                    content: ResolvedScriptContents::Inline("echo one\nexit 0".to_string()),
+                    env: IndexMap::new(),
+                    cwd: None,
+                    label: Some("step 0".to_string()),
+                },
+                BuildScriptSection {
+                    interpreter: None,
+                    content: ResolvedScriptContents::Inline("echo two> marker.txt".to_string()),
+                    env: IndexMap::new(),
+                    cwd: None,
+                    label: Some("step 1".to_string()),
+                },
+            ],
+            ..base
+        };
+
+        run_script(args).await.unwrap();
+
+        assert!(
+            tmp.path().join("marker.txt").exists(),
+            "bare `exit 0` in the first cmd section must not skip the second section"
+        );
     }
 
     /// Multiple sections compose in order, each scoped, with labels and env.

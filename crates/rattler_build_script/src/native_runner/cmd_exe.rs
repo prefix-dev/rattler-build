@@ -47,6 +47,9 @@ IF "%CONDA_BUILD%" == "" (
 
     fn native_section_script_command(&self, script_path: &Path) -> Option<Vec<String>> {
         Some(vec![
+            "cmd.exe".to_string(),
+            "/d".to_string(),
+            "/c".to_string(),
             "call".to_string(),
             script_path.to_string_lossy().into_owned(),
         ])
@@ -69,6 +72,7 @@ IF "%CONDA_BUILD%" == "" (
         }
         out.push_str("setlocal\n");
         for (key, value) in env {
+            super::validate_env_assignment(key, value)?;
             shell
                 .set_env_var(&mut out, key, value)
                 .map_err(std::io::Error::other)?;

@@ -191,6 +191,11 @@ pub async fn run_build(
 
     match output.run_build_script().await {
         Ok(_) => {}
+        Err(InterpreterError::ExecutionFailed(err))
+            if err.kind() == std::io::ErrorKind::InvalidInput =>
+        {
+            return Err(miette::miette!("{err}"));
+        }
         Err(InterpreterError::ExecutionFailed(_)) => {
             return Err(miette::miette!("Script failed to execute"));
         }

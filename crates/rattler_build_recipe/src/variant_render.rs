@@ -218,6 +218,9 @@ pub struct RenderedVariant {
     /// dependencies to their correct variants.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub full_combination: BTreeMap<NormalizedKey, Variable>,
+    /// Whether experimental features were enabled when this variant was rendered.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub experimental: bool,
     /// The rendered stage1 recipe
     pub recipe: Stage1Recipe,
     /// Pin subpackage dependencies that need to be tracked for exact pinning
@@ -974,6 +977,7 @@ fn render_with_empty_combinations(
             RenderedVariant {
                 variant,
                 full_combination: BTreeMap::new(), // No combination when rendering with empty combinations
+                experimental: config.experimental,
                 recipe,
                 pin_subpackages: BTreeMap::new(),
                 hash_info: None,
@@ -1415,6 +1419,7 @@ fn render_with_variants(
             results.push(RenderedVariant {
                 variant,
                 full_combination: combination.clone(), // Track the full combination for pin matching
+                experimental: config.experimental,
                 recipe,
                 pin_subpackages: BTreeMap::new(), // Will be populated after first build string resolution
                 hash_info: None,

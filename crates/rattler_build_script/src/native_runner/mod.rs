@@ -81,6 +81,30 @@ pub(crate) fn write_shell_script(
     Ok(bytes)
 }
 
+/// Validate an env assignment before emitting it into a shell wrapper.
+pub(crate) fn validate_env_assignment(key: &str, value: &str) -> Result<(), std::io::Error> {
+    let mut chars = key.chars();
+    let valid_key = chars
+        .next()
+        .is_some_and(|c| c == '_' || c.is_ascii_alphabetic())
+        && chars.all(|c| c == '_' || c.is_ascii_alphanumeric());
+    if !valid_key {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            format!("invalid environment variable name '{key}'; expected [A-Za-z_][A-Za-z0-9_]*"),
+        ));
+    }
+    if value.contains(['\n', '\r']) {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            format!(
+                "environment variable '{key}' contains a newline, which cannot be represented safely in build scripts"
+            ),
+        ));
+    }
+    Ok(())
+}
+
 /// Quotes a single command argument for the given shell when it contains shell
 /// metacharacters, whitespace, or is empty. `rattler_shell::Shell::run_command`
 /// joins arguments with spaces without quoting, so a resolved interpreter,
@@ -206,6 +230,35 @@ popd
 if %RB_SECTION_ERRORLEVEL% equ 0 if %errorlevel% neq 0 set "RB_SECTION_ERRORLEVEL=%errorlevel%"
 endlocal & if %RB_SECTION_ERRORLEVEL% neq 0 exit /b %RB_SECTION_ERRORLEVEL%
 "###);
+    }
+
+    #[test]
+    fn scope_section_rejects_invalid_env_names() {
+        let runner = native_runner(Platform::Linux64);
+        let mut env = IndexMap::new();
+        env.insert("BAD-NAME".to_string(), "value".to_string());
+
+        let err = runner
+            .scope_section(None, &env, None, "echo hi")
+            .expect_err("invalid env name should fail");
+
+        assert!(
+            err.to_string()
+                .contains("invalid environment variable name")
+        );
+    }
+
+    #[test]
+    fn cmd_scope_section_rejects_newline_env_values() {
+        let runner = native_runner(Platform::Win64);
+        let mut env = IndexMap::new();
+        env.insert("FOO".to_string(), "safe\necho injected".to_string());
+
+        let err = runner
+            .scope_section(None, &env, None, "echo hi")
+            .expect_err("newline env value should fail");
+
+        assert!(err.to_string().contains("contains a newline"));
     }
 
     #[test]

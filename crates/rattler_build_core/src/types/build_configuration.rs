@@ -56,6 +56,10 @@ pub struct BuildConfiguration {
     #[serde(skip_serializing, default = "default_true")]
     pub force_colors: bool,
 
+    /// Whether experimental features are enabled for this build invocation.
+    #[serde(skip_serializing, default)]
+    pub experimental: bool,
+
     /// The environment isolation mode for build scripts
     #[serde(skip_serializing, default)]
     pub env_isolation: EnvironmentIsolation,
@@ -89,7 +93,7 @@ impl BuildConfiguration {
             host_platform: self.host_platform.platform,
             build_platform: self.build_platform.platform,
             variant: self.variant.clone(),
-            experimental: false,
+            experimental: self.experimental,
             undefined_behavior: rattler_build_jinja::UndefinedBehavior::Lenient,
             recipe_path: None,
         }

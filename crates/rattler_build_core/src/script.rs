@@ -37,6 +37,12 @@ impl Output {
         let target_platform = self.build_configuration.target_platform;
         let env_isolation = self.build_configuration.env_isolation;
         let build = self.recipe.build();
+        if matches!(&build.plan, BuildPlan::Steps(_)) && !self.build_configuration.experimental {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "`build.steps` is an experimental feature: provide the `--experimental` flag to enable it",
+            ));
+        }
 
         let mut env_vars = env_vars::vars(self, "BUILD");
         env_vars.extend(env_vars::os_vars(
@@ -53,17 +59,6 @@ impl Output {
         if let BuildPlan::Script(script) = &build.plan {
             env_vars.extend(script.env().clone());
         }
-
-        // Renderer for script content, with the build environment variables
-        // available in the Jinja context.
-        let mut jinja = Jinja::new(self.build_configuration.selector_config())
-            .with_context(&self.recipe.context);
-        for (k, v) in &env_vars {
-            jinja
-                .context_mut()
-                .insert(k.clone(), Value::from_safe_string(v.clone()));
-        }
-        let jinja_renderer = |template: &str| jinja.render_str(template).map_err(|e| e.to_string());
 
         let build_prefix = if self.recipe.build().merge_build_and_host_envs {
             None
@@ -91,9 +86,25 @@ impl Output {
         let mut sections = Vec::with_capacity(scripts.len());
 
         for (script, source_index) in scripts {
+            // Render each section with both the whole-build environment and
+            // that section's scoped env. This preserves legacy `build.script`
+            // behavior and makes step-local env visible to that step's `run`
+            // templates without leaking it to later steps.
+            let mut section_jinja = Jinja::new(self.build_configuration.selector_config())
+                .with_context(&self.recipe.context);
+            for (k, v) in env_vars.iter().chain(script.env()) {
+                section_jinja
+                    .context_mut()
+                    .insert(k.clone(), Value::from_safe_string(v.clone()));
+            }
+            let section_jinja_renderer = |template: &str| {
+                section_jinja
+                    .render_str(template)
+                    .map_err(|e| e.to_string())
+            };
             let content = script.resolve_content(
                 recipe_dir,
-                Some(&jinja_renderer),
+                Some(&section_jinja_renderer),
                 platform_script_extensions(),
             )?;
 

@@ -1279,14 +1279,7 @@ pub fn evaluate_script(
         None
     };
 
-    // Evaluate environment variables
-    let mut env = indexmap::IndexMap::new();
-    for (key, val) in &script.env {
-        let evaluated_val = evaluate_string_value(val, context)?;
-        if !evaluated_val.is_empty() {
-            env.insert(key.clone(), evaluated_val);
-        }
-    }
+    let env = evaluate_env_map("script.env", &script.env, context)?;
 
     // Copy secrets as-is
     let secrets = script.secrets.clone();
@@ -1395,7 +1388,7 @@ pub fn evaluate_steps(
                 scripts.push(Stage1Step::new(
                     rattler_build_script::Script {
                         interpreter,
-                        env: evaluate_step_env(&run.env, context)?,
+                        env: evaluate_env_map("steps.env", &run.env, context)?,
                         content: ScriptContent::Commands(commands),
                         cwd,
                         ..Default::default()
@@ -1409,14 +1402,24 @@ pub fn evaluate_steps(
     Ok(scripts)
 }
 
-/// Evaluate step-local `env` values eagerly (like `build.script.env`).
-fn evaluate_step_env(
+fn evaluate_env_map(
+    field_name: &str,
     env: &indexmap::IndexMap<String, Value<String>>,
     context: &EvaluationContext,
 ) -> Result<IndexMap<String, String>, ParseError> {
     let mut evaluated = IndexMap::new();
     for (key, value) in env {
         let evaluated_value = evaluate_string_value(value, context)?;
+        if evaluated_value.contains(['\n', '\r']) {
+            return Err(ParseError::invalid_value(
+                field_name,
+                format!(
+                    "environment variable '{}' contains a newline, which cannot be represented safely in build scripts",
+                    key
+                ),
+                value.span().copied().unwrap_or_else(Span::new_blank),
+            ));
+        }
         if !evaluated_value.is_empty() {
             evaluated.insert(key.clone(), evaluated_value);
         }
@@ -6187,6 +6190,41 @@ package:
 
         assert_eq!(scripts.len(), 1);
         assert!(!scripts[0].env.contains_key("EMPTY"));
+    }
+
+    #[test]
+    fn test_evaluate_steps_rejects_newline_env_values() {
+        let steps = vec![run_step_with(
+            "make install",
+            "bash",
+            &[("INJECT", "safe\necho injected")],
+        )];
+        let ctx = EvaluationContext::new();
+
+        let err = evaluate_steps(&steps, &ctx).unwrap_err();
+
+        assert!(err.to_string().contains("contains a newline"), "{err}");
+    }
+
+    #[test]
+    fn test_evaluate_script_rejects_newline_env_values() {
+        let mut env = IndexMap::new();
+        env.insert(
+            "INJECT".to_string(),
+            Value::new_concrete("safe\necho injected".to_string(), None),
+        );
+        let script = crate::stage0::types::Script {
+            content: Some(ConditionalList::new(vec![Item::Value(
+                Value::new_concrete("echo hi".to_string(), None),
+            )])),
+            env,
+            ..Default::default()
+        };
+        let ctx = EvaluationContext::new();
+
+        let err = evaluate_script(&script, &ctx).unwrap_err();
+
+        assert!(err.to_string().contains("contains a newline"), "{err}");
     }
 
     #[test]

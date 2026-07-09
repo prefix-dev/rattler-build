@@ -1,4 +1,7 @@
-use marked_yaml::{Node, types::MarkedMappingNode};
+use marked_yaml::{
+    Node,
+    types::{MarkedMappingNode, MarkedScalarNode},
+};
 use rattler_build_yaml_parser::ParseError;
 use rattler_conda_types::NoArchType;
 
@@ -255,7 +258,7 @@ pub(crate) fn parse_script(node: &Node) -> Result<crate::stage0::types::Script, 
                     })?;
 
                     for (env_key_node, env_value_node) in env_mapping.iter() {
-                        let env_key = env_key_node.as_str().to_string();
+                        let env_key = parse_env_key("script.env", env_key_node)?;
                         let env_value = parse_field!("script.env", env_value_node);
                         env.insert(env_key, env_value);
                     }
@@ -348,6 +351,28 @@ pub(crate) fn parse_script(node: &Node) -> Result<crate::stage0::types::Script, 
     ))
 }
 
+fn parse_env_key(field_name: &str, key_node: &MarkedScalarNode) -> Result<String, ParseError> {
+    let key = key_node.as_str();
+    let mut chars = key.chars();
+    let valid = chars
+        .next()
+        .is_some_and(|c| c == '_' || c.is_ascii_alphabetic())
+        && chars.all(|c| c == '_' || c.is_ascii_alphanumeric());
+
+    if !valid {
+        return Err(ParseError::invalid_value(
+            field_name,
+            format!(
+                "invalid environment variable name '{}'; expected [A-Za-z_][A-Za-z0-9_]*",
+                key
+            ),
+            *key_node.span(),
+        ));
+    }
+
+    Ok(key.to_string())
+}
+
 /// Parse build files field - can be a list or include/exclude mapping
 /// Parse the `build.steps` list into an ordered list of [`Step`]s.
 fn parse_steps(node: &Node) -> Result<Vec<Step>, ParseError> {
@@ -402,7 +427,7 @@ fn parse_step(node: &Node) -> Result<Step, ParseError> {
                 })?;
 
                 for (env_key_node, env_value_node) in env_mapping.iter() {
-                    let env_key = env_key_node.as_str().to_string();
+                    let env_key = parse_env_key("steps.env", env_key_node)?;
                     let env_value = parse_field!("steps.env", env_value_node);
                     env.insert(env_key, env_value);
                 }
@@ -1074,6 +1099,52 @@ steps:
                 assert!(second.env.contains_key("FOO"));
             }
         }
+    }
+
+    #[test]
+    fn test_parse_script_env_rejects_invalid_name() {
+        let yaml = r#"
+script:
+  env:
+    BAD-NAME: value
+  content: echo hi
+"#;
+        let node = marked_yaml::parse_yaml(0, yaml).unwrap();
+        let result = parse_build(&node);
+
+        assert!(
+            result.is_err(),
+            "expected invalid script env name to be rejected"
+        );
+        let err = result.unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("invalid environment variable name"),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn test_parse_step_env_rejects_invalid_name() {
+        let yaml = r#"
+steps:
+  - run: echo hi
+    env:
+      BAD-NAME: value
+"#;
+        let node = marked_yaml::parse_yaml(0, yaml).unwrap();
+        let result = parse_build(&node);
+
+        assert!(
+            result.is_err(),
+            "expected invalid step env name to be rejected"
+        );
+        let err = result.unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("invalid environment variable name"),
+            "{err}"
+        );
     }
 
     #[test]

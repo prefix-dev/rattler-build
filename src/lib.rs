@@ -574,6 +574,7 @@ pub async fn get_build_output(
                 ),
                 store_recipe: !build_data.no_include_recipe,
                 force_colors: build_data.color_build_log && console::colors_enabled(),
+                experimental: build_data.common.experimental,
                 env_isolation: build_data.env_isolation,
                 sandbox_config: build_data.sandbox_configuration.clone(),
                 exclude_newer: build_data.exclude_newer,
@@ -1073,6 +1074,10 @@ pub async fn rebuild_package_core(
     };
     output.system_tools.warn_if_changed(&current_build_tool);
     output.system_tools = SystemTools::new("rattler-build", env!("CARGO_PKG_VERSION"));
+
+    // Set invocation-only build configuration that is not serialized into the
+    // package's rendered recipe.
+    output.build_configuration.experimental = rebuild_data.common.experimental;
 
     // set recipe dir to the temp folder
     output.build_configuration.directories.recipe_dir = temp_dir;

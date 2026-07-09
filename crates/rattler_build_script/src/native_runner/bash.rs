@@ -59,6 +59,7 @@ set -x
         }
         out.push_str("(\n");
         for (key, value) in env {
+            super::validate_env_assignment(key, value)?;
             shell
                 .set_env_var(&mut out, key, value)
                 .map_err(std::io::Error::other)?;

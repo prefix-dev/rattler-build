@@ -223,6 +223,7 @@ pub(crate) fn output_from_rendered_variant(
             ),
             store_recipe: !effective_no_include_recipe,
             force_colors: false,
+            experimental: rendered_variant.inner.experimental,
             env_isolation,
             sandbox_config: None,
             exclude_newer,

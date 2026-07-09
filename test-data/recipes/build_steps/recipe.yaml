@@ -12,7 +12,7 @@ build:
         mkdir -p "$PREFIX/share/build_steps/cwd"
         echo "one" > "$PREFIX/share/build_steps/step1.txt"
     - if: unix
-      run: echo "$GREETING" > "$PREFIX/share/build_steps/step2.txt"
+      run: echo "${{ GREETING }}" > "$PREFIX/share/build_steps/step2.txt"
       env:
         GREETING: hello-from-step
     - if: unix
@@ -26,7 +26,7 @@ build:
         if not exist "%PREFIX%\share\build_steps\cwd" mkdir "%PREFIX%\share\build_steps\cwd"
         echo one> "%PREFIX%\share\build_steps\step1.txt"
     - if: win
-      run: echo %GREETING%> "%PREFIX%\share\build_steps\step2.txt"
+      run: echo ${{ GREETING }}> "%PREFIX%\share\build_steps\step2.txt"
       env:
         GREETING: hello-from-step
     - if: win
