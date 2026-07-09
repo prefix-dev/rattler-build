@@ -43,6 +43,19 @@ jobs:
         with:
           submodules: recursive
           persist-credentials: false
+      # Use a ReFS dev drive on Windows for ~30x faster I/O than the C: drive
+      - name: Set up Windows dev drive
+        if: runner.os == 'Windows'
+        uses: samypr100/setup-dev-drive@cf663fdf88945e3faaa980ec525b5bc2350fbf9d # v3
+        with:
+          drive-size: 50GB
+          env-mapping: |
+            CARGO_HOME,{{ DEV_DRIVE }}/.cargo
+      - name: Redirect cargo target directory to dev drive
+        if: runner.os == 'Windows'
+        run: |
+          New-Item -ItemType Directory -Path "$env:DEV_DRIVE/target-pixi" -Force | Out-Null
+          New-Item -ItemType Junction -Path "target-pixi" -Target "$env:DEV_DRIVE/target-pixi" | Out-Null
       - uses: prefix-dev/setup-pixi@5185adfbffb4bd703da3010310260805d89ebb11 # v0.9.6
         with:
           cache: true
@@ -92,6 +105,19 @@ jobs:
         with:
           submodules: recursive
           persist-credentials: false
+      # Use a ReFS dev drive on Windows for ~30x faster I/O than the C: drive
+      - name: Set up Windows dev drive
+        if: runner.os == 'Windows'
+        uses: samypr100/setup-dev-drive@cf663fdf88945e3faaa980ec525b5bc2350fbf9d # v3
+        with:
+          drive-size: 50GB
+          env-mapping: |
+            CARGO_HOME,{{ DEV_DRIVE }}/.cargo
+      - name: Redirect cargo target directory to dev drive
+        if: runner.os == 'Windows'
+        run: |
+          New-Item -ItemType Directory -Path "$env:DEV_DRIVE/target-pixi" -Force | Out-Null
+          New-Item -ItemType Junction -Path "target-pixi" -Target "$env:DEV_DRIVE/target-pixi" | Out-Null
       - uses: prefix-dev/setup-pixi@5185adfbffb4bd703da3010310260805d89ebb11 # v0.9.6
         with:
           cache: true
