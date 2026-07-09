@@ -1373,7 +1373,7 @@ pub fn evaluate_steps(
                 }
 
                 if let Some(condition) = &run.condition
-                    && !evaluate_step_condition(condition, context)?
+                    && !evaluate_condition(condition, context, run.condition_span.as_ref())?
                 {
                     continue;
                 }
@@ -1422,68 +1422,6 @@ fn evaluate_step_env(
         }
     }
     Ok(evaluated)
-}
-
-/// Evaluate a step `if` condition as a Jinja boolean expression (e.g. `unix`).
-///
-/// Unlike `skip`, a step condition that fails to evaluate is treated as an error
-/// rather than silently dropping the step.
-fn evaluate_step_condition(
-    condition: &Value<String>,
-    context: &EvaluationContext,
-) -> Result<bool, ParseError> {
-    if let Some(expr) = condition.as_concrete() {
-        return evaluate_step_condition_expression(expr, context, condition.span());
-    }
-
-    if let Some(template) = condition.as_template() {
-        return Err(ParseError::invalid_value(
-            "steps.if",
-            format!(
-                "step condition must be a Jinja expression without `${{{{ }}}}` template delimiters: '{}'",
-                template.source()
-            ),
-            condition.span().copied().unwrap_or_else(Span::new_blank),
-        )
-        .with_suggestion("Use `if: target_platform == \"win-64\"`, not `if: ${{ target_platform }} == \"win-64\"`."));
-    }
-
-    unreachable!("Value must be either concrete or template")
-}
-
-fn evaluate_step_condition_expression(
-    expr: &str,
-    context: &EvaluationContext,
-    span: Option<&Span>,
-) -> Result<bool, ParseError> {
-    let jinja = context.to_jinja();
-    let value = match jinja.eval(expr) {
-        Ok(value) => value,
-        Err(e) => {
-            for var in jinja.accessed_variables_excluding_functions() {
-                context.track_access(&var);
-            }
-            return Err(ParseError::invalid_value(
-                "steps.if",
-                format!("failed to evaluate step condition '{}': {}", expr, e),
-                span.copied().unwrap_or_else(Span::new_blank),
-            ));
-        }
-    };
-
-    for var in jinja.accessed_variables_excluding_functions() {
-        context.track_access(&var);
-    }
-
-    if value.is_undefined() {
-        return Err(ParseError::invalid_value(
-            "steps.if",
-            format!("undefined variable in step condition '{}'", expr),
-            span.copied().unwrap_or_else(Span::new_blank),
-        ));
-    }
-
-    Ok(value.is_true())
 }
 
 /// Parse a boolean from a string (case-insensitive)
@@ -6051,6 +5989,10 @@ package:
         })
     }
 
+    fn step_condition(expr: &str) -> JinjaExpression {
+        JinjaExpression::new(expr.to_string()).unwrap()
+    }
+
     #[test]
     fn test_evaluate_steps_basic_desugar() {
         let steps = vec![run_step("echo a"), run_step("echo b")];
@@ -6076,7 +6018,7 @@ package:
                 "echo windows".to_string(),
                 None,
             ))]),
-            condition: Some(Value::new_concrete("win".to_string(), None)),
+            condition: Some(step_condition("win")),
             ..Default::default()
         });
         let steps = vec![run_step("echo always"), win_step];
@@ -6102,7 +6044,7 @@ package:
                 "echo filtered".to_string(),
                 None,
             ))]),
-            condition: Some(Value::new_concrete("win".to_string(), None)),
+            condition: Some(step_condition("win")),
             ..Default::default()
         });
         let steps = vec![false_step, run_step("echo kept")];
@@ -6122,7 +6064,7 @@ package:
                 "echo enabled".to_string(),
                 None,
             ))]),
-            condition: Some(Value::new_concrete("enable_feature".to_string(), None)),
+            condition: Some(step_condition("enable_feature")),
             ..Default::default()
         });
         let mut ctx = EvaluationContext::new();
@@ -6144,7 +6086,7 @@ package:
                 "echo typo".to_string(),
                 None,
             ))]),
-            condition: Some(Value::new_concrete("enabel_feature".to_string(), None)),
+            condition: Some(step_condition("enabel_feature")),
             ..Default::default()
         });
         let ctx = EvaluationContext::new();
@@ -6164,7 +6106,7 @@ package:
                 JinjaTemplate::new("echo ${{ flavor }}".to_string()).unwrap(),
                 None,
             ))]),
-            condition: Some(Value::new_concrete("win".to_string(), None)),
+            condition: Some(step_condition("win")),
             ..Default::default()
         });
         let mut ctx = EvaluationContext::new();
@@ -6184,10 +6126,7 @@ package:
                 "echo gated".to_string(),
                 None,
             ))]),
-            condition: Some(Value::new_concrete(
-                "target_platform == 'win-64'".to_string(),
-                None,
-            )),
+            condition: Some(step_condition("target_platform == 'win-64'")),
             ..Default::default()
         });
         let mut linux_ctx = EvaluationContext::new();
@@ -6205,64 +6144,6 @@ package:
 
         assert_eq!(scripts.len(), 1);
         assert!(win_ctx.accessed_variables().contains("target_platform"));
-    }
-
-    #[test]
-    fn test_evaluate_steps_if_rejects_template_syntax() {
-        for condition in [
-            "${{ target_platform }}",
-            "${{ unix }} and ${{ win }}",
-            "${{ unix }} }} ${{ win }}",
-            "${{ major }}-${{ minor }}",
-        ] {
-            let step = Stage0Step::Run(Stage0RunStep {
-                run: ConditionalList::new(vec![Item::Value(Value::new_concrete(
-                    "echo gated".to_string(),
-                    None,
-                ))]),
-                condition: Some(Value::new_template(
-                    JinjaTemplate::new(condition.to_string()).unwrap(),
-                    None,
-                )),
-                ..Default::default()
-            });
-            let mut ctx = EvaluationContext::new();
-            ctx.insert("target_platform".to_string(), Variable::from("win-64"));
-            ctx.insert("unix".to_string(), Variable::from(true));
-            ctx.insert("win".to_string(), Variable::from(false));
-            ctx.insert("major".to_string(), Variable::from(3));
-            ctx.insert("minor".to_string(), Variable::from(3));
-
-            let err = evaluate_steps(&[step], &ctx).unwrap_err();
-
-            assert!(
-                err.to_string()
-                    .contains("without `${{ }}` template delimiters"),
-                "unexpected error for {condition:?}: {err}"
-            );
-        }
-    }
-
-    #[test]
-    fn test_evaluate_steps_if_malformed_expression_errors_without_panic() {
-        let step = Stage0Step::Run(Stage0RunStep {
-            run: ConditionalList::new(vec![Item::Value(Value::new_concrete(
-                "echo typo".to_string(),
-                None,
-            ))]),
-            condition: Some(Value::new_concrete("target_platform }}".to_string(), None)),
-            ..Default::default()
-        });
-        let mut ctx = EvaluationContext::new();
-        ctx.insert("target_platform".to_string(), Variable::from("win-64"));
-
-        let err = evaluate_steps(&[step], &ctx).unwrap_err();
-
-        assert!(
-            err.to_string()
-                .contains("failed to evaluate step condition"),
-            "unexpected error: {err}"
-        );
     }
 
     /// A run step that sets an explicit interpreter and step-local env.
@@ -6393,7 +6274,7 @@ package:
                 "echo filtered".to_string(),
                 None,
             ))]),
-            condition: Some(Value::new_concrete("win".to_string(), None)),
+            condition: Some(step_condition("win")),
             ..Default::default()
         });
         let build = Stage0Build {

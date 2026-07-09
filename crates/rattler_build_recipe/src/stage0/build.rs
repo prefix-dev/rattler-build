@@ -1,6 +1,7 @@
 use std::fmt::Display;
 
 use itertools::Itertools as _;
+use marked_yaml::Span;
 use rattler_conda_types::{Flag, NoArchType, package::EntryPoint};
 use serde::{Deserialize, Serialize};
 
@@ -42,7 +43,11 @@ pub struct RunStep {
 
     /// Optional selector expression gating whether this step runs (e.g. `unix`).
     #[serde(default, rename = "if", skip_serializing_if = "Option::is_none")]
-    pub condition: Option<Value<String>>,
+    pub condition: Option<JinjaExpression>,
+
+    /// Optional span for the condition expression (for error reporting).
+    #[serde(default, skip)]
+    pub condition_span: Option<Span>,
 
     /// Optional interpreter override for this step (e.g. `bash`, `cmd.exe`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -72,6 +77,7 @@ impl RunStep {
         let RunStep {
             run,
             condition,
+            condition_span: _,
             interpreter,
             cwd,
             env,
@@ -80,12 +86,7 @@ impl RunStep {
         let mut vars = run.used_variables();
 
         if let Some(condition) = condition {
-            vars.extend(condition.used_variables());
-            if let Some(expr) = condition.as_concrete()
-                && let Ok(expr) = JinjaExpression::new(expr.clone())
-            {
-                vars.extend(expr.used_variables().iter().cloned());
-            }
+            vars.extend(condition.used_variables().iter().cloned());
         }
         if let Some(interpreter) = interpreter {
             vars.extend(interpreter.used_variables());

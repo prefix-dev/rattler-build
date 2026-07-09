@@ -95,6 +95,26 @@ where
     Ok(ConditionalListOrItem::new(vec![item]))
 }
 
+/// Parse a Jinja expression from a scalar YAML node.
+///
+/// This is used by stage0 `if` condition syntax. Expressions are verbatim
+/// Jinja expressions and do not include `${{ }}` template delimiters.
+pub fn parse_jinja_expression(
+    yaml: &MarkedNode,
+    field_name: &str,
+) -> ParseResult<(JinjaExpression, marked_yaml::Span)> {
+    let condition_scalar = yaml
+        .as_scalar()
+        .ok_or_else(|| ParseError::expected_type("scalar", "non-scalar", get_span(yaml)))?;
+
+    let condition_span = *condition_scalar.span();
+    let condition = JinjaExpression::new(condition_scalar.as_str().to_string()).map_err(|e| {
+        ParseError::jinja_error(format!("Failed to parse {field_name}: {e}"), condition_span)
+    })?;
+
+    Ok((condition, condition_span))
+}
+
 /// Parse an Item<T> from YAML using a custom converter
 ///
 /// This handles both simple values and conditional (if/then/else) items.
@@ -132,13 +152,7 @@ where
         .get("if")
         .ok_or_else(|| ParseError::missing_field("if", get_span(yaml)))?;
 
-    let condition_scalar = condition_node.as_scalar().ok_or_else(|| {
-        ParseError::expected_type("scalar", "non-scalar", get_span(condition_node))
-    })?;
-
-    let condition_span = *condition_scalar.span();
-    let condition = JinjaExpression::new(condition_scalar.as_str().to_string())
-        .map_err(|e| ParseError::jinja_error(e, condition_span))?;
+    let (condition, condition_span) = parse_jinja_expression(condition_node, "if")?;
 
     // Get the "then" field - parse as NestedItemList to support nested conditionals
     let then_yaml = mapping

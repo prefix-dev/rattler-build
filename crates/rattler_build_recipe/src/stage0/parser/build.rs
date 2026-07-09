@@ -13,7 +13,7 @@ use crate::stage0::{
 };
 use rattler_build_yaml_parser::{
     helpers::contains_jinja_template, parse_conditional_list, parse_conditional_list_or_item,
-    parse_value_with_name,
+    parse_jinja_expression, parse_value_with_name,
 };
 
 /// Macro to parse a value with automatic field name inference for better error messages
@@ -372,6 +372,7 @@ fn parse_step(node: &Node) -> Result<Step, ParseError> {
 
     let mut run = None;
     let mut condition = None;
+    let mut condition_span = None;
     let mut interpreter = None;
     let mut cwd = None;
     let mut env = indexmap::IndexMap::new();
@@ -384,7 +385,9 @@ fn parse_step(node: &Node) -> Result<Step, ParseError> {
                 run = Some(parse_step_content(value_node)?);
             }
             "if" => {
-                condition = Some(parse_step_condition(value_node)?);
+                let (parsed_condition, parsed_span) = parse_step_condition(value_node)?;
+                condition = Some(parsed_condition);
+                condition_span = Some(parsed_span);
             }
             "interpreter" => {
                 interpreter = Some(parse_field!("steps.interpreter", value_node));
@@ -423,6 +426,7 @@ fn parse_step(node: &Node) -> Result<Step, ParseError> {
     Ok(Step::Run(RunStep {
         run,
         condition,
+        condition_span,
         interpreter,
         cwd,
         env,
@@ -430,7 +434,7 @@ fn parse_step(node: &Node) -> Result<Step, ParseError> {
 }
 
 /// Parse a step `if` condition as a verbatim Jinja expression.
-fn parse_step_condition(node: &Node) -> Result<Value<String>, ParseError> {
+fn parse_step_condition(node: &Node) -> Result<(JinjaExpression, marked_yaml::Span), ParseError> {
     let scalar = node.as_scalar().ok_or_else(|| {
         ParseError::expected_type("scalar", "non-scalar", get_span(node))
             .with_message("Expected step 'if' to be a Jinja expression")
@@ -458,9 +462,7 @@ fn parse_step_condition(node: &Node) -> Result<Value<String>, ParseError> {
         ));
     }
 
-    JinjaExpression::new(condition.to_string()).map_err(|e| ParseError::jinja_error(e, span))?;
-
-    Ok(Value::new_concrete(condition.to_string(), Some(span)))
+    parse_jinja_expression(node, "steps.if")
 }
 
 /// Parse step `run` content: either a (multiline) scalar string or a list of
