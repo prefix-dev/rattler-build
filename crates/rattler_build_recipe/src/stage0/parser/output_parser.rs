@@ -261,7 +261,7 @@ fn parse_staging_output(
         Requirements::default()
     };
 
-    // Parse optional build (only script allowed)
+    // Parse optional build plan.
     let build = if let Some(build_node) = mapping.get("build") {
         parse_staging_build(build_node)?
     } else {
@@ -351,7 +351,8 @@ fn parse_staging_requirements(yaml: &MarkedNode, config: ParseConfig) -> ParseRe
     super::requirements::parse_requirements_with_config(yaml, config)
 }
 
-/// Parse staging build (only script allowed)
+/// Parse staging build. Staging supports the same executable build plan as
+/// package outputs, but none of the package-only build settings.
 fn parse_staging_build(yaml: &MarkedNode) -> ParseResult<StagingBuild> {
     let mapping = yaml.as_mapping().ok_or_else(|| {
         ParseError::expected_type("mapping", "non-mapping", get_span(yaml))
@@ -359,29 +360,37 @@ fn parse_staging_build(yaml: &MarkedNode) -> ParseResult<StagingBuild> {
     })?;
 
     let mut build = StagingBuild::default();
+    let mut script_seen = false;
+    let mut steps_span = None;
 
     for (key_node, value_node) in mapping.iter() {
         let key = key_node.as_str();
 
-        match key {
-            "script" => {
-                build.script = crate::stage0::parser::build::parse_script(value_node)?;
-            }
-            _ => {
-                return Err(ParseError::invalid_value(
-                    "staging build",
-                    format!(
-                        "unknown field '{}' - only 'script' is allowed in staging builds",
-                        key
-                    ),
-                    *key_node.span(),
-                )
-                .with_suggestion(
-                    "staging outputs can only have a 'script' field in the build section",
-                ));
-            }
+        if crate::stage0::parser::build::parse_build_plan_key(
+            &mut build.plan,
+            key,
+            value_node,
+            *key_node.span(),
+            &mut script_seen,
+            &mut steps_span,
+        )? {
+            continue;
         }
+
+        return Err(ParseError::invalid_value(
+            "staging build",
+            format!(
+                "unknown field '{}' - only 'script' and 'steps' are allowed in staging builds",
+                key
+            ),
+            *key_node.span(),
+        )
+        .with_suggestion(
+            "staging outputs can only have 'script' or 'steps' in the build section",
+        ));
     }
+
+    crate::stage0::parser::build::reject_script_and_steps(script_seen, steps_span)?;
 
     Ok(build)
 }
