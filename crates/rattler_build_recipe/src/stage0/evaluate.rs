@@ -521,12 +521,12 @@ pub fn evaluate_optional_string_value(
     }
 }
 
-/// Extract the template source from a Value<String> without evaluating it
-/// This is used for deferred evaluation (e.g., build.string with hash variable)
-fn extract_template_source(value: &Value<String>) -> Option<String> {
+/// Extract the original string from a `Value<String>` without evaluating templates.
+/// This is used for deferred/lazy evaluation (e.g., build.string or build scripts).
+fn string_value_source(value: &Value<String>) -> String {
     match value.inner() {
-        ValueInner::Concrete(v) => Some(v.clone()),
-        ValueInner::Template(template) => Some(template.source().to_string()),
+        ValueInner::Concrete(v) => v.clone(),
+        ValueInner::Template(template) => template.source().to_string(),
     }
 }
 
@@ -573,15 +573,8 @@ fn evaluate_or_preserve_template(
     // Try to evaluate
     match evaluate_string_value(value, context) {
         Ok(result) => Ok(result),
-        Err(e) => {
-            if is_undefined_variable_error(&e) {
-                // This is an undefined variable error - preserve the template
-                Ok(extract_template_source(value).unwrap_or_default())
-            } else {
-                // This is a different error (syntax error, etc.) - propagate it
-                Err(e)
-            }
-        }
+        Err(e) if is_undefined_variable_error(&e) => Ok(string_value_source(value)),
+        Err(e) => Err(e),
     }
 }
 
@@ -924,7 +917,7 @@ pub fn preserve_string_list(
         track_template_variables(value, ctx);
 
         // Extract the original string value without evaluating templates
-        let s = extract_template_source(value).unwrap_or_default();
+        let s = string_value_source(value);
         // Filter out empty strings
         Ok(if s.is_empty() { None } else { Some(s) })
     })
@@ -1273,11 +1266,11 @@ pub fn evaluate_script(
     }
 
     // Evaluate interpreter normally (it's typically simple and doesn't use env vars)
-    let interpreter = if let Some(interp) = &script.interpreter {
-        Some(evaluate_string_value(interp, context)?)
-    } else {
-        None
-    };
+    let interpreter = script
+        .interpreter
+        .as_ref()
+        .map(|interp| evaluate_string_value(interp, context))
+        .transpose()?;
 
     let env = evaluate_env_map("script.env", &script.env, context)?;
 
@@ -1285,11 +1278,11 @@ pub fn evaluate_script(
     let secrets = script.secrets.clone();
 
     // Evaluate cwd normally (it's a path, not a script command)
-    let cwd = if let Some(cwd_val) = &script.cwd {
-        Some(PathBuf::from(evaluate_string_value(cwd_val, context)?))
-    } else {
-        None
-    };
+    let cwd = script
+        .cwd
+        .as_ref()
+        .map(|cwd| evaluate_string_value(cwd, context).map(PathBuf::from))
+        .transpose()?;
 
     // For content: evaluate conditionals but preserve templates with undefined vars
     let (content, inferred_interpreter) = if let Some(file_val) = &script.file {
@@ -1376,14 +1369,16 @@ pub fn evaluate_steps(
                     continue;
                 }
 
-                let interpreter = match &run.interpreter {
-                    Some(interpreter) => Some(evaluate_string_value(interpreter, context)?),
-                    None => None,
-                };
-                let cwd = match &run.cwd {
-                    Some(cwd) => Some(PathBuf::from(evaluate_string_value(cwd, context)?)),
-                    None => None,
-                };
+                let interpreter = run
+                    .interpreter
+                    .as_ref()
+                    .map(|interpreter| evaluate_string_value(interpreter, context))
+                    .transpose()?;
+                let cwd = run
+                    .cwd
+                    .as_ref()
+                    .map(|cwd| evaluate_string_value(cwd, context).map(PathBuf::from))
+                    .transpose()?;
 
                 scripts.push(Stage1Step::new(rattler_build_script::Script {
                     interpreter,
@@ -1397,6 +1392,27 @@ pub fn evaluate_steps(
     }
 
     Ok(scripts)
+}
+
+fn evaluate_build_plan(
+    plan: &Stage0BuildPlan,
+    context: &EvaluationContext,
+) -> Result<Stage1BuildPlan, ParseError> {
+    match plan {
+        Stage0BuildPlan::Steps(steps) => {
+            if !context.jinja_config().experimental {
+                return Err(ParseError::invalid_value(
+                    "build.steps",
+                    "`build.steps` is an experimental feature: provide the `--experimental` flag to enable it",
+                    Span::new_blank(),
+                ));
+            }
+            Ok(Stage1BuildPlan::Steps(evaluate_steps(steps, context)?))
+        }
+        Stage0BuildPlan::Script(script) => {
+            Ok(Stage1BuildPlan::Script(evaluate_script(script, context)?))
+        }
+    }
 }
 
 fn evaluate_env_map(
@@ -2148,7 +2164,7 @@ impl Evaluate for Stage0Build {
                 // Track variables without failing on undefined
                 track_template_variables(s, context);
 
-                let template = extract_template_source(s).unwrap();
+                let template = string_value_source(s);
                 crate::stage1::build::BuildString::unresolved(template, s.span().cloned())
             });
 
@@ -2161,21 +2177,7 @@ impl Evaluate for Stage0Build {
         // (enforced during parsing). Steps mode is preserved even if the list is
         // empty or all steps filter out, so outputs don't accidentally inherit a
         // top-level script.
-        let plan = match &self.plan {
-            Stage0BuildPlan::Steps(steps) => {
-                if !context.jinja_config().experimental {
-                    return Err(ParseError::invalid_value(
-                        "build.steps",
-                        "`build.steps` is an experimental feature: provide the `--experimental` flag to enable it",
-                        Span::new_blank(),
-                    ));
-                }
-                Stage1BuildPlan::Steps(evaluate_steps(steps, context)?)
-            }
-            Stage0BuildPlan::Script(script) => {
-                Stage1BuildPlan::Script(evaluate_script(script, context)?)
-            }
-        };
+        let plan = evaluate_build_plan(&self.plan, context)?;
 
         // Evaluate noarch
         //
@@ -2293,6 +2295,17 @@ impl Evaluate for Stage0Build {
             variant,
             prefix_detection,
             post_process,
+        })
+    }
+}
+
+impl Evaluate for stage0::StagingBuild {
+    type Output = Stage1Build;
+
+    fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
+        Ok(Stage1Build {
+            plan: evaluate_build_plan(&self.plan, context)?,
+            ..Stage1Build::default()
         })
     }
 }
@@ -3526,12 +3539,7 @@ impl Evaluate for crate::stage0::MultiOutputRecipe {
                     evaluate_string_value(&staging_output.staging.name, &context_with_vars)?;
 
                 // Evaluate staging output components
-                let script = evaluate_script(&staging_output.build.script, &context_with_vars)?;
-                let build = crate::stage1::Build {
-                    plan: Stage1BuildPlan::Script(script),
-                    ..crate::stage1::Build::default()
-                };
-
+                let build = staging_output.build.evaluate(&context_with_vars)?;
                 let requirements = staging_output.requirements.evaluate(&context_with_vars)?;
 
                 // Staging outputs inherit top-level sources (prepend), then add their own
@@ -4375,6 +4383,127 @@ outputs:
                 assert!(!staging_cache.requirements.build.is_empty()); // Should have gcc, cmake
                 assert!(!staging_cache.requirements.host.is_empty()); // Should have zlib
                 assert!(staging_cache.requirements.run.is_empty()); // Staging has no run requirements
+            }
+            _ => panic!("Expected MultiOutputRecipe"),
+        }
+    }
+
+    #[test]
+    fn test_staging_build_script_and_steps_are_mutually_exclusive() {
+        let recipe_yaml = r#"
+schema_version: 1
+
+recipe:
+  name: myproject
+  version: 1.0.0
+
+outputs:
+  - staging:
+      name: build-cache
+    build:
+      script: echo script
+      steps: []
+"#;
+
+        let err = parse_recipe_or_multi_from_source(recipe_yaml).unwrap_err();
+        assert!(err.to_string().contains("mutually exclusive"), "{err}");
+    }
+
+    #[test]
+    fn test_staging_build_steps_requires_experimental() {
+        let recipe_yaml = r#"
+schema_version: 1
+
+recipe:
+  name: myproject
+  version: 1.0.0
+
+outputs:
+  - staging:
+      name: build-cache
+    build:
+      steps:
+        - run: echo staging
+
+  - package:
+      name: mylib
+      version: 1.0.0
+    inherit: build-cache
+"#;
+
+        let parsed = parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+
+        match parsed {
+            stage0::Recipe::MultiOutput(multi) => {
+                let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
+                let err = multi.evaluate(&ctx).unwrap_err();
+                assert!(err.to_string().contains("experimental"), "{err}");
+            }
+            _ => panic!("Expected MultiOutputRecipe"),
+        }
+    }
+
+    #[test]
+    fn test_staging_build_steps_evaluate_into_cache() {
+        let recipe_yaml = r#"
+schema_version: 1
+
+recipe:
+  name: myproject
+  version: 1.0.0
+
+outputs:
+  - staging:
+      name: build-cache
+    build:
+      steps:
+        - run: echo one
+        - if: target_platform == 'linux-64'
+          run: echo ${{ flavor }}
+          env:
+            FLAVOR: ${{ flavor }}
+
+  - package:
+      name: mylib
+      version: 1.0.0
+    inherit: build-cache
+"#;
+
+        let parsed = parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+
+        match parsed {
+            stage0::Recipe::MultiOutput(multi) => {
+                let mut variables = IndexMap::new();
+                variables.insert("flavor".to_string(), Variable::from("vanilla"));
+                let ctx = EvaluationContext::with_variables_and_config(
+                    variables,
+                    JinjaConfig {
+                        target_platform: rattler_conda_types::Platform::Linux64,
+                        host_platform: rattler_conda_types::Platform::Linux64,
+                        build_platform: rattler_conda_types::Platform::Linux64,
+                        experimental: true,
+                        ..Default::default()
+                    },
+                );
+
+                let recipes = multi.evaluate(&ctx).unwrap();
+                assert_eq!(recipes.len(), 1);
+
+                let staging_cache = &recipes[0].staging_caches[0];
+                let steps = staging_cache.build.plan.steps().expect("steps mode");
+                assert_eq!(steps.len(), 2);
+                assert_eq!(
+                    steps[0].run,
+                    Stage1StepRun::Commands(vec!["echo one".to_string()])
+                );
+                assert_eq!(
+                    steps[1].run,
+                    Stage1StepRun::Commands(vec!["echo ${{ flavor }}".to_string()])
+                );
+                assert_eq!(
+                    steps[1].env.get("FLAVOR").map(String::as_str),
+                    Some("vanilla")
+                );
             }
             _ => panic!("Expected MultiOutputRecipe"),
         }

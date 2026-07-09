@@ -11,9 +11,8 @@ use std::{
 
 use fs_err as fs;
 use miette::{Context, IntoDiagnostic};
-use minijinja::Value;
-use rattler_build_jinja::{Jinja, Variable};
-use rattler_build_recipe::stage1::{BuildPlan, InheritsFrom, StagingCache};
+use rattler_build_jinja::Variable;
+use rattler_build_recipe::stage1::{InheritsFrom, StagingCache};
 use rattler_build_types::NormalizedKey;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -26,6 +25,7 @@ use crate::{
     render::resolved_dependencies::{
         FinalizedDependencies, RunExportsDownload, install_environments, resolve_dependencies,
     },
+    script::prepare_build_plan_execution_args,
     source::{copy_dir::CopyDir, fetch_sources},
     utils::remove_dir_all_force,
 };
@@ -80,18 +80,6 @@ pub struct StagingCacheMetadata {
     /// physically installed in the host prefix.
     #[serde(default)]
     pub library_name_map: LibraryNameMap,
-}
-
-fn staging_build_script(
-    staging: &StagingCache,
-) -> Result<&rattler_build_script::Script, miette::Error> {
-    match &staging.build.plan {
-        BuildPlan::Script(script) => Ok(script),
-        BuildPlan::Steps(_) => Err(miette::miette!(
-            "staging cache `{}` uses `build.steps`, but staging builds only support `build.script`",
-            staging.name
-        )),
-    }
 }
 
 impl Output {
@@ -312,45 +300,27 @@ impl Output {
             env_vars.remove(key);
         }
 
-        // Create Jinja context
-        let selector_config = self.build_configuration.selector_config();
-        let mut jinja = Jinja::new(selector_config.clone());
-
-        // Add context from the recipe
-        for (k, v) in self.recipe.context().iter() {
-            jinja.context_mut().insert(k.clone(), v.clone().into());
-        }
-
-        // Add env vars to jinja context
-        for (k, v) in &env_vars {
-            if let Some(value) = v {
-                jinja
-                    .context_mut()
-                    .insert(k.clone(), Value::from_safe_string(value.clone()));
-            }
-        }
-
-        let jinja_renderer = |template: &str| -> Result<String, String> {
-            jinja.render_str(template).map_err(|e| e.to_string())
-        };
-
         let build_prefix = if staging.build.merge_build_and_host_envs {
             None
         } else {
-            Some(&self.build_configuration.directories.build_prefix)
+            Some(self.build_configuration.directories.build_prefix.clone())
         };
 
-        staging_build_script(staging)?
-            .run_script(
-                env_vars,
-                &self.build_configuration.directories.work_dir,
-                &self.build_configuration.directories.recipe_dir,
-                &self.build_configuration.directories.host_prefix,
-                build_prefix,
-                Some(jinja_renderer),
-                self.build_configuration.sandbox_config(),
-                self.build_configuration.env_isolation,
-            )
+        let exec_args = prepare_build_plan_execution_args(
+            &staging.build.plan,
+            self.recipe.context(),
+            self.build_configuration.selector_config(),
+            env_vars,
+            self.build_configuration.directories.work_dir.clone(),
+            &self.build_configuration.directories.recipe_dir,
+            self.build_configuration.directories.host_prefix.clone(),
+            build_prefix,
+            self.build_configuration.sandbox_config().cloned(),
+            self.build_configuration.env_isolation,
+            self.build_configuration.experimental,
+        )
+        .into_diagnostic()?;
+        rattler_build_script::run_script(exec_args)
             .await
             .into_diagnostic()?;
 
@@ -582,14 +552,25 @@ pub fn should_inherit_run_exports(inherits: &InheritsFrom) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rattler_build_recipe::stage1::{Build, Requirements};
+    use rattler_build_jinja::JinjaConfig;
+    use rattler_build_recipe::stage1::{
+        Build, Requirements,
+        build::{BuildPlan, Step, StepRun},
+    };
+    use rattler_build_script::EnvironmentIsolation;
 
     #[test]
-    fn staging_build_steps_returns_error_instead_of_panicking() {
+    fn staging_build_steps_prepare_as_sections() {
         let staging = StagingCache::new(
             "compile".to_string(),
             Build {
-                plan: BuildPlan::Steps(Vec::new()),
+                plan: BuildPlan::Steps(vec![Step {
+                    run: StepRun::Commands(vec!["echo hi".to_string()]),
+                    env: [("FOO".to_string(), "bar".to_string())]
+                        .into_iter()
+                        .collect(),
+                    ..Default::default()
+                }]),
                 ..Default::default()
             },
             Requirements::default(),
@@ -597,11 +578,26 @@ mod tests {
             BTreeMap::new(),
         );
 
-        let err = staging_build_script(&staging).unwrap_err();
+        let args = prepare_build_plan_execution_args(
+            &staging.build.plan,
+            &indexmap::IndexMap::new(),
+            JinjaConfig::default(),
+            std::collections::HashMap::new(),
+            PathBuf::from("."),
+            Path::new("."),
+            PathBuf::from("."),
+            None,
+            None,
+            EnvironmentIsolation::default(),
+            true,
+        )
+        .unwrap();
 
-        assert!(
-            err.to_string().contains("staging builds only support"),
-            "unexpected error: {err}"
+        assert_eq!(args.sections.len(), 1);
+        assert_eq!(args.sections[0].label.as_deref(), Some("step 0"));
+        assert_eq!(
+            args.sections[0].env.get("FOO").map(String::as_str),
+            Some("bar")
         );
     }
 }
