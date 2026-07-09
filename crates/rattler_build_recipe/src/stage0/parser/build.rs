@@ -384,7 +384,7 @@ fn parse_step(node: &Node) -> Result<Step, ParseError> {
                 run = Some(parse_step_content(value_node)?);
             }
             "if" => {
-                condition = Some(parse_field!("steps.if", value_node));
+                condition = Some(parse_step_condition(value_node)?);
             }
             "interpreter" => {
                 interpreter = Some(parse_field!("steps.interpreter", value_node));
@@ -427,6 +427,40 @@ fn parse_step(node: &Node) -> Result<Step, ParseError> {
         cwd,
         env,
     }))
+}
+
+/// Parse a step `if` condition as a verbatim Jinja expression.
+fn parse_step_condition(node: &Node) -> Result<Value<String>, ParseError> {
+    let scalar = node.as_scalar().ok_or_else(|| {
+        ParseError::expected_type("scalar", "non-scalar", get_span(node))
+            .with_message("Expected step 'if' to be a Jinja expression")
+    })?;
+
+    let condition = scalar.as_str();
+    let span = *scalar.span();
+
+    if condition.trim().is_empty() {
+        return Err(ParseError::invalid_value(
+            "steps.if",
+            "step condition must be a non-empty Jinja expression",
+            span,
+        ));
+    }
+
+    if contains_jinja_template(condition) {
+        return Err(ParseError::invalid_value(
+            "steps.if",
+            "step condition is a Jinja expression; do not use `${{ }}` template delimiters",
+            span,
+        )
+        .with_suggestion(
+            "Use `if: target_platform == \"win-64\"`, not `if: ${{ target_platform }} == \"win-64\"`.",
+        ));
+    }
+
+    JinjaExpression::new(condition.to_string()).map_err(|e| ParseError::jinja_error(e, span))?;
+
+    Ok(Value::new_concrete(condition.to_string(), Some(span)))
 }
 
 /// Parse step `run` content: either a (multiline) scalar string or a list of
@@ -1038,6 +1072,40 @@ steps:
                 assert!(second.env.contains_key("FOO"));
             }
         }
+    }
+
+    #[test]
+    fn test_parse_step_if_rejects_template_syntax() {
+        let yaml = r#"
+steps:
+  - run: echo "step"
+    if: ${{ target_platform }} == "win-64"
+"#;
+        let node = marked_yaml::parse_yaml(0, yaml).unwrap();
+        let result = parse_build(&node);
+
+        assert!(
+            result.is_err(),
+            "expected template-style steps.if to be rejected"
+        );
+        let err = result.unwrap_err();
+        assert!(err.to_string().contains("do not use `${{ }}`"), "{err}");
+    }
+
+    #[test]
+    fn test_parse_step_if_rejects_malformed_expression_without_panic() {
+        let yaml = r#"
+steps:
+  - run: echo "step"
+    if: target_platform }}
+"#;
+        let node = marked_yaml::parse_yaml(0, yaml).unwrap();
+        let result = parse_build(&node);
+
+        assert!(
+            result.is_err(),
+            "expected malformed steps.if expression to be rejected"
+        );
     }
 
     #[test]

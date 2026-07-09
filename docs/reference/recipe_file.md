@@ -678,7 +678,7 @@ Each step is a scoped build-wrapper section. Step-local `env` values and `cwd`
 changes apply only to that step. A step supports:
 
 - **`run`** - Required inline command, multiline string, or list of commands.
-- **`if`** - Optional Jinja selector expression evaluated before the step runs.
+- **`if`** - Optional Jinja selector expression evaluated before the step runs. Do not wrap expressions in `${{ }}`.
 - **`interpreter`** - Optional interpreter override for this step.
 - **`cwd`** - Optional working directory for this step. Relative paths are
   resolved against the host prefix (`$PREFIX` / `%PREFIX%`).

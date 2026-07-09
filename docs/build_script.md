@@ -54,7 +54,7 @@ Each step is a scoped section of the generated build wrapper, so step-local
 
 - **`run`** - Required inline command, multiline string, or list of commands.
 - **`if`** - Optional Jinja selector expression, such as `unix` or
-  `target_platform == "linux-64"`.
+  `target_platform == "linux-64"`. Do not wrap expressions in `${{ }}`.
 - **`interpreter`** - Optional interpreter override for this step.
 - **`cwd`** - Optional working directory for this step. Relative paths are
   resolved against the host prefix (`$PREFIX` / `%PREFIX%`), and the wrapper

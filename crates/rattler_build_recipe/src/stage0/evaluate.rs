@@ -1437,19 +1437,15 @@ fn evaluate_step_condition(
     }
 
     if let Some(template) = condition.as_template() {
-        if let Some(expr) = single_jinja_expression(template.source()) {
-            return evaluate_step_condition_expression(expr, context, condition.span());
-        }
-
-        if let Some(expr) = jinja_template_to_expression(template.source()) {
-            return evaluate_step_condition_expression(&expr, context, condition.span());
-        }
-
         return Err(ParseError::invalid_value(
             "steps.if",
-            "step condition must be a non-empty Jinja expression",
+            format!(
+                "step condition must be a Jinja expression without `${{{{ }}}}` template delimiters: '{}'",
+                template.source()
+            ),
             condition.span().copied().unwrap_or_else(Span::new_blank),
-        ));
+        )
+        .with_suggestion("Use `if: target_platform == \"win-64\"`, not `if: ${{ target_platform }} == \"win-64\"`."));
     }
 
     unreachable!("Value must be either concrete or template")
@@ -1488,48 +1484,6 @@ fn evaluate_step_condition_expression(
     }
 
     Ok(value.is_true())
-}
-
-fn single_jinja_expression(template: &str) -> Option<&str> {
-    let trimmed = template.trim();
-    if !trimmed.starts_with("${{") || !trimmed.ends_with("}}") {
-        return None;
-    }
-
-    let inner = &trimmed[3..trimmed.len() - 2];
-    if inner.contains("${{") || inner.contains("}}") {
-        return None;
-    }
-
-    let expr = inner.trim();
-    (!expr.is_empty()).then_some(expr)
-}
-
-fn jinja_template_to_expression(template: &str) -> Option<String> {
-    let trimmed = template.trim();
-    let mut rest = trimmed;
-    let mut expression = String::new();
-    let mut saw_template = false;
-
-    while let Some(start) = rest.find("${{") {
-        expression.push_str(&rest[..start]);
-        let after_start = &rest[start + 3..];
-        let end = after_start.find("}}")?;
-        let inner = after_start[..end].trim();
-        if inner.is_empty() {
-            return None;
-        }
-
-        expression.push('(');
-        expression.push_str(inner);
-        expression.push(')');
-        saw_template = true;
-        rest = &after_start[end + 2..];
-    }
-
-    expression.push_str(rest);
-    let expression = expression.trim();
-    (saw_template && !expression.is_empty()).then(|| expression.to_string())
 }
 
 /// Parse a boolean from a string (case-insensitive)
@@ -3131,14 +3085,15 @@ impl Evaluate for Stage0Recipe {
     }
 }
 
-fn build_plan_inherits_from_toplevel(plan: &Stage1BuildPlan) -> bool {
+fn build_plan_inherits_from_toplevel(toplevel: &Stage1BuildPlan, output: &Stage1BuildPlan) -> bool {
     matches!(
-        plan,
+        output,
         Stage1BuildPlan::Script(script)
             if script.content.is_default()
                 && script.interpreter.is_none()
                 && script.env.is_empty()
                 && script.secrets.is_empty()
+                && (script.cwd.is_none() || matches!(toplevel, Stage1BuildPlan::Script(_)))
     )
 }
 
@@ -3152,9 +3107,10 @@ fn merge_stage1_build(
     // determined per build unit. If the output specifies either, it fully owns
     // the mode; only a legacy script-discovery plan with no executable content
     // inherits from top-level. A cwd-only script object still counts as unset
-    // for this inheritance decision, matching the historical multi-output
-    // behavior.
-    let plan = if build_plan_inherits_from_toplevel(&output.plan) {
+    // when inheriting a top-level script, matching the historical multi-output
+    // behavior. It does not inherit a top-level steps plan because there is no
+    // whole-plan `cwd` to apply to steps without silently dropping it.
+    let plan = if build_plan_inherits_from_toplevel(&toplevel.plan, &output.plan) {
         toplevel.plan
     } else {
         output.plan
@@ -5312,6 +5268,52 @@ outputs:
     }
 
     #[test]
+    fn test_multi_output_cwd_only_script_does_not_inherit_top_level_steps() {
+        let recipe_yaml = r#"
+schema_version: 1
+
+recipe:
+  name: myproject
+  version: 1.0.0
+
+build:
+  steps:
+    - run: echo top-level-step
+
+outputs:
+  - package:
+      name: output
+      version: 1.0.0
+    build:
+      script:
+        cwd: subdir
+"#;
+
+        let parsed = parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+
+        match parsed {
+            stage0::Recipe::MultiOutput(multi) => {
+                let jinja_config = JinjaConfig {
+                    target_platform: rattler_conda_types::Platform::Linux64,
+                    build_platform: rattler_conda_types::Platform::Linux64,
+                    host_platform: rattler_conda_types::Platform::Linux64,
+                    experimental: true,
+                    ..Default::default()
+                };
+                let ctx =
+                    EvaluationContext::with_variables_and_config(IndexMap::new(), jinja_config);
+                let recipes = multi.evaluate(&ctx).unwrap();
+                assert_eq!(recipes.len(), 1);
+
+                let script = recipes[0].build.plan.script().expect("script mode");
+                assert_eq!(script.content, ScriptContent::Commands(Vec::new()));
+                assert_eq!(script.cwd.as_deref(), Some(std::path::Path::new("subdir")));
+            }
+            _ => panic!("Expected MultiOutputRecipe"),
+        }
+    }
+
+    #[test]
     fn test_multi_output_does_not_default_to_build_sh() {
         // Outputs without an explicit `build.script` in a multi-output recipe
         // must resolve to an empty command list, not to `Default` (which would
@@ -6176,71 +6178,25 @@ package:
     }
 
     #[test]
-    fn test_evaluate_steps_if_template_expression_uses_jinja_truthiness() {
-        let step = Stage0Step::Run(Stage0RunStep {
-            run: ConditionalList::new(vec![Item::Value(Value::new_concrete(
-                "echo string condition".to_string(),
-                None,
-            ))]),
-            condition: Some(Value::new_template(
-                JinjaTemplate::new("${{ target_platform }}".to_string()).unwrap(),
-                None,
-            )),
-            ..Default::default()
-        });
-        let mut ctx = EvaluationContext::new();
-        ctx.insert("target_platform".to_string(), Variable::from("linux-64"));
-
-        let scripts = evaluate_steps(&[step], &ctx).unwrap();
-
-        assert_eq!(scripts.len(), 1);
-        assert!(ctx.accessed_variables().contains("target_platform"));
-    }
-
-    #[test]
-    fn test_evaluate_steps_if_multiple_template_expressions_do_not_panic() {
+    fn test_evaluate_steps_if_expression_compares_target_platform() {
         let step = Stage0Step::Run(Stage0RunStep {
             run: ConditionalList::new(vec![Item::Value(Value::new_concrete(
                 "echo gated".to_string(),
                 None,
             ))]),
-            condition: Some(Value::new_template(
-                JinjaTemplate::new("${{ unix }} and ${{ win }}".to_string()).unwrap(),
+            condition: Some(Value::new_concrete(
+                "target_platform == 'win-64'".to_string(),
                 None,
             )),
             ..Default::default()
         });
-        let mut ctx = EvaluationContext::new();
-        ctx.insert("unix".to_string(), Variable::from(true));
-        ctx.insert("win".to_string(), Variable::from(false));
+        let mut linux_ctx = EvaluationContext::new();
+        linux_ctx.insert("target_platform".to_string(), Variable::from("linux-64"));
 
-        let scripts = evaluate_steps(&[step], &ctx).unwrap();
-
-        assert!(scripts.is_empty());
-        assert!(ctx.accessed_variables().contains("unix"));
-        assert!(ctx.accessed_variables().contains("win"));
-    }
-
-    #[test]
-    fn test_evaluate_steps_if_partial_template_expression_is_not_string_truthy() {
-        let step = Stage0Step::Run(Stage0RunStep {
-            run: ConditionalList::new(vec![Item::Value(Value::new_concrete(
-                "echo gated".to_string(),
-                None,
-            ))]),
-            condition: Some(Value::new_template(
-                JinjaTemplate::new("${{ target_platform }} == 'win-64'".to_string()).unwrap(),
-                None,
-            )),
-            ..Default::default()
-        });
-        let mut ctx = EvaluationContext::new();
-        ctx.insert("target_platform".to_string(), Variable::from("linux-64"));
-
-        let scripts = evaluate_steps(std::slice::from_ref(&step), &ctx).unwrap();
+        let scripts = evaluate_steps(std::slice::from_ref(&step), &linux_ctx).unwrap();
 
         assert!(scripts.is_empty());
-        assert!(ctx.accessed_variables().contains("target_platform"));
+        assert!(linux_ctx.accessed_variables().contains("target_platform"));
 
         let mut win_ctx = EvaluationContext::new();
         win_ctx.insert("target_platform".to_string(), Variable::from("win-64"));
@@ -6249,6 +6205,64 @@ package:
 
         assert_eq!(scripts.len(), 1);
         assert!(win_ctx.accessed_variables().contains("target_platform"));
+    }
+
+    #[test]
+    fn test_evaluate_steps_if_rejects_template_syntax() {
+        for condition in [
+            "${{ target_platform }}",
+            "${{ unix }} and ${{ win }}",
+            "${{ unix }} }} ${{ win }}",
+            "${{ major }}-${{ minor }}",
+        ] {
+            let step = Stage0Step::Run(Stage0RunStep {
+                run: ConditionalList::new(vec![Item::Value(Value::new_concrete(
+                    "echo gated".to_string(),
+                    None,
+                ))]),
+                condition: Some(Value::new_template(
+                    JinjaTemplate::new(condition.to_string()).unwrap(),
+                    None,
+                )),
+                ..Default::default()
+            });
+            let mut ctx = EvaluationContext::new();
+            ctx.insert("target_platform".to_string(), Variable::from("win-64"));
+            ctx.insert("unix".to_string(), Variable::from(true));
+            ctx.insert("win".to_string(), Variable::from(false));
+            ctx.insert("major".to_string(), Variable::from(3));
+            ctx.insert("minor".to_string(), Variable::from(3));
+
+            let err = evaluate_steps(&[step], &ctx).unwrap_err();
+
+            assert!(
+                err.to_string()
+                    .contains("without `${{ }}` template delimiters"),
+                "unexpected error for {condition:?}: {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_evaluate_steps_if_malformed_expression_errors_without_panic() {
+        let step = Stage0Step::Run(Stage0RunStep {
+            run: ConditionalList::new(vec![Item::Value(Value::new_concrete(
+                "echo typo".to_string(),
+                None,
+            ))]),
+            condition: Some(Value::new_concrete("target_platform }}".to_string(), None)),
+            ..Default::default()
+        });
+        let mut ctx = EvaluationContext::new();
+        ctx.insert("target_platform".to_string(), Variable::from("win-64"));
+
+        let err = evaluate_steps(&[step], &ctx).unwrap_err();
+
+        assert!(
+            err.to_string()
+                .contains("failed to evaluate step condition"),
+            "unexpected error: {err}"
+        );
     }
 
     /// A run step that sets an explicit interpreter and step-local env.
