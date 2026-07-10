@@ -161,8 +161,8 @@ pub async fn build_reindexed_channels(
         return Ok(build_configuration.channels.clone());
     }
 
-    let output_channel = Channel::try_from_directory(output_dir)
-        .expect("could not create channel from directory");
+    let output_channel =
+        Channel::try_from_directory(output_dir).expect("could not create channel from directory");
 
     // Clear the repodata gateway of any cached values for the output channel.
     // Clear all subdirs so that packages from other platforms (e.g. a linux-64
