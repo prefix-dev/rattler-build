@@ -2896,7 +2896,13 @@
 <li>
 <dl>
 <dt><a id="arg---config-file" href="#arg---config-file"><code>--config-file &lt;CONFIG_FILE&gt;</code></a></dt>
-<dd>The Rattler-Build configuration file to use</dd>
+<dd>The Rattler-Build configuration file to use. If not set, configuration is loaded from the default locations (the system-wide and global pixi configuration files as well as rattler-build's own configuration files)</dd>
+</dl>
+</li>
+<li>
+<dl>
+<dt><a id="arg---no-config" href="#arg---no-config"><code>--no-config</code></a></dt>
+<dd>Do not load any configuration. Disables the automatic discovery of pixi/rattler-build configuration files so that only built-in defaults and command-line arguments are used (the behavior of rattler-build versions before default config discovery was added). Mutually exclusive with <code>--config-file</code></dd>
 </dl>
 </li>
 <li>

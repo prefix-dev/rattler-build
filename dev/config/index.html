@@ -987,6 +987,28 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#seeing-which-configuration-was-loaded" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Seeing which configuration was loaded
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#programmatic-use" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Programmatic use
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#channels" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2752,6 +2774,28 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#seeing-which-configuration-was-loaded" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Seeing which configuration was loaded
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#programmatic-use" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Programmatic use
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#channels" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2821,31 +2865,49 @@
 
 
 <h1 id="rattler-build-configuration">Rattler-Build configuration<a class="headerlink" href="#rattler-build-configuration" title="Permanent link">#</a></h1>
-<p>Rattler-Build can be configured by specifying <code>--config-file ~/.pixi/config.toml</code>.
-The config file is of the same format as pixi's <a href="https://pixi.sh/latest/reference/pixi_configuration/">global configuration file</a>.</p>
+<p>Rattler-Build shares its configuration format with pixi: the config file is of the same format as pixi's <a href="https://pixi.sh/latest/reference/pixi_configuration/">global configuration file</a>.</p>
+<p>By default (when no <code>--config-file</code> is passed), Rattler-Build automatically loads and merges configuration from the standard locations shared by all rattler based tools. Discovery is provided by <code>rattler_config</code>'s common <code>locations</code> helper, so the search order is identical to the one pixi and other tools use. The locations, in ascending order of precedence (values from later files override values from earlier files):</p>
+<ol>
+<li>The system-wide configuration of each tool: <code>/etc/pixi/config.toml</code> followed by <code>/etc/rattler-build/config.toml</code> (on Windows: <code>C:\ProgramData\&lt;tool&gt;\config.toml</code>)</li>
+<li>The per-user configuration of each tool: the platform config directory (<code>$XDG_CONFIG_HOME/&lt;tool&gt;/config.toml</code>, e.g. <code>~/.config/pixi/config.toml</code>) and the tool home (<code>$PIXI_HOME</code> / <code>$RATTLER_BUILD_HOME</code>, defaulting to <code>~/.pixi/config.toml</code> / <code>~/.rattler-build/config.toml</code>), for <code>pixi</code> first and then <code>rattler-build</code></li>
+</ol>
+<p>In other words all system-wide files are read before any per-user file, and within each group pixi's files are overridden by Rattler-Build's own files. This means that settings such as default channels, mirrors, or S3 options that you have configured for pixi are picked up by Rattler-Build automatically, and can be overridden in Rattler-Build's own configuration files.</p>
+<p>Alternatively, a single configuration file can be specified explicitly with <code>--config-file</code> (e.g. <code>--config-file ~/.pixi/config.toml</code>), which disables the automatic discovery and loads only that file. To disable configuration entirely — so that only built-in defaults and command-line arguments apply — pass <code>--no-config</code> (mutually exclusive with <code>--config-file</code>).</p>
+<div class="admonition note">
+<p class="admonition-title">Behavior change</p>
+<p>Earlier versions of Rattler-Build only loaded configuration when <code>--config-file</code> was passed. Automatic discovery of the locations above is new: if you already have a pixi configuration, Rattler-Build now picks it up by default. Pass <code>--no-config</code> to restore the old behavior and skip all configuration loading, or <code>--config-file</code> to load only a specific file.</p>
+</div>
+<h2 id="seeing-which-configuration-was-loaded">Seeing which configuration was loaded<a class="headerlink" href="#seeing-which-configuration-was-loaded" title="Permanent link">#</a></h2>
+<p>On startup Rattler-Build logs its version and the configuration files it actually loaded, so you can always trace where a setting came from:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>rattler-build 0.68.0
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>Loaded configuration from: /etc/pixi/config.toml, /home/user/.pixi/config.toml
+</span></code></pre></div>
+<p>If no configuration file was found — either because none of the default locations exist, or because <code>--config-file</code> was not given — it logs <code>No configuration file loaded</code> instead. These lines appear at the default log level; run with <code>-v</code> to additionally see the full list of candidate paths that were considered (useful when a file you expected is not picked up).</p>
+<h2 id="programmatic-use">Programmatic use<a class="headerlink" href="#programmatic-use" title="Permanent link">#</a></h2>
+<p>Automatic discovery happens <strong>only when you run the <code>rattler-build</code> command-line tool</strong>. When Rattler-Build is used as a library (for example from <a href="https://pixi.sh">pixi</a>, or through the Python bindings), no configuration is loaded implicitly — the embedding application constructs the configuration and passes it in. This guarantees that using Rattler-Build programmatically never silently reads your global pixi or Rattler-Build configuration from disk.</p>
 <h2 id="channels">Channels<a class="headerlink" href="#channels" title="Permanent link">#</a></h2>
 <p>You can specify custom channels via the <code>default-channels</code> option.</p>
-<div class="language-toml highlight"><span class="filename">config.toml</span><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">default-channels</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;conda-forge&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;bioconda&quot;</span><span class="p">]</span>
+<div class="language-toml highlight"><span class="filename">config.toml</span><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">default-channels</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;conda-forge&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;bioconda&quot;</span><span class="p">]</span>
 </span></code></pre></div>
 <h2 id="package-format">Package format<a class="headerlink" href="#package-format" title="Permanent link">#</a></h2>
 <p>You can define the default package format to use for builds.
 It can be one of <code>tar-bz2</code> or <code>conda</code>.
 You can also add a compression level to the package format, e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number&gt;</code> (from -7 to 22).</p>
-<div class="language-toml highlight"><span class="filename">config.toml</span><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">[build]</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">package-format</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;conda:22&quot;</span>
+<div class="language-toml highlight"><span class="filename">config.toml</span><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">[build]</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">package-format</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;conda:22&quot;</span>
 </span></code></pre></div>
 <h2 id="mirror-configuration">Mirror configuration<a class="headerlink" href="#mirror-configuration" title="Permanent link">#</a></h2>
 <p>By specifying the <code>mirrors</code> section, you can instruct Rattler-Build to use mirrors when building.
 For more information, see <a href="https://pixi.sh/latest/reference/pixi_configuration/#mirror-configuration">pixi's documentation</a>.</p>
-<div class="language-toml highlight"><span class="filename">config.toml</span><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">[mirrors]</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="s2">&quot;https://conda.anaconda.org/conda-forge&quot;</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;https://prefix.dev/conda-forge&quot;</span><span class="p">]</span>
+<div class="language-toml highlight"><span class="filename">config.toml</span><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">[mirrors]</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="s2">&quot;https://conda.anaconda.org/conda-forge&quot;</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;https://prefix.dev/conda-forge&quot;</span><span class="p">]</span>
 </span></code></pre></div>
 <h2 id="s3-configuration">S3 configuration<a class="headerlink" href="#s3-configuration" title="Permanent link">#</a></h2>
 <p>You can configure your S3 buckets that are used during build by specifying <code>s3-options</code>. For more information, consult <a href="https://pixi.sh/latest/deployment/s3/">pixi's documentation</a>.</p>
-<div class="language-toml highlight"><span class="filename">config.toml</span><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">[s3-options.my-bucket]</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">endpoint-url</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;https://fsn1.your-objectstorage.com&quot;</span>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;US&quot;</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">force-path-style</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">false</span>
+<div class="language-toml highlight"><span class="filename">config.toml</span><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">[s3-options.my-bucket]</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">endpoint-url</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;https://fsn1.your-objectstorage.com&quot;</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;US&quot;</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="n">force-path-style</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">false</span>
 </span></code></pre></div>
 
 
