@@ -6061,17 +6061,17 @@ package:
 
     #[test]
     fn test_evaluate_steps_if_undefined_variable_errors() {
-        let typo_step = Stage0Step::Run(Stage0RunStep {
+        let undefined_step = Stage0Step::Run(Stage0RunStep {
             run: ConditionalList::new(vec![Item::Value(Value::new_concrete(
-                "echo typo".to_string(),
+                "echo undefined".to_string(),
                 None,
             ))]),
-            condition: Some(step_condition("enabel_feature")),
+            condition: Some(step_condition("undefined_feature")),
             ..Default::default()
         });
         let ctx = EvaluationContext::new();
 
-        let err = evaluate_steps(&[typo_step], &ctx).unwrap_err();
+        let err = evaluate_steps(&[undefined_step], &ctx).unwrap_err();
 
         assert!(
             err.to_string().contains("undefined variable"),
