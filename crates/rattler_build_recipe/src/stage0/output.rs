@@ -8,7 +8,7 @@ use serde::Serialize;
 
 use crate::stage0::{
     about::About,
-    build::Build,
+    build::{Build, BuildPlan},
     package::{Package, PackageMetadata},
     requirements::Requirements,
     source::Source,
@@ -126,7 +126,7 @@ pub struct StagingOutput {
     #[serde(default)]
     pub requirements: Requirements,
 
-    /// Build configuration (only script is allowed)
+    /// Build configuration.
     #[serde(default)]
     pub build: StagingBuild,
 }
@@ -138,17 +138,12 @@ pub struct StagingMetadata {
     pub name: Value<String>,
 }
 
-/// Build configuration for staging outputs
-///
-/// Only the script field is allowed for staging outputs.
+/// Build configuration for staging outputs.
 #[derive(Debug, Clone, PartialEq, Serialize, Default)]
 pub struct StagingBuild {
-    /// Build script - contains script content, interpreter, environment variables, etc.
-    #[serde(
-        default,
-        skip_serializing_if = "crate::stage0::types::Script::is_default"
-    )]
-    pub script: crate::stage0::types::Script,
+    /// Executable build plan: either a single legacy script or explicit steps.
+    #[serde(default, flatten)]
+    pub plan: BuildPlan,
 }
 
 /// Package output configuration
@@ -523,11 +518,7 @@ impl Inherit {
 impl StagingBuild {
     /// Get all used variables in staging build
     pub fn used_variables(&self) -> Vec<String> {
-        let mut vars = Vec::new();
-        vars.extend(self.script.used_variables());
-        vars.sort();
-        vars.dedup();
-        vars
+        self.plan.used_variables()
     }
 }
 

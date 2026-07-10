@@ -154,15 +154,10 @@ impl BuildPlan {
 
     /// Collect all variables used in the build plan.
     pub fn used_variables(&self) -> Vec<String> {
-        let mut vars = Vec::new();
-        match self {
-            Self::Script(script) => vars.extend(script.used_variables()),
-            Self::Steps(steps) => {
-                for step in steps {
-                    vars.extend(step.used_variables());
-                }
-            }
-        }
+        let mut vars: Vec<_> = match self {
+            Self::Script(script) => script.used_variables(),
+            Self::Steps(steps) => steps.iter().flat_map(Step::used_variables).collect(),
+        };
         vars.sort();
         vars.dedup();
         vars

@@ -78,10 +78,7 @@ impl BuildString {
 
     /// Get the resolved string value, if available
     pub fn as_resolved(&self) -> Option<&str> {
-        match self {
-            BuildString::Resolved(s) => Some(s),
-            BuildString::Unresolved(_, _) | BuildString::Default => None,
-        }
+        self.as_str()
     }
 
     /// Get the string value, only if resolved
@@ -192,16 +189,20 @@ impl From<StepRun> for ScriptContent {
     }
 }
 
+fn step_run_from_content(value: ScriptContent) -> StepRun {
+    match value {
+        ScriptContent::Commands(commands) => StepRun::Commands(commands),
+        ScriptContent::Command(command) | ScriptContent::CommandOrPath(command) => {
+            StepRun::Command(command)
+        }
+        ScriptContent::Path(path) => StepRun::Command(path.to_string_lossy().into_owned()),
+        ScriptContent::Default => StepRun::Commands(Vec::new()),
+    }
+}
+
 impl From<&ScriptContent> for StepRun {
     fn from(value: &ScriptContent) -> Self {
-        match value {
-            ScriptContent::Commands(commands) => Self::Commands(commands.clone()),
-            ScriptContent::Command(command) | ScriptContent::CommandOrPath(command) => {
-                Self::Command(command.clone())
-            }
-            ScriptContent::Path(path) => Self::Command(path.to_string_lossy().into_owned()),
-            ScriptContent::Default => Self::Commands(Vec::new()),
-        }
+        step_run_from_content(value.clone())
     }
 }
 
@@ -229,7 +230,7 @@ impl Step {
     /// Create a step from an evaluated script payload.
     pub fn new(script: Script) -> Self {
         Self {
-            run: StepRun::from(&script.content),
+            run: step_run_from_content(script.content),
             interpreter: script.interpreter,
             env: script.env,
             cwd: script.cwd,
@@ -737,29 +738,15 @@ impl Build {
             && self.plan.is_default()
             && self.noarch.is_none()
             && self.flags.is_empty()
-            && self.python.entry_points.is_empty()
-            && self.python.skip_pyc_compilation.is_empty()
-            && !self.python.use_python_app_entrypoint
-            && !self.python.version_independent
-            && self.python.site_packages_path.is_none()
+            && self.python.is_default()
             && !self.skip
             && self.always_copy_files.is_empty()
             && self.always_include_files.is_empty()
             && !self.merge_build_and_host_envs
             && self.files.is_empty()
-            && self.dynamic_linking.rpaths.is_empty()
-            && self.dynamic_linking.binary_relocation.is_all()
-            && self.dynamic_linking.missing_dso_allowlist.is_empty()
-            && self.dynamic_linking.rpath_allowlist.is_empty()
-            && self.dynamic_linking.overdepending_behavior == LinkingCheckBehavior::Ignore
-            && self.dynamic_linking.overlinking_behavior == LinkingCheckBehavior::Ignore
-            && self.variant.use_keys.is_empty()
-            && self.variant.ignore_keys.is_empty()
-            && self.variant.down_prioritize_variant.is_none()
-            && self.prefix_detection.force_file_type.text.is_empty()
-            && self.prefix_detection.force_file_type.binary.is_empty()
-            && self.prefix_detection.ignore.is_none()
-            && !self.prefix_detection.ignore_binary_files
+            && self.dynamic_linking.is_default()
+            && self.variant.is_default()
+            && self.prefix_detection.is_default()
             && self.post_process.is_empty()
     }
 }

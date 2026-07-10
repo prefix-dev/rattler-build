@@ -15,14 +15,14 @@ use super::{About, Build, Extra, Package, Requirements, Source, TestType};
 /// A staging cache is similar to a Recipe but:
 /// - Does not produce a package artifact
 /// - Only has build/host requirements (no run requirements)
-/// - Only has a build script (no tests, no about section)
+/// - Only has a build plan (no tests, no about section)
 /// - Results are cached and can be inherited by package outputs
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct StagingCache {
     /// Name of the staging cache (unique identifier)
     pub name: String,
 
-    /// Build configuration (only script field is used)
+    /// Build configuration.
     #[serde(default, skip_serializing_if = "Build::is_default")]
     pub build: Build,
 
