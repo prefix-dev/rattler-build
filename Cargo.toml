@@ -289,3 +289,10 @@ pretty_assertions = { workspace = true }
 [[bench]]
 name = "parse_file"
 harness = false
+
+[patch.crates-io]
+# TEMPORARY: use rattler_git from the rattler branch that unifies the git
+# cache implementation between pixi, rattler and rattler-build (adds git-LFS
+# support to `CheckoutOptions`). Remove once that rattler_git version is
+# released to crates.io.
+rattler_git = { git = "https://github.com/conda/rattler", branch = "claude/git-cache-unification-7g1icn" }
