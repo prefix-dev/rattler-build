@@ -152,7 +152,12 @@ async fn async_main() -> miette::Result<()> {
     )
     .into_diagnostic()?;
 
-    let config = if let Some(config_path) = app.config_file {
+    let config = if app.no_config {
+        // `--no-config` disables all loading and discovery: only built-in
+        // defaults and command-line arguments apply (the behavior before
+        // default config discovery was added).
+        None
+    } else if let Some(config_path) = app.config_file {
         // An explicitly passed configuration file disables the automatic
         // discovery and is used as-is.
         Some(Config::load_from_files(&[config_path]).into_diagnostic()?)

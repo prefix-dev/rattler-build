@@ -9,10 +9,10 @@ By default (when no `--config-file` is passed), Rattler-Build automatically load
 
 In other words all system-wide files are read before any per-user file, and within each group pixi's files are overridden by Rattler-Build's own files. This means that settings such as default channels, mirrors, or S3 options that you have configured for pixi are picked up by Rattler-Build automatically, and can be overridden in Rattler-Build's own configuration files.
 
-Alternatively, a single configuration file can be specified explicitly with `--config-file` (e.g. `--config-file ~/.pixi/config.toml`), which disables the automatic discovery and loads only that file.
+Alternatively, a single configuration file can be specified explicitly with `--config-file` (e.g. `--config-file ~/.pixi/config.toml`), which disables the automatic discovery and loads only that file. To disable configuration entirely — so that only built-in defaults and command-line arguments apply — pass `--no-config` (mutually exclusive with `--config-file`).
 
 !!! note "Behavior change"
-    Earlier versions of Rattler-Build only loaded configuration when `--config-file` was passed. Automatic discovery of the locations above is new: if you already have a pixi configuration, Rattler-Build now picks it up by default. Pass `--config-file` (pointing at the file you want, or an empty file) to opt out of discovery.
+    Earlier versions of Rattler-Build only loaded configuration when `--config-file` was passed. Automatic discovery of the locations above is new: if you already have a pixi configuration, Rattler-Build now picks it up by default. Pass `--no-config` to restore the old behavior and skip all configuration loading, or `--config-file` to load only a specific file.
 
 ## Seeing which configuration was loaded
 

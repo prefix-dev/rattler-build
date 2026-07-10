@@ -4854,7 +4854,6 @@ dependencies = [
  "console",
  "criterion",
  "dialoguer",
- "dirs",
  "dunce",
  "fs-err",
  "futures",

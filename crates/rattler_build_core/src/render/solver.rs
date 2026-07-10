@@ -208,8 +208,14 @@ pub async fn load_repodatas(
         .clear()
         .unwrap();
 
-    // `query` now returns a `RepoDataQueryOutput` (records plus non-fatal
-    // warnings); we only need the repodata records here.
+    // `query` returns a `RepoDataQueryOutput`: repodata records plus any
+    // non-fatal warnings gathered during the query (e.g. CEP-42 channel
+    // relations). Surface the warnings to the user instead of dropping them,
+    // then return the records.
+    for warning in &result.warnings {
+        tracing::warn!("{warning}");
+    }
+
     Ok(result.repodata)
 }
 
