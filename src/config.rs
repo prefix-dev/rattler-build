@@ -6,9 +6,20 @@
 //! [`rattler_config::config::ConfigBase`], while everything that only makes
 //! sense for `rattler-build` lives in the [`RattlerBuildConfig`] extension.
 //!
-//! When no `--config-file` is passed on the command line, configuration is
-//! discovered from the standard pixi locations as well as `rattler-build`'s
-//! own configuration paths (see [`default_config_paths`]).
+//! ## When configuration is loaded
+//!
+//! Configuration is discovered and loaded **only by the command-line
+//! interface** ([`load_default_config`]), and only when no explicit
+//! `--config-file` is given. On startup the CLI logs its version and the
+//! files it loaded, so config resolution is easy to trace.
+//!
+//! Programmatic/library consumers of `rattler-build` — including pixi via
+//! `rattler_build_core`, and the Python bindings — never load configuration
+//! implicitly. They must construct a [`Config`] themselves (e.g.
+//! [`Config::default`] or [`ConfigBase::load_from_files`]) and pass it in.
+//! This keeps library use free of surprising reads of the user's global
+//! pixi/rattler-build configuration; the embedding application stays in full
+//! control of where configuration comes from.
 
 use std::path::PathBuf;
 
@@ -66,17 +77,30 @@ pub fn default_config_paths() -> Vec<PathBuf> {
 /// the list override values from earlier files.
 ///
 /// Returns `Ok(None)` if none of the default configuration files exist.
+///
+/// This is the command-line interface's discovery entry point. It is
+/// intentionally **not** called by any library code path: programmatic
+/// consumers construct and pass their own [`Config`] instead of having one
+/// discovered from the user's environment (see the module docs).
+///
+/// The full candidate list (in precedence order) is logged at debug level so
+/// that `-v` runs can explain why a particular file was or was not picked up;
+/// the CLI separately logs the files that were actually loaded at the default
+/// level on startup.
 pub fn load_default_config() -> Result<Option<Config>, LoadError> {
-    let paths = default_config_paths()
+    let candidates = default_config_paths();
+    tracing::debug!("Configuration search paths (lowest precedence first): {candidates:?}");
+
+    let paths = candidates
         .into_iter()
         .filter(|p| p.is_file())
         .collect::<Vec<_>>();
 
     if paths.is_empty() {
+        tracing::debug!("No configuration file found in any default location");
         return Ok(None);
     }
 
-    tracing::debug!("Loading configuration from: {:?}", paths);
     Config::load_from_files(&paths).map(Some)
 }
 

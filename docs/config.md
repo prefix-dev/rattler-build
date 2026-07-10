@@ -11,6 +11,24 @@ In other words all system-wide files are read before any per-user file, and with
 
 Alternatively, a single configuration file can be specified explicitly with `--config-file` (e.g. `--config-file ~/.pixi/config.toml`), which disables the automatic discovery and loads only that file.
 
+!!! note "Behavior change"
+    Earlier versions of Rattler-Build only loaded configuration when `--config-file` was passed. Automatic discovery of the locations above is new: if you already have a pixi configuration, Rattler-Build now picks it up by default. Pass `--config-file` (pointing at the file you want, or an empty file) to opt out of discovery.
+
+## Seeing which configuration was loaded
+
+On startup Rattler-Build logs its version and the configuration files it actually loaded, so you can always trace where a setting came from:
+
+```
+rattler-build 0.68.0
+Loaded configuration from: /etc/pixi/config.toml, /home/user/.pixi/config.toml
+```
+
+If no configuration file was found — either because none of the default locations exist, or because `--config-file` was not given — it logs `No configuration file loaded` instead. These lines appear at the default log level; run with `-v` to additionally see the full list of candidate paths that were considered (useful when a file you expected is not picked up).
+
+## Programmatic use
+
+Automatic discovery happens **only when you run the `rattler-build` command-line tool**. When Rattler-Build is used as a library (for example from [pixi](https://pixi.sh), or through the Python bindings), no configuration is loaded implicitly — the embedding application constructs the configuration and passes it in. This guarantees that using Rattler-Build programmatically never silently reads your global pixi or Rattler-Build configuration from disk.
+
 ## Channels
 
 You can specify custom channels via the `default-channels` option.

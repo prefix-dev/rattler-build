@@ -163,6 +163,23 @@ async fn async_main() -> miette::Result<()> {
         load_default_config().into_diagnostic()?
     };
 
+    // Print a startup line so users can always see which version is running
+    // and exactly which configuration files were loaded (if any), making
+    // config resolution easy to trace. Shown at the default log level.
+    tracing::info!("rattler-build {}", env!("CARGO_PKG_VERSION"));
+    match config.as_ref() {
+        Some(config) if !config.loaded_from.is_empty() => tracing::info!(
+            "Loaded configuration from: {}",
+            config
+                .loaded_from
+                .iter()
+                .map(|p| p.display().to_string())
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
+        _ => tracing::info!("No configuration file loaded"),
+    }
+
     match app.subcommand {
         Some(SubCommands::Completion(ShellCompletion { shell })) => {
             let mut cmd = App::command();
