@@ -4680,7 +4680,6 @@ dependencies = [
  "comfy-table",
  "console",
  "dialoguer",
- "dirs",
  "dunce",
  "fs-err",
  "futures",
