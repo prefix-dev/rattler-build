@@ -110,7 +110,7 @@ impl RunStep {
 pub enum BuildPlan {
     /// Legacy `build.script` mode. `Script::default()` preserves default
     /// `build.sh` / `build.bat` discovery.
-    Script(Script),
+    Script(Box<Script>),
     /// Explicit `build.steps` mode. An empty vector is meaningful: it disables
     /// legacy default script discovery.
     Steps(Vec<Step>),
@@ -118,7 +118,7 @@ pub enum BuildPlan {
 
 impl Default for BuildPlan {
     fn default() -> Self {
-        Self::Script(Script::default())
+        Self::Script(Box::default())
     }
 }
 

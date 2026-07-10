@@ -124,10 +124,11 @@ impl Output {
             sections.push(BuildScriptSection {
                 interpreter: script.interpreter.clone(),
                 content,
-                env: step_index
-                    .is_some()
-                    .then(|| script.env().clone())
-                    .unwrap_or_default(),
+                env: if step_index.is_some() {
+                    script.env().clone()
+                } else {
+                    Default::default()
+                },
                 cwd,
                 label: step_index.map(|index| format!("step {index}")),
             });

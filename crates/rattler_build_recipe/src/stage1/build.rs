@@ -491,15 +491,11 @@ pub struct Build {
     pub post_process: Vec<PostProcess>,
 }
 
+#[derive(Default)]
 enum PresentField<T> {
+    #[default]
     Missing,
     Present(T),
-}
-
-impl<T> Default for PresentField<T> {
-    fn default() -> Self {
-        Self::Missing
-    }
 }
 
 impl<'de, T> Deserialize<'de> for PresentField<T>

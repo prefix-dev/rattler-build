@@ -593,7 +593,7 @@ fn parse_build_from_mapping(mapping: &MarkedMappingNode) -> Result<Build, ParseE
             }
             "script" => {
                 script_seen = true;
-                build.plan = BuildPlan::Script(parse_script(value_node)?);
+                build.plan = BuildPlan::Script(Box::new(parse_script(value_node)?));
             }
             "steps" => {
                 steps_span = Some(*key_node.span());
