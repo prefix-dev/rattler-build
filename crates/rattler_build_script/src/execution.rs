@@ -1125,10 +1125,10 @@ mod tests {
             .await
             .unwrap();
 
-        let wrapper = fs::read_to_string(tmp.path().join("conda_build.bat")).unwrap();
+        let script = fs::read_to_string(tmp.path().join("conda_build_script.bat")).unwrap();
         assert!(
-            wrapper.contains("if %errorlevel% neq 0 exit /b %errorlevel%"),
-            "cmd wrapper must propagate errors between commands, got:\n{wrapper}"
+            script.contains("if %errorlevel% neq 0 exit /b %errorlevel%"),
+            "cmd section script must propagate errors between commands, got:\n{script}"
         );
     }
 
@@ -1656,8 +1656,7 @@ echo hi
         let wrapper = fs::read_to_string(tmp.path().join("conda_build.bat")).unwrap();
         insta::assert_snapshot!(cmd_wrapper_body(&wrapper, tmp.path()), @r###"
 setlocal
-pushd .
-if %errorlevel% neq 0 exit /b %errorlevel%
+pushd "." || exit /b 1
 @cmd.exe /d /c call $WORK_DIR/conda_build_script.bat
 set "RB_SECTION_ERRORLEVEL=%errorlevel%"
 popd
@@ -1707,8 +1706,7 @@ endlocal & if %RB_SECTION_ERRORLEVEL% neq 0 exit /b %RB_SECTION_ERRORLEVEL%
         insta::assert_snapshot!(cmd_wrapper_body(&wrapper, tmp.path()), @r###"
 @rem === step 0 ===
 setlocal
-pushd .
-if %errorlevel% neq 0 exit /b %errorlevel%
+pushd "." || exit /b 1
 @cmd.exe /d /c call $WORK_DIR/conda_build_step0.bat
 set "RB_SECTION_ERRORLEVEL=%errorlevel%"
 popd
@@ -1716,8 +1714,7 @@ if %RB_SECTION_ERRORLEVEL% equ 0 if %errorlevel% neq 0 set "RB_SECTION_ERRORLEVE
 endlocal & if %RB_SECTION_ERRORLEVEL% neq 0 exit /b %RB_SECTION_ERRORLEVEL%
 @rem === step 1 ===
 setlocal
-pushd .
-if %errorlevel% neq 0 exit /b %errorlevel%
+pushd "." || exit /b 1
 @cmd.exe /d /c call $WORK_DIR/conda_build_step1.bat
 set "RB_SECTION_ERRORLEVEL=%errorlevel%"
 popd

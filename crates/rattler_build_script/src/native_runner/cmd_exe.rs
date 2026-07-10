@@ -80,8 +80,16 @@ IF "%CONDA_BUILD%" == "" (
         let cwd = cwd
             .map(|cwd| super::quote_arg(&self.shell(), &cwd.to_string_lossy()))
             .unwrap_or_else(|| ".".to_string());
-        let _ = writeln!(out, "pushd {cwd}");
-        out.push_str("if %errorlevel% neq 0 exit /b %errorlevel%\n");
+        // `pushd` can misparse an unquoted path containing forward slashes as
+        // command switches, even when the path has no spaces.
+        let cwd = if cwd.starts_with('"') {
+            cwd
+        } else {
+            format!("\"{cwd}\"")
+        };
+        // Use command chaining instead of inspecting `%errorlevel%`: a successful
+        // `pushd` does not reliably clear an error left by environment activation.
+        let _ = writeln!(out, "pushd {cwd} || exit /b 1");
         out.push_str(body);
         if !body.ends_with('\n') {
             out.push('\n');

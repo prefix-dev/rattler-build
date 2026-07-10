@@ -197,8 +197,7 @@ echo hi
 @rem === step 1 ===
 setlocal
 @SET "FOO=bar"
-pushd .
-if %errorlevel% neq 0 exit /b %errorlevel%
+pushd "." || exit /b 1
 echo hi
 set "RB_SECTION_ERRORLEVEL=%errorlevel%"
 popd
@@ -222,8 +221,7 @@ endlocal & if %RB_SECTION_ERRORLEVEL% neq 0 exit /b %RB_SECTION_ERRORLEVEL%
         insta::assert_snapshot!(out, @r###"
 @rem === step 1 ===
 setlocal
-pushd "C:\some&dir"
-if %errorlevel% neq 0 exit /b %errorlevel%
+pushd "C:\some&dir" || exit /b 1
 echo hi
 set "RB_SECTION_ERRORLEVEL=%errorlevel%"
 popd
