@@ -1,0 +1,39 @@
+schema_version: 1
+
+recipe:
+  name: staging-build-steps
+  version: 1.0.0
+
+outputs:
+  - staging:
+      name: staging-build-steps-cache
+    build:
+      steps:
+        - if: unix
+          run: echo "one" > "$PREFIX/staging-steps.txt"
+        - if: unix
+          run: echo "${{ MARKER }}" >> "$PREFIX/staging-steps.txt"
+          env:
+            MARKER: two
+        - if: win
+          run: echo one> "%PREFIX%\staging-steps.txt"
+        - if: win
+          run: echo ${{ MARKER }}>> "%PREFIX%\staging-steps.txt"
+          env:
+            MARKER: two
+
+  - package:
+      name: staging-build-steps-a
+      version: 1.0.0
+    inherit: staging-build-steps-cache
+    build:
+      files:
+        - "**/*"
+
+  - package:
+      name: staging-build-steps-b
+      version: 1.0.0
+    inherit: staging-build-steps-cache
+    build:
+      files:
+        - "**/*"
