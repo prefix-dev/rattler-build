@@ -46,8 +46,12 @@ IF "%CONDA_BUILD%" == "" (
     }
 
     fn native_section_script_command(&self, script_path: &Path) -> Option<Vec<String>> {
+        // Activated build environments can replace PATH entirely. Resolve the
+        // command processor before entering the wrapper so nested native
+        // sections do not depend on `cmd.exe` remaining discoverable.
+        let command_processor = std::env::var("COMSPEC").unwrap_or_else(|_| "cmd.exe".to_string());
         Some(vec![
-            "cmd.exe".to_string(),
+            command_processor,
             "/d".to_string(),
             "/c".to_string(),
             "call".to_string(),

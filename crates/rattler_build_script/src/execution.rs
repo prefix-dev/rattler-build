@@ -1580,6 +1580,11 @@ mod tests {
 
     fn cmd_wrapper_body(wrapper: &str, work_dir: &Path) -> String {
         let normalized = wrapper.replace("\r\n", "\n").replace('\\', "/");
+        let normalized = if let Ok(command_processor) = std::env::var("COMSPEC") {
+            normalized.replace(&command_processor.replace('\\', "/"), "cmd.exe")
+        } else {
+            normalized
+        };
         let work_dir = work_dir.to_string_lossy().replace('\\', "/");
         let normalized = normalized.replace(&work_dir, "$WORK_DIR");
         let start = normalized
