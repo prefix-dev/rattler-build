@@ -57,7 +57,8 @@ pub async fn skip_existing(
 
     let channels = if only_local {
         vec![
-            Channel::from_directory(&first_output.build_configuration.directories.output_dir)
+            Channel::try_from_directory(&first_output.build_configuration.directories.output_dir)
+                .expect("could not create channel from directory")
                 .base_url,
         ]
     } else {

@@ -10,7 +10,6 @@ use rattler_build_script::{SandboxArguments, SandboxConfiguration};
 use rattler_conda_types::{
     NamedChannelOrUrl, Platform, compression_level::CompressionLevel, package::CondaArchiveType,
 };
-use rattler_config::config::ConfigBase;
 use rattler_config::config::build::PackageFormatAndCompression;
 use rattler_networking::mirror_middleware;
 #[cfg(feature = "s3")]
@@ -21,6 +20,7 @@ use serde_json::{Value, json};
 use url::Url;
 
 use crate::{
+    config::Config,
     console_utils::{Color, LogStyle},
     tool_configuration::{ContinueOnFailure, SkipExisting, TestStrategy},
 };
@@ -377,9 +377,20 @@ pub struct App {
     )]
     pub wrap_log_lines: Option<bool>,
 
-    /// The Rattler-Build configuration file to use
+    /// The Rattler-Build configuration file to use.
+    /// If not set, configuration is loaded from the default locations
+    /// (the system-wide and global pixi configuration files as well as
+    /// rattler-build's own configuration files)
     #[arg(long, global = true)]
     pub config_file: Option<PathBuf>,
+
+    /// Do not load any configuration.
+    /// Disables the automatic discovery of pixi/rattler-build configuration
+    /// files so that only built-in defaults and command-line arguments are
+    /// used (the behavior of rattler-build versions before default config
+    /// discovery was added). Mutually exclusive with `--config-file`.
+    #[arg(long, global = true, conflicts_with = "config_file")]
+    pub no_config: bool,
 
     /// Enable or disable colored output from Rattler-Build.
     /// Also honors the `CLICOLOR` and `CLICOLOR_FORCE` environment variable.
@@ -462,7 +473,7 @@ impl CommonData {
         experimental: bool,
         v3: bool,
         auth_file: Option<PathBuf>,
-        config: ConfigBase<()>,
+        config: Config,
         channel_priority: Option<ChannelPriority>,
         allow_insecure_host: Option<Vec<String>>,
         use_zstd: bool,
@@ -518,7 +529,7 @@ impl CommonData {
     }
 
     /// Create from CLI options and config file
-    pub fn from_opts_and_config(value: CommonOpts, config: ConfigBase<()>) -> Self {
+    pub fn from_opts_and_config(value: CommonOpts, config: Config) -> Self {
         Self::new(
             value.output_dir,
             value.experimental,
@@ -789,7 +800,7 @@ pub struct PublishData {
 
 impl PublishData {
     /// Generate a new PublishData struct from PublishOpts and an optional config.
-    pub fn from_opts_and_config(opts: PublishOpts, config: Option<ConfigBase<()>>) -> Self {
+    pub fn from_opts_and_config(opts: PublishOpts, config: Option<Config>) -> Self {
         // Separate package files from recipe paths based on file extension
         let mut package_files = Vec::new();
         let mut recipe_paths = Vec::new();
@@ -994,7 +1005,7 @@ impl BuildData {
 impl BuildData {
     /// Generate a new BuildData struct from BuildOpts and an optional pixi config.
     /// BuildOpts have higher priority than the pixi config.
-    pub fn from_opts_and_config(opts: BuildOpts, config: Option<ConfigBase<()>>) -> Self {
+    pub fn from_opts_and_config(opts: BuildOpts, config: Option<Config>) -> Self {
         Self::new(
             opts.up_to,
             opts.build_platform,
@@ -1121,7 +1132,7 @@ pub struct TestData {
 impl TestData {
     /// Generate a new TestData struct from TestOpts and an optional pixi config.
     /// TestOpts have higher priority than the pixi config.
-    pub fn from_opts_and_config(value: TestOpts, config: Option<ConfigBase<()>>) -> Self {
+    pub fn from_opts_and_config(value: TestOpts, config: Option<Config>) -> Self {
         Self::new(
             value.package_file,
             value.channels,
@@ -1191,7 +1202,7 @@ pub struct RebuildData {
 impl RebuildData {
     /// Generate a new RebuildData struct from RebuildOpts and an optional pixi config.
     /// RebuildOpts have higher priority than the pixi config.
-    pub fn from_opts_and_config(value: RebuildOpts, config: Option<ConfigBase<()>>) -> Self {
+    pub fn from_opts_and_config(value: RebuildOpts, config: Option<Config>) -> Self {
         Self::new(
             value.package_file,
             value.test.unwrap_or(if value.no_test {
@@ -1250,10 +1261,7 @@ pub struct DebugData {
 impl DebugData {
     /// Generate a new DebugData struct from DebugSetupOpts and an optional
     /// config.
-    pub fn from_setup_opts_and_config(
-        opts: DebugSetupOpts,
-        config: Option<ConfigBase<()>>,
-    ) -> Self {
+    pub fn from_setup_opts_and_config(opts: DebugSetupOpts, config: Option<Config>) -> Self {
         Self {
             recipe_path: opts.recipe,
             output_dir: opts
