@@ -208,7 +208,9 @@ pub async fn load_repodatas(
         .clear()
         .unwrap();
 
-    Ok(result)
+    // `query` now returns a `RepoDataQueryOutput` (records plus non-fatal
+    // warnings); we only need the repodata records here.
+    Ok(result.repodata)
 }
 
 pub async fn install_packages(

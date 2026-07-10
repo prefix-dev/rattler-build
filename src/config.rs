@@ -12,7 +12,7 @@
 
 use std::path::PathBuf;
 
-use rattler_config::config::{ConfigBase, LoadError, MergeError, ValidationError};
+use rattler_config::config::{ConfigBase, LoadError, MergeError};
 
 /// rattler-build specific configuration keys.
 /// Extend this struct to add configuration that only makes sense for
@@ -22,22 +22,11 @@ use rattler_config::config::{ConfigBase, LoadError, MergeError, ValidationError}
 pub struct RattlerBuildConfig {}
 
 impl rattler_config::config::Config for RattlerBuildConfig {
-    fn get_extension_name(&self) -> String {
-        "rattler-build".to_string()
-    }
-
     fn merge_config(self, _other: &Self) -> Result<Self, MergeError> {
         // There are no rattler-build specific keys yet, so there is nothing
-        // to merge.
+        // to merge. `validate`, `keys` and `is_default` use the trait's
+        // default implementations.
         Ok(self)
-    }
-
-    fn validate(&self) -> Result<(), ValidationError> {
-        Ok(())
-    }
-
-    fn keys(&self) -> Vec<String> {
-        Vec::new()
     }
 }
 
@@ -45,115 +34,31 @@ impl rattler_config::config::Config for RattlerBuildConfig {
 /// other rattler based tools, extended with rattler-build specific keys.
 pub type Config = ConfigBase<RattlerBuildConfig>;
 
-/// The file name of the configuration file.
-const CONFIG_FILE: &str = "config.toml";
-
-/// The directory name used by pixi inside the (XDG) config directory.
-const PIXI_CONFIG_DIR: &str = "pixi";
-
-/// The directory name used by rattler-build inside the (XDG) config
-/// directory.
-const RATTLER_BUILD_CONFIG_DIR: &str = "rattler-build";
-
-/// Returns the path to the system-wide pixi configuration file.
-///
-/// This mirrors pixi's `config_path_system`.
-pub fn pixi_config_path_system() -> PathBuf {
-    #[cfg(target_os = "windows")]
-    let base_path = PathBuf::from("C:\\ProgramData");
-    #[cfg(not(target_os = "windows"))]
-    let base_path = PathBuf::from("/etc");
-
-    base_path.join(PIXI_CONFIG_DIR).join(CONFIG_FILE)
-}
-
-/// Get the pixi home directory, defaulting to `$HOME/.pixi`.
-///
-/// It may be overridden by the `PIXI_HOME` environment variable. This mirrors
-/// pixi's `pixi_home`.
-fn pixi_home() -> Option<PathBuf> {
-    if let Some(path) = std::env::var_os("PIXI_HOME") {
-        Some(PathBuf::from(path))
-    } else {
-        dirs::home_dir().map(|path| path.join(".pixi"))
-    }
-}
-
-/// Get the rattler-build home directory, defaulting to
-/// `$HOME/.rattler-build`.
-///
-/// It may be overridden by the `RATTLER_BUILD_HOME` environment variable.
-fn rattler_build_home() -> Option<PathBuf> {
-    if let Some(path) = std::env::var_os("RATTLER_BUILD_HOME") {
-        Some(PathBuf::from(path))
-    } else {
-        dirs::home_dir().map(|path| path.join(".rattler-build"))
-    }
-}
-
-/// The base directories in which tools look for a `<tool>/config.toml`.
-fn config_base_dirs() -> Vec<PathBuf> {
-    vec![
-        // On macOS, also honor the XDG_CONFIG_HOME directory, although it is
-        // not a standard there and not set by default (mirrors pixi).
-        #[cfg(target_os = "macos")]
-        std::env::var("XDG_CONFIG_HOME").ok().map(PathBuf::from),
-        dirs::config_dir(),
-    ]
-    .into_iter()
-    .flatten()
-    .collect()
-}
-
-/// Compute the candidate configuration file paths for a tool, in ascending
-/// order of precedence (later paths override earlier ones).
-fn tool_config_paths(
-    config_base_dirs: Vec<PathBuf>,
-    tool_home: Option<PathBuf>,
-    config_dir_name: &str,
-) -> Vec<PathBuf> {
-    config_base_dirs
-        .into_iter()
-        .map(|d| d.join(config_dir_name).join(CONFIG_FILE))
-        .chain(tool_home.map(|d| d.join(CONFIG_FILE)))
-        .collect()
-}
-
-/// Returns the path(s) to the global pixi configuration files, in ascending
-/// order of precedence.
-///
-/// This mirrors pixi's `config_path_global`.
-pub fn pixi_config_paths_global() -> Vec<PathBuf> {
-    tool_config_paths(config_base_dirs(), pixi_home(), PIXI_CONFIG_DIR)
-}
-
-/// Returns the path(s) to rattler-build's own configuration files, in
-/// ascending order of precedence.
-pub fn rattler_build_config_paths() -> Vec<PathBuf> {
-    tool_config_paths(
-        config_base_dirs(),
-        rattler_build_home(),
-        RATTLER_BUILD_CONFIG_DIR,
-    )
-}
+/// The tools whose configuration `rattler-build` reads, in ascending order of
+/// precedence: pixi's configuration is picked up automatically and can be
+/// overridden by rattler-build specific files.
+const CONFIG_TOOLS: &[&str] = &["pixi", "rattler-build"];
 
 /// All default configuration file locations, in ascending order of precedence
-/// (values from later files override values from earlier files):
+/// (values from later files override values from earlier files).
 ///
-/// 1. the system-wide pixi configuration (`/etc/pixi/config.toml`, or
-///    `C:\ProgramData\pixi\config.toml` on Windows),
-/// 2. pixi's global configuration (`$XDG_CONFIG_HOME/pixi/config.toml` /
-///    the platform config directory, and `$PIXI_HOME/config.toml` defaulting
-///    to `~/.pixi/config.toml`),
-/// 3. rattler-build's own configuration
-///    (`$XDG_CONFIG_HOME/rattler-build/config.toml` / the platform config
-///    directory, and `$RATTLER_BUILD_HOME/config.toml` defaulting to
-///    `~/.rattler-build/config.toml`).
+/// This is a thin wrapper around
+/// [`rattler_config::locations::config_search_paths`], the shared discovery
+/// logic used by all rattler based tools. For the tools
+/// `["pixi", "rattler-build"]` it yields, lowest precedence first:
+///
+/// 1. the system-wide configuration of every tool
+///    (`/etc/pixi/config.toml`, `/etc/rattler-build/config.toml`, or the
+///    `C:\ProgramData\<tool>\config.toml` equivalents on Windows),
+/// 2. the per-user configuration of every tool: the platform config directory
+///    (`$XDG_CONFIG_HOME/<tool>/config.toml`) followed by the tool home
+///    (`$PIXI_HOME` / `$RATTLER_BUILD_HOME`, defaulting to `~/.pixi` /
+///    `~/.rattler-build`).
+///
+/// Within each group the tools are ordered as listed, so rattler-build's
+/// configuration overrides pixi's.
 pub fn default_config_paths() -> Vec<PathBuf> {
-    let mut paths = vec![pixi_config_path_system()];
-    paths.extend(pixi_config_paths_global());
-    paths.extend(rattler_build_config_paths());
-    paths
+    rattler_config::locations::config_search_paths(CONFIG_TOOLS)
 }
 
 /// Load the configuration from the default locations (see
@@ -181,51 +86,49 @@ mod tests {
     use rattler_conda_types::NamedChannelOrUrl;
     use std::str::FromStr;
 
-    #[test]
-    fn test_tool_config_paths_ordering() {
-        let paths = tool_config_paths(
-            vec![PathBuf::from("/xdg-config"), PathBuf::from("/config")],
-            Some(PathBuf::from("/home/.pixi")),
-            "pixi",
-        );
-        assert_eq!(
-            paths,
-            vec![
-                PathBuf::from("/xdg-config/pixi/config.toml"),
-                PathBuf::from("/config/pixi/config.toml"),
-                PathBuf::from("/home/.pixi/config.toml"),
-            ]
-        );
-    }
-
-    #[test]
-    fn test_tool_config_paths_without_home() {
-        let paths = tool_config_paths(vec![PathBuf::from("/config")], None, "rattler-build");
-        assert_eq!(
-            paths,
-            vec![PathBuf::from("/config/rattler-build/config.toml")]
-        );
-    }
-
+    /// The `default_config_paths` wrapper must preserve the precedence
+    /// guaranteed by the shared `locations` helper (lowest precedence first):
+    /// all system-wide files come before all per-user files, and within each
+    /// group pixi's file is overridden by rattler-build's. We assert on the
+    /// positions of the paths reported by the upstream helpers rather than
+    /// depending on the real home directory.
     #[test]
     fn test_default_config_paths_ordering() {
+        use rattler_config::locations::{system_config_path, user_config_paths};
+
         let paths = default_config_paths();
+        let position = |needle: &std::path::Path| paths.iter().position(|p| p == needle);
 
-        // The system-wide pixi config always comes first.
-        assert_eq!(paths[0], pixi_config_path_system());
+        let system_pixi = system_config_path("pixi");
+        let system_rb = system_config_path("rattler-build");
+        let pos_system_pixi = position(&system_pixi).expect("system pixi config present");
+        let pos_system_rb = position(&system_rb).expect("system rattler-build config present");
 
-        // All pixi paths come before all rattler-build paths so that
-        // rattler-build specific configuration takes precedence.
-        let last_pixi = paths.iter().rposition(|p| {
-            p.parent()
-                .is_some_and(|p| p.ends_with(".pixi") || p.ends_with("pixi"))
-        });
-        let first_rattler_build = paths.iter().position(|p| {
-            p.parent()
-                .is_some_and(|p| p.ends_with(".rattler-build") || p.ends_with("rattler-build"))
-        });
-        if let (Some(last_pixi), Some(first_rattler_build)) = (last_pixi, first_rattler_build) {
-            assert!(last_pixi < first_rattler_build);
+        // Within the system group, rattler-build overrides pixi.
+        assert!(
+            pos_system_pixi < pos_system_rb,
+            "system rattler-build config must override system pixi config"
+        );
+
+        // All system-wide files come before all per-user files.
+        if let Some(first_user) = user_config_paths("pixi").first().and_then(|p| position(p)) {
+            assert!(
+                pos_system_rb < first_user,
+                "system configs must come before per-user configs"
+            );
+        }
+
+        // Within the per-user group, rattler-build overrides pixi.
+        if let (Some(last_user_pixi), Some(first_user_rb)) = (
+            user_config_paths("pixi").last().and_then(|p| position(p)),
+            user_config_paths("rattler-build")
+                .first()
+                .and_then(|p| position(p)),
+        ) {
+            assert!(
+                last_user_pixi < first_user_rb,
+                "per-user rattler-build config must override per-user pixi config"
+            );
         }
     }
 

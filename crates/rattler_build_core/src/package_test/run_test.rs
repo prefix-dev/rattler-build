@@ -507,7 +507,12 @@ pub async fn run_test(
     let package_folder = cache_metadata.path().to_path_buf();
 
     let mut channels = config.channels.clone();
-    channels.insert(0, Channel::from_directory(tmp_repo.path()).base_url);
+    channels.insert(
+        0,
+        Channel::try_from_directory(tmp_repo.path())
+            .expect("could not create channel from directory")
+            .base_url,
+    );
 
     let host_platform = config.host_platform.clone().unwrap_or_else(|| {
         if target_platform == Platform::NoArch {

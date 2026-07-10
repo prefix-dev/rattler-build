@@ -2,13 +2,12 @@
 
 Rattler-Build shares its configuration format with pixi: the config file is of the same format as pixi's [global configuration file](https://pixi.sh/latest/reference/pixi_configuration/).
 
-By default (when no `--config-file` is passed), Rattler-Build automatically loads and merges configuration from the following locations, in ascending order of precedence (values from later files override values from earlier files):
+By default (when no `--config-file` is passed), Rattler-Build automatically loads and merges configuration from the standard locations shared by all rattler based tools. Discovery is provided by `rattler_config`'s common `locations` helper, so the search order is identical to the one pixi and other tools use. The locations, in ascending order of precedence (values from later files override values from earlier files):
 
-1. The system-wide pixi configuration: `/etc/pixi/config.toml` (on Windows: `C:\ProgramData\pixi\config.toml`)
-2. Pixi's global configuration: `$XDG_CONFIG_HOME/pixi/config.toml` (or the platform's config directory, e.g. `~/.config/pixi/config.toml`) and `$PIXI_HOME/config.toml` (defaults to `~/.pixi/config.toml`)
-3. Rattler-Build's own configuration: `$XDG_CONFIG_HOME/rattler-build/config.toml` (or the platform's config directory) and `$RATTLER_BUILD_HOME/config.toml` (defaults to `~/.rattler-build/config.toml`)
+1. The system-wide configuration of each tool: `/etc/pixi/config.toml` followed by `/etc/rattler-build/config.toml` (on Windows: `C:\ProgramData\<tool>\config.toml`)
+2. The per-user configuration of each tool: the platform config directory (`$XDG_CONFIG_HOME/<tool>/config.toml`, e.g. `~/.config/pixi/config.toml`) and the tool home (`$PIXI_HOME` / `$RATTLER_BUILD_HOME`, defaulting to `~/.pixi/config.toml` / `~/.rattler-build/config.toml`), for `pixi` first and then `rattler-build`
 
-This means that settings such as default channels, mirrors, or S3 options that you have configured for pixi are picked up by Rattler-Build automatically, and can be overridden in Rattler-Build's own configuration files.
+In other words all system-wide files are read before any per-user file, and within each group pixi's files are overridden by Rattler-Build's own files. This means that settings such as default channels, mirrors, or S3 options that you have configured for pixi are picked up by Rattler-Build automatically, and can be overridden in Rattler-Build's own configuration files.
 
 Alternatively, a single configuration file can be specified explicitly with `--config-file` (e.g. `--config-file ~/.pixi/config.toml`), which disables the automatic discovery and loads only that file.
 
