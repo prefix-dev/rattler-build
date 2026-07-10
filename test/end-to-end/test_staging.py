@@ -34,6 +34,25 @@ def test_basic_staging(rattler_build: RattlerBuild, recipes: Path, tmp_path: Pat
     assert content1 == content2
 
 
+def test_staging_build_steps(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Test that staging outputs execute `build.steps` once and share the result."""
+    rattler_build.build(
+        recipes / "staging/build-steps.yaml",
+        tmp_path,
+        extra_args=["--experimental"],
+    )
+
+    pkg1 = get_extracted_package(tmp_path, "staging-build-steps-a")
+    pkg2 = get_extracted_package(tmp_path, "staging-build-steps-b")
+
+    content1 = (pkg1 / "staging-steps.txt").read_text().splitlines()
+    content2 = (pkg2 / "staging-steps.txt").read_text().splitlines()
+    assert content1 == ["one", "two"]
+    assert content2 == content1
+
+
 @pytest.mark.skipif(os.name == "nt", reason="symlinks not fully supported on Windows")
 def test_staging_symlinks(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     """Test that symlinks are properly cached and restored in staging outputs."""
