@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.10](https://github.com/prefix-dev/rattler-build/compare/rattler_build_jinja-v0.1.9...rattler_build_jinja-v0.1.10) - 2026-07-11
+
+### Added
+
+- make SHLIB_EXT available in Jinja templates ([#2612](https://github.com/prefix-dev/rattler-build/pull/2612))
+
+### Fixed
+
+- *(jinja)* negative indexing and slicing on split filter results ([#2644](https://github.com/prefix-dev/rattler-build/pull/2644))
+
 ## [0.1.9](https://github.com/prefix-dev/rattler-build/compare/rattler_build_jinja-v0.1.8...rattler_build_jinja-v0.1.9) - 2026-06-18
 
 ### Added

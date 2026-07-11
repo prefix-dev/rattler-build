@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.9](https://github.com/prefix-dev/rattler-build/compare/rattler_build_types-v0.1.8...rattler_build_types-v0.1.9) - 2026-07-11
+
+### Added
+
+- make SHLIB_EXT available in Jinja templates ([#2612](https://github.com/prefix-dev/rattler-build/pull/2612))
+
+### Fixed
+
+- consolidate license_file and license_file_late_bound into single LicenseFiles type ([#2624](https://github.com/prefix-dev/rattler-build/pull/2624))
+
 ## [0.1.8](https://github.com/prefix-dev/rattler-build/compare/rattler_build_types-v0.1.7...rattler_build_types-v0.1.8) - 2026-06-18
 
 ### Added

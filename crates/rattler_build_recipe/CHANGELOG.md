@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.10](https://github.com/prefix-dev/rattler-build/compare/rattler_build_recipe-v0.1.9...rattler_build_recipe-v0.1.10) - 2026-07-11
+
+### Added
+
+- allow empty sha256 as all-zeros placeholder for recipe scaffolding ([#2610](https://github.com/prefix-dev/rattler-build/pull/2610))
+- support `source.filter` for URL and archive path sources ([#2608](https://github.com/prefix-dev/rattler-build/pull/2608))
+
+### Fixed
+
+- treat empty/null-like `noarch` as absent; hint `default` filter for undefined variant keys ([#2626](https://github.com/prefix-dev/rattler-build/pull/2626))
+- consolidate license_file and license_file_late_bound into single LicenseFiles type ([#2624](https://github.com/prefix-dev/rattler-build/pull/2624))
+- don't treat non-exact run_constraints pins as build-order edges ([#2537](https://github.com/prefix-dev/rattler-build/pull/2537))
+- preserve explicit empty license_file in output packages ([#2600](https://github.com/prefix-dev/rattler-build/pull/2600))
+- report YAML parse error location for malformed Jinja ([#2603](https://github.com/prefix-dev/rattler-build/pull/2603))
+
+### Other
+
+- fix down_prioritize_variant documentation and example value ([#2606](https://github.com/prefix-dev/rattler-build/pull/2606))
+
 ## [0.1.9](https://github.com/prefix-dev/rattler-build/compare/rattler_build_recipe-v0.1.8...rattler_build_recipe-v0.1.9) - 2026-06-18
 
 ### Added
