@@ -5151,14 +5151,14 @@ dependencies = [
 [[package]]
 name = "rattler_git"
 version = "0.1.3"
-source = "git+https://github.com/conda/rattler?branch=claude%2Fgit-cache-unification-7g1icn#af7ea5e3202f0e9ee82a50943c68bd5feaffc4e6"
+source = "git+https://github.com/conda/rattler?rev=b7c2273df6469076b2e90e3342871027c187f6ef#b7c2273df6469076b2e90e3342871027c187f6ef"
 dependencies = [
  "astral-reqwest-middleware",
  "dashmap",
  "dunce",
  "fs-err",
  "rattler_networking 0.30.1",
- "rattler_prefix_guard 0.1.1 (git+https://github.com/conda/rattler?branch=claude%2Fgit-cache-unification-7g1icn)",
+ "rattler_prefix_guard 0.1.1 (git+https://github.com/conda/rattler?rev=b7c2273df6469076b2e90e3342871027c187f6ef)",
  "reqwest",
  "serde",
  "thiserror 2.0.18",
@@ -5291,7 +5291,7 @@ dependencies = [
 [[package]]
 name = "rattler_networking"
 version = "0.30.1"
-source = "git+https://github.com/conda/rattler?branch=claude%2Fgit-cache-unification-7g1icn#af7ea5e3202f0e9ee82a50943c68bd5feaffc4e6"
+source = "git+https://github.com/conda/rattler?rev=b7c2273df6469076b2e90e3342871027c187f6ef#b7c2273df6469076b2e90e3342871027c187f6ef"
 dependencies = [
  "ambient-id",
  "anyhow",
@@ -5373,7 +5373,7 @@ dependencies = [
 [[package]]
 name = "rattler_prefix_guard"
 version = "0.1.1"
-source = "git+https://github.com/conda/rattler?branch=claude%2Fgit-cache-unification-7g1icn#af7ea5e3202f0e9ee82a50943c68bd5feaffc4e6"
+source = "git+https://github.com/conda/rattler?rev=b7c2273df6469076b2e90e3342871027c187f6ef#b7c2273df6469076b2e90e3342871027c187f6ef"
 dependencies = [
  "fs-err",
  "libc",

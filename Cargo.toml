@@ -291,8 +291,8 @@ name = "parse_file"
 harness = false
 
 [patch.crates-io]
-# TEMPORARY: use rattler_git from the rattler branch that unifies the git
+# TEMPORARY: use rattler_git pinned to the conda/rattler main commit that unified the git
 # cache implementation between pixi, rattler and rattler-build (adds git-LFS
-# support to `CheckoutOptions`). Remove once that rattler_git version is
-# released to crates.io.
-rattler_git = { git = "https://github.com/conda/rattler", branch = "claude/git-cache-unification-7g1icn" }
+# support to `CheckoutOptions`; conda/rattler#2590). Remove once that
+# rattler_git version is released to crates.io.
+rattler_git = { git = "https://github.com/conda/rattler", rev = "b7c2273df6469076b2e90e3342871027c187f6ef" }
