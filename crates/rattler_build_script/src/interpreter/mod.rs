@@ -899,6 +899,24 @@ mod tests {
         assert_eq!(closest_interpreter("PowerShell"), Some("powershell"));
     }
 
+    /// `brush` runs scripts under `set -euxo pipefail` semantics by default,
+    /// passed as invocation flags ahead of the script path so both inline and
+    /// file-backed scripts get them. `bash` keeps its plain invocation (its
+    /// strict modes come from the wrapper preamble instead).
+    #[test]
+    fn brush_invocation_defaults_to_strict_mode_flags() {
+        let script = Path::new("conda_build_script.sh");
+
+        assert_eq!(
+            super::brush::BrushInvocation.args(script),
+            ["-euxo", "pipefail", "conda_build_script.sh"]
+        );
+        assert_eq!(
+            super::bash::BashInvocation.args(script),
+            ["conda_build_script.sh"]
+        );
+    }
+
     /// `cmd` propagates a non-zero exit between commands; others join plainly.
     #[test]
     fn join_commands_is_interpreter_specific() {

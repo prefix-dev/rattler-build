@@ -24,6 +24,7 @@ use rattler_conda_types::{
 use rattler_package_streaming::seek::read_package_file;
 
 // Imports for rebuild functionality
+use ::rattler_build::config::Config;
 use ::rattler_build::{
     console_utils::LoggingOutputHandler,
     opt::{CommonData, PackageSource, RebuildData},
@@ -31,7 +32,6 @@ use ::rattler_build::{
     tool_configuration::TestStrategy,
 };
 use clap::ValueEnum;
-use rattler_config::config::ConfigBase;
 
 /// A loaded conda package for inspection and testing.
 #[pyclass(name = "Package")]
@@ -349,7 +349,7 @@ impl PyPackage {
             .unwrap_or_default();
 
         // Create common data
-        let config = ConfigBase::<()>::default();
+        let config = Config::default();
         let common = CommonData::new(
             output_dir,
             false,
@@ -494,17 +494,17 @@ impl PyPackage {
         progress_callback: Option<Py<PyAny>>,
     ) -> PyResult<Vec<PyTestResult>> {
         use ::rattler_build::{
+            config::Config,
             opt::{ChannelPriorityWrapper, CommonData, TestData},
             run_test,
         };
-        use rattler_config::config::ConfigBase;
 
         let channel_priority = channel_priority
             .map(|c| ChannelPriorityWrapper::from_str(&c).map(|c| c.value))
             .transpose()
             .map_err(|e| RattlerBuildError::ChannelPriority(e.to_string()))?;
 
-        let config = ConfigBase::<()>::default();
+        let config = Config::default();
         let common = CommonData::new(
             None,
             false,

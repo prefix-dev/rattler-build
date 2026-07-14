@@ -144,6 +144,11 @@ pub async fn fetch_highest_build_numbers(
 
     match result {
         Ok(repo_data) => {
+            // Surface any non-fatal warnings gathered during the query
+            // instead of dropping them.
+            for warning in &repo_data.warnings {
+                tracing::warn!("{warning}");
+            }
             for repo in repo_data {
                 for record in repo.iter() {
                     let name = &record.package_record.name;
