@@ -344,6 +344,94 @@ mod source_cache_tests {
         );
     }
 
+    /// End-to-end: a git source with `lfs: true` materialises LFS pointer
+    /// files into real blob content via rattler_git's built-in LFS support.
+    /// Skips itself when git-lfs is not installed on the host.
+    #[tokio::test]
+    async fn test_git_source_with_lfs() {
+        use crate::GitReference;
+        use crate::source::{GitSource, Source};
+        use std::path::Path;
+        use std::process::Command;
+
+        let lfs_available = Command::new("git")
+            .args(["lfs", "version"])
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false);
+        if !lfs_available {
+            eprintln!("skipping test_git_source_with_lfs: git-lfs is not installed");
+            return;
+        }
+
+        let tmp = TempDir::new().unwrap();
+        let repo = tmp.path().join("lfs-sample");
+        fs_err::create_dir_all(&repo).unwrap();
+
+        let git = |dir: &Path, args: &[&str]| -> std::process::Output {
+            let out = Command::new("git")
+                .current_dir(dir)
+                .arg("-c")
+                .arg("user.name=test")
+                .arg("-c")
+                .arg("user.email=test@test")
+                .args(args)
+                .output()
+                .unwrap();
+            assert!(
+                out.status.success(),
+                "git {} failed: {}",
+                args.join(" "),
+                String::from_utf8_lossy(&out.stderr),
+            );
+            out
+        };
+
+        git(&repo, &["init", "-b", "main"]);
+        git(&repo, &["config", "commit.gpgsign", "false"]);
+        git(&repo, &["lfs", "install", "--local"]);
+
+        let payload: &[u8] = b"\x00\x01\x02\x03binary payload\xff\xfe";
+        fs_err::write(
+            repo.join(".gitattributes"),
+            "*.bin filter=lfs diff=lfs merge=lfs -text\n",
+        )
+        .unwrap();
+        fs_err::write(repo.join("data.bin"), payload).unwrap();
+        git(&repo, &["add", "."]);
+        git(&repo, &["commit", "-m", "add lfs file"]);
+        let out = git(&repo, &["rev-parse", "HEAD"]);
+        let commit = String::from_utf8(out.stdout).unwrap().trim().to_string();
+
+        let cache_dir = tmp.path().join("cache");
+        let url = url::Url::from_directory_path(&repo).unwrap();
+
+        let cache = SourceCacheBuilder::new()
+            .cache_dir(&cache_dir)
+            .build()
+            .await
+            .unwrap();
+
+        let source = Source::Git(GitSource::with_expected_commit(
+            url,
+            GitReference::from_rev(commit.clone()),
+            None,
+            true,
+            true,
+            Some(commit),
+        ));
+
+        let result = cache.get_source(&source).await.unwrap();
+
+        let data = result.path.join("data.bin");
+        assert!(data.is_file(), "data.bin missing from checkout");
+        let contents = fs_err::read(&data).unwrap();
+        assert_eq!(
+            contents, payload,
+            "data.bin should be the materialised blob, not an LFS pointer"
+        );
+    }
+
     #[test]
     fn test_extract_filename_from_header_strips_path_components() {
         use crate::cache::extract_filename_from_header;

@@ -101,6 +101,10 @@ impl SourceCache {
 
         let checkout_options = CheckoutOptions {
             update_submodules: source.submodules,
+            // `Some(true)` fetches LFS objects into the git database and runs
+            // the smudge filter during checkout; `Some(false)` force-skips the
+            // smudge filter so checkouts contain pointer files only.
+            lfs: Some(source.lfs),
         };
 
         let fetch_result = self
@@ -130,9 +134,14 @@ impl SourceCache {
             tracing::info!("Verified expected commit: {}", expected);
         }
 
-        // Handle LFS if needed
-        if source.lfs {
-            self.git_lfs_pull(&repo_path, &source.url).await?;
+        // LFS objects are fetched and validated by rattler_git itself (see
+        // `CheckoutOptions::lfs` above); it only warns on failure, so turn an
+        // unfulfilled LFS request into a hard error here.
+        if source.lfs && !fetch_result.lfs_ready() {
+            return Err(CacheError::Git(format!(
+                "failed to fetch git-lfs files for {} — is `git-lfs` installed?",
+                source.url
+            )));
         }
 
         // Create cache entry
@@ -161,90 +170,6 @@ impl SourceCache {
             path: repo_path,
             git_commit: Some(commit_hash),
         })
-    }
-
-    /// Pull LFS files for a git repository
-    async fn git_lfs_pull(
-        &self,
-        repo_path: &Path,
-        source_url: &url::Url,
-    ) -> Result<(), CacheError> {
-        let output = tokio::process::Command::new("git")
-            .current_dir(repo_path)
-            .arg("lfs")
-            .arg("version")
-            .output()
-            .await
-            .map_err(|e| CacheError::Git(format!("git-lfs not installed: {}", e)))?;
-
-        if !output.status.success() {
-            return Err(CacheError::Git("git-lfs not installed".to_string()));
-        }
-
-        // Point git-lfs at the original source via `lfs.url` config.
-        // The checkout's origin remote points to the local bare database
-        // (set by `git clone --local`), which doesn't have LFS objects.
-        // We use lfs.url rather than modifying origin so only LFS is affected.
-        // For file:// URLs, convert to a plain local path because git-lfs does
-        // not handle the file:// protocol correctly (especially on Windows).
-        let lfs_url = if source_url.scheme() == "file" {
-            source_url
-                .to_file_path()
-                .map(|p| p.display().to_string())
-                .unwrap_or_else(|_| source_url.as_str().to_string())
-        } else {
-            source_url.as_str().to_string()
-        };
-
-        let output = tokio::process::Command::new("git")
-            .current_dir(repo_path)
-            .arg("config")
-            .arg("lfs.url")
-            .arg(&lfs_url)
-            .output()
-            .await
-            .map_err(|e| CacheError::Git(format!("Failed to configure lfs.url: {}", e)))?;
-
-        if !output.status.success() {
-            return Err(CacheError::Git(format!(
-                "Failed to configure lfs.url: {}",
-                String::from_utf8_lossy(&output.stderr)
-            )));
-        }
-
-        // Fetch LFS files from the configured lfs.url.
-        let output = tokio::process::Command::new("git")
-            .current_dir(repo_path)
-            .arg("lfs")
-            .arg("fetch")
-            .output()
-            .await
-            .map_err(|e| CacheError::Git(format!("Failed to fetch LFS files: {}", e)))?;
-
-        if !output.status.success() {
-            return Err(CacheError::Git(format!(
-                "LFS fetch failed: {}",
-                String::from_utf8_lossy(&output.stderr)
-            )));
-        }
-
-        // Checkout LFS files
-        let output = tokio::process::Command::new("git")
-            .current_dir(repo_path)
-            .arg("lfs")
-            .arg("checkout")
-            .output()
-            .await
-            .map_err(|e| CacheError::Git(format!("Failed to checkout LFS files: {}", e)))?;
-
-        if !output.status.success() {
-            return Err(CacheError::Git(format!(
-                "LFS checkout failed: {}",
-                String::from_utf8_lossy(&output.stderr)
-            )));
-        }
-
-        Ok(())
     }
 
     /// Get a URL source from the cache or download it if not present
