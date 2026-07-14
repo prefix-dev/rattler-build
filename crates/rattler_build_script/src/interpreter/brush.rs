@@ -22,10 +22,7 @@ impl InterpreterInvocation for BrushInvocation {
         // invocation makes them the default for inline and file-backed scripts
         // alike, while a script can still opt out with `set +e` etc.
         vec![
-            "-e".to_string(),
-            "-u".to_string(),
-            "-x".to_string(),
-            "-o".to_string(),
+            "-euxo".to_string(),
             "pipefail".to_string(),
             script_path.to_string_lossy().into_owned(),
         ]

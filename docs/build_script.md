@@ -140,7 +140,7 @@ requirements:
 
 `brush` is always taken from the build environment, so it must be listed in `requirements/build`. A `brush` found on the system `PATH` is intentionally not used, which keeps builds reproducible.
 
-Scripts run with `set -euxo pipefail` semantics by default: `brush` is invoked with `-e -u -x -o pipefail`, so the script aborts on errors, unset variables and pipeline failures, and traces every command. A script can relax this where needed with e.g. `set +e` or `set +u`.
+Scripts run with `set -euxo pipefail` semantics by default: `brush` is invoked with `-euxo pipefail`, so the script aborts on errors, unset variables and pipeline failures, and traces every command. A script can relax this where needed with e.g. `set +e` or `set +u`.
 
 ```yaml title="recipe.yaml"
 build:

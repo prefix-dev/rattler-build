@@ -909,7 +909,7 @@ mod tests {
 
         assert_eq!(
             super::brush::BrushInvocation.args(script),
-            ["-e", "-u", "-x", "-o", "pipefail", "conda_build_script.sh"]
+            ["-euxo", "pipefail", "conda_build_script.sh"]
         );
         assert_eq!(
             super::bash::BashInvocation.args(script),

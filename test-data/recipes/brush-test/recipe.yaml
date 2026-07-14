@@ -9,7 +9,7 @@ build:
     # wrapper that performs activation before invoking brush.
     interpreter: brush
     content: |
-      # brush is invoked with `-e -u -x -o pipefail`, so strict mode is on
+      # brush is invoked with `-euxo pipefail`, so strict mode is on
       # without a `set -euxo pipefail` prologue in the script.
       [[ $- == *e* && $- == *u* && $- == *x* ]]
       set -o | grep -q "pipefail.*on"
