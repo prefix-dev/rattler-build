@@ -370,8 +370,9 @@ source:
 
 The attestation config has the following fields:
 
-- **`publishers`** - A list of publisher identities in `github:owner/repo` format. At least one
-  publisher must match for verification to succeed.
+- **`publishers`** (required) - Trusted identities in `github:owner/repo` or
+  `gitlab:owner/repo` format. At least one must match. This trusts any workflow and ref in the
+  repository; workflow/ref constraints are not currently supported.
 - **`bundle_url`** (optional) - URL to the Sigstore bundle file. For PyPI sources, this is
   automatically derived from the PyPI attestation API. For GitHub releases, use the pattern
   `https://github.com/{owner}/{repo}/releases/download/{tag}/{filename}.sigstore.json`.

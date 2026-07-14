@@ -117,8 +117,8 @@ pub struct AttestationConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bundle_url: Option<Value<String>>,
 
-    /// Publisher identities to verify (e.g., "github:owner/repo" or "github:owner/repo@refs/tags/v1.0")
-    /// All specified publishers must match.
+    /// Trusted publisher identities (e.g., "github:owner/repo").
+    /// At least one publisher must match.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub publishers: Vec<Value<String>>,
 }

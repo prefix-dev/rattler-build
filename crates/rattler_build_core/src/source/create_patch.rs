@@ -719,8 +719,10 @@ fn find_url_cache_dir(
         .first()
         .ok_or_else(|| SourceError::UnknownError("No URLs in source".to_string()))?;
 
-    // Generate cache key using the same logic as the source cache
-    let key = CacheIndex::generate_cache_key(first_url, &checksums);
+    // Generate cache key using the same logic as the source cache.
+    let cache_source = super::convert_url_source(url_src)?;
+    let key =
+        CacheIndex::generate_cache_key(first_url, &checksums, cache_source.attestation.as_ref());
 
     // The source cache stores extracted archives as "{key}_extracted"
     let extracted_dir = cache_dir.join(format!("{}_extracted", key));

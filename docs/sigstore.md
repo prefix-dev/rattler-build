@@ -193,14 +193,15 @@ source:
 When Rattler-Build downloads the source, it will:
 
 1. Fetch the Sigstore attestation bundle (automatically derived for PyPI packages, or from `bundle_url`)
-2. Verify the bundle signature against the Sigstore transparency log
-3. Check that the attestation identity matches one of the listed publishers
+2. Verify the bundle's certificate and signature against Sigstore's trusted root
+3. Check that the attestation identity matches at least one listed publisher
+4. Check that the signed subject digest matches the downloaded source
 
 If verification fails, the build is aborted.
 
 ### PyPI sources
 
-For packages hosted on PyPI, the attestation bundle URL is automatically derived from the [PyPI attestation API](https://docs.pypi.org/api/integrity/). You only need to specify the publisher:
+For packages hosted on PyPI, the attestation bundle URL is automatically derived from the [PyPI attestation API](https://docs.pypi.org/api/integrity/). You only need to specify the publisher. The certificate, signature, issuer, identity, and artifact digest are verified. Rekor inclusion is not currently re-verified because the PyPI response omits the canonicalized Rekor body required by the verifier:
 
 ```yaml
 source:
@@ -227,7 +228,7 @@ source:
 
 ### Publisher format
 
-Publishers are specified in `github:owner/repo` format. The identity is matched against the Sigstore certificate's Subject Alternative Name (SAN), which for GitHub Actions is the workflow identity.
+Publishers are specified in `github:owner/repo` or `gitlab:owner/repo` format. At least one listed publisher must match. This trusts any workflow and ref in that repository; workflow/ref constraints are not currently supported and are rejected rather than silently ignored. The repository prefix is matched against the Sigstore certificate's Subject Alternative Name (SAN).
 
 ## Verifying attestations
 

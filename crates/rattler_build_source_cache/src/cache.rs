@@ -211,7 +211,7 @@ impl SourceCache {
         file_name: Option<&str>,
         attestation: Option<&AttestationVerification>,
     ) -> Result<PathBuf, CacheError> {
-        let key = CacheIndex::generate_cache_key(url, checksums);
+        let key = CacheIndex::generate_cache_key(url, checksums, attestation);
 
         // Acquire lock for this cache entry
         let _lock = self.lock_manager.acquire(&key).await?;
@@ -220,25 +220,35 @@ impl SourceCache {
         if let Some(entry) = self.index.get(&key).await {
             let cache_path = self.index.get_cache_path(&entry);
 
-            // If extraction was done, return extracted path
+            // Validate the archive before trusting an extracted cache entry.
             if let Some(extracted_path) = self.index.get_extracted_path(&entry)
                 && extracted_path.exists()
             {
-                // Re-verify attestation if configured but not yet verified for this entry
-                if let Some(attestation_config) = attestation
-                    && !entry.attestation_verified
+                let archive_path = self.index.get_cache_path(&entry);
+                if checksums
+                    .iter()
+                    .any(|cs| cs.validate(&archive_path).is_err())
                 {
-                    let archive_path = self.index.get_cache_path(&entry);
-                    self.verify_attestation(&archive_path, url, attestation_config)
-                        .await?;
-                    self.index.set_attestation_verified(&key).await?;
+                    tracing::warn!("Cached archive validation failed, re-downloading");
+                    if archive_path.exists() {
+                        fs_err::tokio::remove_file(&archive_path).await?;
+                    }
+                    fs_err::tokio::remove_dir_all(&extracted_path).await?;
+                } else {
+                    if let Some(attestation_config) = attestation
+                        && !entry.attestation_verified
+                    {
+                        self.verify_attestation(&archive_path, url, attestation_config)
+                            .await?;
+                        self.index.set_attestation_verified(&key).await?;
+                    }
+                    self.index.touch(&key).await?;
+                    tracing::info!(
+                        "Found extracted source in cache: {}",
+                        extracted_path.display()
+                    );
+                    return Ok(extracted_path);
                 }
-                self.index.touch(&key).await?;
-                tracing::info!(
-                    "Found extracted source in cache: {}",
-                    extracted_path.display()
-                );
-                return Ok(extracted_path);
             }
 
             // Otherwise return the archive file
@@ -525,12 +535,11 @@ impl SourceCache {
         #[cfg(not(feature = "sigstore"))]
         {
             let _ = (file_path, attestation_config);
-            tracing::warn!(
-                url = %source_url,
-                "sigstore verification is disabled at compile time — \
-                 attestation will NOT be verified"
-            );
+            return Err(CacheError::AttestationVerification(format!(
+                "sigstore verification was requested for {source_url}, but this build has the sigstore feature disabled"
+            )));
         }
+        #[cfg(feature = "sigstore")]
         Ok(())
     }
 

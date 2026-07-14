@@ -366,16 +366,12 @@ pub(crate) async fn verify_attestation(
     let artifact_sha256_hex = hex::encode(Sha256::digest(&artifact_bytes));
     verify_artifact_subject(&artifact_sha256_hex, &parsed.bundles)?;
 
-    // For each required identity check, find a matching bundle and verify it
+    // A cryptographically valid bundle must match at least one trusted publisher.
+    let mut found_identities = Vec::new();
+    let mut verification_errors = Vec::new();
     for check in &attestation_config.identity_checks {
-        let mut matched = false;
-        let mut found_identities: Vec<String> = Vec::new();
-        let mut verification_errors: Vec<String> = Vec::new();
-
         for bundle in &parsed.bundles {
-            // Verify with just the issuer in the policy — we do prefix matching on identity ourselves.
-            // For PyPI-converted bundles, skip tlog verification since we can't reconstruct
-            // the canonicalized rekor body from the PEP 740 format.
+            // PyPI's API omits the canonicalized Rekor body needed by this verifier.
             let mut policy = VerificationPolicy::default().require_issuer(check.issuer.clone());
             if parsed.from_pypi {
                 policy = policy.skip_tlog();
@@ -383,58 +379,41 @@ pub(crate) async fn verify_attestation(
 
             match verify(artifact_bytes.as_slice(), bundle, &policy, &trusted_root) {
                 Ok(result) => {
-                    if let Some(ref actual_identity) = result.identity {
-                        if identity_matches(&check.identity, actual_identity) {
+                    if let Some(actual_identity) = result.identity {
+                        if identity_matches(&check.identity, &actual_identity) {
                             tracing::info!(
                                 "\u{2714} Attestation verified (identity={})",
                                 actual_identity,
                             );
-                            matched = true;
-                            break;
-                        } else {
-                            found_identities.push(actual_identity.clone());
+                            tracing::info!(
+                                "\u{2714} All attestation checks passed for {}",
+                                file_path.display()
+                            );
+                            return Ok(());
                         }
+                        found_identities.push(actual_identity);
                     }
                 }
-                Err(e) => {
-                    verification_errors.push(e.to_string());
-                }
+                Err(e) => verification_errors.push(e.to_string()),
             }
-        }
-
-        if !matched {
-            let mut msg = format!(
-                "attestation identity mismatch for publisher '{}'\n  expected identity prefix: {}\n  expected issuer: {}",
-                check
-                    .identity
-                    .trim_start_matches("https://github.com/")
-                    .trim_start_matches("https://gitlab.com/"),
-                check.identity,
-                check.issuer,
-            );
-            if !found_identities.is_empty() {
-                msg.push_str("\n  found identities in attestation:");
-                for id in &found_identities {
-                    msg.push_str(&format!("\n    - {}", id));
-                }
-            }
-            if !verification_errors.is_empty() {
-                for err in &verification_errors {
-                    msg.push_str(&format!("\n  verification error: {}", err));
-                }
-            }
-            return Err(CacheError::AttestationVerification(msg));
         }
     }
 
-    tracing::info!(
-        "\u{2714} All attestation checks passed for {}",
-        file_path
-            .file_name()
-            .map(|f| f.to_string_lossy())
-            .unwrap_or_else(|| file_path.to_string_lossy())
-    );
-    Ok(())
+    let expected = attestation_config
+        .identity_checks
+        .iter()
+        .map(|check| format!("{} (issuer {})", check.identity, check.issuer))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let mut msg =
+        format!("attestation did not match any trusted publisher\n  expected: {expected}");
+    for identity in found_identities {
+        msg.push_str(&format!("\n  found identity: {identity}"));
+    }
+    for error in verification_errors {
+        msg.push_str(&format!("\n  verification error: {error}"));
+    }
+    Err(CacheError::AttestationVerification(msg))
 }
 
 #[cfg(test)]

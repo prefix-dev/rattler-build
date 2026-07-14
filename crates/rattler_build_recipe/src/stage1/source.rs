@@ -172,7 +172,7 @@ impl fmt::Display for PublisherProvider {
     }
 }
 
-/// A parsed publisher identity (e.g., "github:owner/repo@refs/tags/v1.0")
+/// A parsed publisher identity (e.g., "github:owner/repo")
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Publisher {
     /// The provider (github, gitlab)
@@ -181,15 +181,12 @@ pub struct Publisher {
     pub owner: String,
     /// Repository name
     pub repo: String,
-    /// Optional ref constraint (e.g., "refs/tags/v1.0")
-    pub ref_constraint: Option<String>,
 }
 
 impl Publisher {
     /// Convert to identity prefix and issuer for sigstore verification.
     ///
-    /// The identity is a URL prefix that must match the certificate's SAN.
-    /// The ref_constraint is not used here — it can be checked separately if needed.
+    /// The identity is a repository URL prefix that must match the certificate's SAN.
     pub fn to_identity_and_issuer(&self) -> (String, String) {
         match self.provider {
             PublisherProvider::GitHub => {
@@ -209,15 +206,11 @@ impl Publisher {
 
 impl fmt::Display for Publisher {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}:{}/{}", self.provider, self.owner, self.repo)?;
-        if let Some(ref_constraint) = &self.ref_constraint {
-            write!(f, "@{}", ref_constraint)?;
-        }
-        Ok(())
+        write!(f, "{}:{}/{}", self.provider, self.owner, self.repo)
     }
 }
 
-/// Parse a publisher string like "github:owner/repo" or "github:owner/repo@refs/tags/v1.0"
+/// Parse a publisher string like "github:owner/repo".
 pub fn parse_publisher_string(s: &str) -> Result<Publisher, String> {
     let (provider_str, rest) = s.split_once(':').ok_or_else(|| {
         format!(
@@ -237,13 +230,14 @@ pub fn parse_publisher_string(s: &str) -> Result<Publisher, String> {
         }
     };
 
-    let (owner_repo, ref_constraint) = if let Some((or, r)) = rest.split_once('@') {
-        (or, Some(r.to_string()))
-    } else {
-        (rest, None)
-    };
+    if rest.contains('@') {
+        return Err(format!(
+            "Invalid publisher format '{}': ref constraints are not supported",
+            s
+        ));
+    }
 
-    let (owner, repo) = owner_repo.split_once('/').ok_or_else(|| {
+    let (owner, repo) = rest.split_once('/').ok_or_else(|| {
         format!(
             "Invalid publisher format '{}': expected 'provider:owner/repo'",
             s
@@ -261,7 +255,6 @@ pub fn parse_publisher_string(s: &str) -> Result<Publisher, String> {
         provider,
         owner: owner.to_string(),
         repo: repo.to_string(),
-        ref_constraint,
     })
 }
 
@@ -273,7 +266,7 @@ pub struct AttestationConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bundle_url: Option<Url>,
 
-    /// Publisher identities to verify. All must match.
+    /// Trusted publisher identities. At least one must match.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub publishers: Vec<Publisher>,
 }
@@ -453,16 +446,11 @@ mod tests {
         assert_eq!(p.provider, PublisherProvider::GitHub);
         assert_eq!(p.owner, "pallets");
         assert_eq!(p.repo, "flask");
-        assert_eq!(p.ref_constraint, None);
     }
 
     #[test]
-    fn test_parse_publisher_github_with_ref() {
-        let p = parse_publisher_string("github:owner/repo@refs/tags/v1.0").unwrap();
-        assert_eq!(p.provider, PublisherProvider::GitHub);
-        assert_eq!(p.owner, "owner");
-        assert_eq!(p.repo, "repo");
-        assert_eq!(p.ref_constraint, Some("refs/tags/v1.0".to_string()));
+    fn test_parse_publisher_rejects_unsupported_ref() {
+        assert!(parse_publisher_string("github:owner/repo@refs/tags/v1.0").is_err());
     }
 
     #[test]
@@ -503,8 +491,8 @@ mod tests {
         let p = parse_publisher_string("github:pallets/flask").unwrap();
         assert_eq!(p.to_string(), "github:pallets/flask");
 
-        let p = parse_publisher_string("gitlab:org/repo@refs/tags/v2.0").unwrap();
-        assert_eq!(p.to_string(), "gitlab:org/repo@refs/tags/v2.0");
+        let p = parse_publisher_string("gitlab:org/repo").unwrap();
+        assert_eq!(p.to_string(), "gitlab:org/repo");
     }
 
     #[test]

@@ -4,8 +4,8 @@
 # source URL — no need to specify `bundle_url` explicitly. The provenance
 # is fetched from https://pypi.org/integrity/{project}/{version}/{filename}/provenance
 #
-# The `publishers` list specifies which identities must have signed the
-# artifact. All listed publishers must match.
+# The `publishers` list specifies trusted signing identities. At least one
+# listed publisher must match.
 
 context:
   version: "3.1.1"

@@ -24,13 +24,27 @@ mod source_cache_tests {
         let url = url::Url::parse("https://example.com/file.tar.gz").unwrap();
         let checksum = Checksum::Sha256(vec![1, 2, 3, 4]);
 
-        let key1 = CacheIndex::generate_cache_key(&url, std::slice::from_ref(&checksum));
-        let key2 = CacheIndex::generate_cache_key(&url, &[checksum]);
+        let key1 = CacheIndex::generate_cache_key(&url, std::slice::from_ref(&checksum), None);
+        let key2 = CacheIndex::generate_cache_key(&url, &[checksum], None);
 
         assert_eq!(key1, key2);
+        assert_eq!(
+            key1,
+            "bf8bdfb82507dbb24c976f68386f3d46b4d3ba299bc8fa641f631455fae58dc3"
+        );
 
-        let key3 = CacheIndex::generate_cache_key(&url, &[]);
+        let key3 = CacheIndex::generate_cache_key(&url, &[], None);
         assert_ne!(key1, key3);
+
+        let attestation = AttestationVerification {
+            bundle_url: None,
+            identity_checks: vec![IdentityCheck {
+                identity: "https://github.com/example/project".to_string(),
+                issuer: "https://token.actions.githubusercontent.com".to_string(),
+            }],
+        };
+        let key4 = CacheIndex::generate_cache_key(&url, &[], Some(&attestation));
+        assert_ne!(key3, key4, "attestation policy must affect the cache key");
     }
 
     #[tokio::test]

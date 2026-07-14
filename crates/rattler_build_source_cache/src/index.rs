@@ -125,19 +125,35 @@ impl CacheIndex {
         Ok(())
     }
 
-    /// Generate a cache key from URL and checksums
-    pub fn generate_cache_key(url: &url::Url, checksums: &[crate::source::Checksum]) -> String {
-        use std::collections::hash_map::DefaultHasher;
-        use std::hash::{Hash, Hasher};
+    /// Generate a cache key from the URL, checksums, and verification policy.
+    pub fn generate_cache_key(
+        url: &url::Url,
+        checksums: &[crate::source::Checksum],
+        attestation: Option<&crate::source::AttestationVerification>,
+    ) -> String {
+        use sha2::{Digest, Sha256};
 
-        let mut hasher = DefaultHasher::new();
-        url.as_str().hash(&mut hasher);
-
+        let mut hasher = Sha256::new();
+        hasher.update(url.as_str());
         for cs in checksums {
-            cs.to_hex().hash(&mut hasher);
+            hasher.update([0]);
+            hasher.update(cs.kind().to_string());
+            hasher.update(cs.to_hex());
+        }
+        if let Some(attestation) = attestation {
+            hasher.update([0]);
+            if let Some(bundle_url) = &attestation.bundle_url {
+                hasher.update(bundle_url.as_str());
+            }
+            for check in &attestation.identity_checks {
+                hasher.update([0]);
+                hasher.update(&check.identity);
+                hasher.update([0]);
+                hasher.update(&check.issuer);
+            }
         }
 
-        format!("{:x}", hasher.finish())
+        hex::encode(hasher.finalize())
     }
 
     /// Generate a cache key for a git source

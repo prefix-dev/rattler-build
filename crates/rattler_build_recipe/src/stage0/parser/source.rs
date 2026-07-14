@@ -406,6 +406,17 @@ fn parse_attestation_config(
         }
     }
 
+    let publishers_node = mapping.get("publishers").ok_or_else(|| {
+        ParseError::missing_field("publishers", get_span(&Node::Mapping(mapping.clone())))
+    })?;
+    if publishers.is_empty() {
+        return Err(ParseError::invalid_value(
+            "attestation.publishers",
+            "at least one trusted publisher is required",
+            get_span(publishers_node),
+        ));
+    }
+
     Ok(AttestationConfig {
         bundle_url,
         publishers,
