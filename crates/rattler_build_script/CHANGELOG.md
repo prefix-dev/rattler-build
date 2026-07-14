@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.6](https://github.com/prefix-dev/rattler-build/compare/rattler_build_script-v0.2.5...rattler_build_script-v0.2.6) - 2026-07-11
+
+### Added
+
+- *(test)* show executed commands for failing test scripts ([#2266](https://github.com/prefix-dev/rattler-build/pull/2266))
+
+### Other
+
+- *(script)* compose the build wrapper from scoped sections ([#2539](https://github.com/prefix-dev/rattler-build/pull/2539))
+
 ## [0.2.5](https://github.com/prefix-dev/rattler-build/compare/rattler_build_script-v0.2.4...rattler_build_script-v0.2.5) - 2026-06-18
 
 ### Added
