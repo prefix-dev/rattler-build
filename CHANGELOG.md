@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.69.0] - 2026-07-15
+### ✨ Highlights
+
+This release reworks how the build wrapper script is generated:
+it is now composed from scoped sections that each carry their own interpreter and environment,
+laying the groundwork for running multiple isolated units of work in a single build.
+
+We also fixed the `split` filter in Jinja templates to return a real list,
+as specified in [CEP 39](https://github.com/conda/ceps/blob/main/cep-0039.md),
+so negative indexing and slicing like `(version | split('.'))[-1]` work as expected.
+
+### Added
+
+- Detect and warn when patches are already applied by @wolfv in [#2635](https://github.com/prefix-dev/rattler-build/pull/2635)
+- Add tool-specific config extension and default config discovery by @wolfv in [#2636](https://github.com/prefix-dev/rattler-build/pull/2636)
+- Use rattler_git's built-in LFS support in the source cache by @wolfv in [#2648](https://github.com/prefix-dev/rattler-build/pull/2648)
+
+
+### Changed
+
+- Compose the build wrapper from scoped sections by @baszalmstra in [#2539](https://github.com/prefix-dev/rattler-build/pull/2539)
+- Negative indexing and slicing on split filter results by @wolfv in [#2644](https://github.com/prefix-dev/rattler-build/pull/2644)
+
+
+### Documentation
+
+- Package format differences and authentication resolution by @wolfv in [#2628](https://github.com/prefix-dev/rattler-build/pull/2628)
+
+
+### Fixed
+
+- Trailing spaces in format_requirement for packages without versions by @wolfv in [#2634](https://github.com/prefix-dev/rattler-build/pull/2634)
+- Consolidate license_file and license_file_late_bound into single LicenseFiles type by @wolfv in [#2624](https://github.com/prefix-dev/rattler-build/pull/2624)
+- Treat empty/null-like `noarch` as absent; hint `default` filter for undefined variant keys by @wolfv in [#2626](https://github.com/prefix-dev/rattler-build/pull/2626)
+- Set `LIBRARY_PREFIX` and friends for noarch builds on Windows by @baszalmstra in [#2655](https://github.com/prefix-dev/rattler-build/pull/2655)
+
+
+
 ## [0.68.0] - 2026-07-06
 ### ✨ Highlights
 
