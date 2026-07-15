@@ -208,12 +208,8 @@ pub fn os_vars(
 ) -> HashMap<String, Option<String>> {
     let mut vars = HashMap::new();
 
-    // For `noarch` outputs there is no concrete target platform, but the build
-    // script still runs against a real host platform. Use the host platform to
-    // decide which OS-specific variables to emit (e.g. `LIBRARY_PREFIX` and
-    // friends on Windows), so that `noarch: generic` packages can still compile
-    // native artifacts during the build.
-    // See https://github.com/prefix-dev/rattler-build/issues/2475
+    // For `noarch` outputs, fall back to the host platform so Windows target
+    // vars (e.g. `LIBRARY_PREFIX`) are still emitted. See issue #2475.
     let os_platform = if *target_platform == Platform::NoArch {
         host_platform
     } else {
@@ -496,10 +492,7 @@ pub fn env_vars_from_variant(
 mod test {
     use super::*;
 
-    /// For a `noarch` target built on a Windows host, the Windows-specific target
-    /// variables (e.g. `LIBRARY_PREFIX`) must still be emitted so that
-    /// `noarch: generic` packages can compile native artifacts. See
-    /// https://github.com/prefix-dev/rattler-build/issues/2475
+    /// noarch on a Windows host still emits Windows target vars (issue #2475).
     #[test]
     fn test_noarch_uses_host_platform_for_os_vars() {
         let prefix = Path::new("/some/prefix");
@@ -513,11 +506,9 @@ mod test {
             work_dir,
         );
 
-        // Windows target vars should be present because the host is Windows.
         assert!(vars.contains_key("LIBRARY_PREFIX"));
         assert!(vars.contains_key("LIBRARY_BIN"));
         assert!(vars.contains_key("SCRIPTS"));
-        // The Windows path variable is `Path`, not `PATH`.
         assert!(vars.contains_key("Path"));
         assert_eq!(
             vars.get("SHLIB_EXT").and_then(|v| v.as_deref()),
@@ -525,7 +516,7 @@ mod test {
         );
     }
 
-    /// A `noarch` target on a non-Windows host must not emit Windows target vars.
+    /// noarch on a non-Windows host does not emit Windows target vars.
     #[test]
     fn test_noarch_non_windows_host_has_no_windows_vars() {
         let prefix = Path::new("/some/prefix");
