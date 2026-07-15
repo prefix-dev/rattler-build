@@ -274,10 +274,12 @@ impl Output {
 
         // Run the build script
         let target_platform = self.build_configuration.target_platform;
+        let host_platform = self.host_platform().platform;
         let mut env_vars = env_vars::vars(self, "BUILD");
         env_vars.extend(env_vars::os_vars(
             self.prefix(),
             &target_platform,
+            &host_platform,
             self.build_configuration.env_isolation,
             &self.build_configuration.directories.work_dir,
         ));

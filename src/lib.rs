@@ -393,6 +393,7 @@ pub async fn get_build_output(
     let os_env_var_keys = env_vars::os_vars(
         &std::path::PathBuf::new(),
         &build_data.host_platform,
+        &build_data.host_platform,
         build_data.env_isolation,
         &std::path::PathBuf::new(),
     )
