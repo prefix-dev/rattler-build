@@ -205,8 +205,13 @@ impl Tests {
         })?;
 
         let platform = Platform::current();
-        let mut env_vars =
-            env_vars::os_vars(environment, &platform, config.env_isolation, tmp_dir.path());
+        let mut env_vars = env_vars::os_vars(
+            environment,
+            &platform,
+            &platform,
+            config.env_isolation,
+            tmp_dir.path(),
+        );
         if config.env_isolation == EnvironmentIsolation::None {
             env_vars.retain(|key, _| key != ShellEnum::default().path_var(&platform));
         }
@@ -794,7 +799,13 @@ async fn run_python_test_inner(
     let platform = Platform::current();
     let test_dir = prefix.join("test");
     fs::create_dir_all(&test_dir)?;
-    let test_env_vars = env_vars::os_vars(&test_prefix, &platform, config.env_isolation, &test_dir);
+    let test_env_vars = env_vars::os_vars(
+        &test_prefix,
+        &platform,
+        &platform,
+        config.env_isolation,
+        &test_dir,
+    );
 
     script
         .run_script(
@@ -898,8 +909,13 @@ async fn run_perl_test(
     fs::create_dir_all(&test_folder)?;
 
     let platform = Platform::current();
-    let test_env_vars =
-        env_vars::os_vars(&test_prefix, &platform, config.env_isolation, &test_folder);
+    let test_env_vars = env_vars::os_vars(
+        &test_prefix,
+        &platform,
+        &platform,
+        config.env_isolation,
+        &test_folder,
+    );
 
     script
         .run_script(
@@ -1006,7 +1022,13 @@ async fn run_commands_test(
     })?;
 
     let platform = Platform::current();
-    let mut env_vars = env_vars::os_vars(&run_prefix, &platform, config.env_isolation, &test_dir);
+    let mut env_vars = env_vars::os_vars(
+        &run_prefix,
+        &platform,
+        &platform,
+        config.env_isolation,
+        &test_dir,
+    );
     if config.env_isolation == EnvironmentIsolation::None {
         env_vars.retain(|key, _| key != ShellEnum::default().path_var(&platform));
     }
@@ -1200,8 +1222,13 @@ async fn run_r_test(
     fs::create_dir_all(&test_folder)?;
 
     let platform = Platform::current();
-    let test_env_vars =
-        env_vars::os_vars(&test_prefix, &platform, config.env_isolation, &test_folder);
+    let test_env_vars = env_vars::os_vars(
+        &test_prefix,
+        &platform,
+        &platform,
+        config.env_isolation,
+        &test_folder,
+    );
 
     script
         .run_script(
@@ -1276,8 +1303,13 @@ async fn run_ruby_test(
     fs::create_dir_all(&test_folder)?;
 
     let platform = Platform::current();
-    let test_env_vars =
-        env_vars::os_vars(&test_prefix, &platform, config.env_isolation, &test_folder);
+    let test_env_vars = env_vars::os_vars(
+        &test_prefix,
+        &platform,
+        &platform,
+        config.env_isolation,
+        &test_folder,
+    );
 
     script
         .run_script(

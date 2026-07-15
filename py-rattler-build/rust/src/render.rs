@@ -77,6 +77,7 @@ impl PyRenderConfig {
         // We use an empty prefix path since we just need the keys, not the values
         let os_env_var_keys = rattler_build::env_vars::os_vars(
             &std::path::PathBuf::new(),
+            &target_platform,
             &host_platform,
             EnvironmentIsolation::default(),
             &std::path::PathBuf::new(),

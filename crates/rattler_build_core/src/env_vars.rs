@@ -202,12 +202,21 @@ pub fn language_vars(output: &Output) -> HashMap<String, Option<String>> {
 pub fn os_vars(
     prefix: &Path,
     target_platform: &Platform,
+    host_platform: &Platform,
     env_isolation: EnvironmentIsolation,
     work_dir: &Path,
 ) -> HashMap<String, Option<String>> {
     let mut vars = HashMap::new();
 
-    let path_var = if target_platform.is_windows() {
+    // For `noarch` outputs, fall back to the host platform so Windows target
+    // vars (e.g. `LIBRARY_PREFIX`) are still emitted. See issue #2475.
+    let os_platform = if *target_platform == Platform::NoArch {
+        host_platform
+    } else {
+        target_platform
+    };
+
+    let path_var = if os_platform.is_windows() {
         "Path"
     } else {
         "PATH"
@@ -236,18 +245,18 @@ pub fn os_vars(
     insert!(
         vars,
         "SHLIB_EXT",
-        rattler_build_types::shlib_ext(target_platform)
+        rattler_build_types::shlib_ext(os_platform)
     );
     vars.insert(path_var.to_string(), env::var(path_var).ok());
 
-    if target_platform.is_windows() {
+    if os_platform.is_windows() {
         vars.extend(windows::env::default_env_vars_target(prefix));
-    } else if target_platform.is_osx() {
-        vars.extend(macos::env::default_env_vars_target(prefix, target_platform));
-    } else if target_platform.is_linux() {
+    } else if os_platform.is_osx() {
+        vars.extend(macos::env::default_env_vars_target(prefix, os_platform));
+    } else if os_platform.is_linux() {
         vars.extend(linux::env::default_env_vars_target(
             prefix,
-            target_platform,
+            os_platform,
             env_isolation,
         ));
     }
@@ -477,4 +486,51 @@ pub fn env_vars_from_variant(
             }
         })
         .collect()
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    /// noarch on a Windows host still emits Windows target vars (issue #2475).
+    #[test]
+    fn test_noarch_uses_host_platform_for_os_vars() {
+        let prefix = Path::new("/some/prefix");
+        let work_dir = Path::new("/some/work");
+
+        let vars = os_vars(
+            prefix,
+            &Platform::NoArch,
+            &Platform::Win64,
+            EnvironmentIsolation::Strict,
+            work_dir,
+        );
+
+        assert!(vars.contains_key("LIBRARY_PREFIX"));
+        assert!(vars.contains_key("LIBRARY_BIN"));
+        assert!(vars.contains_key("SCRIPTS"));
+        assert!(vars.contains_key("Path"));
+        assert_eq!(
+            vars.get("SHLIB_EXT").and_then(|v| v.as_deref()),
+            Some(".dll")
+        );
+    }
+
+    /// noarch on a non-Windows host does not emit Windows target vars.
+    #[test]
+    fn test_noarch_non_windows_host_has_no_windows_vars() {
+        let prefix = Path::new("/some/prefix");
+        let work_dir = Path::new("/some/work");
+
+        let vars = os_vars(
+            prefix,
+            &Platform::NoArch,
+            &Platform::Linux64,
+            EnvironmentIsolation::Strict,
+            work_dir,
+        );
+
+        assert!(!vars.contains_key("LIBRARY_PREFIX"));
+        assert!(vars.contains_key("PATH"));
+    }
 }
