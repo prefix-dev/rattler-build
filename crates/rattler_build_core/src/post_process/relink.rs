@@ -146,12 +146,12 @@ pub fn get_relinker(platform: Platform, path: &Path) -> Result<Box<dyn Relinker>
 /// `@loader_path` variable. The change for Mach-O files is applied with the `install_name_tool`.
 pub fn relink(temp_files: &TempFiles, output: &Output) -> Result<(), RelinkError> {
     let dynamic_linking = &output.recipe.build().dynamic_linking;
-    let target_platform = output.subdir();
+    let subdir = output.subdir();
     let relocation_config = &dynamic_linking.binary_relocation;
 
-    if target_platform == Platform::NoArch
+    if subdir == Platform::NoArch
         // skip linking checks for wasm
-        || target_platform.arch() == Some(Arch::Wasm32)
+        || subdir.arch() == Some(Arch::Wasm32)
         || relocation_config.is_none()
     {
         return Ok(());
@@ -187,9 +187,9 @@ pub fn relink(temp_files: &TempFiles, output: &Output) -> Result<(), RelinkError
                 return Ok(None);
             }
 
-            match get_relinker(target_platform, p) {
+            match get_relinker(subdir, p) {
                 Ok(relinker) => {
-                    if !target_platform.is_windows() {
+                    if !subdir.is_windows() {
                         relinker.relink(
                             tmp_prefix,
                             encoded_prefix,

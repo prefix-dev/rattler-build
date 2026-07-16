@@ -546,7 +546,7 @@ pub fn perform_linking_checks(
         .collect();
 
     // check all DSOs and what they are linking
-    let target_platform = output.subdir();
+    let subdir = output.subdir();
     let host_prefix = output.prefix();
 
     // Parallel processing of DSO files
@@ -566,7 +566,7 @@ pub fn perform_linking_checks(
                     );
                     for (lib, resolved) in &resolved_libraries {
                         // filter out @self on macOS
-                        if target_platform.is_osx() && lib.to_str() == Some("self") {
+                        if subdir.is_osx() && lib.to_str() == Some("self") {
                             continue;
                         }
 
@@ -621,7 +621,7 @@ pub fn perform_linking_checks(
             let lib = lib.strip_prefix(host_prefix).unwrap_or(lib);
 
             // skip @self on macOS
-            if target_platform.is_osx() && lib.to_str() == Some("self") {
+            if subdir.is_osx() && lib.to_str() == Some("self") {
                 continue;
             }
 
