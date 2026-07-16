@@ -107,20 +107,32 @@ def gh_token() -> str:
 
 
 def cliff_preview(tag: str, main_ref: str) -> str:
-    """Render what git-cliff would add for the commits since `tag`."""
-    return subprocess.run(
+    """Render what git-cliff would add for the commits since `tag`.
+
+    The range ends at the resolved commit SHA because git-cliff forwards the
+    range end verbatim to the GitHub API as the `sha` parameter, which does
+    not know local remote-tracking names like `upstream/main`.
+
+    stderr is left attached to the terminal so git-cliff template or fetch
+    errors surface instead of silently collapsing the preview to nothing.
+    """
+    head = git_out("rev-parse", main_ref)
+    result = subprocess.run(
         [
             "git-cliff",
             "--strip",
             "header",
             "--github-token",
             gh_token(),
-            f"{tag}..{main_ref}",
+            f"{tag}..{head}",
         ],
         cwd=ROOT,
         text=True,
-        capture_output=True,
-    ).stdout.strip()
+        stdout=subprocess.PIPE,
+    )
+    if result.returncode != 0:
+        fail(f"git-cliff failed with exit code {result.returncode}")
+    return result.stdout.strip()
 
 
 def bump_changelog(version: str) -> None:
