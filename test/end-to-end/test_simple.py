@@ -28,6 +28,15 @@ def test_functionality(rattler_build: RattlerBuild):
     assert text[0] == f"Usage: rattler-build{suffix} [OPTIONS] [COMMAND]"
 
 
+def test_completion_stderr_is_clean(rattler_build: RattlerBuild):
+    """Shell completions are sourced at shell startup, so stderr must stay
+    free of startup banners like the version or config-loading messages."""
+    result = rattler_build("completion", "--shell", "nushell", capture_output=True)
+    assert result.returncode == 0
+    assert "extern" in result.stdout
+    assert result.stderr == ""
+
+
 def test_license_glob(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     rattler_build.build(recipes / "globtest", tmp_path)
     pkg = get_extracted_package(tmp_path, "globtest")

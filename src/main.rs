@@ -141,23 +141,18 @@ fn main() -> miette::Result<()> {
         .map_err(|_| miette::miette!("Thread panicked"))?
 }
 
-async fn async_main() -> miette::Result<()> {
-    let app = App::parse();
-    let log_handler = init_logging(
-        &app.log_style,
-        &app.verbose,
-        &app.color,
-        app.wrap_log_lines,
-        None::<fn() -> std::io::Stderr>,
-    )
-    .into_diagnostic()?;
-
-    let config = if app.no_config {
+/// Load the configuration according to the command-line options and print a
+/// startup line with the version and the configuration files that were used.
+///
+/// Only subcommands that consume the configuration call this, so commands
+/// like `completion` produce no output besides their actual result.
+fn load_config(no_config: bool, config_file: Option<PathBuf>) -> miette::Result<Option<Config>> {
+    let config = if no_config {
         // `--no-config` disables all loading and discovery: only built-in
         // defaults and command-line arguments apply (the behavior before
         // default config discovery was added).
         None
-    } else if let Some(config_path) = app.config_file {
+    } else if let Some(config_path) = config_file {
         // An explicitly passed configuration file disables the automatic
         // discovery and is used as-is.
         Some(Config::load_from_files(&[config_path]).into_diagnostic()?)
@@ -185,6 +180,20 @@ async fn async_main() -> miette::Result<()> {
         _ => tracing::info!("No configuration file loaded"),
     }
 
+    Ok(config)
+}
+
+async fn async_main() -> miette::Result<()> {
+    let app = App::parse();
+    let log_handler = init_logging(
+        &app.log_style,
+        &app.verbose,
+        &app.color,
+        app.wrap_log_lines,
+        None::<fn() -> std::io::Stderr>,
+    )
+    .into_diagnostic()?;
+
     match app.subcommand {
         Some(SubCommands::Completion(ShellCompletion { shell })) => {
             let mut cmd = App::command();
@@ -204,6 +213,7 @@ async fn async_main() -> miette::Result<()> {
             Ok(())
         }
         Some(SubCommands::Build(build_only)) => {
+            let config = load_config(app.no_config, app.config_file)?;
             let recipes = build_only.build.recipes.clone();
             let recipe_dir = build_only.build.recipe_dir.clone();
             let mut build_data = BuildData::from_opts_and_config(build_only.build, config);
@@ -225,11 +235,13 @@ async fn async_main() -> miette::Result<()> {
         }
 
         Some(SubCommands::Publish(publish_args)) => {
+            let config = load_config(app.no_config, app.config_file)?;
             let publish_data = PublishData::from_opts_and_config(publish_args, config);
             publish_packages(publish_data, &Some(log_handler)).await
         }
 
         Some(SubCommands::Test(test_args)) => {
+            let config = load_config(app.no_config, app.config_file)?;
             run_test(
                 TestData::from_opts_and_config(test_args, config),
                 Some(log_handler),
@@ -237,6 +249,7 @@ async fn async_main() -> miette::Result<()> {
             .await
         }
         Some(SubCommands::Rebuild(rebuild_args)) => {
+            let config = load_config(app.no_config, app.config_file)?;
             rebuild(
                 RebuildData::from_opts_and_config(rebuild_args, config),
                 log_handler,
@@ -251,14 +264,17 @@ async fn async_main() -> miette::Result<()> {
         Some(SubCommands::Auth(args)) => rattler::cli::auth::execute(args).await.into_diagnostic(),
         Some(SubCommands::Debug(args)) => match args.subcommand {
             DebugSubCommands::Setup(opts) => {
+                let config = load_config(app.no_config, app.config_file)?;
                 let debug_data = DebugData::from_setup_opts_and_config(opts, config);
                 debug_recipe(debug_data, &Some(log_handler)).await
             }
             DebugSubCommands::Shell(opts) => debug::debug_shell(opts).into_diagnostic(),
             DebugSubCommands::HostAdd(opts) => {
+                let config = load_config(app.no_config, app.config_file)?;
                 debug::debug_env_add("host", opts, config, &Some(log_handler)).await
             }
             DebugSubCommands::BuildAdd(opts) => {
+                let config = load_config(app.no_config, app.config_file)?;
                 debug::debug_env_add("build", opts, config, &Some(log_handler)).await
             }
             DebugSubCommands::Workdir(opts) => debug::debug_workdir(opts).into_diagnostic(),
