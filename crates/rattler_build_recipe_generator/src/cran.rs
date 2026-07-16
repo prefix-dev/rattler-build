@@ -75,6 +75,14 @@ pub struct CranOpts {
     #[cfg_attr(feature = "cli", arg(short, long))]
     pub tree: bool,
 
+    /// Whether to recursively generate recipes for dependencies that are
+    /// missing from conda-forge (mirrors grayskull's `--recursive`). Unlike
+    /// `--tree`, this only recurses into the dependencies actually missing
+    /// from conda-forge rather than the whole tree, and has no effect when
+    /// `--tree` is also set.
+    #[cfg_attr(feature = "cli", arg(short, long))]
+    pub recursive: bool,
+
     /// Name of the package to generate
     pub package: String,
 
@@ -282,19 +290,29 @@ async fn conda_forge_package_exists(conda_name: &str) -> bool {
     conda_forge_package_exists_at(conda_name, &url).await
 }
 
-/// Warn about any dependency in `deps` that is not yet available on
-/// conda-forge, so the user knows upfront which recipes they need to
-/// package first.
-async fn warn_about_missing_conda_forge_deps(deps: &HashSet<String>) {
+/// Check `deps` against conda-forge, returning those that aren't available
+/// there yet (as the original, non-prefixed dependency names).
+async fn find_missing_conda_forge_deps(deps: &HashSet<String>) -> Vec<String> {
+    let mut missing = Vec::new();
     for dep in deps {
         let conda_name = format_r_package(dep, None);
         if !conda_forge_package_exists(&conda_name).await {
-            tracing::warn!(
-                "Dependency '{}' does not appear to be available on conda-forge as '{}'. You may need to create and publish a recipe for it first.",
-                dep,
-                conda_name
-            );
+            missing.push(dep.clone());
         }
+    }
+    missing
+}
+
+/// Warn about each dependency in `missing`, so the user knows upfront which
+/// recipes they need to package first.
+fn warn_about_missing_conda_forge_deps(missing: &[String]) {
+    for dep in missing {
+        let conda_name = format_r_package(dep, None);
+        tracing::warn!(
+            "Dependency '{}' does not appear to be available on conda-forge as '{}'. You may need to create and publish a recipe for it first.",
+            dep,
+            conda_name
+        );
     }
 }
 
@@ -570,6 +588,8 @@ pub async fn generate_r_recipe_string(
 /// If `opts.write` is true, the recipe is written to a folder named after the
 /// package. Otherwise, the YAML is printed to stdout. When `tree` is enabled,
 /// dependencies are recursively generated if they don't already exist locally.
+/// When `recursive` is enabled instead, only dependencies missing from
+/// conda-forge are recursively generated.
 pub async fn generate_r_recipe(opts: &CranOpts) -> miette::Result<()> {
     let (recipe, remaining_deps) =
         build_cran_recipe_and_deps(&opts.package, opts.universe.as_deref()).await?;
@@ -582,19 +602,33 @@ pub async fn generate_r_recipe(opts: &CranOpts) -> miette::Result<()> {
         print!("{}", final_recipe);
     }
 
-    warn_about_missing_conda_forge_deps(&remaining_deps).await;
+    let missing_deps = find_missing_conda_forge_deps(&remaining_deps).await;
+    warn_about_missing_conda_forge_deps(&missing_deps);
 
     if opts.tree {
-        for dep in remaining_deps {
-            let r_package = format_r_package(&dep, None);
+        generate_recipes_for_deps(remaining_deps, opts).await?;
+    } else if opts.recursive {
+        generate_recipes_for_deps(missing_deps, opts).await?;
+    }
 
-            if !PathBuf::from(r_package).exists() {
-                let opts = CranOpts {
-                    package: dep,
-                    ..opts.clone()
-                };
-                generate_r_recipe(&opts).await?;
-            }
+    Ok(())
+}
+
+/// Generate a recipe for each of `deps` that doesn't already have a local
+/// folder, reusing `opts` (except for the package name) for each one.
+async fn generate_recipes_for_deps(
+    deps: impl IntoIterator<Item = String>,
+    opts: &CranOpts,
+) -> miette::Result<()> {
+    for dep in deps {
+        let r_package = format_r_package(&dep, None);
+
+        if !PathBuf::from(r_package).exists() {
+            let opts = CranOpts {
+                package: dep,
+                ..opts.clone()
+            };
+            generate_r_recipe(&opts).await?;
         }
     }
 
@@ -749,15 +783,15 @@ mod tests {
 
     #[tokio::test]
     #[traced_test]
-    async fn test_warn_about_missing_conda_forge_deps_warns_for_fake_package() {
+    async fn test_find_missing_conda_forge_deps_includes_fake_package() {
         let dep = "this_package_does_not_exist_xyz123";
         let mut deps = HashSet::new();
         deps.insert(dep.to_string());
 
-        warn_about_missing_conda_forge_deps(&deps).await;
+        let missing = find_missing_conda_forge_deps(&deps).await;
 
         let warning = "Dependency 'this_package_does_not_exist_xyz123' does not appear to be available on conda-forge as 'r-this_package_does_not_exist_xyz123'";
-        if !logs_contain(warning) {
+        if !missing.contains(&dep.to_string()) {
             // The warning is only skipped if the conda-forge check itself
             // failed open due to a network error. Confirm that's what
             // happened, rather than a missed warning.
@@ -771,11 +805,31 @@ mod tests {
 
     #[tokio::test]
     #[traced_test]
-    async fn test_warn_about_missing_conda_forge_deps_silent_for_real_package() {
+    async fn test_find_missing_conda_forge_deps_excludes_real_package() {
         let mut deps = HashSet::new();
         deps.insert("jsonlite".to_string());
 
-        warn_about_missing_conda_forge_deps(&deps).await;
+        let missing = find_missing_conda_forge_deps(&deps).await;
+
+        assert!(missing.is_empty());
+    }
+
+    #[test]
+    #[traced_test]
+    fn test_warn_about_missing_conda_forge_deps_logs_warning() {
+        let missing = vec!["this_package_does_not_exist_xyz123".to_string()];
+
+        warn_about_missing_conda_forge_deps(&missing);
+
+        assert!(logs_contain(
+            "Dependency 'this_package_does_not_exist_xyz123' does not appear to be available on conda-forge as 'r-this_package_does_not_exist_xyz123'"
+        ));
+    }
+
+    #[test]
+    #[traced_test]
+    fn test_warn_about_missing_conda_forge_deps_silent_when_empty() {
+        warn_about_missing_conda_forge_deps(&[]);
 
         assert!(!logs_contain(
             "does not appear to be available on conda-forge"
