@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.69.1] - 2026-07-16
+### ✨ Highlights
+
+This release fixes a bug where you get this message on every shell startup if you have Rattler-Build completions installed:
+
+```
+rattler-build 0.69.0
+No configuration file loaded
+```
+
+### Fixed
+
+- Only load config and print banner for config-consuming subcommands by @Hofer-Julian in [#2658](https://github.com/prefix-dev/rattler-build/pull/2658)
+- Resolve changelog preview range end to a commit SHA by @Hofer-Julian in [#2659](https://github.com/prefix-dev/rattler-build/pull/2659)
+
+
+
 ## [0.69.0] - 2026-07-15
 ### ✨ Highlights
 
