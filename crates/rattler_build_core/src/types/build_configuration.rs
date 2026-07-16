@@ -21,10 +21,10 @@ fn default_true() -> bool {
 /// The configuration for a build of a package
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BuildConfiguration {
-    /// The target platform for the build
+    /// The target platform for the build. This is never `noarch`, the subdir
+    /// of a noarch package is derived from the recipe instead.
     pub target_platform: Platform,
-    /// The host platform (usually target platform, but for `noarch` it's the
-    /// build platform)
+    /// The host platform (usually the same as the target platform)
     pub host_platform: PlatformWithVirtualPackages,
     /// The build platform (the platform that the build is running on)
     pub build_platform: PlatformWithVirtualPackages,

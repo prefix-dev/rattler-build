@@ -734,6 +734,26 @@ variable is still an error: if the variable is only defined on some platforms,
 provide an explicit fallback with the `default` filter, e.g.
 `${{ "python" if use_noarch | default(false) }}`.
 
+Note that for noarch packages the `target_platform` variable keeps its
+concrete value (e.g. `linux-64`) during rendering and in the build script;
+only the subdir of the resulting package becomes `noarch`.
+
+### Overriding the subdir of a package
+
+The `subdir` key overrides the subdir the package is created for. This is
+useful for packages such as cross-compilers where the subdir of the package
+does not match the platform the build runs on. It cannot be combined with
+`noarch`.
+
+```yaml
+build:
+  subdir: linux-aarch64
+```
+
+This only affects how the package is stamped and where it is placed; it does
+not change `target_platform` or how dependencies are resolved. It is the
+equivalent of the output-level `target` key of conda-build.
+
 ### Include only certain files in the package
 
 Sometimes you may want to include only a subset of the files installed by the

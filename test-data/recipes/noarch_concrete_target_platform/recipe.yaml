@@ -1,0 +1,16 @@
+package:
+  name: noarch-concrete-target-platform
+  version: "1.0.0"
+
+build:
+  noarch: generic
+  script:
+    - if: unix
+      then: |
+        echo "$target_platform" > $PREFIX/target_platform_env.txt
+        echo "${{ target_platform }}" > $PREFIX/target_platform_jinja.txt
+        echo "$SUBDIR" > $PREFIX/subdir_env.txt
+      else: |
+        echo %target_platform%> %PREFIX%\target_platform_env.txt
+        echo ${{ target_platform }}> %PREFIX%\target_platform_jinja.txt
+        echo %SUBDIR%> %PREFIX%\subdir_env.txt

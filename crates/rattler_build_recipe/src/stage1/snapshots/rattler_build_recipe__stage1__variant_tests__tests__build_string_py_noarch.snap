@@ -2,4 +2,4 @@
 source: crates/rattler_build_recipe/src/stage1/variant_tests.rs
 expression: "format!(\"{:?}\", used_variant)"
 ---
-{NormalizedKey("__unix"): "__unix", NormalizedKey("target_platform"): "noarch"}
+{NormalizedKey("__unix"): "__unix", NormalizedKey("target_platform"): "linux-64"}

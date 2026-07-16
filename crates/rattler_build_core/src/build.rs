@@ -234,9 +234,8 @@ pub async fn run_build(
     // Check for symlinks on Windows if not allowed
     // Skip the check for noarch packages that have __unix in run dependencies,
     // since they will never be installed on Windows.
-    if (output.build_configuration.target_platform.is_windows()
-        || (output.build_configuration.target_platform == Platform::NoArch
-            && !has_unix_virtual_package(&output)))
+    if (output.subdir().is_windows()
+        || (output.subdir() == Platform::NoArch && !has_unix_virtual_package(&output)))
         && !tool_configuration.allow_symlinks_on_windows
     {
         tracing::info!("Checking for symlinks ...");

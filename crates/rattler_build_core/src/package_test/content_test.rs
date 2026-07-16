@@ -395,7 +395,7 @@ impl PackageContentsTestExt for PackageContentsTest {
     fn run_test(&self, paths: &PathsJson, output: &Output) -> Result<(), TestError> {
         let span = tracing::info_span!("Package content test");
         let _enter = span.enter();
-        let target_platform = output.target_platform();
+        let target_platform = &output.subdir();
         let paths: Vec<&PathBuf> = paths.paths.iter().map(|p| &p.relative_path).collect();
 
         let mut collected_issues = Vec::new();

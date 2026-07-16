@@ -536,6 +536,27 @@ build:
     }
 
     #[test]
+    fn test_hash_noarch_platform_independent() {
+        // The hash input replaces target_platform with noarch, so noarch
+        // packages hash identically regardless of the platform they target
+        let mut variant1 = BTreeMap::new();
+        variant1.insert(
+            NormalizedKey::from("target_platform"),
+            Variable::from("linux-64"),
+        );
+        let mut variant2 = BTreeMap::new();
+        variant2.insert(
+            NormalizedKey::from("target_platform"),
+            Variable::from("win-64"),
+        );
+
+        let hash1 = HashInfo::from_variant(&variant1, &NoArchType::generic());
+        let hash2 = HashInfo::from_variant(&variant2, &NoArchType::generic());
+
+        assert_eq!(hash1, hash2);
+    }
+
+    #[test]
     fn test_hash_deterministic() {
         let mut variant = BTreeMap::new();
         variant.insert(
@@ -654,12 +675,15 @@ requirements:
         assert!(!used_variant.contains_key(&NormalizedKey::from("python")));
         // The virtual __unix dependency should be included in the variant
         assert!(used_variant.contains_key(&NormalizedKey::from("__unix")));
+        // target_platform stays the actual platform in the variant
         assert_eq!(
             used_variant.get(&NormalizedKey::from("target_platform")),
-            Some(&Variable::from("noarch"))
+            Some(&Variable::from("linux-64"))
         );
 
         insta::assert_snapshot!(format!("{:?}", used_variant));
+        // The hash input replaces target_platform with noarch, so the build
+        // string is unchanged from before the subdir decoupling
         let build_string = recipe
             .build()
             .string

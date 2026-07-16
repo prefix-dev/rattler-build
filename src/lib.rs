@@ -140,12 +140,6 @@ fn find_variants(
         let recipe = rendered.recipe;
         let variant = rendered.variant;
 
-        let effective_target_platform = if recipe.build().noarch.is_none() {
-            target_platform
-        } else {
-            Platform::NoArch
-        };
-
         // The recipe has already been evaluated and has its build string resolved
         // (including proper variant filtering for noarch python)
         // Extract the build string and hash from the already-evaluated recipe
@@ -160,7 +154,7 @@ fn find_variants(
             version: recipe.package().version().to_string(),
             build_string: build_string.to_string(),
             noarch_type: recipe.build().noarch.unwrap_or(NoArchType::none()),
-            target_platform: effective_target_platform,
+            target_platform,
             used_vars: variant,
             recipe,
             hash: rendered.hash_info.expect("Should be set after evaluation"),
@@ -716,8 +710,8 @@ pub async fn run_build_from_args(
         let (skip_test, skip_test_reason) = match tool_configuration.test_strategy {
             TestStrategy::Skip => (true, "the argument --test=skip was set".to_string()),
             TestStrategy::Native => {
-                // Skip if `host_platform != build_platform` and `target_platform != noarch`
-                if output.build_configuration.target_platform != Platform::NoArch
+                // Skip if `host_platform != build_platform` and the package is not `noarch`
+                if output.subdir() != Platform::NoArch
                     && output.build_configuration.host_platform.platform
                         != output.build_configuration.build_platform.platform
                 {
@@ -766,7 +760,7 @@ pub async fn run_build_from_args(
                             .directories
                             .output_dir
                             .join("test"),
-                        target_platform: Some(output.build_configuration.target_platform),
+                        target_platform: Some(output.subdir()),
                         host_platform: Some(output.build_configuration.host_platform.clone()),
                         current_platform: output.build_configuration.build_platform.clone(),
                         keep_test_prefix: tool_configuration.no_clean,
@@ -858,10 +852,10 @@ pub async fn skip_noarch(
     if let Some(noarch_build_platform) = tool_configuration.noarch_build_platform {
         outputs.retain(|output| {
             // Skip the build if:
-            // - target_platform is "noarch"
+            // - the package is `noarch`
             // and
             // - build_platform != noarch_build_platform
-            let should_skip = output.build_configuration.target_platform == Platform::NoArch
+            let should_skip = output.subdir() == Platform::NoArch
                 && output.build_configuration.build_platform.platform != noarch_build_platform;
 
             if should_skip {

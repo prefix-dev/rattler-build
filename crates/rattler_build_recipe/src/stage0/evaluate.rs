@@ -29,8 +29,8 @@ use indexmap::IndexMap;
 use rattler_build_script::ScriptContent;
 use rattler_build_types::NormalizedKey;
 use rattler_conda_types::{
-    MatchSpec, NoArchType, PackageName, PackageNameMatcher, ParseStrictness, RepodataRevision,
-    VersionWithSource,
+    MatchSpec, NoArchType, PackageName, PackageNameMatcher, ParseStrictness, Platform,
+    RepodataRevision, VersionWithSource,
 };
 use rattler_digest::{Md5Hash, Sha256Hash};
 
@@ -820,9 +820,7 @@ fn evaluate_flag_list(
 /// Skip values are Jinja expressions like `is_abi3`, `not unix`, etc.
 /// They are rendered through Jinja to track accessed variables
 /// (important for variant hash computation), and then evaluated eagerly
-/// to produce a boolean result. This matches the behavior of main where
-/// skip conditions are resolved during parsing, before the variant gets
-/// noarch overrides that would change `target_platform`.
+/// to produce a boolean result.
 ///
 /// Returns true if ANY skip condition evaluates to true (OR logic).
 pub fn evaluate_skip_list(
@@ -2113,6 +2111,42 @@ impl Evaluate for Stage0Build {
             }
         };
 
+        // Evaluate the subdir override
+        let subdir = match &self.subdir {
+            None => None,
+            Some(v) => {
+                let span = v.span().copied().unwrap_or_else(Span::new_blank);
+                let rendered = if let Some(value) = v.as_concrete() {
+                    Some(*value)
+                } else if let Some(template) = v.as_template() {
+                    let s = render_template(template.source(), context, v.span())?;
+                    if s.is_empty() {
+                        None
+                    } else {
+                        Some(s.parse::<Platform>().map_err(|e| {
+                            ParseError::invalid_value(
+                                "subdir",
+                                format!("invalid subdir '{}': {}", s, e),
+                                span,
+                            )
+                        })?)
+                    }
+                } else {
+                    unreachable!("Value must be either concrete or template")
+                };
+
+                if rendered.is_some() && noarch.is_some() {
+                    return Err(ParseError::invalid_value(
+                        "subdir",
+                        "`build.subdir` cannot be combined with `build.noarch`",
+                        span,
+                    ));
+                }
+
+                rendered
+            }
+        };
+
         // Evaluate skip conditions as Jinja boolean expressions
         // This tracks accessed variables for proper variant hash computation
         let skip = evaluate_skip_list(&self.skip, context)?;
@@ -2190,6 +2224,7 @@ impl Evaluate for Stage0Build {
             string,
             script,
             noarch,
+            subdir,
             flags,
             python,
             skip,
@@ -2894,11 +2929,6 @@ impl Evaluate for Stage0Recipe {
             })
             .collect();
 
-        // Ensure that `target_platform` is set to "noarch" for noarch packages
-        if !noarch.is_none() {
-            actual_variant.insert("target_platform".into(), Variable::from_string("noarch"));
-        }
-
         // Add virtual packages from run requirements to the variant
         // Virtual packages (starting with '__') should be included in the hash
         for dep in &requirements.run {
@@ -2955,6 +2985,9 @@ fn merge_stage1_build(
 
     // Noarch: inherit from top-level if not set in output
     let noarch = output.noarch.or(toplevel.noarch);
+
+    // Subdir override: inherit from top-level if not set in output
+    let subdir = output.subdir.or(toplevel.subdir);
 
     // V3 package flags: use output if not empty, otherwise inherit from top-level
     let flags = if output.flags.is_empty() {
@@ -3031,6 +3064,7 @@ fn merge_stage1_build(
         number,
         string,
         noarch,
+        subdir,
         flags,
         python,
         skip,
@@ -3177,6 +3211,9 @@ fn evaluate_package_output_to_recipe(
         }
         if output_build.noarch.is_none() {
             output_build.noarch = toplevel_build.noarch;
+        }
+        if output_build.subdir.is_none() {
+            output_build.subdir = toplevel_build.subdir;
         }
         if output_build.python.is_default() {
             output_build.python = toplevel_build.python;
@@ -3336,11 +3373,6 @@ fn evaluate_package_output_to_recipe(
         })
         .map(|(k, v)| (NormalizedKey::from(k.as_str()), v.clone()))
         .collect();
-
-    // Ensure that `target_platform` is set to "noarch" for noarch packages
-    if !noarch.is_none() {
-        actual_variant.insert("target_platform".into(), Variable::from_string("noarch"));
-    }
 
     // Add virtual packages from run requirements to the variant
     // Virtual packages (starting with '__') should be included in the hash
@@ -4077,6 +4109,40 @@ requirements:
         assert_undefined_with_default_hint(&eval(cond, &[]).unwrap_err());
         // Invalid noarch types are still rejected.
         assert!(eval(r#"${{ "banana" }}"#, &[]).is_err());
+    }
+
+    #[test]
+    fn test_build_subdir() {
+        let eval = |subdir: &str, vars: &[(&str, Variable)]| {
+            let recipe = format!(
+                "schema_version: 1\n\npackage:\n  name: p\n  version: \"1.0\"\n\nbuild:\n  subdir: {subdir}\n"
+            );
+            evaluate_recipe_with_vars(&recipe, vars).map(|r| r.build.subdir)
+        };
+
+        // Concrete platform
+        assert_eq!(
+            eval("linux-aarch64", &[]).unwrap(),
+            Some(Platform::LinuxAarch64)
+        );
+        // Template
+        assert_eq!(
+            eval(
+                "${{ my_subdir }}",
+                &[("my_subdir", Variable::from("osx-arm64"))]
+            )
+            .unwrap(),
+            Some(Platform::OsxArm64)
+        );
+        // A template rendering to an invalid platform is rejected
+        assert!(eval(r#"${{ "not-a-platform" }}"#, &[]).is_err());
+    }
+
+    #[test]
+    fn test_build_subdir_conflicts_with_noarch() {
+        let recipe = "schema_version: 1\n\npackage:\n  name: p\n  version: \"1.0\"\n\nbuild:\n  noarch: generic\n  subdir: linux-64\n";
+        let err = evaluate_recipe_with_vars(recipe, &[]).unwrap_err();
+        assert!(err.to_string().contains("cannot be combined"));
     }
 
     /// #2544: `down_prioritize_variant` referencing a variant key that is only

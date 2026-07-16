@@ -919,13 +919,12 @@ pub fn package_conda(
 
     print_enhanced_file_listing(&files, &tmp, output)?;
 
-    let output_folder =
-        local_channel_dir.join(output.build_configuration.target_platform.to_string());
+    let output_folder = local_channel_dir.join(output.subdir().to_string());
     tracing::info!("Creating target folder '{}'", output_folder.display());
 
     fs::create_dir_all(&output_folder)?;
 
-    if let Platform::NoArch = output.build_configuration.target_platform {
+    if let Platform::NoArch = output.subdir() {
         create_empty_build_folder(
             local_channel_dir,
             &output.build_configuration.build_platform.platform,

@@ -146,7 +146,7 @@ pub fn get_relinker(platform: Platform, path: &Path) -> Result<Box<dyn Relinker>
 /// `@loader_path` variable. The change for Mach-O files is applied with the `install_name_tool`.
 pub fn relink(temp_files: &TempFiles, output: &Output) -> Result<(), RelinkError> {
     let dynamic_linking = &output.recipe.build().dynamic_linking;
-    let target_platform = output.build_configuration.target_platform;
+    let target_platform = output.subdir();
     let relocation_config = &dynamic_linking.binary_relocation;
 
     if target_platform == Platform::NoArch

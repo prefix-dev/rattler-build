@@ -394,7 +394,7 @@ pub fn vars(output: &Output, build_state: &str) -> HashMap<String, Option<String
     } else {
         insert!(vars, "CONDA_BUILD_CROSS_COMPILATION", "0");
     }
-    insert!(vars, "SUBDIR", output.target_platform().to_string());
+    insert!(vars, "SUBDIR", output.subdir().to_string());
     insert!(
         vars,
         "build_platform",
