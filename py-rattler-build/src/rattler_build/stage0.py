@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import tempfile
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -290,7 +291,11 @@ class Stage0Recipe(ABC):
             variant._siblings = variants
         return variants
 
-    def render_context(self, jinja_config: JinjaConfig | None = None) -> dict[str, Any]:
+    def render_context(
+        self,
+        jinja_config: JinjaConfig | None = None,
+        functions: dict[str, Callable[..., Any]] | None = None,
+    ) -> dict[str, Any]:
         """Render the ``context`` section and substitute it into the recipe.
 
         This is a lenient, lint-oriented render that does **not** resolve
@@ -307,12 +312,14 @@ class Stage0Recipe(ABC):
             jinja_config: Optional :class:`~rattler_build.jinja_config.JinjaConfig`.
                 When ``None`` a default config is used. Pass
                 ``allow_undefined=True`` to mirror the lenient behaviour.
+            functions: Optional mapping of helper names to Python callables that
+                are evaluated instead of preserving the helper call verbatim.
 
         Returns:
             The recipe as a plain dictionary with the context substituted.
         """
         config_inner = jinja_config._config if jinja_config is not None else None
-        return _render.render_context(self._wrapper, config_inner)
+        return _render.render_context(self._wrapper, config_inner, functions)
 
     def run_build(
         self,

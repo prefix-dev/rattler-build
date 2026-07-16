@@ -1239,12 +1239,60 @@ pub fn get_rattler_build_version() -> &'static str {
     env!("CARGO_PKG_VERSION")
 }
 
+/// Render Rattler-Build recipes without building them.
+///
+/// This is the programmatic equivalent of `rattler-build build --render-only`:
+/// outputs are discovered, skip-filtered, sorted topologically and, when
+/// `build_data.with_solve` is set, their dependencies are resolved. The
+/// returned outputs serialize to the same JSON the CLI prints.
+pub async fn render_recipes(
+    recipe_paths: Vec<std::path::PathBuf>,
+    build_data: &BuildData,
+    log_handler: &Option<console_utils::LoggingOutputHandler>,
+) -> Result<Vec<Output>, miette::Error> {
+    let tool_config = get_tool_config(build_data, log_handler)?;
+    let mut outputs = Vec::new();
+    for recipe_path in &recipe_paths {
+        let recipe_path = get_recipe_path(recipe_path)?;
+        tracing::info!("Processing recipe at path: {}", recipe_path.display());
+        let output = get_build_output(build_data, &recipe_path, &tool_config).await?;
+        outputs.extend(output);
+    }
+
+    // Sort outputs topologically even in render-only mode to show expected build order
+    sort_build_outputs_topologically(&mut outputs, build_data.up_to.as_deref())?;
+
+    if build_data.with_solve {
+        let mut updated_outputs = Vec::new();
+        for output in outputs {
+            updated_outputs.push(
+                output
+                    .resolve_dependencies(&tool_config, RunExportsDownload::DownloadMissing)
+                    .await
+                    .into_diagnostic()?,
+            );
+        }
+        outputs = updated_outputs;
+    }
+
+    Ok(outputs)
+}
+
 /// Build Rattler-Build recipes
 pub async fn build_recipes(
     recipe_paths: Vec<std::path::PathBuf>,
     build_data: BuildData,
     log_handler: &Option<console_utils::LoggingOutputHandler>,
 ) -> Result<(), miette::Error> {
+    if build_data.render_only {
+        let outputs = render_recipes(recipe_paths, &build_data, log_handler).await?;
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&outputs).into_diagnostic()?
+        );
+        return Ok(());
+    }
+
     let tool_config = get_tool_config(&build_data, log_handler)?;
     let mut outputs = Vec::new();
     for recipe_path in &recipe_paths {
@@ -1254,32 +1302,6 @@ pub async fn build_recipes(
         );
         let output = get_build_output(&build_data, recipe_path, &tool_config).await?;
         outputs.extend(output);
-    }
-
-    if build_data.render_only {
-        // Sort outputs topologically even in render-only mode to show expected build order
-        sort_build_outputs_topologically(&mut outputs, build_data.up_to.as_deref())?;
-
-        let outputs = if build_data.with_solve {
-            let mut updated_outputs = Vec::new();
-            for output in outputs {
-                updated_outputs.push(
-                    output
-                        .resolve_dependencies(&tool_config, RunExportsDownload::DownloadMissing)
-                        .await
-                        .into_diagnostic()?,
-                );
-            }
-            updated_outputs
-        } else {
-            outputs
-        };
-
-        println!(
-            "{}",
-            serde_json::to_string_pretty(&outputs).into_diagnostic()?
-        );
-        return Ok(());
     }
 
     // Skip noarch builds before the topological sort

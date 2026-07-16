@@ -54,3 +54,64 @@ def test_render_context_uses_jinja_config_platform() -> None:
 
     rendered = render_context(recipe, JinjaConfig(platform=PlatformConfig(target_platform="linux-64")))
     assert rendered["context"]["sel"] == "yes"
+
+
+def test_render_context_feeds_strings_forward_and_types_the_output() -> None:
+    recipe = {
+        "context": {
+            "version": "0.2025.39",
+            "major": '${{ (version | split("."))[0] }}',
+            "tag": "${{ 'weekly' if major == '0' else 'release' }}",
+            "combo": "${{ unknown_thing }}",
+            "ref": "prefix-${{ combo }}",
+        }
+    }
+
+    rendered = render_context(recipe)
+
+    # The output recovers YAML types for fully resolved entries...
+    assert rendered["context"]["major"] == 0
+    # ...but later entries see the rendered *string*, like a Jinja engine would.
+    assert rendered["context"]["tag"] == "weekly"
+    # Unresolved entries stay verbatim and references to them are not expanded.
+    assert rendered["context"]["combo"] == "${{ unknown_thing }}"
+    assert rendered["context"]["ref"] == "prefix-${{ combo }}"
+
+
+def test_render_context_with_functions_evaluates_mapped_helpers() -> None:
+    rendered = render_context(
+        Stage0Recipe.from_yaml(RECIPE),
+        functions={
+            "compiler": lambda lang: f"{lang}_compiler_stub",
+            "pin_subpackage": lambda name, **kwargs: f"subpackage_pin {name}",
+        },
+    )
+
+    # Mapped helpers are evaluated with the callable's return value.
+    assert rendered["requirements"]["build"] == ["c_compiler_stub"]
+    assert rendered["requirements"]["run"] == ["subpackage_pin mypkg"]
+    # Everything else keeps the default lenient behavior.
+    assert rendered["package"]["name"] == "mypkg"
+    assert rendered["build"]["string"] == "1_${{ unknown_var }}"
+
+
+def test_render_context_with_functions_forwards_kwargs() -> None:
+    recipe = {
+        "context": {"name": "abc"},
+        "requirements": {"run": ['${{ pin_subpackage("abc", exact=True) }}']},
+    }
+
+    def pin_subpackage(name: str, exact: bool = False) -> str:
+        return f"subpackage_pin {name} exact={exact}"
+
+    rendered = render_context(recipe, functions={"pin_subpackage": pin_subpackage})
+    assert rendered["requirements"]["run"] == ["subpackage_pin abc exact=True"]
+
+
+def test_render_context_with_raising_function_preserves_expression() -> None:
+    def broken(*args: object, **kwargs: object) -> str:
+        raise ValueError("boom")
+
+    recipe = {"requirements": {"build": ["${{ compiler('c') }}"]}}
+    rendered = render_context(recipe, functions={"compiler": broken})
+    assert rendered["requirements"]["build"] == ["${{ compiler('c') }}"]

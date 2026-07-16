@@ -7,6 +7,8 @@ into Stage1 recipes (fully evaluated and ready to build) using variant configura
 
 from __future__ import annotations
 
+import json
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -16,6 +18,7 @@ from rattler_build._rattler_build import (
     EnvironmentIsolation,
     RepodataRevision,
     build_rendered_variant_py,
+    render_recipes_py,
 )
 from rattler_build._rattler_build import render as _render
 from rattler_build.build_result import BuildResult
@@ -28,7 +31,11 @@ if TYPE_CHECKING:
 ContextValue = str | int | float | bool | list[str | int | float | bool]
 
 
-def render_context(recipe: Any, jinja_config: JinjaConfig | None = None) -> dict[str, Any]:
+def render_context(
+    recipe: Any,
+    jinja_config: JinjaConfig | None = None,
+    functions: dict[str, Callable[..., Any]] | None = None,
+) -> dict[str, Any]:
     """Render a recipe's ``context`` section and substitute it into the recipe.
 
     This is a lenient, lint-oriented render that does **not** resolve variants or
@@ -44,6 +51,10 @@ def render_context(recipe: Any, jinja_config: JinjaConfig | None = None) -> dict
         recipe: A :class:`~rattler_build.stage0.Stage0Recipe` or a plain recipe
             dictionary. A dictionary is rendered as-is, preserving its structure.
         jinja_config: Optional :class:`~rattler_build.jinja_config.JinjaConfig`.
+        functions: Optional mapping of helper names (e.g. ``compiler``,
+            ``pin_subpackage``) to Python callables. A mapped helper is evaluated
+            with the callable's return value instead of being preserved verbatim.
+            A callable that raises falls back to preserving the expression.
 
     Returns:
         The recipe as a plain dictionary with the context substituted.
@@ -52,7 +63,89 @@ def render_context(recipe: Any, jinja_config: JinjaConfig | None = None) -> dict
     # dict is passed through untouched.
     inner = getattr(recipe, "_wrapper", recipe)
     config_inner = jinja_config._config if jinja_config is not None else None
-    return _render.render_context(inner, config_inner)
+    return _render.render_context(inner, config_inner, functions)
+
+
+def render_recipes(
+    recipes: list[str | Path],
+    *,
+    up_to: str | None = None,
+    build_platform: str | None = None,
+    target_platform: str | None = None,
+    host_platform: str | None = None,
+    channels: list[str] | None = None,
+    variant_config: list[str | Path] | None = None,
+    variant_overrides: dict[str, list[str]] | None = None,
+    ignore_recipe_variants: bool = False,
+    with_solve: bool = False,
+    no_build_id: bool = False,
+    output_dir: str | Path | None = None,
+    auth_file: str | Path | None = None,
+    channel_priority: str | None = None,
+    allow_insecure_host: list[str] | None = None,
+    exclude_newer: datetime | None = None,
+    build_num: int | None = None,
+    build_string_prefix: str | None = None,
+    repodata_revision: RepodataRevision = RepodataRevision.LEGACY,
+) -> list[dict[str, Any]]:
+    """Render recipes without building them.
+
+    This is the programmatic equivalent of ``rattler-build build --render-only``:
+    each returned dictionary matches one entry of the JSON the CLI prints, with
+    the rendered ``recipe`` and its ``build_configuration`` (variant, subpackages,
+    ...). Outputs whose skip conditions evaluate to true are filtered out and the
+    remaining outputs are sorted topologically.
+
+    Args:
+        recipes: The recipe files or directories containing ``recipe.yaml``.
+        up_to: Only keep the outputs needed to build the named package.
+        build_platform: The build platform to use for rendering.
+        target_platform: The target platform for the rendering.
+        host_platform: The host platform for the rendering.
+        channels: Channels to use when resolving dependencies.
+        variant_config: Variant configuration files to use for rendering. A
+            ``variants.yaml`` next to the recipe is picked up automatically
+            unless ``ignore_recipe_variants`` is set.
+        variant_overrides: A dictionary of variant key-value pairs to override.
+        ignore_recipe_variants: Do not read the ``variants.yaml`` next to the recipe.
+        with_solve: Also resolve dependencies of the rendered outputs.
+        no_build_id: Don't use a build id (timestamp) in the work directory name.
+        output_dir: The output directory recorded in the build configuration.
+        auth_file: The authentication file.
+        channel_priority: The channel priority.
+        allow_insecure_host: Allow insecure hosts.
+        exclude_newer: Exclude packages newer than this timestamp from the solver.
+        build_num: Override the build number of the recipe.
+        build_string_prefix: Prefix to prepend to the default build string.
+        repodata_revision: Repodata revision controlling which recipe fields and
+            MatchSpec syntax are accepted.
+
+    Returns:
+        One dictionary per rendered output, in build order.
+    """
+    rendered = render_recipes_py(
+        recipes=[str(recipe) for recipe in recipes],
+        up_to=up_to,
+        build_platform=build_platform,
+        target_platform=target_platform,
+        host_platform=host_platform,
+        channel=channels,
+        variant_config=[str(path) for path in variant_config] if variant_config is not None else None,
+        variant_overrides=variant_overrides,
+        ignore_recipe_variants=ignore_recipe_variants,
+        with_solve=with_solve,
+        no_build_id=no_build_id,
+        output_dir=str(output_dir) if output_dir is not None else None,
+        auth_file=str(auth_file) if auth_file is not None else None,
+        channel_priority=channel_priority,
+        allow_insecure_host=allow_insecure_host,
+        exclude_newer=exclude_newer,
+        build_num=build_num,
+        build_string_prefix=build_string_prefix,
+        repodata_revision=repodata_revision,
+    )
+    result: list[dict[str, Any]] = json.loads(rendered)
+    return result
 
 
 class HashInfo:

@@ -322,14 +322,19 @@ pub fn render_recipe(
 ///   `pin_subpackage`, `cdt`, ...) are left **verbatim** as `${{ ... }}`;
 /// * `if` / `then` / `else` conditionals are preserved as-is.
 ///
+/// `functions` may map helper names to Python callables; a mapped helper is
+/// evaluated with the callable's return value instead of being preserved. A
+/// callable that raises falls back to preserving the expression verbatim.
+///
 /// A fully resolved scalar is re-parsed as a YAML scalar so that its type
 /// (int, bool, ...) is recovered, matching how the recipe would be read back.
 #[pyfunction]
-#[pyo3(signature = (recipe, jinja_config=None))]
+#[pyo3(signature = (recipe, jinja_config=None, functions=None))]
 pub fn render_context(
     py: Python<'_>,
     recipe: &Bound<'_, PyAny>,
     jinja_config: Option<PyJinjaConfig>,
+    functions: Option<Bound<'_, PyDict>>,
 ) -> PyResult<Py<PyAny>> {
     // Accept either a parsed Stage0 recipe or a raw recipe dictionary. The
     // dictionary path preserves the recipe's exact structure, which is what a
@@ -352,15 +357,41 @@ pub fn render_context(
     let mut jinja = Jinja::new(config);
     jinja.preserve_recipe_functions();
 
-    // Evaluate the `context` section in order and feed it forward.
-    if let Some(context) = tree.get("context").cloned() {
-        if let Some(map) = context.as_object() {
-            for (key, value) in map {
-                let resolved = render_json_scalar(&jinja, value);
-                jinja
-                    .context_mut()
-                    .insert(key.clone(), minijinja::Value::from_serialize(&resolved));
-            }
+    // Re-enable helpers the caller provided an implementation for. The global
+    // replaces the undefined shadow installed by `preserve_recipe_functions`.
+    if let Some(functions) = functions {
+        for (name, func) in functions.iter() {
+            let name = name.extract::<String>()?;
+            let func = func.unbind();
+            jinja.env_mut().add_global(
+                name,
+                minijinja::Value::from_function(python_jinja_function(func)),
+            );
+        }
+    }
+
+    // Evaluate the `context` section in order and feed it forward. Rendered
+    // entries are fed forward as *strings* — the same value a Jinja engine
+    // produces — so that comparisons in later entries (e.g.
+    // `${{ x if major == '0' else y }}`) keep working. The typed YAML re-parse
+    // only lands in the output tree. Entries that do not fully resolve are not
+    // fed forward at all, so a reference to them stays verbatim instead of
+    // having the unresolved template expanded into it.
+    if let Some(context) = tree.get("context").cloned()
+        && let Some(map) = context.as_object()
+    {
+        for (key, value) in map {
+            let context_value = match value.as_str() {
+                Some(source) if source.contains("${{") => {
+                    let rendered = substitute_expressions(&jinja, source);
+                    if rendered.contains("${{") {
+                        continue;
+                    }
+                    minijinja::Value::from(rendered)
+                }
+                _ => minijinja::Value::from_serialize(value),
+            };
+            jinja.context_mut().insert(key.clone(), context_value);
         }
     }
 
@@ -371,6 +402,70 @@ pub fn render_context(
         .map_err(|e| {
             RattlerBuildError::Other(format!("Failed to convert rendered recipe: {e}")).into()
         })
+}
+
+/// Wrap a Python callable as a minijinja function.
+///
+/// Positional arguments and keyword arguments are converted to Python values,
+/// the callable's result is converted back into a Jinja value. Any Python
+/// exception surfaces as a minijinja error, which `render_context` treats as
+/// "keep the expression verbatim".
+fn python_jinja_function(
+    func: Py<PyAny>,
+) -> impl Fn(minijinja::value::Rest<minijinja::Value>) -> Result<minijinja::Value, minijinja::Error>
++ Send
++ Sync
++ 'static {
+    use minijinja::ErrorKind;
+
+    fn invalid_op(message: String) -> minijinja::Error {
+        minijinja::Error::new(ErrorKind::InvalidOperation, message)
+    }
+
+    move |args: minijinja::value::Rest<minijinja::Value>| {
+        Python::attach(|py| {
+            // Keyword arguments arrive as a trailing kwargs-marked value.
+            let mut positional = args.0.as_slice();
+            let kwargs = positional
+                .last()
+                .filter(|last| last.is_kwargs())
+                .and_then(|last| minijinja::value::Kwargs::try_from(last.clone()).ok());
+            if kwargs.is_some() {
+                positional = &positional[..positional.len() - 1];
+            }
+
+            let py_args = positional
+                .iter()
+                .map(|value| pythonize::pythonize(py, value))
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(|e| invalid_op(format!("failed to convert argument: {e}")))?;
+            let py_args = pyo3::types::PyTuple::new(py, py_args)
+                .map_err(|e| invalid_op(format!("failed to build arguments: {e}")))?;
+
+            let py_kwargs = kwargs
+                .map(|kwargs| {
+                    let dict = PyDict::new(py);
+                    for key in kwargs.args() {
+                        let value: minijinja::Value = kwargs.get(key)?;
+                        let value = pythonize::pythonize(py, &value).map_err(|e| {
+                            invalid_op(format!("failed to convert keyword argument: {e}"))
+                        })?;
+                        dict.set_item(key, value)
+                            .map_err(|e| invalid_op(format!("failed to set keyword: {e}")))?;
+                    }
+                    Ok::<_, minijinja::Error>(dict)
+                })
+                .transpose()?;
+
+            let result = func
+                .call(py, py_args, py_kwargs.as_ref())
+                .map_err(|e| invalid_op(format!("python function raised: {e}")))?;
+
+            let json: serde_json::Value = pythonize::depythonize(result.bind(py))
+                .map_err(|e| invalid_op(format!("failed to convert return value: {e}")))?;
+            Ok(minijinja::Value::from_serialize(&json))
+        })
+    }
 }
 
 /// Render a single JSON scalar with the current Jinja context.
@@ -393,9 +488,56 @@ fn render_json_scalar(jinja: &Jinja, value: &serde_json::Value) -> serde_json::V
     } else {
         // Fully resolved: recover the scalar type (int/bool/...) the way YAML
         // would read it back.
-        serde_yaml::from_str::<serde_json::Value>(&rendered)
-            .unwrap_or(serde_json::Value::String(rendered))
+        reparse_yaml_scalar(&rendered)
     }
+}
+
+/// Re-parse a fully rendered scalar as YAML to recover its type, the way the
+/// value would be read back from a rendered recipe file.
+///
+/// Escape sequences are escaped before parsing so a rendered value containing
+/// newlines survives as a single-line plain scalar instead of being folded or
+/// rejected by the YAML parser; a string result is unescaped again.
+fn reparse_yaml_scalar(rendered: &str) -> serde_json::Value {
+    let escaped = rendered
+        .replace('\\', "\\\\")
+        .replace('\n', "\\n")
+        .replace('\t', "\\t")
+        .replace('\r', "\\r");
+
+    match serde_yaml::from_str::<serde_json::Value>(&escaped) {
+        Ok(serde_json::Value::String(s)) => serde_json::Value::String(unescape_scalar(&s)),
+        // A scalar must stay a scalar: a rendered value that happens to parse
+        // as a mapping or list (e.g. "foo: bar") is kept as a string.
+        Ok(serde_json::Value::Object(_)) | Ok(serde_json::Value::Array(_)) | Err(_) => {
+            serde_json::Value::String(rendered.to_string())
+        }
+        Ok(other) => other,
+    }
+}
+
+/// Reverse the escaping applied in [`reparse_yaml_scalar`].
+fn unescape_scalar(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let mut chars = s.chars();
+    while let Some(c) = chars.next() {
+        if c != '\\' {
+            out.push(c);
+            continue;
+        }
+        match chars.next() {
+            Some('n') => out.push('\n'),
+            Some('t') => out.push('\t'),
+            Some('r') => out.push('\r'),
+            Some('\\') => out.push('\\'),
+            Some(other) => {
+                out.push('\\');
+                out.push(other);
+            }
+            None => out.push('\\'),
+        }
+    }
+    out
 }
 
 /// Replace every `${{ ... }}` expression in `source` by rendering it on its
