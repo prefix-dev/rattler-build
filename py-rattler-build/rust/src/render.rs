@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use indexmap::IndexMap;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
-use rattler_build_jinja::Variable;
+use rattler_build_jinja::{Jinja, UndefinedBehavior, Variable};
 use rattler_build_recipe::variant_render::{
     RenderConfig as RustRenderConfig, RenderedVariant as RustRenderedVariant,
     render_recipe_with_variant_config,
@@ -13,6 +13,7 @@ use rattler_conda_types::Platform;
 use rattler_build_script::EnvironmentIsolation;
 
 use crate::error::RattlerBuildError;
+use crate::jinja_config::PyJinjaConfig;
 use crate::repodata_revision::PyRepodataRevision;
 use crate::stage0::PyStage0Recipe;
 use crate::stage1::PyStage1Recipe;
@@ -307,6 +308,142 @@ pub fn render_recipe(
         .collect())
 }
 
+/// Render the `context` section of a recipe and substitute the resulting
+/// variables into the rest of the recipe, *without* resolving variants or
+/// lowering to Stage1. `recipe` may be a `Stage0Recipe` or a plain recipe
+/// dictionary; a dictionary is rendered as-is, preserving its exact structure.
+///
+/// Semantics (a lenient, lint-oriented render):
+/// * the `context` section is evaluated in order, so later entries may use
+///   earlier ones;
+/// * plain variables and filters (`version_to_buildstring`, `split`, ...) are
+///   resolved with rattler-build's own Jinja engine;
+/// * undefined variables and recipe helper functions (`compiler`,
+///   `pin_subpackage`, `cdt`, ...) are left **verbatim** as `${{ ... }}`;
+/// * `if` / `then` / `else` conditionals are preserved as-is.
+///
+/// A fully resolved scalar is re-parsed as a YAML scalar so that its type
+/// (int, bool, ...) is recovered, matching how the recipe would be read back.
+#[pyfunction]
+#[pyo3(signature = (recipe, jinja_config=None))]
+pub fn render_context(
+    py: Python<'_>,
+    recipe: &Bound<'_, PyAny>,
+    jinja_config: Option<PyJinjaConfig>,
+) -> PyResult<Py<PyAny>> {
+    // Accept either a parsed Stage0 recipe or a raw recipe dictionary. The
+    // dictionary path preserves the recipe's exact structure, which is what a
+    // linter wants.
+    let mut tree = if let Ok(stage0) = recipe.extract::<PyRef<PyStage0Recipe>>() {
+        serde_json::to_value(&stage0.inner).map_err(RattlerBuildError::from)?
+    } else {
+        pythonize::depythonize(recipe).map_err(|e| {
+            RattlerBuildError::Other(format!("Expected a Stage0 recipe or a dict: {e}"))
+        })?
+    };
+
+    let mut config = jinja_config.map(|c| c.inner).unwrap_or_default();
+    // Context rendering must keep undefined variables verbatim, so force a
+    // strict engine: an undefined variable then errors and the original
+    // `${{ ... }}` source is preserved instead of rendering to an empty string.
+    config.undefined_behavior = UndefinedBehavior::Strict;
+
+    // Build the engine and disable recipe helper functions so they survive.
+    let mut jinja = Jinja::new(config);
+    jinja.preserve_recipe_functions();
+
+    // Evaluate the `context` section in order and feed it forward.
+    if let Some(context) = tree.get("context").cloned() {
+        if let Some(map) = context.as_object() {
+            for (key, value) in map {
+                let resolved = render_json_scalar(&jinja, value);
+                jinja
+                    .context_mut()
+                    .insert(key.clone(), minijinja::Value::from_serialize(&resolved));
+            }
+        }
+    }
+
+    render_tree(&mut tree, &jinja);
+
+    pythonize::pythonize(py, &tree)
+        .map(|obj| obj.into())
+        .map_err(|e| {
+            RattlerBuildError::Other(format!("Failed to convert rendered recipe: {e}")).into()
+        })
+}
+
+/// Render a single JSON scalar with the current Jinja context.
+///
+/// Non-strings and strings without a `${{` marker pass through unchanged.
+/// Each `${{ ... }}` expression is rendered on its own so that a scalar mixing
+/// resolvable and unresolvable expressions (e.g.
+/// `${{ name }}-${{ unknown }}`) keeps only the unresolved part verbatim.
+fn render_json_scalar(jinja: &Jinja, value: &serde_json::Value) -> serde_json::Value {
+    let Some(source) = value.as_str() else {
+        return value.clone();
+    };
+    if !source.contains("${{") {
+        return value.clone();
+    }
+    let rendered = substitute_expressions(jinja, source);
+    if rendered.contains("${{") {
+        // Something was left unresolved, keep it as a string.
+        serde_json::Value::String(rendered)
+    } else {
+        // Fully resolved: recover the scalar type (int/bool/...) the way YAML
+        // would read it back.
+        serde_yaml::from_str::<serde_json::Value>(&rendered)
+            .unwrap_or(serde_json::Value::String(rendered))
+    }
+}
+
+/// Replace every `${{ ... }}` expression in `source` by rendering it on its
+/// own. An expression that fails to render (undefined variable or a preserved
+/// helper function) is kept verbatim.
+fn substitute_expressions(jinja: &Jinja, source: &str) -> String {
+    let mut out = String::new();
+    let mut rest = source;
+    while let Some(start) = rest.find("${{") {
+        out.push_str(&rest[..start]);
+        let after = &rest[start..];
+        match after.find("}}") {
+            Some(end) => {
+                let expr = &after[..end + 2];
+                match jinja.render_str(expr) {
+                    Ok(rendered) => out.push_str(&rendered),
+                    Err(_) => out.push_str(expr),
+                }
+                rest = &after[end + 2..];
+            }
+            None => {
+                out.push_str(after);
+                return out;
+            }
+        }
+    }
+    out.push_str(rest);
+    out
+}
+
+/// Recursively render every templated string in the tree in place.
+fn render_tree(value: &mut serde_json::Value, jinja: &Jinja) {
+    match value {
+        serde_json::Value::String(_) => *value = render_json_scalar(jinja, value),
+        serde_json::Value::Array(items) => {
+            for item in items {
+                render_tree(item, jinja);
+            }
+        }
+        serde_json::Value::Object(map) => {
+            for (_key, v) in map.iter_mut() {
+                render_tree(v, jinja);
+            }
+        }
+        _ => {}
+    }
+}
+
 /// Helper function to convert Python values to Variable
 fn python_to_variable(value: Bound<'_, PyAny>) -> PyResult<Variable> {
     if let Ok(b) = value.extract::<bool>() {
@@ -384,6 +521,7 @@ pub fn register_render_module(py: Python<'_>, parent: &Bound<'_, PyModule>) -> P
     m.add_class::<PyHashInfo>()?;
     m.add_class::<PyPinSubpackageInfo>()?;
     m.add_function(wrap_pyfunction!(render_recipe, &m)?)?;
+    m.add_function(wrap_pyfunction!(render_context, &m)?)?;
     parent.add_submodule(&m)?;
     Ok(())
 }

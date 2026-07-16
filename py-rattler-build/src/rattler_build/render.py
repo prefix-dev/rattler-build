@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from rattler_build import stage1
 from rattler_build._rattler_build import (
@@ -22,9 +22,37 @@ from rattler_build.build_result import BuildResult
 from rattler_build.tool_config import PlatformConfig, ToolConfiguration
 
 if TYPE_CHECKING:
+    from rattler_build.jinja_config import JinjaConfig
     from rattler_build.progress import ProgressCallback
 
 ContextValue = str | int | float | bool | list[str | int | float | bool]
+
+
+def render_context(recipe: Any, jinja_config: JinjaConfig | None = None) -> dict[str, Any]:
+    """Render a recipe's ``context`` section and substitute it into the recipe.
+
+    This is a lenient, lint-oriented render that does **not** resolve variants or
+    lower the recipe to Stage1:
+
+    * the ``context`` section is evaluated in order;
+    * plain variables and filters are resolved with rattler-build's Jinja engine;
+    * undefined variables and recipe helper functions (``compiler``,
+      ``pin_subpackage``, ...) are left verbatim as ``${{ ... }}``;
+    * ``if`` / ``then`` / ``else`` conditionals are preserved.
+
+    Args:
+        recipe: A :class:`~rattler_build.stage0.Stage0Recipe` or a plain recipe
+            dictionary. A dictionary is rendered as-is, preserving its structure.
+        jinja_config: Optional :class:`~rattler_build.jinja_config.JinjaConfig`.
+
+    Returns:
+        The recipe as a plain dictionary with the context substituted.
+    """
+    # Unwrap the Python Stage0Recipe wrapper to its inner Rust object; a plain
+    # dict is passed through untouched.
+    inner = getattr(recipe, "_wrapper", recipe)
+    config_inner = jinja_config._config if jinja_config is not None else None
+    return _render.render_context(inner, config_inner)
 
 
 class HashInfo:

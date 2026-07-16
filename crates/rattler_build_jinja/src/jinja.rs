@@ -294,6 +294,43 @@ impl Jinja {
         expr.eval(Value::from_object(tracking_context))
     }
 
+    /// Override the build-phase recipe helper functions (`compiler`,
+    /// `pin_subpackage`, `cdt`, `match`, `env`, `git`, ...) so that calling
+    /// them raises an error instead of being evaluated.
+    ///
+    /// This is used for *context rendering*: resolving the `context` section,
+    /// plain variables, filters and platform predicates (`is_linux`, ...)
+    /// while leaving build-phase expressions such as `${{ compiler('c') }}` or
+    /// `${{ pin_subpackage('foo') }}` untouched. The intended use is to render
+    /// every scalar on its own and keep the original source whenever
+    /// [`Self::render_str`] fails, so that unresolved helper calls survive
+    /// verbatim for the caller to interpret. The platform predicates are left
+    /// resolvable on purpose, since the platform is known at context time.
+    pub fn preserve_recipe_functions(&mut self) -> &mut Self {
+        const PRESERVED: &[&str] = &[
+            "compiler",
+            "stdlib",
+            "pin_subpackage",
+            "pin_compatible",
+            "cdt",
+            "match",
+            "env",
+            "git",
+            "load_from_file",
+            "hash",
+            "cmp",
+        ];
+        // Shadow each helper with an *undefined* value rather than an erroring
+        // function: that way both a call (`${{ compiler('c') }}`) and a bare
+        // reference (`${{ hash }}`) resolve to undefined and, under the strict
+        // undefined behavior used for context rendering, error out so the
+        // caller can keep the original `${{ ... }}` source verbatim.
+        for name in PRESERVED {
+            self.env.add_global(*name, Value::UNDEFINED);
+        }
+        self
+    }
+
     /// Get the set of variables that were accessed during rendering
     pub fn accessed_variables(&self) -> HashSet<String> {
         self.accessed_variables
@@ -1402,7 +1439,29 @@ mod tests {
     }
 
     #[test]
+    fn preserve_recipe_functions_keeps_helpers_but_renders_context() {
+        let mut jinja = Jinja::new(JinjaConfig {
+            target_platform: Platform::Linux64,
+            host_platform: Platform::Linux64,
+            build_platform: Platform::Linux64,
+            ..Default::default()
+        });
+        jinja.preserve_recipe_functions();
+        jinja
+            .context_mut()
+            .insert("name".to_string(), Value::from("foo"));
 
+        // Plain context variables and filters still resolve.
+        assert_eq!(jinja.render_str("${{ name }}").unwrap(), "foo");
+        assert_eq!(jinja.render_str("${{ 'A-B' | lower }}").unwrap(), "a-b");
+
+        // Recipe helper functions error out so the caller can keep the source.
+        assert!(jinja.render_str("${{ compiler('c') }}").is_err());
+        assert!(jinja.render_str("${{ pin_subpackage('foo') }}").is_err());
+        assert!(jinja.render_str("${{ cdt('bar') }}").is_err());
+    }
+
+    #[test]
     fn eval() {
         let options = JinjaConfig {
             target_platform: Platform::Linux64,
