@@ -4320,6 +4320,7 @@ dependencies = [
  "indicatif",
  "jiff",
  "miette",
+ "minijinja",
  "pyo3",
  "pyo3-build-config",
  "pythonize",
