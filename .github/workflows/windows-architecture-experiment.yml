@@ -27,11 +27,22 @@ jobs:
           cache: true
       - name: Build release binary
         run: pixi run build-release
+      - name: Stage x64 binary
+        shell: pwsh
+        run: |
+          $binary = Get-ChildItem target-pixi -Recurse -Filter rattler-build.exe |
+            Where-Object { $_.DirectoryName -match "\\release$" } |
+            Select-Object -First 1
+          if ($null -eq $binary) {
+            throw "Could not find the x64 release binary."
+          }
+          New-Item -ItemType Directory -Path staging | Out-Null
+          Copy-Item $binary.FullName staging/rattler-build.exe
       - name: Upload x64 binary
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: rattler-build-x64
-          path: target/release/rattler-build.exe
+          path: staging/rattler-build.exe
           if-no-files-found: error
 
   run-on-arm64:
