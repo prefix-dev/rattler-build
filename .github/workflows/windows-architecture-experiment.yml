@@ -62,6 +62,12 @@ jobs:
           if ($rattlerBuildExitCode -eq 0) {
             throw "Expected the recipe's intentional exit code 37 to fail the build."
           }
+          if ($outputText -notmatch "PROCESSOR_ARCHITECTURE=ARM64") {
+            throw "Expected the activated environment to report ARM64."
+          }
+          if ($outputText -notmatch "ProcessArchitecture=ARM64") {
+            throw "Expected the launched PowerShell process to be ARM64."
+          }
           if ($outputText -notmatch "Script failed with status 37") {
             throw "Expected rattler-build to report the child exit code 37."
           }

@@ -1,5 +1,6 @@
 @echo off
 
+echo PROCESSOR_ARCHITECTURE=%PROCESSOR_ARCHITECTURE%
 if /I not "%PROCESSOR_ARCHITECTURE%" == "ARM64" exit /b 64
 if not "%PROCESSOR_ARCHITEW6432%" == "" exit /b 65
 
