@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use rattler_conda_types::Platform;
 
 use super::{InterpreterInvocation, InterpreterSearchScope};
-use crate::runtime::RuntimeEnv;
+use crate::ExecutionContext;
 
 pub struct CmdExeInvocation;
 
@@ -35,21 +35,19 @@ impl InterpreterInvocation for CmdExeInvocation {
 
     fn resolve_executable(
         &self,
-        build_prefix: Option<&Path>,
-        run_prefix: &Path,
-        runtime: &RuntimeEnv,
+        context: &ExecutionContext,
     ) -> Result<PathBuf, super::InterpreterError> {
-        let platform = runtime.platform();
+        let platform = context.build().platform();
         let scope = self.search_scope(&platform);
         if platform.is_windows()
             && scope.allows_system_fallback()
-            && let Some(comspec) = runtime.var("COMSPEC")
+            && let Some(comspec) = context.runtime().var("COMSPEC")
             && comspec.to_lowercase().contains("cmd.exe")
         {
             return Ok(PathBuf::from(comspec));
         }
 
-        super::find_interpreter("cmd", build_prefix, run_prefix, runtime, scope)
+        super::find_interpreter("cmd", context, scope)
             .ok_or_else(|| super::InterpreterError::InterpreterNotFound("cmd".to_string()))
     }
 

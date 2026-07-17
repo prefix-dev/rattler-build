@@ -4,7 +4,8 @@ use std::path::Path;
 use indexmap::IndexMap;
 use rattler_shell::shell::{self, Shell};
 
-use super::NativeShellRunner;
+use super::{CommandSpec, NativeShellRunner, windows_machine_transition};
+use crate::{ExecutionContext, PrefixLayout};
 
 pub(crate) struct CmdExeNativeRunner;
 
@@ -33,8 +34,43 @@ IF "%CONDA_BUILD%" == "" (
         )
     }
 
-    fn command_to_run_script<'a>(&self, build_script_path: &'a str) -> Vec<&'a str> {
-        vec!["cmd.exe", "/d", "/c", build_script_path]
+    fn command_to_run_script(
+        &self,
+        build_script_path: &Path,
+        context: &ExecutionContext,
+    ) -> CommandSpec {
+        if let Some(machine) = windows_machine_transition(
+            context.runtime().process_platform(),
+            context.build().platform(),
+        ) {
+            let script_name = build_script_path
+                .file_name()
+                .expect("generated build script has a filename")
+                .to_string_lossy();
+            let command = format!(
+                "start /b /wait /machine {} cmd.exe /d /c {} & exit /b !ERRORLEVEL!",
+                machine.start_argument(),
+                script_name,
+            );
+            CommandSpec::new(
+                "cmd.exe",
+                [
+                    "/d".to_string(),
+                    "/v:on".to_string(),
+                    "/c".to_string(),
+                    command,
+                ],
+            )
+        } else {
+            CommandSpec::new(
+                "cmd.exe",
+                [
+                    "/d".to_string(),
+                    "/c".to_string(),
+                    build_script_path.to_string_lossy().into_owned(),
+                ],
+            )
+        }
     }
 
     fn replacements_template(&self) -> &'static str {
@@ -75,26 +111,30 @@ IF "%CONDA_BUILD%" == "" (
     }
 
     /// Returns reproduction instructions for the failed cmd wrapper script.
-    fn debug_info(
-        &self,
-        work_dir: &Path,
-        run_prefix: &Path,
-        build_prefix: Option<&Path>,
-    ) -> String {
+    fn debug_info(&self, work_dir: &Path, context: &ExecutionContext) -> String {
         let mut output = String::new();
 
         output.push_str("\nScript execution failed.\n\n");
         output.push_str(&format!("  Work directory: {}\n", work_dir.display()));
-        output.push_str(&format!("  Prefix: {}\n", run_prefix.display()));
+        output.push_str(&format!("  Prefix: {}\n", context.host().path().display()));
 
-        if let Some(build_prefix) = build_prefix {
-            output.push_str(&format!("  Build prefix: {}\n", build_prefix.display()));
+        if context.layout() == PrefixLayout::Separate {
+            output.push_str(&format!(
+                "  Build prefix: {}\n",
+                context.build().path().display()
+            ));
         } else {
             output.push_str("  Build prefix: None\n");
         }
 
+        let command = self.command_to_run_script(&work_dir.join("conda_build.bat"), context);
         output.push_str("\nTo run the script manually, use the following command:\n");
-        output.push_str(&format!("  cd {:?} && ./conda_build.bat\n\n", work_dir));
+        output.push_str(&format!(
+            "  cd {:?} && {} {}\n\n",
+            work_dir,
+            command.program,
+            command.args.join(" ")
+        ));
         output.push_str("To run commands interactively in the build environment:\n");
         output.push_str(&format!("  cd {:?} && call build_env.bat", work_dir));
 

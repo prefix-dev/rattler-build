@@ -9,8 +9,8 @@ use rattler_build_jinja::Jinja;
 
 // Re-export from rattler_build_script
 pub use rattler_build_script::{
-    ExecutionArgs, InterpreterError, ResolvedScriptContents, RuntimeEnv, SandboxArguments,
-    SandboxConfiguration, Script, ScriptContent, platform_script_extensions,
+    ExecutionArgs, ExecutionContext, InterpreterError, ResolvedScriptContents, RuntimeEnv,
+    SandboxArguments, SandboxConfiguration, Script, ScriptContent, platform_script_extensions,
 };
 
 use crate::{
@@ -37,6 +37,7 @@ impl Output {
             &host_prefix,
             &target_platform,
             &host_platform,
+            &self.build_configuration.build_platform.platform,
             env_isolation,
             &self.build_configuration.directories.work_dir,
         ));
@@ -44,10 +45,21 @@ impl Output {
 
         let jinja_renderer = self.jinja_renderer();
 
-        let build_prefix = if self.recipe.build().merge_build_and_host_envs {
-            None
+        let context = if self.recipe.build().merge_build_and_host_envs {
+            ExecutionContext::shared(
+                RuntimeEnv::current(),
+                &host_prefix,
+                self.build_configuration.build_platform.platform,
+                host_platform,
+            )
         } else {
-            Some(&self.build_configuration.directories.build_prefix)
+            ExecutionContext::separate(
+                RuntimeEnv::current(),
+                &self.build_configuration.directories.build_prefix,
+                self.build_configuration.build_platform.platform,
+                &host_prefix,
+                host_platform,
+            )
         };
 
         let work_dir = &self.build_configuration.directories.work_dir;
@@ -63,9 +75,7 @@ impl Output {
                 .filter_map(|(k, v)| v.map(|v| (k, v)))
                 .collect(),
             secrets: IndexMap::new(),
-            build_prefix: build_prefix.map(|p| p.to_owned()),
-            run_prefix: host_prefix,
-            runtime: RuntimeEnv::current(),
+            context,
             work_dir: work_dir.clone(),
             sandbox_config: self.build_configuration.sandbox_config().cloned(),
             env_isolation,
@@ -101,12 +111,9 @@ impl Output {
             Err(err) => return Err(err.into()),
         }
 
-        let exec_args = self.prepare_build_script().await?;
-        let build_prefix = if self.recipe.build().merge_build_and_host_envs {
-            None
-        } else {
-            Some(&self.build_configuration.directories.build_prefix)
-        };
+        let mut exec_args = self.prepare_build_script().await?;
+        exec_args.apply_platform_environment();
+        let context = exec_args.context.clone();
 
         // Create Jinja context with environment variables
         let mut jinja = Jinja::new(self.build_configuration.selector_config())
@@ -134,8 +141,7 @@ impl Output {
                     .collect(),
                 &self.build_configuration.directories.work_dir,
                 &self.build_configuration.directories.recipe_dir,
-                &self.build_configuration.directories.host_prefix,
-                build_prefix,
+                context,
                 Some(jinja_renderer),
                 self.build_configuration.sandbox_config(),
                 self.build_configuration.env_isolation,

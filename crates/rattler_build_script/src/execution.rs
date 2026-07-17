@@ -4,9 +4,9 @@
 //! [`generate_build_script`], executes them with [`run_script`], and provides
 //! subprocess output handling via [`run_process_with_replacements`].
 
-use crate::runtime::RuntimeEnv;
 use crate::sandbox::SandboxConfiguration;
 use crate::script::{Script, ScriptContent};
+use crate::{execution_context::ExecutionContext, runtime::RuntimeEnv};
 use fs_err as fs;
 use futures::TryStreamExt;
 use indexmap::IndexMap;
@@ -82,14 +82,8 @@ pub struct ExecutionArgs {
     /// Secrets to set as env vars and replace in the output
     pub secrets: IndexMap<String, String>,
 
-    /// The environment rattler-build is running in: process environment
-    /// variables (including `PATH`) and the platform scripts execute on.
-    pub runtime: RuntimeEnv,
-
-    /// The build prefix that should contain the interpreter to use
-    pub build_prefix: Option<PathBuf>,
-    /// The prefix to use for the script execution
-    pub run_prefix: PathBuf,
+    /// Process and platform-aware build and host prefixes for this execution.
+    pub context: ExecutionContext,
 
     /// The working directory (`cwd`) in which the script should execute
     pub work_dir: PathBuf,
@@ -107,14 +101,12 @@ impl ExecutionArgs {
     /// will be replaced with the actual variable name.
     pub(crate) fn replacements(&self, template: &str) -> HashMap<String, String> {
         let mut replacements = HashMap::new();
-        if let Some(build_prefix) = &self.build_prefix {
-            replacements.insert(
-                build_prefix.display().to_string(),
-                template.replace("((var))", "BUILD_PREFIX"),
-            );
-        };
         replacements.insert(
-            self.run_prefix.display().to_string(),
+            self.context.build().path().display().to_string(),
+            template.replace("((var))", "BUILD_PREFIX"),
+        );
+        replacements.insert(
+            self.context.host().path().display().to_string(),
             template.replace("((var))", "PREFIX"),
         );
 
@@ -135,6 +127,23 @@ impl ExecutionArgs {
         });
 
         replacements
+    }
+
+    /// Normalizes mutable Windows process architecture variables when the
+    /// configured build environment deliberately switches between x64 and ARM64.
+    pub fn apply_platform_environment(&mut self) {
+        if let Some(machine) = crate::native_runner::windows_machine_transition(
+            self.context.runtime().process_platform(),
+            self.context.build().platform(),
+        ) {
+            self.env_vars.insert(
+                "PROCESSOR_ARCHITECTURE".to_string(),
+                machine.processor_architecture().to_string(),
+            );
+            // `set "VAR="` in build_env.bat removes this compatibility marker.
+            self.env_vars
+                .insert("PROCESSOR_ARCHITEW6432".to_string(), String::new());
+        }
     }
 }
 
@@ -194,8 +203,7 @@ impl Script {
         env_vars: HashMap<String, Option<String>>,
         work_dir: &Path,
         recipe_dir: &Path,
-        run_prefix: &Path,
-        build_prefix: Option<&PathBuf>,
+        context: ExecutionContext,
         jinja_renderer: Option<F>,
         sandbox_config: Option<&SandboxConfiguration>,
         env_isolation: EnvironmentIsolation,
@@ -215,7 +223,7 @@ impl Script {
             crate::platform_script_extensions(),
         )?;
 
-        let runtime = RuntimeEnv::current();
+        let runtime = context.runtime();
 
         let secrets = self
             .secrets()
@@ -233,25 +241,24 @@ impl Script {
             .collect::<IndexMap<String, String>>();
 
         let work_dir = if let Some(cwd) = self.cwd.as_ref() {
-            run_prefix.join(cwd)
+            context.host().path().join(cwd)
         } else {
             work_dir.to_owned()
         };
 
         tracing::debug!("Running script in {}", work_dir.display());
 
-        let exec_args = ExecutionArgs {
+        let mut exec_args = ExecutionArgs {
             script: contents,
             interpreter: self.interpreter.clone(),
             env_vars,
             secrets,
-            build_prefix: build_prefix.map(|p| p.to_owned()),
-            run_prefix: run_prefix.to_owned(),
-            runtime,
+            context,
             work_dir,
             sandbox_config: sandbox_config.cloned(),
             env_isolation,
         };
+        exec_args.apply_platform_environment();
 
         crate::execution::run_script(exec_args).await?;
 
@@ -475,7 +482,7 @@ fn section_script_filename(extension: &str, index: SectionIndex) -> String {
 pub(crate) async fn generate_build_script(
     args: &ExecutionArgs,
 ) -> Result<PathBuf, crate::InterpreterError> {
-    let runner = crate::native_runner::native_runner(args.runtime.platform());
+    let runner = crate::native_runner::native_runner(args.context.runtime().process_platform());
     let shell = runner.shell();
 
     let script_extension = shell.extension();
@@ -605,11 +612,7 @@ async fn build_section_body(
     };
 
     // Resolve from the activated environment (build/host prefix, then PATH).
-    let executable = interpreter.resolve_executable(
-        args.build_prefix.as_deref(),
-        &args.run_prefix,
-        &args.runtime,
-    )?;
+    let executable = interpreter.resolve_executable(&args.context)?;
 
     // Quote so a prefix or script path with spaces survives the native shell.
     let mut command = vec![executable.to_string_lossy().into_owned()];
@@ -627,14 +630,17 @@ async fn build_section_body(
 }
 
 /// Runs a script with the given execution arguments.
-pub(crate) async fn run_script(exec_args: ExecutionArgs) -> Result<(), crate::InterpreterError> {
-    let runner = crate::native_runner::native_runner(exec_args.runtime.platform());
+pub(crate) async fn run_script(
+    mut exec_args: ExecutionArgs,
+) -> Result<(), crate::InterpreterError> {
+    exec_args.apply_platform_environment();
+    let runner =
+        crate::native_runner::native_runner(exec_args.context.runtime().process_platform());
     let build_script_path = generate_build_script(&exec_args).await?;
-    let build_script_path_str = build_script_path.to_string_lossy().to_string();
-    let cmd_args = runner.command_to_run_script(&build_script_path_str);
+    let command_spec = runner.command_to_run_script(&build_script_path, &exec_args.context);
 
     let output = crate::execution::run_process_with_replacements(
-        &cmd_args,
+        &command_spec,
         &exec_args.work_dir,
         &exec_args.replacements(runner.replacements_template()),
         &exec_args.env_vars,
@@ -645,17 +651,13 @@ pub(crate) async fn run_script(exec_args: ExecutionArgs) -> Result<(), crate::In
         } else {
             None
         },
-        &exec_args.runtime,
+        exec_args.context.runtime(),
     )
     .await?;
 
     if !output.status.success() {
         let status_code = output.status.code().unwrap_or(1);
-        let debug_info = runner.debug_info(
-            &exec_args.work_dir,
-            &exec_args.run_prefix,
-            exec_args.build_prefix.as_deref(),
-        );
+        let debug_info = runner.debug_info(&exec_args.work_dir, &exec_args.context);
         tracing::error!("Script failed with status {}", status_code);
         tracing::error!("{}", debug_info);
         return Err(crate::InterpreterError::ExecutionFailed(
@@ -670,7 +672,8 @@ pub(crate) async fn run_script(exec_args: ExecutionArgs) -> Result<(), crate::In
 }
 
 /// Creates build script files without executing them.
-pub async fn create_build_script(exec_args: ExecutionArgs) -> Result<(), std::io::Error> {
+pub async fn create_build_script(mut exec_args: ExecutionArgs) -> Result<(), std::io::Error> {
+    exec_args.apply_platform_environment();
     let build_script_path = generate_build_script(&exec_args)
         .await
         .map_err(|err| match err {
@@ -792,7 +795,7 @@ fn configure_subprocess_env(
 /// This is used to replace the host prefix with $PREFIX and the build prefix with $BUILD_PREFIX
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn run_process_with_replacements(
-    args: &[&str],
+    command_spec: &crate::native_runner::CommandSpec,
     cwd: &Path,
     replacements: &HashMap<String, String>,
     env_vars: &IndexMap<String, String>,
@@ -820,8 +823,8 @@ pub(crate) async fn run_process_with_replacements(
             cmd.args(&sandbox_args);
 
             // Add the actual command to execute (as positional arguments)
-            cmd.arg(args[0]);
-            cmd.args(&args[1..]);
+            cmd.arg(&command_spec.program);
+            cmd.args(&command_spec.args);
 
             cmd
         } else {
@@ -833,7 +836,7 @@ pub(crate) async fn run_process_with_replacements(
             ));
         }
     } else {
-        tokio::process::Command::new(args[0])
+        tokio::process::Command::new(&command_spec.program)
     };
 
     configure_subprocess_env(&mut command, env_vars, secrets, env_isolation, runtime);
@@ -843,7 +846,7 @@ pub(crate) async fn run_process_with_replacements(
         // when using `pixi global install bash` the current work dir
         // causes some strange issues that are fixed when setting the `PWD`
         .env("PWD", cwd)
-        .args(&args[1..])
+        .args(&command_spec.args)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
@@ -925,6 +928,7 @@ pub(crate) async fn run_process_with_replacements(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ExecutionContext;
     use rattler_conda_types::Platform;
     use tokio_util::bytes::BytesMut;
 
@@ -943,9 +947,12 @@ mod tests {
             interpreter: None,
             env_vars: IndexMap::new(),
             secrets: IndexMap::new(),
-            runtime: RuntimeEnv::for_test(Platform::current()),
-            build_prefix: None,
-            run_prefix: prefix,
+            context: ExecutionContext::shared(
+                RuntimeEnv::for_test(Platform::current()),
+                prefix,
+                Platform::current(),
+                Platform::current(),
+            ),
             work_dir: tmp.path().to_path_buf(),
             sandbox_config: None,
             env_isolation: EnvironmentIsolation::None,
@@ -956,6 +963,66 @@ mod tests {
             script.contains("CONDA_BUILD") && script.contains("1"),
             "build_env.sh must set CONDA_BUILD=1 for nested-shell re-entrancy, got:\n{script}"
         );
+    }
+
+    #[test]
+    fn architecture_transition_normalizes_processor_environment() {
+        let mut args = ExecutionArgs {
+            script: ResolvedScriptContents::Missing,
+            interpreter: None,
+            env_vars: IndexMap::new(),
+            secrets: IndexMap::new(),
+            context: ExecutionContext::shared(
+                RuntimeEnv::for_test(Platform::Win64),
+                "prefix",
+                Platform::WinArm64,
+                Platform::WinArm64,
+            ),
+            work_dir: PathBuf::from("work"),
+            sandbox_config: None,
+            env_isolation: EnvironmentIsolation::Strict,
+        };
+        args.env_vars.insert(
+            "PROCESSOR_IDENTIFIER".to_string(),
+            "ARMv8 (64-bit) Family".to_string(),
+        );
+        args.apply_platform_environment();
+        assert_eq!(
+            args.env_vars.get("PROCESSOR_ARCHITECTURE"),
+            Some(&"ARM64".to_string())
+        );
+        assert_eq!(
+            args.env_vars.get("PROCESSOR_ARCHITEW6432"),
+            Some(&String::new())
+        );
+        assert_eq!(
+            args.env_vars.get("PROCESSOR_IDENTIFIER"),
+            Some(&"ARMv8 (64-bit) Family".to_string()),
+            "the host processor identifier is intentionally preserved"
+        );
+
+        args.context = ExecutionContext::shared(
+            RuntimeEnv::for_test(Platform::WinArm64),
+            "prefix",
+            Platform::Win64,
+            Platform::Win64,
+        );
+        args.env_vars.clear();
+        args.apply_platform_environment();
+        assert_eq!(
+            args.env_vars.get("PROCESSOR_ARCHITECTURE"),
+            Some(&"AMD64".to_string())
+        );
+
+        args.context = ExecutionContext::shared(
+            RuntimeEnv::for_test(Platform::Win64),
+            "prefix",
+            Platform::Win64,
+            Platform::Win64,
+        );
+        args.env_vars.clear();
+        args.apply_platform_environment();
+        assert!(args.env_vars.is_empty());
     }
 
     /// The outer subprocess must start without `CONDA_BUILD` set, otherwise
@@ -1050,9 +1117,12 @@ mod tests {
             interpreter: None,
             env_vars: IndexMap::new(),
             secrets: IndexMap::new(),
-            runtime: RuntimeEnv::for_test(Platform::Win64),
-            build_prefix: None,
-            run_prefix: prefix,
+            context: ExecutionContext::shared(
+                RuntimeEnv::for_test(Platform::Win64),
+                prefix,
+                Platform::Win64,
+                Platform::Win64,
+            ),
             work_dir: tmp.path().to_path_buf(),
             sandbox_config: None,
             env_isolation: EnvironmentIsolation::None,
@@ -1283,9 +1353,12 @@ mod tests {
             interpreter: interpreter.map(str::to_string),
             env_vars: IndexMap::new(),
             secrets: IndexMap::new(),
-            runtime: RuntimeEnv::current(),
-            build_prefix: None,
-            run_prefix,
+            context: ExecutionContext::shared(
+                RuntimeEnv::current(),
+                run_prefix,
+                Platform::current(),
+                Platform::current(),
+            ),
             work_dir,
             sandbox_config: None,
             env_isolation: EnvironmentIsolation::None,
@@ -1508,7 +1581,9 @@ mod tests {
             None,
         );
         let args = ExecutionArgs {
-            runtime: RuntimeEnv::for_test(Platform::Linux64),
+            context: args
+                .context
+                .with_runtime(RuntimeEnv::for_test(Platform::Linux64)),
             ..args
         };
         generate_build_script(&args).await.unwrap();
@@ -1534,7 +1609,9 @@ mod tests {
             None,
         );
         let args = ExecutionArgs {
-            runtime: RuntimeEnv::for_test(Platform::Linux64),
+            context: args
+                .context
+                .with_runtime(RuntimeEnv::for_test(Platform::Linux64)),
             ..args
         };
         generate_build_script(&args).await.unwrap();
@@ -1560,7 +1637,9 @@ mod tests {
             None,
         );
         let args = ExecutionArgs {
-            runtime: RuntimeEnv::for_test(Platform::Win64),
+            context: args
+                .context
+                .with_runtime(RuntimeEnv::for_test(Platform::Win64)),
             ..args
         };
         generate_build_script(&args).await.unwrap();

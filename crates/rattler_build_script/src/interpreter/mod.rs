@@ -21,7 +21,7 @@ use std::path::{Path, PathBuf};
 use rattler_conda_types::Platform;
 use rattler_shell::activation::prefix_path_entries;
 
-use crate::runtime::RuntimeEnv;
+use crate::ExecutionContext;
 
 /// Describes interpreter execution and lookup errors.
 #[derive(Debug, thiserror::Error)]
@@ -126,23 +126,24 @@ impl InterpreterSearchScope {
 
 pub(crate) fn find_interpreter(
     name: &str,
-    build_prefix: Option<&Path>,
-    run_prefix: &Path,
-    runtime: &RuntimeEnv,
+    context: &ExecutionContext,
     scope: InterpreterSearchScope,
 ) -> Option<PathBuf> {
+    let runtime = context.runtime();
     let exe_name = format!("{}{}", name, runtime.exe_suffix());
-    let platform = runtime.platform();
 
     let mut search_path = Vec::new();
     if scope.search_build {
-        // When build and host are merged there is no separate build prefix; the
-        // run prefix is the build environment.
-        let build_env = build_prefix.unwrap_or(run_prefix);
-        search_path.extend(prefix_path_entries(build_env, &platform));
+        search_path.extend(prefix_path_entries(
+            context.build().path(),
+            &context.build().platform(),
+        ));
     }
     if scope.search_host {
-        search_path.extend(prefix_path_entries(run_prefix, &platform));
+        search_path.extend(prefix_path_entries(
+            context.host().path(),
+            &context.host().platform(),
+        ));
     }
     if scope.system_fallback {
         search_path.extend(std::env::split_paths(runtime.path()));
@@ -151,11 +152,8 @@ pub(crate) fn find_interpreter(
     if search_path.is_empty() {
         return None;
     }
-    // The interpreter is resolved on the host filesystem, so use the host's path
-    // conventions throughout: `std::env::{split_paths,join_paths}` and `which`
-    // (path-list separator, `PATHEXT`, executable bit) all key off the host
-    // platform. `runtime.platform()` always equals the host here, so there is no
-    // cross-platform case to handle.
+    // Prefix paths use their configured platform conventions. System fallback
+    // uses the rattler-build process environment and host filesystem rules.
     which::which_in_global(exe_name, std::env::join_paths(search_path).ok())
         .ok()?
         .next()
@@ -212,18 +210,13 @@ pub(crate) trait InterpreterInvocation: Send + Sync {
     ///
     /// The default implementation provides shared lookup behavior; interpreters
     /// can override it for platform-specific behavior.
-    fn resolve_executable(
-        &self,
-        build_prefix: Option<&Path>,
-        run_prefix: &Path,
-        runtime: &RuntimeEnv,
-    ) -> Result<PathBuf, InterpreterError> {
-        let platform = runtime.platform();
+    fn resolve_executable(&self, context: &ExecutionContext) -> Result<PathBuf, InterpreterError> {
+        let platform = context.build().platform();
         let scope = self.search_scope(&platform);
         let mut unusable_candidate = None;
 
         for executable_name in self.executable_names(&platform) {
-            match find_interpreter(executable_name, build_prefix, run_prefix, runtime, scope) {
+            match find_interpreter(executable_name, context, scope) {
                 Some(path) => match self.is_usable_executable(&path) {
                     Ok(()) => return Ok(path),
                     Err(err) => unusable_candidate = Some((path, err)),
@@ -300,12 +293,10 @@ impl SelectedInterpreter {
     /// Resolve the executable, remapping internal errors to the user-facing name.
     pub(crate) fn resolve_executable(
         &self,
-        build_prefix: Option<&Path>,
-        run_prefix: &Path,
-        runtime: &RuntimeEnv,
+        context: &ExecutionContext,
     ) -> Result<PathBuf, InterpreterError> {
         self.invocation
-            .resolve_executable(build_prefix, run_prefix, runtime)
+            .resolve_executable(context)
             .map_err(|err| match err {
                 InterpreterError::InterpreterNotFound(_) => {
                     InterpreterError::InterpreterNotFound(self.user_name.clone())
@@ -323,7 +314,10 @@ impl SelectedInterpreter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::execution::{ExecutionArgs, ResolvedScriptContents};
+    use crate::{
+        ExecutionContext, RuntimeEnv,
+        execution::{ExecutionArgs, ResolvedScriptContents},
+    };
     use fs_err as fs;
     use indexmap::IndexMap;
     use rattler_conda_types::Platform;
@@ -341,13 +335,20 @@ mod tests {
             interpreter: interpreter.map(str::to_string),
             env_vars: IndexMap::new(),
             secrets: IndexMap::new(),
-            runtime: RuntimeEnv::current(),
-            build_prefix: None,
-            run_prefix,
+            context: ExecutionContext::shared(
+                RuntimeEnv::current(),
+                run_prefix,
+                Platform::current(),
+                Platform::current(),
+            ),
             work_dir,
             sandbox_config: None,
             env_isolation: crate::execution::EnvironmentIsolation::None,
         }
+    }
+
+    fn shared_context(runtime: RuntimeEnv, prefix: &Path) -> ExecutionContext {
+        ExecutionContext::shared(runtime, prefix, Platform::current(), Platform::current())
     }
 
     fn native_build_script_path(work_dir: &Path) -> PathBuf {
@@ -590,11 +591,7 @@ mod tests {
 
         let stub = RejectFirstStub;
         let resolved = stub
-            .resolve_executable(
-                Some(prefix.as_path()),
-                prefix.as_path(),
-                &RuntimeEnv::current(),
-            )
+            .resolve_executable(&shared_context(RuntimeEnv::current(), &prefix))
             .expect("second candidate should resolve");
         assert_eq!(resolved, second);
     }
@@ -613,11 +610,7 @@ mod tests {
 
         let stub = RejectFirstStub;
         let err = stub
-            .resolve_executable(
-                Some(prefix.as_path()),
-                prefix.as_path(),
-                &RuntimeEnv::current(),
-            )
+            .resolve_executable(&shared_context(RuntimeEnv::current(), &prefix))
             .expect_err("only candidate is rejected");
         match err {
             InterpreterError::InvalidInterpreter { interpreter, .. } => {
@@ -647,11 +640,7 @@ mod tests {
         };
 
         let err = selected
-            .resolve_executable(
-                Some(prefix.as_path()),
-                prefix.as_path(),
-                &RuntimeEnv::current(),
-            )
+            .resolve_executable(&shared_context(RuntimeEnv::current(), &prefix))
             .expect_err("only candidate is rejected");
         match err {
             InterpreterError::InvalidInterpreter {
@@ -691,18 +680,15 @@ mod tests {
         let runtime = RuntimeEnv::for_test(Platform::current())
             .with_var("PATH", path_dir.to_string_lossy().into_owned());
 
+        let context = shared_context(runtime, &prefix);
         let found_via_path = find_interpreter(
             "rb_path_only_tool",
-            Some(prefix.as_path()),
-            prefix.as_path(),
-            &runtime,
+            &context,
             InterpreterSearchScope::build_and_host_with_system_fallback(),
         );
         let found_build_only = find_interpreter(
             "rb_path_only_tool",
-            Some(prefix.as_path()),
-            prefix.as_path(),
-            &runtime,
+            &context,
             InterpreterSearchScope::build_only(),
         );
 
@@ -765,20 +751,23 @@ mod tests {
         // Empty runtime PATH so resolution can only come from a prefix.
         let runtime = RuntimeEnv::for_test(Platform::current()).with_var("PATH", "");
 
+        let context = ExecutionContext::separate(
+            runtime,
+            &build_prefix,
+            Platform::current(),
+            &host_prefix,
+            Platform::current(),
+        );
         let found = find_interpreter(
             "rb_host_tool",
-            Some(build_prefix.as_path()),
-            host_prefix.as_path(),
-            &runtime,
+            &context,
             InterpreterSearchScope::build_and_host_with_system_fallback(),
         );
         assert_eq!(found.as_deref(), Some(tool.as_path()));
 
         let build_only = find_interpreter(
             "rb_host_tool",
-            Some(build_prefix.as_path()),
-            host_prefix.as_path(),
-            &runtime,
+            &context,
             InterpreterSearchScope::build_only(),
         );
         assert!(
@@ -811,11 +800,7 @@ mod tests {
         let second = create_fake_executable(&prefix, "stub_second");
 
         let resolved = RejectFirstStub
-            .resolve_executable(
-                Some(prefix.as_path()),
-                prefix.as_path(),
-                &RuntimeEnv::current(),
-            )
+            .resolve_executable(&shared_context(RuntimeEnv::current(), &prefix))
             .expect("second candidate should resolve when the first is absent");
         assert_eq!(resolved, second);
     }
@@ -834,8 +819,8 @@ mod tests {
         let runtime = RuntimeEnv::for_test(Platform::Win64)
             .with_var("COMSPEC", fake_cmd.to_string_lossy().into_owned());
 
-        let resolved =
-            super::cmd_exe::CmdExeInvocation.resolve_executable(None, tmp.path(), &runtime);
+        let resolved = super::cmd_exe::CmdExeInvocation
+            .resolve_executable(&shared_context(runtime, tmp.path()));
         assert_eq!(resolved.unwrap(), fake_cmd);
     }
 
