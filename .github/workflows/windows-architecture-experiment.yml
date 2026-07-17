@@ -1,8 +1,12 @@
 name: Windows architecture experiment
 
-# Temporary manual validation for x64 rattler-build on Windows ARM. Remove this
+# Temporary validation for x64 rattler-build on Windows ARM. Remove this
 # workflow after it has run successfully on a Windows ARM runner.
 on:
+  pull_request:
+    paths:
+      - ".github/workflows/windows-architecture-experiment.yml"
+      - "test-data/recipes/windows-architecture-execution/**"
   workflow_dispatch:
 
 permissions:
