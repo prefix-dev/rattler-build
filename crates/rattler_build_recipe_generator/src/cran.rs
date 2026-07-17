@@ -594,7 +594,20 @@ pub async fn generate_r_recipe(opts: &CranOpts) -> miette::Result<()> {
     let (recipe, remaining_deps) =
         build_cran_recipe_and_deps(&opts.package, opts.universe.as_deref()).await?;
 
-    let final_recipe = format_cran_recipe_with_suggests(&recipe);
+    finish_generating_r_recipe(&recipe, remaining_deps, opts).await
+}
+
+/// The part of [`generate_r_recipe`] that doesn't need `recipe`/`remaining_deps`
+/// to have come from a real network fetch: print or write the recipe, warn
+/// about dependencies missing from conda-forge, and recurse per `opts.tree`/
+/// `opts.recursive`. Split out so this logic can be exercised in tests with
+/// fabricated `remaining_deps` instead of a real CRAN lookup.
+async fn finish_generating_r_recipe(
+    recipe: &serialize::Recipe,
+    remaining_deps: HashSet<String>,
+    opts: &CranOpts,
+) -> miette::Result<()> {
+    let final_recipe = format_cran_recipe_with_suggests(recipe);
 
     if opts.write {
         write_recipe(&recipe.package.name, &final_recipe).into_diagnostic()?;
@@ -834,5 +847,170 @@ mod tests {
         assert!(!logs_contain(
             "does not appear to be available on conda-forge"
         ));
+    }
+
+    fn dummy_cran_opts() -> CranOpts {
+        CranOpts {
+            universe: None,
+            tree: false,
+            recursive: false,
+            package: "unused".to_string(),
+            write: false,
+        }
+    }
+
+    fn dummy_recipe() -> serialize::Recipe {
+        serialize::Recipe::default()
+    }
+
+    /// Known to exist on conda-forge as `r-jsonlite`.
+    const EXISTING_DEP: &str = "jsonlite";
+    /// Known to not exist on conda-forge (or CRAN) under this name.
+    const MISSING_DEP: &str = "this_package_does_not_exist_xyz123";
+
+    const MISSING_DEP_WARNING: &str = "Dependency 'this_package_does_not_exist_xyz123' does not appear to be available on conda-forge";
+
+    /// Calls `finish_generating_r_recipe` with a single dependency in
+    /// `remaining_deps`. The result is ignored: recursing into a real
+    /// dependency name always fails right now (the upstream metadata is
+    /// either missing fields or the package doesn't exist at all), but
+    /// `generate_r_recipe` logs "Generating R recipe for <dep>" *before*
+    /// doing any actual network lookup, so whether recursion was attempted
+    /// can still be checked afterwards via `logs_contain`.
+    async fn attempt_finish_generating_r_recipe(dep: &str, opts: &CranOpts) {
+        let mut deps = HashSet::new();
+        deps.insert(dep.to_string());
+
+        let _ = finish_generating_r_recipe(&dummy_recipe(), deps, opts).await;
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    async fn test_generate_r_recipe_neither_tree_nor_recursive() {
+        let opts = CranOpts {
+            tree: false,
+            recursive: false,
+            ..dummy_cran_opts()
+        };
+
+        attempt_finish_generating_r_recipe(MISSING_DEP, &opts).await;
+        // Neither flag is set, so recursion never happens, even for a
+        // dependency missing from conda-forge -- only the warning fires.
+        assert!(!logs_contain(&format!(
+            "Generating R recipe for {MISSING_DEP}"
+        )));
+        assert!(logs_contain(MISSING_DEP_WARNING));
+
+        attempt_finish_generating_r_recipe(EXISTING_DEP, &opts).await;
+        assert!(!logs_contain(&format!(
+            "Generating R recipe for {EXISTING_DEP}"
+        )));
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    async fn test_generate_r_recipe_tree_only() {
+        let opts = CranOpts {
+            tree: true,
+            recursive: false,
+            ..dummy_cran_opts()
+        };
+
+        attempt_finish_generating_r_recipe(MISSING_DEP, &opts).await;
+        assert!(logs_contain(&format!(
+            "Generating R recipe for {MISSING_DEP}"
+        )));
+        assert!(logs_contain(MISSING_DEP_WARNING));
+
+        // `--tree` recurses into every dependency, including ones already
+        // on conda-forge.
+        attempt_finish_generating_r_recipe(EXISTING_DEP, &opts).await;
+        assert!(logs_contain(&format!(
+            "Generating R recipe for {EXISTING_DEP}"
+        )));
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    async fn test_generate_r_recipe_recursive_only() {
+        let opts = CranOpts {
+            tree: false,
+            recursive: true,
+            ..dummy_cran_opts()
+        };
+
+        attempt_finish_generating_r_recipe(MISSING_DEP, &opts).await;
+        assert!(logs_contain(&format!(
+            "Generating R recipe for {MISSING_DEP}"
+        )));
+        assert!(logs_contain(MISSING_DEP_WARNING));
+
+        // `--recursive` only recurses into dependencies missing from
+        // conda-forge, so an already-available dependency is left alone.
+        attempt_finish_generating_r_recipe(EXISTING_DEP, &opts).await;
+        assert!(!logs_contain(&format!(
+            "Generating R recipe for {EXISTING_DEP}"
+        )));
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    async fn test_generate_r_recipe_tree_and_recursive() {
+        let opts = CranOpts {
+            tree: true,
+            recursive: true,
+            ..dummy_cran_opts()
+        };
+
+        attempt_finish_generating_r_recipe(MISSING_DEP, &opts).await;
+        assert!(logs_contain(&format!(
+            "Generating R recipe for {MISSING_DEP}"
+        )));
+        assert!(logs_contain(MISSING_DEP_WARNING));
+
+        // When both flags are set, `--tree` takes precedence, so this
+        // behaves the same as tree-only: every dependency is recursed into.
+        attempt_finish_generating_r_recipe(EXISTING_DEP, &opts).await;
+        assert!(logs_contain(&format!(
+            "Generating R recipe for {EXISTING_DEP}"
+        )));
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    async fn test_generate_recipes_for_deps_skips_dependency_with_existing_local_folder() {
+        let dep = "test-recurse-missing-fixture-existing";
+        let folder = format_r_package(dep, None);
+        fs_err::create_dir_all(&folder).unwrap();
+
+        let result = generate_recipes_for_deps([dep.to_string()], &dummy_cran_opts()).await;
+
+        fs_err::remove_dir_all(&folder).unwrap();
+
+        // A pre-existing local folder means the dependency is skipped
+        // entirely, so no network call is attempted and this can't fail.
+        assert!(
+            result.is_ok(),
+            "should skip recursion once a local folder for the dependency already exists"
+        );
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    async fn test_generate_recipes_for_deps_recurses_into_dependency_without_local_folder() {
+        let dep = "this-package-definitely-does-not-exist-anywhere-xyz123";
+        let folder = format_r_package(dep, None);
+        assert!(
+            !PathBuf::from(&folder).exists(),
+            "test fixture assumption violated: {folder} should not exist locally"
+        );
+
+        let result = generate_recipes_for_deps([dep.to_string()], &dummy_cran_opts()).await;
+
+        // No local folder means `generate_recipes_for_deps` recurses into
+        // `generate_r_recipe`, which looks the (nonexistent) package up on
+        // CRAN and fails -- proving recursion was actually attempted rather
+        // than silently skipped.
+        assert!(result.is_err());
     }
 }
