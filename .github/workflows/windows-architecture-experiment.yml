@@ -106,3 +106,7 @@ jobs:
             -Platform win-32 `
             -ExpectedArchitecture x86 `
             -ExpectedWow64Architecture ARM64
+
+          # The expected rattler-build failures leave LASTEXITCODE at 1.
+          # The assertions above already validated their reported status.
+          exit 0
