@@ -295,6 +295,8 @@ class Stage0Recipe(ABC):
         self,
         jinja_config: JinjaConfig | None = None,
         functions: dict[str, Callable[..., Any]] | None = None,
+        *,
+        retype: bool = True,
     ) -> dict[str, Any]:
         """Render the ``context`` section and substitute it into the recipe.
 
@@ -310,16 +312,20 @@ class Stage0Recipe(ABC):
 
         Args:
             jinja_config: Optional :class:`~rattler_build.jinja_config.JinjaConfig`.
-                When ``None`` a default config is used. Pass
-                ``allow_undefined=True`` to mirror the lenient behaviour.
+                When ``None`` a default config is used. Its ``undefined_behavior``
+                is ignored: context rendering always uses the strict engine so
+                that an unresolvable expression can be kept verbatim.
             functions: Optional mapping of helper names to Python callables that
                 are evaluated instead of preserving the helper call verbatim.
+            retype: Re-parse fully resolved scalars as YAML so their types
+                (int, bool, ...) are recovered. Pass ``False`` to keep every
+                substituted scalar a string.
 
         Returns:
             The recipe as a plain dictionary with the context substituted.
         """
         config_inner = jinja_config._config if jinja_config is not None else None
-        return _render.render_context(self._wrapper, config_inner, functions)
+        return _render.render_context(self._wrapper, config_inner, functions, retype)
 
     def run_build(
         self,

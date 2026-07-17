@@ -115,3 +115,19 @@ def test_render_context_with_raising_function_preserves_expression() -> None:
     recipe = {"requirements": {"build": ["${{ compiler('c') }}"]}}
     rendered = render_context(recipe, functions={"compiler": broken})
     assert rendered["requirements"]["build"] == ["${{ compiler('c') }}"]
+
+
+def test_render_context_retype_false_keeps_substituted_scalars_as_strings() -> None:
+    recipe = {
+        "context": {"build_num": 5, "python_min": "3.10"},
+        "build": {"number": "${{ build_num }}"},
+        "tests": [{"python": {"python_version": "${{ python_min }}"}}],
+    }
+
+    rendered = render_context(recipe, retype=False)
+    assert rendered["build"]["number"] == "5"
+    # with re-typing, "3.10" would read back as the float 3.1
+    assert rendered["tests"][0]["python"]["python_version"] == "3.10"
+
+    rendered = render_context(recipe)
+    assert rendered["build"]["number"] == 5

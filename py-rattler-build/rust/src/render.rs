@@ -1,6 +1,13 @@
+use std::collections::HashMap;
 use std::path::PathBuf;
+use std::str::FromStr;
 
+use ::rattler_build::config::Config;
+use ::rattler_build::opt::{BuildData, ChannelPriorityWrapper, CommonData};
+use ::rattler_build::render_recipes as render_recipes_rs;
+use ::rattler_build::tool_configuration::ContinueOnFailure;
 use indexmap::IndexMap;
+use minijinja::ErrorKind;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use rattler_build_jinja::{Jinja, UndefinedBehavior, Variable};
@@ -8,13 +15,14 @@ use rattler_build_recipe::variant_render::{
     RenderConfig as RustRenderConfig, RenderedVariant as RustRenderedVariant,
     render_recipe_with_variant_config,
 };
-use rattler_conda_types::Platform;
+use rattler_conda_types::{NamedChannelOrUrl, Platform};
 
 use rattler_build_script::EnvironmentIsolation;
 
 use crate::error::RattlerBuildError;
 use crate::jinja_config::PyJinjaConfig;
 use crate::repodata_revision::PyRepodataRevision;
+use crate::run_async_task;
 use crate::stage0::PyStage0Recipe;
 use crate::stage1::PyStage1Recipe;
 use crate::variant_config::PyVariantConfig;
@@ -308,6 +316,126 @@ pub fn render_recipe(
         .collect())
 }
 
+/// Render recipes without building them.
+///
+/// Returns the same JSON string that `rattler-build build --render-only`
+/// prints: a list of outputs with their rendered recipe and build
+/// configuration, skip-filtered and sorted topologically.
+#[pyfunction]
+#[pyo3(signature = (recipes, up_to=None, build_platform=None, target_platform=None, host_platform=None, channel=None, variant_config=None, variant_overrides=None, ignore_recipe_variants=false, with_solve=false, no_build_id=false, output_dir=None, auth_file=None, channel_priority=None, allow_insecure_host=None, exclude_newer=None, build_num=None, build_string_prefix=None, use_bz2=true, use_zstd=true, use_sharded=true, repodata_revision=None))]
+#[allow(clippy::too_many_arguments)]
+pub fn render_recipes(
+    recipes: Vec<PathBuf>,
+    up_to: Option<String>,
+    build_platform: Option<String>,
+    target_platform: Option<String>,
+    host_platform: Option<String>,
+    channel: Option<Vec<String>>,
+    variant_config: Option<Vec<PathBuf>>,
+    variant_overrides: Option<HashMap<String, Vec<String>>>,
+    ignore_recipe_variants: bool,
+    with_solve: bool,
+    no_build_id: bool,
+    output_dir: Option<PathBuf>,
+    auth_file: Option<String>,
+    channel_priority: Option<String>,
+    allow_insecure_host: Option<Vec<String>>,
+    exclude_newer: Option<jiff::Timestamp>,
+    build_num: Option<u64>,
+    build_string_prefix: Option<String>,
+    use_bz2: bool,
+    use_zstd: bool,
+    use_sharded: bool,
+    repodata_revision: Option<PyRepodataRevision>,
+) -> PyResult<String> {
+    let channel_priority = channel_priority
+        .map(|c| ChannelPriorityWrapper::from_str(&c).map(|c| c.value))
+        .transpose()
+        .map_err(|e| RattlerBuildError::ChannelPriority(e.to_string()))?;
+    let config = Config::default();
+    let v3 = matches!(
+        repodata_revision.unwrap_or_default(),
+        PyRepodataRevision::V3
+    );
+    let common = CommonData::new(
+        output_dir,
+        false,
+        v3,
+        auth_file.map(|a| a.into()),
+        config,
+        channel_priority,
+        allow_insecure_host,
+        use_bz2,
+        use_zstd,
+        use_sharded,
+    );
+    let build_platform = build_platform
+        .map(|p| Platform::from_str(&p))
+        .transpose()
+        .map_err(RattlerBuildError::from)?;
+    let target_platform = target_platform
+        .map(|p| Platform::from_str(&p))
+        .transpose()
+        .map_err(RattlerBuildError::from)?;
+    let host_platform = host_platform
+        .map(|p| Platform::from_str(&p))
+        .transpose()
+        .map_err(RattlerBuildError::from)?;
+    let channel = match channel {
+        None => None,
+        Some(channel) => Some(
+            channel
+                .iter()
+                .map(|c| {
+                    NamedChannelOrUrl::from_str(c)
+                        .map_err(|e| RattlerBuildError::ChannelPriority(e.to_string()))
+                        .map_err(|e| e.into())
+                })
+                .collect::<PyResult<_>>()?,
+        ),
+    };
+
+    let build_data = BuildData::new(
+        up_to,
+        build_platform,
+        target_platform,
+        host_platform,
+        channel,
+        variant_config,
+        variant_overrides.unwrap_or_default(),
+        ignore_recipe_variants,
+        true, // render_only
+        with_solve,
+        false, // keep_build
+        no_build_id,
+        None,  // package_format
+        None,  // compression_threads
+        None,  // io_concurrency_limit
+        false, // no_include_recipe
+        None,  // test
+        common,
+        None, // skip_existing
+        None, // noarch_build_platform
+        None, // extra meta
+        None, // sandbox configuration
+        EnvironmentIsolation::default(),
+        ContinueOnFailure::from(false),
+        false, // error_prefix_in_binary
+        false, // allow_symlinks_on_windows
+        false, // allow_absolute_license_paths
+        exclude_newer,
+        build_num,
+        build_string_prefix,
+        None, // markdown_summary
+    );
+
+    run_async_task(async {
+        let outputs = render_recipes_rs(recipes, &build_data, &None).await?;
+        serde_json::to_string(&outputs)
+            .map_err(|e| miette::miette!("failed to serialize rendered outputs: {e}"))
+    })
+}
+
 /// Render the `context` section of a recipe and substitute the resulting
 /// variables into the rest of the recipe, *without* resolving variants or
 /// lowering to Stage1. `recipe` may be a `Stage0Recipe` or a plain recipe
@@ -328,13 +456,17 @@ pub fn render_recipe(
 ///
 /// A fully resolved scalar is re-parsed as a YAML scalar so that its type
 /// (int, bool, ...) is recovered, matching how the recipe would be read back.
+/// Pass ``retype=False`` to keep every substituted scalar a string instead,
+/// e.g. when the caller wants to recover scalar types itself using the
+/// original document's quoting information.
 #[pyfunction]
-#[pyo3(signature = (recipe, jinja_config=None, functions=None))]
+#[pyo3(signature = (recipe, jinja_config=None, functions=None, retype=true))]
 pub fn render_context(
     py: Python<'_>,
     recipe: &Bound<'_, PyAny>,
     jinja_config: Option<PyJinjaConfig>,
     functions: Option<Bound<'_, PyDict>>,
+    retype: bool,
 ) -> PyResult<Py<PyAny>> {
     // Accept either a parsed Stage0 recipe or a raw recipe dictionary. The
     // dictionary path preserves the recipe's exact structure, which is what a
@@ -395,7 +527,7 @@ pub fn render_context(
         }
     }
 
-    render_tree(&mut tree, &jinja);
+    render_tree(&mut tree, &jinja, retype);
 
     pythonize::pythonize(py, &tree)
         .map(|obj| obj.into())
@@ -416,8 +548,6 @@ fn python_jinja_function(
 + Send
 + Sync
 + 'static {
-    use minijinja::ErrorKind;
-
     fn invalid_op(message: String) -> minijinja::Error {
         minijinja::Error::new(ErrorKind::InvalidOperation, message)
     }
@@ -474,7 +604,7 @@ fn python_jinja_function(
 /// Each `${{ ... }}` expression is rendered on its own so that a scalar mixing
 /// resolvable and unresolvable expressions (e.g.
 /// `${{ name }}-${{ unknown }}`) keeps only the unresolved part verbatim.
-fn render_json_scalar(jinja: &Jinja, value: &serde_json::Value) -> serde_json::Value {
+fn render_json_scalar(jinja: &Jinja, value: &serde_json::Value, retype: bool) -> serde_json::Value {
     let Some(source) = value.as_str() else {
         return value.clone();
     };
@@ -482,8 +612,9 @@ fn render_json_scalar(jinja: &Jinja, value: &serde_json::Value) -> serde_json::V
         return value.clone();
     }
     let rendered = substitute_expressions(jinja, source);
-    if rendered.contains("${{") {
-        // Something was left unresolved, keep it as a string.
+    if !retype || rendered.contains("${{") {
+        // Something was left unresolved (or the caller wants to recover the
+        // scalar types itself), keep it as a string.
         serde_json::Value::String(rendered)
     } else {
         // Fully resolved: recover the scalar type (int/bool/...) the way YAML
@@ -569,17 +700,17 @@ fn substitute_expressions(jinja: &Jinja, source: &str) -> String {
 }
 
 /// Recursively render every templated string in the tree in place.
-fn render_tree(value: &mut serde_json::Value, jinja: &Jinja) {
+fn render_tree(value: &mut serde_json::Value, jinja: &Jinja, retype: bool) {
     match value {
-        serde_json::Value::String(_) => *value = render_json_scalar(jinja, value),
+        serde_json::Value::String(_) => *value = render_json_scalar(jinja, value, retype),
         serde_json::Value::Array(items) => {
             for item in items {
-                render_tree(item, jinja);
+                render_tree(item, jinja, retype);
             }
         }
         serde_json::Value::Object(map) => {
             for (_key, v) in map.iter_mut() {
-                render_tree(v, jinja);
+                render_tree(v, jinja, retype);
             }
         }
         _ => {}
@@ -663,6 +794,7 @@ pub fn register_render_module(py: Python<'_>, parent: &Bound<'_, PyModule>) -> P
     m.add_class::<PyHashInfo>()?;
     m.add_class::<PyPinSubpackageInfo>()?;
     m.add_function(wrap_pyfunction!(render_recipe, &m)?)?;
+    m.add_function(wrap_pyfunction!(render_recipes, &m)?)?;
     m.add_function(wrap_pyfunction!(render_context, &m)?)?;
     parent.add_submodule(&m)?;
     Ok(())

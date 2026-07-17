@@ -18,7 +18,6 @@ from rattler_build._rattler_build import (
     EnvironmentIsolation,
     RepodataRevision,
     build_rendered_variant_py,
-    render_recipes_py,
 )
 from rattler_build._rattler_build import render as _render
 from rattler_build.build_result import BuildResult
@@ -35,6 +34,8 @@ def render_context(
     recipe: Any,
     jinja_config: JinjaConfig | None = None,
     functions: dict[str, Callable[..., Any]] | None = None,
+    *,
+    retype: bool = True,
 ) -> dict[str, Any]:
     """Render a recipe's ``context`` section and substitute it into the recipe.
 
@@ -55,6 +56,11 @@ def render_context(
             ``pin_subpackage``) to Python callables. A mapped helper is evaluated
             with the callable's return value instead of being preserved verbatim.
             A callable that raises falls back to preserving the expression.
+        retype: Re-parse fully resolved scalars as YAML so their types
+            (int, bool, ...) are recovered, matching how a rendered recipe file
+            would be read back. Pass ``False`` to keep every substituted scalar
+            a string, e.g. when the caller recovers scalar types itself using
+            the original document's quoting information.
 
     Returns:
         The recipe as a plain dictionary with the context substituted.
@@ -63,7 +69,7 @@ def render_context(
     # dict is passed through untouched.
     inner = getattr(recipe, "_wrapper", recipe)
     config_inner = jinja_config._config if jinja_config is not None else None
-    return _render.render_context(inner, config_inner, functions)
+    return _render.render_context(inner, config_inner, functions, retype)
 
 
 def render_recipes(
@@ -123,7 +129,7 @@ def render_recipes(
     Returns:
         One dictionary per rendered output, in build order.
     """
-    rendered = render_recipes_py(
+    rendered = _render.render_recipes(
         recipes=[str(recipe) for recipe in recipes],
         up_to=up_to,
         build_platform=build_platform,
