@@ -110,6 +110,19 @@ impl ExecutionContext {
     pub fn layout(&self) -> PrefixLayout {
         self.layout
     }
+
+    /// The processor architecture to expose in a Windows child process.
+    ///
+    /// Returns a value only when the Windows runner must switch between x64 and
+    /// ARM64 with `start /machine`; otherwise the child inherits its normal
+    /// process environment.
+    pub fn windows_processor_architecture(&self) -> Option<&'static str> {
+        crate::native_runner::windows_machine_transition(
+            self.runtime.process_platform(),
+            self.build.platform(),
+        )
+        .map(crate::native_runner::WindowsMachine::processor_architecture)
+    }
 }
 
 #[cfg(test)]

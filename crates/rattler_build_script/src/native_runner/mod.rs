@@ -250,6 +250,14 @@ mod tests {
         assert!(arm_command.args[3].contains("conda_build.bat"));
         assert!(arm_command.args[3].contains("exit /b !ERRORLEVEL!"));
 
+        let spaced_script = std::path::Path::new("work/conda build.bat");
+        assert!(
+            runner
+                .command_to_run_script(spaced_script, &x64_to_arm)
+                .args[3]
+                .contains(r#"cmd.exe /d /c "conda build.bat""#)
+        );
+
         let arm_to_x64 = ExecutionContext::shared(
             RuntimeEnv::for_test(Platform::WinArm64),
             "prefix",

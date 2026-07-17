@@ -32,19 +32,6 @@ impl Output {
         let target_platform = self.build_configuration.target_platform;
         let host_platform = self.host_platform().platform;
         let env_isolation = self.build_configuration.env_isolation;
-        let mut env_vars = env_vars::vars(self, "BUILD");
-        env_vars.extend(env_vars::os_vars(
-            &host_prefix,
-            &target_platform,
-            &host_platform,
-            &self.build_configuration.build_platform.platform,
-            env_isolation,
-            &self.build_configuration.directories.work_dir,
-        ));
-        env_vars.extend(env_vars::env_vars_from_variant(self.variant()));
-
-        let jinja_renderer = self.jinja_renderer();
-
         let context = if self.recipe.build().merge_build_and_host_envs {
             ExecutionContext::shared(
                 RuntimeEnv::current(),
@@ -62,6 +49,25 @@ impl Output {
             )
         };
 
+        let mut env_vars = env_vars::vars(self, "BUILD");
+        env_vars.extend(env_vars::os_vars(
+            &host_prefix,
+            &target_platform,
+            &host_platform,
+            &self.build_configuration.build_platform.platform,
+            env_isolation,
+            &self.build_configuration.directories.work_dir,
+        ));
+        env_vars.extend(env_vars::env_vars_from_variant(self.variant()));
+        if let Some(architecture) = context.windows_processor_architecture() {
+            env_vars.insert(
+                "PROCESSOR_ARCHITECTURE".to_string(),
+                Some(architecture.to_string()),
+            );
+            env_vars.insert("PROCESSOR_ARCHITEW6432".to_string(), Some(String::new()));
+        }
+
+        let jinja_renderer = self.jinja_renderer();
         let work_dir = &self.build_configuration.directories.work_dir;
         Ok(ExecutionArgs {
             interpreter: self.recipe.build().script.interpreter.clone(),
@@ -111,8 +117,7 @@ impl Output {
             Err(err) => return Err(err.into()),
         }
 
-        let mut exec_args = self.prepare_build_script().await?;
-        exec_args.apply_platform_environment();
+        let exec_args = self.prepare_build_script().await?;
         let context = exec_args.context.clone();
 
         // Create Jinja context with environment variables

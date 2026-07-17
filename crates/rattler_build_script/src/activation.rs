@@ -23,6 +23,19 @@ pub(crate) fn activation_script<T: Shell + Clone + 'static>(
     for (k, v) in args.env_vars.iter() {
         shell_script.set_env_var(k, v)?;
     }
+
+    // `start /machine` changes the child `cmd.exe` architecture but inherits
+    // variables that describe the outer process. Set the values in the
+    // activation script, where the build environment is assembled, rather than
+    // mutating the execution arguments. `PROCESSOR_IDENTIFIER` intentionally
+    // remains untouched because it describes the physical processor.
+    if let Some(architecture) = args.context.windows_processor_architecture() {
+        shell_script.set_env_var("PROCESSOR_ARCHITECTURE", architecture)?;
+        // An empty value produces `set "PROCESSOR_ARCHITEW6432="` for cmd.exe,
+        // clearing this WOW64 compatibility marker from the activated shell.
+        shell_script.set_env_var("PROCESSOR_ARCHITEW6432", "")?;
+    }
+
     // Re-entrancy marker: this way the preamble sources this file
     // once and nested shells skip re-sourcing it.
     shell_script.set_env_var("CONDA_BUILD", "1")?;
@@ -81,6 +94,45 @@ mod tests {
 
     use crate::execution::{EnvironmentIsolation, ExecutionArgs, ResolvedScriptContents};
     use crate::{ExecutionContext, runtime::RuntimeEnv};
+
+    /// The activation script must set the Windows architecture variables after
+    /// caller-provided environment values, because `/machine` changes the child
+    /// process but not its inherited environment.
+    #[test]
+    fn architecture_transition_normalizes_processor_environment() {
+        let tmp = tempfile::tempdir().unwrap();
+        let prefix = tmp.path().join("prefix");
+        fs_err::create_dir_all(&prefix).unwrap();
+        let mut env_vars = IndexMap::new();
+        env_vars.insert("PROCESSOR_ARCHITECTURE".to_string(), "AMD64".to_string());
+        env_vars.insert(
+            "PROCESSOR_IDENTIFIER".to_string(),
+            "ARMv8 (64-bit) Family".to_string(),
+        );
+        let args = ExecutionArgs {
+            script: ResolvedScriptContents::Missing,
+            interpreter: None,
+            env_vars,
+            secrets: IndexMap::new(),
+            context: ExecutionContext::shared(
+                RuntimeEnv::for_test(Platform::Win64),
+                &prefix,
+                Platform::WinArm64,
+                Platform::WinArm64,
+            ),
+            work_dir: tmp.path().to_path_buf(),
+            sandbox_config: None,
+            env_isolation: EnvironmentIsolation::Strict,
+        };
+
+        let script = super::activation_script(&args, shell::CmdExe).unwrap();
+        assert!(script.contains(r#"@SET "PROCESSOR_ARCHITECTURE=ARM64""#));
+        assert!(script.contains(r#"@SET "PROCESSOR_ARCHITEW6432=""#));
+        assert!(
+            script.contains(r#"@SET "PROCESSOR_IDENTIFIER=ARMv8 (64-bit) Family""#),
+            "the host processor identifier must be preserved: {script}"
+        );
+    }
 
     /// When a build prefix is present, both the run prefix and build prefix are
     /// activated and the generated script references both paths.

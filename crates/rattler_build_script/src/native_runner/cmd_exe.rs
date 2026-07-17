@@ -43,10 +43,20 @@ IF "%CONDA_BUILD%" == "" (
             context.runtime().process_platform(),
             context.build().platform(),
         ) {
+            // `start /machine` selects the architecture of the child `cmd.exe`.
+            // It normally returns immediately, so `/wait` is required to obtain
+            // the script's status. `cmd /c` otherwise returns the status of the
+            // `start` command itself, hence the explicit delayed `ERRORLEVEL`
+            // expansion and `exit /b` after the child finishes.
+            //
+            // The outer process runs in `work_dir`, so only the generated file
+            // name is needed. Quote it when necessary so a changed or reused
+            // filename containing whitespace remains a single argument.
             let script_name = build_script_path
                 .file_name()
                 .expect("generated build script has a filename")
                 .to_string_lossy();
+            let script_name = crate::native_runner::quote_arg(&self.shell(), &script_name);
             let command = format!(
                 "start /b /wait /machine {} cmd.exe /d /c {} & exit /b !ERRORLEVEL!",
                 machine.start_argument(),

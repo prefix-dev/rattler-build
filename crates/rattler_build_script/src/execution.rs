@@ -128,23 +128,6 @@ impl ExecutionArgs {
 
         replacements
     }
-
-    /// Normalizes mutable Windows process architecture variables when the
-    /// configured build environment deliberately switches between x64 and ARM64.
-    pub fn apply_platform_environment(&mut self) {
-        if let Some(machine) = crate::native_runner::windows_machine_transition(
-            self.context.runtime().process_platform(),
-            self.context.build().platform(),
-        ) {
-            self.env_vars.insert(
-                "PROCESSOR_ARCHITECTURE".to_string(),
-                machine.processor_architecture().to_string(),
-            );
-            // `set "VAR="` in build_env.bat removes this compatibility marker.
-            self.env_vars
-                .insert("PROCESSOR_ARCHITEW6432".to_string(), String::new());
-        }
-    }
 }
 
 /// The resolved contents of a script.
@@ -248,7 +231,7 @@ impl Script {
 
         tracing::debug!("Running script in {}", work_dir.display());
 
-        let mut exec_args = ExecutionArgs {
+        let exec_args = ExecutionArgs {
             script: contents,
             interpreter: self.interpreter.clone(),
             env_vars,
@@ -258,7 +241,6 @@ impl Script {
             sandbox_config: sandbox_config.cloned(),
             env_isolation,
         };
-        exec_args.apply_platform_environment();
 
         crate::execution::run_script(exec_args).await?;
 
@@ -630,10 +612,7 @@ async fn build_section_body(
 }
 
 /// Runs a script with the given execution arguments.
-pub(crate) async fn run_script(
-    mut exec_args: ExecutionArgs,
-) -> Result<(), crate::InterpreterError> {
-    exec_args.apply_platform_environment();
+pub(crate) async fn run_script(exec_args: ExecutionArgs) -> Result<(), crate::InterpreterError> {
     let runner =
         crate::native_runner::native_runner(exec_args.context.runtime().process_platform());
     let build_script_path = generate_build_script(&exec_args).await?;
@@ -672,8 +651,7 @@ pub(crate) async fn run_script(
 }
 
 /// Creates build script files without executing them.
-pub async fn create_build_script(mut exec_args: ExecutionArgs) -> Result<(), std::io::Error> {
-    exec_args.apply_platform_environment();
+pub async fn create_build_script(exec_args: ExecutionArgs) -> Result<(), std::io::Error> {
     let build_script_path = generate_build_script(&exec_args)
         .await
         .map_err(|err| match err {
@@ -963,66 +941,6 @@ mod tests {
             script.contains("CONDA_BUILD") && script.contains("1"),
             "build_env.sh must set CONDA_BUILD=1 for nested-shell re-entrancy, got:\n{script}"
         );
-    }
-
-    #[test]
-    fn architecture_transition_normalizes_processor_environment() {
-        let mut args = ExecutionArgs {
-            script: ResolvedScriptContents::Missing,
-            interpreter: None,
-            env_vars: IndexMap::new(),
-            secrets: IndexMap::new(),
-            context: ExecutionContext::shared(
-                RuntimeEnv::for_test(Platform::Win64),
-                "prefix",
-                Platform::WinArm64,
-                Platform::WinArm64,
-            ),
-            work_dir: PathBuf::from("work"),
-            sandbox_config: None,
-            env_isolation: EnvironmentIsolation::Strict,
-        };
-        args.env_vars.insert(
-            "PROCESSOR_IDENTIFIER".to_string(),
-            "ARMv8 (64-bit) Family".to_string(),
-        );
-        args.apply_platform_environment();
-        assert_eq!(
-            args.env_vars.get("PROCESSOR_ARCHITECTURE"),
-            Some(&"ARM64".to_string())
-        );
-        assert_eq!(
-            args.env_vars.get("PROCESSOR_ARCHITEW6432"),
-            Some(&String::new())
-        );
-        assert_eq!(
-            args.env_vars.get("PROCESSOR_IDENTIFIER"),
-            Some(&"ARMv8 (64-bit) Family".to_string()),
-            "the host processor identifier is intentionally preserved"
-        );
-
-        args.context = ExecutionContext::shared(
-            RuntimeEnv::for_test(Platform::WinArm64),
-            "prefix",
-            Platform::Win64,
-            Platform::Win64,
-        );
-        args.env_vars.clear();
-        args.apply_platform_environment();
-        assert_eq!(
-            args.env_vars.get("PROCESSOR_ARCHITECTURE"),
-            Some(&"AMD64".to_string())
-        );
-
-        args.context = ExecutionContext::shared(
-            RuntimeEnv::for_test(Platform::Win64),
-            "prefix",
-            Platform::Win64,
-            Platform::Win64,
-        );
-        args.env_vars.clear();
-        args.apply_platform_environment();
-        assert!(args.env_vars.is_empty());
     }
 
     /// The outer subprocess must start without `CONDA_BUILD` set, otherwise
