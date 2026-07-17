@@ -1,0 +1,63 @@
+name: Windows architecture experiment
+
+# Temporary manual validation for x64 rattler-build on Windows ARM. Remove this
+# workflow after it has run successfully on a Windows ARM runner.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-x64:
+    name: Build x64 rattler-build
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
+        with:
+          cache: true
+      - name: Build release binary
+        run: pixi run build-release
+      - name: Upload x64 binary
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: rattler-build-x64
+          path: target/release/rattler-build.exe
+          if-no-files-found: error
+
+  run-on-arm64:
+    name: Run x64 build on Windows ARM
+    needs: build-x64
+    runs-on: windows-11-arm
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - name: Download x64 binary
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: rattler-build-x64
+          path: bin
+      - name: Verify ARM child process and forwarded failure status
+        shell: pwsh
+        run: |
+          $output = & "$env:GITHUB_WORKSPACE\bin\rattler-build.exe" build `
+            --recipe test-data/recipes/windows-architecture-execution `
+            --build-platform win-arm64 `
+            --host-platform win-arm64 `
+            --target-platform win-arm64 `
+            --output-dir output 2>&1
+          $rattlerBuildExitCode = $LASTEXITCODE
+          $outputText = $output | Out-String
+          Write-Host $outputText
+
+          if ($rattlerBuildExitCode -eq 0) {
+            throw "Expected the recipe's intentional exit code 37 to fail the build."
+          }
+          if ($outputText -notmatch "Script failed with status 37") {
+            throw "Expected rattler-build to report the child exit code 37."
+          }
