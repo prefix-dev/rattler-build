@@ -348,7 +348,8 @@ mod tests {
     }
 
     fn shared_context(runtime: RuntimeEnv, prefix: &Path) -> ExecutionContext {
-        ExecutionContext::shared(runtime, prefix, Platform::current(), Platform::current())
+        let platform = runtime.process_platform();
+        ExecutionContext::shared(runtime, prefix, platform, platform)
     }
 
     fn native_build_script_path(work_dir: &Path) -> PathBuf {
