@@ -64,7 +64,12 @@ impl Output {
                 "PROCESSOR_ARCHITECTURE".to_string(),
                 Some(architecture.to_string()),
             );
-            env_vars.insert("PROCESSOR_ARCHITEW6432".to_string(), Some(String::new()));
+        }
+        if let Some(wow64_architecture) = context.windows_processor_architecture_w6432() {
+            env_vars.insert(
+                "PROCESSOR_ARCHITEW6432".to_string(),
+                Some(wow64_architecture.unwrap_or_default().to_string()),
+            );
         }
 
         let jinja_renderer = self.jinja_renderer();

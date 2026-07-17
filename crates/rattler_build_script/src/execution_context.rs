@@ -113,15 +113,37 @@ impl ExecutionContext {
 
     /// The processor architecture to expose in a Windows child process.
     ///
-    /// Returns a value only when the Windows runner must switch between x64 and
-    /// ARM64 with `start /machine`; otherwise the child inherits its normal
-    /// process environment.
+    /// Returns a value only when the Windows runner must switch to x86 or
+    /// between x64 and ARM64 with `start /machine`; otherwise the child
+    /// inherits its normal process environment.
     pub fn windows_processor_architecture(&self) -> Option<&'static str> {
         crate::native_runner::windows_machine_transition(
             self.runtime.process_platform(),
             self.build.platform(),
         )
         .map(crate::native_runner::WindowsMachine::processor_architecture)
+    }
+
+    /// The value to set for `PROCESSOR_ARCHITEW6432` in a switched child.
+    ///
+    /// `Some(None)` clears the marker for a 64-bit child. `Some(value)` sets
+    /// the detected native architecture for an x86 WOW64 child. `None` keeps
+    /// the inherited value when no transition is needed or native detection is
+    /// unavailable.
+    pub fn windows_processor_architecture_w6432(&self) -> Option<Option<&'static str>> {
+        let machine = crate::native_runner::windows_machine_transition(
+            self.runtime.process_platform(),
+            self.build.platform(),
+        )?;
+
+        match machine {
+            crate::native_runner::WindowsMachine::X86 => {
+                crate::native_runner::native_windows_machine()
+                    .map(crate::native_runner::WindowsMachine::wow64_processor_architecture)
+            }
+            crate::native_runner::WindowsMachine::Amd64
+            | crate::native_runner::WindowsMachine::Arm64 => Some(None),
+        }
     }
 }
 

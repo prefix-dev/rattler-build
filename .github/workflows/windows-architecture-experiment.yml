@@ -7,6 +7,7 @@ on:
     paths:
       - ".github/workflows/windows-architecture-experiment.yml"
       - "test-data/recipes/windows-architecture-execution/**"
+      - "test-data/recipes/windows-architecture-execution-x86/**"
   workflow_dispatch:
 
 permissions:
@@ -46,28 +47,51 @@ jobs:
         with:
           name: rattler-build-x64
           path: bin
-      - name: Verify ARM child process and forwarded failure status
+      - name: Verify switched child processes and forwarded failure status
         shell: pwsh
         run: |
-          $output = & "$env:GITHUB_WORKSPACE\bin\rattler-build.exe" build `
-            --recipe test-data/recipes/windows-architecture-execution `
-            --build-platform win-arm64 `
-            --host-platform win-arm64 `
-            --target-platform win-arm64 `
-            --output-dir output 2>&1
-          $rattlerBuildExitCode = $LASTEXITCODE
-          $outputText = $output | Out-String
-          Write-Host $outputText
+          function Assert-CrossArchitecture {
+            param(
+              [string] $Recipe,
+              [string] $Platform,
+              [string] $ExpectedArchitecture,
+              [string] $ExpectedWow64Architecture
+            )
 
-          if ($rattlerBuildExitCode -eq 0) {
-            throw "Expected the recipe's intentional exit code 37 to fail the build."
+            $output = & "$env:GITHUB_WORKSPACE\bin\rattler-build.exe" build `
+              --recipe $Recipe `
+              --build-platform $Platform `
+              --host-platform $Platform `
+              --target-platform $Platform `
+              --output-dir "output-$Platform" 2>&1
+            $rattlerBuildExitCode = $LASTEXITCODE
+            $outputText = $output | Out-String
+            Write-Host $outputText
+
+            if ($rattlerBuildExitCode -eq 0) {
+              throw "Expected the recipe's intentional exit code 37 to fail the build."
+            }
+            if ($outputText -notmatch "PROCESSOR_ARCHITECTURE=$ExpectedArchitecture") {
+              throw "Expected the activated environment to report $ExpectedArchitecture."
+            }
+            if ($outputText -notmatch "PROCESSOR_ARCHITEW6432=$ExpectedWow64Architecture") {
+              throw "Expected the activated environment to report PROCESSOR_ARCHITEW6432=$ExpectedWow64Architecture."
+            }
+            if ($outputText -notmatch "ProcessArchitecture=$ExpectedArchitecture") {
+              throw "Expected the launched PowerShell process to be $ExpectedArchitecture."
+            }
+            if ($outputText -notmatch "Script failed with status 37") {
+              throw "Expected rattler-build to report the child exit code 37."
+            }
           }
-          if ($outputText -notmatch "PROCESSOR_ARCHITECTURE=ARM64") {
-            throw "Expected the activated environment to report ARM64."
-          }
-          if ($outputText -notmatch "ProcessArchitecture=ARM64") {
-            throw "Expected the launched PowerShell process to be ARM64."
-          }
-          if ($outputText -notmatch "Script failed with status 37") {
-            throw "Expected rattler-build to report the child exit code 37."
-          }
+
+          Assert-CrossArchitecture `
+            -Recipe test-data/recipes/windows-architecture-execution `
+            -Platform win-arm64 `
+            -ExpectedArchitecture ARM64 `
+            -ExpectedWow64Architecture ""
+          Assert-CrossArchitecture `
+            -Recipe test-data/recipes/windows-architecture-execution-x86 `
+            -Platform win-32 `
+            -ExpectedArchitecture x86 `
+            -ExpectedWow64Architecture ARM64

@@ -31,9 +31,11 @@ pub(crate) fn activation_script<T: Shell + Clone + 'static>(
     // remains untouched because it describes the physical processor.
     if let Some(architecture) = args.context.windows_processor_architecture() {
         shell_script.set_env_var("PROCESSOR_ARCHITECTURE", architecture)?;
+    }
+    if let Some(wow64_architecture) = args.context.windows_processor_architecture_w6432() {
         // An empty value produces `set "PROCESSOR_ARCHITEW6432="` for cmd.exe,
-        // clearing this WOW64 compatibility marker from the activated shell.
-        shell_script.set_env_var("PROCESSOR_ARCHITEW6432", "")?;
+        // clearing the marker for a 64-bit child or native x86 process.
+        shell_script.set_env_var("PROCESSOR_ARCHITEW6432", wow64_architecture.unwrap_or(""))?;
     }
 
     // Re-entrancy marker: this way the preamble sources this file

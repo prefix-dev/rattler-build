@@ -57,9 +57,21 @@ IF "%CONDA_BUILD%" == "" (
                 .expect("generated build script has a filename")
                 .to_string_lossy();
             let script_name = crate::native_runner::quote_arg(&self.shell(), &script_name);
+            // `/machine x86` does not redirect an explicit `cmd.exe` lookup
+            // from System32. Launch the x86 command interpreter from SysWOW64
+            // directly. SystemRoot is conventionally an unspaced system path,
+            // so keep it unquoted to avoid `start` treating it as a title. The
+            // other architectures use `cmd.exe`, whose image selection is
+            // handled by `/machine`.
+            let child_cmd = match machine {
+                crate::native_runner::WindowsMachine::X86 => r"%SystemRoot%\SysWOW64\cmd.exe",
+                crate::native_runner::WindowsMachine::Amd64
+                | crate::native_runner::WindowsMachine::Arm64 => "cmd.exe",
+            };
             let command = format!(
-                "start /b /wait /machine {} cmd.exe /d /c {} & exit /b !ERRORLEVEL!",
+                "start /b /wait /machine {} {} /d /c {} & exit /b !ERRORLEVEL!",
                 machine.start_argument(),
+                child_cmd,
                 script_name,
             );
             CommandSpec::new(
