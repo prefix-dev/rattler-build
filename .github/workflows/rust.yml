@@ -136,6 +136,10 @@ jobs:
   windows-arm-e2e-test:
     name: End-to-end (windows-11-arm)
     needs: e2e-test
+    # e2e-test is a matrix job. Run this when another platform fails, provided
+    # the workflow itself was not cancelled, so an unrelated failure does not
+    # skip validation of the successfully uploaded Windows x64 binary.
+    if: ${{ always() && !cancelled() }}
     runs-on: windows-11-arm
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
