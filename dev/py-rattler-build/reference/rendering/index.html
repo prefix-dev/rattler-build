@@ -2380,6 +2380,73 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Functions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Functions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#render_recipes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        render_recipes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rattler_build.render.render_recipes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        render_recipes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="render_recipes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#render_context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        render_context
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rattler_build.render.render_context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        render_context
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#supporting-types" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3606,6 +3673,73 @@
     <span class="md-ellipsis">
       
         run_build
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Functions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Functions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#render_recipes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        render_recipes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rattler_build.render.render_recipes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        render_recipes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="render_recipes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#render_context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        render_context
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rattler_build.render.render_context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        render_context
       
     </span>
   </a>
@@ -6133,6 +6267,506 @@ Defaults to <code>&lt;recipe_dir&gt;/output</code>.</p>
 
 
   </div>
+
+    </div>
+
+</div><h2 id="functions">Functions<a class="headerlink" href="#functions" title="Permanent link">#</a></h2>
+<h3 id="render_recipes"><code>render_recipes</code><a class="headerlink" href="#render_recipes" title="Permanent link">#</a></h3>
+
+
+<div class="doc doc-object doc-function">
+
+
+
+<a id="rattler_build.render.render_recipes"></a>
+    <div class="doc doc-contents first">
+
+        <p>Render recipes without building them.</p>
+<p>This is the programmatic equivalent of <code>rattler-build build --render-only</code>:
+each returned dictionary matches one entry of the JSON the CLI prints, with
+the rendered <code>recipe</code> and its <code>build_configuration</code> (variant, subpackages,
+...). Outputs whose skip conditions evaluate to true are filtered out and the
+remaining outputs are sorted topologically.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>recipes</code>
+            </td>
+            <td>
+                  <code><span title="list">list</span>[<span title="str">str</span> | <span title="pathlib.Path">Path</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The recipe files or directories containing <code>recipe.yaml</code>.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>up_to</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Only keep the outputs needed to build the named package.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>build_platform</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The build platform to use for rendering.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>target_platform</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The target platform for the rendering.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>host_platform</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The host platform for the rendering.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>channels</code>
+            </td>
+            <td>
+                  <code><span title="list">list</span>[<span title="str">str</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Channels to use when resolving dependencies.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>variant_config</code>
+            </td>
+            <td>
+                  <code><span title="list">list</span>[<span title="str">str</span> | <span title="pathlib.Path">Path</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Variant configuration files to use for rendering. A
+<code>variants.yaml</code> next to the recipe is picked up automatically
+unless <code>ignore_recipe_variants</code> is set.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>variant_overrides</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="list">list</span>[<span title="str">str</span>]] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A dictionary of variant key-value pairs to override.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>ignore_recipe_variants</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Do not read the <code>variants.yaml</code> next to the recipe.</p>
+              </div>
+            </td>
+            <td>
+                  <code>False</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>with_solve</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Also resolve dependencies of the rendered outputs.</p>
+              </div>
+            </td>
+            <td>
+                  <code>False</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>no_build_id</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Don't use a build id (timestamp) in the work directory name.</p>
+              </div>
+            </td>
+            <td>
+                  <code>False</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>output_dir</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span> | <span title="pathlib.Path">Path</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The output directory recorded in the build configuration.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>auth_file</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span> | <span title="pathlib.Path">Path</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The authentication file.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>channel_priority</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The channel priority.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>allow_insecure_host</code>
+            </td>
+            <td>
+                  <code><span title="list">list</span>[<span title="str">str</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Allow insecure hosts.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>exclude_newer</code>
+            </td>
+            <td>
+                  <code><span title="datetime.datetime">datetime</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Exclude packages newer than this timestamp from the solver.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>build_num</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Override the build number of the recipe.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>build_string_prefix</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Prefix to prepend to the default build string.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>repodata_revision</code>
+            </td>
+            <td>
+                  <code><span title="rattler_build._rattler_build.RepodataRevision">RepodataRevision</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Repodata revision controlling which recipe fields and
+MatchSpec syntax are accepted.</p>
+              </div>
+            </td>
+            <td>
+                  <code><span title="rattler_build._rattler_build.RepodataRevision.LEGACY">LEGACY</span></code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="list">list</span>[<span title="dict">dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>]]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>One dictionary per rendered output, in build order.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div><h3 id="render_context"><code>render_context</code><a class="headerlink" href="#render_context" title="Permanent link">#</a></h3>
+
+
+<div class="doc doc-object doc-function">
+
+
+
+<a id="rattler_build.render.render_context"></a>
+    <div class="doc doc-contents first">
+
+        <p>Render a recipe's <code>context</code> section and substitute it into the recipe.</p>
+<p>This is a lenient, lint-oriented render that does <strong>not</strong> resolve variants or
+lower the recipe to Stage1:</p>
+<ul>
+<li>the <code>context</code> section is evaluated in order;</li>
+<li>plain variables and filters are resolved with rattler-build's Jinja engine;</li>
+<li>undefined variables and recipe helper functions (<code>compiler</code>,
+  <code>pin_subpackage</code>, ...) are left verbatim as <code>${{ ... }}</code>;</li>
+<li><code>if</code> / <code>then</code> / <code>else</code> conditionals are preserved.</li>
+</ul>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>recipe</code>
+            </td>
+            <td>
+                  <code><span title="typing.Any">Any</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A :class:<code>~rattler_build.stage0.Stage0Recipe</code> or a plain recipe
+dictionary. A dictionary is rendered as-is, preserving its structure.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>jinja_config</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="&lt;code&gt;rattler_build.jinja_config.JinjaConfig&lt;/code&gt;" href="../configuration/#rattler_build.JinjaConfig">JinjaConfig</a> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Optional :class:<code>~rattler_build.jinja_config.JinjaConfig</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>functions</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="collections.abc.Callable">Callable</span>[..., <span title="typing.Any">Any</span>]] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Optional mapping of helper names (e.g. <code>compiler</code>,
+<code>pin_subpackage</code>) to Python callables. A mapped helper is evaluated
+with the callable's return value instead of being preserved verbatim.
+A callable that raises falls back to preserving the expression.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>retype</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Re-parse fully resolved scalars as YAML so their types
+(int, bool, ...) are recovered, matching how a rendered recipe file
+would be read back. Pass <code>False</code> to keep every substituted scalar
+a string, e.g. when the caller recovers scalar types itself using
+the original document's quoting information.</p>
+              </div>
+            </td>
+            <td>
+                  <code>True</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The recipe as a plain dictionary with the context substituted.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
 
     </div>
 

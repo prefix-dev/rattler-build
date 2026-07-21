@@ -2127,6 +2127,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#rattler_build.Stage0Recipe.render_context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        render_context
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#rattler_build.Stage0Recipe.run_build" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4105,6 +4116,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#rattler_build.Stage0Recipe.render_context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        render_context
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#rattler_build.Stage0Recipe.run_build" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5939,6 +5961,130 @@ render configuration so that Jinja functions like <code>include()</code> and
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">variant</span><span class="o">.</span><span class="n">recipe</span><span class="o">.</span><span class="n">package</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
 </span></code></pre></div>
 </details>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="rattler_build.Stage0Recipe.render_context" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">render_context</span>
+
+
+<a href="#rattler_build.Stage0Recipe.render_context" class="headerlink" title="Permanent link">#</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">render_context</span><span class="p">(</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">jinja_config</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">functions</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">retype</span><span class="o">=</span><span class="kc">True</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="p">)</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Render the <code>context</code> section and substitute it into the recipe.</p>
+<p>This is a lenient, lint-oriented render that does <strong>not</strong> resolve
+variants or lower the recipe to Stage1:</p>
+<ul>
+<li>the <code>context</code> section is evaluated in order;</li>
+<li>plain variables and filters are resolved with rattler-build's Jinja
+  engine;</li>
+<li>undefined variables and recipe helper functions (<code>compiler</code>,
+  <code>pin_subpackage</code>, ...) are left verbatim as <code>${{ ... }}</code>;</li>
+<li><code>if</code> / <code>then</code> / <code>else</code> conditionals are preserved.</li>
+</ul>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>jinja_config</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="&lt;code&gt;rattler_build.jinja_config.JinjaConfig&lt;/code&gt;" href="../configuration/#rattler_build.JinjaConfig">JinjaConfig</a> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Optional :class:<code>~rattler_build.jinja_config.JinjaConfig</code>.
+When <code>None</code> a default config is used. Its <code>undefined_behavior</code>
+is ignored: context rendering always uses the strict engine so
+that an unresolvable expression can be kept verbatim.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>functions</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="collections.abc.Callable">Callable</span>[..., <span title="typing.Any">Any</span>]] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Optional mapping of helper names to Python callables that
+are evaluated instead of preserving the helper call verbatim.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>retype</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Re-parse fully resolved scalars as YAML so their types
+(int, bool, ...) are recovered. Pass <code>False</code> to keep every
+substituted scalar a string.</p>
+              </div>
+            </td>
+            <td>
+                  <code>True</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The recipe as a plain dictionary with the context substituted.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
 
     </div>
 
