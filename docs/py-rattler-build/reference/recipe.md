@@ -27,6 +27,7 @@ from rattler_build import Stage0Recipe, SingleOutputRecipe, MultiOutputRecipe, S
             - as_multi_output
             - to_dict
             - render
+            - render_context
             - run_build
             - schema_version
             - context

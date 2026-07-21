@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import tempfile
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -23,6 +24,7 @@ from rattler_build.variant_config import VariantConfig
 
 if TYPE_CHECKING:
     from rattler_build.build_result import BuildResult
+    from rattler_build.jinja_config import JinjaConfig
     from rattler_build.progress import ProgressCallback
 
 
@@ -288,6 +290,42 @@ class Stage0Recipe(ABC):
         for variant in variants:
             variant._siblings = variants
         return variants
+
+    def render_context(
+        self,
+        jinja_config: JinjaConfig | None = None,
+        functions: dict[str, Callable[..., Any]] | None = None,
+        *,
+        retype: bool = True,
+    ) -> dict[str, Any]:
+        """Render the ``context`` section and substitute it into the recipe.
+
+        This is a lenient, lint-oriented render that does **not** resolve
+        variants or lower the recipe to Stage1:
+
+        * the ``context`` section is evaluated in order;
+        * plain variables and filters are resolved with rattler-build's Jinja
+          engine;
+        * undefined variables and recipe helper functions (``compiler``,
+          ``pin_subpackage``, ...) are left verbatim as ``${{ ... }}``;
+        * ``if`` / ``then`` / ``else`` conditionals are preserved.
+
+        Args:
+            jinja_config: Optional :class:`~rattler_build.jinja_config.JinjaConfig`.
+                When ``None`` a default config is used. Its ``undefined_behavior``
+                is ignored: context rendering always uses the strict engine so
+                that an unresolvable expression can be kept verbatim.
+            functions: Optional mapping of helper names to Python callables that
+                are evaluated instead of preserving the helper call verbatim.
+            retype: Re-parse fully resolved scalars as YAML so their types
+                (int, bool, ...) are recovered. Pass ``False`` to keep every
+                substituted scalar a string.
+
+        Returns:
+            The recipe as a plain dictionary with the context substituted.
+        """
+        config_inner = jinja_config._config if jinja_config is not None else None
+        return _render.render_context(self._wrapper, config_inner, functions, retype)
 
     def run_build(
         self,
