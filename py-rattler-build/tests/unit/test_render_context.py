@@ -130,29 +130,3 @@ def test_render_context_keeps_substituted_scalars_as_strings() -> None:
     assert rendered["tests"][0]["python"]["python_version"] == "3.10"
     # An untemplated scalar keeps whatever type it had.
     assert rendered["context"]["build_num"] == 5
-
-
-def test_render_context_expands_statement_blocks() -> None:
-    # taken from trzsz-feedstock, which conda-forge builds with rattler-build
-    recipe = {
-        "context": {"license_ignore": "github.com/ipfs/kubo bazil.org/fuse"},
-        "requirements": {"build": ["{% if unix %}go-nocgo{% else %}go{% endif %}"]},
-        "build": {"script": ["licenses {% for i in license_ignore | split %}--ignore ${{ i }} {% endfor %}"]},
-    }
-
-    rendered = render_context(recipe)
-
-    assert rendered["requirements"]["build"] == ["go-nocgo"]
-    assert rendered["build"]["script"] == ["licenses --ignore github.com/ipfs/kubo --ignore bazil.org/fuse "]
-
-
-def test_render_context_keeps_unresolvable_statement_blocks_verbatim() -> None:
-    source = "{% if unknown_var %}a{% else %}b{% endif %}"
-    rendered = render_context({"build": {"string": source}})
-    assert rendered["build"]["string"] == source
-
-
-def test_render_context_expands_raw_blocks() -> None:
-    recipe = {"build": {"script": ["echo {% raw %}${{ not_a_template }}{% endraw %}"]}}
-    rendered = render_context(recipe)
-    assert rendered["build"]["script"] == ["echo ${{ not_a_template }}"]

@@ -511,9 +511,9 @@ pub fn render_context(
     {
         for (key, value) in map {
             let context_value = match value.as_str() {
-                Some(source) if is_templated(source) => {
+                Some(source) if source.contains("${{") => {
                     let rendered = substitute_expressions(&jinja, source);
-                    if is_templated(&rendered) {
+                    if rendered.contains("${{") {
                         continue;
                     }
                     minijinja::Value::from(rendered)
@@ -597,45 +597,24 @@ fn python_jinja_function(
 
 /// Render a single JSON scalar with the current Jinja context.
 ///
-/// Non-strings and strings without a `${{` or `{%` marker pass through
-/// unchanged. Each `${{ ... }}` expression is rendered on its own so that a
-/// scalar mixing resolvable and unresolvable expressions (e.g.
+/// Non-strings and strings without a `${{` marker pass through unchanged.
+/// Each `${{ ... }}` expression is rendered on its own so that a scalar mixing
+/// resolvable and unresolvable expressions (e.g.
 /// `${{ name }}-${{ unknown }}`) keeps only the unresolved part verbatim.
 fn render_json_scalar(jinja: &Jinja, value: &serde_json::Value) -> serde_json::Value {
     let Some(source) = value.as_str() else {
         return value.clone();
     };
-    if !is_templated(source) {
+    if !source.contains("${{") {
         return value.clone();
     }
     serde_json::Value::String(substitute_expressions(jinja, source))
 }
 
-/// Whether a scalar carries Jinja syntax: a `${{ ... }}` expression or a
-/// `{% ... %}` statement block.
-fn is_templated(source: &str) -> bool {
-    source.contains("${{") || source.contains("{%")
-}
-
 /// Replace every `${{ ... }}` expression in `source` by rendering it on its
 /// own. An expression that fails to render (undefined variable or a preserved
 /// helper function) is kept verbatim.
-///
-/// A scalar containing a statement block (`{% if %}`, `{% for %}`, `{% raw %}`)
-/// cannot be split this way, because the block spans the surrounding text and
-/// its body may depend on the loop or branch it sits in. Such a scalar is
-/// rendered as a whole instead, and kept verbatim if that fails.
 fn substitute_expressions(jinja: &Jinja, source: &str) -> String {
-    if source.contains("{%") {
-        return jinja
-            .render_str(source)
-            .unwrap_or_else(|_| source.to_string());
-    }
-    substitute_inline_expressions(jinja, source)
-}
-
-/// Replace every `${{ ... }}` expression in a source without statement blocks.
-fn substitute_inline_expressions(jinja: &Jinja, source: &str) -> String {
     let mut out = String::new();
     let mut rest = source;
     while let Some(start) = rest.find("${{") {
