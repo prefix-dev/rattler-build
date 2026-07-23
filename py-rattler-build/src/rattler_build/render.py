@@ -34,6 +34,8 @@ def render_context(
     recipe: Any,
     jinja_config: JinjaConfig | None = None,
     functions: dict[str, Callable[..., Any]] | None = None,
+    *,
+    retype: bool = True,
 ) -> dict[str, Any]:
     """Render a recipe's ``context`` section and substitute it into the recipe.
 
@@ -54,18 +56,20 @@ def render_context(
             ``pin_subpackage``) to Python callables. A mapped helper is evaluated
             with the callable's return value instead of being preserved verbatim.
             A callable that raises falls back to preserving the expression.
+        retype: Re-parse fully resolved scalars as YAML so their types
+            (int, bool, ...) are recovered, matching how a rendered recipe file
+            would be read back. Pass ``False`` to keep every substituted scalar
+            a string, e.g. when the caller recovers scalar types itself using
+            the original document's quoting information.
 
     Returns:
-        The recipe as a plain dictionary with the context substituted. Every
-        substituted scalar is a string: telling ``"${{ python_min }}"`` from
-        ``${{ build_number }}`` needs the original document's quoting, which is
-        lost on the way in, so recovering YAML scalar types is up to the caller.
+        The recipe as a plain dictionary with the context substituted.
     """
     # Unwrap the Python Stage0Recipe wrapper to its inner Rust object; a plain
     # dict is passed through untouched.
     inner = getattr(recipe, "_wrapper", recipe)
     config_inner = jinja_config._config if jinja_config is not None else None
-    return _render.render_context(inner, config_inner, functions)
+    return _render.render_context(inner, config_inner, functions, retype)
 
 
 def render_recipes(

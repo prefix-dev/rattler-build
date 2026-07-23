@@ -454,17 +454,19 @@ pub fn render_recipes(
 /// evaluated with the callable's return value instead of being preserved. A
 /// callable that raises falls back to preserving the expression verbatim.
 ///
-/// Every substituted scalar stays a string. Recovering the YAML type of a
-/// rendered scalar needs the original document's quoting to tell
-/// `"${{ python_min }}"` from `${{ build_number }}`, and that information is
-/// gone by the time the recipe reaches this function, so the caller does it.
+/// A fully resolved scalar is re-parsed as a YAML scalar so that its type
+/// (int, bool, ...) is recovered, matching how the recipe would be read back.
+/// Pass ``retype=False`` to keep every substituted scalar a string instead,
+/// e.g. when the caller wants to recover scalar types itself using the
+/// original document's quoting information.
 #[pyfunction]
-#[pyo3(signature = (recipe, jinja_config=None, functions=None))]
+#[pyo3(signature = (recipe, jinja_config=None, functions=None, retype=true))]
 pub fn render_context(
     py: Python<'_>,
     recipe: &Bound<'_, PyAny>,
     jinja_config: Option<PyJinjaConfig>,
     functions: Option<Bound<'_, PyDict>>,
+    retype: bool,
 ) -> PyResult<Py<PyAny>> {
     // Accept either a parsed Stage0 recipe or a raw recipe dictionary. The
     // dictionary path preserves the recipe's exact structure, which is what a
@@ -501,11 +503,12 @@ pub fn render_context(
     }
 
     // Evaluate the `context` section in order and feed it forward. Rendered
-    // entries are fed forward as *strings* - the same value a Jinja engine
-    // produces - so that comparisons in later entries (e.g.
-    // `${{ x if major == '0' else y }}`) keep working. Entries that do not
-    // fully resolve are not fed forward at all, so a reference to them stays
-    // verbatim instead of having the unresolved template expanded into it.
+    // entries are fed forward as *strings* — the same value a Jinja engine
+    // produces — so that comparisons in later entries (e.g.
+    // `${{ x if major == '0' else y }}`) keep working. The typed YAML re-parse
+    // only lands in the output tree. Entries that do not fully resolve are not
+    // fed forward at all, so a reference to them stays verbatim instead of
+    // having the unresolved template expanded into it.
     if let Some(context) = tree.get("context").cloned()
         && let Some(map) = context.as_object()
     {
@@ -524,7 +527,7 @@ pub fn render_context(
         }
     }
 
-    render_tree(&mut tree, &jinja);
+    render_tree(&mut tree, &jinja, retype);
 
     pythonize::pythonize(py, &tree)
         .map(|obj| obj.into())
@@ -601,14 +604,71 @@ fn python_jinja_function(
 /// Each `${{ ... }}` expression is rendered on its own so that a scalar mixing
 /// resolvable and unresolvable expressions (e.g.
 /// `${{ name }}-${{ unknown }}`) keeps only the unresolved part verbatim.
-fn render_json_scalar(jinja: &Jinja, value: &serde_json::Value) -> serde_json::Value {
+fn render_json_scalar(jinja: &Jinja, value: &serde_json::Value, retype: bool) -> serde_json::Value {
     let Some(source) = value.as_str() else {
         return value.clone();
     };
     if !source.contains("${{") {
         return value.clone();
     }
-    serde_json::Value::String(substitute_expressions(jinja, source))
+    let rendered = substitute_expressions(jinja, source);
+    if !retype || rendered.contains("${{") {
+        // Something was left unresolved (or the caller wants to recover the
+        // scalar types itself), keep it as a string.
+        serde_json::Value::String(rendered)
+    } else {
+        // Fully resolved: recover the scalar type (int/bool/...) the way YAML
+        // would read it back.
+        reparse_yaml_scalar(&rendered)
+    }
+}
+
+/// Re-parse a fully rendered scalar as YAML to recover its type, the way the
+/// value would be read back from a rendered recipe file.
+///
+/// Escape sequences are escaped before parsing so a rendered value containing
+/// newlines survives as a single-line plain scalar instead of being folded or
+/// rejected by the YAML parser; a string result is unescaped again.
+fn reparse_yaml_scalar(rendered: &str) -> serde_json::Value {
+    let escaped = rendered
+        .replace('\\', "\\\\")
+        .replace('\n', "\\n")
+        .replace('\t', "\\t")
+        .replace('\r', "\\r");
+
+    match serde_yaml::from_str::<serde_json::Value>(&escaped) {
+        Ok(serde_json::Value::String(s)) => serde_json::Value::String(unescape_scalar(&s)),
+        // A scalar must stay a scalar: a rendered value that happens to parse
+        // as a mapping or list (e.g. "foo: bar") is kept as a string.
+        Ok(serde_json::Value::Object(_)) | Ok(serde_json::Value::Array(_)) | Err(_) => {
+            serde_json::Value::String(rendered.to_string())
+        }
+        Ok(other) => other,
+    }
+}
+
+/// Reverse the escaping applied in [`reparse_yaml_scalar`].
+fn unescape_scalar(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let mut chars = s.chars();
+    while let Some(c) = chars.next() {
+        if c != '\\' {
+            out.push(c);
+            continue;
+        }
+        match chars.next() {
+            Some('n') => out.push('\n'),
+            Some('t') => out.push('\t'),
+            Some('r') => out.push('\r'),
+            Some('\\') => out.push('\\'),
+            Some(other) => {
+                out.push('\\');
+                out.push(other);
+            }
+            None => out.push('\\'),
+        }
+    }
+    out
 }
 
 /// Replace every `${{ ... }}` expression in `source` by rendering it on its
@@ -640,17 +700,17 @@ fn substitute_expressions(jinja: &Jinja, source: &str) -> String {
 }
 
 /// Recursively render every templated string in the tree in place.
-fn render_tree(value: &mut serde_json::Value, jinja: &Jinja) {
+fn render_tree(value: &mut serde_json::Value, jinja: &Jinja, retype: bool) {
     match value {
-        serde_json::Value::String(_) => *value = render_json_scalar(jinja, value),
+        serde_json::Value::String(_) => *value = render_json_scalar(jinja, value, retype),
         serde_json::Value::Array(items) => {
             for item in items {
-                render_tree(item, jinja);
+                render_tree(item, jinja, retype);
             }
         }
         serde_json::Value::Object(map) => {
             for (_key, v) in map.iter_mut() {
-                render_tree(v, jinja);
+                render_tree(v, jinja, retype);
             }
         }
         _ => {}
