@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.7](https://github.com/prefix-dev/rattler-build/compare/rattler_build_script-v0.2.6...rattler_build_script-v0.2.7) - 2026-07-23
+
+### Other
+
+- run brush scripts with -euxo pipefail by default ([#2653](https://github.com/prefix-dev/rattler-build/pull/2653))
+
 ## [0.2.6](https://github.com/prefix-dev/rattler-build/compare/rattler_build_script-v0.2.5...rattler_build_script-v0.2.6) - 2026-07-11
 
 ### Added

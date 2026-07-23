@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.10](https://github.com/prefix-dev/rattler-build/compare/rattler_build_source_cache-v0.1.9...rattler_build_source_cache-v0.1.10) - 2026-07-23
+
+### Added
+
+- use rattler_git's built-in LFS support in the source cache ([#2648](https://github.com/prefix-dev/rattler-build/pull/2648))
+
 ## [0.1.9](https://github.com/prefix-dev/rattler-build/compare/rattler_build_source_cache-v0.1.8...rattler_build_source_cache-v0.1.9) - 2026-07-11
 
 ### Other
