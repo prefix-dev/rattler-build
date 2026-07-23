@@ -5098,6 +5098,7 @@ dependencies = [
  "tokio",
  "toml",
  "tracing",
+ "tracing-test",
  "url",
  "zip",
 ]

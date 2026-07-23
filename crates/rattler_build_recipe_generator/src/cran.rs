@@ -75,6 +75,14 @@ pub struct CranOpts {
     #[cfg_attr(feature = "cli", arg(short, long))]
     pub tree: bool,
 
+    /// Whether to recursively generate recipes for dependencies that are
+    /// missing from conda-forge (mirrors grayskull's `--recursive`). Unlike
+    /// `--tree`, this only recurses into the dependencies actually missing
+    /// from conda-forge rather than the whole tree, and has no effect when
+    /// `--tree` is also set.
+    #[cfg_attr(feature = "cli", arg(short, long))]
+    pub recursive: bool,
+
     /// Name of the package to generate
     pub package: String,
 
@@ -246,6 +254,66 @@ pub async fn fetch_package_sha256sum(url: &Url) -> Result<Sha256Hash, miette::Er
     let response = client.get(url.clone()).send().await.into_diagnostic()?;
     let bytes = response.bytes().await.into_diagnostic()?;
     Ok(compute_bytes_digest::<Sha256>(&bytes))
+}
+
+/// Query `url` and report whether it responds with a successful status,
+/// i.e. whether the package it points at exists. Split out from
+/// [`conda_forge_package_exists`] so tests can exercise the network-error
+/// branch deterministically by pointing it at an unreachable URL.
+async fn query_conda_forge_url(url: &str) -> Result<bool, reqwest::Error> {
+    let response = reqwest::get(url).await?;
+    Ok(response.status().is_success())
+}
+
+/// Check whether `conda_name` exists on the `conda-forge` channel, using
+/// `url` to query it.
+///
+/// Network errors are treated as "exists" so connectivity issues don't
+/// produce spurious warnings.
+async fn conda_forge_package_exists_at(conda_name: &str, url: &str) -> bool {
+    match query_conda_forge_url(url).await {
+        Ok(exists) => exists,
+        Err(e) => {
+            tracing::debug!("Failed to check conda-forge for {}: {}", conda_name, e);
+            true
+        }
+    }
+}
+
+/// Check whether `conda_name` exists on the `conda-forge` channel.
+///
+/// Unlike PyPI, CRAN package names map to conda-forge by a fixed convention
+/// (`foo` -> `r-foo`, see [`format_r_package`]), so no name-mapping lookup is
+/// needed here, only an existence check via the anaconda.org API.
+async fn conda_forge_package_exists(conda_name: &str) -> bool {
+    let url = format!("https://api.anaconda.org/package/conda-forge/{conda_name}");
+    conda_forge_package_exists_at(conda_name, &url).await
+}
+
+/// Check `deps` against conda-forge, returning those that aren't available
+/// there yet (as the original, non-prefixed dependency names).
+async fn find_missing_conda_forge_deps(deps: &HashSet<String>) -> Vec<String> {
+    let mut missing = Vec::new();
+    for dep in deps {
+        let conda_name = format_r_package(dep, None);
+        if !conda_forge_package_exists(&conda_name).await {
+            missing.push(dep.clone());
+        }
+    }
+    missing
+}
+
+/// Warn about each dependency in `missing`, so the user knows upfront which
+/// recipes they need to package first.
+fn warn_about_missing_conda_forge_deps(missing: &[String]) {
+    for dep in missing {
+        let conda_name = format_r_package(dep, None);
+        tracing::warn!(
+            "Dependency '{}' does not appear to be available on conda-forge as '{}'. You may need to create and publish a recipe for it first.",
+            dep,
+            conda_name
+        );
+    }
 }
 
 // Found when running `installed.packages()` in an `r-base` environment
@@ -520,11 +588,26 @@ pub async fn generate_r_recipe_string(
 /// If `opts.write` is true, the recipe is written to a folder named after the
 /// package. Otherwise, the YAML is printed to stdout. When `tree` is enabled,
 /// dependencies are recursively generated if they don't already exist locally.
+/// When `recursive` is enabled instead, only dependencies missing from
+/// conda-forge are recursively generated.
 pub async fn generate_r_recipe(opts: &CranOpts) -> miette::Result<()> {
     let (recipe, remaining_deps) =
         build_cran_recipe_and_deps(&opts.package, opts.universe.as_deref()).await?;
 
-    let final_recipe = format_cran_recipe_with_suggests(&recipe);
+    finish_generating_r_recipe(&recipe, remaining_deps, opts).await
+}
+
+/// The part of [`generate_r_recipe`] that doesn't need `recipe`/`remaining_deps`
+/// to have come from a real network fetch: print or write the recipe, warn
+/// about dependencies missing from conda-forge, and recurse per `opts.tree`/
+/// `opts.recursive`. Split out so this logic can be exercised in tests with
+/// fabricated `remaining_deps` instead of a real CRAN lookup.
+async fn finish_generating_r_recipe(
+    recipe: &serialize::Recipe,
+    remaining_deps: HashSet<String>,
+    opts: &CranOpts,
+) -> miette::Result<()> {
+    let final_recipe = format_cran_recipe_with_suggests(recipe);
 
     if opts.write {
         write_recipe(&recipe.package.name, &final_recipe).into_diagnostic()?;
@@ -532,17 +615,33 @@ pub async fn generate_r_recipe(opts: &CranOpts) -> miette::Result<()> {
         print!("{}", final_recipe);
     }
 
-    if opts.tree {
-        for dep in remaining_deps {
-            let r_package = format_r_package(&dep, None);
+    let missing_deps = find_missing_conda_forge_deps(&remaining_deps).await;
+    warn_about_missing_conda_forge_deps(&missing_deps);
 
-            if !PathBuf::from(r_package).exists() {
-                let opts = CranOpts {
-                    package: dep,
-                    ..opts.clone()
-                };
-                generate_r_recipe(&opts).await?;
-            }
+    if opts.tree {
+        generate_recipes_for_deps(remaining_deps, opts).await?;
+    } else if opts.recursive {
+        generate_recipes_for_deps(missing_deps, opts).await?;
+    }
+
+    Ok(())
+}
+
+/// Generate a recipe for each of `deps` that doesn't already have a local
+/// folder, reusing `opts` (except for the package name) for each one.
+async fn generate_recipes_for_deps(
+    deps: impl IntoIterator<Item = String>,
+    opts: &CranOpts,
+) -> miette::Result<()> {
+    for dep in deps {
+        let r_package = format_r_package(&dep, None);
+
+        if !PathBuf::from(r_package).exists() {
+            let opts = CranOpts {
+                package: dep,
+                ..opts.clone()
+            };
+            generate_r_recipe(&opts).await?;
         }
     }
 
@@ -552,6 +651,7 @@ pub async fn generate_r_recipe(opts: &CranOpts) -> miette::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tracing_test::traced_test;
 
     #[test]
     fn test_license_mapping() {
@@ -649,5 +749,268 @@ mod tests {
             );
             assert_eq!(license_files, expected_files, "Failed for input: {}", input);
         }
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    async fn test_conda_forge_package_exists_for_real_package() {
+        assert!(conda_forge_package_exists("r-jsonlite").await);
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    async fn test_conda_forge_package_exists_for_fake_package() {
+        let name = "r-this-package-does-not-exist-xyz123";
+        let url = format!("https://api.anaconda.org/package/conda-forge/{name}");
+
+        if conda_forge_package_exists(name).await {
+            // `conda_forge_package_exists` only reports a nonexistent package
+            // as existing when the request itself failed and it fell back to
+            // fail-open behavior. Confirm that's actually what happened here,
+            // rather than a false positive from the API.
+            assert!(
+                query_conda_forge_url(&url).await.is_err(),
+                "fake package unexpectedly reported as existing on conda-forge"
+            );
+        }
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    async fn test_conda_forge_package_exists_fails_open_on_network_error() {
+        // `.invalid` is an IANA-reserved TLD (RFC 2606) guaranteed never to
+        // resolve, so this deterministically exercises the network-error
+        // branch regardless of the test environment's actual connectivity.
+        let exists = conda_forge_package_exists_at(
+            "r-jsonlite",
+            "https://api.anaconda.org.invalid/package/conda-forge/r-jsonlite",
+        )
+        .await;
+
+        assert!(
+            exists,
+            "should fail open (report existing) on network errors"
+        );
+        assert!(logs_contain("Failed to check conda-forge for r-jsonlite"));
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    async fn test_find_missing_conda_forge_deps_includes_fake_package() {
+        let dep = "this_package_does_not_exist_xyz123";
+        let mut deps = HashSet::new();
+        deps.insert(dep.to_string());
+
+        let missing = find_missing_conda_forge_deps(&deps).await;
+
+        let warning = "Dependency 'this_package_does_not_exist_xyz123' does not appear to be available on conda-forge as 'r-this_package_does_not_exist_xyz123'";
+        if !missing.contains(&dep.to_string()) {
+            // The warning is only skipped if the conda-forge check itself
+            // failed open due to a network error. Confirm that's what
+            // happened, rather than a missed warning.
+            let url = format!("https://api.anaconda.org/package/conda-forge/r-{dep}");
+            assert!(
+                query_conda_forge_url(&url).await.is_err(),
+                "expected warning was not logged: {warning}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    async fn test_find_missing_conda_forge_deps_excludes_real_package() {
+        let mut deps = HashSet::new();
+        deps.insert("jsonlite".to_string());
+
+        let missing = find_missing_conda_forge_deps(&deps).await;
+
+        assert!(missing.is_empty());
+    }
+
+    #[test]
+    #[traced_test]
+    fn test_warn_about_missing_conda_forge_deps_logs_warning() {
+        let missing = vec!["this_package_does_not_exist_xyz123".to_string()];
+
+        warn_about_missing_conda_forge_deps(&missing);
+
+        assert!(logs_contain(
+            "Dependency 'this_package_does_not_exist_xyz123' does not appear to be available on conda-forge as 'r-this_package_does_not_exist_xyz123'"
+        ));
+    }
+
+    #[test]
+    #[traced_test]
+    fn test_warn_about_missing_conda_forge_deps_silent_when_empty() {
+        warn_about_missing_conda_forge_deps(&[]);
+
+        assert!(!logs_contain(
+            "does not appear to be available on conda-forge"
+        ));
+    }
+
+    fn dummy_cran_opts() -> CranOpts {
+        CranOpts {
+            universe: None,
+            tree: false,
+            recursive: false,
+            package: "unused".to_string(),
+            write: false,
+        }
+    }
+
+    fn dummy_recipe() -> serialize::Recipe {
+        serialize::Recipe::default()
+    }
+
+    /// Known to exist on conda-forge as `r-jsonlite`.
+    const EXISTING_DEP: &str = "jsonlite";
+    /// Known to not exist on conda-forge (or CRAN) under this name.
+    const MISSING_DEP: &str = "this_package_does_not_exist_xyz123";
+
+    const MISSING_DEP_WARNING: &str = "Dependency 'this_package_does_not_exist_xyz123' does not appear to be available on conda-forge";
+
+    /// Calls `finish_generating_r_recipe` with a single dependency in
+    /// `remaining_deps`. The result is ignored: recursing into a real
+    /// dependency name always fails right now (the upstream metadata is
+    /// either missing fields or the package doesn't exist at all), but
+    /// `generate_r_recipe` logs "Generating R recipe for <dep>" *before*
+    /// doing any actual network lookup, so whether recursion was attempted
+    /// can still be checked afterwards via `logs_contain`.
+    async fn attempt_finish_generating_r_recipe(dep: &str, opts: &CranOpts) {
+        let mut deps = HashSet::new();
+        deps.insert(dep.to_string());
+
+        let _ = finish_generating_r_recipe(&dummy_recipe(), deps, opts).await;
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    async fn test_generate_r_recipe_neither_tree_nor_recursive() {
+        let opts = CranOpts {
+            tree: false,
+            recursive: false,
+            ..dummy_cran_opts()
+        };
+
+        attempt_finish_generating_r_recipe(MISSING_DEP, &opts).await;
+        // Neither flag is set, so recursion never happens, even for a
+        // dependency missing from conda-forge -- only the warning fires.
+        assert!(!logs_contain(&format!(
+            "Generating R recipe for {MISSING_DEP}"
+        )));
+        assert!(logs_contain(MISSING_DEP_WARNING));
+
+        attempt_finish_generating_r_recipe(EXISTING_DEP, &opts).await;
+        assert!(!logs_contain(&format!(
+            "Generating R recipe for {EXISTING_DEP}"
+        )));
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    async fn test_generate_r_recipe_tree_only() {
+        let opts = CranOpts {
+            tree: true,
+            recursive: false,
+            ..dummy_cran_opts()
+        };
+
+        attempt_finish_generating_r_recipe(MISSING_DEP, &opts).await;
+        assert!(logs_contain(&format!(
+            "Generating R recipe for {MISSING_DEP}"
+        )));
+        assert!(logs_contain(MISSING_DEP_WARNING));
+
+        // `--tree` recurses into every dependency, including ones already
+        // on conda-forge.
+        attempt_finish_generating_r_recipe(EXISTING_DEP, &opts).await;
+        assert!(logs_contain(&format!(
+            "Generating R recipe for {EXISTING_DEP}"
+        )));
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    async fn test_generate_r_recipe_recursive_only() {
+        let opts = CranOpts {
+            tree: false,
+            recursive: true,
+            ..dummy_cran_opts()
+        };
+
+        attempt_finish_generating_r_recipe(MISSING_DEP, &opts).await;
+        assert!(logs_contain(&format!(
+            "Generating R recipe for {MISSING_DEP}"
+        )));
+        assert!(logs_contain(MISSING_DEP_WARNING));
+
+        // `--recursive` only recurses into dependencies missing from
+        // conda-forge, so an already-available dependency is left alone.
+        attempt_finish_generating_r_recipe(EXISTING_DEP, &opts).await;
+        assert!(!logs_contain(&format!(
+            "Generating R recipe for {EXISTING_DEP}"
+        )));
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    async fn test_generate_r_recipe_tree_and_recursive() {
+        let opts = CranOpts {
+            tree: true,
+            recursive: true,
+            ..dummy_cran_opts()
+        };
+
+        attempt_finish_generating_r_recipe(MISSING_DEP, &opts).await;
+        assert!(logs_contain(&format!(
+            "Generating R recipe for {MISSING_DEP}"
+        )));
+        assert!(logs_contain(MISSING_DEP_WARNING));
+
+        // When both flags are set, `--tree` takes precedence, so this
+        // behaves the same as tree-only: every dependency is recursed into.
+        attempt_finish_generating_r_recipe(EXISTING_DEP, &opts).await;
+        assert!(logs_contain(&format!(
+            "Generating R recipe for {EXISTING_DEP}"
+        )));
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    async fn test_generate_recipes_for_deps_skips_dependency_with_existing_local_folder() {
+        let dep = "test-recurse-missing-fixture-existing";
+        let folder = format_r_package(dep, None);
+        fs_err::create_dir_all(&folder).unwrap();
+
+        let result = generate_recipes_for_deps([dep.to_string()], &dummy_cran_opts()).await;
+
+        fs_err::remove_dir_all(&folder).unwrap();
+
+        // A pre-existing local folder means the dependency is skipped
+        // entirely, so no network call is attempted and this can't fail.
+        assert!(
+            result.is_ok(),
+            "should skip recursion once a local folder for the dependency already exists"
+        );
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    async fn test_generate_recipes_for_deps_recurses_into_dependency_without_local_folder() {
+        let dep = "this-package-definitely-does-not-exist-anywhere-xyz123";
+        let folder = format_r_package(dep, None);
+        assert!(
+            !PathBuf::from(&folder).exists(),
+            "test fixture assumption violated: {folder} should not exist locally"
+        );
+
+        let result = generate_recipes_for_deps([dep.to_string()], &dummy_cran_opts()).await;
+
+        // No local folder means `generate_recipes_for_deps` recurses into
+        // `generate_r_recipe`, which looks the (nonexistent) package up on
+        // CRAN and fails -- proving recursion was actually attempted rather
+        // than silently skipped.
+        assert!(result.is_err());
     }
 }

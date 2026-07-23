@@ -45,3 +45,4 @@ tempfile = { workspace = true }
 [dev-dependencies]
 insta = { workspace = true, features = ["yaml"] }
 tokio = { workspace = true }
+tracing-test = { workspace = true }
