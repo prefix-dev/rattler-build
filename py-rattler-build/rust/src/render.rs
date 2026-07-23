@@ -88,6 +88,7 @@ impl PyRenderConfig {
             &std::path::PathBuf::new(),
             &target_platform,
             &host_platform,
+            &build_platform,
             EnvironmentIsolation::default(),
             &std::path::PathBuf::new(),
         )

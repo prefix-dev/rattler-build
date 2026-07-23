@@ -15,7 +15,7 @@ use rattler_conda_types::Platform;
 #[derive(Debug, Clone)]
 pub struct RuntimeEnv {
     env: HashMap<String, String>,
-    platform: Platform,
+    process_platform: Platform,
 }
 
 impl RuntimeEnv {
@@ -23,7 +23,7 @@ impl RuntimeEnv {
     pub fn current() -> Self {
         Self {
             env: std::env::vars().collect(),
-            platform: Platform::current(),
+            process_platform: Platform::current(),
         }
     }
 
@@ -33,13 +33,13 @@ impl RuntimeEnv {
     pub fn for_test(platform: Platform) -> Self {
         Self {
             env: HashMap::new(),
-            platform,
+            process_platform: platform,
         }
     }
 
-    /// The platform rattler-build is running on.
-    pub fn platform(&self) -> Platform {
-        self.platform
+    /// The platform of the rattler-build process.
+    pub fn process_platform(&self) -> Platform {
+        self.process_platform
     }
 
     /// Looks up an environment variable by name.
@@ -56,7 +56,7 @@ impl RuntimeEnv {
     /// elsewhere), keyed off the platform rather than the one rattler-build was
     /// compiled for (unlike [`std::env::consts::EXE_SUFFIX`]).
     pub(crate) fn exe_suffix(&self) -> &'static str {
-        if self.platform.is_windows() {
+        if self.process_platform.is_windows() {
             ".exe"
         } else {
             ""
@@ -75,10 +75,10 @@ impl RuntimeEnv {
         self
     }
 
-    /// Returns a copy that runs on the given platform (builder style, for tests).
+    /// Returns a copy with the given rattler-build process platform (for tests).
     #[must_use]
-    pub fn with_platform(mut self, platform: Platform) -> Self {
-        self.platform = platform;
+    pub fn with_process_platform(mut self, platform: Platform) -> Self {
+        self.process_platform = platform;
         self
     }
 }

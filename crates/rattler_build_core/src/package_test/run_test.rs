@@ -12,7 +12,9 @@ use rattler_build_recipe::stage1::{
     TestType,
     tests::{CommandsTest, DownstreamTest, PerlTest, PythonTest, PythonVersion, RTest, RubyTest},
 };
-use rattler_build_script::{EnvironmentIsolation, Script, ScriptContent};
+use rattler_build_script::{
+    EnvironmentIsolation, ExecutionContext, RuntimeEnv, Script, ScriptContent,
+};
 use rattler_build_types::NormalizedKey;
 use rattler_conda_types::{
     Channel, ChannelUrl, MatchSpec, PackageName, PackageNameMatcher, ParseStrictness, Platform,
@@ -204,16 +206,16 @@ impl Tests {
             )))
         })?;
 
-        let platform = Platform::current();
         let mut env_vars = env_vars::os_vars(
             environment,
-            &platform,
-            &platform,
+            &target_platform,
+            &host_platform,
+            &build_platform,
             config.env_isolation,
             tmp_dir.path(),
         );
         if config.env_isolation == EnvironmentIsolation::None {
-            env_vars.retain(|key, _| key != ShellEnum::default().path_var(&platform));
+            env_vars.retain(|key, _| key != ShellEnum::default().path_var(&build_platform));
         }
         env_vars.extend(env_vars::test_vars(
             target_platform,
@@ -223,13 +225,15 @@ impl Tests {
         env_vars.extend(env_vars::python_vars_from_records(
             resolved_records,
             environment,
-            platform,
+            host_platform,
         ));
         env_vars.extend(pkg_vars.iter().map(|(k, v)| (k.clone(), Some(v.clone()))));
         env_vars.insert(
             "PREFIX".to_string(),
             Some(environment.to_string_lossy().to_string()),
         );
+
+        let context = shared_test_context(environment, host_platform);
 
         match self {
             Tests::Commands(path) => {
@@ -243,8 +247,7 @@ impl Tests {
                         env_vars,
                         tmp_dir.path(),
                         cwd,
-                        environment,
-                        None,
+                        context,
                         None::<fn(&str) -> Result<String, String>>,
                         None,
                         config.env_isolation,
@@ -264,8 +267,7 @@ impl Tests {
                         env_vars,
                         tmp_dir.path(),
                         cwd,
-                        environment,
-                        None,
+                        context,
                         None::<fn(&str) -> Result<String, String>>,
                         None,
                         config.env_isolation,
@@ -341,6 +343,23 @@ pub struct TestConfiguration {
     pub exclude_newer: Option<jiff::Timestamp>,
     /// The environment isolation mode for test scripts
     pub env_isolation: EnvironmentIsolation,
+}
+
+fn configured_test_platforms(config: &TestConfiguration) -> (Platform, Platform, Platform) {
+    let target_platform = config.target_platform.unwrap_or(Platform::current());
+    let build_platform = config.current_platform.platform;
+    let host_platform = config
+        .host_platform
+        .as_ref()
+        .map(|platform| platform.platform)
+        .unwrap_or(target_platform);
+    (target_platform, build_platform, host_platform)
+}
+
+/// Tests without a separate build environment execute programs from the test
+/// prefix, so their wrapper architecture must match the package host platform.
+fn shared_test_context(prefix: &Path, host_platform: Platform) -> ExecutionContext {
+    ExecutionContext::shared(RuntimeEnv::current(), prefix, host_platform, host_platform)
 }
 
 fn env_vars_from_package(index_json: &IndexJson) -> HashMap<String, String> {
@@ -796,24 +815,26 @@ async fn run_python_test_inner(
         ..Script::default()
     };
 
-    let platform = Platform::current();
+    let (target_platform, build_platform, host_platform) = configured_test_platforms(config);
     let test_dir = prefix.join("test");
     fs::create_dir_all(&test_dir)?;
     let test_env_vars = env_vars::os_vars(
         &test_prefix,
-        &platform,
-        &platform,
+        &target_platform,
+        &host_platform,
+        &build_platform,
         config.env_isolation,
         &test_dir,
     );
+
+    let context = shared_test_context(&test_prefix, host_platform);
 
     script
         .run_script(
             test_env_vars.clone(),
             &test_dir,
             path,
-            &test_prefix,
-            None,
+            context.clone(),
             None::<fn(&str) -> Result<String, String>>,
             None,
             config.env_isolation,
@@ -836,8 +857,7 @@ async fn run_python_test_inner(
                 test_env_vars,
                 path,
                 path,
-                &test_prefix,
-                None,
+                context,
                 None::<fn(&str) -> Result<String, String>>,
                 None,
                 config.env_isolation,
@@ -908,22 +928,23 @@ async fn run_perl_test(
     let test_folder = prefix.join("test_files");
     fs::create_dir_all(&test_folder)?;
 
-    let platform = Platform::current();
+    let (target_platform, build_platform, host_platform) = configured_test_platforms(config);
     let test_env_vars = env_vars::os_vars(
         &test_prefix,
-        &platform,
-        &platform,
+        &target_platform,
+        &host_platform,
+        &build_platform,
         config.env_isolation,
         &test_folder,
     );
+    let context = shared_test_context(&test_prefix, host_platform);
 
     script
         .run_script(
             test_env_vars,
             &test_folder,
             path,
-            &test_prefix,
-            None,
+            context,
             None::<fn(&str) -> Result<String, String>>,
             None,
             config.env_isolation,
@@ -1021,16 +1042,16 @@ async fn run_commands_test(
         )))
     })?;
 
-    let platform = Platform::current();
     let mut env_vars = env_vars::os_vars(
         &run_prefix,
-        &platform,
-        &platform,
+        &target_platform,
+        &host_platform,
+        &build_platform,
         config.env_isolation,
         &test_dir,
     );
     if config.env_isolation == EnvironmentIsolation::None {
-        env_vars.retain(|key, _| key != ShellEnum::default().path_var(&platform));
+        env_vars.retain(|key, _| key != ShellEnum::default().path_var(&build_platform));
     }
     env_vars.extend(env_vars::test_vars(
         target_platform,
@@ -1040,13 +1061,25 @@ async fn run_commands_test(
     env_vars.extend(env_vars::python_vars_from_records(
         &resolved_records,
         &run_prefix,
-        platform,
+        host_platform,
     ));
     env_vars.extend(pkg_vars.iter().map(|(k, v)| (k.clone(), Some(v.clone()))));
     env_vars.insert(
         "PREFIX".to_string(),
         Some(run_prefix.to_string_lossy().to_string()),
     );
+
+    let context = if let Some(build_prefix) = build_prefix {
+        ExecutionContext::separate(
+            RuntimeEnv::current(),
+            build_prefix,
+            build_platform,
+            &run_prefix,
+            host_platform,
+        )
+    } else {
+        shared_test_context(&run_prefix, host_platform)
+    };
 
     tracing::info!("Testing commands:");
     commands_test
@@ -1055,8 +1088,7 @@ async fn run_commands_test(
             env_vars,
             &test_dir,
             path,
-            &run_prefix,
-            build_prefix.as_ref(),
+            context,
             None::<fn(&str) -> Result<String, String>>,
             None,
             config.env_isolation,
@@ -1221,22 +1253,23 @@ async fn run_r_test(
     let test_folder = prefix.join("test_files");
     fs::create_dir_all(&test_folder)?;
 
-    let platform = Platform::current();
+    let (target_platform, build_platform, host_platform) = configured_test_platforms(config);
     let test_env_vars = env_vars::os_vars(
         &test_prefix,
-        &platform,
-        &platform,
+        &target_platform,
+        &host_platform,
+        &build_platform,
         config.env_isolation,
         &test_folder,
     );
+    let context = shared_test_context(&test_prefix, host_platform);
 
     script
         .run_script(
             test_env_vars,
             &test_folder,
             path,
-            &test_prefix,
-            None,
+            context,
             None::<fn(&str) -> Result<String, String>>,
             None,
             config.env_isolation,
@@ -1302,22 +1335,23 @@ async fn run_ruby_test(
     let test_folder = prefix.join("test_files");
     fs::create_dir_all(&test_folder)?;
 
-    let platform = Platform::current();
+    let (target_platform, build_platform, host_platform) = configured_test_platforms(config);
     let test_env_vars = env_vars::os_vars(
         &test_prefix,
-        &platform,
-        &platform,
+        &target_platform,
+        &host_platform,
+        &build_platform,
         config.env_isolation,
         &test_folder,
     );
+    let context = shared_test_context(&test_prefix, host_platform);
 
     script
         .run_script(
             test_env_vars,
             &test_folder,
             path,
-            &test_prefix,
-            None,
+            context,
             None::<fn(&str) -> Result<String, String>>,
             None,
             config.env_isolation,
@@ -1331,6 +1365,15 @@ async fn run_ruby_test(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn shared_test_context_executes_the_host_prefix_platform() {
+        let context = shared_test_context(Path::new("test-prefix"), Platform::WinArm64);
+        assert_eq!(context.build().path(), Path::new("test-prefix"));
+        assert_eq!(context.host().path(), Path::new("test-prefix"));
+        assert_eq!(context.build().platform(), Platform::WinArm64);
+        assert_eq!(context.host().platform(), Platform::WinArm64);
+    }
 
     /// Verifies that a trailing-underscore version (the openssl ordering
     /// convention, e.g. `3.7_`) is assembled into a `MatchSpec` that matches the
