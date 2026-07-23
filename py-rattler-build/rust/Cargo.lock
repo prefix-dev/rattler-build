@@ -4734,7 +4734,7 @@ dependencies = [
 
 [[package]]
 name = "rattler_build_core"
-version = "0.2.9"
+version = "0.2.10"
 dependencies = [
  "anyhow",
  "arwen-codesign",
@@ -4848,7 +4848,7 @@ dependencies = [
 
 [[package]]
 name = "rattler_build_package"
-version = "0.1.10"
+version = "0.1.11"
 dependencies = [
  "content_inspector",
  "fs-err",
@@ -4876,7 +4876,7 @@ dependencies = [
 
 [[package]]
 name = "rattler_build_recipe"
-version = "0.1.10"
+version = "0.1.11"
 dependencies = [
  "fs-err",
  "globset",
@@ -4939,7 +4939,7 @@ dependencies = [
 
 [[package]]
 name = "rattler_build_script"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "clap",
  "console",
@@ -4961,7 +4961,7 @@ dependencies = [
 
 [[package]]
 name = "rattler_build_source_cache"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "astral-reqwest-middleware",
  "astral-reqwest-retry",
