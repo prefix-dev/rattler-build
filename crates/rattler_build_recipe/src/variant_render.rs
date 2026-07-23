@@ -1699,6 +1699,67 @@ outputs:
         );
     }
 
+    /// Regression test for https://github.com/prefix-dev/rattler-build/issues/2497
+    ///
+    /// A package output that has its own `build` section and inherits from a
+    /// staging cache must still inherit top-level build settings (build number,
+    /// `files`, ...) that it does not override itself. Previously the
+    /// cache-inheritance merge only copied a hand-maintained subset of build
+    /// fields, so top-level settings such as `build.files` were silently lost.
+    #[test]
+    fn test_cache_inherited_output_inherits_top_level_build_settings() {
+        let recipe_yaml = r#"
+recipe:
+  name: libgdal-split
+  version: 3.21.3
+
+build:
+  number: 1
+  files:
+    - "*.txt"
+
+outputs:
+  - staging:
+      name: core-build
+    requirements:
+      build:
+    build:
+      script: build
+
+  - package:
+      name: libgdal-core
+    inherit: core-build
+    requirements:
+      build:
+    build:
+      script: build
+"#;
+
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config = VariantConfig::from_yaml_str("{}").unwrap();
+
+        let rendered =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, RenderConfig::new())
+                .unwrap();
+
+        assert_eq!(rendered.len(), 1);
+        let output = &rendered[0].recipe;
+        assert_eq!(output.package.name.as_normalized(), "libgdal-core");
+        // The top-level build number must be inherited.
+        assert_eq!(output.build.number, Some(1));
+        // The build string must end with the inherited build number.
+        let build_string = output.build.string.as_resolved().unwrap();
+        assert!(
+            build_string.ends_with("_1"),
+            "cache-inherited output should resolve its build string with the inherited build number, got {build_string}"
+        );
+        // Other top-level build settings (e.g. `files`) must be inherited too.
+        assert!(
+            !output.build.files.is_empty(),
+            "cache-inherited output should inherit the top-level build.files glob"
+        );
+    }
+
     #[test]
     fn test_render_multi_output_with_pin_subpackage() {
         let recipe_yaml = r#"
