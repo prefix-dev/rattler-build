@@ -56,16 +56,6 @@ from rattler_build import VariantConfig, RenderConfig, RenderedVariant
             - pin_subpackages
             - run_build
 
-## Functions
-
-### `render_recipes`
-
-::: rattler_build.render.render_recipes
-
-### `render_context`
-
-::: rattler_build.render.render_context
-
 ## Supporting Types
 
 ### `HashInfo`
