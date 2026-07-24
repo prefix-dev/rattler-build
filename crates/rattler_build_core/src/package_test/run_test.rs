@@ -119,6 +119,12 @@ pub enum TestError {
     #[error("could not determine target platform from package file (no index.json?)")]
     CouldNotDetermineTargetPlatform,
 
+    #[error("ABI check failed: {0}")]
+    AbiCheckFailed(String),
+
+    #[error("failed to run ABI check: {0}")]
+    AbiCheckError(String),
+
     #[error(
         "no tests found in package. Expected `info/test/` (conda-build format) or `info/tests/tests.yaml` (rattler-build format)"
     )]
@@ -663,6 +669,10 @@ pub async fn run_test(
                 }
                 // This test already runs during the build process and we don't need to run it again
                 TestType::PackageContents { .. } => {}
+                TestType::AbiCheck { abi_check } => {
+                    super::abi_check::run_abi_check_test(&abi_check, &pkg, &package_folder, &config)
+                        .await?
+                }
             }
 
             if !config.keep_test_prefix {

@@ -11,9 +11,9 @@ use crate::{
         Value,
         parser::helpers::get_span,
         tests::{
-            CommandsTest, CommandsTestFiles, CommandsTestRequirements, DownstreamTest,
-            PackageContentsCheckFiles, PackageContentsTest, PerlTest, PythonTest, PythonVersion,
-            RTest, RubyTest, TestType,
+            AbiCheckTest, CommandsTest, CommandsTestFiles, CommandsTestRequirements,
+            DownstreamTest, PackageContentsCheckFiles, PackageContentsTest, PerlTest, PythonTest,
+            PythonVersion, RTest, RubyTest, TestType,
         },
         types::Script,
     },
@@ -154,10 +154,15 @@ fn parse_single_test(node: &Node) -> Result<TestType, ParseError> {
                 ParseError::expected_type("mapping", "non-mapping", get_span(package_contents_node))
             })?)?;
         Ok(TestType::PackageContents { package_contents })
+    } else if let Some(abi_check_node) = mapping.get("abi_check") {
+        let abi_check = parse_abi_check_test(abi_check_node.as_mapping().ok_or_else(|| {
+            ParseError::expected_type("mapping", "non-mapping", get_span(abi_check_node))
+        })?)?;
+        Ok(TestType::AbiCheck { abi_check })
     } else {
         Err(ParseError::invalid_value(
             "test",
-            "missing test type field (python, perl, r, ruby, script, downstream, package_contents)",
+            "missing test type field (python, perl, r, ruby, script, downstream, package_contents, abi_check)",
             get_span(node),
         ))
     }
@@ -407,6 +412,43 @@ fn parse_downstream_test(
     })?;
 
     Ok(DownstreamTest { downstream })
+}
+
+fn parse_abi_check_test(
+    mapping: &marked_yaml::types::MarkedMappingNode,
+) -> Result<AbiCheckTest, ParseError> {
+    let mut pin = None;
+    let mut libraries = ConditionalList::default();
+    let mut ignore_symbols = ConditionalList::default();
+
+    for (key_node, value_node) in mapping.iter() {
+        let key = key_node.as_str();
+        match key {
+            "pin" => {
+                pin = Some(parse_value(value_node)?);
+            }
+            "libraries" => {
+                libraries = parse_conditional_list(value_node)?;
+            }
+            "ignore_symbols" => {
+                ignore_symbols = parse_conditional_list(value_node)?;
+            }
+            _ => {
+                return Err(ParseError::invalid_value(
+                    "abi_check test",
+                    format!("unknown field '{}'", key),
+                    *key_node.span(),
+                )
+                .with_suggestion("Valid fields are: pin, libraries, ignore_symbols"));
+            }
+        }
+    }
+
+    Ok(AbiCheckTest {
+        pin,
+        libraries,
+        ignore_symbols,
+    })
 }
 
 fn parse_package_contents_test(

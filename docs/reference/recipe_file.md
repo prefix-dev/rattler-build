@@ -1506,6 +1506,49 @@ tests:
   - downstream: numpy
 ```
 
+### ABI check test
+
+The `abi_check` test compares the ABI surface of the shared libraries in the package
+against a previously published version of the same package. It downloads the *lowest*
+published version that matches the given pin expression (the same `x.x` syntax that is
+used for pinnings) and fails if, within that version range:
+
+- a shared library was removed from the package,
+- the soname (ELF), install name (Mach-O) or DLL name (PE) of a library changed, or
+- exported symbols were removed from a library.
+
+This is useful to verify that the ABI promise implied by the `run_exports` of a package
+actually holds: if downstream packages are pinned to e.g. `x.x` of your package, the
+shared libraries of every `x.x` release must stay ABI compatible.
+
+```yaml
+tests:
+  - abi_check:
+      # compare against the lowest published version with the same major.minor
+      # version (this is the default)
+      pin: x.x
+
+      # optionally restrict the check to certain libraries (defaults to all
+      # shared libraries found in the package)
+      libraries:
+        - lib/libfoo*
+
+      # optionally ignore certain exported symbols (glob patterns)
+      ignore_symbols:
+        - _internal_*
+```
+
+The packages to compare against are looked up in the channels used for testing. If no
+previously published version matches the pin (for example for the very first release in
+a new pin range), the check is skipped with a warning. The test is also skipped for
+`noarch` packages.
+
+!!! note
+    The check compares the *exported symbol names* found in the dynamic symbol table
+    (ELF), export trie (Mach-O) or export table (PE) of the libraries. Changes to
+    function signatures or struct layouts that do not change the set of exported symbol
+    names cannot be detected. Added symbols are backwards compatible and never reported.
+
 
 ## Outputs section
 

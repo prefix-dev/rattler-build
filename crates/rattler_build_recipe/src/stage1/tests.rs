@@ -1,4 +1,5 @@
 use rattler_build_script::Script;
+use rattler_build_types::PinExpression;
 use serde::{Deserialize, Serialize};
 
 use crate::stage1::Dependency;
@@ -229,6 +230,48 @@ fn is_false(value: &bool) -> bool {
     !*value
 }
 
+/// The default pin expression for ABI checks (`x.x`)
+fn default_abi_pin() -> PinExpression {
+    "x.x".parse().expect("`x.x` is a valid pin expression")
+}
+
+fn is_default_abi_pin(pin: &PinExpression) -> bool {
+    pin == &default_abi_pin()
+}
+
+/// A test that checks the ABI of the shared libraries in the package against a
+/// previously published version of the same package (evaluated)
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AbiCheckTest {
+    /// The pin expression (`x.x` syntax, as used in pinnings) that selects the range of
+    /// previously published versions that must remain ABI compatible. The lowest published
+    /// version matching the pin is used as the comparison baseline.
+    #[serde(
+        default = "default_abi_pin",
+        skip_serializing_if = "is_default_abi_pin"
+    )]
+    pub pin: PinExpression,
+
+    /// Globs that select the libraries to check (defaults to all shared libraries found in
+    /// the package)
+    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
+    pub libraries: GlobVec,
+
+    /// Globs for exported symbol names that should be ignored in the comparison
+    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
+    pub ignore_symbols: GlobVec,
+}
+
+impl Default for AbiCheckTest {
+    fn default() -> Self {
+        Self {
+            pin: default_abi_pin(),
+            libraries: GlobVec::default(),
+            ignore_symbols: GlobVec::default(),
+        }
+    }
+}
+
 /// The test type enum (evaluated)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
@@ -262,6 +305,12 @@ pub enum TestType {
     PackageContents {
         /// The package contents to test against
         package_contents: PackageContentsTest,
+    },
+    /// A test that checks the ABI of the shared libraries in the package against a
+    /// previously published version of the same package
+    AbiCheck {
+        /// The ABI check to run
+        abi_check: AbiCheckTest,
     },
 }
 
@@ -310,6 +359,31 @@ mod tests {
         script:
           content: echo 'test'
         "###);
+
+        // ABI check test
+        let abi_check = TestType::AbiCheck {
+            abi_check: AbiCheckTest {
+                pin: "x.x.x".parse().unwrap(),
+                libraries: GlobVec::from_vec(vec!["lib/libfoo*"], None),
+                ignore_symbols: GlobVec::from_vec(vec!["_internal_*"], None),
+            },
+        };
+        insta::assert_snapshot!(serde_yaml::to_string(&abi_check).unwrap(), @r###"
+        abi_check:
+          pin: x.x.x
+          libraries:
+          - lib/libfoo*
+          ignore_symbols:
+          - _internal_*
+        "###);
+
+        // ABI check test with all defaults (the default pin is not serialized)
+        let abi_check_default = TestType::AbiCheck {
+            abi_check: AbiCheckTest::default(),
+        };
+        insta::assert_snapshot!(serde_yaml::to_string(&abi_check_default).unwrap(), @r###"
+        abi_check: {}
+        "###);
     }
 
     /// Test deserialization of all test types
@@ -329,6 +403,23 @@ mod tests {
         // Commands
         let commands: TestType = serde_yaml::from_str("script:\n  content: echo test").unwrap();
         assert!(matches!(commands, TestType::Commands(_)));
+
+        // ABI check
+        let abi_check: TestType = serde_yaml::from_str("abi_check:\n  pin: x.x.x").unwrap();
+        match abi_check {
+            TestType::AbiCheck { abi_check } => assert_eq!(abi_check.pin.to_string(), "x.x.x"),
+            _ => panic!("Expected AbiCheck test"),
+        }
+
+        // ABI check with all defaults
+        let abi_check: TestType = serde_yaml::from_str("abi_check: {}").unwrap();
+        match abi_check {
+            TestType::AbiCheck { abi_check } => {
+                assert_eq!(abi_check, AbiCheckTest::default());
+                assert_eq!(abi_check.pin.to_string(), "x.x");
+            }
+            _ => panic!("Expected AbiCheck test"),
+        }
     }
 
     /// Test roundtrip serialization for all test types
@@ -356,6 +447,16 @@ mod tests {
                 },
                 files: CommandsTestFiles::default(),
             }),
+            TestType::AbiCheck {
+                abi_check: AbiCheckTest::default(),
+            },
+            TestType::AbiCheck {
+                abi_check: AbiCheckTest {
+                    pin: "x".parse().unwrap(),
+                    libraries: GlobVec::from_vec(vec!["lib/*"], None),
+                    ignore_symbols: GlobVec::from_vec(vec!["_priv*"], Some(vec!["_privkeep*"])),
+                },
+            },
         ];
 
         for original in test_cases {

@@ -12,8 +12,8 @@ use crate::tracing_subscriber;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use rattler_build_recipe::stage1::tests::{
-    CommandsTest, DownstreamTest, PackageContentsCheckFiles, PackageContentsTest, PerlTest,
-    PythonTest, PythonVersion, RTest, RubyTest, TestType,
+    AbiCheckTest, CommandsTest, DownstreamTest, PackageContentsCheckFiles, PackageContentsTest,
+    PerlTest, PythonTest, PythonVersion, RTest, RubyTest, TestType,
 };
 use rattler_conda_types::{
     NamedChannelOrUrl,
@@ -249,6 +249,13 @@ impl PyPackage {
                     .unbind(),
                     TestType::PackageContents { package_contents } => PyPackageContentsTest {
                         inner: package_contents.clone(),
+                        index,
+                    }
+                    .into_pyobject(py)?
+                    .into_any()
+                    .unbind(),
+                    TestType::AbiCheck { abi_check } => PyAbiCheckTest {
+                        inner: abi_check.clone(),
                         index,
                     }
                     .into_pyobject(py)?
@@ -1020,6 +1027,63 @@ impl PyFileChecks {
     }
 }
 
+/// ABI check test - compares the ABI surface of the shared libraries with a previously
+/// published version of the package
+#[pyclass(name = "AbiCheckTest", from_py_object)]
+#[derive(Clone)]
+pub struct PyAbiCheckTest {
+    inner: AbiCheckTest,
+    index: usize,
+}
+
+#[pymethods]
+impl PyAbiCheckTest {
+    /// Index of this test in the package's test list
+    #[getter]
+    fn index(&self) -> usize {
+        self.index
+    }
+
+    /// The pin expression (`x.x` syntax) selecting the compatible version range
+    #[getter]
+    fn pin(&self) -> String {
+        self.inner.pin.to_string()
+    }
+
+    /// Glob patterns selecting the libraries to check (empty = all shared libraries)
+    #[getter]
+    fn libraries(&self) -> Vec<String> {
+        self.inner
+            .libraries
+            .include_globs()
+            .iter()
+            .map(|g| g.source().to_string())
+            .collect()
+    }
+
+    /// Glob patterns for exported symbol names to ignore in the comparison
+    #[getter]
+    fn ignore_symbols(&self) -> Vec<String> {
+        self.inner
+            .ignore_symbols
+            .include_globs()
+            .iter()
+            .map(|g| g.source().to_string())
+            .collect()
+    }
+
+    fn to_dict(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let json_value = serde_json::to_value(&self.inner).map_err(RattlerBuildError::from)?;
+        pythonize::pythonize(py, &json_value)
+            .map(|obj| obj.into())
+            .map_err(|e| RattlerBuildError::RecipeParse(format!("{}", e)).into())
+    }
+
+    fn __repr__(&self) -> String {
+        format!("AbiCheckTest(pin='{}')", self.inner.pin)
+    }
+}
+
 /// Result of running a test
 #[pyclass(name = "TestResult", from_py_object)]
 #[derive(Clone)]
@@ -1176,6 +1240,7 @@ pub fn register_package_module(
     package_module.add_class::<PyRubyTest>()?;
     package_module.add_class::<PyDownstreamTest>()?;
     package_module.add_class::<PyPackageContentsTest>()?;
+    package_module.add_class::<PyAbiCheckTest>()?;
     package_module.add_class::<PyFileChecks>()?;
     package_module.add_class::<PyTestResult>()?;
     package_module.add_class::<PyPathEntry>()?;
