@@ -67,6 +67,14 @@ pub struct BuildOutput {
     /// physically installed in the host prefix.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub staging_library_name_map: Option<LibraryNameMap>,
+
+    /// True if this output was synthesized to debug a staging (compile) output
+    /// of a multi-output recipe (see `Output::as_staging_debug_output`). When
+    /// set, the build-script setup strips the package-identity `PKG_*` env vars
+    /// so the debug environment matches the real staging build, which does not
+    /// produce a package and therefore removes them.
+    #[serde(skip)]
+    pub is_staging_debug: bool,
 }
 
 impl BuildOutput {
