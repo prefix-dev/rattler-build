@@ -30,7 +30,8 @@ mod runtime;
 
 #[cfg(feature = "execution")]
 pub use execution::{
-    EnvironmentIsolation, ExecutionArgs, ResolvedScriptContents, create_build_script,
+    BuildScriptSection, EnvironmentIsolation, ExecutionArgs, ResolvedScriptContents,
+    create_build_script, run_script,
 };
 #[cfg(feature = "execution")]
 pub use interpreter::{InterpreterError, closest_interpreter};

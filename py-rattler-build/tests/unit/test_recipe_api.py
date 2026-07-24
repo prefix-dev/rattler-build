@@ -71,6 +71,41 @@ def test_recipe_all_sections() -> None:
     assert "https://github.com/example/test-package" == about.repository
 
 
+def test_run_build_passes_render_config(monkeypatch, tmp_path: Path) -> None:
+    """Stage0Recipe.run_build forwards render configuration."""
+    recipe = Stage0Recipe.from_yaml(
+        """
+package:
+  name: test-package
+  version: 1.0.0
+""",
+        recipe_dir=tmp_path,
+    )
+    platform = PlatformConfig(target_platform="linux-64", experimental=True)
+    render_config = RenderConfig(platform=platform)
+    captured: dict[str, object] = {}
+
+    class FakeVariant:
+        def run_build(self, **kwargs: object) -> str:
+            captured["run_build_kwargs"] = kwargs
+            return "built"
+
+    def fake_render(
+        variant_config: VariantConfig | None = None,
+        render_config: RenderConfig | None = None,
+    ) -> list[FakeVariant]:
+        captured["variant_config"] = variant_config
+        captured["render_config"] = render_config
+        return [FakeVariant()]
+
+    monkeypatch.setattr(recipe, "render", fake_render)
+
+    result = recipe.run_build(render_config=render_config)
+
+    assert result == ["built"]
+    assert captured["render_config"] is render_config
+
+
 def test_recipe_representations() -> None:
     """Test string representations of Stage0 and Stage1 objects."""
     stage0 = Stage0Recipe.from_file(str(TEST_RECIPE_FILE))

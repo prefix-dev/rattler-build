@@ -208,6 +208,16 @@ fn test_script_deserialization_with_all_fields() {
 }
 
 #[test]
+fn test_script_with_cwd_is_not_default() {
+    let script = Script {
+        cwd: Some(PathBuf::from("subdir")),
+        ..Default::default()
+    };
+
+    assert!(!script.is_default());
+}
+
+#[test]
 fn test_script_roundtrip() {
     let mut env = IndexMap::new();
     env.insert("KEY".to_string(), "VALUE".to_string());

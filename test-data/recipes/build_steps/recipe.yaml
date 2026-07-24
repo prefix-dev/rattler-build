@@ -1,0 +1,41 @@
+package:
+  name: build_steps_test
+  version: "1.0.0"
+
+build:
+  number: 0
+  # Exercises `build.steps`: ordered run steps, per-step `if`, and step-local
+  # `env`. Each step becomes one scoped section of the generated build wrapper.
+  steps:
+    - if: unix
+      run: |
+        mkdir -p "$PREFIX/share/build_steps/cwd"
+        echo "one" > "$PREFIX/share/build_steps/step1.txt"
+    - if: unix
+      run: echo "${{ GREETING }}" > "$PREFIX/share/build_steps/step2.txt"
+      env:
+        GREETING: hello-from-step
+    - if: unix
+      run: printf '%s\n' "${GREETING:-unset}" > "$PREFIX/share/build_steps/step3.txt"
+    - if: unix
+      cwd: share/build_steps/cwd
+      run: pwd > pwd.txt
+
+    - if: win
+      run: |
+        if not exist "%PREFIX%\share\build_steps\cwd" mkdir "%PREFIX%\share\build_steps\cwd"
+        echo one> "%PREFIX%\share\build_steps\step1.txt"
+    - if: win
+      run: echo ${{ GREETING }}> "%PREFIX%\share\build_steps\step2.txt"
+      env:
+        GREETING: hello-from-step
+    - if: win
+      run: |
+        if defined GREETING (
+          echo %GREETING%> "%PREFIX%\share\build_steps\step3.txt"
+        ) else (
+          echo unset> "%PREFIX%\share\build_steps\step3.txt"
+        )
+    - if: win
+      cwd: share\build_steps\cwd
+      run: cd > pwd.txt

@@ -290,8 +290,19 @@ impl Jinja {
         let tracking_context =
             TrackingContext::new(self.context.clone(), self.accessed_variables.clone());
 
-        let expr = self.env.compile_expression(str)?;
-        expr.eval(Value::from_object(tracking_context))
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let expr = self.env.compile_expression(str)?;
+            expr.eval(Value::from_object(tracking_context))
+        }))
+        .unwrap_or_else(|payload| {
+            Err(minijinja::Error::new(
+                minijinja::ErrorKind::SyntaxError,
+                format!(
+                    "failed to evaluate Jinja expression without panicking: {}",
+                    panic_payload_message(payload.as_ref())
+                ),
+            ))
+        })
     }
 
     /// Get the set of variables that were accessed during rendering
@@ -326,6 +337,16 @@ impl Jinja {
         if let Ok(mut accessed) = self.accessed_variables.lock() {
             accessed.clear();
         }
+    }
+}
+
+fn panic_payload_message(payload: &(dyn std::any::Any + Send)) -> String {
+    if let Some(message) = payload.downcast_ref::<&'static str>() {
+        (*message).to_string()
+    } else if let Some(message) = payload.downcast_ref::<String>() {
+        message.clone()
+    } else {
+        "unknown panic".to_string()
     }
 }
 
@@ -1402,7 +1423,22 @@ mod tests {
     }
 
     #[test]
+    fn eval_malformed_expression_errors_without_panic() {
+        let jinja = Jinja::new(JinjaConfig::default());
 
+        let err = jinja
+            .eval("target_platform }}")
+            .expect_err("malformed expression should return an error");
+
+        assert!(
+            err.to_string()
+                .contains("failed to evaluate Jinja expression")
+                || err.to_string().contains("unexpected"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
     fn eval() {
         let options = JinjaConfig {
             target_platform: Platform::Linux64,

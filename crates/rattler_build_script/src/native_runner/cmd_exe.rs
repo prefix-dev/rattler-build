@@ -45,14 +45,28 @@ IF "%CONDA_BUILD%" == "" (
         false
     }
 
-    /// `setlocal`/`endlocal` scope plus an errorlevel guard. The guard is
-    /// required even on the last section: falling off the end after `endlocal`
-    /// exits 0 regardless of failure, but `endlocal` preserves the
-    /// `%errorlevel%` value so the guard still catches it.
+    fn native_section_script_command(&self, script_path: &Path) -> Option<Vec<String>> {
+        // Activated build environments can replace PATH entirely. Resolve the
+        // command processor before entering the wrapper so nested native
+        // sections do not depend on `cmd.exe` remaining discoverable.
+        let command_processor = std::env::var("COMSPEC").unwrap_or_else(|_| "cmd.exe".to_string());
+        Some(vec![
+            command_processor,
+            "/d".to_string(),
+            "/c".to_string(),
+            "call".to_string(),
+            script_path.to_string_lossy().into_owned(),
+        ])
+    }
+
+    /// `setlocal`/`endlocal` scope environment changes, while `pushd`/`popd`
+    /// restore the working directory after successful sections. The saved
+    /// errorlevel keeps `popd`/`endlocal` from masking a failing body.
     fn scope_section(
         &self,
         label: Option<&str>,
         env: &IndexMap<String, String>,
+        cwd: Option<&Path>,
         body: &str,
     ) -> Result<String, std::io::Error> {
         let shell = shell::CmdExe;
@@ -62,15 +76,34 @@ IF "%CONDA_BUILD%" == "" (
         }
         out.push_str("setlocal\n");
         for (key, value) in env {
+            super::validate_env_assignment(key, value)?;
             shell
                 .set_env_var(&mut out, key, value)
                 .map_err(std::io::Error::other)?;
         }
+        let cwd = cwd
+            .map(|cwd| super::quote_arg(&self.shell(), &cwd.to_string_lossy()))
+            .unwrap_or_else(|| ".".to_string());
+        // `pushd` can misparse an unquoted path containing forward slashes as
+        // command switches, even when the path has no spaces.
+        let cwd = if cwd.starts_with('"') {
+            cwd
+        } else {
+            format!("\"{cwd}\"")
+        };
+        // Use command chaining instead of inspecting `%errorlevel%`: a successful
+        // `pushd` does not reliably clear an error left by environment activation.
+        let _ = writeln!(out, "pushd {cwd} || exit /b 1");
         out.push_str(body);
         if !body.ends_with('\n') {
             out.push('\n');
         }
-        out.push_str("endlocal\nif %errorlevel% neq 0 exit /b %errorlevel%");
+        out.push_str("set \"RB_SECTION_ERRORLEVEL=%errorlevel%\"\n");
+        out.push_str("popd\n");
+        out.push_str(
+            "if %RB_SECTION_ERRORLEVEL% equ 0 if %errorlevel% neq 0 set \"RB_SECTION_ERRORLEVEL=%errorlevel%\"\n",
+        );
+        out.push_str("endlocal & if %RB_SECTION_ERRORLEVEL% neq 0 exit /b %RB_SECTION_ERRORLEVEL%");
         Ok(out)
     }
 

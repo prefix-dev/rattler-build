@@ -41,10 +41,11 @@ use crate::{
         Package as Stage0Package, Requirements as Stage0Requirements, Source as Stage0Source,
         Stage0Recipe, TestType as Stage0TestType,
         build::{
-            BinaryRelocation as Stage0BinaryRelocation, DynamicLinking as Stage0DynamicLinking,
-            ForceFileType as Stage0ForceFileType, PostProcess as Stage0PostProcess,
-            PrefixDetection as Stage0PrefixDetection, PrefixIgnore as Stage0PrefixIgnore,
-            PythonBuild as Stage0PythonBuild, VariantKeyUsage as Stage0VariantKeyUsage,
+            BinaryRelocation as Stage0BinaryRelocation, BuildPlan as Stage0BuildPlan,
+            DynamicLinking as Stage0DynamicLinking, ForceFileType as Stage0ForceFileType,
+            PostProcess as Stage0PostProcess, PrefixDetection as Stage0PrefixDetection,
+            PrefixIgnore as Stage0PrefixIgnore, PythonBuild as Stage0PythonBuild,
+            Step as Stage0Step, VariantKeyUsage as Stage0VariantKeyUsage,
         },
         match_spec::matchspec_parse_options,
         requirements::{
@@ -71,9 +72,10 @@ use crate::{
         Extra as Stage1Extra, GlobVec, Package as Stage1Package, Recipe as Stage1Recipe,
         Requirements as Stage1Requirements, Rpaths,
         build::{
-            Build as Stage1Build, BuildString, DynamicLinking as Stage1DynamicLinking,
-            ForceFileType as Stage1ForceFileType, PostProcess as Stage1PostProcess,
-            PrefixDetection as Stage1PrefixDetection, PythonBuild as Stage1PythonBuild,
+            Build as Stage1Build, BuildPlan as Stage1BuildPlan, BuildString,
+            DynamicLinking as Stage1DynamicLinking, ForceFileType as Stage1ForceFileType,
+            PostProcess as Stage1PostProcess, PrefixDetection as Stage1PrefixDetection,
+            PythonBuild as Stage1PythonBuild, Step as Stage1Step,
             VariantKeyUsage as Stage1VariantKeyUsage,
         },
         requirements::{
@@ -1277,14 +1279,7 @@ pub fn evaluate_script(
         None
     };
 
-    // Evaluate environment variables
-    let mut env = indexmap::IndexMap::new();
-    for (key, val) in &script.env {
-        let evaluated_val = evaluate_string_value(val, context)?;
-        if !evaluated_val.is_empty() {
-            env.insert(key.clone(), evaluated_val);
-        }
-    }
+    let env = evaluate_env_map("script.env", &script.env, context)?;
 
     // Copy secrets as-is
     let secrets = script.secrets.clone();
@@ -1349,6 +1344,84 @@ pub fn evaluate_script(
         cwd,
         content_explicit: script.content_explicit,
     })
+}
+
+/// Evaluate an ordered list of build [`steps`](Stage0Step) into one
+/// [`Step`](Stage1Step) per included recipe step.
+///
+/// Each step's `if` condition is evaluated here, where the target platform and
+/// selectors are known, and excluded steps are dropped. `run` content keeps its
+/// templates so they render at build time, exactly like `build.script`.
+pub fn evaluate_steps(
+    steps: &[Stage0Step],
+    context: &EvaluationContext,
+) -> Result<Vec<Stage1Step>, ParseError> {
+    let mut scripts = Vec::new();
+
+    for step in steps {
+        match step {
+            Stage0Step::Run(run) => {
+                for var in run.used_variables() {
+                    context.track_access(&var);
+                }
+
+                if let Some(condition) = &run.condition
+                    && !evaluate_condition(condition, context, run.condition_span.as_ref())?
+                {
+                    continue;
+                }
+
+                let commands = preserve_string_list(&run.run, context)?;
+                if commands.is_empty() {
+                    continue;
+                }
+
+                let interpreter = match &run.interpreter {
+                    Some(interpreter) => Some(evaluate_string_value(interpreter, context)?),
+                    None => None,
+                };
+                let cwd = match &run.cwd {
+                    Some(cwd) => Some(PathBuf::from(evaluate_string_value(cwd, context)?)),
+                    None => None,
+                };
+
+                scripts.push(Stage1Step::new(rattler_build_script::Script {
+                    interpreter,
+                    env: evaluate_env_map("steps.env", &run.env, context)?,
+                    content: ScriptContent::Commands(commands),
+                    cwd,
+                    ..Default::default()
+                }));
+            }
+        }
+    }
+
+    Ok(scripts)
+}
+
+fn evaluate_env_map(
+    field_name: &str,
+    env: &indexmap::IndexMap<String, Value<String>>,
+    context: &EvaluationContext,
+) -> Result<IndexMap<String, String>, ParseError> {
+    let mut evaluated = IndexMap::new();
+    for (key, value) in env {
+        let evaluated_value = evaluate_string_value(value, context)?;
+        if evaluated_value.contains(['\n', '\r']) {
+            return Err(ParseError::invalid_value(
+                field_name,
+                format!(
+                    "environment variable '{}' contains a newline, which cannot be represented safely in build scripts",
+                    key
+                ),
+                value.span().copied().unwrap_or_else(Span::new_blank),
+            ));
+        }
+        if !evaluated_value.is_empty() {
+            evaluated.insert(key.clone(), evaluated_value);
+        }
+    }
+    Ok(evaluated)
 }
 
 /// Parse a boolean from a string (case-insensitive)
@@ -2083,7 +2156,26 @@ impl Evaluate for Stage0Build {
         // like ${{ PYTHON }} or ${{ PREFIX }} that are only available at build time.
         // Track the variables used in the script to count towards "actually used" variables,
         // but defer actual evaluation until build time.
-        let script = evaluate_script(&self.script, context)?;
+        //
+        // The build plan is either legacy script mode or explicit steps mode
+        // (enforced during parsing). Steps mode is preserved even if the list is
+        // empty or all steps filter out, so outputs don't accidentally inherit a
+        // top-level script.
+        let plan = match &self.plan {
+            Stage0BuildPlan::Steps(steps) => {
+                if !context.jinja_config().experimental {
+                    return Err(ParseError::invalid_value(
+                        "build.steps",
+                        "`build.steps` is an experimental feature: provide the `--experimental` flag to enable it",
+                        Span::new_blank(),
+                    ));
+                }
+                Stage1BuildPlan::Steps(evaluate_steps(steps, context)?)
+            }
+            Stage0BuildPlan::Script(script) => {
+                Stage1BuildPlan::Script(evaluate_script(script, context)?)
+            }
+        };
 
         // Evaluate noarch
         //
@@ -2188,7 +2280,7 @@ impl Evaluate for Stage0Build {
         Ok(Stage1Build {
             number,
             string,
-            script,
+            plan,
             noarch,
             flags,
             python,
@@ -2931,17 +3023,35 @@ impl Evaluate for Stage0Recipe {
     }
 }
 
+fn build_plan_inherits_from_toplevel(toplevel: &Stage1BuildPlan, output: &Stage1BuildPlan) -> bool {
+    matches!(
+        output,
+        Stage1BuildPlan::Script(script)
+            if script.content.is_default()
+                && script.interpreter.is_none()
+                && script.env.is_empty()
+                && script.secrets.is_empty()
+                && (script.cwd.is_none() || matches!(toplevel, Stage1BuildPlan::Script(_)))
+    )
+}
+
 /// Merge two Stage1 Build configurations
 /// The output build takes precedence, but if output has default/empty values, use top-level
 fn merge_stage1_build(
     toplevel: crate::stage1::Build,
     output: crate::stage1::Build,
 ) -> crate::stage1::Build {
-    // Script: use output if not default, otherwise inherit from top-level
-    let script = if output.script.is_default() {
-        toplevel.script
+    // Build-authoring mode (`script` vs `steps`) is mutually exclusive and is
+    // determined per build unit. If the output specifies either, it fully owns
+    // the mode; only a legacy script-discovery plan with no executable content
+    // inherits from top-level. A cwd-only script object still counts as unset
+    // when inheriting a top-level script, matching the historical multi-output
+    // behavior. It does not inherit a top-level steps plan because there is no
+    // whole-plan `cwd` to apply to steps without silently dropping it.
+    let plan = if build_plan_inherits_from_toplevel(&toplevel.plan, &output.plan) {
+        toplevel.plan
     } else {
-        output.script
+        output.plan
     };
 
     // Build string: use output unless it's Default, then inherit from top-level
@@ -3027,7 +3137,7 @@ fn merge_stage1_build(
     };
 
     stage1::Build {
-        script,
+        plan,
         number,
         string,
         noarch,
@@ -3205,8 +3315,10 @@ fn evaluate_package_output_to_recipe(
     // as a no-op; users must set `build.script` explicitly on the output or
     // top-level to run anything.
     let mut build = build;
-    if build.script.content.is_default() {
-        build.script.content = ScriptContent::Commands(Vec::new());
+    if let Stage1BuildPlan::Script(script) = &mut build.plan
+        && script.content.is_default()
+    {
+        script.content = ScriptContent::Commands(Vec::new());
     }
 
     // Check if this output is skipped (already eagerly evaluated during Build::evaluate).
@@ -3416,7 +3528,7 @@ impl Evaluate for crate::stage0::MultiOutputRecipe {
                 // Evaluate staging output components
                 let script = evaluate_script(&staging_output.build.script, &context_with_vars)?;
                 let build = crate::stage1::Build {
-                    script,
+                    plan: Stage1BuildPlan::Script(script),
                     ..crate::stage1::Build::default()
                 };
 
@@ -3609,9 +3721,11 @@ mod tests {
     use super::*;
     use crate::stage0::{
         self,
+        build::RunStep as Stage0RunStep,
         parser::parse_recipe_or_multi_from_source,
         types::{Conditional, ConditionalList, Item, JinjaTemplate, NestedItemList, Value},
     };
+    use crate::stage1::build::StepRun as Stage1StepRun;
 
     #[test]
     fn test_evaluate_condition_simple() {
@@ -5027,7 +5141,7 @@ outputs:
                 // multi-output outputs never auto-discover `build.sh`/`build.bat`,
                 // so the resolved script is an explicit no-op.
                 assert_eq!(
-                    cache_output.build.script.content,
+                    cache_output.build.plan.script().unwrap().content,
                     ScriptContent::Commands(Vec::new())
                 );
 
@@ -5047,7 +5161,92 @@ outputs:
 
                 // Build section: should inherit everything including script
                 assert!(!toplevel_output.build.dynamic_linking.is_default()); // Inherited
-                assert!(!toplevel_output.build.script.is_default()); // Inherited (top-level has script)
+                assert!(!toplevel_output.build.plan.is_default()); // Inherited (top-level has script)
+            }
+            _ => panic!("Expected MultiOutputRecipe"),
+        }
+    }
+
+    #[test]
+    fn test_multi_output_cwd_only_script_inherits_top_level_script() {
+        let recipe_yaml = r#"
+schema_version: 1
+
+recipe:
+  name: myproject
+  version: 1.0.0
+
+build:
+  script: echo top-level
+
+outputs:
+  - package:
+      name: output
+      version: 1.0.0
+    build:
+      script:
+        cwd: subdir
+"#;
+
+        let parsed = parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+
+        match parsed {
+            stage0::Recipe::MultiOutput(multi) => {
+                let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
+                let recipes = multi.evaluate(&ctx).unwrap();
+                assert_eq!(recipes.len(), 1);
+
+                let script = recipes[0].build.plan.script().expect("script mode");
+                assert_eq!(
+                    script.content,
+                    ScriptContent::CommandOrPath("echo top-level".to_string())
+                );
+            }
+            _ => panic!("Expected MultiOutputRecipe"),
+        }
+    }
+
+    #[test]
+    fn test_multi_output_cwd_only_script_does_not_inherit_top_level_steps() {
+        let recipe_yaml = r#"
+schema_version: 1
+
+recipe:
+  name: myproject
+  version: 1.0.0
+
+build:
+  steps:
+    - run: echo top-level-step
+
+outputs:
+  - package:
+      name: output
+      version: 1.0.0
+    build:
+      script:
+        cwd: subdir
+"#;
+
+        let parsed = parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+
+        match parsed {
+            stage0::Recipe::MultiOutput(multi) => {
+                let jinja_config = JinjaConfig {
+                    target_platform: rattler_conda_types::Platform::Linux64,
+                    build_platform: rattler_conda_types::Platform::Linux64,
+                    host_platform: rattler_conda_types::Platform::Linux64,
+                    experimental: true,
+                    ..Default::default()
+                };
+                let ctx =
+                    EvaluationContext::with_variables_and_config(IndexMap::new(), jinja_config);
+                let recipes = multi.evaluate(&ctx).unwrap();
+                assert_eq!(recipes.len(), 1);
+
+                let script = recipes[0].build.plan.script().expect("script mode");
+                assert_eq!(script.content, ScriptContent::Commands(Vec::new()));
+                assert_eq!(script.cwd.as_deref(), Some(std::path::Path::new("subdir")));
             }
             _ => panic!("Expected MultiOutputRecipe"),
         }
@@ -5082,7 +5281,7 @@ outputs:
                 assert_eq!(recipes.len(), 2);
                 for recipe in &recipes {
                     assert_eq!(
-                        recipe.build.script.content,
+                        recipe.build.plan.script().unwrap().content,
                         ScriptContent::Commands(Vec::new()),
                         "multi-output recipe must not default script to build.sh/build.bat (output: {})",
                         recipe.package.name.as_normalized()
@@ -5779,6 +5978,355 @@ package:
             !result.content.is_default(),
             "Empty conditional script must not fall back to Default (which discovers build.sh)"
         );
+    }
+
+    fn run_step(cmd: &str) -> Stage0Step {
+        Stage0Step::Run(Stage0RunStep {
+            run: ConditionalList::new(vec![Item::Value(Value::new_concrete(
+                cmd.to_string(),
+                None,
+            ))]),
+            ..Default::default()
+        })
+    }
+
+    fn step_condition(expr: &str) -> JinjaExpression {
+        JinjaExpression::new(expr.to_string()).unwrap()
+    }
+
+    #[test]
+    fn test_evaluate_steps_basic_desugar() {
+        let steps = vec![run_step("echo a"), run_step("echo b")];
+        let ctx = EvaluationContext::new();
+
+        let scripts = evaluate_steps(&steps, &ctx).unwrap();
+
+        assert_eq!(scripts.len(), 2);
+        assert_eq!(
+            scripts[0].run,
+            Stage1StepRun::Commands(vec!["echo a".to_string()])
+        );
+        assert_eq!(
+            scripts[1].run,
+            Stage1StepRun::Commands(vec!["echo b".to_string()])
+        );
+    }
+
+    #[test]
+    fn test_evaluate_steps_if_filters_step() {
+        let win_step = Stage0Step::Run(Stage0RunStep {
+            run: ConditionalList::new(vec![Item::Value(Value::new_concrete(
+                "echo windows".to_string(),
+                None,
+            ))]),
+            condition: Some(step_condition("win")),
+            ..Default::default()
+        });
+        let steps = vec![run_step("echo always"), win_step];
+
+        let mut ctx = EvaluationContext::new();
+        ctx.insert("win".to_string(), Variable::from(false));
+        ctx.insert("unix".to_string(), Variable::from(true));
+
+        let scripts = evaluate_steps(&steps, &ctx).unwrap();
+
+        assert_eq!(scripts.len(), 1);
+        assert_eq!(
+            scripts[0].run,
+            Stage1StepRun::Commands(vec!["echo always".to_string()])
+        );
+    }
+
+    #[test]
+    fn test_evaluate_steps_if_tracks_accessed_variables() {
+        let gated_step = Stage0Step::Run(Stage0RunStep {
+            run: ConditionalList::new(vec![Item::Value(Value::new_concrete(
+                "echo enabled".to_string(),
+                None,
+            ))]),
+            condition: Some(step_condition("enable_feature")),
+            ..Default::default()
+        });
+        let mut ctx = EvaluationContext::new();
+        ctx.insert("enable_feature".to_string(), Variable::from(true));
+
+        let scripts = evaluate_steps(&[gated_step], &ctx).unwrap();
+
+        assert_eq!(scripts.len(), 1);
+        assert!(
+            ctx.accessed_variables().contains("enable_feature"),
+            "steps.if variables must participate in used_variant/hash tracking"
+        );
+    }
+
+    #[test]
+    fn test_evaluate_steps_if_undefined_variable_errors() {
+        let undefined_step = Stage0Step::Run(Stage0RunStep {
+            run: ConditionalList::new(vec![Item::Value(Value::new_concrete(
+                "echo undefined".to_string(),
+                None,
+            ))]),
+            condition: Some(step_condition("undefined_feature")),
+            ..Default::default()
+        });
+        let ctx = EvaluationContext::new();
+
+        let err = evaluate_steps(&[undefined_step], &ctx).unwrap_err();
+
+        assert!(
+            err.to_string().contains("undefined variable"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn test_evaluate_steps_tracks_filtered_out_step_variables() {
+        let step = Stage0Step::Run(Stage0RunStep {
+            run: ConditionalList::new(vec![Item::Value(Value::new_template(
+                JinjaTemplate::new("echo ${{ flavor }}".to_string()).unwrap(),
+                None,
+            ))]),
+            condition: Some(step_condition("win")),
+            ..Default::default()
+        });
+        let mut ctx = EvaluationContext::new();
+        ctx.insert("win".to_string(), Variable::from(false));
+        ctx.insert("flavor".to_string(), Variable::from("vanilla"));
+
+        let scripts = evaluate_steps(&[step], &ctx).unwrap();
+
+        assert!(scripts.is_empty());
+        assert!(ctx.accessed_variables().contains("flavor"));
+    }
+
+    #[test]
+    fn test_evaluate_steps_if_expression_compares_target_platform() {
+        let step = Stage0Step::Run(Stage0RunStep {
+            run: ConditionalList::new(vec![Item::Value(Value::new_concrete(
+                "echo gated".to_string(),
+                None,
+            ))]),
+            condition: Some(step_condition("target_platform == 'win-64'")),
+            ..Default::default()
+        });
+        let mut linux_ctx = EvaluationContext::new();
+        linux_ctx.insert("target_platform".to_string(), Variable::from("linux-64"));
+
+        let scripts = evaluate_steps(std::slice::from_ref(&step), &linux_ctx).unwrap();
+
+        assert!(scripts.is_empty());
+        assert!(linux_ctx.accessed_variables().contains("target_platform"));
+
+        let mut win_ctx = EvaluationContext::new();
+        win_ctx.insert("target_platform".to_string(), Variable::from("win-64"));
+
+        let scripts = evaluate_steps(&[step], &win_ctx).unwrap();
+
+        assert_eq!(scripts.len(), 1);
+        assert!(win_ctx.accessed_variables().contains("target_platform"));
+    }
+
+    /// A run step that sets an explicit interpreter and step-local env.
+    fn run_step_with(cmd: &str, interpreter: &str, env: &[(&str, &str)]) -> Stage0Step {
+        Stage0Step::Run(Stage0RunStep {
+            run: ConditionalList::new(vec![Item::Value(Value::new_concrete(
+                cmd.to_string(),
+                None,
+            ))]),
+            interpreter: Some(Value::new_concrete(interpreter.to_string(), None)),
+            env: env
+                .iter()
+                .map(|(k, v)| (k.to_string(), Value::new_concrete(v.to_string(), None)))
+                .collect(),
+            ..Default::default()
+        })
+    }
+
+    #[test]
+    fn test_evaluate_steps_carries_interpreter_and_env() {
+        let steps = vec![run_step_with("make install", "bash", &[("FOO", "bar")])];
+        let ctx = EvaluationContext::new();
+
+        let scripts = evaluate_steps(&steps, &ctx).unwrap();
+
+        assert_eq!(scripts.len(), 1);
+        assert_eq!(scripts[0].interpreter.as_deref(), Some("bash"));
+        assert_eq!(scripts[0].env.get("FOO").map(String::as_str), Some("bar"));
+        assert_eq!(
+            scripts[0].run,
+            Stage1StepRun::Commands(vec!["make install".to_string()])
+        );
+    }
+
+    #[test]
+    fn test_evaluate_steps_drops_empty_env_values_like_script_env() {
+        let steps = vec![run_step_with("make install", "bash", &[("EMPTY", "")])];
+        let ctx = EvaluationContext::new();
+
+        let scripts = evaluate_steps(&steps, &ctx).unwrap();
+
+        assert_eq!(scripts.len(), 1);
+        assert!(!scripts[0].env.contains_key("EMPTY"));
+    }
+
+    #[test]
+    fn test_evaluate_steps_rejects_newline_env_values() {
+        let steps = vec![run_step_with(
+            "make install",
+            "bash",
+            &[("INJECT", "safe\necho injected")],
+        )];
+        let ctx = EvaluationContext::new();
+
+        let err = evaluate_steps(&steps, &ctx).unwrap_err();
+
+        assert!(err.to_string().contains("contains a newline"), "{err}");
+    }
+
+    #[test]
+    fn test_evaluate_script_rejects_newline_env_values() {
+        let mut env = IndexMap::new();
+        env.insert(
+            "INJECT".to_string(),
+            Value::new_concrete("safe\necho injected".to_string(), None),
+        );
+        let script = crate::stage0::types::Script {
+            content: Some(ConditionalList::new(vec![Item::Value(
+                Value::new_concrete("echo hi".to_string(), None),
+            )])),
+            env,
+            ..Default::default()
+        };
+        let ctx = EvaluationContext::new();
+
+        let err = evaluate_script(&script, &ctx).unwrap_err();
+
+        assert!(err.to_string().contains("contains a newline"), "{err}");
+    }
+
+    #[test]
+    fn test_evaluate_steps_carries_cwd() {
+        let step = Stage0Step::Run(Stage0RunStep {
+            run: ConditionalList::new(vec![Item::Value(Value::new_concrete(
+                "make install".to_string(),
+                None,
+            ))]),
+            cwd: Some(Value::new_concrete("subdir".to_string(), None)),
+            ..Default::default()
+        });
+        let ctx = EvaluationContext::new();
+
+        let scripts = evaluate_steps(&[step], &ctx).unwrap();
+
+        assert_eq!(scripts.len(), 1);
+        assert_eq!(
+            scripts[0].cwd.as_deref(),
+            Some(std::path::Path::new("subdir"))
+        );
+    }
+
+    #[test]
+    fn test_evaluate_steps_allows_per_step_interpreters() {
+        // Per-step interpreters are independent sections; no conflict.
+        let steps = vec![
+            run_step_with("echo a", "bash", &[]),
+            run_step_with("echo b", "nu", &[]),
+        ];
+        let ctx = EvaluationContext::new();
+
+        let scripts = evaluate_steps(&steps, &ctx).unwrap();
+
+        assert_eq!(scripts.len(), 2);
+        assert_eq!(scripts[0].interpreter.as_deref(), Some("bash"));
+        assert_eq!(scripts[1].interpreter.as_deref(), Some("nu"));
+    }
+
+    /// `build.steps` is experimental and is rejected without `--experimental`.
+    #[test]
+    fn test_build_steps_requires_experimental() {
+        let build = Stage0Build {
+            plan: Stage0BuildPlan::Steps(vec![run_step("echo a")]),
+            ..Default::default()
+        };
+        let ctx = EvaluationContext::new();
+
+        let err = build.evaluate(&ctx).unwrap_err();
+        assert!(err.to_string().contains("experimental"));
+    }
+
+    #[test]
+    fn test_build_evaluate_uses_steps() {
+        let build = Stage0Build {
+            plan: Stage0BuildPlan::Steps(vec![run_step("echo a"), run_step("echo b")]),
+            ..Default::default()
+        };
+        let ctx = EvaluationContext::with_variables_and_config(
+            IndexMap::new(),
+            JinjaConfig {
+                experimental: true,
+                ..Default::default()
+            },
+        );
+
+        let stage1 = build.evaluate(&ctx).unwrap();
+
+        let steps = stage1.plan.steps().expect("steps mode");
+        assert_eq!(steps.len(), 2);
+        assert_eq!(
+            steps[0].run,
+            Stage1StepRun::Commands(vec!["echo a".to_string()])
+        );
+        assert_eq!(
+            steps[1].run,
+            Stage1StepRun::Commands(vec!["echo b".to_string()])
+        );
+    }
+
+    #[test]
+    fn test_build_evaluate_preserves_steps_mode_when_all_steps_filter_out() {
+        let false_step = Stage0Step::Run(Stage0RunStep {
+            run: ConditionalList::new(vec![Item::Value(Value::new_concrete(
+                "echo filtered".to_string(),
+                None,
+            ))]),
+            condition: Some(step_condition("win")),
+            ..Default::default()
+        });
+        let build = Stage0Build {
+            plan: Stage0BuildPlan::Steps(vec![false_step]),
+            ..Default::default()
+        };
+        let mut ctx = EvaluationContext::with_variables_and_config(
+            IndexMap::new(),
+            JinjaConfig {
+                experimental: true,
+                ..Default::default()
+            },
+        );
+        ctx.insert("win".to_string(), Variable::from(false));
+
+        let stage1 = build.evaluate(&ctx).unwrap();
+
+        assert_eq!(stage1.plan.steps().map(<[_]>::len), Some(0));
+    }
+
+    #[test]
+    fn test_merge_stage1_build_filtered_empty_steps_do_not_inherit_script() {
+        let toplevel = stage1::Build {
+            plan: Stage1BuildPlan::Script(rattler_build_script::Script {
+                content: ScriptContent::Command("echo top-level".to_string()),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let output = stage1::Build {
+            plan: Stage1BuildPlan::Steps(Vec::new()),
+            ..Default::default()
+        };
+
+        let merged = merge_stage1_build(toplevel, output);
+
+        assert_eq!(merged.plan.steps().map(<[_]>::len), Some(0));
     }
 
     #[test]

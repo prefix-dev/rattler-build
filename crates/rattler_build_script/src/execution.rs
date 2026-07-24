@@ -73,10 +73,9 @@ impl std::str::FromStr for EnvironmentIsolation {
 /// Arguments for executing a script in a given interpreter.
 #[derive(Debug)]
 pub struct ExecutionArgs {
-    /// Contents of the script to execute
-    pub script: ResolvedScriptContents,
-    /// Explicit interpreter requested for the script, if any.
-    pub interpreter: Option<String>,
+    /// The ordered sections the build wrapper is composed of. Each section runs
+    /// in its own scope with its own interpreter and step-local `env`.
+    pub sections: Vec<BuildScriptSection>,
     /// Environment variables to set before executing the script
     pub env_vars: IndexMap<String, String>,
     /// Secrets to set as env vars and replace in the output
@@ -232,17 +231,19 @@ impl Script {
             })
             .collect::<IndexMap<String, String>>();
 
-        let work_dir = if let Some(cwd) = self.cwd.as_ref() {
-            run_prefix.join(cwd)
-        } else {
-            work_dir.to_owned()
-        };
+        let section_cwd = self.cwd.as_ref().map(|cwd| run_prefix.join(cwd));
+        let work_dir = work_dir.to_owned();
 
         tracing::debug!("Running script in {}", work_dir.display());
 
         let exec_args = ExecutionArgs {
-            script: contents,
-            interpreter: self.interpreter.clone(),
+            sections: vec![BuildScriptSection {
+                interpreter: self.interpreter.clone(),
+                content: contents,
+                env: IndexMap::new(),
+                cwd: section_cwd,
+                label: None,
+            }],
             env_vars,
             secrets,
             build_prefix: build_prefix.map(|p| p.to_owned()),
@@ -353,7 +354,7 @@ impl Script {
             let render = |script: &str| -> Result<String, std::io::Error> {
                 renderer(script).map_err(|e| {
                     std::io::Error::other(format!(
-                        "Failed to render jinja template in build `script`: {}",
+                        "Failed to render jinja template in build script content: {}",
                         e
                     ))
                 })
@@ -427,12 +428,32 @@ impl Decoder for CrLfNormalizer {
     }
 }
 
+/// An owned build-wrapper section carried on [`ExecutionArgs::sections`].
+///
+/// One per build step (or one for a plain `build.script`), with its resolved
+/// content, explicit interpreter, step-local `env`, optional `cwd`, and label.
+/// It is borrowed into a [`ScriptSection`] during wrapper generation.
+#[derive(Debug)]
+pub struct BuildScriptSection {
+    /// Explicit interpreter for this section, or `None` to fall back to the
+    /// wrapper shell.
+    pub interpreter: Option<String>,
+    /// Resolved content for this section.
+    pub content: ResolvedScriptContents,
+    /// Environment variables scoped to this section only.
+    pub env: IndexMap<String, String>,
+    /// Optional working directory for this section.
+    pub cwd: Option<PathBuf>,
+    /// Optional annotation rendered as a boundary comment above the section.
+    pub label: Option<String>,
+}
+
 /// One unit of a generated build wrapper: content run in a single interpreter,
-/// with optional step-local `env` and a boundary-comment label.
+/// with optional step-local `env`, optional `cwd`, and a boundary-comment label.
 ///
 /// `env` is scoped to the section (see `NativeShellRunner::scope_section`) and is
-/// distinct from [`ExecutionArgs::env_vars`], the whole-build environment. Today
-/// one section is built from [`ExecutionArgs`]; the step expander will build many.
+/// distinct from [`ExecutionArgs::env_vars`], the whole-build environment. The
+/// wrapper is built from one [`ScriptSection`] per [`ExecutionArgs::sections`] entry.
 pub(crate) struct ScriptSection<'a> {
     /// Explicit interpreter, or `None` to infer from a file-backed path and
     /// otherwise fall back to the wrapper shell.
@@ -441,6 +462,8 @@ pub(crate) struct ScriptSection<'a> {
     pub content: &'a ResolvedScriptContents,
     /// Environment variables scoped to this section only.
     pub env: &'a IndexMap<String, String>,
+    /// Optional working directory for this section.
+    pub cwd: Option<&'a Path>,
     /// Optional annotation rendered as a boundary comment above the section.
     pub label: Option<&'a str>,
 }
@@ -466,12 +489,12 @@ fn section_script_filename(extension: &str, index: SectionIndex) -> String {
 
 /// Returns the path to the generated native build wrapper script.
 ///
-/// The wrapper sources the activation script, then runs an ordered list of
-/// sections, each wrapped in an isolated scope (see `scope_section`). Sections
-/// with no interpreter, or with the native wrapper shell itself (`cmd` on
-/// Windows, `bash` on Unix), are appended directly to the wrapper; sections with
-/// a specialized interpreter are written to script files and invoked via the
-/// resolved interpreter.
+/// The wrapper sources the activation script, then runs the ordered
+/// [`ExecutionArgs::sections`], each wrapped in an isolated scope (see
+/// `scope_section`). Sections with no interpreter, or with the native wrapper
+/// shell itself (`cmd` on Windows, `bash` on Unix), are appended directly to the
+/// wrapper; sections with a specialized interpreter are written to script files
+/// and invoked via the resolved interpreter.
 pub(crate) async fn generate_build_script(
     args: &ExecutionArgs,
 ) -> Result<PathBuf, crate::InterpreterError> {
@@ -492,14 +515,17 @@ pub(crate) async fn generate_build_script(
     )
     .await?;
 
-    // One section today; the expander will build many.
-    let no_env = IndexMap::new();
-    let sections = [ScriptSection {
-        interpreter: args.interpreter.as_deref(),
-        content: &args.script,
-        env: &no_env,
-        label: None,
-    }];
+    let sections: Vec<ScriptSection> = args
+        .sections
+        .iter()
+        .map(|section| ScriptSection {
+            interpreter: section.interpreter.as_deref(),
+            content: &section.content,
+            env: &section.env,
+            cwd: section.cwd.as_deref(),
+            label: section.label.as_deref(),
+        })
+        .collect();
 
     let total = sections.len();
     let mut fragments = Vec::with_capacity(total);
@@ -517,7 +543,7 @@ pub(crate) async fn generate_build_script(
         if body.trim().is_empty() {
             continue;
         }
-        fragments.push(runner.scope_section(section.label, section.env, &body)?);
+        fragments.push(runner.scope_section(section.label, section.env, section.cwd, &body)?);
     }
 
     let build_script = format!(
@@ -587,7 +613,35 @@ async fn build_section_body(
 
     if !needs_specialized_interpreter {
         // No interpreter, or one that matches the wrapper shell: the content is
-        // the native wrapper body, run directly by the wrapper shell.
+        // native wrapper code. Most shells can inline it directly, but cmd.exe
+        // needs call indirection so `exit /b` exits only this section instead
+        // of terminating the whole wrapper.
+        if let Some(native_command) = runner.native_section_script_command(
+            &args
+                .work_dir
+                .join(section_script_filename(shell.extension(), index)),
+        ) && !script_text.trim().is_empty()
+        {
+            let script_path = args
+                .work_dir
+                .join(section_script_filename(shell.extension(), index));
+            tokio::fs::write(
+                &script_path,
+                crate::native_runner::write_shell_script(shell.clone(), &script_text)?,
+            )
+            .await?;
+            let quoted = native_command
+                .iter()
+                .map(|arg| crate::native_runner::quote_arg(shell, arg))
+                .collect::<Vec<_>>();
+            let command_refs = quoted.iter().map(String::as_str).collect::<Vec<_>>();
+            let mut body = String::new();
+            shell
+                .run_command(&mut body, command_refs)
+                .map_err(std::io::Error::other)?;
+            return Ok(body);
+        }
+
         return Ok(script_text);
     }
 
@@ -627,7 +681,12 @@ async fn build_section_body(
 }
 
 /// Runs a script with the given execution arguments.
-pub(crate) async fn run_script(exec_args: ExecutionArgs) -> Result<(), crate::InterpreterError> {
+///
+/// Most callers use [`Script::run_script`], which builds the [`ExecutionArgs`]
+/// from a single script. This lower-level entry point runs a pre-built
+/// `ExecutionArgs` directly and is used by the step expander, which composes
+/// multiple [`ExecutionArgs::sections`].
+pub async fn run_script(exec_args: ExecutionArgs) -> Result<(), crate::InterpreterError> {
     let runner = crate::native_runner::native_runner(exec_args.runtime.platform());
     let build_script_path = generate_build_script(&exec_args).await?;
     let build_script_path_str = build_script_path.to_string_lossy().to_string();
@@ -939,8 +998,7 @@ mod tests {
         fs_err::create_dir_all(&prefix).unwrap();
 
         let args = ExecutionArgs {
-            script: ResolvedScriptContents::Inline(String::new()),
-            interpreter: None,
+            sections: Vec::new(),
             env_vars: IndexMap::new(),
             secrets: IndexMap::new(),
             runtime: RuntimeEnv::for_test(Platform::current()),
@@ -1043,11 +1101,16 @@ mod tests {
         fs::create_dir_all(&prefix).unwrap();
 
         let args = ExecutionArgs {
-            script: ResolvedScriptContents::Commands(vec![
-                "echo Hello".to_string(),
-                "echo World".to_string(),
-            ]),
-            interpreter: None,
+            sections: vec![BuildScriptSection {
+                interpreter: None,
+                content: ResolvedScriptContents::Commands(vec![
+                    "echo Hello".to_string(),
+                    "echo World".to_string(),
+                ]),
+                env: IndexMap::new(),
+                cwd: None,
+                label: None,
+            }],
             env_vars: IndexMap::new(),
             secrets: IndexMap::new(),
             runtime: RuntimeEnv::for_test(Platform::Win64),
@@ -1062,10 +1125,10 @@ mod tests {
             .await
             .unwrap();
 
-        let wrapper = fs::read_to_string(tmp.path().join("conda_build.bat")).unwrap();
+        let script = fs::read_to_string(tmp.path().join("conda_build_script.bat")).unwrap();
         assert!(
-            wrapper.contains("if %errorlevel% neq 0 exit /b %errorlevel%"),
-            "cmd wrapper must propagate errors between commands, got:\n{wrapper}"
+            script.contains("if %errorlevel% neq 0 exit /b %errorlevel%"),
+            "cmd section script must propagate errors between commands, got:\n{script}"
         );
     }
 
@@ -1279,8 +1342,13 @@ mod tests {
         interpreter: Option<&str>,
     ) -> ExecutionArgs {
         ExecutionArgs {
-            script,
-            interpreter: interpreter.map(str::to_string),
+            sections: vec![BuildScriptSection {
+                interpreter: interpreter.map(str::to_string),
+                content: script,
+                env: IndexMap::new(),
+                cwd: None,
+                label: None,
+            }],
             env_vars: IndexMap::new(),
             secrets: IndexMap::new(),
             runtime: RuntimeEnv::current(),
@@ -1491,8 +1559,39 @@ mod tests {
         );
     }
 
-    fn has_line(s: &str, want: &str) -> bool {
-        s.lines().any(|l| l.trim_end() == want)
+    fn bash_wrapper_body(wrapper: &str) -> String {
+        let normalized = wrapper.replace("\r\n", "\n");
+        let body = normalized
+            .split_once("## End of preamble")
+            .map(|(_, body)| body.trim_start())
+            .unwrap_or_else(|| panic!("missing bash preamble marker:\n{wrapper}"));
+
+        // The command-tracing prologue is part of the native wrapper preamble,
+        // even though it is intentionally emitted after activation.
+        body.strip_prefix(
+            "# Trace each command as it runs so a failing line is visible (see #2264).\n\
+             # Placed after activation so the sourced environment setup is not traced.\n\
+             set -x\n",
+        )
+        .unwrap_or(body)
+        .trim()
+        .to_string()
+    }
+
+    fn cmd_wrapper_body(wrapper: &str, work_dir: &Path) -> String {
+        let normalized = wrapper.replace("\r\n", "\n").replace('\\', "/");
+        let normalized = if let Ok(command_processor) = std::env::var("COMSPEC") {
+            normalized.replace(&command_processor.replace('\\', "/"), "cmd.exe")
+        } else {
+            normalized
+        };
+        let work_dir = work_dir.to_string_lossy().replace('\\', "/");
+        let normalized = normalized.replace(&work_dir, "$WORK_DIR");
+        let start = normalized
+            .find("@rem ===")
+            .or_else(|| normalized.find("setlocal"))
+            .unwrap_or_else(|| panic!("missing cmd section body:\n{wrapper}"));
+        normalized[start..].trim().to_string()
     }
 
     /// The single section is subshell-wrapped on bash (uniform isolation).
@@ -1513,12 +1612,11 @@ mod tests {
         };
         generate_build_script(&args).await.unwrap();
         let wrapper = fs::read_to_string(tmp.path().join("conda_build.sh")).unwrap();
-        assert!(
-            has_line(&wrapper, "("),
-            "section must be subshell-wrapped:\n{wrapper}"
-        );
-        assert!(has_line(&wrapper, ")"), "{wrapper}");
-        assert!(wrapper.contains("echo hi"), "{wrapper}");
+        insta::assert_snapshot!(bash_wrapper_body(&wrapper), @r###"
+(
+echo hi
+)
+"###);
     }
 
     /// A recipe with no build script stays preamble-only: no empty subshell.
@@ -1539,15 +1637,11 @@ mod tests {
         };
         generate_build_script(&args).await.unwrap();
         let wrapper = fs::read_to_string(tmp.path().join("conda_build.sh")).unwrap();
-        assert!(
-            !has_line(&wrapper, "("),
-            "no script => no subshell:\n{wrapper}"
-        );
-        assert!(wrapper.contains("End of preamble"), "{wrapper}");
+        insta::assert_snapshot!(bash_wrapper_body(&wrapper), @"");
     }
 
-    /// The single section is `setlocal`/`endlocal`-scoped on cmd, with the
-    /// trailing errorlevel guard.
+    /// The single section is `setlocal`/`endlocal`-scoped on cmd, `pushd` /
+    /// `popd`-scoped for cwd, with a trailing errorlevel guard.
     #[tokio::test]
     async fn test_cmd_single_section_setlocal_and_guard() {
         let tmp = tempfile::tempdir().unwrap();
@@ -1565,12 +1659,199 @@ mod tests {
         };
         generate_build_script(&args).await.unwrap();
         let wrapper = fs::read_to_string(tmp.path().join("conda_build.bat")).unwrap();
-        assert!(has_line(&wrapper, "setlocal"), "{wrapper}");
-        assert!(has_line(&wrapper, "endlocal"), "{wrapper}");
-        assert!(
-            has_line(&wrapper, "if %errorlevel% neq 0 exit /b %errorlevel%"),
-            "{wrapper}"
+        insta::assert_snapshot!(cmd_wrapper_body(&wrapper, tmp.path()), @r###"
+setlocal
+pushd "." || exit /b 1
+@cmd.exe /d /c call $WORK_DIR/conda_build_script.bat
+set "RB_SECTION_ERRORLEVEL=%errorlevel%"
+popd
+if %RB_SECTION_ERRORLEVEL% equ 0 if %errorlevel% neq 0 set "RB_SECTION_ERRORLEVEL=%errorlevel%"
+endlocal & if %RB_SECTION_ERRORLEVEL% neq 0 exit /b %RB_SECTION_ERRORLEVEL%
+"###);
+    }
+
+    /// Native cmd sections are invoked through a nested `cmd /c call` so `exit /b`
+    /// and bare `exit` inside a section script return to the wrapper instead of
+    /// skipping later steps.
+    #[tokio::test]
+    async fn test_cmd_sections_use_call_indirection() {
+        let tmp = tempfile::tempdir().unwrap();
+        let prefix = tmp.path().join("prefix");
+        fs::create_dir_all(&prefix).unwrap();
+        let base = execution_args(
+            tmp.path().to_path_buf(),
+            prefix,
+            ResolvedScriptContents::Missing,
+            None,
         );
+
+        let args = ExecutionArgs {
+            runtime: RuntimeEnv::for_test(Platform::Win64),
+            sections: vec![
+                BuildScriptSection {
+                    interpreter: None,
+                    content: ResolvedScriptContents::Inline("echo one\nexit /b 0".to_string()),
+                    env: IndexMap::new(),
+                    cwd: None,
+                    label: Some("step 0".to_string()),
+                },
+                BuildScriptSection {
+                    interpreter: None,
+                    content: ResolvedScriptContents::Inline("echo two".to_string()),
+                    env: IndexMap::new(),
+                    cwd: None,
+                    label: Some("step 1".to_string()),
+                },
+            ],
+            ..base
+        };
+
+        generate_build_script(&args).await.unwrap();
+        let wrapper = fs::read_to_string(tmp.path().join("conda_build.bat")).unwrap();
+        insta::assert_snapshot!(cmd_wrapper_body(&wrapper, tmp.path()), @r###"
+@rem === step 0 ===
+setlocal
+pushd "." || exit /b 1
+@cmd.exe /d /c call $WORK_DIR/conda_build_step0.bat
+set "RB_SECTION_ERRORLEVEL=%errorlevel%"
+popd
+if %RB_SECTION_ERRORLEVEL% equ 0 if %errorlevel% neq 0 set "RB_SECTION_ERRORLEVEL=%errorlevel%"
+endlocal & if %RB_SECTION_ERRORLEVEL% neq 0 exit /b %RB_SECTION_ERRORLEVEL%
+@rem === step 1 ===
+setlocal
+pushd "." || exit /b 1
+@cmd.exe /d /c call $WORK_DIR/conda_build_step1.bat
+set "RB_SECTION_ERRORLEVEL=%errorlevel%"
+popd
+if %RB_SECTION_ERRORLEVEL% equ 0 if %errorlevel% neq 0 set "RB_SECTION_ERRORLEVEL=%errorlevel%"
+endlocal & if %RB_SECTION_ERRORLEVEL% neq 0 exit /b %RB_SECTION_ERRORLEVEL%
+"###);
+    }
+
+    #[tokio::test]
+    async fn test_cmd_call_indirection_escapes_percent_paths() {
+        let tmp = tempfile::tempdir().unwrap();
+        let work_dir = tmp.path().join("%NO_SUCH_VAR%");
+        let prefix = work_dir.join("prefix");
+        fs::create_dir_all(&prefix).unwrap();
+        let args = execution_args(
+            work_dir.clone(),
+            prefix,
+            ResolvedScriptContents::Inline("echo hi".to_string()),
+            None,
+        );
+        let args = ExecutionArgs {
+            runtime: RuntimeEnv::for_test(Platform::Win64),
+            ..args
+        };
+
+        generate_build_script(&args).await.unwrap();
+        let wrapper = fs::read_to_string(work_dir.join("conda_build.bat")).unwrap();
+
+        assert!(
+            wrapper.contains("cmd.exe /d /c call"),
+            "native cmd sections should use nested cmd call indirection:\n{wrapper}"
+        );
+        assert!(
+            wrapper.contains("%%NO_SUCH_VAR%%"),
+            "percent signs in call paths must be escaped for the outer batch context:\n{wrapper}"
+        );
+    }
+
+    #[cfg(windows)]
+    #[tokio::test]
+    async fn test_cmd_bare_exit_does_not_skip_later_sections() {
+        let tmp = tempfile::tempdir().unwrap();
+        let prefix = tmp.path().join("prefix");
+        fs::create_dir_all(&prefix).unwrap();
+        let base = execution_args(
+            tmp.path().to_path_buf(),
+            prefix,
+            ResolvedScriptContents::Missing,
+            None,
+        );
+
+        let args = ExecutionArgs {
+            runtime: RuntimeEnv::for_test(Platform::Win64),
+            sections: vec![
+                BuildScriptSection {
+                    interpreter: None,
+                    content: ResolvedScriptContents::Inline("echo one\nexit 0".to_string()),
+                    env: IndexMap::new(),
+                    cwd: None,
+                    label: Some("step 0".to_string()),
+                },
+                BuildScriptSection {
+                    interpreter: None,
+                    content: ResolvedScriptContents::Inline("echo two> marker.txt".to_string()),
+                    env: IndexMap::new(),
+                    cwd: None,
+                    label: Some("step 1".to_string()),
+                },
+            ],
+            ..base
+        };
+
+        run_script(args).await.unwrap();
+
+        assert!(
+            tmp.path().join("marker.txt").exists(),
+            "bare `exit 0` in the first cmd section must not skip the second section"
+        );
+    }
+
+    /// Multiple sections compose in order, each scoped, with labels and env.
+    #[tokio::test]
+    async fn test_multiple_sections_composed_in_order() {
+        let tmp = tempfile::tempdir().unwrap();
+        let prefix = tmp.path().join("prefix");
+        fs::create_dir_all(&prefix).unwrap();
+        let base = execution_args(
+            tmp.path().to_path_buf(),
+            prefix,
+            ResolvedScriptContents::Missing,
+            None,
+        );
+
+        let mut env0 = IndexMap::new();
+        env0.insert("FOO".to_string(), "bar".to_string());
+
+        let args = ExecutionArgs {
+            runtime: RuntimeEnv::for_test(Platform::Linux64),
+            sections: vec![
+                BuildScriptSection {
+                    interpreter: None,
+                    content: ResolvedScriptContents::Inline("echo one".to_string()),
+                    env: env0,
+                    cwd: Some(PathBuf::from("/tmp/step0")),
+                    label: Some("step 0".to_string()),
+                },
+                BuildScriptSection {
+                    interpreter: None,
+                    content: ResolvedScriptContents::Inline("echo two".to_string()),
+                    env: IndexMap::new(),
+                    cwd: None,
+                    label: Some("step 1".to_string()),
+                },
+            ],
+            ..base
+        };
+
+        generate_build_script(&args).await.unwrap();
+        let wrapper = fs::read_to_string(tmp.path().join("conda_build.sh")).unwrap();
+
+        insta::assert_snapshot!(bash_wrapper_body(&wrapper), @r###"
+# === step 0 ===
+(
+export FOO=bar
+cd /tmp/step0
+echo one
+)
+# === step 1 ===
+(
+echo two
+)
+"###);
     }
 
     /// A sole section keeps the historic file name; multiple are numbered.

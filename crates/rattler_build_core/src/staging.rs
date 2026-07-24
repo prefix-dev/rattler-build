@@ -13,7 +13,7 @@ use fs_err as fs;
 use miette::{Context, IntoDiagnostic};
 use minijinja::Value;
 use rattler_build_jinja::{Jinja, Variable};
-use rattler_build_recipe::stage1::{InheritsFrom, StagingCache};
+use rattler_build_recipe::stage1::{BuildPlan, InheritsFrom, StagingCache};
 use rattler_build_types::NormalizedKey;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -80,6 +80,18 @@ pub struct StagingCacheMetadata {
     /// physically installed in the host prefix.
     #[serde(default)]
     pub library_name_map: LibraryNameMap,
+}
+
+fn staging_build_script(
+    staging: &StagingCache,
+) -> Result<&rattler_build_script::Script, miette::Error> {
+    match &staging.build.plan {
+        BuildPlan::Script(script) => Ok(script),
+        BuildPlan::Steps(_) => Err(miette::miette!(
+            "staging cache `{}` uses `build.steps`, but staging builds only support `build.script`",
+            staging.name
+        )),
+    }
 }
 
 impl Output {
@@ -330,9 +342,7 @@ impl Output {
             Some(&self.build_configuration.directories.build_prefix)
         };
 
-        staging
-            .build
-            .script
+        staging_build_script(staging)?
             .run_script(
                 env_vars,
                 &self.build_configuration.directories.work_dir,
@@ -569,4 +579,31 @@ pub fn get_staging_cache_name(inherits: &InheritsFrom) -> &str {
 /// Check if run_exports should be inherited from the staging cache
 pub fn should_inherit_run_exports(inherits: &InheritsFrom) -> bool {
     inherits.inherit_run_exports
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rattler_build_recipe::stage1::{Build, Requirements};
+
+    #[test]
+    fn staging_build_steps_returns_error_instead_of_panicking() {
+        let staging = StagingCache::new(
+            "compile".to_string(),
+            Build {
+                plan: BuildPlan::Steps(Vec::new()),
+                ..Default::default()
+            },
+            Requirements::default(),
+            Vec::new(),
+            BTreeMap::new(),
+        );
+
+        let err = staging_build_script(&staging).unwrap_err();
+
+        assert!(
+            err.to_string().contains("staging builds only support"),
+            "unexpected error: {err}"
+        );
+    }
 }

@@ -63,7 +63,7 @@ def test_debug_multiple_outputs(
     # checking for build scripts to see if they were created
     if platform.system() == "Windows":
         assert (work_dir / "conda_build.bat").exists()
-        with open(work_dir / "conda_build.bat") as f:
+        with open(work_dir / "conda_build_script.bat") as f:
             content = f.read()
             assert "Building output1" in content
     else:
@@ -94,7 +94,7 @@ def test_debug_multiple_outputs(
 
     if platform.system() == "Windows":
         assert (work_dir / "conda_build.bat").exists()
-        with open(work_dir / "conda_build.bat") as f:
+        with open(work_dir / "conda_build_script.bat") as f:
             content = f.read()
             assert "Building output2" in content
     else:
