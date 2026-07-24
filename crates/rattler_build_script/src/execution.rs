@@ -15,6 +15,7 @@ use rattler_shell::shell::Shell;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::collections::HashMap;
+use std::ffi::{OsStr, OsString};
 use std::fmt;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -379,10 +380,95 @@ impl Script {
 }
 
 /// An AsyncRead wrapper that replaces carriage return (\r) bytes with newline (\n) bytes.
-pub(crate) fn normalize_crlf<R: AsyncRead + Unpin>(reader: R) -> impl AsyncRead + Unpin {
+pub(crate) fn normalize_crlf<R: AsyncRead + Send + Unpin>(
+    reader: R,
+) -> impl AsyncRead + Send + Unpin {
     FramedRead::new(reader, CrLfNormalizer::default())
         .into_async_read()
         .compat()
+}
+
+/// One CRLF-normalized line of subprocess output, tagged with its stream.
+#[derive(Debug)]
+pub(crate) struct OutputLine {
+    pub(crate) text: String,
+    pub(crate) is_stderr: bool,
+}
+
+type NormalizedLines = tokio::io::Lines<tokio::io::BufReader<Box<dyn AsyncRead + Send + Unpin>>>;
+
+/// A spawned script process streaming CRLF-normalized output lines.
+pub(crate) struct SpawnedProcess {
+    child: tokio::process::Child,
+    stdout: NormalizedLines,
+    stderr: NormalizedLines,
+    stdout_closed: bool,
+    stderr_closed: bool,
+}
+
+/// Spawns `program` with `args` in `cwd` with exactly `env` as the child
+/// environment plus `PWD` set to `cwd`. stdin is null; stdout/stderr are piped
+/// and CRLF-normalized.
+pub(crate) fn spawn_process(
+    program: &OsStr,
+    args: &[String],
+    cwd: &Path,
+    env: &IndexMap<String, String>,
+) -> io::Result<SpawnedProcess> {
+    let mut command = tokio::process::Command::new(program);
+    command
+        .env_clear()
+        .envs(env)
+        .current_dir(cwd)
+        // when using `pixi global install bash` the current work dir
+        // causes some strange issues that are fixed when setting the `PWD`
+        .env("PWD", cwd)
+        .args(args)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+
+    let mut child = command.spawn()?;
+    let stdout: Box<dyn AsyncRead + Send + Unpin> = Box::new(normalize_crlf(
+        child.stdout.take().expect("Failed to take stdout"),
+    ));
+    let stderr: Box<dyn AsyncRead + Send + Unpin> = Box::new(normalize_crlf(
+        child.stderr.take().expect("Failed to take stderr"),
+    ));
+
+    Ok(SpawnedProcess {
+        child,
+        stdout: tokio::io::BufReader::new(stdout).lines(),
+        stderr: tokio::io::BufReader::new(stderr).lines(),
+        stdout_closed: false,
+        stderr_closed: false,
+    })
+}
+
+impl SpawnedProcess {
+    /// Returns the next line from either stream, or `None` once both close.
+    pub(crate) async fn next_line(&mut self) -> Option<io::Result<OutputLine>> {
+        loop {
+            tokio::select! {
+                line = self.stdout.next_line(), if !self.stdout_closed => match line {
+                    Ok(Some(text)) => return Some(Ok(OutputLine { text, is_stderr: false })),
+                    Ok(None) => self.stdout_closed = true,
+                    Err(error) => return Some(Err(error)),
+                },
+                line = self.stderr.next_line(), if !self.stderr_closed => match line {
+                    Ok(Some(text)) => return Some(Ok(OutputLine { text, is_stderr: true })),
+                    Ok(None) => self.stderr_closed = true,
+                    Err(error) => return Some(Err(error)),
+                },
+                else => return None,
+            }
+        }
+    }
+
+    /// Waits for the process to exit. Call after draining its output.
+    pub(crate) async fn wait(&mut self) -> io::Result<std::process::ExitStatus> {
+        self.child.wait().await
+    }
 }
 
 /// Codec that normalizes CR and CRLF to LF
@@ -816,22 +902,18 @@ pub(crate) async fn run_process_with_replacements(
         .append(true)
         .open(&log_file_path)
         .await?;
-    let mut command = if let Some(sandbox_config) = sandbox_config {
+    let (program, process_args) = if let Some(sandbox_config) = sandbox_config {
         tracing::info!("{}", sandbox_config);
 
         // Try to find rattler-sandbox executable
         if let Some(sandbox_exe) = find_rattler_sandbox(runtime) {
-            let mut cmd = tokio::process::Command::new(sandbox_exe);
+            let mut sandbox_args = sandbox_config.with_cwd(cwd).to_args();
 
-            // Add sandbox configuration arguments
-            let sandbox_args = sandbox_config.with_cwd(cwd).to_args();
-            cmd.args(&sandbox_args);
+            // Add the actual command to execute as positional arguments.
+            sandbox_args.push(args[0].to_string());
+            sandbox_args.extend(args[1..].iter().map(ToString::to_string));
 
-            // Add the actual command to execute (as positional arguments)
-            cmd.arg(args[0]);
-            cmd.args(&args[1..]);
-
-            cmd
+            (sandbox_exe.into_os_string(), sandbox_args)
         } else {
             tracing::error!("rattler-sandbox executable not found in PATH");
             tracing::error!("Please install it by running: pixi global install rattler-sandbox");
@@ -841,51 +923,24 @@ pub(crate) async fn run_process_with_replacements(
             ));
         }
     } else {
-        tokio::process::Command::new(args[0])
+        (
+            OsString::from(args[0]),
+            args[1..].iter().map(ToString::to_string).collect(),
+        )
     };
 
-    command.env_clear();
-    command.envs(process_env);
-
-    command
-        .current_dir(cwd)
-        // when using `pixi global install bash` the current work dir
-        // causes some strange issues that are fixed when setting the `PWD`
-        .env("PWD", cwd)
-        .args(&args[1..])
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-
-    let mut child = command.spawn()?;
-
-    let stdout = child.stdout.take().expect("Failed to take stdout");
-    let stderr = child.stderr.take().expect("Failed to take stderr");
-
-    let stdout_wrapped = normalize_crlf(stdout);
-    let stderr_wrapped = normalize_crlf(stderr);
-
-    let mut stdout_lines = tokio::io::BufReader::new(stdout_wrapped).lines();
-    let mut stderr_lines = tokio::io::BufReader::new(stderr_wrapped).lines();
+    let mut process = spawn_process(&program, &process_args, cwd, process_env)?;
 
     let mut stdout_log = String::new();
     let mut stderr_log = String::new();
-    let mut closed = (false, false);
-
-    loop {
-        let (line, is_stderr) = tokio::select! {
-            line = stdout_lines.next_line() => (line, false),
-            line = stderr_lines.next_line() => (line, true),
-            else => break,
-        };
-
+    while let Some(line) = process.next_line().await {
         match line {
-            Ok(Some(line)) => {
+            Ok(line) => {
                 let filtered_line = replacements
                     .iter()
-                    .fold(line, |acc, (from, to)| acc.replace(from, to));
+                    .fold(line.text, |acc, (from, to)| acc.replace(from, to));
 
-                if is_stderr {
+                if line.is_stderr {
                     stderr_log.push_str(&filtered_line);
                     stderr_log.push('\n');
                 } else {
@@ -903,21 +958,14 @@ pub(crate) async fn run_process_with_replacements(
 
                 tracing::info!("{}", filtered_line);
             }
-            Ok(None) if !is_stderr => closed.0 = true,
-            Ok(None) if is_stderr => closed.1 = true,
-            Ok(None) => unreachable!(),
             Err(e) => {
                 tracing::warn!("Error reading output: {:?}", e);
                 break;
             }
-        };
-        // make sure we close the loop when both stdout and stderr are closed
-        if closed == (true, true) {
-            break;
         }
     }
 
-    let status = child.wait().await?;
+    let status = process.wait().await?;
 
     // Flush and close the log file
     if let Err(e) = log_file.flush().await {
@@ -1398,6 +1446,150 @@ mod tests {
             &runtime.with_platform(Platform::Linux64),
         );
         assert!(!linux_env.contains_key("SYSTEMROOT"));
+    }
+
+    #[cfg(windows)]
+    fn command_that_writes_stdout_and_stderr() -> (OsString, Vec<String>) {
+        (
+            OsString::from("cmd"),
+            vec![
+                "/d".to_string(),
+                "/c".to_string(),
+                "echo stdout & echo stderr 1>&2".to_string(),
+            ],
+        )
+    }
+
+    #[cfg(not(windows))]
+    fn command_that_writes_stdout_and_stderr() -> (OsString, Vec<String>) {
+        (
+            OsString::from("sh"),
+            vec![
+                "-c".to_string(),
+                "printf 'stdout\\r\\n'; printf 'stderr\\r\\n' >&2".to_string(),
+            ],
+        )
+    }
+
+    #[cfg(windows)]
+    fn command_that_lists_environment() -> (OsString, Vec<String>) {
+        (
+            OsString::from("cmd"),
+            vec!["/d".to_string(), "/c".to_string(), "set".to_string()],
+        )
+    }
+
+    #[cfg(not(windows))]
+    fn command_that_lists_environment() -> (OsString, Vec<String>) {
+        (OsString::from("env"), Vec::new())
+    }
+
+    #[tokio::test]
+    async fn test_spawn_process_streams_normalized_tagged_lines() {
+        let tmp = tempfile::tempdir().unwrap();
+        let env = IndexMap::new();
+        let (program, args) = command_that_writes_stdout_and_stderr();
+        let mut process = spawn_process(&program, &args, tmp.path(), &env).unwrap();
+        let mut lines = Vec::new();
+
+        while let Some(line) = process.next_line().await {
+            let line = line.unwrap();
+            lines.push((line.text, line.is_stderr));
+        }
+
+        assert!(process.wait().await.unwrap().success());
+        assert_eq!(lines.len(), 2);
+        assert!(lines.iter().any(|(text, is_stderr)| {
+            text.trim() == "stdout" && !*is_stderr && !text.contains('\r')
+        }));
+        assert!(lines.iter().any(|(text, is_stderr)| {
+            text.trim() == "stderr" && *is_stderr && !text.contains('\r')
+        }));
+    }
+
+    #[tokio::test]
+    async fn test_spawn_process_applies_exact_environment() {
+        assert!(
+            std::env::var_os("PATH").is_some(),
+            "the test requires PATH in the parent environment"
+        );
+
+        let tmp = tempfile::tempdir().unwrap();
+        let mut env = IndexMap::new();
+        env.insert("RB_SPAWN_PROCESS_ENV".to_string(), "passed".to_string());
+        let (program, args) = command_that_lists_environment();
+        let mut process = spawn_process(&program, &args, tmp.path(), &env).unwrap();
+        let mut lines = Vec::new();
+
+        while let Some(line) = process.next_line().await {
+            lines.push(line.unwrap().text);
+        }
+
+        assert!(process.wait().await.unwrap().success());
+        assert!(
+            lines
+                .iter()
+                .any(|line| line == "RB_SPAWN_PROCESS_ENV=passed"),
+            "explicit environment variable must be passed to the child"
+        );
+        assert!(
+            lines
+                .iter()
+                .any(|line| { line == &format!("PWD={}", tmp.path().to_string_lossy()) }),
+            "the child PWD must be the requested working directory"
+        );
+        assert!(
+            !lines.iter().any(|line| {
+                line.split_once('=')
+                    .is_some_and(|(name, _)| name.eq_ignore_ascii_case("PATH"))
+            }),
+            "parent PATH must not leak into the child"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_run_process_with_replacements_keeps_output_handling_host_side() {
+        let tmp = tempfile::tempdir().unwrap();
+        let process_env = IndexMap::new();
+        let mut replacements = HashMap::new();
+        replacements.insert("RAW_PREFIX".to_string(), "$PREFIX".to_string());
+        replacements.insert("raw-secret".to_string(), "***".to_string());
+
+        #[cfg(windows)]
+        let command = [
+            "cmd".to_string(),
+            "/d".to_string(),
+            "/c".to_string(),
+            "echo RAW_PREFIX raw-secret & echo RAW_PREFIX raw-secret 1>&2".to_string(),
+        ];
+        #[cfg(not(windows))]
+        let command = [
+            "sh".to_string(),
+            "-c".to_string(),
+            "printf 'RAW_PREFIX raw-secret\\n'; printf 'RAW_PREFIX raw-secret\\n' >&2".to_string(),
+        ];
+        let command_refs = command.iter().map(String::as_str).collect::<Vec<_>>();
+
+        let output = run_process_with_replacements(
+            &command_refs,
+            tmp.path(),
+            &replacements,
+            &process_env,
+            None,
+            &RuntimeEnv::for_test(Platform::current()),
+        )
+        .await
+        .unwrap();
+
+        assert!(output.status.success());
+        let stdout = String::from_utf8(output.stdout).unwrap();
+        let stderr = String::from_utf8(output.stderr).unwrap();
+        let log = fs::read_to_string(tmp.path().join("conda_build.log")).unwrap();
+        for content in [&stdout, &stderr, &log] {
+            assert!(content.contains("$PREFIX ***"), "got:\n{content}");
+            assert!(!content.contains("RAW_PREFIX"), "got:\n{content}");
+            assert!(!content.contains("raw-secret"), "got:\n{content}");
+        }
     }
 
     /// The PowerShell prologue is written verbatim into the generated script
