@@ -708,10 +708,17 @@ build:
 ```
 
 !!! note
-    At the time of this writing, `noarch` packages should not make use
-    of preprocess-selectors: `noarch` packages are built with the directives which
-    evaluate to `true` in the platform it is built on, which probably will result
-    in incorrect/incomplete installation in other platforms.
+    Be careful when combining `noarch` packages with selectors: a `noarch`
+    package is built once, and the selectors are evaluated for the platform it
+    is built on — which probably results in an incorrect or incomplete
+    installation on other platforms.
+
+    That said, selectors can deliberately be combined with `noarch` to build
+    multiple flavors of the same `noarch` package, each restricted to certain
+    platforms or Python versions via virtual packages or version constraints.
+    See [building a header-only library as `noarch: generic`](../tutorials/cpp.md#building-a-header-only-library-as-noarch-generic)
+    and [multiple `noarch: python` variants for different Python versions](../tutorials/python.md#multiple-noarch-python-variants-for-different-python-versions)
+    for examples of this pattern.
 
 #### Conditional `noarch`
 
