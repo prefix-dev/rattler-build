@@ -249,7 +249,10 @@ impl Output {
 
     /// Returns the contents of the `hash_input.json` file.
     pub fn hash_input(&self) -> HashInput {
-        HashInput::from_variant(&self.build_configuration.variant)
+        HashInput::from_variant(
+            &self.build_configuration.variant,
+            &self.recipe.build().noarch.unwrap_or(NoArchType::none()),
+        )
     }
 
     /// Create the about.json file for the given output.
@@ -311,10 +314,10 @@ impl Output {
     /// Create the contents of the index.json file for the given output.
     pub fn index_json(&self) -> Result<IndexJson, PackagingError> {
         let recipe = &self.recipe;
-        let target_platform = self.target_platform();
+        let subdir = self.subdir();
 
-        let arch = target_platform.arch().map(|a| a.to_string());
-        let platform = target_platform.only_platform().map(|p| p.to_string());
+        let arch = subdir.arch().map(|a| a.to_string());
+        let platform = subdir.only_platform().map(|p| p.to_string());
 
         let finalized_dependencies = self
             .finalized_dependencies
@@ -372,7 +375,7 @@ impl Output {
             build_number: recipe.build().number.unwrap_or(0),
             arch,
             platform,
-            subdir: Some(self.build_configuration.target_platform.to_string()),
+            subdir: Some(subdir.to_string()),
             license: recipe.about().license.as_ref().map(|l| l.to_string()),
             license_family: recipe.about().license_family.clone(),
             timestamp: Some(self.build_configuration.timestamp.into()),
@@ -506,7 +509,7 @@ impl Output {
                 } else if meta.is_file() {
                     let content_type = content_type.ok_or_else(|| PackagingError::ContentTypeNotFound(p.clone()))?;
                     let prefix_placeholder = create_prefix_placeholder(
-                        &self.build_configuration.target_platform,
+                        &self.subdir(),
                         p,
                         temp_files.temp_dir.path(),
                         &temp_files.encoded_prefix,

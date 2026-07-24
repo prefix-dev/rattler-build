@@ -86,10 +86,23 @@ pub struct HashInfo {
 pub struct HashInput(String);
 
 impl HashInput {
-    /// Create a new hash input from a variant
-    pub fn from_variant(variant: &BTreeMap<NormalizedKey, Variable>) -> Self {
+    /// Create a new hash input from a variant.
+    ///
+    /// For noarch packages, `target_platform` is set to `noarch` in the hash
+    /// input so the hash is independent of the platform the package is built
+    /// for (matching conda-build).
+    pub fn from_variant(variant: &BTreeMap<NormalizedKey, Variable>, noarch: &NoArchType) -> Self {
         let mut buf = Vec::new();
         let mut ser = serde_json::Serializer::with_formatter(&mut buf, PythonFormatter {});
+
+        let mut noarch_variant;
+        let variant = if noarch.is_none() {
+            variant
+        } else {
+            noarch_variant = variant.clone();
+            noarch_variant.insert("target_platform".into(), "noarch".into());
+            &noarch_variant
+        };
 
         // BTree has sorted keys, which is important for hashing
         variant
@@ -169,7 +182,7 @@ impl HashInfo {
     /// Compute the build string for a given variant
     pub fn from_variant(variant: &BTreeMap<NormalizedKey, Variable>, noarch: &NoArchType) -> Self {
         Self {
-            hash: Self::hash_from_input(&HashInput::from_variant(variant)),
+            hash: Self::hash_from_input(&HashInput::from_variant(variant, noarch)),
             prefix: Self::hash_prefix(variant, noarch),
         }
     }
@@ -376,7 +389,7 @@ mod tests {
             Variable::from("linux-64"),
         );
 
-        let hash_input = HashInput::from_variant(&variant);
+        let hash_input = HashInput::from_variant(&variant, &NoArchType::none());
         let json_str = hash_input.as_str();
 
         // Should be valid JSON

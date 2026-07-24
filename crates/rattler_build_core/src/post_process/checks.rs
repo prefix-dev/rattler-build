@@ -419,9 +419,9 @@ fn add_windows_system_libs(
     // Load dsolists from both build and host prefixes.
     let build_result = load_dsolists(
         &output.build_configuration.directories.build_prefix,
-        &output.build_configuration.target_platform,
+        &output.subdir(),
     )?;
-    let host_result = load_dsolists(output.prefix(), &output.build_configuration.target_platform)?;
+    let host_result = load_dsolists(output.prefix(), &output.subdir())?;
 
     let (build_allow, build_deny) = build_result.unwrap_or_default();
     let (host_allow, host_deny) = host_result.unwrap_or_default();
@@ -503,7 +503,7 @@ struct SystemLibs {
 fn find_system_libs(output: &Output) -> Result<SystemLibs, LinkingCheckError> {
     let mut allow_builder = GlobSetBuilder::new();
     let mut deny_builder = GlobSetBuilder::new();
-    let platform = &output.build_configuration.target_platform;
+    let platform = &output.subdir();
 
     if platform.is_osx() {
         add_osx_system_libs(output, &mut allow_builder)?;
@@ -546,7 +546,7 @@ pub fn perform_linking_checks(
         .collect();
 
     // check all DSOs and what they are linking
-    let target_platform = output.target_platform();
+    let subdir = output.subdir();
     let host_prefix = output.prefix();
 
     // Parallel processing of DSO files
@@ -554,7 +554,7 @@ pub fn perform_linking_checks(
         .par_iter()
         .filter_map(|file| {
             // Parse the DSO to get the list of libraries it links to
-            match relink::get_relinker(output.build_configuration.target_platform, file) {
+            match relink::get_relinker(output.subdir(), file) {
                 Ok(relinker) => {
                     let mut file_dsos = Vec::new();
 
@@ -566,7 +566,7 @@ pub fn perform_linking_checks(
                     );
                     for (lib, resolved) in &resolved_libraries {
                         // filter out @self on macOS
-                        if target_platform.is_osx() && lib.to_str() == Some("self") {
+                        if subdir.is_osx() && lib.to_str() == Some("self") {
                             continue;
                         }
 
@@ -621,7 +621,7 @@ pub fn perform_linking_checks(
             let lib = lib.strip_prefix(host_prefix).unwrap_or(lib);
 
             // skip @self on macOS
-            if target_platform.is_osx() && lib.to_str() == Some("self") {
+            if subdir.is_osx() && lib.to_str() == Some("self") {
                 continue;
             }
 

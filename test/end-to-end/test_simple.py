@@ -1118,7 +1118,7 @@ def test_noarch_variants(rattler_build: RattlerBuild, recipes: Path, tmp_path: P
 
     assert rendered[0]["build_configuration"]["variant"] == {
         "__unix": "__unix",
-        "target_platform": "noarch",
+        "target_platform": "linux-64",
     }
 
     pin = {
@@ -1132,7 +1132,7 @@ def test_noarch_variants(rattler_build: RattlerBuild, recipes: Path, tmp_path: P
     assert rendered[1]["recipe"]["requirements"]["run"] == [pin]
     assert rendered[1]["build_configuration"]["variant"] == {
         "rattler_build_demo": "1 unix_5600cae_0",
-        "target_platform": "noarch",
+        "target_platform": "linux-64",
     }
 
     output = rattler_build(
@@ -1146,7 +1146,7 @@ def test_noarch_variants(rattler_build: RattlerBuild, recipes: Path, tmp_path: P
 
     assert rendered[0]["build_configuration"]["variant"] == {
         "__win": "__win >=11.0.123 foobar",
-        "target_platform": "noarch",
+        "target_platform": "win-64",
     }
 
     pin = {
@@ -1160,8 +1160,47 @@ def test_noarch_variants(rattler_build: RattlerBuild, recipes: Path, tmp_path: P
     assert rendered[1]["recipe"]["requirements"]["run"] == [pin]
     assert rendered[1]["build_configuration"]["variant"] == {
         "rattler_build_demo": "1 win_19aa286_0",
-        "target_platform": "noarch",
+        "target_platform": "win-64",
     }
+
+
+def test_noarch_target_platform_is_concrete(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """The build script of a noarch package sees the concrete target platform,
+    while the package itself is stamped and placed as noarch."""
+    rattler_build.build(recipes / "noarch_concrete_target_platform", tmp_path)
+
+    package_path = get_package(tmp_path, "noarch-concrete-target-platform")
+    assert package_path.parent.name == "noarch"
+
+    pkg = get_extracted_package(tmp_path, "noarch-concrete-target-platform")
+    index = json.loads((pkg / "info/index.json").read_text())
+    assert index["subdir"] == "noarch"
+    assert index.get("platform") is None
+    assert index.get("arch") is None
+
+    current = host_subdir()
+    assert (pkg / "target_platform_env.txt").read_text().strip() == current
+    assert (pkg / "target_platform_jinja.txt").read_text().strip() == current
+    # SUBDIR refers to the package subdir
+    assert (pkg / "subdir_env.txt").read_text().strip() == "noarch"
+
+
+def test_build_subdir_override(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """`build.subdir` overrides the subdir the package is stamped with."""
+    rattler_build.build(recipes / "build_subdir", tmp_path, extra_args=["--test=skip"])
+
+    package_path = get_package(tmp_path, "build-subdir-override")
+    assert package_path.parent.name == "linux-aarch64"
+
+    pkg = get_extracted_package(tmp_path, "build-subdir-override")
+    index = json.loads((pkg / "info/index.json").read_text())
+    assert index["subdir"] == "linux-aarch64"
+    assert index["platform"] == "linux"
+    assert index["arch"] == "aarch64"
 
 
 def test_platform_selectors_use_host_platform(
@@ -1572,7 +1611,7 @@ def test_used_vars(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     rendered = json.loads(output)
     assert len(rendered) == 1
     assert rendered[0]["build_configuration"]["variant"] == {
-        "target_platform": "noarch"
+        "target_platform": "linux-64"
     }
 
 

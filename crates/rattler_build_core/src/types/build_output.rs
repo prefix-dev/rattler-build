@@ -142,6 +142,19 @@ impl BuildOutput {
         &self.build_configuration.target_platform
     }
 
+    /// The subdir of the package created by this output. This is the explicit
+    /// `build.subdir` from the recipe if set, `noarch` for noarch packages,
+    /// and the target platform otherwise.
+    pub fn subdir(&self) -> Platform {
+        if let Some(subdir) = self.recipe.build().subdir {
+            subdir
+        } else if self.recipe.build().noarch.is_none() {
+            self.build_configuration.target_platform
+        } else {
+            Platform::NoArch
+        }
+    }
+
     /// Shorthand to retrieve the target platform for this output
     pub fn host_platform(&self) -> &PlatformWithVirtualPackages {
         &self.build_configuration.host_platform

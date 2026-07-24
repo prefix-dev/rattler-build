@@ -426,6 +426,9 @@ fn parse_build_from_mapping(mapping: &MarkedMappingNode) -> Result<Build, ParseE
             "noarch" => {
                 build.noarch = Some(parse_noarch(value_node)?);
             }
+            "subdir" => {
+                build.subdir = Some(parse_field!("build.subdir", value_node));
+            }
             "flags" => {
                 build.flags = parse_conditional_list(value_node)?;
             }
@@ -464,7 +467,7 @@ fn parse_build_from_mapping(mapping: &MarkedMappingNode) -> Result<Build, ParseE
             _ => {
                 return Err(
                     ParseError::invalid_value("build", format!("unknown field '{}'", key), *key_node.span())
-                        .with_suggestion("Valid fields are: number, string, script, noarch, flags, python, skip, always_copy_files, always_include_files, merge_build_and_host_envs, files, dynamic_linking, variant, prefix_detection, post_process")
+                        .with_suggestion("Valid fields are: number, string, script, noarch, subdir, flags, python, skip, always_copy_files, always_include_files, merge_build_and_host_envs, files, dynamic_linking, variant, prefix_detection, post_process")
                 );
             }
         }

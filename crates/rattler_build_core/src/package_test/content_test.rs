@@ -395,7 +395,7 @@ impl PackageContentsTestExt for PackageContentsTest {
     fn run_test(&self, paths: &PathsJson, output: &Output) -> Result<(), TestError> {
         let span = tracing::info_span!("Package content test");
         let _enter = span.enter();
-        let target_platform = output.target_platform();
+        let subdir = &output.subdir();
         let paths: Vec<&PathBuf> = paths.paths.iter().map(|p| &p.relative_path).collect();
 
         let mut collected_issues = Vec::new();
@@ -416,7 +416,7 @@ impl PackageContentsTestExt for PackageContentsTest {
             let globs = self.get_globs_for_section(
                 section.clone(),
                 true,
-                target_platform,
+                subdir,
                 version_independent_override,
             )?;
             Self::check_globs(
@@ -432,7 +432,7 @@ impl PackageContentsTestExt for PackageContentsTest {
             let globs = self.get_globs_for_section(
                 section,
                 false,
-                target_platform,
+                subdir,
                 version_independent_override,
             )?;
             Self::check_globs(

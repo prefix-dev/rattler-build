@@ -98,7 +98,7 @@ impl Output {
         prefix: &Path,
         dest_folder: &Path,
     ) -> Result<Option<PathBuf>, PackagingError> {
-        let target_platform = &self.build_configuration.target_platform;
+        let subdir = &self.subdir();
         let entry_points = &self.recipe.build().python.entry_points;
 
         let path_rel = path.strip_prefix(prefix)?;
@@ -187,7 +187,7 @@ impl Output {
                 // on Windows, if the file ends with -script.py, remove the -script.py suffix
                 if let Some(Component::Normal(name)) = new_parts.last_mut()
                     && let Some(name_str) = name.to_str()
-                    && target_platform.is_windows()
+                    && subdir.is_windows()
                     && let Some(stripped_suffix) = name_str.strip_suffix("-script.py")
                 {
                     *name = stripped_suffix.as_ref();
@@ -217,7 +217,7 @@ impl Output {
 
         // Handle symlinks: make absolute symlinks relative and copy the link
         if metadata.file_type().is_symlink() {
-            if target_platform.is_windows() {
+            if subdir.is_windows() {
                 tracing::warn!("Symlink creation on Windows requires administrator privileges");
             }
             // Read the link target

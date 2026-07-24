@@ -1,0 +1,7 @@
+package:
+  name: build-subdir-override
+  version: "1.0.0"
+
+build:
+  subdir: linux-aarch64
+  number: 0

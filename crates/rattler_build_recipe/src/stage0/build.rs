@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use itertools::Itertools as _;
-use rattler_conda_types::{Flag, NoArchType, package::EntryPoint};
+use rattler_conda_types::{Flag, NoArchType, Platform, package::EntryPoint};
 use serde::{Deserialize, Serialize};
 
 use crate::stage0::types::{ConditionalList, IncludeExclude, Item, Script, Value};
@@ -43,6 +43,12 @@ pub struct Build {
     /// Noarch type - python or generic
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub noarch: Option<Value<NoArchType>>,
+
+    /// Override the subdir the package is created for. Defaults to the target
+    /// platform (or `noarch` for noarch packages). Cannot be combined with
+    /// `noarch`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subdir: Option<Value<Platform>>,
 
     /// V3 package variant flags.
     #[serde(default, skip_serializing_if = "ConditionalList::is_empty")]
@@ -96,6 +102,7 @@ impl Default for Build {
             string: None,
             script: Script::default(),
             noarch: None,
+            subdir: None,
             flags: ConditionalList::default(),
             python: PythonBuild::default(),
             skip: ConditionalList::default(),
@@ -277,6 +284,7 @@ impl Build {
             string,
             script,
             noarch,
+            subdir,
             flags,
             python,
             skip,
@@ -304,6 +312,10 @@ impl Build {
 
         if let Some(noarch) = noarch {
             vars.extend(noarch.used_variables());
+        }
+
+        if let Some(subdir) = subdir {
+            vars.extend(subdir.used_variables());
         }
 
         vars.extend(flags.used_variables());

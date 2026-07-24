@@ -966,11 +966,6 @@ fn render_with_empty_combinations(
                 .collect();
             variant.retain(|key, _| !ignore_keys.contains(key));
 
-            // For noarch packages, override target_platform
-            if recipe.build.noarch.is_some() {
-                variant.insert("target_platform".into(), "noarch".into());
-            }
-
             RenderedVariant {
                 variant,
                 full_combination: BTreeMap::new(), // No combination when rendering with empty combinations
@@ -3019,9 +3014,8 @@ build:
     fn test_noarch_should_not_override_target_platform_for_skip() {
         // When building a noarch package on a native platform (e.g., linux-64),
         // the skip condition `target_platform == "noarch"` should evaluate to false
-        // because the target_platform should remain the build platform, not "noarch".
-        // Skip conditions are evaluated eagerly during recipe evaluation, before
-        // the variant gets the noarch target_platform override.
+        // because target_platform remains the actual platform for noarch packages;
+        // only the package subdir becomes "noarch".
         use crate::stage0::parse_recipe_from_source;
 
         let recipe_yaml = r#"
