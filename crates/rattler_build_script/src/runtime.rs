@@ -44,7 +44,14 @@ impl RuntimeEnv {
 
     /// Looks up an environment variable by name.
     pub fn var(&self, name: &str) -> Option<&str> {
-        self.env.get(name).map(String::as_str)
+        if self.platform.is_windows() {
+            self.env
+                .iter()
+                .find(|(key, _)| key.to_uppercase() == name.to_uppercase())
+                .map(|(_, val)| val.as_str())
+        } else {
+            self.env.get(name).map(String::as_str)
+        }
     }
 
     /// The value of `PATH`, or an empty string when it is unset.
