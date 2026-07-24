@@ -22,7 +22,7 @@ env = { AWS_LC_SYS_CMAKE_BUILDER = "1" }
 
 [package.host-dependencies]
 python = "*"
-maturin = "~=1.12.0"
+maturin = "~=1.14.1"
 
 [package.target.linux.build-dependencies]
 patchelf = "~=0.17.2"
@@ -31,7 +31,7 @@ make = ">=4,<5"
 
 [feature.lint.dependencies]
 # we need rust for cargo-fmt and clippy
-rust = ">=1.96.0,<1.97"
+rust = ">=1.97.1,<1.98"
 ruff = ">=0.15.18,<0.16"
 
 [feature.lint.tasks]

@@ -162,7 +162,7 @@ impl HashInfo {
 
         const HASH_LENGTH: usize = 7;
 
-        let res = format!("{:x}", result);
+        let res = hex::encode(result);
         res[..HASH_LENGTH].to_string()
     }
 

@@ -7,7 +7,7 @@ preview = ['pixi-build']
 name = "rattler-build"
 
 [workspace.build-variants]
-rust_compiler_version = [">=1.95,<1.96"]
+rust_compiler_version = [">=1.97,<1.98"]
 
 [workspace.target.osx.build-variants]
 c_compiler_version = ["19"]
@@ -41,8 +41,8 @@ python = ">=3.14.6,<3.15"
 clang = ">=22.1.8,<23"
 livereload = ">=2.7.1,<3"
 wasm-pack = ">=0.15.0,<0.16"
-rust = ">=1.96.0,<1.97"
-rust-std-wasm32-unknown-unknown = ">=1.96.0,<2"
+rust = ">=1.97.1,<1.98"
+rust-std-wasm32-unknown-unknown = ">=1.97.1,<2"
 
 [feature.playground.tasks]
 playground-build = { cmd = "python scripts/build_playground.py", description = "Build the WASM playground", inputs = [
@@ -90,7 +90,7 @@ deploy-dev = { cmd = "mike deploy --push dev devel", depends-on = [
 ] }
 
 [dependencies]
-rust-src = ">=1.95.0,<2"
+rust-src = ">=1.97.1,<2"
 sccache = ">=0.16.0,<0.17"
 libssh2 = ">=1.11.1,<2"
 pkg-config = ">=0.29.2,<0.30"
@@ -230,7 +230,7 @@ ipykernel = ">=7.3.0,<8"
 python = ">=3.14.6,<3.15"
 git-cliff = ">=2.13.1,<3"
 release-plz = ">=0.3.159,<0.4"
-rust = ">=1.96.0,<1.97"
+rust = ">=1.97.1,<1.98"
 7zip = ">=26.1,<27"
 httpx = ">=0.28.1,<0.29"
 

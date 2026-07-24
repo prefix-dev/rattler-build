@@ -91,7 +91,7 @@ impl BuildOutput {
             "{}-{}-{}",
             self.name().as_normalized(),
             self.version(),
-            &self.build_string()
+            self.build_string()
         )
     }
 

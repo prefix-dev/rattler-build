@@ -42,7 +42,10 @@ pub fn upload_package_to_artifactory_py(
 ) -> PyResult<()> {
     let store = tool_configuration::get_auth_store(auth_file).map_err(RattlerBuildError::Auth)?;
     let url = Url::parse(&url).map_err(RattlerBuildError::from)?;
-    let artifactory_data = ArtifactoryData::new(url, channels, token);
+    let mut artifactory_data = ArtifactoryData::new(url, channels);
+    if let Some(token) = token {
+        artifactory_data = artifactory_data.with_bearer_auth(token);
+    }
 
     run_async_task(async {
         upload::upload_package_to_artifactory(&store, &package_files, artifactory_data).await?;

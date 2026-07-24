@@ -1410,39 +1410,40 @@ mod tests {
     }
 
     /// Directly compares the old "string round-trip parse" path against the new
-    /// typed-assembly path to pin down the root cause.
+    /// typed-assembly path.
     ///
-    /// The old path `MatchSpec::from_str("tmux=3.7_=hd811a6c_0")` tokenizes
-    /// the `_=` incorrectly, yielding `version=3.7` (underscore dropped) and
-    /// `build="_=hd811a6c_0"` (the `_=` swallowed), which then fails to match the
-    /// real artifact `version=3.7_`, `build=hd811a6c_0` and makes the solver
-    /// report "No candidates were found". The new path must avoid both errors.
+    /// The old path `MatchSpec::from_str("tmux=3.7_=hd811a6c_0")` used to
+    /// tokenize the `_=` incorrectly, yielding `version=3.7` (underscore
+    /// dropped) and `build="_=hd811a6c_0"` (the `_=` swallowed), which failed to
+    /// match the real artifact `version=3.7_`, `build=hd811a6c_0` and made the
+    /// solver report "No candidates were found". `rattler_conda_types` 0.49 fixed
+    /// that tokenization, so both paths now agree; we keep asserting on both so a
+    /// regression on either side is caught.
     /// See <https://github.com/prefix-dev/rattler-build/issues/2590>.
     #[test]
-    fn old_string_roundtrip_is_buggy_new_path_fixes_it() {
+    fn string_roundtrip_and_typed_path_agree() {
         let (name, version, build) = ("tmux", "3.7_", "hd811a6c_0");
 
-        // Old path: reproduce the incorrectly tokenized spec.
         let legacy = MatchSpec::from_str(
             &format!("{name}={version}={build}"),
             ParseStrictness::Lenient,
         )
-        .expect("old path parses (but is semantically wrong)");
+        .expect("string round-trip parses");
         assert_eq!(
             legacy.version,
             Some(VersionSpec::Exact(
                 EqualityOperator::Equals,
-                Version::from_str("3.7").unwrap()
+                Version::from_str("3.7_").unwrap()
             )),
-            "old path truncates the version to 3.7 (drops the underscore) — this is the bug"
+            "the trailing underscore must be kept as part of the version"
         );
         assert_eq!(
             legacy.build,
-            Some(StringMatcher::Exact("_=hd811a6c_0".to_string())),
-            "old path swallows `_=` into the build string — this is the bug"
+            Some(StringMatcher::Exact(build.to_string())),
+            "the build string must not swallow the `_=`"
         );
 
-        // New path: semantically correct — no dropped underscore, no swallowed `_=`.
+        // New path: assembles the spec from typed fields, no parsing involved.
         let fixed = match_spec_for_identifier(&ArchiveIdentifier {
             name: name.to_string(),
             version: version.to_string(),
@@ -1458,10 +1459,8 @@ mod tests {
         );
         assert_eq!(fixed.build, Some(StringMatcher::Exact(build.to_string())));
 
-        // The two paths produce semantically different specs — proving the fix
-        // has an effect.
-        assert_ne!(legacy.version, fixed.version);
-        assert_ne!(legacy.build, fixed.build);
+        assert_eq!(legacy.version, fixed.version);
+        assert_eq!(legacy.build, fixed.build);
     }
 
     /// A regular version (no trailing underscore) must also assemble correctly,

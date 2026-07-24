@@ -445,6 +445,9 @@ impl ConfigurationBuilder {
                     bz2_enabled: self.use_bz2,
                     sharded_enabled: self.use_sharded,
                     cache_action: Default::default(),
+                    // We solve against the full cached repodata, so a missing
+                    // shard should surface as an error rather than "no records".
+                    missing_shards_are_empty: false,
                 },
                 per_channel: Default::default(),
             })

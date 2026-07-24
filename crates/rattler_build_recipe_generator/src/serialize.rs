@@ -179,7 +179,7 @@ impl fmt::Display for Recipe {
 /// Write a recipe to "{package_name}/recipe.yaml"
 #[cfg(not(target_arch = "wasm32"))]
 pub fn write_recipe(package_name: &str, recipe: &str) -> std::io::Result<()> {
-    let path = PathBuf::from(&format!("{}/recipe.yaml", &package_name));
+    let path = PathBuf::from(format!("{package_name}/recipe.yaml"));
     fs_err::create_dir_all(path.parent().unwrap())?;
 
     if path.exists() {
