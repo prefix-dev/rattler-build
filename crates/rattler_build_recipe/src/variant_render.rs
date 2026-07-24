@@ -36,6 +36,65 @@ use crate::{
 /// Result type for [`build_recipe_dependency_graph`]: the graph, node mapping, and sorted item indices.
 type RecipeDependencyGraph = (DiGraph<usize, ()>, Vec<NodeIndex>, Vec<usize>);
 
+/// Errors that can occur when setting a build string prefix on a [`RenderConfig`].
+#[derive(Debug, Clone, PartialEq, Eq, Error, Diagnostic)]
+pub enum BuildStringPrefixError {
+    /// The prefix contains a character that is not allowed by CEP26.
+    /// Only ASCII letters, ASCII digits and the characters `_`, `.`, `+` are
+    /// allowed.
+    #[error(
+        "invalid character {character:?} in build string prefix: CEP26 only allows ASCII letters, ASCII digits and the characters '_', '.', '+'"
+    )]
+    InvalidCharacter {
+        /// The offending character.
+        character: char,
+    },
+}
+
+/// A validated prefix prepended to the auto-generated build string.
+///
+/// Only characters allowed by CEP26 in build strings may appear in the prefix:
+/// ASCII letters, ASCII digits and the characters `_`, `.`, `+`. An empty
+/// prefix is valid and means "no prefix".
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
+pub struct BuildStringPrefix(String);
+
+impl BuildStringPrefix {
+    /// Returns `true` if the prefix is empty.
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+}
+
+impl std::fmt::Display for BuildStringPrefix {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+impl TryFrom<String> for BuildStringPrefix {
+    type Error = BuildStringPrefixError;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        if let Some(character) = value
+            .chars()
+            .find(|c| !c.is_ascii_alphanumeric() && !['_', '.', '+'].contains(c))
+        {
+            Err(BuildStringPrefixError::InvalidCharacter { character })
+        } else {
+            Ok(Self(value))
+        }
+    }
+}
+
+impl TryFrom<&str> for BuildStringPrefix {
+    type Error = BuildStringPrefixError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        Self::try_from(value.to_string())
+    }
+}
+
 /// Errors that can occur during recipe rendering with variant configurations.
 ///
 /// This is the primary error type for the rendering layer, covering parse errors,
@@ -108,9 +167,9 @@ pub struct RenderConfig {
     /// like `MACOSX_DEPLOYMENT_TARGET` on macOS that have default values but can be
     /// customized via variant config.
     pub os_env_var_keys: HashSet<String>,
-    /// An optional prefix to prepend to the auto-generated build string.
-    /// When set, the build string becomes `{prefix}_{default_build_string}`.
-    pub build_string_prefix: Option<String>,
+    /// Prefix to prepend to the auto-generated build string. When non-empty,
+    /// the build string becomes `{prefix}_{default_build_string}`.
+    pub build_string_prefix: BuildStringPrefix,
     /// An optional build number override.
     /// When set, this replaces the build number from the recipe.
     pub build_number_override: Option<u64>,
@@ -127,7 +186,7 @@ impl Default for RenderConfig {
             build_platform: rattler_conda_types::Platform::current(),
             host_platform: rattler_conda_types::Platform::current(),
             os_env_var_keys: HashSet::new(),
-            build_string_prefix: None,
+            build_string_prefix: Default::default(),
             build_number_override: None,
         }
     }
@@ -194,9 +253,16 @@ impl RenderConfig {
     }
 
     /// Set a prefix to prepend to the auto-generated build string.
-    pub fn with_build_string_prefix(mut self, prefix: impl Into<String>) -> Self {
-        self.build_string_prefix = Some(prefix.into());
-        self
+    ///
+    /// Returns [`BuildStringPrefixError::InvalidCharacter`] if `prefix` contains
+    /// any character that is not allowed by CEP26.
+    pub fn with_build_string_prefix(
+        mut self,
+        prefix: impl Into<String>,
+    ) -> Result<Self, BuildStringPrefixError> {
+        let prefix = BuildStringPrefix::try_from(prefix.into())?;
+        self.build_string_prefix = prefix;
+        Ok(self)
     }
 
     /// Override the build number from the recipe.
@@ -1025,7 +1091,7 @@ fn finalize_build_string_single(
     result: &mut RenderedVariant,
     config: &RenderConfig,
 ) -> Result<(), RenderError> {
-    let build_string_prefix = config.build_string_prefix.as_deref();
+    let build_string_prefix = &config.build_string_prefix;
     let noarch = result.recipe.build.noarch.unwrap_or(NoArchType::none());
 
     // Compute hash from the variant (which now includes pin_subpackage information)
@@ -1033,12 +1099,8 @@ fn finalize_build_string_single(
 
     // Prepend the user-provided build string prefix to the hash prefix so it
     // becomes part of the default build string format: {prefix}h{hash}_{number}.
-    if let Some(prefix) = build_string_prefix {
-        if hash_info.prefix.is_empty() {
-            hash_info.prefix = format!("{prefix}_");
-        } else {
-            hash_info.prefix = format!("{prefix}_{}", hash_info.prefix);
-        }
+    if !build_string_prefix.is_empty() {
+        hash_info.prefix = format!("{build_string_prefix}_{}", hash_info.prefix);
     }
 
     // If build string is not set (Default), or if it needs resolving
@@ -3254,7 +3316,7 @@ package:
         let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
         let variant_config = VariantConfig::default();
 
-        let config = RenderConfig::new().with_build_string_prefix("foobar");
+        let config = RenderConfig::new().with_build_string_prefix("123").unwrap();
         let rendered =
             render_recipe_with_variant_config(&stage0_recipe, &variant_config, config).unwrap();
 
@@ -3267,8 +3329,8 @@ package:
             .unwrap()
             .to_string();
         assert!(
-            build_string.starts_with("foobar_h"),
-            "build string should start with 'foobar_h', got '{build_string}'"
+            build_string.starts_with("123_h"),
+            "build string should start with '123_h', got '{build_string}'"
         );
     }
 
@@ -3293,7 +3355,7 @@ python:
         let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
         let variant_config = VariantConfig::from_yaml_str(variant_yaml).unwrap();
 
-        let config = RenderConfig::new().with_build_string_prefix("myprefix");
+        let config = RenderConfig::new().with_build_string_prefix("1.0").unwrap();
         let rendered =
             render_recipe_with_variant_config(&stage0_recipe, &variant_config, config).unwrap();
 
@@ -3307,8 +3369,8 @@ python:
                 .unwrap()
                 .to_string();
             assert!(
-                build_string.starts_with("myprefix_"),
-                "build string should start with 'myprefix_', got '{build_string}'"
+                build_string.starts_with("1.0_"),
+                "build string should start with '1.0_', got '{build_string}'"
             );
         }
 
@@ -3334,7 +3396,7 @@ package:
         let with_prefix = render_recipe_with_variant_config(
             &stage0_recipe,
             &variant_config,
-            RenderConfig::new().with_build_string_prefix("pfx"),
+            RenderConfig::new().with_build_string_prefix("42").unwrap(),
         )
         .unwrap();
         let without_prefix =
@@ -3346,12 +3408,187 @@ package:
 
         // The prefixed version should contain the unprefixed version
         assert!(
-            bs_with.starts_with("pfx_"),
-            "prefixed build string should start with 'pfx_', got '{bs_with}'"
+            bs_with.starts_with("42_"),
+            "prefixed build string should start with '42_', got '{bs_with}'"
         );
         assert!(
             bs_with.ends_with(bs_without),
             "prefixed '{bs_with}' should end with default '{bs_without}'"
+        );
+    }
+
+    #[test]
+    fn test_build_string_prefix_try_from_accepts_valid() {
+        let prefix = BuildStringPrefix::try_from("MyCi_1.2+3").unwrap();
+        assert_eq!(prefix.to_string(), "MyCi_1.2+3");
+        assert!(!prefix.is_empty());
+
+        // Each allowed character class on its own.
+        assert_eq!(BuildStringPrefix::try_from("a").unwrap().to_string(), "a");
+        assert_eq!(BuildStringPrefix::try_from("Z").unwrap().to_string(), "Z");
+        assert_eq!(BuildStringPrefix::try_from("0").unwrap().to_string(), "0");
+        assert_eq!(BuildStringPrefix::try_from("_").unwrap().to_string(), "_");
+        assert_eq!(BuildStringPrefix::try_from(".").unwrap().to_string(), ".");
+        assert_eq!(BuildStringPrefix::try_from("+").unwrap().to_string(), "+");
+    }
+
+    #[test]
+    fn test_build_string_prefix_try_from_empty_is_valid() {
+        let prefix = BuildStringPrefix::try_from("").unwrap();
+        assert!(prefix.is_empty());
+        assert_eq!(prefix.to_string(), "");
+        assert_eq!(prefix, BuildStringPrefix::default());
+    }
+
+    #[test]
+    fn test_build_string_prefix_try_from_reports_first_invalid_char() {
+        // "ab-cd!" — both '-' and '!' are invalid, but the error should name '-'.
+        let err = BuildStringPrefix::try_from("ab-cd!").unwrap_err();
+        assert_eq!(
+            err,
+            BuildStringPrefixError::InvalidCharacter { character: '-' }
+        );
+    }
+
+    #[test]
+    fn test_build_string_prefix_try_from_rejects_path_separators() {
+        for prefix in [
+            "a/b", "a\\b", "a:b", "a*b", "a?b", "a\"b", "a<b", "a>b", "a|b", "a\0b",
+        ] {
+            assert!(
+                BuildStringPrefix::try_from(prefix).is_err(),
+                "prefix {prefix:?} should be rejected"
+            );
+        }
+    }
+
+    #[test]
+    fn test_build_string_prefix_try_from_rejects_nul() {
+        // NUL on its own.
+        assert_eq!(
+            BuildStringPrefix::try_from("\0").unwrap_err(),
+            BuildStringPrefixError::InvalidCharacter { character: '\0' }
+        );
+        // NUL after otherwise-valid characters — it must still be reported.
+        assert_eq!(
+            BuildStringPrefix::try_from("v1.0\0").unwrap_err(),
+            BuildStringPrefixError::InvalidCharacter { character: '\0' }
+        );
+    }
+
+    #[test]
+    fn test_build_string_prefix_try_from_rejects_non_ascii() {
+        // The first non-ASCII character must be reported.
+        assert_eq!(
+            BuildStringPrefix::try_from("café").unwrap_err(),
+            BuildStringPrefixError::InvalidCharacter { character: 'é' }
+        );
+        assert_eq!(
+            BuildStringPrefix::try_from("é").unwrap_err(),
+            BuildStringPrefixError::InvalidCharacter { character: 'é' }
+        );
+        assert_eq!(
+            BuildStringPrefix::try_from("🦀").unwrap_err(),
+            BuildStringPrefixError::InvalidCharacter { character: '🦀' }
+        );
+    }
+
+    #[test]
+    fn test_build_string_prefix_try_from_str_matches_string() {
+        // The `&str` impl must agree with the `String` impl.
+        assert_eq!(
+            BuildStringPrefix::try_from("v1.0").unwrap(),
+            BuildStringPrefix::try_from(String::from("v1.0")).unwrap()
+        );
+        assert_eq!(
+            BuildStringPrefix::try_from("-").unwrap_err(),
+            BuildStringPrefix::try_from(String::from("-")).unwrap_err()
+        );
+    }
+
+    #[test]
+    fn test_build_string_prefix_validates_chars() {
+        // Allowed characters are ASCII letters, ASCII digits, '_', '.' and '+'.
+        let config = RenderConfig::new()
+            .with_build_string_prefix("MyCi_1.2+3")
+            .unwrap();
+        assert_eq!(config.build_string_prefix.to_string(), "MyCi_1.2+3");
+
+        // An empty prefix is accepted (and round-trips as the empty string).
+        let config = RenderConfig::new().with_build_string_prefix("").unwrap();
+        assert!(config.build_string_prefix.is_empty());
+
+        // Characters that are invalid in file names on Windows or Unix are
+        // rejected.
+        for prefix in [
+            "a/b", "a\\b", "a:b", "a*b", "a?b", "a\"b", "a<b", "a>b", "a|b", "a\0b",
+        ] {
+            assert!(
+                RenderConfig::new()
+                    .with_build_string_prefix(prefix)
+                    .is_err(),
+                "prefix {prefix:?} should be rejected"
+            );
+        }
+
+        // Non-ASCII letters and emojis are rejected.
+        assert!(
+            RenderConfig::new()
+                .with_build_string_prefix("café")
+                .is_err()
+        );
+        assert!(RenderConfig::new().with_build_string_prefix("🦀").is_err());
+    }
+
+    #[test]
+    fn test_build_string_prefix_in_rendered_string() {
+        let recipe_yaml = r#"
+package:
+  name: test-pkg
+  version: "1.0.0"
+"#;
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config = VariantConfig::default();
+
+        // Render once without a prefix as the baseline.
+        let config = RenderConfig::new().with_build_string_prefix("").unwrap();
+        let rendered =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, config).unwrap();
+        let unprefixed = rendered[0]
+            .recipe
+            .build
+            .string
+            .as_resolved()
+            .unwrap()
+            .to_string();
+
+        // An empty prefix must not introduce a leading '_' in the rendered
+        // build string.
+        assert!(
+            !unprefixed.starts_with('_'),
+            "build string with empty prefix should not start with '_', got '{unprefixed}'"
+        );
+
+        // A valid prefix is joined to the unprefixed build string with exactly
+        // one separating '_'.
+        let prefix = "1.0+2_3";
+        let config = RenderConfig::new()
+            .with_build_string_prefix(prefix)
+            .unwrap();
+        let rendered =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, config).unwrap();
+        let prefixed = rendered[0]
+            .recipe
+            .build
+            .string
+            .as_resolved()
+            .unwrap()
+            .to_string();
+
+        assert_eq!(
+            prefixed,
+            format!("{prefix}_{unprefixed}"),
+            "prefixed build string '{prefixed}' should be '{prefix}_' + '{unprefixed}'"
         );
     }
 
