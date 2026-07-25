@@ -93,7 +93,7 @@ pub async fn skip_existing(
             "{}-{}-{}",
             output.name().as_normalized(),
             output.version(),
-            &output.build_string()
+            output.build_string()
         ));
         if exists {
             // The identifier should always be set at this point

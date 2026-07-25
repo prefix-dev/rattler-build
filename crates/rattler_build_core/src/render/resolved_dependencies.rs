@@ -166,27 +166,27 @@ impl DependencyInfo {
     pub fn render(&self, long: bool) -> String {
         if !long {
             match self {
-                DependencyInfo::Variant(spec) => format!("{} (V)", &spec.spec),
-                DependencyInfo::PinSubpackage(spec) => format!("{} (PS)", &spec.spec),
-                DependencyInfo::PinCompatible(spec) => format!("{} (PC)", &spec.spec),
+                DependencyInfo::Variant(spec) => format!("{} (V)", spec.spec),
+                DependencyInfo::PinSubpackage(spec) => format!("{} (PS)", spec.spec),
+                DependencyInfo::PinCompatible(spec) => format!("{} (PC)", spec.spec),
                 DependencyInfo::RunExport(spec) => format!(
                     "{} (RE of [{}: {}])",
-                    &spec.spec, &spec.from, &spec.source_package
+                    spec.spec, spec.from, spec.source_package
                 ),
                 DependencyInfo::Source(spec) => spec.spec.to_string(),
             }
         } else {
             match self {
-                DependencyInfo::Variant(spec) => format!("{} (from variant config)", &spec.spec),
+                DependencyInfo::Variant(spec) => format!("{} (from variant config)", spec.spec),
                 DependencyInfo::PinSubpackage(spec) => {
-                    format!("{} (from pin subpackage)", &spec.spec)
+                    format!("{} (from pin subpackage)", spec.spec)
                 }
                 DependencyInfo::PinCompatible(spec) => {
-                    format!("{} (from pin compatible)", &spec.spec)
+                    format!("{} (from pin compatible)", spec.spec)
                 }
                 DependencyInfo::RunExport(spec) => format!(
                     "{} (run export by {} in {} env)",
-                    &spec.spec, &spec.from, &spec.source_package
+                    spec.spec, spec.from, spec.source_package
                 ),
                 DependencyInfo::Source(spec) => spec.spec.to_string(),
             }

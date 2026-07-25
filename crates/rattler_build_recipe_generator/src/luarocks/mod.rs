@@ -493,7 +493,7 @@ fn normalize_lua_name(name: &str) -> miette::Result<PackageName> {
 
     // Convert to conda-friendly name, but don't double-prefix lua-
     let normalized = if clean_name.starts_with("lua-") || clean_name.starts_with("lua_") {
-        format!("lua-{}", &clean_name[4..].replace('_', "-").to_lowercase())
+        format!("lua-{}", clean_name[4..].replace('_', "-").to_lowercase())
     } else {
         format!("lua-{}", clean_name.replace('_', "-").to_lowercase())
     };
