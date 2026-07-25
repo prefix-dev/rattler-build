@@ -106,12 +106,14 @@ pub trait Relinker {
 
 /// Returns the relink helper for the current platform.
 pub fn get_relinker(platform: Platform, path: &Path) -> Result<Box<dyn Relinker>, RelinkError> {
-    if platform.is_linux() {
+    if platform.is_linux() || platform.is_android() {
+        // Android produces ELF objects, just like Linux.
         if !SharedObject::test_file(path)? {
             return Err(RelinkError::UnknownFileFormat);
         }
         Ok(Box::new(SharedObject::new(path)?))
-    } else if platform.is_osx() {
+    } else if platform.is_osx() || platform.is_ios() {
+        // iOS produces Mach-O objects, just like macOS.
         if !Dylib::test_file(path)? {
             return Err(RelinkError::UnknownFileFormat);
         }

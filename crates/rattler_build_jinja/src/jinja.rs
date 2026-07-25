@@ -222,6 +222,16 @@ impl Jinja {
             }
         }
 
+        // `only_platform()` reports "iossimulator" for the simulator targets, so the
+        // derived `ios` family selector above would only match real devices. A recipe
+        // saying `if: ios` almost always means "building for iOS at all", so widen it
+        // to cover the simulator too (`iossimulator` stays available for the narrow
+        // case). This mirrors how `osx` covers every macOS architecture.
+        context.insert(
+            "ios".to_string(),
+            Value::from(config.host_platform.is_ios()),
+        );
+
         // Add variant variables to context
         for (key, value) in &config.variant {
             context.insert(key.normalize(), value.clone().into());
@@ -441,7 +451,9 @@ fn default_compiler(platform: Platform, language: &str) -> Option<Variable> {
                         "cxx" => "vs2022",
                         _ => unreachable!(),
                     }
-                } else if platform.is_osx() {
+                } else if platform.is_osx() || platform.is_ios() || platform.is_android() {
+                    // Apple platforms use Apple clang; the Android NDK also ships
+                    // clang as its only supported toolchain.
                     match language {
                         "c" => "clang",
                         "cxx" => "clangxx",
@@ -928,6 +940,12 @@ fn set_jinja(
     });
     env.add_function("is_unix", |platform: &str| {
         Ok(parse_platform(platform)?.is_unix())
+    });
+    env.add_function("is_ios", |platform: &str| {
+        Ok(parse_platform(platform)?.is_ios())
+    });
+    env.add_function("is_android", |platform: &str| {
+        Ok(parse_platform(platform)?.is_android())
     });
 
     register_io_functions(&mut env, experimental, recipe_path);
@@ -1546,6 +1564,11 @@ mod tests {
             (Platform::OsxArm64, ".dylib"),
             (Platform::Osx64, ".dylib"),
             (Platform::Win64, ".dll"),
+            // iOS is Mach-O, Android is ELF
+            (Platform::IosArm64, ".dylib"),
+            (Platform::IosSimulatorArm64, ".dylib"),
+            (Platform::AndroidAarch64, ".so"),
+            (Platform::AndroidArmV7a, ".so"),
         ];
         for (target_platform, expected) in cases {
             let jinja = Jinja::new(JinjaConfig {
@@ -2274,5 +2297,102 @@ mod tests {
             "flang",
             default_compiler(platform, "fortran").unwrap().to_string()
         );
+    }
+
+    #[test]
+    fn test_default_compiler_apple_and_android_use_clang() {
+        // Apple platforms and the Android NDK all use clang.
+        for platform in [
+            Platform::OsxArm64,
+            Platform::IosArm64,
+            Platform::IosSimulatorArm64,
+            Platform::IosSimulator64,
+            Platform::AndroidAarch64,
+            Platform::AndroidArmV7a,
+            Platform::Android64,
+            Platform::Android32,
+        ] {
+            assert_eq!(
+                "clang",
+                default_compiler(platform, "c").unwrap().to_string(),
+                "unexpected c compiler for {platform}"
+            );
+            assert_eq!(
+                "clangxx",
+                default_compiler(platform, "cxx").unwrap().to_string(),
+                "unexpected cxx compiler for {platform}"
+            );
+        }
+    }
+
+    #[test]
+    fn eval_ios_and_android_selectors() {
+        // The `ios` selector covers devices *and* simulators, while
+        // `iossimulator` stays narrow.
+        let jinja = Jinja::new(JinjaConfig {
+            target_platform: Platform::IosSimulatorArm64,
+            host_platform: Platform::IosSimulatorArm64,
+            build_platform: Platform::OsxArm64,
+            ..Default::default()
+        });
+        assert!(jinja.eval("ios").expect("host is ios").is_true());
+        assert!(
+            jinja
+                .eval("iossimulator")
+                .expect("host is iossimulator")
+                .is_true()
+        );
+        assert!(jinja.eval("unix").expect("ios is unix").is_true());
+        assert!(!jinja.eval("osx").expect("ios is not osx").is_true());
+
+        let jinja = Jinja::new(JinjaConfig {
+            target_platform: Platform::IosArm64,
+            host_platform: Platform::IosArm64,
+            build_platform: Platform::OsxArm64,
+            ..Default::default()
+        });
+        assert!(jinja.eval("ios").expect("host is ios").is_true());
+        assert!(
+            !jinja
+                .eval("iossimulator")
+                .expect("device is not a simulator")
+                .is_true()
+        );
+
+        let jinja = Jinja::new(JinjaConfig {
+            target_platform: Platform::AndroidAarch64,
+            host_platform: Platform::AndroidAarch64,
+            build_platform: Platform::Linux64,
+            ..Default::default()
+        });
+        assert!(jinja.eval("android").expect("host is android").is_true());
+        assert!(jinja.eval("unix").expect("android is unix").is_true());
+        assert!(!jinja.eval("linux").expect("android is not linux").is_true());
+        assert!(jinja.eval("aarch64").expect("host is aarch64").is_true());
+    }
+
+    #[test]
+    fn eval_is_ios_and_is_android_functions() {
+        let jinja = Jinja::new(JinjaConfig::default());
+        assert!(jinja.eval("is_ios('ios-arm64')").unwrap().is_true());
+        assert!(
+            jinja
+                .eval("is_ios('iossimulator-arm64')")
+                .unwrap()
+                .is_true()
+        );
+        assert!(!jinja.eval("is_ios('osx-arm64')").unwrap().is_true());
+        assert!(
+            jinja
+                .eval("is_android('android-aarch64')")
+                .unwrap()
+                .is_true()
+        );
+        assert!(!jinja.eval("is_android('linux-64')").unwrap().is_true());
+        // iOS/Android are unix but not osx/linux
+        assert!(jinja.eval("is_unix('ios-arm64')").unwrap().is_true());
+        assert!(jinja.eval("is_unix('android-64')").unwrap().is_true());
+        assert!(!jinja.eval("is_linux('android-64')").unwrap().is_true());
+        assert!(!jinja.eval("is_osx('ios-arm64')").unwrap().is_true());
     }
 }

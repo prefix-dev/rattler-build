@@ -289,13 +289,21 @@ fn check_for_binary_prefix(output: &Output, paths_json: &PathsJson) -> Result<()
 }
 
 /// Check if the output has a Unix-specific virtual package (`__unix`, `__osx`,
-/// `__linux`, or `__glibc`) in its finalized run dependencies, indicating this
-/// package is only intended for Unix systems.
+/// `__linux`, `__glibc`, `__ios`, or `__android`) in its finalized run
+/// dependencies, indicating this package is only intended for Unix systems.
 fn has_unix_virtual_package(output: &Output) -> bool {
     output.finalized_dependencies.as_ref().is_some_and(|deps| {
         deps.run.depends.iter().any(|dep| {
             dep.spec().name.as_exact().is_some_and(|name| {
-                ["__unix", "__osx", "__linux", "__glibc"].contains(&name.as_normalized())
+                [
+                    "__unix",
+                    "__osx",
+                    "__linux",
+                    "__glibc",
+                    "__ios",
+                    "__android",
+                ]
+                .contains(&name.as_normalized())
             })
         })
     })

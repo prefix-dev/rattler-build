@@ -21,9 +21,11 @@ pub mod tool_configuration;
 pub mod types;
 pub mod utils;
 
+mod android;
 /// Constants used throughout the build process.
 pub mod consts;
 pub mod env_vars;
+mod ios;
 mod linux;
 mod macos;
 pub mod package_info;

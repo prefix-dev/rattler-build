@@ -71,15 +71,25 @@ The following variables are available during rendering of the recipe:
 | `linux`              | "true" if `host_platform` is Linux                                     |
 | `osx`                | "true" if `host_platform` is OSX / macOS                               |
 | `win`                | "true" if `host_platform` is Windows                                   |
-| `unix`               | "true" if `host_platform` is a Unix (macOS or Linux)                   |
+| `ios`                | "true" if `host_platform` is iOS (device or simulator)                 |
+| `iossimulator`       | "true" if `host_platform` is an iOS simulator                          |
+| `android`            | "true" if `host_platform` is Android                                   |
+| `unix`               | "true" if `host_platform` is a Unix (macOS, Linux, iOS or Android)     |
 | `x86`, `x86_64`      | x86 32/64-bit Architecture (based on `host_platform`)                  |
-| `aarch64`            | 64-bit Arm (if `host_platform` is `linux-aarch64`)                     |
-| `arm64`              | 64-bit Arm (if `host_platform` is `osx-arm64` or `win-arm64`)          |
+| `aarch64`            | 64-bit Arm (if `host_platform` is `linux-aarch64` or `android-aarch64`)|
+| `arm64`              | 64-bit Arm (if `host_platform` is `osx-arm64`, `win-arm64` or `ios-*`) |
 | `armV6l`, `armV7l`   | 32-bit Arm                                                             |
+| `armv7a`             | 32-bit Arm using Android's `armeabi-v7a` ABI                           |
 | `ppc64`, `s390x`,    | Big endian                                                             |
 | `ppc64le`            | Little endian                                                          |
 | `riscv32`, `riscv64` | The [RISC-V](https://wikipedia.org/wiki/RISC-V) Architecture           |
 | `wasm32`             | The [WebAssembly](https://wikipedia.org/wiki/WebAssembly) Architecture |
+
+!!! note "iOS and Android are not `osx` / `linux`"
+    Although iOS is Mach-O based like macOS, and Android is ELF based like Linux, they
+    are *distinct* platform families: `osx` is false on iOS and `linux` is false on
+    Android. Both are `unix`. Use `ios` / `android` to select them, and note that
+    `ios` also covers the simulator targets (use `iossimulator` for the narrower case).
 
 ### Variant selectors
 
