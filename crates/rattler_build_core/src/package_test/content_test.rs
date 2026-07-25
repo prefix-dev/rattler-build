@@ -258,7 +258,7 @@ impl PackageContentsTestExt for PackageContentsTest {
                     })
                 } else {
                     Self::match_files(raws, |raw| {
-                        let patterns = if target_platform.is_osx() {
+                        let patterns = if target_platform.is_osx() || target_platform.is_ios() {
                             if raw.ends_with(".dylib") || raw.ends_with(".a") {
                                 vec![format!("lib/{raw}")]
                             } else {
@@ -713,6 +713,14 @@ mod tests {
 
         let test_case = load_test_case(Path::new("test_lib_win.yaml"));
         evaluate_test_case(test_case).unwrap();
+
+        let package_contents = PackageContentsTest {
+            lib: make_check_files(vec!["libssl.3.dylib"], None),
+            ..Default::default()
+        };
+        let globs = package_contents.lib_as_globs(&Platform::IosArm64).unwrap();
+        assert_eq!(globs[0].0, "lib/libssl.3.dylib");
+        test_glob_matches(&globs, &["lib/libssl.3.dylib".to_string()]).unwrap();
     }
 
     #[test]
