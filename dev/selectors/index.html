@@ -2920,8 +2920,20 @@ items can also be selected, such as:</p>
 <td>"true" if <code>host_platform</code> is Windows</td>
 </tr>
 <tr>
+<td><code>ios</code></td>
+<td>"true" if <code>host_platform</code> is iOS (device or simulator)</td>
+</tr>
+<tr>
+<td><code>iossimulator</code></td>
+<td>"true" if <code>host_platform</code> is an iOS simulator</td>
+</tr>
+<tr>
+<td><code>android</code></td>
+<td>"true" if <code>host_platform</code> is Android</td>
+</tr>
+<tr>
 <td><code>unix</code></td>
-<td>"true" if <code>host_platform</code> is a Unix (macOS or Linux)</td>
+<td>"true" if <code>host_platform</code> is a Unix (macOS, Linux, iOS or Android)</td>
 </tr>
 <tr>
 <td><code>x86</code>, <code>x86_64</code></td>
@@ -2929,15 +2941,19 @@ items can also be selected, such as:</p>
 </tr>
 <tr>
 <td><code>aarch64</code></td>
-<td>64-bit Arm (if <code>host_platform</code> is <code>linux-aarch64</code>)</td>
+<td>64-bit Arm (if <code>host_platform</code> is <code>linux-aarch64</code> or <code>android-aarch64</code>)</td>
 </tr>
 <tr>
 <td><code>arm64</code></td>
-<td>64-bit Arm (if <code>host_platform</code> is <code>osx-arm64</code> or <code>win-arm64</code>)</td>
+<td>64-bit Arm (if <code>host_platform</code> is <code>osx-arm64</code>, <code>win-arm64</code> or <code>ios-*</code>)</td>
 </tr>
 <tr>
 <td><code>armV6l</code>, <code>armV7l</code></td>
 <td>32-bit Arm</td>
+</tr>
+<tr>
+<td><code>armv7a</code></td>
+<td>32-bit Arm using Android's <code>armeabi-v7a</code> ABI</td>
 </tr>
 <tr>
 <td><code>ppc64</code>, <code>s390x</code>,</td>
@@ -2957,6 +2973,13 @@ items can also be selected, such as:</p>
 </tr>
 </tbody>
 </table>
+<div class="admonition note">
+<p class="admonition-title">iOS and Android are not <code>osx</code> / <code>linux</code></p>
+<p>Although iOS is Mach-O based like macOS, and Android is ELF based like Linux, they
+are <em>distinct</em> platform families: <code>osx</code> is false on iOS and <code>linux</code> is false on
+Android. Both are <code>unix</code>. Use <code>ios</code> / <code>android</code> to select them, and note that
+<code>ios</code> also covers the simulator targets (use <code>iossimulator</code> for the narrower case).</p>
+</div>
 <h3 id="variant-selectors">Variant selectors<a class="headerlink" href="#variant-selectors" title="Permanent link">#</a></h3>
 <p>To select based on <a href="../variants/">variant configuration</a> you can use the names in the selectors as well.
 For example, if the build uses <code>python: 3.8</code> as a variant, we can use <code>if: python == "3.8"</code> to enable a dependency for

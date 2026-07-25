@@ -1015,6 +1015,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#default-compilers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Default compilers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#cross-compilation" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2736,6 +2747,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#default-compilers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Default compilers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#cross-compilation" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2812,6 +2834,43 @@ like the following:</p>
 <code>gcc_linux-64 9.3.0</code>. You can define your own compilers. For example, for Rust
 you can use <code>${{ compiler('rust') }}</code> and <code>rust_compiler_{version}</code> in your
 variant config.</p>
+<h3 id="default-compilers">Default compilers<a class="headerlink" href="#default-compilers" title="Permanent link">#</a></h3>
+<p>If no <code>{lang}_compiler</code> is set in the variant config, <code>compiler('c')</code> and
+<code>compiler('cxx')</code> fall back to a per-platform default:</p>
+<table>
+<thead>
+<tr>
+<th>Target platform</th>
+<th><code>compiler('c')</code></th>
+<th><code>compiler('cxx')</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Windows</td>
+<td><code>vs2022</code></td>
+<td><code>vs2022</code></td>
+</tr>
+<tr>
+<td>macOS, iOS, Android</td>
+<td><code>clang</code></td>
+<td><code>clangxx</code></td>
+</tr>
+<tr>
+<td><code>emscripten-wasm32</code></td>
+<td><code>emscripten</code></td>
+<td><code>emscripten</code></td>
+</tr>
+<tr>
+<td>Linux (and everything else)</td>
+<td><code>gcc</code></td>
+<td><code>gxx</code></td>
+</tr>
+</tbody>
+</table>
+<p>For <code>compiler('fortran')</code> the default is <code>flang</code> on Windows and <code>gfortran</code>
+elsewhere. Any other language passes through unchanged, so <code>compiler('rust')</code>
+resolves to <code>rust_{target_platform}</code>.</p>
 <h2 id="cross-compilation">Cross-compilation<a class="headerlink" href="#cross-compilation" title="Permanent link">#</a></h2>
 <p>Cross-compilation is supported by Rattler-Build and the compiler template
 function is part of what makes it possible. When you want to cross-compile from
