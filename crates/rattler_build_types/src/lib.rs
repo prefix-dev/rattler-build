@@ -21,9 +21,11 @@ use rattler_conda_types::Platform;
 pub fn shlib_ext(platform: &Platform) -> &'static str {
     if platform.is_windows() {
         ".dll"
-    } else if platform.is_osx() {
+    } else if platform.is_osx() || platform.is_ios() {
+        // iOS is Mach-O like macOS.
         ".dylib"
-    } else if platform.is_linux() {
+    } else if platform.is_linux() || platform.is_android() {
+        // Android is ELF like Linux (Bionic instead of glibc, same object format).
         ".so"
     } else {
         ".not_implemented"
@@ -42,4 +44,29 @@ pub fn short_version(input: &str, length: u32) -> String {
         }
     }
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn shlib_ext_follows_object_format() {
+        // Mach-O
+        assert_eq!(shlib_ext(&Platform::Osx64), ".dylib");
+        assert_eq!(shlib_ext(&Platform::OsxArm64), ".dylib");
+        assert_eq!(shlib_ext(&Platform::IosArm64), ".dylib");
+        assert_eq!(shlib_ext(&Platform::IosSimulatorArm64), ".dylib");
+        assert_eq!(shlib_ext(&Platform::IosSimulator64), ".dylib");
+        // ELF
+        assert_eq!(shlib_ext(&Platform::Linux64), ".so");
+        assert_eq!(shlib_ext(&Platform::AndroidAarch64), ".so");
+        assert_eq!(shlib_ext(&Platform::AndroidArmV7a), ".so");
+        assert_eq!(shlib_ext(&Platform::Android64), ".so");
+        assert_eq!(shlib_ext(&Platform::Android32), ".so");
+        // PE
+        assert_eq!(shlib_ext(&Platform::Win64), ".dll");
+        // no known extension
+        assert_eq!(shlib_ext(&Platform::NoArch), ".not_implemented");
+    }
 }

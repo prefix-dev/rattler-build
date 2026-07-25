@@ -9,7 +9,9 @@ use rattler_build_types::NormalizedKey;
 use rattler_conda_types::{Platform, RepoDataRecord};
 use std::collections::BTreeMap;
 
+use crate::android;
 use crate::consts;
+use crate::ios;
 use crate::linux;
 use crate::macos;
 use crate::metadata::Output;
@@ -254,6 +256,10 @@ pub fn os_vars(
         vars.extend(windows::env::default_env_vars_target(prefix));
     } else if os_platform.is_osx() {
         vars.extend(macos::env::default_env_vars_target(prefix, os_platform));
+    } else if os_platform.is_ios() {
+        vars.extend(ios::env::default_env_vars_target(prefix, os_platform));
+    } else if os_platform.is_android() {
+        vars.extend(android::env::default_env_vars_target(prefix, os_platform));
     } else if os_platform.is_linux() {
         vars.extend(linux::env::default_env_vars_target(
             prefix,
