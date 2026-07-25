@@ -14,6 +14,7 @@ use miette::{Context, IntoDiagnostic};
 use minijinja::Value;
 use rattler_build_jinja::{Jinja, Variable};
 use rattler_build_recipe::stage1::{InheritsFrom, StagingCache};
+use rattler_build_script::{ExecutionContext, RuntimeEnv};
 use rattler_build_types::NormalizedKey;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -280,6 +281,7 @@ impl Output {
             self.prefix(),
             &target_platform,
             &host_platform,
+            &self.build_configuration.build_platform.platform,
             self.build_configuration.env_isolation,
             &self.build_configuration.directories.work_dir,
         ));
@@ -324,10 +326,21 @@ impl Output {
             jinja.render_str(template).map_err(|e| e.to_string())
         };
 
-        let build_prefix = if staging.build.merge_build_and_host_envs {
-            None
+        let context = if staging.build.merge_build_and_host_envs {
+            ExecutionContext::shared(
+                RuntimeEnv::current(),
+                &self.build_configuration.directories.host_prefix,
+                self.build_configuration.build_platform.platform,
+                host_platform,
+            )
         } else {
-            Some(&self.build_configuration.directories.build_prefix)
+            ExecutionContext::separate(
+                RuntimeEnv::current(),
+                &self.build_configuration.directories.build_prefix,
+                self.build_configuration.build_platform.platform,
+                &self.build_configuration.directories.host_prefix,
+                host_platform,
+            )
         };
 
         staging
@@ -337,8 +350,7 @@ impl Output {
                 env_vars,
                 &self.build_configuration.directories.work_dir,
                 &self.build_configuration.directories.recipe_dir,
-                &self.build_configuration.directories.host_prefix,
-                build_prefix,
+                context,
                 Some(jinja_renderer),
                 self.build_configuration.sandbox_config(),
                 self.build_configuration.env_isolation,

@@ -10,9 +10,127 @@ mod cmd_exe;
 
 use std::path::Path;
 
-use indexmap::IndexMap;
 use rattler_conda_types::Platform;
+
+use indexmap::IndexMap;
 use rattler_shell::shell::{Shell, ShellEnum};
+
+use crate::ExecutionContext;
+
+/// A process invocation with owned arguments.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct CommandSpec {
+    pub(crate) program: String,
+    pub(crate) args: Vec<String>,
+}
+
+impl CommandSpec {
+    pub(crate) fn new(
+        program: impl Into<String>,
+        args: impl IntoIterator<Item = impl Into<String>>,
+    ) -> Self {
+        Self {
+            program: program.into(),
+            args: args.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+/// Requested Windows child process architecture for a supported transition.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum WindowsMachine {
+    X86,
+    Amd64,
+    Arm64,
+}
+
+impl WindowsMachine {
+    pub(crate) fn start_argument(self) -> &'static str {
+        match self {
+            Self::X86 => "x86",
+            Self::Amd64 => "amd64",
+            Self::Arm64 => "arm64",
+        }
+    }
+
+    pub(crate) fn processor_architecture(self) -> &'static str {
+        match self {
+            Self::X86 => "x86",
+            Self::Amd64 => "AMD64",
+            Self::Arm64 => "ARM64",
+        }
+    }
+
+    /// The `PROCESSOR_ARCHITEW6432` marker Windows exposes to an x86 child.
+    pub(crate) fn wow64_processor_architecture(self) -> Option<&'static str> {
+        (self != Self::X86).then(|| self.processor_architecture())
+    }
+
+    #[cfg(windows)]
+    fn from_image_file_machine(machine: u16) -> Option<Self> {
+        use windows_sys::Win32::System::SystemInformation::{
+            IMAGE_FILE_MACHINE_AMD64, IMAGE_FILE_MACHINE_ARM64, IMAGE_FILE_MACHINE_I386,
+        };
+
+        match machine {
+            IMAGE_FILE_MACHINE_I386 => Some(Self::X86),
+            IMAGE_FILE_MACHINE_AMD64 => Some(Self::Amd64),
+            IMAGE_FILE_MACHINE_ARM64 => Some(Self::Arm64),
+            _ => None,
+        }
+    }
+}
+
+/// Returns the requested child architecture when a supported Windows build
+/// process transition is needed. Rattler-build ships x64 and ARM64 binaries,
+/// and both can launch x86 build tools; x86 rattler-build processes are not
+/// supported as cross-architecture launchers.
+pub(crate) fn windows_machine_transition(
+    process_platform: Platform,
+    build_platform: Platform,
+) -> Option<WindowsMachine> {
+    match (process_platform, build_platform) {
+        (Platform::Win64, Platform::Win32) | (Platform::WinArm64, Platform::Win32) => {
+            Some(WindowsMachine::X86)
+        }
+        (Platform::Win64, Platform::WinArm64) => Some(WindowsMachine::Arm64),
+        (Platform::WinArm64, Platform::Win64) => Some(WindowsMachine::Amd64),
+        _ => None,
+    }
+}
+
+/// Detects the native Windows machine architecture without affecting launch
+/// selection. This is only used to reproduce the `PROCESSOR_ARCHITEW6432`
+/// value that Windows exposes to x86 WOW64 processes.
+#[cfg(windows)]
+pub(crate) fn native_windows_machine() -> Option<WindowsMachine> {
+    use windows_sys::Win32::System::{
+        SystemInformation::IMAGE_FILE_MACHINE_UNKNOWN,
+        Threading::{GetCurrentProcess, IsWow64Process2},
+    };
+
+    let mut process_machine = IMAGE_FILE_MACHINE_UNKNOWN;
+    let mut native_machine = IMAGE_FILE_MACHINE_UNKNOWN;
+    // `IsWow64Process2` is available on every Windows version that supports
+    // `start /machine`. A failure leaves the inherited WOW64 marker untouched.
+    if unsafe {
+        IsWow64Process2(
+            GetCurrentProcess(),
+            &mut process_machine,
+            &mut native_machine,
+        )
+    } == 0
+    {
+        return None;
+    }
+
+    WindowsMachine::from_image_file_machine(native_machine)
+}
+
+#[cfg(not(windows))]
+pub(crate) fn native_windows_machine() -> Option<WindowsMachine> {
+    None
+}
 
 /// Defines platform-native wrapper execution.
 pub(crate) trait NativeShellRunner: Send + Sync {
@@ -26,8 +144,12 @@ pub(crate) trait NativeShellRunner: Send + Sync {
     /// Returns the shell preamble inserted at the top of `conda_build.*`.
     fn preamble(&self, activation_script_path: &Path) -> String;
 
-    /// Returns process argv used to execute the generated native wrapper script.
-    fn command_to_run_script<'a>(&self, build_script_path: &'a str) -> Vec<&'a str>;
+    /// Returns the process invocation used to execute the generated native wrapper script.
+    fn command_to_run_script(
+        &self,
+        build_script_path: &Path,
+        context: &ExecutionContext,
+    ) -> CommandSpec;
 
     /// Returns the replacement template used when streaming process output.
     fn replacements_template(&self) -> &'static str;
@@ -49,8 +171,7 @@ pub(crate) trait NativeShellRunner: Send + Sync {
     ) -> Result<String, std::io::Error>;
 
     /// Returns human-readable reproduction instructions shown when execution fails.
-    fn debug_info(&self, work_dir: &Path, run_prefix: &Path, build_prefix: Option<&Path>)
-    -> String;
+    fn debug_info(&self, work_dir: &Path, context: &ExecutionContext) -> String;
 }
 
 /// Selects the native wrapper shell for the given platform: `cmd.exe` on
@@ -92,7 +213,8 @@ pub(crate) fn quote_arg(shell: &ShellEnum, arg: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{native_runner, quote_arg};
+    use super::{WindowsMachine, native_runner, quote_arg, windows_machine_transition};
+    use crate::{ExecutionContext, RuntimeEnv};
     use indexmap::IndexMap;
     use rattler_conda_types::Platform;
     use rattler_shell::shell::{self, Shell};
@@ -167,6 +289,96 @@ mod tests {
         assert_eq!(
             native_runner(Platform::Linux64).default_interpreter(),
             "bash"
+        );
+    }
+
+    #[test]
+    fn cmd_switches_between_supported_windows_architectures() {
+        let script = std::path::Path::new("work/conda_build.bat");
+        let runner = native_runner(Platform::Win64);
+
+        let x64_to_arm = ExecutionContext::shared(
+            RuntimeEnv::for_test(Platform::Win64),
+            "prefix",
+            Platform::WinArm64,
+            Platform::WinArm64,
+        );
+        let arm_command = runner.command_to_run_script(script, &x64_to_arm);
+        assert_eq!(arm_command.program, "cmd.exe");
+        assert_eq!(arm_command.args[..3], ["/d", "/v:on", "/c"]);
+        assert!(arm_command.args[3].contains("/machine arm64"));
+        assert!(arm_command.args[3].contains("conda_build.bat"));
+        assert!(arm_command.args[3].contains("exit /b !ERRORLEVEL!"));
+
+        let spaced_script = std::path::Path::new("work/conda build.bat");
+        assert!(
+            runner
+                .command_to_run_script(spaced_script, &x64_to_arm)
+                .args[3]
+                .contains(r#"cmd.exe /d /c "conda build.bat""#)
+        );
+
+        let arm_to_x64 = ExecutionContext::shared(
+            RuntimeEnv::for_test(Platform::WinArm64),
+            "prefix",
+            Platform::Win64,
+            Platform::Win64,
+        );
+        let x64_command = runner.command_to_run_script(script, &arm_to_x64);
+        assert!(x64_command.args[3].contains("/machine amd64"));
+
+        let x64_to_x86 = ExecutionContext::shared(
+            RuntimeEnv::for_test(Platform::Win64),
+            "prefix",
+            Platform::Win32,
+            Platform::Win32,
+        );
+        let x86_command = runner.command_to_run_script(script, &x64_to_x86);
+        assert!(x86_command.args[3].contains("/machine x86"));
+        assert!(
+            x86_command.args[3].contains(r"%SystemRoot%\SysWOW64\cmd.exe"),
+            "x86 must launch the SysWOW64 command interpreter: {}",
+            x86_command.args[3]
+        );
+
+        let same_arch = ExecutionContext::shared(
+            RuntimeEnv::for_test(Platform::Win64),
+            "prefix",
+            Platform::Win64,
+            Platform::Win64,
+        );
+        assert_eq!(
+            runner.command_to_run_script(script, &same_arch).args,
+            ["/d", "/c", "work/conda_build.bat"]
+        );
+        assert_eq!(
+            windows_machine_transition(Platform::Win64, Platform::Win32),
+            Some(WindowsMachine::X86)
+        );
+        assert_eq!(
+            windows_machine_transition(Platform::Win32, Platform::Win64),
+            None
+        );
+        assert_eq!(
+            windows_machine_transition(Platform::Win32, Platform::WinArm64),
+            None
+        );
+        assert_eq!(WindowsMachine::X86.wow64_processor_architecture(), None);
+        assert_eq!(
+            WindowsMachine::Amd64.wow64_processor_architecture(),
+            Some("AMD64")
+        );
+        assert_eq!(
+            WindowsMachine::Arm64.wow64_processor_architecture(),
+            Some("ARM64")
+        );
+        assert_eq!(
+            windows_machine_transition(Platform::Win32, Platform::Win32),
+            None
+        );
+        assert_eq!(
+            windows_machine_transition(Platform::Linux64, Platform::Win32),
+            None
         );
     }
 

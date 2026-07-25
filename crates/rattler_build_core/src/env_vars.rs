@@ -203,6 +203,7 @@ pub fn os_vars(
     prefix: &Path,
     target_platform: &Platform,
     host_platform: &Platform,
+    build_platform: &Platform,
     env_isolation: EnvironmentIsolation,
     work_dir: &Path,
 ) -> HashMap<String, Option<String>> {
@@ -260,13 +261,12 @@ pub fn os_vars(
             env_isolation,
         ));
     }
-    let build_platform = Platform::current();
     if build_platform.is_windows() {
-        vars.extend(windows::env::default_env_vars_build(&build_platform));
+        vars.extend(windows::env::default_env_vars_build(build_platform));
     } else if build_platform.is_osx() {
-        vars.extend(macos::env::default_env_vars_build(&build_platform));
+        vars.extend(macos::env::default_env_vars_build(build_platform));
     } else if build_platform.is_linux() {
-        vars.extend(linux::env::default_env_vars_build(&build_platform));
+        vars.extend(linux::env::default_env_vars_build(build_platform));
     }
 
     if build_platform.is_windows() {
@@ -502,6 +502,7 @@ mod test {
             prefix,
             &Platform::NoArch,
             &Platform::Win64,
+            &Platform::Win64,
             EnvironmentIsolation::Strict,
             work_dir,
         );
@@ -516,6 +517,25 @@ mod test {
         );
     }
 
+    #[test]
+    fn build_vars_follow_configured_build_platform() {
+        let vars = os_vars(
+            Path::new("/some/prefix"),
+            &Platform::WinArm64,
+            &Platform::WinArm64,
+            &Platform::WinArm64,
+            EnvironmentIsolation::Strict,
+            Path::new("/some/work"),
+        );
+
+        let expected =
+            std::env::var("BUILD").unwrap_or_else(|_| "arm64-pc-windows-19.0.0".to_string());
+        assert_eq!(
+            vars.get("BUILD").and_then(|value| value.as_deref()),
+            Some(expected.as_str())
+        );
+    }
+
     /// noarch on a non-Windows host does not emit Windows target vars.
     #[test]
     fn test_noarch_non_windows_host_has_no_windows_vars() {
@@ -525,6 +545,7 @@ mod test {
         let vars = os_vars(
             prefix,
             &Platform::NoArch,
+            &Platform::Linux64,
             &Platform::Linux64,
             EnvironmentIsolation::Strict,
             work_dir,

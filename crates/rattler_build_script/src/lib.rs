@@ -22,6 +22,8 @@ mod activation;
 #[cfg(feature = "execution")]
 mod execution;
 #[cfg(feature = "execution")]
+mod execution_context;
+#[cfg(feature = "execution")]
 mod interpreter;
 #[cfg(feature = "execution")]
 mod native_runner;
@@ -32,6 +34,8 @@ mod runtime;
 pub use execution::{
     EnvironmentIsolation, ExecutionArgs, ResolvedScriptContents, create_build_script,
 };
+#[cfg(feature = "execution")]
+pub use execution_context::{ExecutionContext, PrefixLayout, PrefixWithPlatform};
 #[cfg(feature = "execution")]
 pub use interpreter::{InterpreterError, closest_interpreter};
 #[cfg(feature = "execution")]
