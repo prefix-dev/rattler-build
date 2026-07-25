@@ -21,7 +21,7 @@
       
       
       <link rel="icon" href="../../../assets/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -29,7 +29,7 @@
       
     
     
-      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -3289,15 +3289,15 @@ Recipe rendering complete!
 </span></code></pre></div>
 <div class="language-text highlight"><pre><span></span><code>Building packages...
 ============================================================
-Recipe path: /tmp/rattler_build_2hnjqrws/recipe.yaml
+Recipe path: /tmp/rattler_build_k5rlyoej/recipe.yaml
 
 Building variant 1/3
   Package: my-simple-package
   Version: 1.0.0
   Build string: np121py39h13fef27_0
-  Build complete in 1.72s!
-  Package: /tmp/rattler_build_2hnjqrws/output/linux-64/my-simple-package-1.0.0-np121py39h13fef27_0.conda
-  Variant: {&#39;target_platform&#39;: &#39;linux-64&#39;, &#39;numpy&#39;: &#39;1.21&#39;, &#39;python&#39;: &#39;3.9&#39;}
+  Build complete in 1.71s!
+  Package: /tmp/rattler_build_k5rlyoej/output/linux-64/my-simple-package-1.0.0-np121py39h13fef27_0.conda
+  Variant: {&#39;python&#39;: &#39;3.9&#39;, &#39;target_platform&#39;: &#39;linux-64&#39;, &#39;numpy&#39;: &#39;1.21&#39;}
   Build log: 53 messages captured
 
   Build log details:
@@ -3307,9 +3307,9 @@ Building variant 1/3
     Adding 0 packages to subdir noarch.
     Successfully added 0 packages to subdir noarch.
     Writing repodata to noarch/repodata.json
-      Platform: linux-64 [2m[__unix=0=0, __linux=6.17.0=0, __glibc=2.39=0, __archspec=1=sapphirerapids][0m
+      Platform: linux-64 [2m[__unix=0=0, __linux=6.17.0=0, __glibc=2.39=0, __archspec=1=zen2][0m
       Channels: 
-       - file:///tmp/rattler_build_2hnjqrws/output/
+       - file:///tmp/rattler_build_k5rlyoej/output/
        - conda-forge
     ... and 43 more messages
 
@@ -3317,21 +3317,25 @@ Building variant 2/3
   Package: my-simple-package
   Version: 1.0.0
   Build string: np122py310h27bf20f_0
-  Build complete in 1.42s!
-  Package: /tmp/rattler_build_2hnjqrws/output/linux-64/my-simple-package-1.0.0-np122py310h27bf20f_0.conda
-  Variant: {&#39;numpy&#39;: &#39;1.22&#39;, &#39;python&#39;: &#39;3.10&#39;, &#39;target_platform&#39;: &#39;linux-64&#39;}
+
+
+  Build complete in 1.58s!
+
+
+  Package: /tmp/rattler_build_k5rlyoej/output/linux-64/my-simple-package-1.0.0-np122py310h27bf20f_0.conda
+  Variant: {&#39;python&#39;: &#39;3.10&#39;, &#39;numpy&#39;: &#39;1.22&#39;, &#39;target_platform&#39;: &#39;linux-64&#39;}
   Build log: 53 messages captured
 
   Build log details:
     Starting build of 1 outputs
     No sources to fetch
-    Adding 0 packages to subdir linux-64.
-    Successfully added 0 packages to subdir linux-64.
-    Writing repodata to linux-64/repodata.json
     Adding 0 packages to subdir noarch.
     Successfully added 0 packages to subdir noarch.
     Writing repodata to noarch/repodata.json
-      Platform: linux-64 [2m[__unix=0=0, __linux=6.17.0=0, __glibc=2.39=0, __archspec=1=sapphirerapids][0m
+    Adding 0 packages to subdir linux-64.
+    Successfully added 0 packages to subdir linux-64.
+    Writing repodata to linux-64/repodata.json
+      Platform: linux-64 [2m[__unix=0=0, __linux=6.17.0=0, __glibc=2.39=0, __archspec=1=zen2][0m
       Channels: 
     ... and 43 more messages
 
@@ -3339,11 +3343,9 @@ Building variant 3/3
   Package: my-simple-package
   Version: 1.0.0
   Build string: np123py311hadc6f11_0
-
-
-  Build complete in 2.04s!
-  Package: /tmp/rattler_build_2hnjqrws/output/linux-64/my-simple-package-1.0.0-np123py311hadc6f11_0.conda
-  Variant: {&#39;python&#39;: &#39;3.11&#39;, &#39;target_platform&#39;: &#39;linux-64&#39;, &#39;numpy&#39;: &#39;1.23&#39;}
+  Build complete in 1.17s!
+  Package: /tmp/rattler_build_k5rlyoej/output/linux-64/my-simple-package-1.0.0-np123py311hadc6f11_0.conda
+  Variant: {&#39;target_platform&#39;: &#39;linux-64&#39;, &#39;numpy&#39;: &#39;1.23&#39;, &#39;python&#39;: &#39;3.11&#39;}
   Build log: 53 messages captured
 
   Build log details:
@@ -3355,14 +3357,14 @@ Building variant 3/3
     Adding 0 packages to subdir linux-64.
     Successfully added 0 packages to subdir linux-64.
     Writing repodata to linux-64/repodata.json
-      Platform: linux-64 [2m[__unix=0=0, __linux=6.17.0=0, __glibc=2.39=0, __archspec=1=sapphirerapids][0m
+      Platform: linux-64 [2m[__unix=0=0, __linux=6.17.0=0, __glibc=2.39=0, __archspec=1=zen2][0m
       Channels: 
     ... and 43 more messages
 
 ============================================================
 All builds completed successfully!
 
-Built packages are available in: /tmp/rattler_build_2hnjqrws/output
+Built packages are available in: /tmp/rattler_build_k5rlyoej/output
 </code></pre></div>
 <h2 id="summary">Summary<a class="headerlink" href="#summary" title="Permanent link">#</a></h2>
 <p>In this tutorial, you learned:</p>
@@ -3576,7 +3578,7 @@ Built packages are available in: /tmp/rattler_build_2hnjqrws/output
       <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["content.tabs.link", "content.code.copy", "content.action.edit", "content.code.annotate", "content.tooltips", "navigation.instant", "navigation.instant.progress", "navigation.tracking", "navigation.indexes", "navigation.top", "navigation.footer"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
-      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>
