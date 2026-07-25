@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.10](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.9...rattler_build_core-v0.2.10) - 2026-07-25
+
+### Added
+
+- add iOS and Android platform support ([#2682](https://github.com/prefix-dev/rattler-build/pull/2682))
+- make CMD subprocesses match `build_platform` architecture when running emulated ([#2664](https://github.com/prefix-dev/rattler-build/pull/2664))
+
+### Fixed
+
+- package content tests for ios ([#2684](https://github.com/prefix-dev/rattler-build/pull/2684))
+- set `LIBRARY_PREFIX` and friends for noarch builds on Windows ([#2655](https://github.com/prefix-dev/rattler-build/pull/2655))
+
+### Other
+
+- update dependencies and Rust toolchain to 1.97.1 ([#2679](https://github.com/prefix-dev/rattler-build/pull/2679))
+
 ## [0.2.9](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.8...rattler_build_core-v0.2.9) - 2026-07-11
 
 ### Added
