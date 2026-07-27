@@ -7,6 +7,7 @@
 //! * `imports` - import a list of modules and check if they can be imported
 //! * `files` - check if a list of files exist
 use fs_err as fs;
+use miette::WrapErr;
 use rattler_build_jinja::Variable;
 use rattler_build_recipe::stage1::{
     TestType,
@@ -97,8 +98,8 @@ pub enum TestError {
     #[error("failed to parse MatchSpec: {0}")]
     MatchSpecParse(String),
 
-    #[error("failed to setup test environment: {0}")]
-    TestEnvironmentSetup(String),
+    #[error("{0}")]
+    TestEnvironmentSetup(miette::Report),
 
     #[error("failed to setup test environment: {0}")]
     TestEnvironmentActivation(#[from] ActivationError),
@@ -125,6 +126,27 @@ pub enum TestError {
         "no tests found in package. Expected `info/test/` (conda-build format) or `info/tests/tests.yaml` (rattler-build format)"
     )]
     NoTestsFound,
+}
+
+impl TestError {
+    /// Converts this error into a report without rendering nested reports.
+    pub fn into_report(self) -> miette::Report {
+        match self {
+            Self::TestEnvironmentSetup(report) => report,
+            error => miette::Report::from_err(error),
+        }
+    }
+}
+
+#[test]
+fn test_environment_setup_preserves_diagnostic() {
+    let diagnostic = miette::MietteDiagnostic::new("solver failed");
+    let report = Err::<(), _>(miette::Report::new(diagnostic))
+        .wrap_err("failed to setup test environment")
+        .unwrap_err();
+    let report = TestError::TestEnvironmentSetup(report).into_report();
+
+    assert!(report.downcast_ref::<miette::MietteDiagnostic>().is_some());
 }
 
 /// Create a `.conda` archive from an extracted package directory.
@@ -608,7 +630,8 @@ pub async fn run_test(
             config.exclude_newer,
         )
         .await
-        .map_err(|e| TestError::TestEnvironmentSetup(format!("{e:?}")))?;
+        .wrap_err("failed to setup test environment")
+        .map_err(TestError::TestEnvironmentSetup)?;
 
         // These are the legacy tests
         let (test_folder, tests) = legacy_tests_from_folder(&package_folder).await?;
@@ -802,7 +825,8 @@ async fn run_python_test_inner(
         config.exclude_newer,
     )
     .await
-    .map_err(|e| TestError::TestEnvironmentSetup(format!("{e:?}")))?;
+    .wrap_err("failed to setup test environment")
+    .map_err(TestError::TestEnvironmentSetup)?;
 
     let mut imports = String::new();
     for import in &python_test.imports {
@@ -908,7 +932,8 @@ async fn run_perl_test(
         config.exclude_newer,
     )
     .await
-    .map_err(|e| TestError::TestEnvironmentSetup(format!("{e:?}")))?;
+    .wrap_err("failed to setup test environment")
+    .map_err(TestError::TestEnvironmentSetup)?;
 
     let mut imports = String::new();
     tracing::info!("Testing perl imports:\n");
@@ -992,7 +1017,8 @@ async fn run_commands_test(
             config.exclude_newer,
         )
         .await
-        .map_err(|e| TestError::TestEnvironmentSetup(format!("{e:?}")))?;
+        .wrap_err("failed to setup test environment")
+        .map_err(TestError::TestEnvironmentSetup)?;
         Some(build_prefix)
     } else {
         None
@@ -1022,7 +1048,8 @@ async fn run_commands_test(
         config.exclude_newer,
     )
     .await
-    .map_err(|e| TestError::TestEnvironmentSetup(format!("{e:?}")))?;
+    .wrap_err("failed to setup test environment")
+    .map_err(TestError::TestEnvironmentSetup)?;
 
     let target_platform = config.target_platform.unwrap_or(Platform::current());
     let build_platform = config.current_platform.platform;
@@ -1233,7 +1260,8 @@ async fn run_r_test(
         config.exclude_newer,
     )
     .await
-    .map_err(|e| TestError::TestEnvironmentSetup(format!("{e:?}")))?;
+    .wrap_err("failed to setup test environment")
+    .map_err(TestError::TestEnvironmentSetup)?;
 
     let mut libraries = String::new();
     tracing::info!("Testing R libraries:\n");
@@ -1315,7 +1343,8 @@ async fn run_ruby_test(
         config.exclude_newer,
     )
     .await
-    .map_err(|e| TestError::TestEnvironmentSetup(format!("{e:?}")))?;
+    .wrap_err("failed to setup test environment")
+    .map_err(TestError::TestEnvironmentSetup)?;
 
     let mut requires = String::new();
     tracing::info!("Testing Ruby requires:\n");

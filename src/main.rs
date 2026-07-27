@@ -111,6 +111,19 @@ fn run_migrate_recipe(opts: MigrateRecipeOpts) -> miette::Result<()> {
 }
 
 fn main() -> miette::Result<()> {
+    let in_ci = matches!(std::env::var("CI").as_deref(), Ok("1" | "true"));
+    let no_wrap = matches!(
+        std::env::var("RATTLER_BUILD_NO_WRAP").as_deref(),
+        Ok("1" | "true")
+    );
+    miette::set_hook(Box::new(move |_| {
+        Box::new(
+            miette::MietteHandlerOpts::new()
+                .wrap_lines(!in_ci && !no_wrap)
+                .build(),
+        )
+    }))?;
+
     // Stack size varies significantly across platforms:
     // - Windows: only 1MB by default
     // - macOS/Linux: ~8MB by default
