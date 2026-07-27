@@ -1631,6 +1631,13 @@ def test_pin_subpackage(
     assert (pkg / "info/index.json").exists()
 
 
+def test_transitive_test_dependencies(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    rattler_build.build(recipes / "transitive-test-dependencies", tmp_path)
+    assert get_package(tmp_path, "transitive-test-root").exists()
+
+
 def test_testing_strategy(
     rattler_build: RattlerBuild,
     recipes: Path,
