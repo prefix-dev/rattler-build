@@ -819,11 +819,16 @@ pub async fn run_build_from_args(
                             );
                         }
 
+                        let report = e.into_report();
                         if tool_configuration.continue_on_failure == ContinueOnFailure::Yes {
-                            tracing::error!("Test failed for {}: {}", output.identifier(), e);
-                            output.record_warning(&format!("Test failed: {}", e));
+                            tracing::error!(
+                                "Test failed for {}: {:?}",
+                                output.identifier(),
+                                report
+                            );
+                            output.record_warning(&format!("Test failed: {report:?}"));
                         } else {
-                            return Err(miette::miette!("Test failed: {}", e));
+                            return Err(report).context("Test failed");
                         }
                     }
                 }
@@ -961,7 +966,7 @@ pub async fn run_test(
     let _enter = span.enter();
     package_test::run_test(&package_file, &test_options, None)
         .await
-        .into_diagnostic()?;
+        .map_err(|e| e.into_report())?;
 
     Ok(())
 }

@@ -111,6 +111,10 @@ fn run_migrate_recipe(opts: MigrateRecipeOpts) -> miette::Result<()> {
 }
 
 fn main() -> miette::Result<()> {
+    miette::set_hook(Box::new(|_| {
+        Box::new(miette::MietteHandlerOpts::new().wrap_lines(false).build())
+    }))?;
+
     // Stack size varies significantly across platforms:
     // - Windows: only 1MB by default
     // - macOS/Linux: ~8MB by default
