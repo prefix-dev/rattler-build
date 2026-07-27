@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.10](https://github.com/prefix-dev/rattler-build/compare/rattler_build_types-v0.1.9...rattler_build_types-v0.1.10) - 2026-07-25
+
+### Added
+
+- add iOS and Android platform support ([#2682](https://github.com/prefix-dev/rattler-build/pull/2682))
+
 ## [0.1.9](https://github.com/prefix-dev/rattler-build/compare/rattler_build_types-v0.1.8...rattler_build_types-v0.1.9) - 2026-07-11
 
 ### Added
