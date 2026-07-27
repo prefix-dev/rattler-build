@@ -606,36 +606,54 @@ pub async fn get_build_output(
 }
 
 fn can_test(output: &Output, all_output_names: &[&PackageName], done_outputs: &[Output]) -> bool {
-    let check_if_matches = |spec: &MatchSpec, output: &Output| -> bool {
-        if spec.name.as_exact() != Some(&output.name().clone()) {
-            return false;
-        }
-        if let Some(version_spec) = &spec.version
-            && !version_spec.matches(output.recipe.package().version())
-        {
-            return false;
-        }
-        if let Some(build_string_spec) = &spec.build
-            && !build_string_spec.matches(&output.build_string())
-        {
-            return false;
-        }
-        true
-    };
+    fn check_if_matches(spec: &MatchSpec, output: &Output) -> bool {
+        spec.name.as_exact() == Some(output.name())
+            && spec
+                .version
+                .as_ref()
+                .is_none_or(|version| version.matches(output.recipe.package().version()))
+            && spec
+                .build
+                .as_ref()
+                .is_none_or(|build| build.matches(&output.build_string()))
+    }
 
-    // Check if any run dependencies are not built yet
-    if let Some(ref deps) = output.finalized_dependencies {
-        for dep in &deps.run.depends {
-            if all_output_names
-                .iter()
-                .any(|o| dep.spec().name.as_exact() == Some(*o))
-            {
-                // this dependency might not be built yet
-                if !done_outputs.iter().any(|o| check_if_matches(dep.spec(), o)) {
-                    return false;
-                }
-            }
+    fn run_dependencies_are_built(
+        output: &Output,
+        all_output_names: &[&PackageName],
+        done_outputs: &[Output],
+        visiting: &mut Vec<String>,
+    ) -> bool {
+        let identifier = output.identifier();
+        if visiting.contains(&identifier) {
+            return true;
         }
+        visiting.push(identifier);
+
+        let ready = output.finalized_dependencies.as_ref().is_none_or(|deps| {
+            deps.run.depends.iter().all(|dep| {
+                !all_output_names
+                    .iter()
+                    .any(|name| dep.spec().name.as_exact() == Some(*name))
+                    || done_outputs.iter().any(|candidate| {
+                        check_if_matches(dep.spec(), candidate)
+                            && run_dependencies_are_built(
+                                candidate,
+                                all_output_names,
+                                done_outputs,
+                                visiting,
+                            )
+                    })
+            })
+        });
+
+        visiting.pop();
+        ready
+    }
+
+    let mut visiting = Vec::new();
+    if !run_dependencies_are_built(output, all_output_names, done_outputs, &mut visiting) {
+        return false;
     }
 
     // Also check that for all script tests
@@ -652,15 +670,21 @@ fn can_test(output: &Output, all_output_names: &[&PackageName], done_outputs: &[
                     // this dependency might not be built yet
                     // For pin_subpackage/pin_compatible, we only check name match
                     // For regular specs, we also check version/build if specified
-                    let is_built = match dep {
-                        rattler_build_recipe::stage1::Dependency::Spec(spec) => {
-                            done_outputs.iter().any(|o| check_if_matches(spec, o))
-                        }
-                        _ => {
-                            // For pins, just check if any output with that name is built
-                            done_outputs.iter().any(|o| Some(o.name()) == dep_name)
-                        }
-                    };
+                    let is_built = done_outputs.iter().any(|output| {
+                        let matches = match dep {
+                            rattler_build_recipe::stage1::Dependency::Spec(spec) => {
+                                check_if_matches(spec, output)
+                            }
+                            _ => Some(output.name()) == dep_name,
+                        };
+                        matches
+                            && run_dependencies_are_built(
+                                output,
+                                all_output_names,
+                                done_outputs,
+                                &mut visiting,
+                            )
+                    });
                     if !is_built {
                         return false;
                     }
