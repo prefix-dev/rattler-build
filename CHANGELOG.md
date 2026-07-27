@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.71.0] - 2026-07-27
+### ✨ Highlights
+
+This release adds iOS and Android platform support and improves cross-architecture Windows command execution. It also fixes cache-output build setting inheritance and defers tests until transitive outputs are available.
+
+
+
+### Added
+
+- Make CMD subprocesses match `build_platform` architecture when running emulated by @baszalmstra in [#2664](https://github.com/prefix-dev/rattler-build/pull/2664)
+- Add iOS and Android platform support by @wolfv in [#2682](https://github.com/prefix-dev/rattler-build/pull/2682)
+
+
+### Fixed
+
+- Package content tests for ios by @wolfv in [#2684](https://github.com/prefix-dev/rattler-build/pull/2684)
+- Defer tests until transitive outputs are built by @wolfv in [#2686](https://github.com/prefix-dev/rattler-build/pull/2686)
+- Stop wrapping solver errors by @wolfv in [#2687](https://github.com/prefix-dev/rattler-build/pull/2687)
+- Inherit all top-level build settings for cache outputs by @Hofer-Julian in [#2641](https://github.com/prefix-dev/rattler-build/pull/2641)
+
+
+### Removed
+
+- Remove the rattler-build-conda-compat integration API by @Hofer-Julian in [#2675](https://github.com/prefix-dev/rattler-build/pull/2675)
+
+
+
 ## [0.70.1] - 2026-07-23
 ### ✨ Highlights
 
