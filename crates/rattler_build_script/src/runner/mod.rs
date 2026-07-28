@@ -15,26 +15,9 @@ pub use local::LocalRunner;
 /// Error returned while preparing or driving a runner session.
 #[derive(Debug, thiserror::Error)]
 pub enum RunnerError {
-    /// The runner cannot execute on this machine.
-    #[error("runner `{runner}` is not usable: {reason}")]
-    NotUsable {
-        /// The runner name.
-        runner: String,
-        /// The reason the runner is unavailable.
-        reason: String,
-    },
     /// An I/O failure while starting or driving a process.
     #[error(transparent)]
     Io(#[from] std::io::Error),
-}
-
-/// How a runner exposes the host filesystem to executing scripts.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FilesystemAccess {
-    /// The host reaches the session's files directly through its mount mapping.
-    Shared,
-    /// File content crosses only through an explicit transfer transport.
-    Streamed,
 }
 
 /// A path on the machine rattler-build runs on.
@@ -84,15 +67,6 @@ pub struct ExecSpec {
     pub cwd: GuestPath,
     /// Explicit environment variables for the command.
     pub env: IndexMap<String, String>,
-}
-
-/// What to preserve when closing a session.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Keep {
-    /// Tear down everything the session created.
-    Nothing,
-    /// Keep backing resources alive.
-    Alive,
 }
 
 /// Exit status of an executed command.
@@ -149,9 +123,6 @@ pub trait Runner: Send + Sync {
     /// The platform scripts execute on.
     fn execution_platform(&self) -> Platform;
 
-    /// Filesystem relationship between host and guest.
-    fn filesystem(&self) -> FilesystemAccess;
-
     /// Performs a cheap availability check.
     async fn check_usable(&self) -> Result<(), RunnerError>;
 
@@ -183,5 +154,5 @@ pub trait Session: Send {
     ) -> Result<Option<GuestPath>, RunnerError>;
 
     /// Closes this session.
-    async fn close(self: Box<Self>, keep: Keep) -> Result<(), RunnerError>;
+    async fn close(self: Box<Self>) -> Result<(), RunnerError>;
 }

@@ -6,8 +6,8 @@ use async_trait::async_trait;
 use indexmap::IndexMap;
 
 use super::{
-    ExecSpec, ExecStatus, FilesystemAccess, GuestInfo, GuestPath, Keep, OutputSink, OutputStream,
-    Runner, RunnerError, Session, SessionSpec, resolve_process_env,
+    ExecSpec, ExecStatus, GuestInfo, GuestPath, OutputSink, OutputStream, Runner, RunnerError,
+    Session, SessionSpec, resolve_process_env,
 };
 use crate::RuntimeEnv;
 use crate::execution::{EnvironmentIsolation, spawn_process};
@@ -49,10 +49,6 @@ impl Runner for LocalRunner {
 
     fn execution_platform(&self) -> rattler_conda_types::Platform {
         self.runtime.process_platform()
-    }
-
-    fn filesystem(&self) -> FilesystemAccess {
-        FilesystemAccess::Shared
     }
 
     async fn check_usable(&self) -> Result<(), RunnerError> {
@@ -159,7 +155,7 @@ impl Session for LocalSession {
         Ok(None)
     }
 
-    async fn close(self: Box<Self>, _keep: Keep) -> Result<(), RunnerError> {
+    async fn close(self: Box<Self>) -> Result<(), RunnerError> {
         Ok(())
     }
 }
@@ -409,17 +405,12 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn close_accepts_both_keep_values() {
+    async fn close_is_a_noop() {
         let temp_dir = tempfile::tempdir().unwrap();
         let runner = LocalRunner::default();
         start_local_session(&runner, temp_dir.path())
             .await
-            .close(Keep::Nothing)
-            .await
-            .unwrap();
-        start_local_session(&runner, temp_dir.path())
-            .await
-            .close(Keep::Alive)
+            .close()
             .await
             .unwrap();
     }
