@@ -48,16 +48,6 @@ impl EnvironmentVariables {
     fn iter(&self) -> impl Iterator<Item = (&str, &str)> {
         self.values.iter().map(|(k, v)| (k.as_str(), v.as_str()))
     }
-
-    fn set_case_insensitive(&mut self, case_insensitive: bool) {
-        if self.case_insensitive_keys.is_some() != case_insensitive {
-            let values = std::mem::take(&mut self.values);
-            *self = Self::new(case_insensitive);
-            for (name, value) in values {
-                self.insert(name, value);
-            }
-        }
-    }
 }
 
 /// The environment rattler-build is running in: the process environment
@@ -80,10 +70,6 @@ impl RuntimeEnv {
             runtime_env.env.insert(name, value)
         }
         runtime_env
-    }
-
-    pub fn set_case_insensitive(&mut self, case_insensitive: bool) {
-        self.env.set_case_insensitive(case_insensitive);
     }
 
     /// Creates a runtime environment with an empty variable set and the given
