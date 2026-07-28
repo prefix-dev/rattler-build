@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.72.0] - 2026-07-28
 ### ✨ Highlights
 
-This release introduces experimental `build.steps` as an alternative to `build.script`: each step is an isolated section of the build wrapper with its own `if` condition, `interpreter`, `cwd`, and `env`, so shell state no longer leaks between steps. It requires `--experimental` and is mutually exclusive with `script`. Recipes may now also carry a top-level `$schema` field for editor validation, and two fixes land for case-insensitive `RuntimeEnv` lookups on Windows and for deletion-only patches being misdetected as already applied.
+This release introduces experimental `build.steps` as an alternative to `build.script`: each step is an isolated section of the build wrapper with its own `if` condition, `interpreter`, `cwd`, and `env`, so shell state no longer leaks between steps. It requires `--experimental` and is mutually exclusive with `script`. Recipes may now also carry a top-level `$schema` field for editor validation, and the process-execution layer gains reusable Runner and Session interfaces. Fixes cover case-insensitive `RuntimeEnv` lookups on Windows, deletion-only patches, Android `DT_RUNPATH` handling, and CEP-17 site-packages paths in `SP_DIR`.
 
 
 
@@ -17,12 +17,15 @@ This release introduces experimental `build.steps` as an alternative to `build.s
 - Add experimental build steps by @baszalmstra in [#2646](https://github.com/prefix-dev/rattler-build/pull/2646)
 - Allow $schema top-level field in recipe.yaml by @bollwyvl in [#2645](https://github.com/prefix-dev/rattler-build/pull/2645)
 - Support steps in staging outputs by @baszalmstra in [#2647](https://github.com/prefix-dev/rattler-build/pull/2647)
+- Add Runner and Session execution interfaces by @baszalmstra in [#2696](https://github.com/prefix-dev/rattler-build/pull/2696)
 
 
 ### Fixed
 
 - Ignore case when querying variables from `RuntimeEnv` on Windows by @paperchalice in [#2676](https://github.com/prefix-dev/rattler-build/pull/2676)
 - Deletion-only patches misdetected as already applied by @wolfv in [#2695](https://github.com/prefix-dev/rattler-build/pull/2695)
+- Use CEP-17 path for SP_DIR by @wolfv in [#2700](https://github.com/prefix-dev/rattler-build/pull/2700)
+- Use DT_RUNPATH instead of DT_RPATH on Android by @wolfv in [#2699](https://github.com/prefix-dev/rattler-build/pull/2699)
 
 
 ### Refactor
