@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.72.0] - 2026-07-28
+### ✨ Highlights
+
+This release introduces experimental `build.steps` as an alternative to `build.script`: each step is an isolated section of the build wrapper with its own `if` condition, `interpreter`, `cwd`, and `env`, so shell state no longer leaks between steps. It requires `--experimental` and is mutually exclusive with `script`. Recipes may now also carry a top-level `$schema` field for editor validation, and two fixes land for case-insensitive `RuntimeEnv` lookups on Windows and for deletion-only patches being misdetected as already applied.
+
+
+
+### Added
+
+- Add experimental build steps by @baszalmstra in [#2646](https://github.com/prefix-dev/rattler-build/pull/2646)
+- Allow $schema top-level field in recipe.yaml by @bollwyvl in [#2645](https://github.com/prefix-dev/rattler-build/pull/2645)
+- Support steps in staging outputs by @baszalmstra in [#2647](https://github.com/prefix-dev/rattler-build/pull/2647)
+
+
+### Fixed
+
+- Ignore case when querying variables from `RuntimeEnv` on Windows by @paperchalice in [#2676](https://github.com/prefix-dev/rattler-build/pull/2676)
+- Deletion-only patches misdetected as already applied by @wolfv in [#2695](https://github.com/prefix-dev/rattler-build/pull/2695)
+
+
+### Refactor
+
+- Extract pure resolve_process_env by @baszalmstra in [#2677](https://github.com/prefix-dev/rattler-build/pull/2677)
+- Split process spawn from output handling by @baszalmstra in [#2690](https://github.com/prefix-dev/rattler-build/pull/2690)
+- Rename `NativeShellRunner` to `ShellDialect` by @baszalmstra in [#2692](https://github.com/prefix-dev/rattler-build/pull/2692)
+- Add an execution view for Directories by @baszalmstra in [#2694](https://github.com/prefix-dev/rattler-build/pull/2694)
+- Inject RuntimeEnv into script environment generation by @baszalmstra in [#2691](https://github.com/prefix-dev/rattler-build/pull/2691)
+
+
+### New Contributors
+* @paperchalice made their first contribution in [#2676](https://github.com/prefix-dev/rattler-build/pull/2676)
+
 ## [0.71.0] - 2026-07-27
 ### ✨ Highlights
 
