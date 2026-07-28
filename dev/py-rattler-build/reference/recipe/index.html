@@ -5963,7 +5963,8 @@ render configuration so that Jinja functions like <code>include()</code> and
 </span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">no_include_recipe</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
 </span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="n">exclude_newer</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
 </span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="n">env_isolation</span><span class="o">=</span><span class="n">EnvironmentIsolation</span><span class="o">.</span><span class="n">STRICT</span><span class="p">,</span>
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="p">)</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>    <span class="n">render_config</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="p">)</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">
@@ -6144,6 +6145,22 @@ Defaults to <code>&lt;recipe_dir&gt;/output</code>.</p>
             </td>
             <td>
                   <code><span title="rattler_build._rattler_build.EnvironmentIsolation.STRICT">STRICT</span></code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>render_config</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="&lt;code&gt;rattler_build.render.RenderConfig&lt;/code&gt;" href="../rendering/#rattler_build.RenderConfig">RenderConfig</a> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Optional RenderConfig to use when rendering before building.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
             </td>
           </tr>
       </tbody>
@@ -7275,7 +7292,7 @@ and all conditionals resolved.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Get the build script configuration.</p>
+        <p>Get the build script configuration, if this build uses script mode.</p>
 
     </div>
 
@@ -7924,7 +7941,7 @@ and all conditionals resolved.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Get the build script.</p>
+        <p>Get the build script, if this build uses script mode.</p>
 
     </div>
 
