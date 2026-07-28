@@ -6,6 +6,7 @@ use goblin::strtab::Strtab;
 use itertools::Itertools;
 use memmap2::MmapMut;
 use rattler_build_recipe::stage1::GlobVec;
+use rattler_conda_types::Platform;
 use scroll::Pwrite;
 use scroll::ctx::SizeWith;
 use std::collections::{HashMap, HashSet};
@@ -31,6 +32,27 @@ pub struct SharedObject {
     runpaths: Vec<String>,
     /// Whether the shared object is dynamically linked
     has_dynamic: bool,
+    /// Whether to record the search path as `DT_RUNPATH` instead of `DT_RPATH`.
+    ///
+    /// This is set for Android targets, whose dynamic linker never implemented
+    /// `DT_RPATH`: bionic handles `DT_RUNPATH` only, and warns about anything else
+    /// ("unused DT entry ... (ignoring)"). Writing `DT_RPATH` there leaves the binary
+    /// with no search path at all, which cannot be seen until it fails to load on a
+    /// device.
+    use_runpath: bool,
+}
+
+impl SharedObject {
+    /// Creates a new shared object relinker for a specific target platform.
+    ///
+    /// Prefer this over [`Relinker::new`] when the target platform is known, so that
+    /// Android binaries get `DT_RUNPATH` rather than a `DT_RPATH` their linker ignores.
+    pub fn new_for_platform(path: &Path, target_platform: Platform) -> Result<Self, RelinkError> {
+        Ok(Self {
+            use_runpath: target_platform.is_android(),
+            ..<Self as Relinker>::new(path)?
+        })
+    }
 }
 
 impl Relinker for SharedObject {
@@ -93,6 +115,7 @@ impl Relinker for SharedObject {
             rpaths: elf.rpaths.iter().map(|s| s.to_string()).collect(),
             runpaths: elf.runpaths.iter().map(|s| s.to_string()).collect(),
             has_dynamic: elf.dynamic.is_some(),
+            use_runpath: false,
         })
     }
 
@@ -262,8 +285,8 @@ impl Relinker for SharedObject {
         let _permission_guard = PermissionGuard::new(&self.path, READ_WRITE)?;
 
         // run builtin relink. if it fails, try patchelf
-        if builtin_relink(&self.path, &final_rpaths).is_err() {
-            call_patchelf(&self.path, &final_rpaths, system_tools)?;
+        if builtin_relink(&self.path, &final_rpaths, self.use_runpath).is_err() {
+            call_patchelf(&self.path, &final_rpaths, system_tools, self.use_runpath)?;
         }
 
         Ok(())
@@ -275,6 +298,7 @@ fn call_patchelf(
     elf_path: &Path,
     new_rpath: &[PathBuf],
     system_tools: &SystemTools,
+    use_runpath: bool,
 ) -> Result<(), RelinkError> {
     let new_rpath = new_rpath.iter().map(|p| p.to_string_lossy()).join(":");
 
@@ -291,7 +315,13 @@ fn call_patchelf(
     // `LD_LIBRARY_PATH`. This ensures that the libraries from the environment
     // are found first, providing better isolation and preventing potential
     // conflicts with system libraries.
-    cmd.arg("--force-rpath");
+    //
+    // Android is the exception: bionic ignores DT_RPATH entirely, so forcing it would
+    // leave the binary with no search path rather than a stricter one. patchelf writes
+    // DT_RUNPATH by default, which is what bionic reads.
+    if !use_runpath {
+        cmd.arg("--force-rpath");
+    }
 
     // set the new rpath
     cmd.arg("--set-rpath").arg(new_rpath).arg(elf_path);
@@ -325,12 +355,18 @@ fn get_context(object: &Elf) -> goblin::container::Ctx {
     goblin::container::Ctx { container, le }
 }
 
-/// To relink binaries we do the following operations:
+/// To relink binaries we do the following operations, where the *preferred* tag is
+/// `DT_RPATH`, or `DT_RUNPATH` when `use_runpath` is set (Android, whose linker ignores
+/// `DT_RPATH`):
 ///
-/// - if the binary has both, a RUNPATH and a RPATH, we delete the RUNPATH
-/// - if the binary has only a RUNPATH, we turn the RUNPATH into an RPATH
-/// - if the binary has only a RPATH, we just rewrite the RPATH
-fn builtin_relink(elf_path: &Path, new_rpath: &[PathBuf]) -> Result<(), RelinkError> {
+/// - if the binary has both, we keep the preferred one and empty out the other
+/// - if the binary has only the other one, we change its tag to the preferred one
+/// - if the binary has only the preferred one, we just rewrite its value
+fn builtin_relink(
+    elf_path: &Path,
+    new_rpath: &[PathBuf],
+    use_runpath: bool,
+) -> Result<(), RelinkError> {
     let new_rpath = new_rpath.iter().map(|p| p.to_string_lossy()).join(":");
 
     let file = std::fs::OpenOptions::new()
@@ -369,6 +405,21 @@ fn builtin_relink(elf_path: &Path, new_rpath: &[PathBuf]) -> Result<(), RelinkEr
         .iter()
         .any(|entry| entry.d_tag == goblin::elf::dynamic::DT_RUNPATH);
 
+    // Which tag we write, and which one we neutralise. Both are the same size, so
+    // swapping a tag never moves anything in the dynamic section.
+    let (preferred_tag, other_tag) = if use_runpath {
+        (
+            goblin::elf::dynamic::DT_RUNPATH,
+            goblin::elf::dynamic::DT_RPATH,
+        )
+    } else {
+        (
+            goblin::elf::dynamic::DT_RPATH,
+            goblin::elf::dynamic::DT_RUNPATH,
+        )
+    };
+    let has_preferred = if use_runpath { has_runpath } else { has_rpath };
+
     // fallback to patchelf if there is no rpath found
     if !has_rpath && !has_runpath {
         return Err(RelinkError::RpathNotFound);
@@ -401,21 +452,21 @@ fn builtin_relink(elf_path: &Path, new_rpath: &[PathBuf]) -> Result<(), RelinkEr
     let mut needs_rewrite = false;
 
     for entry in dynamic.dyns.iter() {
-        if entry.d_tag == goblin::elf::dynamic::DT_RPATH {
+        if entry.d_tag == preferred_tag {
             overwrite_strtab(&mut data_mut, entry.d_val as usize, &new_rpath)?;
             new_dynamic.push(entry.clone());
-        } else if entry.d_tag == goblin::elf::dynamic::DT_RUNPATH {
+        } else if entry.d_tag == other_tag {
             needs_rewrite = true;
-            if has_rpath {
+            if has_preferred {
                 // todo: clear value from strtab to avoid any mentions of placeholders in the binary
                 overwrite_strtab(&mut data_mut, entry.d_val as usize, "")?;
                 push_to_end.push(Dyn {
-                    d_tag: goblin::elf::dynamic::DT_RPATH,
+                    d_tag: preferred_tag,
                     d_val: entry.d_val,
                 });
             } else {
                 let mut new_entry = entry.clone();
-                new_entry.d_tag = goblin::elf::dynamic::DT_RPATH;
+                new_entry.d_tag = preferred_tag;
                 overwrite_strtab(&mut data_mut, entry.d_val as usize, &new_rpath)?;
                 new_dynamic.push(new_entry);
             }
@@ -593,6 +644,7 @@ mod test {
                 PathBuf::from("$ORIGIN/../lib"),
                 PathBuf::from("/usr/lib/custom_lib"),
             ],
+            false,
         )?;
 
         let object = SharedObject::new(&binary_path)?;
@@ -626,6 +678,7 @@ mod test {
                 PathBuf::from("$ORIGIN/../lib"),
                 PathBuf::from("/usr/lib/custom_lib"),
             ],
+            false,
         )?;
 
         let object = SharedObject::new(&binary_path)?;
@@ -636,6 +689,80 @@ mod test {
                 .iter()
                 .flat_map(|r| r.split(':'))
                 .collect::<Vec<&str>>()
+        );
+
+        Ok(())
+    }
+    /// Android's linker only reads DT_RUNPATH, so relinking for an Android target has to
+    /// convert an existing DT_RPATH rather than rewrite it in place. `zlink` has RPATH
+    /// and no RUNPATH, which is the case that used to silently produce a binary with no
+    /// usable search path at all on device.
+    #[test]
+    fn relink_builtin_android_converts_rpath_to_runpath() -> Result<(), RelinkError> {
+        let prefix = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/binary_files");
+        let tmp_dir = tempdir_in(&prefix)?;
+        let binary_path = tmp_dir.path().join("zlink");
+        fs::copy(prefix.join("zlink"), &binary_path)?;
+
+        let object = SharedObject::new(&binary_path)?;
+        assert!(object.runpaths.is_empty() && !object.rpaths.is_empty());
+
+        super::builtin_relink(&binary_path, &[PathBuf::from("$ORIGIN/../lib")], true)?;
+
+        let object = SharedObject::new(&binary_path)?;
+        assert_eq!(
+            vec!["$ORIGIN/../lib"],
+            object
+                .runpaths
+                .iter()
+                .flat_map(|r| r.split(':'))
+                .collect::<Vec<&str>>()
+        );
+        assert!(
+            object.rpaths.iter().all(|r| r.is_empty()),
+            "DT_RPATH should be gone or empty, got {:?}",
+            object.rpaths
+        );
+
+        Ok(())
+    }
+
+    /// And a binary that already has DT_RUNPATH keeps it, with the new value.
+    #[test]
+    fn relink_builtin_android_keeps_runpath() -> Result<(), RelinkError> {
+        let prefix = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/binary_files");
+        let tmp_dir = tempdir_in(&prefix)?;
+        let binary_path = tmp_dir.path().join("zlink");
+        fs::copy(prefix.join("zlink-runpath"), &binary_path)?;
+
+        let object = SharedObject::new(&binary_path)?;
+        assert!(!object.runpaths.is_empty() && object.rpaths.is_empty());
+
+        super::builtin_relink(&binary_path, &[PathBuf::from("$ORIGIN/../lib")], true)?;
+
+        let object = SharedObject::new(&binary_path)?;
+        assert_eq!(
+            vec!["$ORIGIN/../lib"],
+            object
+                .runpaths
+                .iter()
+                .flat_map(|r| r.split(':'))
+                .collect::<Vec<&str>>()
+        );
+        assert!(object.rpaths.is_empty());
+
+        Ok(())
+    }
+
+    /// The choice is made from the target platform, not from the binary.
+    #[test]
+    fn new_for_platform_selects_the_dynamic_tag() -> Result<(), RelinkError> {
+        let prefix = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/binary_files");
+        let binary_path = prefix.join("zlink");
+
+        assert!(!SharedObject::new_for_platform(&binary_path, Platform::LinuxAarch64)?.use_runpath);
+        assert!(
+            SharedObject::new_for_platform(&binary_path, Platform::AndroidAarch64)?.use_runpath
         );
 
         Ok(())
