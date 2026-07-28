@@ -26,6 +26,8 @@ mod execution_context;
 #[cfg(feature = "execution")]
 mod interpreter;
 #[cfg(feature = "execution")]
+pub mod runner;
+#[cfg(feature = "execution")]
 mod runtime;
 #[cfg(feature = "execution")]
 mod shell_dialect;
