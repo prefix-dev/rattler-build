@@ -63,7 +63,7 @@ impl RuntimeEnv {
     pub fn current() -> Self {
         let current_platform = Platform::current();
         let mut runtime_env = Self {
-            env: EnvironmentVariables::new(current_platform.is_windows()), // std::env::vars().collect(),
+            env: EnvironmentVariables::new(current_platform.is_windows()),
             process_platform: current_platform,
         };
         for (name, value) in std::env::vars() {
