@@ -20,7 +20,7 @@ pub struct JinjaTemplate {
 impl JinjaTemplate {
     /// Create a new JinjaTemplate, validating that it parses correctly
     pub fn new(source: String) -> Result<Self, String> {
-        let variables = extract_variables_from_template(&source)
+        let variables = catch_minijinja_panic(|| extract_variables_from_template(&source))
             .map_err(|e| format!("Failed to parse Jinja template: {}", e))?;
         Ok(Self { source, variables })
     }
@@ -78,8 +78,9 @@ pub struct JinjaExpression {
 impl JinjaExpression {
     /// Create a new JinjaExpression, validating that it parses correctly
     pub fn new(source: String) -> Result<Self, String> {
-        let variables = extract_variables_from_expression_checked(&source)
-            .map_err(|e| format!("Failed to parse Jinja expression: {}", e))?;
+        let variables =
+            catch_minijinja_panic(|| extract_variables_from_expression_checked(&source))
+                .map_err(|e| format!("Failed to parse Jinja expression: {}", e))?;
         Ok(Self { source, variables })
     }
 
@@ -117,6 +118,30 @@ impl<'de> Deserialize<'de> for JinjaExpression {
     {
         let source = String::deserialize(deserializer)?;
         JinjaExpression::new(source).map_err(serde::de::Error::custom)
+    }
+}
+
+fn catch_minijinja_panic<T>(
+    f: impl FnOnce() -> Result<T, minijinja::Error>,
+) -> Result<T, minijinja::Error> {
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(f)).unwrap_or_else(|payload| {
+        Err(minijinja::Error::new(
+            minijinja::ErrorKind::SyntaxError,
+            format!(
+                "failed to parse Jinja without panicking: {}",
+                panic_payload_message(payload.as_ref())
+            ),
+        ))
+    })
+}
+
+fn panic_payload_message(payload: &(dyn std::any::Any + Send)) -> String {
+    if let Some(message) = payload.downcast_ref::<&'static str>() {
+        (*message).to_string()
+    } else if let Some(message) = payload.downcast_ref::<String>() {
+        message.clone()
+    } else {
+        "unknown panic".to_string()
     }
 }
 
@@ -484,6 +509,14 @@ mod tests {
     fn test_expression_simple() {
         let expr = JinjaExpression::new("linux".to_string()).unwrap();
         assert_eq!(expr.used_variables(), &["linux"]);
+    }
+
+    #[test]
+    fn test_expression_malformed_errors_without_panic() {
+        let err = JinjaExpression::new("target_platform }}".to_string())
+            .expect_err("malformed expression should return an error");
+
+        assert!(err.contains("Failed to parse Jinja expression"), "{err}");
     }
 
     #[test]

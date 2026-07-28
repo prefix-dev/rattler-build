@@ -197,6 +197,7 @@ impl Script {
             && self.interpreter.is_none()
             && self.env.is_empty()
             && self.secrets.is_empty()
+            && self.cwd.is_none()
     }
 }
 

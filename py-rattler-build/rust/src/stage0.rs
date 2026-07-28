@@ -463,14 +463,32 @@ impl PyStage0Build {
         }
     }
 
-    /// Get the build script configuration
+    /// Get the build script configuration, if this build uses script mode.
     #[getter]
-    fn script(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let json_value =
-            serde_json::to_value(&self.inner.script).map_err(RattlerBuildError::from)?;
-        pythonize::pythonize(py, &json_value)
-            .map(|obj| obj.into())
-            .map_err(|e| RattlerBuildError::RecipeParse(format!("{}", e)).into())
+    fn script(&self, py: Python<'_>) -> PyResult<Option<Py<PyAny>>> {
+        match self.inner.plan.script() {
+            Some(script) => {
+                let json_value = serde_json::to_value(script).map_err(RattlerBuildError::from)?;
+                let py_value = pythonize::pythonize(py, &json_value)
+                    .map_err(|e| RattlerBuildError::RecipeParse(format!("{}", e)))?;
+                Ok(Some(py_value.into()))
+            }
+            None => Ok(None),
+        }
+    }
+
+    /// Get the build steps, if this build uses steps mode.
+    #[getter]
+    fn steps(&self, py: Python<'_>) -> PyResult<Option<Py<PyAny>>> {
+        match self.inner.plan.steps() {
+            Some(steps) => {
+                let json_value = serde_json::to_value(steps).map_err(RattlerBuildError::from)?;
+                let py_value = pythonize::pythonize(py, &json_value)
+                    .map_err(|e| RattlerBuildError::RecipeParse(format!("{}", e)))?;
+                Ok(Some(py_value.into()))
+            }
+            None => Ok(None),
+        }
     }
 
     /// Get the noarch type (may be a template or None)

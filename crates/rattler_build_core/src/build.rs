@@ -184,8 +184,19 @@ pub async fn run_build(
             }
         });
 
+    let interpreter_field = if output.recipe.build().plan.steps().is_some() {
+        "build.steps[].interpreter"
+    } else {
+        "build.script.interpreter"
+    };
+
     match output.run_build_script().await {
         Ok(_) => {}
+        Err(InterpreterError::ExecutionFailed(err))
+            if err.kind() == std::io::ErrorKind::InvalidInput =>
+        {
+            return Err(miette::miette!("{err}"));
+        }
         Err(InterpreterError::ExecutionFailed(_)) => {
             return Err(miette::miette!("Script failed to execute"));
         }
@@ -210,10 +221,10 @@ pub async fn run_build(
                 match rattler_build_script::closest_interpreter(&interpreter) {
                     Some(suggestion) => miette::miette!(
                         help = format!("Did you mean `{suggestion}`?"),
-                        "unsupported interpreter `{interpreter}` in `build.script.interpreter`"
+                        "unsupported interpreter `{interpreter}` in `{interpreter_field}`"
                     ),
                     None => miette::miette!(
-                        "unsupported interpreter `{interpreter}` in `build.script.interpreter`"
+                        "unsupported interpreter `{interpreter}` in `{interpreter_field}`"
                     ),
                 },
             );

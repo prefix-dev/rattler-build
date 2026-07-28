@@ -591,14 +591,14 @@ with the following fields (all optional):
   the rendered recipe. The variables must already be set in the environment
   running `rattler-build`.
 - **`interpreter`** - Explicit interpreter to run `content` with. Supported
-  values are `bash` (default on Unix), `cmd.exe` (default on Windows),
+  values are `bash` (default on Unix), `cmd` (Windows `cmd.exe`),
   `powershell`, `nu` (nushell), `brush`, `python`, `perl`, `rscript`, `ruby`
   and `node`/`nodejs`. When unset, the interpreter is auto-detected from the
   script's file extension (`.sh`/`.bash`, `.bat`/`.cmd`, `.ps1`, `.nu`, `.py`,
   `.pl`, `.r`, `.rb`, `.js`).
-- **`cwd`** - Working directory for the script, relative to the
-  `[build folder]/work` directory. Defaults to the `[build folder]/work`
-  directory itself.
+- **`cwd`** - Working directory for the script. Relative paths are resolved
+  against the host prefix (`$PREFIX` / `%PREFIX%`). Defaults to the build work
+  directory.
 
 !!! note "Where interpreters come from"
 
@@ -617,7 +617,7 @@ with the following fields (all optional):
     (`build.merge_build_and_host_envs`), that single environment is used.
 
     Two interpreters are resolved differently:
-     - `bash`/`cmd.exe` (and `powershell` on Windows) may be taken from the
+     - `bash`/`cmd` (and `powershell` on Windows) may be taken from the
        system `PATH` on their native platform.
      - `brush` is resolved **only** from the build environment (not the host
        prefix or the system `PATH`), so it must be in `requirements.build`.
@@ -667,6 +667,40 @@ requirements:
   build:
     - nushell
 ```
+
+#### Build steps (experimental)
+
+`build.steps` is an experimental alternative to `build.script` and requires
+`--experimental`. `script` and `steps` are mutually exclusive, including
+`steps: []`.
+
+Each step is a scoped build-wrapper section. Step-local `env` values and `cwd`
+changes apply only to that step. A step supports:
+
+- **`run`** - Required inline command, multiline string, or list of commands.
+- **`if`** - Optional Jinja selector expression evaluated before the step runs. Do not wrap expressions in `${{ }}`.
+- **`interpreter`** - Optional interpreter override for this step.
+- **`cwd`** - Optional working directory for this step. Relative paths are
+  resolved against the host prefix (`$PREFIX` / `%PREFIX%`).
+- **`env`** - Optional environment variables scoped to this step.
+
+```yaml title="recipe.yaml"
+build:
+  steps:
+    - if: unix
+      run:
+        - mkdir -p "$PREFIX/bin"
+        - cp "$RECIPE_DIR/tool" "$PREFIX/bin/tool"
+
+    - run: python -m pip install . --no-deps
+      env:
+        SETUPTOOLS_SCM_PRETEND_VERSION: ${{ version }}
+```
+
+!!! warning "Windows multiline steps"
+    On Windows, a multiline `run: |` block is emitted as one command-list item.
+    Fail-fast guards are inserted between list items, not between the physical
+    lines inside one multiline scalar.
 
 See [Build script](../build_script.md) for more examples and the full
 behaviour of environment variables, secrets, and interpreters.

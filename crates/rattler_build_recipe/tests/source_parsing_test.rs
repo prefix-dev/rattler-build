@@ -586,7 +586,9 @@ fn test_parse_nested_conditionals() {
     // The script should have 2 top-level items (unix and win conditionals)
     let script_content = recipe
         .build
-        .script
+        .plan
+        .script()
+        .expect("script mode")
         .content
         .as_ref()
         .expect("Script content should exist");

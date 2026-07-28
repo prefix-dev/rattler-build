@@ -1,6 +1,9 @@
 //! Stage 1 Build - evaluated build configuration with concrete values
+use std::path::PathBuf;
+
+use indexmap::IndexMap;
 use rattler_build_jinja::Variable;
-use rattler_build_script::Script;
+use rattler_build_script::{Script, ScriptContent};
 use rattler_build_yaml_parser::ParseError;
 use rattler_conda_types::{Flag, NoArchType, package::EntryPoint};
 use serde::{Deserialize, Serialize};
@@ -164,6 +167,130 @@ impl AsRef<str> for BuildString {
     }
 }
 
+/// The evaluated `run` payload for a build step.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum StepRun {
+    /// Multiple commands, joined by the selected interpreter.
+    Commands(Vec<String>),
+    /// A single inline script body.
+    Command(String),
+}
+
+impl Default for StepRun {
+    fn default() -> Self {
+        Self::Commands(Vec::new())
+    }
+}
+
+impl From<StepRun> for ScriptContent {
+    fn from(value: StepRun) -> Self {
+        match value {
+            StepRun::Commands(commands) => Self::Commands(commands),
+            StepRun::Command(command) => Self::Command(command),
+        }
+    }
+}
+
+impl From<&ScriptContent> for StepRun {
+    fn from(value: &ScriptContent) -> Self {
+        match value {
+            ScriptContent::Commands(commands) => Self::Commands(commands.clone()),
+            ScriptContent::Command(command) | ScriptContent::CommandOrPath(command) => {
+                Self::Command(command.clone())
+            }
+            ScriptContent::Path(path) => Self::Command(path.to_string_lossy().into_owned()),
+            ScriptContent::Default => Self::Commands(Vec::new()),
+        }
+    }
+}
+
+/// A stage1 build step with evaluated metadata and script content.
+///
+/// This is deliberately separate from [`Script`]: rendered recipes use
+/// `build.steps[].run`, while `build.script` uses the normal script syntax.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Step {
+    /// Script content to execute for this step.
+    pub run: StepRun,
+    /// Optional interpreter override for this step.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub interpreter: Option<String>,
+    /// Environment variables scoped to this step only.
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
+    pub env: IndexMap<String, String>,
+    /// Optional working directory for this step, relative to the host prefix.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cwd: Option<PathBuf>,
+}
+
+impl Step {
+    /// Create a step from an evaluated script payload.
+    pub fn new(script: Script) -> Self {
+        Self {
+            run: StepRun::from(&script.content),
+            interpreter: script.interpreter,
+            env: script.env,
+            cwd: script.cwd,
+        }
+    }
+
+    /// Convert this step into the script representation used by the executor.
+    pub fn to_script(&self) -> Script {
+        Script {
+            interpreter: self.interpreter.clone(),
+            env: self.env.clone(),
+            secrets: Vec::new(),
+            content: self.run.clone().into(),
+            cwd: self.cwd.clone(),
+            content_explicit: false,
+        }
+    }
+}
+
+/// The executable build plan: either a single legacy script, or explicit
+/// ordered build steps.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BuildPlan {
+    /// Legacy `build.script` mode. `Script::default()` preserves default
+    /// `build.sh` / `build.bat` discovery.
+    Script(Script),
+    /// Explicit `build.steps` mode. An empty vector is meaningful: it disables
+    /// legacy default script discovery.
+    Steps(Vec<Step>),
+}
+
+impl Default for BuildPlan {
+    fn default() -> Self {
+        Self::Script(Script::default())
+    }
+}
+
+impl BuildPlan {
+    /// Returns true if this is the default script-discovery plan.
+    pub fn is_default(&self) -> bool {
+        matches!(self, Self::Script(script) if script.is_default())
+    }
+
+    /// Returns the script in legacy script mode.
+    pub fn script(&self) -> Option<&Script> {
+        match self {
+            Self::Script(script) => Some(script),
+            Self::Steps(_) => None,
+        }
+    }
+
+    /// Returns the steps in explicit steps mode.
+    pub fn steps(&self) -> Option<&[Step]> {
+        match self {
+            Self::Script(_) => None,
+            Self::Steps(steps) => Some(steps.as_slice()),
+        }
+    }
+}
+
 /// Variant key usage configuration (evaluated)
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct VariantKeyUsage {
@@ -277,6 +404,7 @@ impl<'de> serde::Deserialize<'de> for PostProcess {
         D: serde::Deserializer<'de>,
     {
         #[derive(Deserialize)]
+        #[serde(deny_unknown_fields)]
         struct PostProcessHelper {
             files: GlobVec,
             regex: String,
@@ -296,6 +424,7 @@ impl<'de> serde::Deserialize<'de> for PostProcess {
 
 /// Evaluated build configuration with all templates and conditionals resolved
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(try_from = "BuildDeserialize")]
 pub struct Build {
     /// Build number (increments with each rebuild)
     /// None means inherit from top-level, Some(n) means use n (even if n is 0)
@@ -307,9 +436,9 @@ pub struct Build {
     #[serde(default)]
     pub string: BuildString,
 
-    /// Build script - contains script content, interpreter, environment variables, etc.
-    #[serde(default, skip_serializing_if = "Script::is_default")]
-    pub script: Script,
+    /// Executable build plan: either a single legacy script or explicit steps.
+    #[serde(default, flatten, skip_serializing_if = "BuildPlan::is_default")]
+    pub plan: BuildPlan,
 
     /// Noarch type - "python" or "generic" if set
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -360,6 +489,105 @@ pub struct Build {
     /// Post-processing operations
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub post_process: Vec<PostProcess>,
+}
+
+#[derive(Default)]
+enum PresentField<T> {
+    #[default]
+    Missing,
+    Present(T),
+}
+
+impl<'de, T> Deserialize<'de> for PresentField<T>
+where
+    T: serde::de::DeserializeOwned,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        use serde::de::Error as _;
+
+        let value = serde_yaml::Value::deserialize(deserializer)?;
+        if value.is_null() {
+            return Err(D::Error::custom("null is not a valid value for this field"));
+        }
+        T::deserialize(value)
+            .map(Self::Present)
+            .map_err(D::Error::custom)
+    }
+}
+
+#[derive(Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct BuildDeserialize {
+    #[serde(default)]
+    number: Option<u64>,
+    #[serde(default)]
+    string: BuildString,
+    #[serde(default)]
+    script: PresentField<Script>,
+    #[serde(default)]
+    steps: PresentField<Vec<Step>>,
+    #[serde(default)]
+    noarch: Option<NoArchType>,
+    #[serde(default)]
+    flags: Vec<Flag>,
+    #[serde(default)]
+    python: PythonBuild,
+    #[serde(default)]
+    skip: bool,
+    #[serde(default)]
+    always_copy_files: GlobVec,
+    #[serde(default)]
+    always_include_files: GlobVec,
+    #[serde(default)]
+    merge_build_and_host_envs: bool,
+    #[serde(default)]
+    files: GlobVec,
+    #[serde(default)]
+    dynamic_linking: DynamicLinking,
+    #[serde(default)]
+    variant: VariantKeyUsage,
+    #[serde(default)]
+    prefix_detection: PrefixDetection,
+    #[serde(default)]
+    post_process: Vec<PostProcess>,
+}
+
+impl TryFrom<BuildDeserialize> for Build {
+    type Error = String;
+
+    fn try_from(raw: BuildDeserialize) -> Result<Self, Self::Error> {
+        let plan = match (raw.script, raw.steps) {
+            (PresentField::Present(_), PresentField::Present(_)) => {
+                return Err(
+                    "`script` and `steps` are mutually exclusive; use one or the other".to_string(),
+                );
+            }
+            (PresentField::Missing, PresentField::Present(steps)) => BuildPlan::Steps(steps),
+            (PresentField::Present(script), PresentField::Missing) => BuildPlan::Script(script),
+            (PresentField::Missing, PresentField::Missing) => BuildPlan::Script(Script::default()),
+        };
+
+        Ok(Self {
+            number: raw.number,
+            string: raw.string,
+            plan,
+            noarch: raw.noarch,
+            flags: raw.flags,
+            python: raw.python,
+            skip: raw.skip,
+            always_copy_files: raw.always_copy_files,
+            always_include_files: raw.always_include_files,
+            merge_build_and_host_envs: raw.merge_build_and_host_envs,
+            files: raw.files,
+            dynamic_linking: raw.dynamic_linking,
+            variant: raw.variant,
+            prefix_detection: raw.prefix_detection,
+            post_process: raw.post_process,
+        })
+    }
 }
 
 /// Dynamic linking configuration
@@ -506,7 +734,7 @@ impl Build {
     pub fn is_default(&self) -> bool {
         self.number.is_none()
             && matches!(self.string, BuildString::Default)
-            && self.script.is_default()
+            && self.plan.is_default()
             && self.noarch.is_none()
             && self.flags.is_empty()
             && self.python.entry_points.is_empty()
@@ -559,17 +787,150 @@ mod tests {
         use rattler_build_script::ScriptContent;
 
         let build = Build {
-            script: Script {
+            plan: BuildPlan::Script(Script {
                 content: ScriptContent::Commands(vec![
                     "echo hello".to_string(),
                     "make install".to_string(),
                 ]),
                 ..Default::default()
-            },
+            }),
             ..Default::default()
         };
 
         assert!(!build.is_default());
-        assert!(!build.script.is_default());
+        assert!(!build.plan.is_default());
+    }
+
+    #[test]
+    fn test_build_with_steps_is_not_default_and_serializes_steps() {
+        use rattler_build_script::ScriptContent;
+
+        let build = Build {
+            plan: BuildPlan::Steps(vec![Step::new(Script {
+                interpreter: Some("bash".to_string()),
+                env: [("FOO".to_string(), "bar".to_string())]
+                    .into_iter()
+                    .collect(),
+                content: ScriptContent::Commands(vec!["echo step".to_string()]),
+                cwd: Some("subdir".into()),
+                ..Default::default()
+            })]),
+            ..Default::default()
+        };
+
+        assert!(!build.is_default());
+        let yaml = serde_yaml::to_string(&build).unwrap();
+        assert!(yaml.contains("steps:"), "{yaml}");
+        assert!(yaml.contains("run:"), "{yaml}");
+        assert!(yaml.contains("echo step"), "{yaml}");
+        assert!(yaml.contains("interpreter: bash"), "{yaml}");
+        assert!(yaml.contains("cwd: subdir"), "{yaml}");
+        assert!(!yaml.contains("source_index"), "{yaml}");
+
+        let recipe_yaml = format!(
+            "package:\n  name: test-pkg\n  version: 1.0.0\nbuild:\n{}",
+            yaml.lines()
+                .map(|line| format!("  {line}\n"))
+                .collect::<String>()
+        );
+        let parsed = crate::stage0::parse_recipe_from_source(&recipe_yaml).unwrap();
+        assert_eq!(parsed.build.plan.steps().map(<[_]>::len), Some(1));
+
+        let roundtripped: Build = serde_yaml::from_str(&yaml).unwrap();
+        let steps = roundtripped.plan.steps().expect("steps mode");
+        assert_eq!(steps.len(), 1);
+        assert_eq!(
+            steps[0].run,
+            StepRun::Commands(vec!["echo step".to_string()])
+        );
+    }
+
+    #[test]
+    fn test_build_deserialize_rejects_unknown_step_fields() {
+        let yaml = r#"
+steps:
+  - if: win
+    run: echo windows
+"#;
+
+        let result = serde_yaml::from_str::<Build>(yaml);
+        assert!(
+            result.is_err(),
+            "expected unknown step fields to be rejected"
+        );
+        assert!(result.unwrap_err().to_string().contains("unknown field"));
+    }
+
+    #[test]
+    fn test_build_deserialize_rejects_unknown_build_fields() {
+        let result = serde_yaml::from_str::<Build>("unexpected: true\n");
+        assert!(
+            result.is_err(),
+            "expected unknown build fields to be rejected"
+        );
+        assert!(result.unwrap_err().to_string().contains("unknown field"));
+    }
+
+    #[test]
+    fn test_build_deserialize_rejects_unknown_post_process_fields() {
+        let yaml = r#"
+post_process:
+  - files:
+      - bin/*
+    regex: foo
+    replacement: bar
+    unexpected: true
+"#;
+
+        let result = serde_yaml::from_str::<Build>(yaml);
+        assert!(
+            result.is_err(),
+            "expected unknown post_process fields to be rejected"
+        );
+        assert!(result.unwrap_err().to_string().contains("unknown field"));
+    }
+
+    #[test]
+    fn test_build_deserialize_rejects_script_and_steps() {
+        let yaml = r#"
+script: echo script
+steps:
+  - run: echo step
+"#;
+
+        let result = serde_yaml::from_str::<Build>(yaml);
+        assert!(result.is_err(), "expected script+steps to be rejected");
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("mutually exclusive")
+        );
+    }
+
+    #[test]
+    fn test_build_deserialize_rejects_null_script_or_steps() {
+        for yaml in ["script:\n", "steps:\n", "script:\nsteps: []\n"] {
+            let result = serde_yaml::from_str::<Build>(yaml);
+            assert!(
+                result.is_err(),
+                "expected null script/steps to be rejected: {yaml:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_explicit_empty_steps_serializes_steps_mode() {
+        let build = Build {
+            plan: BuildPlan::Steps(Vec::new()),
+            ..Default::default()
+        };
+
+        assert!(!build.is_default());
+        let yaml = serde_yaml::to_string(&build).unwrap();
+        assert!(yaml.contains("steps: []"), "{yaml}");
+
+        let roundtripped: Build = serde_yaml::from_str(&yaml).unwrap();
+        assert_eq!(roundtripped.plan.steps().map(<[_]>::len), Some(0));
     }
 }
