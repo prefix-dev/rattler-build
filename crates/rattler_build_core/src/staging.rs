@@ -278,6 +278,13 @@ impl Output {
         let host_platform = self.host_platform().platform;
         let runtime = RuntimeEnv::current();
         let mut env_vars = env_vars::vars(self, "BUILD");
+        if let Some(host) = &finalized_dependencies.host {
+            env_vars.extend(env_vars::python_vars_from_records(
+                &host.resolved,
+                self.prefix(),
+                host_platform,
+            ));
+        }
         env_vars.extend(env_vars::os_vars(
             self.prefix(),
             &target_platform,

@@ -32,8 +32,16 @@ fn get_stdlib_dir(prefix: &Path, platform: Platform, py_ver: &str) -> PathBuf {
     }
 }
 
-fn get_sitepackages_dir(prefix: &Path, platform: Platform, py_ver: &str) -> PathBuf {
-    get_stdlib_dir(prefix, platform, py_ver).join("site-packages")
+fn get_sitepackages_dir(
+    prefix: &Path,
+    platform: Platform,
+    py_ver: &str,
+    python_site_packages_path: Option<&str>,
+) -> PathBuf {
+    python_site_packages_path.map_or_else(
+        || get_stdlib_dir(prefix, platform, py_ver).join("site-packages"),
+        |path| prefix.join(path),
+    )
 }
 
 /// Returns a map of environment variables for Python that are used in the build process.
@@ -58,17 +66,18 @@ pub fn python_vars(output: &Output) -> HashMap<String, Option<String>> {
     }
 
     // find python in the host dependencies
-    let mut python_version = output
+    let python_record = output
+        .find_resolved_package("python")
+        .map(|(record, _)| record);
+    let python_version = output
         .variant()
         .get(&"python".into())
-        .map(|s| s.to_string());
-    if python_version.is_none()
-        && let Some((record, _)) = output.find_resolved_package("python")
-    {
-        // Use the resolved python version even if it's a transitive dependency
-        // (e.g. pulled in by pip in noarch python packages)
-        python_version = Some(record.package_record.version.to_string());
-    }
+        .map(|s| s.to_string())
+        .or_else(|| {
+            // Use the resolved python version even if it's a transitive dependency
+            // (e.g. pulled in by pip in noarch python packages)
+            python_record.map(|record| record.package_record.version.to_string())
+        });
 
     if let Some(py_ver) = python_version {
         let py_ver: Vec<_> = py_ver.split('.').take(2).collect();
@@ -82,6 +91,8 @@ pub fn python_vars(output: &Output) -> HashMap<String, Option<String>> {
             output.prefix(),
             output.host_platform().platform,
             &py_ver_str,
+            python_record
+                .and_then(|record| record.package_record.python_site_packages_path.as_deref()),
         );
         let py3k = if py_ver[0] == "3" { "1" } else { "0" };
         insert!(result, "PY3K", py3k);
@@ -120,16 +131,24 @@ pub fn python_vars_from_records(
         insert!(result, "PYTHON", python.to_string_lossy());
     }
 
-    let python_version = records
+    let python_record = records
         .iter()
-        .find(|r| r.package_record.name.as_normalized() == "python")
-        .map(|r| r.package_record.version.to_string());
+        .find(|r| r.package_record.name.as_normalized() == "python");
 
-    if let Some(py_ver) = python_version {
+    if let Some(python_record) = python_record {
+        let py_ver = python_record.package_record.version.to_string();
         let py_ver: Vec<_> = py_ver.split('.').take(2).collect();
         let py_ver_str = py_ver.join(".");
         let stdlib_dir = get_stdlib_dir(prefix, platform, &py_ver_str);
-        let site_packages_dir = get_sitepackages_dir(prefix, platform, &py_ver_str);
+        let site_packages_dir = get_sitepackages_dir(
+            prefix,
+            platform,
+            &py_ver_str,
+            python_record
+                .package_record
+                .python_site_packages_path
+                .as_deref(),
+        );
         let py3k = if py_ver[0] == "3" { "1" } else { "0" };
         insert!(result, "PY3K", py3k);
         insert!(result, "PY_VER", py_ver_str);
@@ -529,6 +548,37 @@ pub fn env_vars_from_variant(
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[test]
+    fn python_vars_use_site_packages_path_from_repodata() {
+        use rattler_conda_types::{PackageName, PackageRecord, VersionWithSource};
+        use std::str::FromStr;
+        use url::Url;
+
+        let mut package_record = PackageRecord::new(
+            PackageName::from_str("python").unwrap(),
+            "3.13.1".parse::<VersionWithSource>().unwrap(),
+            "cp313t".to_string(),
+        );
+        package_record.python_site_packages_path =
+            Some("lib/python3.13t/site-packages".to_string());
+        let record = RepoDataRecord {
+            package_record,
+            identifier: "python-3.13.1-cp313t.conda".parse().unwrap(),
+            url: Url::parse("https://example.com/python-3.13.1-cp313t.conda").unwrap(),
+            channel: None,
+        };
+
+        let prefix = Path::new("prefix");
+        let vars = python_vars_from_records(&[record], prefix, Platform::Linux64);
+
+        assert_eq!(
+            vars.get("SP_DIR")
+                .and_then(|value| value.as_deref())
+                .map(Path::new),
+            Some(prefix.join("lib/python3.13t/site-packages").as_path())
+        );
+    }
 
     #[test]
     fn os_vars_uses_the_injected_runtime_environment() {
