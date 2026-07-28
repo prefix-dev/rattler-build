@@ -3,7 +3,7 @@
 //! This module maps recipe `interpreter` values and inferred file extensions to
 //! [`InterpreterInvocation`] implementations. It resolves interpreter executables
 //! with [`find_interpreter`] and reports failures through [`InterpreterError`].
-//! Native wrapper execution lives in `crate::native_runner`.
+//! Native wrapper execution lives in `crate::shell_dialect`.
 
 mod bash;
 mod brush;

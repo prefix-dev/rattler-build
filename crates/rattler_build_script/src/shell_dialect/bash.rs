@@ -4,12 +4,12 @@ use std::path::Path;
 use indexmap::IndexMap;
 use rattler_shell::shell::{self, Shell};
 
-use super::{CommandSpec, NativeShellRunner};
+use super::{CommandSpec, ShellDialect};
 use crate::{ExecutionContext, PrefixLayout};
 
-pub(crate) struct BashNativeRunner;
+pub(crate) struct BashDialect;
 
-impl NativeShellRunner for BashNativeRunner {
+impl ShellDialect for BashDialect {
     fn shell(&self) -> shell::ShellEnum {
         shell::Bash::default().into()
     }
