@@ -288,6 +288,7 @@ impl Output {
         // Run the build script
         let target_platform = self.build_configuration.target_platform;
         let host_platform = self.host_platform().platform;
+        let runtime = RuntimeEnv::current();
         let mut env_vars = env_vars::vars(self, "BUILD");
         env_vars.extend(env_vars::os_vars(
             self.prefix(),
@@ -296,6 +297,7 @@ impl Output {
             &self.build_configuration.build_platform.platform,
             self.build_configuration.env_isolation,
             &self.build_configuration.directories.work_dir,
+            &runtime,
         ));
         // Use the staging cache's own used_variant rather than the inheriting
         // output's: the staging cache is shared across all inheritors, and the
@@ -340,14 +342,14 @@ impl Output {
 
         let context = if staging.build.merge_build_and_host_envs {
             ExecutionContext::shared(
-                RuntimeEnv::current(),
+                runtime.clone(),
                 &self.build_configuration.directories.host_prefix,
                 self.build_configuration.build_platform.platform,
                 host_platform,
             )
         } else {
             ExecutionContext::separate(
-                RuntimeEnv::current(),
+                runtime.clone(),
                 &self.build_configuration.directories.build_prefix,
                 self.build_configuration.build_platform.platform,
                 &self.build_configuration.directories.host_prefix,

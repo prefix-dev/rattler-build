@@ -3,6 +3,7 @@ use std::{
     path::{Component::*, Path, Prefix::Disk},
 };
 
+use rattler_build_script::RuntimeEnv;
 use rattler_conda_types::Platform;
 use regex::Regex;
 
@@ -39,7 +40,10 @@ fn to_cygdrive(path: &Path) -> String {
     }
 }
 
-pub fn default_env_vars_target(prefix: &Path) -> HashMap<String, Option<String>> {
+pub fn default_env_vars_target(
+    prefix: &Path,
+    runtime: &RuntimeEnv,
+) -> HashMap<String, Option<String>> {
     let library_prefix = prefix.join("Library");
     let mut vars = HashMap::<String, Option<String>>::new();
     vars.insert(
@@ -68,8 +72,8 @@ pub fn default_env_vars_target(prefix: &Path) -> HashMap<String, Option<String>>
     // This adds the LIB and INCLUDE vars. It would not be entirely correct if someone
     // overwrites the LIBRARY_LIB or LIBRARY_INCLUDE variables from the variants.yaml
     // but I think for now this is fine.
-    let lib_var = std::env::var("LIB").ok().unwrap_or_default();
-    let include_var = std::env::var("INCLUDE").ok().unwrap_or_default();
+    let lib_var = runtime.var("LIB").unwrap_or_default();
+    let include_var = runtime.var("INCLUDE").unwrap_or_default();
     vars.insert(
         "LIB".to_string(),
         Some(format!("{};{}", library_lib.display(), lib_var)),
@@ -83,7 +87,10 @@ pub fn default_env_vars_target(prefix: &Path) -> HashMap<String, Option<String>>
     vars
 }
 
-pub fn default_env_vars_build(build_platform: &Platform) -> HashMap<String, Option<String>> {
+pub fn default_env_vars_build(
+    build_platform: &Platform,
+    runtime: &RuntimeEnv,
+) -> HashMap<String, Option<String>> {
     let mut vars = HashMap::<String, Option<String>>::new();
     let default_vars = vec![
         "ALLUSERSPROFILE",
@@ -121,7 +128,7 @@ pub fn default_env_vars_build(build_platform: &Platform) -> HashMap<String, Opti
     ];
 
     for var in default_vars {
-        vars.insert(var.to_string(), std::env::var(var).ok());
+        vars.insert(var.to_string(), runtime.var(var).map(str::to_owned));
     }
 
     // Do we need to get these from the variant configuration?
@@ -138,17 +145,20 @@ pub fn default_env_vars_build(build_platform: &Platform) -> HashMap<String, Opti
     vars.insert(
         "BUILD".to_string(),
         Some(
-            std::env::var("BUILD")
-                .unwrap_or_else(|_| format!("{}-pc-windows-{}", win_arch, win_msvc)),
+            runtime
+                .var("BUILD")
+                .map(str::to_owned)
+                .unwrap_or_else(|| format!("{}-pc-windows-{}", win_arch, win_msvc)),
         ),
     );
 
     let re_vs_comntools = Regex::new(r"^VS[0-9]{2,3}COMNTOOLS$").unwrap();
     let re_vs_installdir = Regex::new(r"^VS[0-9]{4}INSTALLDIR$").unwrap();
 
-    for (key, val) in std::env::vars() {
-        if re_vs_comntools.is_match(&key) || re_vs_installdir.is_match(&key) {
-            vars.insert(key, Some(val));
+    for (key, val) in runtime.vars() {
+        let normalized_key = key.to_ascii_uppercase();
+        if re_vs_comntools.is_match(&normalized_key) || re_vs_installdir.is_match(&normalized_key) {
+            vars.insert(key.to_owned(), Some(val.to_owned()));
         }
     }
 
@@ -157,6 +167,26 @@ pub fn default_env_vars_build(build_platform: &Platform) -> HashMap<String, Opti
 
 #[cfg(test)]
 mod test {
+    use super::*;
+
+    #[test]
+    fn build_vars_use_the_injected_runtime_environment() {
+        let runtime = RuntimeEnv::for_test(Platform::Win64)
+            .with_var("vs140comntools", "C:\\VS140")
+            .with_var("BUILD", "injected-build");
+        let vars = default_env_vars_build(&Platform::Win64, &runtime);
+
+        assert_eq!(
+            vars.get("vs140comntools")
+                .and_then(|value| value.as_deref()),
+            Some("C:\\VS140")
+        );
+        assert_eq!(
+            vars.get("BUILD").and_then(|value| value.as_deref()),
+            Some("injected-build")
+        );
+    }
+
     #[cfg(target_os = "windows")]
     #[test]
     fn test_cygdrive() {

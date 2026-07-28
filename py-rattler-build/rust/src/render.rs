@@ -82,6 +82,7 @@ impl PyRenderConfig {
             &build_platform,
             EnvironmentIsolation::default(),
             &std::path::PathBuf::new(),
+            &rattler_build::script::RuntimeEnv::current(),
         )
         .keys()
         .cloned()

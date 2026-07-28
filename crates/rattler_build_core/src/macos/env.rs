@@ -1,4 +1,5 @@
 //! macOS specific environment variables
+use rattler_build_script::RuntimeEnv;
 use rattler_conda_types::Platform;
 use std::{collections::HashMap, path::Path};
 
@@ -8,8 +9,9 @@ use crate::unix;
 pub fn default_env_vars_target(
     prefix: &Path,
     target_platform: &Platform,
+    runtime: &RuntimeEnv,
 ) -> HashMap<String, Option<String>> {
-    let mut vars = unix::env::default_env_vars_target(prefix);
+    let mut vars = unix::env::default_env_vars_target(prefix, runtime);
     let arch = target_platform
         .arch()
         .expect("arch missing on target_platform")

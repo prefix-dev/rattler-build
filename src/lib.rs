@@ -397,6 +397,7 @@ pub async fn get_build_output(
         &build_data.build_platform,
         build_data.env_isolation,
         &std::path::PathBuf::new(),
+        &crate::script::RuntimeEnv::current(),
     )
     .keys()
     .cloned()

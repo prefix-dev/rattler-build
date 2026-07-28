@@ -45,16 +45,17 @@ impl Output {
                 "`build.steps` is an experimental feature: provide the `--experimental` flag to enable it",
             ));
         }
+        let runtime = RuntimeEnv::current();
         let context = if build.merge_build_and_host_envs {
             ExecutionContext::shared(
-                RuntimeEnv::current(),
+                runtime.clone(),
                 &host_prefix,
                 self.build_configuration.build_platform.platform,
                 host_platform,
             )
         } else {
             ExecutionContext::separate(
-                RuntimeEnv::current(),
+                runtime.clone(),
                 &self.build_configuration.directories.build_prefix,
                 self.build_configuration.build_platform.platform,
                 &host_prefix,
@@ -70,6 +71,7 @@ impl Output {
             &self.build_configuration.build_platform.platform,
             env_isolation,
             &self.build_configuration.directories.work_dir,
+            context.runtime(),
         ));
         env_vars.extend(env_vars::env_vars_from_variant(self.variant()));
         if let Some(architecture) = context.windows_processor_architecture() {
