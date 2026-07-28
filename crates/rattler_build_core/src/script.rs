@@ -3,9 +3,14 @@
 //! This module provides integration between Rattler-Build and the rattler_build_script crate,
 //! specifically handling the execution of build scripts within the Output context.
 
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
+
 use indexmap::IndexMap;
 use minijinja::Value;
-use rattler_build_jinja::Jinja;
+use rattler_build_jinja::{Jinja, JinjaConfig, Variable};
 
 // Re-export from rattler_build_script
 pub use rattler_build_script::{
@@ -14,11 +19,119 @@ pub use rattler_build_script::{
     platform_script_extensions,
 };
 
-use crate::{
-    env_vars::{self},
-    metadata::Output,
-};
+use crate::{env_vars, metadata::Output};
 use rattler_build_recipe::stage1::build::BuildPlan;
+
+/// Prepare execution arguments for a stage1 build plan.
+///
+/// Package outputs and staging outputs intentionally share this implementation
+/// so `build.script` and `build.steps` resolve content, env, cwd, secrets, and
+/// labels the same way in both places.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn prepare_build_plan_execution_args(
+    plan: &BuildPlan,
+    recipe_context: &IndexMap<String, Variable>,
+    selector_config: JinjaConfig,
+    mut env_vars: HashMap<String, Option<String>>,
+    work_dir: PathBuf,
+    recipe_dir: &Path,
+    context: ExecutionContext,
+    sandbox_config: Option<SandboxConfiguration>,
+    env_isolation: rattler_build_script::EnvironmentIsolation,
+    experimental: bool,
+) -> Result<ExecutionArgs, std::io::Error> {
+    if matches!(plan, BuildPlan::Steps(_)) && !experimental {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "`build.steps` is an experimental feature: provide the `--experimental` flag to enable it",
+        ));
+    }
+
+    if let Some(architecture) = context.windows_processor_architecture() {
+        env_vars.insert(
+            "PROCESSOR_ARCHITECTURE".to_string(),
+            Some(architecture.to_string()),
+        );
+    }
+    if let Some(wow64_architecture) = context.windows_processor_architecture_w6432() {
+        env_vars.insert(
+            "PROCESSOR_ARCHITEW6432".to_string(),
+            Some(wow64_architecture.unwrap_or_default().to_string()),
+        );
+    }
+
+    let mut env_vars: IndexMap<String, String> = env_vars
+        .into_iter()
+        .filter_map(|(key, value)| value.map(|value| (key, value)))
+        .collect();
+    if let BuildPlan::Script(script) = plan {
+        env_vars.extend(script.env().clone());
+    }
+
+    let scripts: Vec<(Script, Option<usize>)> = match plan {
+        BuildPlan::Steps(steps) => steps
+            .iter()
+            .enumerate()
+            .map(|(index, step)| (step.to_script(), Some(index)))
+            .collect(),
+        BuildPlan::Script(script) => vec![(script.clone(), None)],
+    };
+
+    let mut secrets = IndexMap::new();
+    let mut sections = Vec::with_capacity(scripts.len());
+    for (script, step_index) in scripts {
+        let mut section_jinja = Jinja::new(selector_config.clone()).with_context(recipe_context);
+        for (key, value) in env_vars.iter().chain(script.env()) {
+            section_jinja
+                .context_mut()
+                .insert(key.clone(), Value::from_safe_string(value.clone()));
+        }
+        let section_jinja_renderer = |template: &str| {
+            section_jinja
+                .render_str(template)
+                .map_err(|error| error.to_string())
+        };
+        let content = script.resolve_content(
+            recipe_dir,
+            Some(&section_jinja_renderer),
+            platform_script_extensions(),
+        )?;
+
+        for name in script.secrets() {
+            if let Some(value) = context.runtime().var(name) {
+                secrets.insert(name.to_string(), value.to_string());
+            } else {
+                tracing::warn!("Secret {} not found in environment", name);
+            }
+        }
+
+        let cwd = script
+            .cwd
+            .as_ref()
+            .map(|cwd| context.host().path().join(cwd));
+        sections.push(BuildScriptSection {
+            interpreter: script.interpreter.clone(),
+            content,
+            env: if step_index.is_some() {
+                script.env().clone()
+            } else {
+                Default::default()
+            },
+            cwd,
+            label: step_index.map(|index| format!("step {index}")),
+        });
+    }
+
+    Ok(ExecutionArgs {
+        sections,
+        env_vars,
+        secrets,
+        context,
+        work_dir,
+        sandbox_config,
+        env_isolation,
+    })
+}
 
 impl Output {
     /// Helper function to get a jinja renderer for the output's recipe context.
@@ -39,12 +152,6 @@ impl Output {
         let host_platform = self.host_platform().platform;
         let env_isolation = self.build_configuration.env_isolation;
         let build = self.recipe.build();
-        if matches!(&build.plan, BuildPlan::Steps(_)) && !self.build_configuration.experimental {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
-                "`build.steps` is an experimental feature: provide the `--experimental` flag to enable it",
-            ));
-        }
         let runtime = RuntimeEnv::current();
         let context = if build.merge_build_and_host_envs {
             ExecutionContext::shared(
@@ -74,94 +181,18 @@ impl Output {
             context.runtime(),
         ));
         env_vars.extend(env_vars::env_vars_from_variant(self.variant()));
-        if let Some(architecture) = context.windows_processor_architecture() {
-            env_vars.insert(
-                "PROCESSOR_ARCHITECTURE".to_string(),
-                Some(architecture.to_string()),
-            );
-        }
-        if let Some(wow64_architecture) = context.windows_processor_architecture_w6432() {
-            env_vars.insert(
-                "PROCESSOR_ARCHITEW6432".to_string(),
-                Some(wow64_architecture.unwrap_or_default().to_string()),
-            );
-        }
-
-        let mut env_vars: IndexMap<String, String> = env_vars
-            .into_iter()
-            .filter_map(|(k, v)| v.map(|v| (k, v)))
-            .collect();
-        if let BuildPlan::Script(script) = &build.plan {
-            env_vars.extend(script.env().clone());
-        }
-
-        let recipe_dir = &self.build_configuration.directories.recipe_dir;
-        let scripts: Vec<(Script, Option<usize>)> = match &build.plan {
-            BuildPlan::Steps(steps) => steps
-                .iter()
-                .enumerate()
-                .map(|(index, step)| (step.to_script(), Some(index)))
-                .collect(),
-            BuildPlan::Script(script) => vec![(script.clone(), None)],
-        };
-
-        let mut secrets = IndexMap::new();
-        let work_dir = self.build_configuration.directories.work_dir.clone();
-        let mut sections = Vec::with_capacity(scripts.len());
-
-        for (script, step_index) in scripts {
-            let mut section_jinja = Jinja::new(self.build_configuration.selector_config())
-                .with_context(&self.recipe.context);
-            for (key, value) in env_vars.iter().chain(script.env()) {
-                section_jinja
-                    .context_mut()
-                    .insert(key.clone(), Value::from_safe_string(value.clone()));
-            }
-            let section_jinja_renderer = |template: &str| {
-                section_jinja
-                    .render_str(template)
-                    .map_err(|err| err.to_string())
-            };
-            let content = script.resolve_content(
-                recipe_dir,
-                Some(&section_jinja_renderer),
-                platform_script_extensions(),
-            )?;
-
-            for name in script.secrets() {
-                if let Some(value) = context.runtime().var(name) {
-                    secrets.insert(name.to_string(), value.to_string());
-                } else {
-                    tracing::warn!("Secret {} not found in environment", name);
-                }
-            }
-
-            let cwd = script
-                .cwd
-                .as_ref()
-                .map(|cwd| context.host().path().join(cwd));
-            sections.push(BuildScriptSection {
-                interpreter: script.interpreter.clone(),
-                content,
-                env: if step_index.is_some() {
-                    script.env().clone()
-                } else {
-                    Default::default()
-                },
-                cwd,
-                label: step_index.map(|index| format!("step {index}")),
-            });
-        }
-
-        Ok(ExecutionArgs {
-            sections,
+        prepare_build_plan_execution_args(
+            &build.plan,
+            &self.recipe.context,
+            self.build_configuration.selector_config(),
             env_vars,
-            secrets,
+            self.build_configuration.directories.work_dir.clone(),
+            &self.build_configuration.directories.recipe_dir,
             context,
-            work_dir,
-            sandbox_config: self.build_configuration.sandbox_config().cloned(),
+            self.build_configuration.sandbox_config().cloned(),
             env_isolation,
-        })
+            self.build_configuration.experimental,
+        )
     }
 
     /// Run the build script for the output as defined in the recipe's build section.

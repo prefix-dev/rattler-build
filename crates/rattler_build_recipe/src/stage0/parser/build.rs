@@ -375,7 +375,7 @@ fn parse_env_key(field_name: &str, key_node: &MarkedScalarNode) -> Result<String
 
 /// Parse build files field - can be a list or include/exclude mapping
 /// Parse the `build.steps` list into an ordered list of [`Step`]s.
-fn parse_steps(node: &Node) -> Result<Vec<Step>, ParseError> {
+pub(crate) fn parse_steps(node: &Node) -> Result<Vec<Step>, ParseError> {
     let sequence = node.as_sequence().ok_or_else(|| {
         ParseError::expected_type("sequence", "non-sequence", get_span(node))
             .with_message("Expected 'steps' to be a list of steps")
@@ -518,6 +518,47 @@ fn parse_step_content(node: &Node) -> Result<ConditionalList<String>, ParseError
     )
 }
 
+pub(crate) fn parse_build_plan_key(
+    plan: &mut BuildPlan,
+    key: &str,
+    value_node: &Node,
+    key_span: marked_yaml::Span,
+    script_seen: &mut bool,
+    steps_span: &mut Option<marked_yaml::Span>,
+) -> Result<bool, ParseError> {
+    match key {
+        "script" => {
+            *script_seen = true;
+            *plan = BuildPlan::Script(Box::new(parse_script(value_node)?));
+            Ok(true)
+        }
+        "steps" => {
+            *steps_span = Some(key_span);
+            *plan = BuildPlan::Steps(parse_steps(value_node)?);
+            Ok(true)
+        }
+        _ => Ok(false),
+    }
+}
+
+pub(crate) fn reject_script_and_steps(
+    script_seen: bool,
+    steps_span: Option<marked_yaml::Span>,
+) -> Result<(), ParseError> {
+    // A build unit uses either `script` or `steps`, never both. Even an empty
+    // `steps: []` list explicitly selects steps mode.
+    if script_seen && let Some(span) = steps_span {
+        return Err(ParseError::invalid_value(
+            "build",
+            "`script` and `steps` are mutually exclusive; use one or the other",
+            span,
+        )
+        .with_suggestion("Remove either `build.script` or `build.steps`"));
+    }
+
+    Ok(())
+}
+
 fn parse_build_files(node: &Node) -> Result<IncludeExclude, ParseError> {
     // Try parsing as a mapping with include/exclude first
     if let Some(mapping) = node.as_mapping() {
@@ -591,13 +632,15 @@ fn parse_build_from_mapping(mapping: &MarkedMappingNode) -> Result<Build, ParseE
             "string" => {
                 build.string = Some(parse_field!("build.string", value_node));
             }
-            "script" => {
-                script_seen = true;
-                build.plan = BuildPlan::Script(Box::new(parse_script(value_node)?));
-            }
-            "steps" => {
-                steps_span = Some(*key_node.span());
-                build.plan = BuildPlan::Steps(parse_steps(value_node)?);
+            "script" | "steps" => {
+                parse_build_plan_key(
+                    &mut build.plan,
+                    key,
+                    value_node,
+                    *key_node.span(),
+                    &mut script_seen,
+                    &mut steps_span,
+                )?;
             }
             "noarch" => {
                 build.noarch = Some(parse_noarch(value_node)?);
@@ -646,16 +689,7 @@ fn parse_build_from_mapping(mapping: &MarkedMappingNode) -> Result<Build, ParseE
         }
     }
 
-    // A build unit uses either `script` or `steps`, never both. Even an empty
-    // `steps: []` list explicitly selects steps mode.
-    if script_seen && let Some(span) = steps_span {
-        return Err(ParseError::invalid_value(
-            "build",
-            "`script` and `steps` are mutually exclusive; use one or the other",
-            span,
-        )
-        .with_suggestion("Remove either `build.script` or `build.steps`"));
-    }
+    reject_script_and_steps(script_seen, steps_span)?;
 
     Ok(build)
 }

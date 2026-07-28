@@ -8,7 +8,7 @@ Sometimes you build a package and want to split the contents into multiple sub-p
 For example, when building a C/C++ package, you might want to create multiple packages for the
 runtime requirements (library), and the development time requirements such as header files.
 
-Staging outputs make this easy. A staging output runs its build script once, then copies its files directly into each inheriting package's prefix. Since these are "new" files in the prefix, they will be included in the output package.
+Staging outputs make this easy. A staging output runs its build plan once, then copies its files directly into each inheriting package's prefix. Since these are "new" files in the prefix, they will be included in the output package.
 
 Let's take a look at an example:
 
@@ -53,6 +53,8 @@ outputs:
 ```
 
 In this example, we have a staging output called `mypackage-build` that creates files during its build. The two package outputs `mypackage-library` and `mypackage-headers` inherit from it using the `inherit:` key.
+
+Staging `build:` sections support the same executable build plan as package outputs: either `script:` or experimental `steps:` (with `--experimental`).
 
 When building, the staging output runs first and creates files in `$PREFIX`. These files are then copied into the `$PREFIX` of each inheriting output package.
 The easiest way to select a subset of the files in the prefix is by using the `files` field in the output definition.
@@ -255,11 +257,11 @@ cache directory contains:
 ```txt
 output/build_cache/staging_<sha256>/
 ├─ metadata.json    # Cache metadata (deps, sources, file lists, variant)
-├─ prefix/          # Cached prefix files (only files added by the build script)
+├─ prefix/          # Cached prefix files (only files added by the build plan)
 └─ work_dir/        # Cached work directory
 ```
 
-On a **cache hit**, the staging build script is skipped entirely — the cached
+On a **cache hit**, the staging build plan is skipped entirely — the cached
 prefix and work directory files are restored directly. On a **cache miss**, the
 full build runs and the results are cached for future use.
 
@@ -276,9 +278,9 @@ applicable.
 
 ### File capture
 
-Only files **added** by the build script are cached — files that were already
+Only files **added** by the build plan are cached — files that were already
 present in the host environment from dependencies are excluded. This means the
-staging cache contains exactly the files that the build script installed into
+staging cache contains exactly the files that the build plan installed into
 `$PREFIX`, not the entire environment.
 
 
