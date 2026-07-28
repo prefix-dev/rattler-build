@@ -1,10 +1,10 @@
 //! Functions to collect environment variables that are used during the build process.
+use std::collections::HashMap;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
-use std::{collections::HashMap, env};
 
 use rattler_build_jinja::Variable;
-use rattler_build_script::EnvironmentIsolation;
+use rattler_build_script::{EnvironmentIsolation, RuntimeEnv};
 use rattler_build_types::NormalizedKey;
 use rattler_conda_types::{Platform, RepoDataRecord};
 use std::collections::BTreeMap;
@@ -208,6 +208,7 @@ pub fn os_vars(
     build_platform: &Platform,
     env_isolation: EnvironmentIsolation,
     work_dir: &Path,
+    runtime: &RuntimeEnv,
 ) -> HashMap<String, Option<String>> {
     let mut vars = HashMap::new();
 
@@ -228,7 +229,10 @@ pub fn os_vars(
     insert!(
         vars,
         "CPU_COUNT",
-        env::var("CPU_COUNT").unwrap_or_else(|_| num_cpus::get().to_string())
+        runtime
+            .var("CPU_COUNT")
+            .map(str::to_owned)
+            .unwrap_or_else(|| num_cpus::get().to_string())
     );
 
     match env_isolation {
@@ -239,9 +243,15 @@ pub fn os_vars(
         }
         EnvironmentIsolation::CondaBuild | EnvironmentIsolation::None => {
             // Forward locale from host (conda-build behavior)
-            vars.insert("LANG".to_string(), env::var("LANG").ok());
-            vars.insert("LC_ALL".to_string(), env::var("LC_ALL").ok());
-            vars.insert("MAKEFLAGS".to_string(), env::var("MAKEFLAGS").ok());
+            vars.insert("LANG".to_string(), runtime.var("LANG").map(str::to_owned));
+            vars.insert(
+                "LC_ALL".to_string(),
+                runtime.var("LC_ALL").map(str::to_owned),
+            );
+            vars.insert(
+                "MAKEFLAGS".to_string(),
+                runtime.var("MAKEFLAGS").map(str::to_owned),
+            );
         }
     }
 
@@ -250,25 +260,44 @@ pub fn os_vars(
         "SHLIB_EXT",
         rattler_build_types::shlib_ext(os_platform)
     );
-    vars.insert(path_var.to_string(), env::var(path_var).ok());
+    vars.insert(
+        path_var.to_string(),
+        runtime.var(path_var).map(str::to_owned),
+    );
 
     if os_platform.is_windows() {
-        vars.extend(windows::env::default_env_vars_target(prefix));
+        vars.extend(windows::env::default_env_vars_target(prefix, runtime));
     } else if os_platform.is_osx() {
-        vars.extend(macos::env::default_env_vars_target(prefix, os_platform));
+        vars.extend(macos::env::default_env_vars_target(
+            prefix,
+            os_platform,
+            runtime,
+        ));
     } else if os_platform.is_ios() {
-        vars.extend(ios::env::default_env_vars_target(prefix, os_platform));
+        vars.extend(ios::env::default_env_vars_target(
+            prefix,
+            os_platform,
+            runtime,
+        ));
     } else if os_platform.is_android() {
-        vars.extend(android::env::default_env_vars_target(prefix, os_platform));
+        vars.extend(android::env::default_env_vars_target(
+            prefix,
+            os_platform,
+            runtime,
+        ));
     } else if os_platform.is_linux() {
         vars.extend(linux::env::default_env_vars_target(
             prefix,
             os_platform,
             env_isolation,
+            runtime,
         ));
     }
     if build_platform.is_windows() {
-        vars.extend(windows::env::default_env_vars_build(build_platform));
+        vars.extend(windows::env::default_env_vars_build(
+            build_platform,
+            runtime,
+        ));
     } else if build_platform.is_osx() {
         vars.extend(macos::env::default_env_vars_build(build_platform));
     } else if build_platform.is_linux() {
@@ -281,7 +310,10 @@ pub fn os_vars(
                 insert!(vars, "USERPROFILE", work_dir.to_string_lossy());
             }
             EnvironmentIsolation::CondaBuild => {
-                vars.insert("USERPROFILE".to_string(), env::var("USERPROFILE").ok());
+                vars.insert(
+                    "USERPROFILE".to_string(),
+                    runtime.var("USERPROFILE").map(str::to_owned),
+                );
             }
             EnvironmentIsolation::None => {}
         }
@@ -297,7 +329,7 @@ pub fn os_vars(
             EnvironmentIsolation::CondaBuild => {
                 vars.insert(
                     "HOME".to_string(),
-                    Some(env::var("HOME").unwrap_or_else(|_| "UNKNOWN".to_string())),
+                    Some(runtime.var("HOME").unwrap_or("UNKNOWN").to_owned()),
                 );
             }
             EnvironmentIsolation::None => {}
@@ -498,6 +530,27 @@ pub fn env_vars_from_variant(
 mod test {
     use super::*;
 
+    #[test]
+    fn os_vars_uses_the_injected_runtime_environment() {
+        let runtime = RuntimeEnv::for_test(Platform::Linux64).with_var("PATH", "/injected/bin");
+
+        let vars = os_vars(
+            Path::new("/some/prefix"),
+            &Platform::Linux64,
+            &Platform::Linux64,
+            &Platform::Linux64,
+            EnvironmentIsolation::CondaBuild,
+            Path::new("/some/work"),
+            &runtime,
+        );
+
+        assert_eq!(
+            vars.get("PATH").and_then(|value| value.as_deref()),
+            Some("/injected/bin")
+        );
+        assert_eq!(vars.get("LANG"), Some(&None));
+    }
+
     /// noarch on a Windows host still emits Windows target vars (issue #2475).
     #[test]
     fn test_noarch_uses_host_platform_for_os_vars() {
@@ -511,6 +564,7 @@ mod test {
             &Platform::Win64,
             EnvironmentIsolation::Strict,
             work_dir,
+            &RuntimeEnv::for_test(Platform::Win64),
         );
 
         assert!(vars.contains_key("LIBRARY_PREFIX"));
@@ -532,13 +586,12 @@ mod test {
             &Platform::WinArm64,
             EnvironmentIsolation::Strict,
             Path::new("/some/work"),
+            &RuntimeEnv::for_test(Platform::WinArm64),
         );
 
-        let expected =
-            std::env::var("BUILD").unwrap_or_else(|_| "arm64-pc-windows-19.0.0".to_string());
         assert_eq!(
             vars.get("BUILD").and_then(|value| value.as_deref()),
-            Some(expected.as_str())
+            Some("arm64-pc-windows-19.0.0")
         );
     }
 
@@ -555,6 +608,7 @@ mod test {
             &Platform::Linux64,
             EnvironmentIsolation::Strict,
             work_dir,
+            &RuntimeEnv::for_test(Platform::Linux64),
         );
 
         assert!(!vars.contains_key("LIBRARY_PREFIX"));

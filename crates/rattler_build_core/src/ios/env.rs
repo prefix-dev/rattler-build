@@ -1,4 +1,5 @@
 //! iOS specific environment variables
+use rattler_build_script::RuntimeEnv;
 use rattler_conda_types::Platform;
 use std::{collections::HashMap, path::Path};
 
@@ -25,8 +26,9 @@ fn target_triple(target_platform: &Platform) -> Option<String> {
 pub fn default_env_vars_target(
     prefix: &Path,
     target_platform: &Platform,
+    runtime: &RuntimeEnv,
 ) -> HashMap<String, Option<String>> {
-    let mut vars = unix::env::default_env_vars_target(prefix);
+    let mut vars = unix::env::default_env_vars_target(prefix, runtime);
 
     if let Some(arch) = target_platform.arch() {
         vars.insert("IOS_ARCH".to_string(), Some(arch.as_str().to_string()));
@@ -69,7 +71,11 @@ mod tests {
 
     #[test]
     fn target_vars_include_unix_and_ios_specific_vars() {
-        let vars = default_env_vars_target(Path::new("/some/prefix"), &Platform::IosArm64);
+        let vars = default_env_vars_target(
+            Path::new("/some/prefix"),
+            &Platform::IosArm64,
+            &RuntimeEnv::for_test(Platform::Linux64),
+        );
         // inherited from the generic unix vars
         assert!(vars.contains_key("PKG_CONFIG_PATH"));
         assert!(vars.contains_key("CMAKE_GENERATOR"));

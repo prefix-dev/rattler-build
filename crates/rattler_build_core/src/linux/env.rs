@@ -2,7 +2,7 @@
 use std::env::consts::ARCH;
 use std::{collections::HashMap, path::Path};
 
-use rattler_build_script::EnvironmentIsolation;
+use rattler_build_script::{EnvironmentIsolation, RuntimeEnv};
 use rattler_conda_types::Platform;
 
 use crate::unix;
@@ -12,8 +12,9 @@ pub fn default_env_vars_target(
     prefix: &Path,
     target_platform: &Platform,
     env_isolation: EnvironmentIsolation,
+    runtime: &RuntimeEnv,
 ) -> HashMap<String, Option<String>> {
-    let mut vars = unix::env::default_env_vars_target(prefix);
+    let mut vars = unix::env::default_env_vars_target(prefix, runtime);
 
     let build_distro = match target_platform {
         Platform::Linux32 | Platform::Linux64 => "cos6",
@@ -30,21 +31,40 @@ pub fn default_env_vars_target(
         env_isolation,
         EnvironmentIsolation::CondaBuild | EnvironmentIsolation::None
     ) {
-        vars.insert("CFLAGS".to_string(), std::env::var("CFLAGS").ok());
-        vars.insert("CXXFLAGS".to_string(), std::env::var("CXXFLAGS").ok());
-        vars.insert("LDFLAGS".to_string(), std::env::var("LDFLAGS").ok());
+        vars.insert(
+            "CFLAGS".to_string(),
+            runtime.var("CFLAGS").map(str::to_owned),
+        );
+        vars.insert(
+            "CXXFLAGS".to_string(),
+            runtime.var("CXXFLAGS").map(str::to_owned),
+        );
+        vars.insert(
+            "LDFLAGS".to_string(),
+            runtime.var("LDFLAGS").map(str::to_owned),
+        );
     }
     vars.insert(
         "QEMU_LD_PREFIX".to_string(),
-        std::env::var("QEMU_LD_PREFIX").ok(),
+        runtime.var("QEMU_LD_PREFIX").map(str::to_owned),
     );
-    vars.insert("QEMU_UNAME".to_string(), std::env::var("QEMU_UNAME").ok());
-    vars.insert("DEJAGNU".to_string(), std::env::var("DEJAGNU").ok());
-    vars.insert("DISPLAY".to_string(), std::env::var("DISPLAY").ok());
+    vars.insert(
+        "QEMU_UNAME".to_string(),
+        runtime.var("QEMU_UNAME").map(str::to_owned),
+    );
+    vars.insert(
+        "DEJAGNU".to_string(),
+        runtime.var("DEJAGNU").map(str::to_owned),
+    );
+    vars.insert(
+        "DISPLAY".to_string(),
+        runtime.var("DISPLAY").map(str::to_owned),
+    );
     vars.insert(
         "LD_RUN_PATH".to_string(),
-        std::env::var("LD_RUN_PATH")
-            .ok()
+        runtime
+            .var("LD_RUN_PATH")
+            .map(str::to_owned)
             .or_else(|| Some(prefix.join("lib").to_string_lossy().to_string())),
     );
     vars.insert(
@@ -83,18 +103,16 @@ pub fn default_env_vars_build(build_platform: &Platform) -> HashMap<String, Opti
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serial_test::serial;
-
     #[test]
-    #[serial]
     fn build_and_ld_run_path_defaults() {
         let tmp_prefix = tempfile::tempdir().unwrap();
-        unsafe { std::env::remove_var("LD_RUN_PATH") };
+        let runtime = RuntimeEnv::for_test(Platform::Linux64);
 
         let vars = default_env_vars_target(
             tmp_prefix.path(),
             &Platform::Linux64,
             EnvironmentIsolation::Strict,
+            &runtime,
         );
         let build_val = vars
             .get("BUILD")
@@ -112,22 +130,21 @@ mod tests {
     }
 
     #[test]
-    #[serial]
     fn ld_run_path_env_preserved() {
         let tmp_prefix = tempfile::tempdir().unwrap();
-        unsafe { std::env::set_var("LD_RUN_PATH", "/custom/lib") };
+        let runtime =
+            RuntimeEnv::for_test(Platform::Linux64).with_var("LD_RUN_PATH", "/custom/lib");
 
         let vars = default_env_vars_target(
             tmp_prefix.path(),
             &Platform::Linux64,
             EnvironmentIsolation::Strict,
+            &runtime,
         );
         assert_eq!(
             vars.get("LD_RUN_PATH"),
             Some(&Some("/custom/lib".to_string()))
         );
-
-        unsafe { std::env::remove_var("LD_RUN_PATH") };
     }
 
     #[test]
@@ -137,6 +154,7 @@ mod tests {
             tmp_prefix.path(),
             &Platform::Linux64,
             EnvironmentIsolation::Strict,
+            &RuntimeEnv::for_test(Platform::Linux64),
         );
         assert_eq!(vars.get("CFLAGS"), None);
         assert_eq!(vars.get("CXXFLAGS"), None);

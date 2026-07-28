@@ -24,6 +24,14 @@ impl EnvironmentVariables {
         }
     }
 
+    fn from_iter(values: impl IntoIterator<Item = (String, String)>, platform: Platform) -> Self {
+        let mut environment = Self::new(platform.is_windows());
+        for (name, value) in values {
+            environment.insert(name, value);
+        }
+        environment
+    }
+
     fn get(&self, name: &str) -> Option<&str> {
         let name = self
             .case_insensitive_keys
@@ -61,15 +69,11 @@ pub struct RuntimeEnv {
 impl RuntimeEnv {
     /// Captures the real process environment variables and the current platform.
     pub fn current() -> Self {
-        let current_platform = Platform::current();
-        let mut runtime_env = Self {
-            env: EnvironmentVariables::new(current_platform.is_windows()),
-            process_platform: current_platform,
-        };
-        for (name, value) in std::env::vars() {
-            runtime_env.env.insert(name, value)
+        let process_platform = Platform::current();
+        Self {
+            env: EnvironmentVariables::from_iter(std::env::vars(), process_platform),
+            process_platform,
         }
-        runtime_env
     }
 
     /// Creates a runtime environment with an empty variable set and the given
@@ -137,6 +141,16 @@ mod tests {
         assert_eq!(RuntimeEnv::for_test(Platform::Win64).exe_suffix(), ".exe");
         assert_eq!(RuntimeEnv::for_test(Platform::Linux64).exe_suffix(), "");
         assert_eq!(RuntimeEnv::for_test(Platform::OsxArm64).exe_suffix(), "");
+    }
+
+    #[test]
+    fn environment_variables_from_iter_uses_platform_casing() {
+        let environment = EnvironmentVariables::from_iter(
+            [("Path".to_string(), "C:\\bin".to_string())],
+            Platform::Win64,
+        );
+
+        assert_eq!(environment.get("PATH"), Some("C:\\bin"));
     }
 
     #[test]

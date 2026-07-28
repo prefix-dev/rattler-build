@@ -235,6 +235,7 @@ impl Tests {
             &build_platform,
             config.env_isolation,
             tmp_dir.path(),
+            &RuntimeEnv::current(),
         );
         if config.env_isolation == EnvironmentIsolation::None {
             env_vars.retain(|key, _| key != ShellEnum::default().path_var(&build_platform));
@@ -849,6 +850,7 @@ async fn run_python_test_inner(
         &build_platform,
         config.env_isolation,
         &test_dir,
+        &RuntimeEnv::current(),
     );
 
     let context = shared_test_context(&test_prefix, host_platform);
@@ -961,6 +963,7 @@ async fn run_perl_test(
         &build_platform,
         config.env_isolation,
         &test_folder,
+        &RuntimeEnv::current(),
     );
     let context = shared_test_context(&test_prefix, host_platform);
 
@@ -1076,6 +1079,7 @@ async fn run_commands_test(
         &build_platform,
         config.env_isolation,
         &test_dir,
+        &RuntimeEnv::current(),
     );
     if config.env_isolation == EnvironmentIsolation::None {
         env_vars.retain(|key, _| key != ShellEnum::default().path_var(&build_platform));
@@ -1289,6 +1293,7 @@ async fn run_r_test(
         &build_platform,
         config.env_isolation,
         &test_folder,
+        &RuntimeEnv::current(),
     );
     let context = shared_test_context(&test_prefix, host_platform);
 
@@ -1372,6 +1377,7 @@ async fn run_ruby_test(
         &build_platform,
         config.env_isolation,
         &test_folder,
+        &RuntimeEnv::current(),
     );
     let context = shared_test_context(&test_prefix, host_platform);
 
