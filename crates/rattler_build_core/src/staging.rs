@@ -574,6 +574,7 @@ mod tests {
         build::{BuildPlan, Step, StepRun},
     };
     use rattler_build_script::EnvironmentIsolation;
+    use rattler_conda_types::Platform;
 
     #[test]
     fn staging_build_steps_prepare_as_sections() {
@@ -601,8 +602,12 @@ mod tests {
             std::collections::HashMap::new(),
             PathBuf::from("."),
             Path::new("."),
-            PathBuf::from("."),
-            None,
+            ExecutionContext::shared(
+                RuntimeEnv::for_test(Platform::current()),
+                Path::new("."),
+                Platform::current(),
+                Platform::current(),
+            ),
             None,
             EnvironmentIsolation::default(),
             true,
