@@ -254,7 +254,8 @@ fn parse_single_output_recipe_with_config(
         let key_str = key.as_str();
         if !matches!(
             key_str,
-            "package"
+            "$schema"
+                | "package"
                 | "build"
                 | "about"
                 | "requirements"
