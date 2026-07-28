@@ -152,7 +152,4 @@ pub trait Session: Send {
         names: &[String],
         search_paths: &[GuestPath],
     ) -> Result<Option<GuestPath>, RunnerError>;
-
-    /// Closes this session.
-    async fn close(self: Box<Self>) -> Result<(), RunnerError>;
 }

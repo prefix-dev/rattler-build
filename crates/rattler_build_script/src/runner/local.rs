@@ -154,10 +154,6 @@ impl Session for LocalSession {
 
         Ok(None)
     }
-
-    async fn close(self: Box<Self>) -> Result<(), RunnerError> {
-        Ok(())
-    }
 }
 
 fn is_executable_file(path: &Path, _platform: rattler_conda_types::Platform) -> bool {
@@ -402,17 +398,6 @@ mod tests {
                 .unwrap(),
             None
         );
-    }
-
-    #[tokio::test]
-    async fn close_is_a_noop() {
-        let temp_dir = tempfile::tempdir().unwrap();
-        let runner = LocalRunner::default();
-        start_local_session(&runner, temp_dir.path())
-            .await
-            .close()
-            .await
-            .unwrap();
     }
 
     #[test]
