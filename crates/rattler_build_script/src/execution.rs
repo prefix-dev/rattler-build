@@ -10,6 +10,7 @@ use crate::{execution_context::ExecutionContext, runtime::RuntimeEnv};
 use fs_err as fs;
 use futures::TryStreamExt;
 use indexmap::IndexMap;
+use rattler_conda_types::Platform;
 use rattler_shell::shell::Shell;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -618,13 +619,18 @@ pub(crate) async fn run_script(exec_args: ExecutionArgs) -> Result<(), crate::In
     let build_script_path = generate_build_script(&exec_args).await?;
     let command_spec = runner.command_to_run_script(&build_script_path, &exec_args.context);
 
+    let process_env = resolve_process_env(
+        exec_args.env_isolation,
+        &exec_args.env_vars,
+        &exec_args.secrets,
+        &exec_args.runtime,
+    );
+
     let output = crate::execution::run_process_with_replacements(
         &command_spec,
         &exec_args.work_dir,
         &exec_args.replacements(runner.replacements_template()),
-        &exec_args.env_vars,
-        &exec_args.secrets,
-        exec_args.env_isolation,
+        &process_env,
         if runner.supports_sandbox() {
             exec_args.sandbox_config.as_ref()
         } else {
@@ -710,61 +716,65 @@ const PASSTHROUGH_ENV_VARS: &[&str] = &[
 
 /// Platform-critical environment variables that must always be passed through
 /// to avoid breaking fundamental OS functionality.
-#[cfg(target_os = "windows")]
-const PLATFORM_PASSTHROUGH_ENV_VARS: &[&str] = &[
-    // Required for Winsock/networking and DLL loading
-    "SYSTEMROOT",
-    "WINDIR",
-    // Command interpreter
-    "COMSPEC",
-    // Temp directories
-    "TEMP",
-    "TMP",
-    // Executable extension resolution
-    "PATHEXT",
-];
+fn platform_passthrough_vars(platform: Platform) -> &'static [&'static str] {
+    if platform.is_windows() {
+        &[
+            // Required for Winsock/networking and DLL loading
+            "SYSTEMROOT",
+            "WINDIR",
+            // Command interpreter
+            "COMSPEC",
+            // Temp directories
+            "TEMP",
+            "TMP",
+            // Executable extension resolution
+            "PATHEXT",
+        ]
+    } else if platform.is_osx() {
+        &[
+            // macOS uses per-session temp directories
+            "TMPDIR",
+            // CoreFoundation text encoding
+            "__CF_USER_TEXT_ENCODING",
+        ]
+    } else {
+        &[]
+    }
+}
 
-/// Platform-critical environment variables that must always be passed through
-/// to avoid breaking fundamental OS functionality.
-#[cfg(target_os = "macos")]
-const PLATFORM_PASSTHROUGH_ENV_VARS: &[&str] = &[
-    // macOS uses per-session temp directories
-    "TMPDIR",
-    // CoreFoundation text encoding
-    "__CF_USER_TEXT_ENCODING",
-];
-
-/// Platform-critical environment variables that must always be passed through
-/// to avoid breaking fundamental OS functionality.
-#[cfg(not(any(target_os = "windows", target_os = "macos")))]
-const PLATFORM_PASSTHROUGH_ENV_VARS: &[&str] = &[];
-
-/// Configures the subprocess environment for the given isolation mode.
-fn configure_subprocess_env(
-    command: &mut tokio::process::Command,
+/// Computes the complete child environment for the given isolation mode.
+///
+/// This reads only its arguments and never the ambient process environment.
+pub(crate) fn resolve_process_env(
+    env_isolation: EnvironmentIsolation,
     env_vars: &IndexMap<String, String>,
     secrets: &IndexMap<String, String>,
-    env_isolation: EnvironmentIsolation,
     runtime: &RuntimeEnv,
-) {
+) -> IndexMap<String, String> {
     match env_isolation {
         EnvironmentIsolation::Strict | EnvironmentIsolation::CondaBuild => {
-            command.env_clear();
+            let mut process_env = IndexMap::new();
 
             for var in PASSTHROUGH_ENV_VARS
                 .iter()
-                .chain(PLATFORM_PASSTHROUGH_ENV_VARS)
+                .chain(platform_passthrough_vars(runtime.platform()))
             {
                 if let Some(value) = runtime.var(var) {
-                    command.env(var, value);
+                    process_env.insert((*var).to_owned(), value.to_owned());
                 }
             }
 
-            command.envs(env_vars);
-            command.envs(secrets.iter());
+            process_env.extend(env_vars.clone());
+            process_env.extend(secrets.clone());
+            process_env
         }
         EnvironmentIsolation::None => {
-            command.envs(env_vars);
+            let mut process_env = runtime
+                .vars()
+                .map(|(name, value)| (name.to_owned(), value.to_owned()))
+                .collect::<IndexMap<_, _>>();
+            process_env.extend(env_vars.clone());
+            process_env
         }
     }
 }
@@ -776,9 +786,7 @@ pub(crate) async fn run_process_with_replacements(
     command_spec: &crate::native_runner::CommandSpec,
     cwd: &Path,
     replacements: &HashMap<String, String>,
-    env_vars: &IndexMap<String, String>,
-    secrets: &IndexMap<String, String>,
-    env_isolation: EnvironmentIsolation,
+    process_env: &IndexMap<String, String>,
     sandbox_config: Option<&SandboxConfiguration>,
     runtime: &RuntimeEnv,
 ) -> Result<std::process::Output, std::io::Error> {
@@ -817,7 +825,8 @@ pub(crate) async fn run_process_with_replacements(
         tokio::process::Command::new(&command_spec.program)
     };
 
-    configure_subprocess_env(&mut command, env_vars, secrets, env_isolation, runtime);
+    command.env_clear();
+    command.envs(process_env);
 
     command
         .current_dir(cwd)
@@ -950,17 +959,15 @@ mod tests {
         let env_vars = IndexMap::new();
         let secrets = IndexMap::new();
 
-        let mut command = tokio::process::Command::new("true");
-        configure_subprocess_env(
-            &mut command,
+        let process_env = resolve_process_env(
+            EnvironmentIsolation::None,
             &env_vars,
             &secrets,
-            EnvironmentIsolation::None,
             &RuntimeEnv::for_test(Platform::current()),
         );
 
         assert!(
-            !command.as_std().get_envs().any(|(k, _)| k == "CONDA_BUILD"),
+            !process_env.contains_key("CONDA_BUILD"),
             "CONDA_BUILD must not be set on the outer subprocess"
         );
     }
@@ -1298,24 +1305,11 @@ mod tests {
         let mut secrets = IndexMap::new();
         secrets.insert("SECRET_VAR".to_string(), "secret".to_string());
 
-        let collect_envs = |isolation: EnvironmentIsolation| {
-            let mut command = tokio::process::Command::new("true");
-            configure_subprocess_env(&mut command, &env_vars, &secrets, isolation, &runtime);
-            command
-                .as_std()
-                .get_envs()
-                .filter_map(|(k, v)| {
-                    v.map(|v| {
-                        (
-                            k.to_string_lossy().into_owned(),
-                            v.to_string_lossy().into_owned(),
-                        )
-                    })
-                })
-                .collect::<HashMap<String, String>>()
+        let resolve = |isolation: EnvironmentIsolation| {
+            resolve_process_env(isolation, &env_vars, &secrets, &runtime)
         };
 
-        let strict = collect_envs(EnvironmentIsolation::Strict);
+        let strict = resolve(EnvironmentIsolation::Strict);
         assert!(
             !strict.contains_key("RB_TEST_RANDOM_VAR"),
             "non-whitelisted host var must be absent in Strict mode"
@@ -1332,7 +1326,7 @@ mod tests {
         assert_eq!(strict.get("SECRET_VAR").map(String::as_str), Some("secret"));
 
         // CondaBuild also clears the env and applies the same whitelist.
-        let conda_build = collect_envs(EnvironmentIsolation::CondaBuild);
+        let conda_build = resolve(EnvironmentIsolation::CondaBuild);
         assert!(
             !conda_build.contains_key("RB_TEST_RANDOM_VAR"),
             "non-whitelisted host var must be absent in CondaBuild mode"
@@ -1341,6 +1335,60 @@ mod tests {
             conda_build.get("SSL_CERT_FILE").map(String::as_str),
             Some("/host/cacert.pem")
         );
+    }
+
+    #[test]
+    fn test_none_env_uses_injected_runtime_with_explicit_overrides() {
+        let runtime = RuntimeEnv::for_test(Platform::Linux64)
+            .with_var("RUNTIME_ONLY", "runtime")
+            .with_var("OVERLAY", "runtime");
+        let mut env_vars = IndexMap::new();
+        env_vars.insert("OVERLAY".to_string(), "explicit".to_string());
+        env_vars.insert("EXPLICIT_ONLY".to_string(), "explicit".to_string());
+        let mut secrets = IndexMap::new();
+        secrets.insert("SECRET_ONLY".to_string(), "secret".to_string());
+
+        let process_env =
+            resolve_process_env(EnvironmentIsolation::None, &env_vars, &secrets, &runtime);
+
+        assert_eq!(
+            process_env.get("RUNTIME_ONLY").map(String::as_str),
+            Some("runtime")
+        );
+        assert_eq!(
+            process_env.get("OVERLAY").map(String::as_str),
+            Some("explicit")
+        );
+        assert_eq!(
+            process_env.get("EXPLICIT_ONLY").map(String::as_str),
+            Some("explicit")
+        );
+        assert!(
+            !process_env.contains_key("SECRET_ONLY"),
+            "None mode relies on secrets captured in RuntimeEnv"
+        );
+    }
+
+    #[test]
+    fn test_platform_passthrough_follows_runtime_platform() {
+        let env_vars = IndexMap::new();
+        let secrets = IndexMap::new();
+        let runtime = RuntimeEnv::for_test(Platform::Win64).with_var("SYSTEMROOT", "C:\\Windows");
+
+        let windows_env =
+            resolve_process_env(EnvironmentIsolation::Strict, &env_vars, &secrets, &runtime);
+        assert_eq!(
+            windows_env.get("SYSTEMROOT").map(String::as_str),
+            Some("C:\\Windows")
+        );
+
+        let linux_env = resolve_process_env(
+            EnvironmentIsolation::Strict,
+            &env_vars,
+            &secrets,
+            &runtime.with_platform(Platform::Linux64),
+        );
+        assert!(!linux_env.contains_key("SYSTEMROOT"));
     }
 
     /// The PowerShell prologue is written verbatim into the generated script
