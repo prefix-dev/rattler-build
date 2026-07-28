@@ -1,0 +1,17 @@
+diff --git a/deletion_only.cmake b/deletion_only.cmake
+index 4134fcf..975dc34 100644
+--- a/deletion_only.cmake
++++ b/deletion_only.cmake
+@@ -1,12 +1,6 @@
+ if(NOT MSVC)
+     add_compile_options(-Wall -Wextra -Wno-narrowing)
+ else()
+-    if (CMAKE_BUILD_TYPE MATCHES Debug)
+-        add_compile_options(/MTd)
+-    else()
+-        add_compile_options(/MT)
+-    endif()
+-
+     add_compile_options(/utf-8)
+     add_compile_definitions(-D_CRT_SECURE_NO_WARNINGS=1)
+ endif()

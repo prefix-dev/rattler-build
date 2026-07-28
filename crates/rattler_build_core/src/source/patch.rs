@@ -654,6 +654,78 @@ mod tests {
     }
 
     #[test]
+    fn test_deletion_only_patch_is_applied() {
+        // A patch that only deletes lines must actually be applied, not be
+        // misdetected as "already applied" and skipped. Regression test for
+        // https://github.com/prefix-dev/rattler-build/issues/2693
+        let (tempdir, _) = setup_patch_test_dir();
+        let work_dir = tempdir.path().join("workdir");
+        let patches_dir = tempdir.path().join("patches");
+
+        apply_patches(
+            &[LateBoundPath::new("test_deletion_only.patch")],
+            &work_dir,
+            &patches_dir,
+            &patches_dir,
+            &patches_dir,
+            apply_patch_custom,
+        )
+        .expect("deletion-only patch should apply");
+
+        let content = fs_err::read_to_string(work_dir.join("deletion_only.cmake")).unwrap();
+        assert!(
+            !content.contains("add_compile_options(/MTd)"),
+            "deletion-only patch was not applied:\n{content}"
+        );
+        assert!(content.contains("add_compile_options(/utf-8)"));
+
+        // Re-applying it now must be detected as already applied and skipped.
+        apply_patches(
+            &[LateBoundPath::new("test_deletion_only.patch")],
+            &work_dir,
+            &patches_dir,
+            &patches_dir,
+            &patches_dir,
+            apply_patch_custom,
+        )
+        .expect("re-applying an already-applied deletion-only patch should not error");
+
+        let after_second = fs_err::read_to_string(work_dir.join("deletion_only.cmake")).unwrap();
+        assert_eq!(content, after_second);
+    }
+
+    #[test]
+    fn test_deletion_only_patch_with_stale_context_fails() {
+        // Same deletion-only patch shape, but its trailing context references a
+        // line that does not exist in the target file (patch written against a
+        // newer upstream). GNU patch rejects this; we must error out instead of
+        // skipping it as "already applied".
+        let (tempdir, _) = setup_patch_test_dir();
+        let work_dir = tempdir.path().join("workdir");
+        let patches_dir = tempdir.path().join("patches");
+
+        let before =
+            fs_err::read_to_string(work_dir.join("deletion_only_stale.cmake")).unwrap();
+
+        let result = apply_patches(
+            &[LateBoundPath::new("test_deletion_only_stale_context.patch")],
+            &work_dir,
+            &patches_dir,
+            &patches_dir,
+            &patches_dir,
+            apply_patch_custom,
+        );
+        assert!(
+            result.is_err(),
+            "patch with non-matching context must fail to apply"
+        );
+
+        // The target file must be left untouched.
+        let after = fs_err::read_to_string(work_dir.join("deletion_only_stale.cmake")).unwrap();
+        assert_eq!(before, after);
+    }
+
+    #[test]
     fn test_apply_patches_with_orig() {
         let (tempdir, _) = setup_patch_test_dir();
 
