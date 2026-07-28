@@ -704,8 +704,7 @@ mod tests {
         let work_dir = tempdir.path().join("workdir");
         let patches_dir = tempdir.path().join("patches");
 
-        let before =
-            fs_err::read_to_string(work_dir.join("deletion_only_stale.cmake")).unwrap();
+        let before = fs_err::read_to_string(work_dir.join("deletion_only_stale.cmake")).unwrap();
 
         let result = apply_patches(
             &[LateBoundPath::new("test_deletion_only_stale_context.patch")],
