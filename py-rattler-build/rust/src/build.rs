@@ -204,6 +204,7 @@ pub(crate) fn output_from_rendered_variant(
                 &safe_recipe_path,
                 output_dir,
                 &timestamp,
+                Platform::current(),
             )
             .no_build_id(no_build_id)
             .build()

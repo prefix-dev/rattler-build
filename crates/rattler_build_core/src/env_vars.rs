@@ -337,7 +337,7 @@ pub fn vars(output: &Output, build_state: &str) -> HashMap<String, Option<String
         insert!(vars, "ARCH", host_arch);
     }
 
-    let directories = &output.build_configuration.directories;
+    let directories = output.build_configuration.directories.exec_view();
     insert!(
         vars,
         "CONDA_DEFAULT_ENV",
