@@ -301,6 +301,7 @@ class Stage0Recipe(ABC):
         no_include_recipe: bool = False,
         exclude_newer: datetime | None = None,
         env_isolation: EnvironmentIsolation = EnvironmentIsolation.STRICT,
+        render_config: RenderConfig | None = None,
     ) -> list[BuildResult]:
         """Build this recipe.
 
@@ -320,6 +321,7 @@ class Stage0Recipe(ABC):
             no_include_recipe: Don't include recipe in the output package.
             exclude_newer: Exclude packages newer than this timestamp.
             env_isolation: Environment isolation mode. Defaults to ``EnvironmentIsolation.STRICT``.
+            render_config: Optional RenderConfig to use when rendering before building.
 
         Returns:
             list[BuildResult]: List of build results, one per variant built.
@@ -341,7 +343,7 @@ class Stage0Recipe(ABC):
         """
 
         # Render the recipe to get Stage1 variants
-        rendered_variants = self.render(variant_config)
+        rendered_variants = self.render(variant_config, render_config)
 
         # Build each rendered variant using its run_build method
         results: list[BuildResult] = []
@@ -538,9 +540,14 @@ class Build:
         return self._inner.string
 
     @property
-    def script(self) -> Any:
-        """Get the build script configuration."""
+    def script(self) -> Any | None:
+        """Get the build script configuration, if this build uses script mode."""
         return self._inner.script
+
+    @property
+    def steps(self) -> Any | None:
+        """Get the build steps, if this build uses steps mode."""
+        return self._inner.steps
 
     @property
     def noarch(self) -> Any | None:

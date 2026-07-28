@@ -218,6 +218,9 @@ pub struct RenderedVariant {
     /// dependencies to their correct variants.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub full_combination: BTreeMap<NormalizedKey, Variable>,
+    /// Whether experimental features were enabled when this variant was rendered.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub experimental: bool,
     /// The rendered stage1 recipe
     pub recipe: Stage1Recipe,
     /// Pin subpackage dependencies that need to be tracked for exact pinning
@@ -974,6 +977,7 @@ fn render_with_empty_combinations(
             RenderedVariant {
                 variant,
                 full_combination: BTreeMap::new(), // No combination when rendering with empty combinations
+                experimental: config.experimental,
                 recipe,
                 pin_subpackages: BTreeMap::new(),
                 hash_info: None,
@@ -1415,6 +1419,7 @@ fn render_with_variants(
             results.push(RenderedVariant {
                 variant,
                 full_combination: combination.clone(), // Track the full combination for pin matching
+                experimental: config.experimental,
                 recipe,
                 pin_subpackages: BTreeMap::new(), // Will be populated after first build string resolution
                 hash_info: None,
@@ -1496,6 +1501,54 @@ python:
 
         assert!(variants.contains(&"3.9.*".to_string()));
         assert!(variants.contains(&"3.10.*".to_string()));
+    }
+
+    #[test]
+    fn test_build_steps_if_participates_in_variant_matrix() {
+        let recipe_yaml = r#"
+package:
+  name: test-pkg
+  version: "1.0.0"
+
+build:
+  steps:
+    - if: feature_enabled
+      run: echo enabled
+"#;
+
+        let variant_yaml = r#"
+feature_enabled:
+  - true
+  - false
+"#;
+
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config = VariantConfig::from_yaml_str(variant_yaml).unwrap();
+
+        let rendered = render_recipe_with_variant_config(
+            &stage0_recipe,
+            &variant_config,
+            RenderConfig::new().with_experimental(true),
+        )
+        .unwrap();
+
+        assert_eq!(rendered.len(), 2);
+        let variants = rendered
+            .iter()
+            .map(|r| {
+                r.variant
+                    .get(&"feature_enabled".into())
+                    .unwrap()
+                    .to_string()
+            })
+            .collect::<Vec<_>>();
+        assert!(variants.contains(&"true".to_string()), "{variants:?}");
+        assert!(variants.contains(&"false".to_string()), "{variants:?}");
+        assert!(
+            rendered
+                .iter()
+                .all(|r| r.recipe.build.plan.steps().is_some())
+        );
     }
 
     #[test]

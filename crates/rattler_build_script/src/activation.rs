@@ -94,7 +94,7 @@ mod tests {
     use rattler_conda_types::Platform;
     use rattler_shell::shell;
 
-    use crate::execution::{EnvironmentIsolation, ExecutionArgs, ResolvedScriptContents};
+    use crate::execution::{EnvironmentIsolation, ExecutionArgs};
     use crate::{ExecutionContext, runtime::RuntimeEnv};
 
     /// The activation script must set the Windows architecture variables after
@@ -112,8 +112,7 @@ mod tests {
             "ARMv8 (64-bit) Family".to_string(),
         );
         let args = ExecutionArgs {
-            script: ResolvedScriptContents::Missing,
-            interpreter: None,
+            sections: Vec::new(),
             env_vars,
             secrets: IndexMap::new(),
             context: ExecutionContext::shared(
@@ -147,8 +146,7 @@ mod tests {
         fs_err::create_dir_all(&build_prefix).unwrap();
 
         let args = ExecutionArgs {
-            script: ResolvedScriptContents::Inline(String::new()),
-            interpreter: None,
+            sections: Vec::new(),
             env_vars: IndexMap::new(),
             secrets: IndexMap::new(),
             context: ExecutionContext::separate(
