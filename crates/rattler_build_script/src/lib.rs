@@ -26,9 +26,11 @@ mod execution_context;
 #[cfg(feature = "execution")]
 mod interpreter;
 #[cfg(feature = "execution")]
-mod native_runner;
-#[cfg(feature = "execution")]
 mod runtime;
+#[cfg(feature = "execution")]
+mod shell_dialect;
+#[cfg(feature = "execution")]
+mod windows_machine;
 
 #[cfg(feature = "execution")]
 pub use execution::{

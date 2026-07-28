@@ -527,7 +527,7 @@ pub struct BuildScriptSection {
 /// One unit of a generated build wrapper: content run in a single interpreter,
 /// with optional step-local `env`, optional `cwd`, and a boundary-comment label.
 ///
-/// `env` is scoped to the section (see `NativeShellRunner::scope_section`) and is
+/// `env` is scoped to the section (see `ShellDialect::scope_section`) and is
 /// distinct from [`ExecutionArgs::env_vars`], the whole-build environment. The
 /// wrapper is built from one [`ScriptSection`] per [`ExecutionArgs::sections`] entry.
 pub(crate) struct ScriptSection<'a> {
@@ -574,8 +574,8 @@ fn section_script_filename(extension: &str, index: SectionIndex) -> String {
 pub(crate) async fn generate_build_script(
     args: &ExecutionArgs,
 ) -> Result<PathBuf, crate::InterpreterError> {
-    let runner = crate::native_runner::native_runner(args.context.runtime().process_platform());
-    let shell = runner.shell();
+    let dialect = crate::shell_dialect::shell_dialect(args.context.runtime().process_platform());
+    let shell = dialect.shell();
 
     let script_extension = shell.extension();
     let activation_script_path = args.work_dir.join(format!("build_env.{script_extension}"));
@@ -587,7 +587,7 @@ pub(crate) async fn generate_build_script(
         .map_err(|err| std::io::Error::other(err.to_string()))?;
     tokio::fs::write(
         &activation_script_path,
-        crate::native_runner::write_shell_script(shell.clone(), &activation_script)?,
+        crate::shell_dialect::write_shell_script(shell.clone(), &activation_script)?,
     )
     .await?;
 
@@ -608,7 +608,7 @@ pub(crate) async fn generate_build_script(
     for (position, section) in sections.iter().enumerate() {
         let body = build_section_body(
             args,
-            runner.as_ref(),
+            dialect.as_ref(),
             &shell,
             section,
             SectionIndex { position, total },
@@ -619,17 +619,17 @@ pub(crate) async fn generate_build_script(
         if body.trim().is_empty() {
             continue;
         }
-        fragments.push(runner.scope_section(section.label, section.env, section.cwd, &body)?);
+        fragments.push(dialect.scope_section(section.label, section.env, section.cwd, &body)?);
     }
 
     let build_script = format!(
         "{}\n{}",
-        runner.preamble(&activation_script_path),
+        dialect.preamble(&activation_script_path),
         fragments.join("\n"),
     );
     tokio::fs::write(
         &build_script_path,
-        crate::native_runner::write_shell_script(shell, &build_script)?,
+        crate::shell_dialect::write_shell_script(shell, &build_script)?,
     )
     .await?;
 
@@ -649,7 +649,7 @@ pub(crate) async fn generate_build_script(
 /// interpreter applies, otherwise an invocation of the resolved interpreter.
 async fn build_section_body(
     args: &ExecutionArgs,
-    runner: &dyn crate::native_runner::NativeShellRunner,
+    dialect: &dyn crate::shell_dialect::ShellDialect,
     shell: &rattler_shell::shell::ShellEnum,
     section: &ScriptSection<'_>,
     index: SectionIndex,
@@ -664,7 +664,7 @@ async fn build_section_body(
     // No interpreter specified: default to the wrapper shell.
     let interpreter_name = explicit_or_inferred
         .clone()
-        .unwrap_or_else(|| runner.default_interpreter().to_string());
+        .unwrap_or_else(|| dialect.default_interpreter().to_string());
     let interpreter = crate::interpreter::SelectedInterpreter::from_recipe_name(&interpreter_name)
         .ok_or_else(|| crate::InterpreterError::UnsupportedInterpreter(interpreter_name.clone()))?;
 
@@ -677,7 +677,7 @@ async fn build_section_body(
     // conda-provided executable and would otherwise fail to resolve.
     let needs_specialized_interpreter = explicit_or_inferred
         .as_deref()
-        .is_some_and(|name| name != runner.default_interpreter());
+        .is_some_and(|name| name != dialect.default_interpreter());
 
     // Assemble the rendered content; the interpreter joins a command list.
     let script_text = match section.content {
@@ -692,7 +692,7 @@ async fn build_section_body(
         // native wrapper code. Most shells can inline it directly, but cmd.exe
         // needs call indirection so `exit /b` exits only this section instead
         // of terminating the whole wrapper.
-        if let Some(native_command) = runner.native_section_script_command(
+        if let Some(native_command) = dialect.native_section_script_command(
             &args
                 .work_dir
                 .join(section_script_filename(shell.extension(), index)),
@@ -703,12 +703,12 @@ async fn build_section_body(
                 .join(section_script_filename(shell.extension(), index));
             tokio::fs::write(
                 &script_path,
-                crate::native_runner::write_shell_script(shell.clone(), &script_text)?,
+                crate::shell_dialect::write_shell_script(shell.clone(), &script_text)?,
             )
             .await?;
             let quoted = native_command
                 .iter()
-                .map(|arg| crate::native_runner::quote_arg(shell, arg))
+                .map(|arg| crate::shell_dialect::quote_arg(shell, arg))
                 .collect::<Vec<_>>();
             let command_refs = quoted.iter().map(String::as_str).collect::<Vec<_>>();
             let mut body = String::new();
@@ -742,7 +742,7 @@ async fn build_section_body(
     command.extend(interpreter.args(&script_path));
     let quoted = command
         .iter()
-        .map(|arg| crate::native_runner::quote_arg(shell, arg))
+        .map(|arg| crate::shell_dialect::quote_arg(shell, arg))
         .collect::<Vec<_>>();
     let command_refs = quoted.iter().map(String::as_str).collect::<Vec<_>>();
     let mut body = String::new();
@@ -758,10 +758,10 @@ async fn build_section_body(
 /// from a single script. This lower-level entry point runs a pre-built
 /// `ExecutionArgs` directly and is used when composing multiple sections.
 pub async fn run_script(exec_args: ExecutionArgs) -> Result<(), crate::InterpreterError> {
-    let runner =
-        crate::native_runner::native_runner(exec_args.context.runtime().process_platform());
+    let dialect =
+        crate::shell_dialect::shell_dialect(exec_args.context.runtime().process_platform());
     let build_script_path = generate_build_script(&exec_args).await?;
-    let command_spec = runner.command_to_run_script(&build_script_path, &exec_args.context);
+    let command_spec = dialect.command_to_run_script(&build_script_path, &exec_args.context);
 
     let process_env = resolve_process_env(
         exec_args.env_isolation,
@@ -773,9 +773,9 @@ pub async fn run_script(exec_args: ExecutionArgs) -> Result<(), crate::Interpret
     let output = crate::execution::run_process_with_replacements(
         &command_spec,
         &exec_args.work_dir,
-        &exec_args.replacements(runner.replacements_template()),
+        &exec_args.replacements(dialect.replacements_template()),
         &process_env,
-        if runner.supports_sandbox() {
+        if dialect.supports_sandbox() {
             exec_args.sandbox_config.as_ref()
         } else {
             None
@@ -786,7 +786,7 @@ pub async fn run_script(exec_args: ExecutionArgs) -> Result<(), crate::Interpret
 
     if !output.status.success() {
         let status_code = output.status.code().unwrap_or(1);
-        let debug_info = runner.debug_info(&exec_args.work_dir, &exec_args.context);
+        let debug_info = dialect.debug_info(&exec_args.work_dir, &exec_args.context);
         tracing::error!("Script failed with status {}", status_code);
         tracing::error!("{}", debug_info);
         return Err(crate::InterpreterError::ExecutionFailed(
@@ -927,7 +927,7 @@ pub(crate) fn resolve_process_env(
 /// This is used to replace the host prefix with $PREFIX and the build prefix with $BUILD_PREFIX
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn run_process_with_replacements(
-    command_spec: &crate::native_runner::CommandSpec,
+    command_spec: &crate::shell_dialect::CommandSpec,
     cwd: &Path,
     replacements: &HashMap<String, String>,
     process_env: &IndexMap<String, String>,
@@ -1626,7 +1626,7 @@ mod tests {
             "-c".to_string(),
             "printf 'RAW_PREFIX raw-secret\\n'; printf 'RAW_PREFIX raw-secret\\n' >&2".to_string(),
         ];
-        let command_spec = crate::native_runner::CommandSpec {
+        let command_spec = crate::shell_dialect::CommandSpec {
             program: command[0].clone(),
             args: command[1..].to_vec(),
         };

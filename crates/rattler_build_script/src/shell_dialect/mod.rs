@@ -1,18 +1,16 @@
-//! Platform-native wrapper execution support.
+//! Platform-native shell dialect support.
 //!
-//! This module selects the [`NativeShellRunner`] for a platform and provides
-//! helpers for writing shell-specific scripts. Specialized interpreters are
-//! described by `crate::interpreter` and are emitted as commands inside the
-//! native wrapper.
+//! This module selects the [`ShellDialect`] for a platform and provides helpers
+//! for writing shell-specific scripts. Specialized interpreters are described by
+//! `crate::interpreter` and are emitted as commands inside the native wrapper.
 
 mod bash;
 mod cmd_exe;
 
 use std::path::Path;
 
-use rattler_conda_types::Platform;
-
 use indexmap::IndexMap;
+use rattler_conda_types::Platform;
 use rattler_shell::shell::{Shell, ShellEnum};
 
 use crate::ExecutionContext;
@@ -36,104 +34,8 @@ impl CommandSpec {
     }
 }
 
-/// Requested Windows child process architecture for a supported transition.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum WindowsMachine {
-    X86,
-    Amd64,
-    Arm64,
-}
-
-impl WindowsMachine {
-    pub(crate) fn start_argument(self) -> &'static str {
-        match self {
-            Self::X86 => "x86",
-            Self::Amd64 => "amd64",
-            Self::Arm64 => "arm64",
-        }
-    }
-
-    pub(crate) fn processor_architecture(self) -> &'static str {
-        match self {
-            Self::X86 => "x86",
-            Self::Amd64 => "AMD64",
-            Self::Arm64 => "ARM64",
-        }
-    }
-
-    /// The `PROCESSOR_ARCHITEW6432` marker Windows exposes to an x86 child.
-    pub(crate) fn wow64_processor_architecture(self) -> Option<&'static str> {
-        (self != Self::X86).then(|| self.processor_architecture())
-    }
-
-    #[cfg(windows)]
-    fn from_image_file_machine(machine: u16) -> Option<Self> {
-        use windows_sys::Win32::System::SystemInformation::{
-            IMAGE_FILE_MACHINE_AMD64, IMAGE_FILE_MACHINE_ARM64, IMAGE_FILE_MACHINE_I386,
-        };
-
-        match machine {
-            IMAGE_FILE_MACHINE_I386 => Some(Self::X86),
-            IMAGE_FILE_MACHINE_AMD64 => Some(Self::Amd64),
-            IMAGE_FILE_MACHINE_ARM64 => Some(Self::Arm64),
-            _ => None,
-        }
-    }
-}
-
-/// Returns the requested child architecture when a supported Windows build
-/// process transition is needed. Rattler-build ships x64 and ARM64 binaries,
-/// and both can launch x86 build tools; x86 rattler-build processes are not
-/// supported as cross-architecture launchers.
-pub(crate) fn windows_machine_transition(
-    process_platform: Platform,
-    build_platform: Platform,
-) -> Option<WindowsMachine> {
-    match (process_platform, build_platform) {
-        (Platform::Win64, Platform::Win32) | (Platform::WinArm64, Platform::Win32) => {
-            Some(WindowsMachine::X86)
-        }
-        (Platform::Win64, Platform::WinArm64) => Some(WindowsMachine::Arm64),
-        (Platform::WinArm64, Platform::Win64) => Some(WindowsMachine::Amd64),
-        _ => None,
-    }
-}
-
-/// Detects the native Windows machine architecture without affecting launch
-/// selection. This is only used to reproduce the `PROCESSOR_ARCHITEW6432`
-/// value that Windows exposes to x86 WOW64 processes.
-#[cfg(windows)]
-pub(crate) fn native_windows_machine() -> Option<WindowsMachine> {
-    use windows_sys::Win32::System::{
-        SystemInformation::IMAGE_FILE_MACHINE_UNKNOWN,
-        Threading::{GetCurrentProcess, IsWow64Process2},
-    };
-
-    let mut process_machine = IMAGE_FILE_MACHINE_UNKNOWN;
-    let mut native_machine = IMAGE_FILE_MACHINE_UNKNOWN;
-    // `IsWow64Process2` is available on every Windows version that supports
-    // `start /machine`. A failure leaves the inherited WOW64 marker untouched.
-    if unsafe {
-        IsWow64Process2(
-            GetCurrentProcess(),
-            &mut process_machine,
-            &mut native_machine,
-        )
-    } == 0
-    {
-        return None;
-    }
-
-    WindowsMachine::from_image_file_machine(native_machine)
-}
-
-#[cfg(not(windows))]
-pub(crate) fn native_windows_machine() -> Option<WindowsMachine> {
-    None
-}
-
-/// Defines platform-native wrapper execution.
-pub(crate) trait NativeShellRunner: Send + Sync {
+/// Defines the platform-native shell syntax used for wrapper execution.
+pub(crate) trait ShellDialect: Send + Sync {
     /// Returns the shell syntax used for the generated native wrapper script.
     fn shell(&self) -> ShellEnum;
 
@@ -154,7 +56,7 @@ pub(crate) trait NativeShellRunner: Send + Sync {
     /// Returns the replacement template used when streaming process output.
     fn replacements_template(&self) -> &'static str;
 
-    /// Returns whether this native shell runner supports rattler-sandbox execution.
+    /// Returns whether this shell dialect supports rattler-sandbox execution.
     fn supports_sandbox(&self) -> bool {
         true
     }
@@ -185,11 +87,11 @@ pub(crate) trait NativeShellRunner: Send + Sync {
 /// Selects the native wrapper shell for the given platform: `cmd.exe` on
 /// Windows, `bash` elsewhere. The script runs on the host, so callers pass the
 /// runtime platform (which equals the host).
-pub(crate) fn native_runner(platform: Platform) -> Box<dyn NativeShellRunner> {
+pub(crate) fn shell_dialect(platform: Platform) -> Box<dyn ShellDialect> {
     if platform.is_windows() {
-        Box::new(cmd_exe::CmdExeNativeRunner)
+        Box::new(cmd_exe::CmdExeDialect)
     } else {
-        Box::new(bash::BashNativeRunner)
+        Box::new(bash::BashDialect)
     }
 }
 
@@ -265,8 +167,11 @@ pub(crate) fn quote_arg(shell: &ShellEnum, arg: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{WindowsMachine, native_runner, quote_arg, windows_machine_transition};
-    use crate::{ExecutionContext, RuntimeEnv};
+    use super::{quote_arg, shell_dialect};
+    use crate::{
+        ExecutionContext, RuntimeEnv,
+        windows_machine::{WindowsMachine, windows_machine_transition},
+    };
     use indexmap::IndexMap;
     use rattler_conda_types::Platform;
     use rattler_shell::shell::{self, Shell};
@@ -276,10 +181,10 @@ mod tests {
     /// from the preamble handles failure.
     #[test]
     fn bash_scope_section_subshell_env_and_label() {
-        let runner = native_runner(Platform::Linux64);
+        let dialect = shell_dialect(Platform::Linux64);
         let mut env = IndexMap::new();
         env.insert("FOO".to_string(), "a b".to_string());
-        let out = runner
+        let out = dialect
             .scope_section(Some("uses: configure"), &env, None, "echo hi")
             .unwrap();
         insta::assert_snapshot!(out, @r###"
@@ -294,8 +199,8 @@ echo hi
     /// No label and empty env => just `( body )`.
     #[test]
     fn bash_scope_section_minimal() {
-        let runner = native_runner(Platform::Linux64);
-        let out = runner
+        let dialect = shell_dialect(Platform::Linux64);
+        let out = dialect
             .scope_section(None, &IndexMap::new(), None, "echo hi")
             .unwrap();
         insta::assert_snapshot!(out, @r###"
@@ -309,10 +214,10 @@ echo hi
     /// appends an errorlevel guard (required even for the last section).
     #[test]
     fn cmd_scope_section_setlocal_env_and_guard() {
-        let runner = native_runner(Platform::Win64);
+        let dialect = shell_dialect(Platform::Win64);
         let mut env = IndexMap::new();
         env.insert("FOO".to_string(), "bar".to_string());
-        let out = runner
+        let out = dialect
             .scope_section(Some("step 1"), &env, None, "echo hi")
             .unwrap();
         insta::assert_snapshot!(out, @r###"
@@ -330,8 +235,8 @@ endlocal & if %RB_SECTION_ERRORLEVEL% neq 0 exit /b %RB_SECTION_ERRORLEVEL%
 
     #[test]
     fn cmd_scope_section_pushd_uses_cwd() {
-        let runner = native_runner(Platform::Win64);
-        let out = runner
+        let dialect = shell_dialect(Platform::Win64);
+        let out = dialect
             .scope_section(
                 Some("step 1"),
                 &IndexMap::new(),
@@ -354,11 +259,11 @@ endlocal & if %RB_SECTION_ERRORLEVEL% neq 0 exit /b %RB_SECTION_ERRORLEVEL%
 
     #[test]
     fn scope_section_rejects_invalid_env_names() {
-        let runner = native_runner(Platform::Linux64);
+        let dialect = shell_dialect(Platform::Linux64);
         let mut env = IndexMap::new();
         env.insert("BAD-NAME".to_string(), "value".to_string());
 
-        let err = runner
+        let err = dialect
             .scope_section(None, &env, None, "echo hi")
             .expect_err("invalid env name should fail");
 
@@ -370,11 +275,11 @@ endlocal & if %RB_SECTION_ERRORLEVEL% neq 0 exit /b %RB_SECTION_ERRORLEVEL%
 
     #[test]
     fn cmd_scope_section_rejects_newline_env_values() {
-        let runner = native_runner(Platform::Win64);
+        let dialect = shell_dialect(Platform::Win64);
         let mut env = IndexMap::new();
         env.insert("FOO".to_string(), "safe\necho injected".to_string());
 
-        let err = runner
+        let err = dialect
             .scope_section(None, &env, None, "echo hi")
             .expect_err("newline env value should fail");
 
@@ -382,15 +287,15 @@ endlocal & if %RB_SECTION_ERRORLEVEL% neq 0 exit /b %RB_SECTION_ERRORLEVEL%
     }
 
     #[test]
-    fn native_runner_follows_the_platform() {
+    fn shell_dialect_follows_the_platform() {
         // Independent of the host this test runs on.
-        assert_eq!(native_runner(Platform::Win64).shell().extension(), "bat");
-        assert_eq!(native_runner(Platform::Linux64).shell().extension(), "sh");
-        assert_eq!(native_runner(Platform::OsxArm64).shell().extension(), "sh");
+        assert_eq!(shell_dialect(Platform::Win64).shell().extension(), "bat");
+        assert_eq!(shell_dialect(Platform::Linux64).shell().extension(), "sh");
+        assert_eq!(shell_dialect(Platform::OsxArm64).shell().extension(), "sh");
 
-        assert_eq!(native_runner(Platform::Win64).default_interpreter(), "cmd");
+        assert_eq!(shell_dialect(Platform::Win64).default_interpreter(), "cmd");
         assert_eq!(
-            native_runner(Platform::Linux64).default_interpreter(),
+            shell_dialect(Platform::Linux64).default_interpreter(),
             "bash"
         );
     }
@@ -398,7 +303,7 @@ endlocal & if %RB_SECTION_ERRORLEVEL% neq 0 exit /b %RB_SECTION_ERRORLEVEL%
     #[test]
     fn cmd_switches_between_supported_windows_architectures() {
         let script = std::path::Path::new("work/conda_build.bat");
-        let runner = native_runner(Platform::Win64);
+        let dialect = shell_dialect(Platform::Win64);
 
         let x64_to_arm = ExecutionContext::shared(
             RuntimeEnv::for_test(Platform::Win64),
@@ -406,7 +311,7 @@ endlocal & if %RB_SECTION_ERRORLEVEL% neq 0 exit /b %RB_SECTION_ERRORLEVEL%
             Platform::WinArm64,
             Platform::WinArm64,
         );
-        let arm_command = runner.command_to_run_script(script, &x64_to_arm);
+        let arm_command = dialect.command_to_run_script(script, &x64_to_arm);
         assert_eq!(arm_command.program, "cmd.exe");
         assert_eq!(arm_command.args[..3], ["/d", "/v:on", "/c"]);
         assert!(arm_command.args[3].contains("/machine arm64"));
@@ -415,7 +320,7 @@ endlocal & if %RB_SECTION_ERRORLEVEL% neq 0 exit /b %RB_SECTION_ERRORLEVEL%
 
         let spaced_script = std::path::Path::new("work/conda build.bat");
         assert!(
-            runner
+            dialect
                 .command_to_run_script(spaced_script, &x64_to_arm)
                 .args[3]
                 .contains(r#"cmd.exe /d /c "conda build.bat""#)
@@ -427,7 +332,7 @@ endlocal & if %RB_SECTION_ERRORLEVEL% neq 0 exit /b %RB_SECTION_ERRORLEVEL%
             Platform::Win64,
             Platform::Win64,
         );
-        let x64_command = runner.command_to_run_script(script, &arm_to_x64);
+        let x64_command = dialect.command_to_run_script(script, &arm_to_x64);
         assert!(x64_command.args[3].contains("/machine amd64"));
 
         let x64_to_x86 = ExecutionContext::shared(
@@ -436,7 +341,7 @@ endlocal & if %RB_SECTION_ERRORLEVEL% neq 0 exit /b %RB_SECTION_ERRORLEVEL%
             Platform::Win32,
             Platform::Win32,
         );
-        let x86_command = runner.command_to_run_script(script, &x64_to_x86);
+        let x86_command = dialect.command_to_run_script(script, &x64_to_x86);
         assert!(x86_command.args[3].contains("/machine x86"));
         assert!(
             x86_command.args[3].contains(r"%SystemRoot%\SysWOW64\cmd.exe"),
@@ -451,7 +356,7 @@ endlocal & if %RB_SECTION_ERRORLEVEL% neq 0 exit /b %RB_SECTION_ERRORLEVEL%
             Platform::Win64,
         );
         assert_eq!(
-            runner.command_to_run_script(script, &same_arch).args,
+            dialect.command_to_run_script(script, &same_arch).args,
             ["/d", "/c", "work/conda_build.bat"]
         );
         assert_eq!(
@@ -488,7 +393,7 @@ endlocal & if %RB_SECTION_ERRORLEVEL% neq 0 exit /b %RB_SECTION_ERRORLEVEL%
     #[test]
     fn bash_preamble_enables_tracing_after_activation() {
         let preamble =
-            native_runner(Platform::Linux64).preamble(std::path::Path::new("build_env.sh"));
+            shell_dialect(Platform::Linux64).preamble(std::path::Path::new("build_env.sh"));
         let activation = preamble
             .find("source")
             .expect("preamble sources activation");

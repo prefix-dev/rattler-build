@@ -4,12 +4,15 @@ use std::path::Path;
 use indexmap::IndexMap;
 use rattler_shell::shell::{self, Shell};
 
-use super::{CommandSpec, NativeShellRunner, windows_machine_transition};
-use crate::{ExecutionContext, PrefixLayout};
+use super::{CommandSpec, ShellDialect};
+use crate::{
+    ExecutionContext, PrefixLayout,
+    windows_machine::{WindowsMachine, windows_machine_transition},
+};
 
-pub(crate) struct CmdExeNativeRunner;
+pub(crate) struct CmdExeDialect;
 
-impl NativeShellRunner for CmdExeNativeRunner {
+impl ShellDialect for CmdExeDialect {
     fn shell(&self) -> shell::ShellEnum {
         shell::CmdExe.into()
     }
@@ -56,7 +59,7 @@ IF "%CONDA_BUILD%" == "" (
                 .file_name()
                 .expect("generated build script has a filename")
                 .to_string_lossy();
-            let script_name = crate::native_runner::quote_arg(&self.shell(), &script_name);
+            let script_name = super::quote_arg(&self.shell(), &script_name);
             // `/machine x86` does not redirect an explicit `cmd.exe` lookup
             // from System32. Launch the x86 command interpreter from SysWOW64
             // directly. SystemRoot is conventionally an unspaced system path,
@@ -64,9 +67,8 @@ IF "%CONDA_BUILD%" == "" (
             // other architectures use `cmd.exe`, whose image selection is
             // handled by `/machine`.
             let child_cmd = match machine {
-                crate::native_runner::WindowsMachine::X86 => r"%SystemRoot%\SysWOW64\cmd.exe",
-                crate::native_runner::WindowsMachine::Amd64
-                | crate::native_runner::WindowsMachine::Arm64 => "cmd.exe",
+                WindowsMachine::X86 => r"%SystemRoot%\SysWOW64\cmd.exe",
+                WindowsMachine::Amd64 | WindowsMachine::Arm64 => "cmd.exe",
             };
             let command = format!(
                 "start /b /wait /machine {} {} /d /c {} & exit /b !ERRORLEVEL!",
