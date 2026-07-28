@@ -560,6 +560,7 @@ pub async fn get_build_output(
                     recipe_path,
                     &output_dir,
                     &timestamp,
+                    Platform::current(),
                 )
                 .no_build_id(build_data.no_build_id)
                 .merge_build_and_host(recipe.build().merge_build_and_host_envs)
