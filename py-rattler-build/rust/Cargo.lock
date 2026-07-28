@@ -4902,6 +4902,7 @@ dependencies = [
 name = "rattler_build_script"
 version = "0.2.7"
 dependencies = [
+ "async-trait",
  "clap",
  "console",
  "fs-err",

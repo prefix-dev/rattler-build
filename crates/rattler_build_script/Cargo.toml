@@ -11,6 +11,7 @@ description = "Script execution and sandbox configuration for rattler-build, sup
 [features]
 default = ["execution"]
 execution = [
+  "async-trait",
   "itertools",
   "thiserror",
   "tracing",
@@ -35,6 +36,7 @@ console = { workspace = true }
 clap = { workspace = true }
 
 # Execution dependencies (optional)
+async-trait = { workspace = true, optional = true }
 itertools = { workspace = true, optional = true }
 thiserror = { workspace = true, optional = true }
 tracing = { workspace = true, optional = true }
@@ -59,7 +61,7 @@ windows-sys = { workspace = true, features = [
 ] }
 
 [dev-dependencies]
-tokio = { workspace = true, features = ["rt", "macros", "fs"] }
+tokio = { workspace = true, features = ["rt", "macros", "fs", "time"] }
 insta = { workspace = true, features = ["yaml"] }
 serde_yaml = { workspace = true }
 tempfile = { workspace = true }

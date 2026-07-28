@@ -6,11 +6,12 @@
 
 use crate::sandbox::SandboxConfiguration;
 use crate::script::{Script, ScriptContent};
-use crate::{execution_context::ExecutionContext, runtime::RuntimeEnv};
+use crate::{
+    execution_context::ExecutionContext, runner::resolve_process_env, runtime::RuntimeEnv,
+};
 use fs_err as fs;
 use futures::TryStreamExt;
 use indexmap::IndexMap;
-use rattler_conda_types::Platform;
 use rattler_shell::shell::Shell;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -455,6 +456,21 @@ impl SpawnedProcess {
         }
     }
 
+    /// Discards all remaining output from both streams.
+    pub(crate) async fn drain_output(&mut self) -> io::Result<()> {
+        let mut stdout_sink = tokio::io::sink();
+        let mut stderr_sink = tokio::io::sink();
+        let (stdout_result, stderr_result) = tokio::join!(
+            tokio::io::copy(self.stdout.get_mut(), &mut stdout_sink),
+            tokio::io::copy(self.stderr.get_mut(), &mut stderr_sink),
+        );
+        self.stdout_closed = true;
+        self.stderr_closed = true;
+        stdout_result?;
+        stderr_result?;
+        Ok(())
+    }
+
     /// Waits for the process to exit. Call after draining its output.
     pub(crate) async fn wait(&mut self) -> io::Result<std::process::ExitStatus> {
         self.child.wait().await
@@ -834,93 +850,6 @@ fn find_rattler_sandbox(runtime: &RuntimeEnv) -> Option<PathBuf> {
     which::which_in_global("rattler-sandbox", Some(runtime.path()))
         .ok()?
         .next()
-}
-
-/// Environment variables that are passed through from the host environment
-/// into the build subprocess. These are variables that cannot be computed
-/// by rattler-build but are needed for builds to function correctly.
-const PASSTHROUGH_ENV_VARS: &[&str] = &[
-    // TLS certificates (needed for https in build scripts)
-    "SSL_CERT_FILE",
-    "SSL_CERT_DIR",
-    // Python requests CA bundle (needed for pip/requests in corporate environments)
-    "REQUESTS_CA_BUNDLE",
-    // SSH agent (needed for private git repo access)
-    "SSH_AUTH_SOCK",
-    // Display server (needed for GUI-related builds on Linux)
-    "DISPLAY",
-    // Proxy configuration (needed in corporate/CI environments)
-    "http_proxy",
-    "https_proxy",
-    "HTTP_PROXY",
-    "HTTPS_PROXY",
-    "no_proxy",
-    "NO_PROXY",
-];
-
-/// Platform-critical environment variables that must always be passed through
-/// to avoid breaking fundamental OS functionality.
-fn platform_passthrough_vars(platform: Platform) -> &'static [&'static str] {
-    if platform.is_windows() {
-        &[
-            // Required for Winsock/networking and DLL loading
-            "SYSTEMROOT",
-            "WINDIR",
-            // Command interpreter
-            "COMSPEC",
-            // Temp directories
-            "TEMP",
-            "TMP",
-            // Executable extension resolution
-            "PATHEXT",
-        ]
-    } else if platform.is_osx() {
-        &[
-            // macOS uses per-session temp directories
-            "TMPDIR",
-            // CoreFoundation text encoding
-            "__CF_USER_TEXT_ENCODING",
-        ]
-    } else {
-        &[]
-    }
-}
-
-/// Computes the complete child environment for the given isolation mode.
-///
-/// This reads only its arguments and never the ambient process environment.
-pub(crate) fn resolve_process_env(
-    env_isolation: EnvironmentIsolation,
-    env_vars: &IndexMap<String, String>,
-    secrets: &IndexMap<String, String>,
-    runtime: &RuntimeEnv,
-) -> IndexMap<String, String> {
-    match env_isolation {
-        EnvironmentIsolation::Strict | EnvironmentIsolation::CondaBuild => {
-            let mut process_env = IndexMap::new();
-
-            for var in PASSTHROUGH_ENV_VARS
-                .iter()
-                .chain(platform_passthrough_vars(runtime.process_platform()))
-            {
-                if let Some(value) = runtime.var(var) {
-                    process_env.insert((*var).to_owned(), value.to_owned());
-                }
-            }
-
-            process_env.extend(env_vars.clone());
-            process_env.extend(secrets.clone());
-            process_env
-        }
-        EnvironmentIsolation::None => {
-            let mut process_env = runtime
-                .vars()
-                .map(|(name, value)| (name.to_owned(), value.to_owned()))
-                .collect::<IndexMap<_, _>>();
-            process_env.extend(env_vars.clone());
-            process_env
-        }
-    }
 }
 
 /// Spawns a process and replaces the given strings in the output with the given replacements.
