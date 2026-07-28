@@ -2960,7 +2960,7 @@
 <p>Sometimes you build a package and want to split the contents into multiple sub-packages.
 For example, when building a C/C++ package, you might want to create multiple packages for the
 runtime requirements (library), and the development time requirements such as header files.</p>
-<p>Staging outputs make this easy. A staging output runs its build script once, then copies its files directly into each inheriting package's prefix. Since these are "new" files in the prefix, they will be included in the output package.</p>
+<p>Staging outputs make this easy. A staging output runs its build plan once, then copies its files directly into each inheriting package's prefix. Since these are "new" files in the prefix, they will be included in the output package.</p>
 <p>Let's take a look at an example:</p>
 <div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">recipe</span><span class="p">:</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mypackage</span>
@@ -3001,6 +3001,7 @@ runtime requirements (library), and the development time requirements such as he
 </span><span id="__span-0-37"><a id="__codelineno-0-37" name="__codelineno-0-37" href="#__codelineno-0-37"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">include/*</span>
 </span></code></pre></div>
 <p>In this example, we have a staging output called <code>mypackage-build</code> that creates files during its build. The two package outputs <code>mypackage-library</code> and <code>mypackage-headers</code> inherit from it using the <code>inherit:</code> key.</p>
+<p>Staging <code>build:</code> sections support the same executable build plan as package outputs: either <code>script:</code> or experimental <code>steps:</code> (with <code>--experimental</code>).</p>
 <p>When building, the staging output runs first and creates files in <code>$PREFIX</code>. These files are then copied into the <code>$PREFIX</code> of each inheriting output package.
 The easiest way to select a subset of the files in the prefix is by using the <code>files</code> field in the output definition.
 You can use a list of globs to select only the files that you want.</p>
@@ -3171,10 +3172,10 @@ across <code>python</code> variants.</p>
 cache directory contains:</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>output/build_cache/staging_&lt;sha256&gt;/
 </span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>├─ metadata.json    # Cache metadata (deps, sources, file lists, variant)
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>├─ prefix/          # Cached prefix files (only files added by the build script)
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>├─ prefix/          # Cached prefix files (only files added by the build plan)
 </span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>└─ work_dir/        # Cached work directory
 </span></code></pre></div>
-<p>On a <strong>cache hit</strong>, the staging build script is skipped entirely — the cached
+<p>On a <strong>cache hit</strong>, the staging build plan is skipped entirely — the cached
 prefix and work directory files are restored directly. On a <strong>cache miss</strong>, the
 full build runs and the results are cached for future use.</p>
 <p>To force a staging cache rebuild, delete the corresponding directory under
@@ -3186,9 +3187,9 @@ broken symlinks (symlinks whose target does not exist). On Unix systems,
 symbolic links are used; on Windows, junction points are created where
 applicable.</p>
 <h3 id="file-capture">File capture<a class="headerlink" href="#file-capture" title="Permanent link">#</a></h3>
-<p>Only files <strong>added</strong> by the build script are cached — files that were already
+<p>Only files <strong>added</strong> by the build plan are cached — files that were already
 present in the host environment from dependencies are excluded. This means the
-staging cache contains exactly the files that the build script installed into
+staging cache contains exactly the files that the build plan installed into
 <code>$PREFIX</code>, not the entire environment.</p>
 <h2 id="c-example-that-builds-python-bindings-on-top-of-a-library">C++ Example that builds Python bindings on top of a library<a class="headerlink" href="#c-example-that-builds-python-bindings-on-top-of-a-library" title="Permanent link">#</a></h2>
 <p>You can find an example (with source code) here: <a href="https://github.com/wolfv/rattler-build-cache-test/">Link</a>.</p>
