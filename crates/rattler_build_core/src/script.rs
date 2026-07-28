@@ -72,6 +72,22 @@ impl Output {
             );
         }
 
+        // A synthesized staging-debug output borrows a package output's
+        // identity, but the staging build does not produce a package. Mirror
+        // `build_staging_cache` and drop the misleading PKG_* vars so the debug
+        // environment matches what the real staging compile sees.
+        if self.is_staging_debug {
+            for key in [
+                "PKG_NAME",
+                "PKG_VERSION",
+                "PKG_BUILDNUM",
+                "PKG_BUILD_STRING",
+                "PKG_HASH",
+            ] {
+                env_vars.remove(key);
+            }
+        }
+
         let jinja_renderer = self.jinja_renderer();
         let work_dir = &self.build_configuration.directories.work_dir;
         Ok(ExecutionArgs {

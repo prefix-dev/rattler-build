@@ -537,12 +537,14 @@ pub async fn add_packages_to_prefix(
 impl crate::metadata::Output {
     /// Set up a debug environment without running the build.
     ///
-    /// This consolidates the 5-step setup sequence:
+    /// This consolidates the setup sequence (mirroring the prefix of
+    /// [`crate::build::run_build`], stopping before the build script runs):
     /// 1. Recreate directories
-    /// 2. Fetch sources
-    /// 3. Resolve dependencies
-    /// 4. Install environments
-    /// 5. Create build script
+    /// 2. Build or restore any inherited staging caches
+    /// 3. Fetch sources
+    /// 4. Resolve dependencies
+    /// 5. Install environments
+    /// 6. Create build script
     pub async fn setup_debug_environment(
         self,
         tool_config: &Configuration,
@@ -554,7 +556,21 @@ impl crate::metadata::Output {
             .recreate_directories()
             .into_diagnostic()?;
 
-        let output: crate::metadata::Output = self
+        // Build or restore any staging caches this output inherits from, exactly
+        // as `run_build` does, so that an inheriting (package) output's work dir
+        // is populated with the staged sources and `./install` tree and the
+        // inherited dependencies are available. This is a no-op for outputs that
+        // do not inherit from a staging cache (including a synthesized staging
+        // debug output, see `as_staging_debug_output`).
+        let mut output = self;
+        let staging_result = output.process_staging_caches(tool_config).await?;
+        if let Some((deps, sources, library_name_map)) = staging_result {
+            output.finalized_cache_dependencies = Some(deps);
+            output.finalized_cache_sources = Some(sources);
+            output.staging_library_name_map = Some(library_name_map);
+        }
+
+        let output: crate::metadata::Output = output
             .fetch_sources(tool_config, apply_patch_custom)
             .await
             .into_diagnostic()?;
@@ -572,5 +588,54 @@ impl crate::metadata::Output {
         output.create_build_script().await.into_diagnostic()?;
 
         Ok(output)
+    }
+
+    /// If `staging_name` names a staging cache that this (package) output
+    /// inherits from, return a synthesized output whose source, build section,
+    /// requirements and variant are those of the staging build.
+    ///
+    /// Setting up the debug environment of the returned output therefore
+    /// prepares the staging *compile* environment (the shared CMake/build step)
+    /// — sources, build/host prefixes and the staging build script — rather than
+    /// the package output's own (e.g. file-copying) environment. This is what
+    /// lets `rattler-build debug setup --output-name <staging>` drop into the
+    /// interactive compilation environment of a multi-output recipe.
+    ///
+    /// Returns `None` if no inherited staging cache has that name.
+    pub fn as_staging_debug_output(&self, staging_name: &str) -> Option<crate::metadata::Output> {
+        let staging = self
+            .recipe
+            .staging_caches
+            .iter()
+            .find(|cache| cache.name == staging_name)?;
+
+        let mut output = self.clone();
+        output.recipe.source = staging.source.clone();
+        // Keep the carrier output's (already resolved) build metadata — notably
+        // its resolved build string — and only adopt the parts of the staging
+        // build that define the compile: the build script and the build/host
+        // env layout. Cloning `staging.build` wholesale would bring in its
+        // unresolved `BuildString` and panic downstream.
+        output.recipe.build.script = staging.build.script.clone();
+        output.recipe.build.merge_build_and_host_envs = staging.build.merge_build_and_host_envs;
+        output.recipe.requirements = staging.requirements.clone();
+        // The synthesized output *is* the staging build, so it must not try to
+        // build/restore a parent staging cache of its own.
+        output.recipe.staging_caches = Vec::new();
+        output.recipe.inherits_from = None;
+        // Use the staging cache's own variant (e.g. for CONDA_BUILD_SYSROOT and
+        // the compilers), which can differ from the inheriting output's.
+        output.build_configuration.variant = staging.used_variant.clone();
+        // Force re-resolution / re-fetch against the staging configuration.
+        output.finalized_dependencies = None;
+        output.finalized_sources = None;
+        output.finalized_cache_dependencies = None;
+        output.finalized_cache_sources = None;
+        output.staging_library_name_map = None;
+        // Strip the carrier package's PKG_* env vars from the staging build
+        // script, matching the real staging build (`build_staging_cache`).
+        output.is_staging_debug = true;
+
+        Some(output)
     }
 }

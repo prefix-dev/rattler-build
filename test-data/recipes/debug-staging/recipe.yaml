@@ -1,0 +1,43 @@
+# Multi-output recipe with a `staging:` (compile) output that the package
+# output inherits. Used to test `rattler-build debug setup` against both the
+# staging compile stage and the inheriting package stage.
+schema_version: 1
+
+recipe:
+  name: debug-staging
+  version: 1.0.0
+
+outputs:
+  # Staging "compile" stage: builds once into ./install (work-dir relative).
+  - staging:
+      name: build-stage
+    build:
+      script:
+        - if: unix
+          then: |
+            echo "Compiling in staging"
+            mkdir -p ./install
+            echo "artifact" > ./install/artifact.txt
+        - if: win
+          then: |
+            echo Compiling in staging
+            mkdir install
+            echo artifact > install\artifact.txt
+
+  # Package stage: inherits the staging cache and copies the built artifact.
+  - package:
+      name: debug-staging
+      version: 1.0.0
+    inherit: build-stage
+    build:
+      script:
+        - if: unix
+          then: |
+            echo "Packaging from staging"
+            mkdir -p $PREFIX/share
+            cp ./install/artifact.txt $PREFIX/share/artifact.txt
+        - if: win
+          then: |
+            echo Packaging from staging
+            mkdir %PREFIX%\share
+            copy install\artifact.txt %PREFIX%\share\artifact.txt
