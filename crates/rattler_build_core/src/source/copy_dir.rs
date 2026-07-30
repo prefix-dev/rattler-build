@@ -443,7 +443,12 @@ where
             // File has been reflinked
             #[cfg(target_os = "linux")]
             {
-                copy_metadata(from, to.as_ref())?;
+                match copy_metadata(from, to.as_ref()) {
+                    Ok(()) => {}
+                    Err(e) => {
+                        tracing::debug!("Failed to copy metadata for {:?} {:?}", to.as_ref(), e);
+                    }
+                }
             }
         }
         Ok(Some(_)) => {
