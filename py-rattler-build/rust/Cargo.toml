@@ -38,11 +38,11 @@ tokio = { version = "1.53.1", features = [
 rattler_conda_types = "0.49"
 rattler_config = "0.6"
 rattler_networking = { version = "0.30.3" }
-rattler_solve = "8.0"
-rattler_virtual_packages = "4.0.0"
+rattler_solve = "9.0"
+rattler_virtual_packages = "4.1.0"
 clap = "4.6.4"
 url = "2.5.8"
-jiff = "0.2.34"
+jiff = "0.2.35"
 hex = "0.4.3"
 rattler_upload = "0.10"
 rattler_package_streaming = { version = "0.26.9", default-features = false }
