@@ -65,6 +65,7 @@ use rattler_index::ensure_channel_initialized_s3;
 use rattler_solve::SolveStrategy;
 use rattler_virtual_packages::VirtualPackageOverrides;
 use render::resolved_dependencies::RunExportsDownload;
+use script::LocalRunner;
 use system_tools::SystemTools;
 use tool_configuration::{Configuration, ContinueOnFailure, SkipExisting, TestStrategy};
 use types::Directories;
@@ -234,6 +235,7 @@ pub fn get_tool_config(
 
     let configuration_builder = Configuration::builder()
         .with_keep_build(build_data.keep_build)
+        .with_runner(Arc::new(LocalRunner::new(build_data.env_isolation)))
         .with_compression_threads(build_data.compression_threads)
         .with_reqwest_client(client)
         .with_test_strategy(build_data.test)
