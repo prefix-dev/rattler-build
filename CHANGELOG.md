@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.72.1] - 2026-07-31
+### ✨ Highlights
+
+This patch release updates `flickzeug` to fix applying patches that only delete lines. It also handles metadata-copy errors for reflinked files and makes explicit `channel_sources` override configured `default-channels`.
+
+
+
+### Fixed
+
+- Update `flickzeug` to fix deletion-only patch application by @wolfv in [#2704](https://github.com/prefix-dev/rattler-build/pull/2704)
+- Handle copy_metadata errors for reflinked files by @jmakovicka in [#2703](https://github.com/prefix-dev/rattler-build/pull/2703)
+- Let `channel_sources` win over `default-channels` from the config file by @Hofer-Julian in [#2705](https://github.com/prefix-dev/rattler-build/pull/2705)
+
+
+### New Contributors
+* @jmakovicka made their first contribution in [#2703](https://github.com/prefix-dev/rattler-build/pull/2703)
+
 ## [0.72.0] - 2026-07-28
 ### ✨ Highlights
 
