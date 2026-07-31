@@ -522,9 +522,15 @@ pub async fn get_build_output(
         // 3. channels from pixi_config
         // 4. conda-forge as fallback
         if variant_channels.is_some() && build_data.channels.is_some() {
-            return Err(miette::miette!(
-                "channel_sources and channels cannot both be set at the same time"
-            ));
+            if build_data.channels_from_config {
+                tracing::debug!(
+                    "ignoring `default-channels` from the configuration file because the variant config sets `channel_sources`"
+                );
+            } else {
+                return Err(miette::miette!(
+                    "channel_sources and channels cannot both be set at the same time"
+                ));
+            }
         }
         let channels = variant_channels.unwrap_or_else(|| {
             build_data
@@ -1587,6 +1593,7 @@ pub async fn debug_recipe(
         target_platform: debug_data.target_platform,
         host_platform: debug_data.host_platform,
         channels: debug_data.channels,
+        channels_from_config: false,
         common: debug_data.common,
         keep_build: true,
         test: TestStrategy::Skip,

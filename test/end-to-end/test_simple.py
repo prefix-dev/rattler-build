@@ -2148,6 +2148,27 @@ def test_channel_sources(
     ]
 
 
+def test_channel_sources_with_default_channels_config(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    # default-channels from the configuration file is a fallback, so
+    # channel_sources takes precedence instead of raising a conflict error
+    config = tmp_path / "config.toml"
+    config.write_text('default-channels = ["https://prefix.dev/conda-forge"]\n')
+
+    output = rattler_build.build(
+        recipes / "channel_sources",
+        tmp_path,
+        extra_args=["--render-only", "--config-file", str(config)],
+    )
+
+    output_json = json.loads(output)
+    assert output_json[0]["build_configuration"]["channels"] == [
+        "https://conda.anaconda.org/conda-forge/label/rust_dev",
+        "https://conda.anaconda.org/conda-forge",
+    ]
+
+
 def test_relative_file_loading(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
