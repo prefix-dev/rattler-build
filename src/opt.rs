@@ -893,6 +893,11 @@ pub struct BuildData {
     pub target_platform: Platform,
     pub host_platform: Platform,
     pub channels: Option<Vec<NamedChannelOrUrl>>,
+    /// Whether `channels` was filled from the configuration file's
+    /// `default-channels` rather than passed explicitly. Config channels are a
+    /// fallback, so they lose against `channel_sources` from a variant config
+    /// instead of conflicting with it.
+    pub channels_from_config: bool,
     pub variant_config: Vec<PathBuf>,
     pub variant_overrides: HashMap<String, Vec<String>>,
     pub ignore_recipe_variants: bool,
@@ -968,6 +973,7 @@ impl BuildData {
                 .or(target_platform)
                 .unwrap_or(Platform::current()),
             channels,
+            channels_from_config: false,
             variant_config: variant_config.unwrap_or_default(),
             variant_overrides,
             ignore_recipe_variants,
@@ -1006,7 +1012,8 @@ impl BuildData {
     /// Generate a new BuildData struct from BuildOpts and an optional pixi config.
     /// BuildOpts have higher priority than the pixi config.
     pub fn from_opts_and_config(opts: BuildOpts, config: Option<Config>) -> Self {
-        Self::new(
+        let explicit_channels = opts.channels.is_some();
+        let mut build_data = Self::new(
             opts.up_to,
             opts.build_platform,
             opts.target_platform, // todo: read this from config as well
@@ -1050,7 +1057,9 @@ impl BuildData {
             None, // build_num_override — set by caller (BuildOnlyOpts or PublishOpts)
             None, // build_string_prefix — set by caller (BuildOnlyOpts or PublishOpts)
             opts.markdown_summary,
-        )
+        );
+        build_data.channels_from_config = !explicit_channels && build_data.channels.is_some();
+        build_data
     }
 }
 
