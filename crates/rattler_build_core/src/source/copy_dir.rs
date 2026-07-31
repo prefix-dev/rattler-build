@@ -45,7 +45,12 @@ fn copy_metadata(from: &Path, to: &Path) -> std::io::Result<()> {
         .set_accessed(metadata.accessed()?)
         .set_modified(metadata.modified()?);
 
-    let file = std::fs::OpenOptions::new().write(true).open(to)?;
+    let mut options = std::fs::OpenOptions::new();
+    #[cfg(target_os = "linux")]
+    options.read(true);
+    #[cfg(not(target_os = "linux"))]
+    options.write(true);
+    let file = options.open(to)?;
     file.set_times(file_times)?;
     file.set_permissions(metadata.permissions())?;
 
@@ -547,6 +552,39 @@ mod test {
 
     use super::GlobVec;
     use std::collections::HashSet;
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn copy_metadata_to_read_only_file() {
+        use std::{
+            fs::FileTimes,
+            os::unix::fs::PermissionsExt,
+            time::{Duration, UNIX_EPOCH},
+        };
+
+        let tmp_dir = tempfile::TempDir::new().unwrap();
+        let source = tmp_dir.path().join("source");
+        let destination = tmp_dir.path().join("destination");
+        fs::write(&source, "source").unwrap();
+        fs::write(&destination, "destination").unwrap();
+
+        File::open(&source)
+            .unwrap()
+            .set_times(FileTimes::new().set_modified(UNIX_EPOCH + Duration::from_secs(1_000_000)))
+            .unwrap();
+        fs::set_permissions(&source, std::fs::Permissions::from_mode(0o444)).unwrap();
+        fs::set_permissions(&destination, std::fs::Permissions::from_mode(0o400)).unwrap();
+
+        super::copy_metadata(&source, &destination).unwrap();
+
+        let source_metadata = fs::metadata(source).unwrap();
+        let destination_metadata = fs::metadata(destination).unwrap();
+        assert_eq!(
+            source_metadata.modified().unwrap(),
+            destination_metadata.modified().unwrap()
+        );
+        assert_eq!(destination_metadata.permissions().mode() & 0o777, 0o444);
+    }
 
     #[test]
     fn test_copy_dir() {
