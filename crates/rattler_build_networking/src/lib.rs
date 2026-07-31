@@ -281,7 +281,9 @@ fn build_middleware_client(
         std::collections::HashMap<String, rattler_networking::s3_middleware::S3Config>,
     >,
 ) -> ClientWithMiddleware {
-    use rattler_networking::{AuthenticationMiddleware, mirror_middleware::MirrorMiddleware};
+    use rattler_networking::{
+        AuthChallengeMiddleware, AuthenticationMiddleware, mirror_middleware::MirrorMiddleware,
+    };
 
     let mut builder =
         reqwest_middleware::ClientBuilder::new(reqwest_client(user_agent, timeout_secs, dangerous));
@@ -295,6 +297,9 @@ fn build_middleware_client(
             auth_storage.clone(),
         ));
     }
+    // Stored credentials take precedence. If none are available, react to a prefix.dev
+    // authentication challenge by acquiring and caching a token from ambient CI OIDC.
     builder = builder.with(AuthenticationMiddleware::from_auth_storage(auth_storage));
+    builder = builder.with(AuthChallengeMiddleware::default());
     builder.with(retry_middleware()).build()
 }
