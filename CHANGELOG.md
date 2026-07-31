@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.72.2] - 2026-07-31
+### ✨ Highlights
+
+This patch release enables trusted-publisher OIDC authentication when reading private prefix.dev channels during solving and `--skip-existing all` checks.
+
+### Fixed
+
+- Authenticate private channel reads with trusted publishing by @wolfv in [#2712](https://github.com/prefix-dev/rattler-build/pull/2712)
+
 ## [0.72.1] - 2026-07-31
 ### ✨ Highlights
 
