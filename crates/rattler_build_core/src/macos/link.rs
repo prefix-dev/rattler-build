@@ -215,11 +215,16 @@ impl Relinker for Dylib {
                 } else if rpath_allowlist.is_match(rpath) {
                     tracing::info!("Rpath in allow list: {}", rpath.display());
                     final_rpaths.push(rpath.clone());
+                } else {
+                    tracing::info!(
+                        "Rpath not in prefix or allow-listed: {} - removing it",
+                        rpath.display()
+                    );
                 }
-                tracing::info!(
-                    "Rpath not in prefix or allow-listed: {} - removing it",
-                    rpath.display()
-                );
+            } else if rpath.starts_with("@executable_path") {
+                // This path is relative to the process executable and is
+                // therefore already relocatable.
+                final_rpaths.push(rpath.clone());
             } else if let Ok(rel) = rpath.strip_prefix(encoded_prefix) {
                 let new_rpath = prefix.join(rel);
 
@@ -923,6 +928,49 @@ mod tests {
         let object = Dylib::new(&binary_path)?;
         assert_eq!(vec![PathBuf::from("@loader_path/../lib")], object.rpaths);
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_keep_executable_relative_rpaths() -> Result<(), RelinkError> {
+        let prefix = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/binary_files");
+        let tmp_dir = tempdir_in(&prefix)?;
+        let bin_dir = tmp_dir.path().join("bin");
+        fs::create_dir(&bin_dir)?;
+        let binary_path = bin_dir.join("zlink-executable-rpaths");
+        fs::copy(prefix.join("duplicate-rpath-macos"), &binary_path)?;
+
+        let object = Dylib::new(&binary_path)?;
+        let executable_rpaths = vec![
+            PathBuf::from("@executable_path/../lib"),
+            PathBuf::from("@executable_path/../lib/lean"),
+        ];
+        let changes = DylibChanges {
+            change_rpath: object
+                .rpaths
+                .iter()
+                .cloned()
+                .zip(executable_rpaths.iter().cloned())
+                .map(|(old, new)| (Some(old), Some(new)))
+                .collect(),
+            change_id: None,
+            change_dylib: HashMap::default(),
+        };
+        super::relink(&binary_path, &changes)?;
+
+        let object = Dylib::new(&binary_path)?;
+        assert_eq!(object.rpaths, executable_rpaths);
+
+        object.relink(
+            tmp_dir.path(),
+            tmp_dir.path(),
+            &[],
+            &GlobVec::default(),
+            &SystemTools::new("rattler-build", "0.0.0"),
+        )?;
+
+        let object = Dylib::new(&binary_path)?;
+        assert_eq!(object.rpaths, executable_rpaths);
         Ok(())
     }
 
