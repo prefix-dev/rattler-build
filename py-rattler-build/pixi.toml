@@ -88,7 +88,7 @@ env = { AWS_LC_SYS_CMAKE_BUILDER = "1" }
 python = "*"
 maturin = "~=1.14.1"
 
-[package.target.linux.build-dependencies]
+[package.build-dependencies."if(linux)"]
 patchelf = "~=0.17.2"
 cmake = ">=4,<5"
 make = ">=4,<5"
