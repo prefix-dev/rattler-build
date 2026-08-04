@@ -1,3 +1,7 @@
+---
+title: Rattler Index
+---
+
 `rattler-index` is a rattler-based tool which allows you to index your channels.
 It can create `repodata.json`, `repodata.json.zst` as well as sharded repodata ([CEP 16](https://github.com/conda/ceps/blob/main/cep-0016.md)).
 It can index both conda channels on a local file system as well as conda channels on S3.

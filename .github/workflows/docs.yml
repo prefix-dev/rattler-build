@@ -6,7 +6,7 @@ on:
       - main
     paths:
       - "docs/**"
-      - "mkdocs.yml"
+      - "zensical.toml"
       - "src/opt.rs"
       - "crates/rattler_build_docs/**"
   pull_request:
@@ -15,7 +15,7 @@ on:
     paths:
       - "docs/**"
       - ".github/workflows/docs.yml"
-      - "mkdocs.yml"
+      - "zensical.toml"
       - "pixi.*"
       - "src/opt.rs"
       - "crates/rattler_build_docs/**"
@@ -64,7 +64,7 @@ jobs:
       - name: Check for changes
         id: git_diff
         run: |
-          git add docs/reference/cli/
+          git add docs/reference/cli/ zensical.toml
           git diff --staged --exit-code || echo "has_changes=true" >> $GITHUB_ENV
 
       - name: Output instructions if there are changes

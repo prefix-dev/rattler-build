@@ -1,3 +1,7 @@
+---
+title: Home
+---
+
 ## A fast conda package builder: Rattler-Build
 
 The Rattler-Build tool creates cross-platform relocatable packages from a simple recipe format.
