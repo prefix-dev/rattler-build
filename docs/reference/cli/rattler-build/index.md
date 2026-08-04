@@ -12,18 +12,18 @@ rattler-build [OPTIONS] [COMMAND]
 ## Subcommands
 | Command | Description |
 |---------|-------------|
-| [`build`](rattler-build/build.md) | Build a package from a recipe |
-| [`publish`](rattler-build/publish.md) | Publish packages to a channel. This command builds packages from recipes (or uses already built packages), uploads them to a channel, and runs indexing |
-| [`test`](rattler-build/test.md) | Run a test for a single package |
-| [`rebuild`](rattler-build/rebuild.md) | Rebuild a package from a package file instead of a recipe |
-| [`upload`](rattler-build/upload.md) | Upload a package |
-| [`completion`](rattler-build/completion.md) | Generate shell completion script |
-| [`generate-recipe`](rattler-build/generate-recipe.md) | Generate a recipe from PyPI, CRAN, CPAN, or LuaRocks |
-| [`auth`](rattler-build/auth.md) | Handle authentication to external channels |
-| [`debug`](rattler-build/debug.md) | Debug a recipe build |
-| [`package`](rattler-build/package.md) | Package-related subcommands |
-| [`bump-recipe`](rattler-build/bump-recipe.md) | Bump a recipe to a new version |
-| [`migrate-recipe`](rattler-build/migrate-recipe.md) | Migrate a recipe from the deprecated `cache:` format to `staging:` outputs |
+| [`build`](build.md) | Build a package from a recipe |
+| [`publish`](publish.md) | Publish packages to a channel. This command builds packages from recipes (or uses already built packages), uploads them to a channel, and runs indexing |
+| [`test`](test.md) | Run a test for a single package |
+| [`rebuild`](rebuild.md) | Rebuild a package from a package file instead of a recipe |
+| [`upload`](upload/index.md) | Upload a package |
+| [`completion`](completion.md) | Generate shell completion script |
+| [`generate-recipe`](generate-recipe/index.md) | Generate a recipe from PyPI, CRAN, CPAN, or LuaRocks |
+| [`auth`](auth/index.md) | Handle authentication to external channels |
+| [`debug`](debug/index.md) | Debug a recipe build |
+| [`package`](package/index.md) | Package-related subcommands |
+| [`bump-recipe`](bump-recipe.md) | Bump a recipe to a new version |
+| [`migrate-recipe`](migrate-recipe.md) | Migrate a recipe from the deprecated `cache:` format to `staging:` outputs |
 
 
 ## Options
