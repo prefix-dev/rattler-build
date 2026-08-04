@@ -34,29 +34,96 @@ generate-cli-docs = "cargo run --manifest-path crates/rattler_build_docs/Cargo.t
 generate-test-data = "cargo r --release --bin patch-apply-gen-test-data"
 update-snapshots = "pytest test/end-to-end --snapshot-update"
 check-native-tls = "python scripts/check-native-tls.py"
-# Playground tasks are in the "playground" environment/feature (see below)
+# Playground tasks are in the "playground" environment (see below)
 
-[feature.playground.dependencies]
-python = ">=3.14.6,<3.15"
+[dependencies]
+rust-src = ">=1.97.1,<2"
+sccache = ">=0.16.0,<0.17"
+libssh2 = ">=1.11.1,<2"
+pkg-config = ">=0.29.2,<0.30"
+perl = ">=5.32.1,<5.33"
+pytest = ">=9.1.1,<10"
+pytest-xdist = ">=3.8.0,<4"
+pyyaml = ">=6.0.3,<7"
+conda-package-handling = ">=2.5.0,<3"
+requests = ">=2.34.2,<3"
+syrupy = ">=5.3.2,<6"
+boto3 = ">=1.43.34,<2"
+
+[target.unix.dependencies]
+make = ">=4.4.1,<5"
+
+[target.linux.dependencies]
+clang = ">=18.1.8,<19.0"
+mold = ">=2.33.0,<3.0"
+patchelf = ">=0.17.2,<0.18"
+openssl = ">=3.6.1,<4"
+
+[target.linux-64.dependencies]
+make = ">=4.4.1,<5"
 clang = ">=22.1.8,<23"
-livereload = ">=2.7.1,<3"
-wasm-pack = ">=0.15.0,<0.16"
-rust = ">=1.97.1,<1.98"
-rust-std-wasm32-unknown-unknown = ">=1.97.1,<2"
+mold = ">=2.40.4,<3"
+patchelf = ">=0.18.0,<0.19"
+openssl = ">=3.6.3,<4"
 
-[feature.playground.tasks]
-playground-build = { cmd = "python scripts/build_playground.py", description = "Build the WASM playground", inputs = [
-  "crates/**",
-  "scripts/build_playground.py",
-  "Cargo.lock",
-], outputs = [
-  "deploy/*",
-] }
-playground-serve = { cmd = "python scripts/serve_playground.py", depends-on = [
-  "playground-build",
-], description = "Serve the playground with live reload on source changes" }
+[target.osx-64.dependencies]
+patchelf = ">=0.18.0,<0.19"
+make = ">=4.4.1,<5"
 
-[feature.docs.tasks]
+[target.osx-arm64.dependencies]
+patchelf = ">=0.18.0,<0.19"
+make = ">=4.4.1,<5"
+
+[dev]
+rattler-build = { path = "." }
+
+[activation.env]
+RUSTC_WRAPPER = "sccache"
+# Use cmake to build aws-lc-sys, because conda's CFLAGS inject -O2 which
+# overrides the -O0 required by jitterentropy-base.c, causing a build failure.
+AWS_LC_SYS_CMAKE_BUILDER = "1"
+PYTHONIOENCODING = "utf-8"
+
+[target.linux.activation]
+scripts = ["scripts/activate.sh"]
+
+[target.osx.activation]
+scripts = ["scripts/activate.sh"]
+
+[target.win.activation]
+scripts = ["scripts/activate.bat"]
+
+[environments.default]
+solve-group = "default"
+
+[environments.default.dependencies]
+tbump = ">=6.9.0,<7"
+git-cliff = ">=2.13.1,<3"
+questionary = ">=2.1.1,<3"
+
+[environments.default.tasks]
+# Bump version by running `pixi run bump NEW_VERSION`
+bump = "tbump --only-patch"
+release = { cmd = "python scripts/release.py", description = "Bump version and update lock files" }
+
+[environments.docs]
+no-default-feature = true
+
+[environments.docs.dependencies]
+cairosvg = ">=2.9.0,<3"
+click = "==8.2.1"                                  # Pin click because of https://github.com/mkdocs/mkdocs/issues/4032
+mike = ">=2.1.3,<3"
+mkdocs = ">=1.6.1,<2"
+mkdocs-material = ">=9.7.0,<10"
+mkdocstrings = ">=0.30.1,<0.31"
+mkdocstrings-python = ">=1.18.2,<2"
+pillow = ">=12.2.0,<13"
+ruff = ">=0.15.18,<0.16"
+py-rattler-build = { path = "./py-rattler-build" }
+nbconvert = ">=7.17.1,<8"
+ipykernel = ">=7.3.0,<8"
+
+[environments.docs.tasks]
 download-font = "bash docs/layouts/download-font-to-cache.sh"
 convert-notebooks = { cmd = "jupyter nbconvert --execute --to markdown py-rattler-build/notebooks/*.ipynb --output-dir docs/py-rattler-build/tutorials", inputs = [
   "py-rattler-build/notebooks/*.ipynb",
@@ -89,34 +156,10 @@ deploy-dev = { cmd = "mike deploy --push dev devel", depends-on = [
   "validate-recipes",
 ] }
 
-[dependencies]
-rust-src = ">=1.97.1,<2"
-sccache = ">=0.16.0,<0.17"
-libssh2 = ">=1.11.1,<2"
-pkg-config = ">=0.29.2,<0.30"
-perl = ">=5.32.1,<5.33"
-pytest = ">=9.1.1,<10"
-pytest-xdist = ">=3.8.0,<4"
-pyyaml = ">=6.0.3,<7"
-conda-package-handling = ">=2.5.0,<3"
-requests = ">=2.34.2,<3"
-syrupy = ">=5.3.2,<6"
-boto3 = ">=1.43.34,<2"
+[environments.lint]
+solve-group = "default"
 
-[target.unix.dependencies]
-make = ">=4.4.1,<5"
-
-[dev]
-rattler-build = { path = "." }
-
-[activation.env]
-RUSTC_WRAPPER = "sccache"
-# Use cmake to build aws-lc-sys, because conda's CFLAGS inject -O2 which
-# overrides the -O0 required by jitterentropy-base.c, causing a build failure.
-AWS_LC_SYS_CMAKE_BUILDER = "1"
-PYTHONIOENCODING = "utf-8"
-
-[feature.lint.dependencies]
+[environments.lint.dependencies]
 actionlint = ">=1.7.12,<2"
 cargo-deny = ">=0.19.9,<0.20"
 prettier = ">=3.8.4,<4"
@@ -127,7 +170,7 @@ typos = ">=1.47.2,<2"
 zizmor = ">=1.26.1,<2"
 nbstripout = ">=0.9.1,<0.10"
 
-[feature.lint.tasks]
+[environments.lint.tasks]
 actionlint = { cmd = "actionlint", env = { SHELLCHECK_OPTS = "-e SC2086" } }
 cargo-clippy = "cargo clippy --all-targets --all-features --workspace -- -D warnings -Dclippy::dbg_macro"
 cargo-deny = "cargo deny --workspace check license --deny warnings"
@@ -143,14 +186,17 @@ toml-lint = "taplo lint --verbose **/pixi.toml"
 typos = "typos --force-exclude"
 zizmor = { cmd = "zizmor --quiet --min-severity=low .github/", description = "Security audit GitHub Actions" }
 
-[feature.pre-commit.dependencies]
+[environments.pre-commit]
+no-default-feature = true
+
+[environments.pre-commit.dependencies]
 lefthook = ">=2.1.9,<3"
 sccache = ">=0.16.0,<0.17"
 
-[feature.pre-commit.activation.env]
+[environments.pre-commit.activation.env]
 RUSTC_WRAPPER = "sccache"
 
-[feature.pre-commit.tasks]
+[environments.pre-commit.tasks]
 lefthook = { cmd = "lefthook", description = "Run lefthook" }
 lint = { depends-on = [
   "lint-fast",
@@ -161,72 +207,48 @@ lint-slow = { cmd = "lefthook run pre-push --all-files --force", description = "
 pre-commit-install = "lefthook install"
 pre-commit-install-minimal = "lefthook install pre-commit"
 
-[feature.dev.dependencies]
-tbump = ">=6.9.0,<7"
-git-cliff = ">=2.13.1,<3"
-questionary = ">=2.1.1,<3"
+[environments.packaging]
+no-default-feature = true
 
-[feature.dev.tasks]
-# Bump version by running `pixi run bump NEW_VERSION`
-bump = "tbump --only-patch"
-release = { cmd = "python scripts/release.py", description = "Bump version and update lock files" }
-
-[feature.packaging.dependencies]
+[environments.packaging.dependencies]
 python = ">=3.14.6,<3.15"
 sccache = ">=0.16.0,<0.17"
 tomlkit = ">=0.15.0,<0.16"
 
-[feature.packaging.activation.env]
+[environments.packaging.activation.env]
 RUSTC_WRAPPER = "sccache"
 
-[feature.packaging.tasks]
+[environments.packaging.tasks]
 build-package = "python scripts/build_package.py"
 upload-package = "python scripts/upload_package.py"
 
-[target.linux.dependencies]
-clang = ">=18.1.8,<19.0"
-mold = ">=2.33.0,<3.0"
-patchelf = ">=0.17.2,<0.18"
-openssl = ">=3.6.1,<4"
+[environments.playground]
+no-default-feature = true
 
-[target.osx-64.dependencies]
-patchelf = ">=0.18.0,<0.19"
-make = ">=4.4.1,<5"
-
-[target.osx-arm64.dependencies]
-patchelf = ">=0.18.0,<0.19"
-make = ">=4.4.1,<5"
-
-[target.linux.activation]
-scripts = ["scripts/activate.sh"]
-
-[target.osx.activation]
-scripts = ["scripts/activate.sh"]
-[target.win.activation]
-scripts = ["scripts/activate.bat"]
-
-[target.linux-64.dependencies]
-make = ">=4.4.1,<5"
+[environments.playground.dependencies]
+python = ">=3.14.6,<3.15"
 clang = ">=22.1.8,<23"
-mold = ">=2.40.4,<3"
-patchelf = ">=0.18.0,<0.19"
-openssl = ">=3.6.3,<4"
+livereload = ">=2.7.1,<3"
+wasm-pack = ">=0.15.0,<0.16"
+rust = ">=1.97.1,<1.98"
+rust-std-wasm32-unknown-unknown = ">=1.97.1,<2"
 
-[feature.docs.dependencies]
-cairosvg = ">=2.9.0,<3"
-click = "==8.2.1"                                  # Pin click because of https://github.com/mkdocs/mkdocs/issues/4032
-mike = ">=2.1.3,<3"
-mkdocs = ">=1.6.1,<2"
-mkdocs-material = ">=9.7.0,<10"
-mkdocstrings = ">=0.30.1,<0.31"
-mkdocstrings-python = ">=1.18.2,<2"
-pillow = ">=12.2.0,<13"
-ruff = ">=0.15.18,<0.16"
-py-rattler-build = { path = "./py-rattler-build" }
-nbconvert = ">=7.17.1,<8"
-ipykernel = ">=7.3.0,<8"
+[environments.playground.tasks]
+playground-build = { cmd = "python scripts/build_playground.py", description = "Build the WASM playground", inputs = [
+  "crates/**",
+  "scripts/build_playground.py",
+  "Cargo.lock",
+], outputs = [
+  "deploy/*",
+] }
+playground-serve = { cmd = "python scripts/serve_playground.py", depends-on = [
+  "playground-build",
+], description = "Serve the playground with live reload on source changes" }
 
-[feature.release.dependencies]
+[environments.release]
+no-default-feature = true
+
+[environments.release.dependencies]
 python = ">=3.14.6,<3.15"
 git-cliff = ">=2.13.1,<3"
 release-plz = ">=0.3.159,<0.4"
@@ -234,7 +256,7 @@ rust = ">=1.97.1,<1.98"
 7zip = ">=26.1,<27"
 httpx = ">=0.28.1,<0.29"
 
-[feature.release.tasks]
+[environments.release.tasks]
 extract-version = { cmd = "python scripts/extract_version.py", description = "Extract version from Cargo.toml" }
 release-plz-pr = { cmd = "python scripts/release_plz_pr.py", description = "Create release PR and sync py-rattler-build Cargo.lock" }
 release-plz-release = { cmd = "python scripts/release_plz_release.py", description = "Publish crates and create git tags" }
@@ -244,15 +266,6 @@ create-tag = { cmd = "python scripts/create_tag.py", description = "Create and p
 sign-macos = { cmd = "python scripts/sign_macos.py", description = "Codesign and notarize a macOS binary in place" }
 save-attestation = { cmd = "python scripts/save_attestation.py", description = "Save attestation bundle" }
 create-release = { cmd = "python scripts/create_release.py", description = "Create GitHub release with all artifacts" }
-
-[environments]
-default = { features = ["dev"], solve-group = "default" }
-docs = { features = ["docs"], no-default-feature = true }
-lint = { features = ["lint"], solve-group = "default" }
-pre-commit = { features = ["pre-commit"], no-default-feature = true }
-packaging = { features = ["packaging"], no-default-feature = true }
-playground = { features = ["playground"], no-default-feature = true }
-release = { features = ["release"], no-default-feature = true }
 
 # -------------------------------------------------------------------------------------------------
 # Pixi package definition

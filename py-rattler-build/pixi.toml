@@ -9,41 +9,13 @@ preview = ["pixi-build"]
 # We are using the oldest supported python version as the build variant here
 build-variants = { python = ["3.10"] }
 
-[package.build.backend]
-name = "pixi-build-python"
-version = "*"
+[dependencies]
+requests = ">=2.34.2,<3"
+sccache = ">=0.16.0,<0.17"
+types-requests = ">=2.33.0.20260518,<3"
 
-[package.build.config]
-compilers = ["rust"]
-extra-input-globs = ["../src", "../crates"]
-# Use cmake to build aws-lc-sys, because conda's CFLAGS inject -O2 which
-# overrides the -O0 required by jitterentropy-base.c, causing a build failure.
-env = { AWS_LC_SYS_CMAKE_BUILDER = "1" }
-
-[package.host-dependencies]
-python = "*"
-maturin = "~=1.14.1"
-
-[package.target.linux.build-dependencies]
-patchelf = "~=0.17.2"
-cmake = ">=4,<5"
-make = ">=4,<5"
-
-[feature.lint.dependencies]
-# we need rust for cargo-fmt and clippy
-rust = ">=1.97.1,<1.98"
-ruff = ">=0.15.18,<0.16"
-
-[feature.lint.tasks]
-
-fmt-rust = "cargo fmt --all --manifest-path rust/Cargo.toml"
-# checks for the CI
-fmt-rust-check = "cargo fmt --all --check --manifest-path rust/Cargo.toml"
-
-lint-python = "ruff check ."
-lint-rust = "cargo clippy --all-targets --workspace --manifest-path rust/Cargo.toml -- -D warnings"
-
-lint = { depends-on = ["lint-python", "lint-rust", "fmt-rust"] }
+[activation.env]
+RUSTC_WRAPPER = "sccache"
 
 [feature.test.dependencies]
 py-rattler-build = { path = "." }
@@ -71,19 +43,52 @@ check-cargo-lock = "cargo check --locked --manifest-path rust/Cargo.toml"
 test = { cmd = "pytest --durations=0 ./tests", depends-on = ["type-check"] }
 type-check = { cmd = "ty check" }
 
-[feature.notebooks.dependencies]
+[environments.default]
+features = ["test"]
+solve-group = "default"
+
+[environments.default.dependencies]
 jupyter = ">=1.1.1,<2"
 
+[environments.test]
+features = ["test"]
+solve-group = "default"
 
-[environments]
-default = { features = ["test", "notebooks"], solve-group = "default" }
-test = { features = ["test"], solve-group = "default" }
-lint = { features = ["lint"] }
+[environments.lint.dependencies]
+# we need rust for cargo-fmt and clippy
+rust = ">=1.97.1,<1.98"
+ruff = ">=0.15.18,<0.16"
 
-[dependencies]
-requests = ">=2.34.2,<3"
-sccache = ">=0.16.0,<0.17"
-types-requests = ">=2.33.0.20260518,<3"
+[environments.lint.tasks]
 
-[activation.env]
-RUSTC_WRAPPER = "sccache"
+fmt-rust = "cargo fmt --all --manifest-path rust/Cargo.toml"
+# checks for the CI
+fmt-rust-check = "cargo fmt --all --check --manifest-path rust/Cargo.toml"
+
+lint-python = "ruff check ."
+lint-rust = "cargo clippy --all-targets --workspace --manifest-path rust/Cargo.toml -- -D warnings"
+
+lint = { depends-on = ["lint-python", "lint-rust", "fmt-rust"] }
+
+# -------------------------------------------------------------------------------------------------
+# Pixi package definition
+# -------------------------------------------------------------------------------------------------
+[package.build.backend]
+name = "pixi-build-python"
+version = "*"
+
+[package.build.config]
+compilers = ["rust"]
+extra-input-globs = ["../src", "../crates"]
+# Use cmake to build aws-lc-sys, because conda's CFLAGS inject -O2 which
+# overrides the -O0 required by jitterentropy-base.c, causing a build failure.
+env = { AWS_LC_SYS_CMAKE_BUILDER = "1" }
+
+[package.host-dependencies]
+python = "*"
+maturin = "~=1.14.1"
+
+[package.build-dependencies."if(linux)"]
+patchelf = "~=0.17.2"
+cmake = ">=4,<5"
+make = ">=4,<5"
