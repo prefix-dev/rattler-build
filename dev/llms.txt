@@ -1,0 +1,104 @@
+# Rattler-Build
+
+> Rattler-Build Documentation — A fast conda package builder that creates cross-platform relocatable packages from a simple recipe format
+
+Rattler-Build is a fast conda package builder that creates cross-platform
+relocatable packages from a simple recipe format. The recipe format is heavily
+inspired by conda-build and boa, and the output is a standard "conda" package
+that can be installed using pixi, mamba or conda.
+
+To build a package, write a `recipe.yaml` file describing the package's
+sources, build script, dependencies and tests, then run
+`rattler-build build --recipe recipe.yaml`. Rattler-Build is implemented in
+Rust, has no dependencies on conda-build or Python and works as a standalone
+binary. Packages can be published to prefix.dev, anaconda.org, JFrog
+Artifactory, S3 buckets, or Quetz servers with `rattler-build upload`.
+See other documentation sections for further details on how to use the
+software.
+
+## Getting Started documentation
+
+- [Home](https://rattler-build.prefix.dev/latest/)
+- [Getting started](https://rattler-build.prefix.dev/latest/getting_started/)
+- [What is Rattler-Build?](https://rattler-build.prefix.dev/latest/highlevel/)
+- [Understanding the terminal output](https://rattler-build.prefix.dev/latest/understanding_terminal_output/)
+
+## Examples documentation
+
+- [Packaging a C++ package](https://rattler-build.prefix.dev/latest/tutorials/cpp/)
+- [Packaging a Go package](https://rattler-build.prefix.dev/latest/tutorials/go/)
+- [Examples](https://rattler-build.prefix.dev/latest/tutorials/)
+- [Packaging a Javascript (NPM/NodeJS) package](https://rattler-build.prefix.dev/latest/tutorials/javascript/)
+- [Packaging a Perl (CPAM) package](https://rattler-build.prefix.dev/latest/tutorials/perl/)
+- [Writing a Python package](https://rattler-build.prefix.dev/latest/tutorials/python/)
+- [Packaging a R (CRAN) package](https://rattler-build.prefix.dev/latest/tutorials/r/)
+- [Repackaging existing software](https://rattler-build.prefix.dev/latest/tutorials/repackaging/)
+- [Building a Rust package](https://rattler-build.prefix.dev/latest/tutorials/rust/)
+- [Converting a recipe from conda-build](https://rattler-build.prefix.dev/latest/converting_from_conda_build/)
+
+## Build options documentation
+
+- [Advanced build options](https://rattler-build.prefix.dev/latest/build_options/)
+- [Selectors in recipes](https://rattler-build.prefix.dev/latest/selectors/)
+- [Scripts for building and testing packages](https://rattler-build.prefix.dev/latest/build_script/)
+- [Variant configuration](https://rattler-build.prefix.dev/latest/variants/)
+- [Rattler-Build configuration](https://rattler-build.prefix.dev/latest/config/)
+- [Compilers and cross-compilation](https://rattler-build.prefix.dev/latest/compilers/)
+- [Experimental features](https://rattler-build.prefix.dev/latest/experimental_features/)
+- [V3 packages (beta)](https://rattler-build.prefix.dev/latest/v3/)
+- [Staging outputs for multiple packages](https://rattler-build.prefix.dev/latest/multiple_output_cache/)
+- [Experimental sandbox](https://rattler-build.prefix.dev/latest/sandbox/)
+- [Generating recipes for different ecosystems](https://rattler-build.prefix.dev/latest/recipe_generation/)
+- [Bumping recipe versions](https://rattler-build.prefix.dev/latest/bump_recipe/)
+- [Creating patches](https://rattler-build.prefix.dev/latest/create_patch/)
+- [Debugging Builds](https://rattler-build.prefix.dev/latest/debugging_builds/)
+- [Tips and tricks for Rattler-Build](https://rattler-build.prefix.dev/latest/tips_and_tricks/)
+- [Windows quirks](https://rattler-build.prefix.dev/latest/windows_quirks/)
+
+## Testing documentation
+
+- [Testing packages](https://rattler-build.prefix.dev/latest/testing/)
+- [Rebuilding a package](https://rattler-build.prefix.dev/latest/rebuild/)
+
+## Publishing documentation
+
+- [Server authentication](https://rattler-build.prefix.dev/latest/authentication_and_upload/)
+- [Publishing packages to your own channel](https://rattler-build.prefix.dev/latest/publish/)
+- [Sigstore attestations](https://rattler-build.prefix.dev/latest/sigstore/)
+- [Publishing to conda-forge](https://rattler-build.prefix.dev/latest/conda_forge/)
+- [Automatic Linting in VSCode](https://rattler-build.prefix.dev/latest/automatic_linting/)
+
+## Package documentation
+
+- [Package specification](https://rattler-build.prefix.dev/latest/package_spec/)
+- [Activation scripts and other special files](https://rattler-build.prefix.dev/latest/special_files/)
+- [What does Rattler-Build do to build a package?](https://rattler-build.prefix.dev/latest/internals/)
+- [System integration for packages](https://rattler-build.prefix.dev/latest/system_integration/)
+
+## Python Bindings documentation
+
+- [Build Result](https://rattler-build.prefix.dev/latest/py-rattler-build/reference/build_result/)
+- [Configuration](https://rattler-build.prefix.dev/latest/py-rattler-build/reference/configuration/)
+- [Debug Session](https://rattler-build.prefix.dev/latest/py-rattler-build/reference/debug/)
+- [Exceptions](https://rattler-build.prefix.dev/latest/py-rattler-build/reference/exceptions/)
+- [Reference](https://rattler-build.prefix.dev/latest/py-rattler-build/reference/)
+- [Package](https://rattler-build.prefix.dev/latest/py-rattler-build/reference/package/)
+- [Package Assembler](https://rattler-build.prefix.dev/latest/py-rattler-build/reference/package_assembler/)
+- [Progress](https://rattler-build.prefix.dev/latest/py-rattler-build/reference/progress/)
+- [Recipe](https://rattler-build.prefix.dev/latest/py-rattler-build/reference/recipe/)
+- [Recipe Generation](https://rattler-build.prefix.dev/latest/py-rattler-build/reference/recipe_generation/)
+- [Rendering](https://rattler-build.prefix.dev/latest/py-rattler-build/reference/rendering/)
+- [Upload](https://rattler-build.prefix.dev/latest/py-rattler-build/reference/upload/)
+- [Debug Session](https://rattler-build.prefix.dev/latest/py-rattler-build/tutorials/debug_session/)
+- [Inspecting Built Packages](https://rattler-build.prefix.dev/latest/py-rattler-build/tutorials/inspecting_built_packages/)
+- [Multi-Output Recipes and Staging Caches](https://rattler-build.prefix.dev/latest/py-rattler-build/tutorials/multi_output_and_staging/)
+- [Package Assembly](https://rattler-build.prefix.dev/latest/py-rattler-build/tutorials/package_assembly/)
+- [Recipe Rendering Basics](https://rattler-build.prefix.dev/latest/py-rattler-build/tutorials/recipe_rendering_basics/)
+
+## Reference documentation
+
+- [CLI Reference](https://rattler-build.prefix.dev/latest/reference/cli/)
+- [Jinja](https://rattler-build.prefix.dev/latest/reference/jinja/)
+- [Multi-Output Recipes](https://rattler-build.prefix.dev/latest/reference/multi_output/)
+- [The recipe spec](https://rattler-build.prefix.dev/latest/reference/recipe_file/)
+- [Rattler Index](https://rattler-build.prefix.dev/latest/rattler_index/)
