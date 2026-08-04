@@ -12,6 +12,8 @@ on:
 
       # When something in the bindings themselves changes
       - "py-rattler-build/**/*"
+      - "py-rattler-build/pixi.toml"
+      - "py-rattler-build/pixi.lock"
 
       # Or when this workflow changes
       - ".github/workflows/python-bindings.yml"

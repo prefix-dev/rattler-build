@@ -13,6 +13,8 @@ on:
       - "crates/rattler_build_types/**"
       - "crates/rattler_build_yaml_parser/**"
       - ".github/workflows/playground.yml"
+      - "pixi.toml"
+      - "pixi.lock"
   pull_request:
     branches:
       - main
@@ -24,6 +26,8 @@ on:
       - "crates/rattler_build_types/**"
       - "crates/rattler_build_yaml_parser/**"
       - ".github/workflows/playground.yml"
+      - "pixi.toml"
+      - "pixi.lock"
   workflow_dispatch:
 
 permissions:
