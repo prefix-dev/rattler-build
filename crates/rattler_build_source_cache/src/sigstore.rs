@@ -407,43 +407,51 @@ fn identity_matches(expected: &str, actual: &str) -> bool {
     suffix.starts_with('/') || suffix.starts_with('@')
 }
 
-/// Check that a GitHub release statement names the expected repository.
+/// Return repository package-URL subjects from GitHub release statements.
 ///
 /// GitHub's release attester has the fixed certificate identity
 /// `https://dotcom.releases.github.com`; the repository identity is instead
 /// cryptographically bound into the signed subject as a package URL.
+fn github_release_repository_subjects(bundles: &[sigstore_types::Bundle]) -> Vec<String> {
+    let mut repositories = Vec::new();
+    for bundle in bundles {
+        let SignatureContent::DsseEnvelope(envelope) = &bundle.content else {
+            continue;
+        };
+        if envelope.payload_type != "application/vnd.in-toto+json" {
+            continue;
+        }
+        let Ok(statement) = serde_json::from_slice::<serde_json::Value>(&envelope.decode_payload())
+        else {
+            continue;
+        };
+        let Some(subjects) = statement.get("subject").and_then(|value| value.as_array()) else {
+            continue;
+        };
+        repositories.extend(subjects.iter().filter_map(|subject| {
+            subject
+                .get("uri")
+                .and_then(|value| value.as_str())
+                .filter(|uri| uri.starts_with("pkg:github/"))
+                .map(ToOwned::to_owned)
+        }));
+    }
+    repositories.sort();
+    repositories.dedup();
+    repositories
+}
+
 fn github_release_matches_repository(
-    bundles: &[sigstore_types::Bundle],
+    repository_subjects: &[String],
     expected_identity: &str,
 ) -> bool {
     let Some(repository) = expected_identity.strip_prefix("https://github.com/") else {
         return false;
     };
     let expected_uri_prefix = format!("pkg:github/{repository}@");
-
-    bundles.iter().any(|bundle| {
-        let SignatureContent::DsseEnvelope(envelope) = &bundle.content else {
-            return false;
-        };
-        if envelope.payload_type != "application/vnd.in-toto+json" {
-            return false;
-        }
-        let Ok(statement) = serde_json::from_slice::<serde_json::Value>(&envelope.decode_payload())
-        else {
-            return false;
-        };
-        statement
-            .get("subject")
-            .and_then(|value| value.as_array())
-            .is_some_and(|subjects| {
-                subjects.iter().any(|subject| {
-                    subject
-                        .get("uri")
-                        .and_then(|value| value.as_str())
-                        .is_some_and(|uri| uri.starts_with(&expected_uri_prefix))
-                })
-            })
-    })
+    repository_subjects
+        .iter()
+        .any(|uri| uri.starts_with(&expected_uri_prefix))
 }
 
 pub(crate) async fn verify_attestation(
@@ -528,76 +536,90 @@ pub(crate) async fn verify_attestation(
         let mut matched = false;
         let mut found_identities: Vec<String> = Vec::new();
         let mut verification_errors: Vec<String> = Vec::new();
-
-        if parsed.from_github
-            && !github_release_matches_repository(&parsed.bundles, &check.identity)
-        {
-            verification_errors.push(format!(
-                "release statement does not contain a subject for {}",
-                check.identity
-            ));
+        let repository_subjects = if parsed.from_github {
+            github_release_repository_subjects(&parsed.bundles)
         } else {
-            for bundle in &parsed.bundles {
-                // GitHub immutable releases are signed by GitHub's release service,
-                // not by the repository's workflow identity. Repository ownership is
-                // checked in the signed package-URL subject above. GitHub bundles use
-                // an RFC 3161 timestamp and do not contain Rekor or public CT entries.
-                let policy = if parsed.from_github {
-                    VerificationPolicy::default()
-                        .require_identity("https://dotcom.releases.github.com")
-                        .skip_tlog()
-                        .skip_sct()
-                } else {
-                    // Verify with just the issuer in the policy — we do prefix
-                    // matching on identity ourselves.
-                    let mut policy =
-                        VerificationPolicy::default().require_issuer(check.issuer.clone());
-                    if parsed.from_pypi {
-                        // We cannot reconstruct the canonicalized Rekor body from
-                        // PEP 740's representation.
-                        policy = policy.skip_tlog();
-                    }
-                    policy
-                };
+            Vec::new()
+        };
+        let repository_matches = !parsed.from_github
+            || github_release_matches_repository(&repository_subjects, &check.identity);
 
-                match verify(artifact_bytes.as_slice(), bundle, &policy, &trusted_root) {
-                    Ok(result) => {
-                        if let Some(ref actual_identity) = result.identity {
-                            let identity_ok = if parsed.from_github {
-                                actual_identity == "https://dotcom.releases.github.com"
-                            } else {
-                                identity_matches(&check.identity, actual_identity)
-                            };
-                            if identity_ok {
-                                tracing::info!(
-                                    "\u{2714} Attestation verified (identity={})",
-                                    actual_identity,
-                                );
-                                matched = true;
-                                break;
-                            } else {
-                                found_identities.push(actual_identity.clone());
-                            }
+        for bundle in &parsed.bundles {
+            // GitHub immutable releases are signed by GitHub's release service,
+            // not by the repository's workflow identity. Repository ownership is
+            // checked in the signed package-URL subject above. GitHub bundles use
+            // an RFC 3161 timestamp and do not contain Rekor or public CT entries.
+            let policy = if parsed.from_github {
+                VerificationPolicy::default()
+                    .require_identity("https://dotcom.releases.github.com")
+                    .skip_tlog()
+                    .skip_sct()
+            } else {
+                // Verify with just the issuer in the policy — we do prefix
+                // matching on identity ourselves.
+                let mut policy = VerificationPolicy::default().require_issuer(check.issuer.clone());
+                if parsed.from_pypi {
+                    // We cannot reconstruct the canonicalized Rekor body from
+                    // PEP 740's representation.
+                    policy = policy.skip_tlog();
+                }
+                policy
+            };
+
+            match verify(artifact_bytes.as_slice(), bundle, &policy, &trusted_root) {
+                Ok(result) => {
+                    if let Some(ref actual_identity) = result.identity {
+                        let identity_ok = if parsed.from_github {
+                            // The policy checked the release-service certificate;
+                            // also require the repository in the signed statement.
+                            repository_matches
+                        } else {
+                            identity_matches(&check.identity, actual_identity)
+                        };
+                        if identity_ok {
+                            tracing::info!(
+                                "\u{2714} Attestation verified (identity={})",
+                                actual_identity,
+                            );
+                            matched = true;
+                            break;
+                        } else {
+                            found_identities.push(actual_identity.clone());
                         }
                     }
-                    Err(e) => {
-                        verification_errors.push(e.to_string());
-                    }
+                }
+                Err(e) => {
+                    verification_errors.push(e.to_string());
                 }
             }
         }
 
         if !matched {
-            let mut msg = format!(
-                "attestation identity mismatch for publisher '{}'\n  expected identity prefix: {}\n  expected issuer: {}",
-                check
-                    .identity
-                    .trim_start_matches("https://github.com/")
-                    .trim_start_matches("https://gitlab.com/"),
-                check.identity,
-                check.issuer,
-            );
-            if !found_identities.is_empty() {
+            let publisher = check
+                .identity
+                .trim_start_matches("https://github.com/")
+                .trim_start_matches("https://gitlab.com/");
+            let mut msg = if parsed.from_github {
+                let mut msg = format!(
+                    "attestation repository identity mismatch for publisher '{publisher}'\n  expected repository identity: {}\n  signing certificate identity: https://dotcom.releases.github.com",
+                    check.identity,
+                );
+                if repository_subjects.is_empty() {
+                    msg.push_str("\n  found signed repository subjects: none");
+                } else {
+                    msg.push_str("\n  found signed repository subjects:");
+                    for subject in &repository_subjects {
+                        msg.push_str(&format!("\n    - {subject}"));
+                    }
+                }
+                msg
+            } else {
+                format!(
+                    "attestation identity mismatch for publisher '{publisher}'\n  expected identity prefix: {}\n  expected issuer: {}",
+                    check.identity, check.issuer,
+                )
+            };
+            if !found_identities.is_empty() && !parsed.from_github {
                 msg.push_str("\n  found identities in attestation:");
                 for id in &found_identities {
                     msg.push_str(&format!("\n    - {}", id));
@@ -876,12 +898,14 @@ mod tests {
             "uri": "pkg:github/astral-sh/uv@0.12.1",
             "digest": { "sha1": "abc123" }
         })]);
+        let subjects = github_release_repository_subjects(&[bundle]);
+        assert_eq!(subjects, ["pkg:github/astral-sh/uv@0.12.1"]);
         assert!(github_release_matches_repository(
-            &[bundle.clone()],
+            &subjects,
             "https://github.com/astral-sh/uv"
         ));
         assert!(!github_release_matches_repository(
-            &[bundle],
+            &subjects,
             "https://github.com/astral-sh/uv-extra"
         ));
     }
@@ -961,5 +985,20 @@ mod tests {
         verify_attestation(&client, temp.path(), &source_url, &config)
             .await
             .unwrap();
+
+        let wrong_config = AttestationVerification {
+            bundle_url: None,
+            identity_checks: vec![crate::source::IdentityCheck {
+                identity: "https://github.com/astral-sh/xv".to_string(),
+                issuer: "https://token.actions.githubusercontent.com".to_string(),
+            }],
+        };
+        let error = verify_attestation(&client, temp.path(), &source_url, &wrong_config)
+            .await
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("expected repository identity: https://github.com/astral-sh/xv"));
+        assert!(error.contains("pkg:github/astral-sh/uv@0.12.1"));
+        assert!(error.contains("signing certificate identity: https://dotcom.releases.github.com"));
     }
 }
