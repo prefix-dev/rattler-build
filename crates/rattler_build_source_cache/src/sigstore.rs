@@ -1,8 +1,8 @@
 //! Sigstore attestation verification
 //!
 //! This module contains all sigstore-related functionality for verifying
-//! attestation bundles against source artifacts. It handles both standard
-//! sigstore bundles and PyPI PEP 740 provenance responses.
+//! attestation bundles against source artifacts. It handles standard Sigstore
+//! bundles, PyPI PEP 740 provenance responses, and GitHub's attestations API.
 
 use std::path::Path;
 
@@ -60,13 +60,55 @@ fn derive_pypi_provenance_url(source_url: &url::Url) -> Option<url::Url> {
     url::Url::parse(&provenance_url).ok()
 }
 
+/// Derive the GitHub repository attestations API URL for a release asset.
+///
+/// Filtering by the downloaded artifact's digest is important: GitHub release
+/// attestations also contain the commit SHA-1, but that does not authenticate
+/// GitHub's dynamically generated source archives. An uploaded release asset,
+/// on the other hand, is included as a SHA-256 subject and can be verified.
+fn derive_github_attestations_url(
+    source_url: &url::Url,
+    artifact_sha256_hex: &str,
+) -> Option<url::Url> {
+    if source_url.host_str()? != "github.com" {
+        return None;
+    }
+
+    let segments: Vec<_> = source_url.path_segments()?.collect();
+    if segments.len() < 6 || segments[2] != "releases" || segments[3] != "download" {
+        return None;
+    }
+
+    let owner = segments[0];
+    let repo = segments[1].strip_suffix(".git").unwrap_or(segments[1]);
+    if owner.is_empty() || repo.is_empty() {
+        return None;
+    }
+
+    // The digest is a path parameter in GitHub's public list-attestations API.
+    // Keep the predicate filter as well so unrelated attestations for the same
+    // artifact are not considered release attestations.
+    let mut api_url = url::Url::parse(&format!(
+        "https://api.github.com/repos/{owner}/{repo}/attestations/sha256:{artifact_sha256_hex}"
+    ))
+    .ok()?;
+    api_url
+        .query_pairs_mut()
+        .append_pair("predicate_type", "release");
+    Some(api_url)
+}
+
 /// Result of parsing an attestation response.
+#[derive(Debug)]
 struct ParsedAttestations {
     bundles: Vec<sigstore_types::Bundle>,
     /// Whether these bundles were converted from PyPI PEP 740 provenance format.
     /// PyPI-converted bundles lack canonicalized rekor bodies so transparency log
     /// verification must be skipped.
     from_pypi: bool,
+    /// Whether these are GitHub immutable-release attestations. They use
+    /// GitHub's Sigstore trust domain and RFC 3161 timestamps instead of Rekor.
+    from_github: bool,
 }
 
 /// Parse an attestation response into one or more sigstore bundles.
@@ -76,6 +118,8 @@ struct ParsedAttestations {
 ///    parsed directly via `Bundle::from_json`.
 /// 2. **PyPI PEP 740 provenance response**: has an `attestation_bundles` array,
 ///    each containing `attestations` that are converted to sigstore bundles.
+/// 3. **GitHub attestations API response**: has an `attestations` array whose
+///    entries each contain a standard bundle in their `bundle` field.
 fn parse_attestation_response(json_str: &str) -> Result<ParsedAttestations, CacheError> {
     let value: serde_json::Value = serde_json::from_str(json_str)
         .map_err(|e| CacheError::InvalidAttestationBundle(format!("Invalid JSON: {}", e)))?;
@@ -88,6 +132,39 @@ fn parse_attestation_response(json_str: &str) -> Result<ParsedAttestations, Cach
         return Ok(ParsedAttestations {
             bundles: vec![bundle],
             from_pypi: false,
+            from_github: false,
+        });
+    }
+
+    // GitHub's repository attestations API wraps each standard bundle.
+    if let Some(attestations) = value.get("attestations").and_then(|v| v.as_array()) {
+        let mut bundles = Vec::new();
+        for attestation in attestations {
+            let Some(bundle_value) = attestation.get("bundle") else {
+                continue;
+            };
+            let bundle_json = serde_json::to_string(bundle_value).map_err(|e| {
+                CacheError::InvalidAttestationBundle(format!(
+                    "Failed to serialize GitHub attestation bundle: {e}"
+                ))
+            })?;
+            let bundle = sigstore_types::Bundle::from_json(&bundle_json).map_err(|e| {
+                CacheError::InvalidAttestationBundle(format!(
+                    "Failed to parse GitHub attestation bundle: {e}"
+                ))
+            })?;
+            bundles.push(bundle);
+        }
+        if bundles.is_empty() {
+            return Err(CacheError::InvalidAttestationBundle(
+                "GitHub returned no release attestation for the artifact SHA-256; dynamically generated source archives are not covered by GitHub release attestations, so upload the source archive as a release asset"
+                    .to_string(),
+            ));
+        }
+        return Ok(ParsedAttestations {
+            bundles,
+            from_pypi: false,
+            from_github: true,
         });
     }
 
@@ -110,11 +187,12 @@ fn parse_attestation_response(json_str: &str) -> Result<ParsedAttestations, Cach
         return Ok(ParsedAttestations {
             bundles,
             from_pypi: true,
+            from_github: false,
         });
     }
 
     Err(CacheError::InvalidAttestationBundle(
-        "Unrecognized attestation format: expected sigstore bundle or PyPI provenance response"
+        "Unrecognized attestation format: expected a Sigstore bundle, PyPI provenance response, or GitHub attestations API response"
             .to_string(),
     ))
 }
@@ -198,10 +276,15 @@ async fn download_attestation_bundle(
     client: &BaseClient,
     url: &url::Url,
 ) -> Result<String, CacheError> {
-    let response = client
-        .for_host(url)
-        .client()
-        .get(url.clone())
+    let mut request = client.for_host(url).client().get(url.clone());
+    if url.host_str() == Some("api.github.com") {
+        request = request
+            .header(reqwest::header::ACCEPT, "application/vnd.github+json")
+            .header(reqwest::header::USER_AGENT, "rattler-build")
+            .header("X-GitHub-Api-Version", "2022-11-28");
+    }
+
+    let response = request
         .send()
         .await
         .map_err(|e| CacheError::AttestationBundleDownload {
@@ -298,8 +381,9 @@ fn verify_artifact_subject(
 
 /// Verify an attestation for a downloaded artifact.
 ///
-/// Downloads the attestation bundle (either from an explicit URL or auto-derived
-/// from PyPI), loads the Sigstore trusted root, and verifies each identity check.
+/// Downloads the attestation bundle (either from an explicit URL or discovered
+/// from PyPI/GitHub), loads the appropriate Sigstore trusted root, and verifies
+/// the signature and each identity check.
 ///
 /// Always verifies that the artifact's SHA-256 digest matches a subject in the
 /// attestation's in-toto statement — regardless of whether publisher identity
@@ -323,48 +407,121 @@ fn identity_matches(expected: &str, actual: &str) -> bool {
     suffix.starts_with('/') || suffix.starts_with('@')
 }
 
+/// Check that a GitHub release statement names the expected repository.
+///
+/// GitHub's release attester has the fixed certificate identity
+/// `https://dotcom.releases.github.com`; the repository identity is instead
+/// cryptographically bound into the signed subject as a package URL.
+fn github_release_matches_repository(
+    bundles: &[sigstore_types::Bundle],
+    expected_identity: &str,
+) -> bool {
+    let Some(repository) = expected_identity.strip_prefix("https://github.com/") else {
+        return false;
+    };
+    let expected_uri_prefix = format!("pkg:github/{repository}@");
+
+    bundles.iter().any(|bundle| {
+        let SignatureContent::DsseEnvelope(envelope) = &bundle.content else {
+            return false;
+        };
+        if envelope.payload_type != "application/vnd.in-toto+json" {
+            return false;
+        }
+        let Ok(statement) = serde_json::from_slice::<serde_json::Value>(&envelope.decode_payload())
+        else {
+            return false;
+        };
+        statement
+            .get("subject")
+            .and_then(|value| value.as_array())
+            .is_some_and(|subjects| {
+                subjects.iter().any(|subject| {
+                    subject
+                        .get("uri")
+                        .and_then(|value| value.as_str())
+                        .is_some_and(|uri| uri.starts_with(&expected_uri_prefix))
+                })
+            })
+    })
+}
+
 pub(crate) async fn verify_attestation(
     client: &BaseClient,
     file_path: &Path,
     source_url: &url::Url,
     attestation_config: &AttestationVerification,
 ) -> Result<(), CacheError> {
-    // Determine bundle URL: explicit, or auto-derive from PyPI source URL
+    // Read and hash the artifact before deriving the URL: GitHub's API can
+    // filter attestations by the exact release asset digest.
+    let artifact_bytes = fs_err::tokio::read(file_path).await?;
+    let artifact_sha256_hex = hex::encode(Sha256::digest(&artifact_bytes));
+
+    // Determine bundle URL: explicit, or auto-derive from PyPI/GitHub.
     let bundle_url = if let Some(url) = &attestation_config.bundle_url {
         Some(url.clone())
     } else {
         derive_pypi_provenance_url(source_url)
+            .or_else(|| derive_github_attestations_url(source_url, &artifact_sha256_hex))
     };
 
     let bundle_url = bundle_url.ok_or_else(|| {
         CacheError::InvalidAttestationBundle(
-            "No bundle_url provided and could not auto-derive one (not a PyPI source)".to_string(),
+            "No bundle_url provided and could not auto-derive one (supported sources are PyPI files and GitHub release assets)".to_string(),
         )
     })?;
 
     tracing::info!("Downloading attestation bundle from {}", bundle_url);
     let response_json = download_attestation_bundle(client, &bundle_url).await?;
 
-    // Load the production Sigstore trusted root through TUF so verification
-    // uses fresh trust material instead of the embedded snapshot.
-    let trusted_root = TrustedRoot::production().await.map_err(|e| {
-        CacheError::SigstoreTrustRoot(format!(
-            "Failed to load Sigstore trusted root via TUF: {}",
-            e
-        ))
-    })?;
-
-    // Read the artifact for verification
-    let artifact_bytes = fs_err::tokio::read(file_path).await?;
-
-    // Parse the response: could be a plain sigstore bundle or a PyPI provenance response
+    // Parse before selecting a trust domain: GitHub immutable-release
+    // attestations use GitHub's own Sigstore instance rather than the public one.
     let parsed = parse_attestation_response(&response_json)?;
+    let trusted_root = if parsed.from_github {
+        TrustedRoot::from_tuf(sigstore_trust_root::TufConfig::github()).await
+    } else {
+        TrustedRoot::production().await
+    }
+    .map_err(|e| {
+        CacheError::SigstoreTrustRoot(format!("Failed to load Sigstore trusted root via TUF: {e}"))
+    })?;
 
     // Always verify the artifact's digest matches a subject in the attestation.
     // This prevents accepting an attestation for a different file (e.g., from a
     // different release or a different artifact entirely).
-    let artifact_sha256_hex = hex::encode(Sha256::digest(&artifact_bytes));
     verify_artifact_subject(&artifact_sha256_hex, &parsed.bundles)?;
+
+    // A bundle URL without publisher constraints must still perform
+    // cryptographic verification rather than only inspecting the signed payload.
+    if attestation_config.identity_checks.is_empty() {
+        let mut errors = Vec::new();
+        let mut verified = false;
+        for bundle in &parsed.bundles {
+            let policy = if parsed.from_github {
+                VerificationPolicy::default()
+                    .require_identity("https://dotcom.releases.github.com")
+                    .skip_tlog()
+                    .skip_sct()
+            } else if parsed.from_pypi {
+                VerificationPolicy::default().skip_tlog()
+            } else {
+                VerificationPolicy::default()
+            };
+            match verify(artifact_bytes.as_slice(), bundle, &policy, &trusted_root) {
+                Ok(_) => {
+                    verified = true;
+                    break;
+                }
+                Err(error) => errors.push(error.to_string()),
+            }
+        }
+        if !verified {
+            return Err(CacheError::AttestationVerification(format!(
+                "attestation signature verification failed: {}",
+                errors.join("; ")
+            )));
+        }
+    }
 
     // For each required identity check, find a matching bundle and verify it
     for check in &attestation_config.identity_checks {
@@ -372,32 +529,60 @@ pub(crate) async fn verify_attestation(
         let mut found_identities: Vec<String> = Vec::new();
         let mut verification_errors: Vec<String> = Vec::new();
 
-        for bundle in &parsed.bundles {
-            // Verify with just the issuer in the policy — we do prefix matching on identity ourselves.
-            // For PyPI-converted bundles, skip tlog verification since we can't reconstruct
-            // the canonicalized rekor body from the PEP 740 format.
-            let mut policy = VerificationPolicy::default().require_issuer(check.issuer.clone());
-            if parsed.from_pypi {
-                policy = policy.skip_tlog();
-            }
+        if parsed.from_github
+            && !github_release_matches_repository(&parsed.bundles, &check.identity)
+        {
+            verification_errors.push(format!(
+                "release statement does not contain a subject for {}",
+                check.identity
+            ));
+        } else {
+            for bundle in &parsed.bundles {
+                // GitHub immutable releases are signed by GitHub's release service,
+                // not by the repository's workflow identity. Repository ownership is
+                // checked in the signed package-URL subject above. GitHub bundles use
+                // an RFC 3161 timestamp and do not contain Rekor or public CT entries.
+                let policy = if parsed.from_github {
+                    VerificationPolicy::default()
+                        .require_identity("https://dotcom.releases.github.com")
+                        .skip_tlog()
+                        .skip_sct()
+                } else {
+                    // Verify with just the issuer in the policy — we do prefix
+                    // matching on identity ourselves.
+                    let mut policy =
+                        VerificationPolicy::default().require_issuer(check.issuer.clone());
+                    if parsed.from_pypi {
+                        // We cannot reconstruct the canonicalized Rekor body from
+                        // PEP 740's representation.
+                        policy = policy.skip_tlog();
+                    }
+                    policy
+                };
 
-            match verify(artifact_bytes.as_slice(), bundle, &policy, &trusted_root) {
-                Ok(result) => {
-                    if let Some(ref actual_identity) = result.identity {
-                        if identity_matches(&check.identity, actual_identity) {
-                            tracing::info!(
-                                "\u{2714} Attestation verified (identity={})",
-                                actual_identity,
-                            );
-                            matched = true;
-                            break;
-                        } else {
-                            found_identities.push(actual_identity.clone());
+                match verify(artifact_bytes.as_slice(), bundle, &policy, &trusted_root) {
+                    Ok(result) => {
+                        if let Some(ref actual_identity) = result.identity {
+                            let identity_ok = if parsed.from_github {
+                                actual_identity == "https://dotcom.releases.github.com"
+                            } else {
+                                identity_matches(&check.identity, actual_identity)
+                            };
+                            if identity_ok {
+                                tracing::info!(
+                                    "\u{2714} Attestation verified (identity={})",
+                                    actual_identity,
+                                );
+                                matched = true;
+                                break;
+                            } else {
+                                found_identities.push(actual_identity.clone());
+                            }
                         }
                     }
-                }
-                Err(e) => {
-                    verification_errors.push(e.to_string());
+                    Err(e) => {
+                        verification_errors.push(e.to_string());
+                    }
                 }
             }
         }
@@ -509,6 +694,31 @@ mod tests {
     }
 
     #[test]
+    fn test_derive_github_attestations_url() {
+        let url = url::Url::parse(
+            "https://github.com/prefix-dev/rattler-build/releases/download/v1.0.0/source.tar.gz",
+        )
+        .unwrap();
+        let result = derive_github_attestations_url(&url, "abc123").unwrap();
+        assert_eq!(result.host_str(), Some("api.github.com"));
+        assert_eq!(
+            result.path(),
+            "/repos/prefix-dev/rattler-build/attestations/sha256:abc123"
+        );
+        let query: std::collections::HashMap<_, _> = result.query_pairs().collect();
+        assert_eq!(query.get("predicate_type").unwrap(), "release");
+    }
+
+    #[test]
+    fn test_github_generated_archive_is_not_auto_derived() {
+        let url = url::Url::parse(
+            "https://github.com/prefix-dev/rattler-build/archive/refs/tags/v1.0.0.tar.gz",
+        )
+        .unwrap();
+        assert!(derive_github_attestations_url(&url, "abc123").is_none());
+    }
+
+    #[test]
     fn test_parse_attestation_response_sigstore_bundle() {
         // A sigstore bundle has a "mediaType" field
         let json = r#"{
@@ -527,6 +737,7 @@ mod tests {
         let parsed = parse_attestation_response(json).unwrap();
         assert_eq!(parsed.bundles.len(), 1);
         assert!(!parsed.from_pypi);
+        assert!(!parsed.from_github);
     }
 
     #[test]
@@ -556,6 +767,30 @@ mod tests {
         let parsed = parse_attestation_response(json).unwrap();
         assert_eq!(parsed.bundles.len(), 1);
         assert!(parsed.from_pypi);
+        assert!(!parsed.from_github);
+    }
+
+    #[test]
+    fn test_parse_attestation_response_github() {
+        let bundle = make_bundle_with_subjects(&[("source.tar.gz", "abc123")]);
+        let bundle_json: serde_json::Value =
+            serde_json::from_str(&bundle.to_json().unwrap()).unwrap();
+        let response = serde_json::json!({
+            "attestations": [{ "id": 42, "bundle": bundle_json }]
+        });
+        let parsed = parse_attestation_response(&response.to_string()).unwrap();
+        assert_eq!(parsed.bundles.len(), 1);
+        assert!(!parsed.from_pypi);
+        assert!(parsed.from_github);
+    }
+
+    #[test]
+    fn test_parse_empty_github_response_explains_generated_archives() {
+        let err = parse_attestation_response(r#"{ "attestations": [] }"#).unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("dynamically generated source archives")
+        );
     }
 
     #[test]
@@ -588,20 +823,11 @@ mod tests {
         ));
     }
 
-    /// Helper to create a minimal sigstore bundle with an in-toto statement
-    /// that attests to the given subjects (name, sha256_hex pairs).
-    fn make_bundle_with_subjects(subjects: &[(&str, &str)]) -> sigstore_types::Bundle {
+    /// Helper to create a minimal sigstore bundle with an in-toto statement.
+    fn make_bundle_with_raw_subjects(
+        subject_json: Vec<serde_json::Value>,
+    ) -> sigstore_types::Bundle {
         use base64::{Engine, engine::general_purpose::STANDARD};
-
-        let subject_json: Vec<serde_json::Value> = subjects
-            .iter()
-            .map(|(name, sha256)| {
-                serde_json::json!({
-                    "name": name,
-                    "digest": { "sha256": sha256 }
-                })
-            })
-            .collect();
 
         let statement = serde_json::json!({
             "_type": "https://in-toto.io/Statement/v1",
@@ -627,6 +853,37 @@ mod tests {
         });
 
         sigstore_types::Bundle::from_json(&serde_json::to_string(&bundle_json).unwrap()).unwrap()
+    }
+
+    /// Create a bundle whose subjects are artifact names and SHA-256 pairs.
+    fn make_bundle_with_subjects(subjects: &[(&str, &str)]) -> sigstore_types::Bundle {
+        make_bundle_with_raw_subjects(
+            subjects
+                .iter()
+                .map(|(name, sha256)| {
+                    serde_json::json!({
+                        "name": name,
+                        "digest": { "sha256": sha256 }
+                    })
+                })
+                .collect(),
+        )
+    }
+
+    #[test]
+    fn test_github_release_repository_subject_matches() {
+        let bundle = make_bundle_with_raw_subjects(vec![serde_json::json!({
+            "uri": "pkg:github/astral-sh/uv@0.12.1",
+            "digest": { "sha1": "abc123" }
+        })]);
+        assert!(github_release_matches_repository(
+            &[bundle.clone()],
+            "https://github.com/astral-sh/uv"
+        ));
+        assert!(!github_release_matches_repository(
+            &[bundle],
+            "https://github.com/astral-sh/uv-extra"
+        ));
     }
 
     #[test]
@@ -672,5 +929,37 @@ mod tests {
             "unexpected error: {}",
             err
         );
+    }
+
+    #[tokio::test]
+    #[ignore = "requires network access"]
+    async fn test_uv_github_release_attestation() {
+        let source_url = url::Url::parse(
+            "https://github.com/astral-sh/uv/releases/download/0.12.1/source.tar.gz",
+        )
+        .unwrap();
+        let client = BaseClient::builder().timeout(300).build();
+        let bytes = client
+            .for_host(&source_url)
+            .client()
+            .get(source_url.clone())
+            .send()
+            .await
+            .unwrap()
+            .bytes()
+            .await
+            .unwrap();
+        let temp = tempfile::NamedTempFile::new().unwrap();
+        fs_err::tokio::write(temp.path(), bytes).await.unwrap();
+        let config = AttestationVerification {
+            bundle_url: None,
+            identity_checks: vec![crate::source::IdentityCheck {
+                identity: "https://github.com/astral-sh/uv".to_string(),
+                issuer: "https://token.actions.githubusercontent.com".to_string(),
+            }],
+        };
+        verify_attestation(&client, temp.path(), &source_url, &config)
+            .await
+            .unwrap();
     }
 }
