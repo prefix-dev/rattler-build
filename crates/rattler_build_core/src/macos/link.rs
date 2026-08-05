@@ -31,6 +31,28 @@ pub struct Dylib {
     id: Option<PathBuf>,
 }
 
+impl Dylib {
+    /// Resolve a placeholder rpath relative to this binary.
+    fn resolve_relative_rpath(
+        &self,
+        rpath: &Path,
+        placeholder: &str,
+        prefix: &Path,
+        encoded_prefix: &Path,
+    ) -> Option<PathBuf> {
+        let relative_rpath = rpath.strip_prefix(placeholder).ok()?;
+        // Get this binary's path in the "encoded prefix".
+        let self_path =
+            encoded_prefix.join(self.path.strip_prefix(prefix).expect("dylib not in prefix"));
+        if let Some(binary_parent) = self_path.parent() {
+            Some(to_lexical_absolute(relative_rpath, binary_parent))
+        } else {
+            tracing::warn!("binary {:?} has no parent directory", self.path);
+            None
+        }
+    }
+}
+
 impl Relinker for Dylib {
     /// Parse the magic number of a file and check if it
     /// is a Mach-O file that should be relinked.
@@ -142,19 +164,10 @@ impl Relinker for Dylib {
         resolved_libraries
     }
 
-    /// Resolve the rpath and replace `@loader_path` with the path of the dylib
+    /// Resolve the rpath and replace `@loader_path` with the path of the dylib.
     fn resolve_rpath(&self, rpath: &Path, prefix: &Path, encoded_prefix: &Path) -> PathBuf {
-        // get self path in "encoded prefix"
-        let self_path =
-            encoded_prefix.join(self.path.strip_prefix(prefix).expect("dylib not in prefix"));
-        if let Ok(rpath_without_loader) = rpath.strip_prefix("@loader_path") {
-            if let Some(library_parent) = self_path.parent() {
-                return to_lexical_absolute(rpath_without_loader, library_parent);
-            } else {
-                tracing::warn!("shared library {:?} has no parent directory", self.path);
-            }
-        }
-        rpath.to_path_buf()
+        self.resolve_relative_rpath(rpath, "@loader_path", prefix, encoded_prefix)
+            .unwrap_or_else(|| rpath.to_path_buf())
     }
 
     /// Modify a dylib to use relative paths for rpaths and dylibs
@@ -223,7 +236,18 @@ impl Relinker for Dylib {
                 }
             } else if rpath.starts_with("@executable_path") {
                 // This path is relative to the process executable and is
-                // therefore already relocatable.
+                // therefore already relocatable. Keep it even if it escapes:
+                // for a dylib, the actual executable path is only known at runtime.
+                let resolved = self
+                    .resolve_relative_rpath(rpath, "@executable_path", prefix, encoded_prefix)
+                    .unwrap_or_else(|| rpath.clone());
+                if !resolved.starts_with(encoded_prefix) {
+                    tracing::warn!(
+                        "Executable-relative rpath {} may resolve outside the prefix ({}); keeping it because the process executable is only known at runtime",
+                        rpath.display(),
+                        resolved.display()
+                    );
+                }
                 final_rpaths.push(rpath.clone());
             } else if let Ok(rel) = rpath.strip_prefix(encoded_prefix) {
                 let new_rpath = prefix.join(rel);
@@ -956,7 +980,11 @@ mod tests {
             change_id: None,
             change_dylib: HashMap::default(),
         };
-        super::relink(&binary_path, &changes)?;
+        install_name_tool(
+            &binary_path,
+            &changes,
+            &SystemTools::new("rattler-build", "0.0.0"),
+        )?;
 
         let object = Dylib::new(&binary_path)?;
         assert_eq!(object.rpaths, executable_rpaths);
@@ -992,6 +1020,17 @@ mod tests {
             &encoded_prefix,
         );
         assert_eq!(resolved, PathBuf::from("/foo/very_long_encoded_prefix/lib"));
+
+        let resolved = dylib
+            .resolve_relative_rpath(
+                &PathBuf::from("@executable_path/../../outside"),
+                "@executable_path",
+                &prefix,
+                &encoded_prefix,
+            )
+            .unwrap();
+        assert_eq!(resolved, PathBuf::from("/foo/outside"));
+        assert!(!resolved.starts_with(&encoded_prefix));
     }
 
     /// Create a binary with duplicate rpaths by starting from
