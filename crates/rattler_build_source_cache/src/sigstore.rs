@@ -412,30 +412,31 @@ fn identity_matches(expected: &str, actual: &str) -> bool {
 /// GitHub's release attester has the fixed certificate identity
 /// `https://dotcom.releases.github.com`; the repository identity is instead
 /// cryptographically bound into the signed subject as a package URL.
-fn github_release_repository_subjects(bundles: &[sigstore_types::Bundle]) -> Vec<String> {
-    let mut repositories = Vec::new();
-    for bundle in bundles {
-        let SignatureContent::DsseEnvelope(envelope) = &bundle.content else {
-            continue;
-        };
-        if envelope.payload_type != "application/vnd.in-toto+json" {
-            continue;
-        }
-        let Ok(statement) = serde_json::from_slice::<serde_json::Value>(&envelope.decode_payload())
-        else {
-            continue;
-        };
-        let Some(subjects) = statement.get("subject").and_then(|value| value.as_array()) else {
-            continue;
-        };
-        repositories.extend(subjects.iter().filter_map(|subject| {
+fn github_release_repository_subjects(bundle: &sigstore_types::Bundle) -> Vec<String> {
+    let SignatureContent::DsseEnvelope(envelope) = &bundle.content else {
+        return Vec::new();
+    };
+    if envelope.payload_type != "application/vnd.in-toto+json" {
+        return Vec::new();
+    }
+    let Ok(statement) = serde_json::from_slice::<serde_json::Value>(&envelope.decode_payload())
+    else {
+        return Vec::new();
+    };
+    let Some(subjects) = statement.get("subject").and_then(|value| value.as_array()) else {
+        return Vec::new();
+    };
+
+    let mut repositories: Vec<_> = subjects
+        .iter()
+        .filter_map(|subject| {
             subject
                 .get("uri")
                 .and_then(|value| value.as_str())
                 .filter(|uri| uri.starts_with("pkg:github/"))
                 .map(ToOwned::to_owned)
-        }));
-    }
+        })
+        .collect();
     repositories.sort();
     repositories.dedup();
     repositories
@@ -445,13 +446,16 @@ fn github_release_matches_repository(
     repository_subjects: &[String],
     expected_identity: &str,
 ) -> bool {
-    let Some(repository) = expected_identity.strip_prefix("https://github.com/") else {
+    let Some(expected_repository) = expected_identity.strip_prefix("https://github.com/") else {
         return false;
     };
-    let expected_uri_prefix = format!("pkg:github/{repository}@");
-    repository_subjects
-        .iter()
-        .any(|uri| uri.starts_with(&expected_uri_prefix))
+    repository_subjects.iter().any(|uri| {
+        uri.strip_prefix("pkg:github/")
+            .and_then(|package| package.split_once('@'))
+            .is_some_and(|(repository, _version)| {
+                repository.eq_ignore_ascii_case(expected_repository)
+            })
+    })
 }
 
 pub(crate) async fn verify_attestation(
@@ -536,13 +540,21 @@ pub(crate) async fn verify_attestation(
         let mut matched = false;
         let mut found_identities: Vec<String> = Vec::new();
         let mut verification_errors: Vec<String> = Vec::new();
+        // Keep an aggregate only for error reporting. Acceptance below checks
+        // the repository subject from the same bundle that verifies the artifact,
+        // preventing subjects from separate bundles from being mixed together.
         let repository_subjects = if parsed.from_github {
-            github_release_repository_subjects(&parsed.bundles)
+            let mut subjects: Vec<_> = parsed
+                .bundles
+                .iter()
+                .flat_map(github_release_repository_subjects)
+                .collect();
+            subjects.sort();
+            subjects.dedup();
+            subjects
         } else {
             Vec::new()
         };
-        let repository_matches = !parsed.from_github
-            || github_release_matches_repository(&repository_subjects, &check.identity);
 
         for bundle in &parsed.bundles {
             // GitHub immutable releases are signed by GitHub's release service,
@@ -571,8 +583,12 @@ pub(crate) async fn verify_attestation(
                     if let Some(ref actual_identity) = result.identity {
                         let identity_ok = if parsed.from_github {
                             // The policy checked the release-service certificate;
-                            // also require the repository in the signed statement.
-                            repository_matches
+                            // also require the repository in this same signed
+                            // statement. Do not combine evidence across bundles.
+                            github_release_matches_repository(
+                                &github_release_repository_subjects(bundle),
+                                &check.identity,
+                            )
                         } else {
                             identity_matches(&check.identity, actual_identity)
                         };
@@ -898,15 +914,41 @@ mod tests {
             "uri": "pkg:github/astral-sh/uv@0.12.1",
             "digest": { "sha1": "abc123" }
         })]);
-        let subjects = github_release_repository_subjects(&[bundle]);
+        let subjects = github_release_repository_subjects(&bundle);
         assert_eq!(subjects, ["pkg:github/astral-sh/uv@0.12.1"]);
         assert!(github_release_matches_repository(
             &subjects,
             "https://github.com/astral-sh/uv"
         ));
+        assert!(github_release_matches_repository(
+            &subjects,
+            "https://github.com/ASTRAL-SH/UV"
+        ));
         assert!(!github_release_matches_repository(
             &subjects,
             "https://github.com/astral-sh/uv-extra"
+        ));
+    }
+
+    #[test]
+    fn test_github_repository_identity_is_scoped_to_one_bundle() {
+        let expected_repository_bundle = make_bundle_with_raw_subjects(vec![serde_json::json!({
+            "uri": "pkg:github/victim/project@1.0.0",
+            "digest": { "sha1": "abc123" }
+        })]);
+        let artifact_bundle = make_bundle_with_raw_subjects(vec![serde_json::json!({
+            "uri": "pkg:github/attacker/project@1.0.0",
+            "digest": { "sha1": "def456" }
+        })]);
+
+        let expected_identity = "https://github.com/victim/project";
+        assert!(github_release_matches_repository(
+            &github_release_repository_subjects(&expected_repository_bundle),
+            expected_identity,
+        ));
+        assert!(!github_release_matches_repository(
+            &github_release_repository_subjects(&artifact_bundle),
+            expected_identity,
         ));
     }
 
