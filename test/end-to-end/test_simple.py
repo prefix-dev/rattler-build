@@ -1465,13 +1465,17 @@ def test_noarch_flask(
 def test_downstream_test(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
 ):
+    # The downstream noarch package's own Python test matrix includes a version
+    # incompatible with the arch-specific upstream artifact. Build both outputs
+    # first, then verify the downstream test selects the compatible version.
     rattler_build.build(
         recipes / "downstream_test/succeed.yaml",
         tmp_path,
+        extra_args=["--no-test"],
     )
 
     pkg = next(tmp_path.rglob("**/upstream-good-*"))
-    test_result = rattler_build.test(pkg, "-c", str(tmp_path))
+    test_result = rattler_build.test(pkg, "-c", str(tmp_path), "-c", "conda-forge")
 
     assert "Running downstream test for package: downstream-good" in test_result
     assert "Downstream test could not run" not in test_result

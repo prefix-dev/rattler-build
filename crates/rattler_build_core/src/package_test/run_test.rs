@@ -684,7 +684,20 @@ pub async fn run_test(
                         .await?
                 }
                 TestType::Python { python } => {
-                    run_python_test(&python, &pkg, &package_folder, &test_prefix, &config).await?
+                    // A downstream package's Python test matrix describes the Python
+                    // versions supported by that package in isolation. When testing it
+                    // against a specific upstream artifact, let that artifact's
+                    // dependencies select the compatible Python version instead.
+                    let apply_python_version = downstream_package.is_none();
+                    run_python_test(
+                        &python,
+                        &pkg,
+                        &package_folder,
+                        &test_prefix,
+                        &config,
+                        apply_python_version,
+                    )
+                    .await?
                 }
                 TestType::Perl { perl } => {
                     run_perl_test(&perl, &pkg, &package_folder, &test_prefix, &config).await?
@@ -729,6 +742,7 @@ async fn run_python_test(
     path: &Path,
     prefix: &Path,
     config: &TestConfiguration,
+    apply_python_version: bool,
 ) -> Result<(), TestError> {
     let pkg_id = format!(
         "{}-{}-{}",
@@ -744,7 +758,12 @@ async fn run_python_test(
     // - python_version: null -> { "": ["mypackage=xx=xx"]}
     // - python_version: 3.12 -> { "3.12": ["python=3.12", "mypackage=xx=xx"]}
     // - python_version: [3.12, 3.13] -> { "3.12": ["python=3.12", "mypackage=xx=xx"], "3.13": ["python=3.13", "mypackage=xx=xx"]}
-    let mut dependencies_map: HashMap<String, Vec<MatchSpec>> = match &python_test.python_version {
+    let python_version = if apply_python_version {
+        &python_test.python_version
+    } else {
+        &PythonVersion::None
+    };
+    let mut dependencies_map: HashMap<String, Vec<MatchSpec>> = match python_version {
         PythonVersion::Multiple(versions) => versions
             .iter()
             .map(|version| {
