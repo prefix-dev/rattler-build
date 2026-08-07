@@ -41,6 +41,98 @@ To build this recipe, simply run:
 rattler-build build --recipe ./ipywidgets
 ```
 
+## Multiple `noarch: python` variants for different Python versions
+
+A `noarch: python` package is built only once and works with any Python
+version. But sometimes a pure Python package needs *different requirements
+depending on the Python version* it is installed with.
+
+A good real-world example is `botocore`: the package supports Python 3.8 and
+up, but requires `urllib3 <1.27` on Python 3.8 / 3.9 and allows `urllib3 <2.1`
+on Python 3.10 and up. A single `noarch: python` package cannot express this,
+but you can build **two variants of the same `noarch: python` package** — one
+per Python version range.
+
+To do so, define a custom variant key in the `variants.yaml` file next to your
+recipe:
+
+```yaml title="variants.yaml"
+--8<-- "docs/snippets/recipes/variants/botocore.yaml"
+```
+
+Then use the variant key in [selectors](../selectors.md) to switch the
+requirements between the two variants. The following recipe is based on
+conda-forge's [`botocore` feedstock](https://github.com/conda-forge/botocore-feedstock/blob/0ee2e3cdb522285b93a9897affe668990832f0bf/recipe/meta.yaml):
+
+```yaml title="recipe.yaml"
+--8<-- "docs/snippets/recipes/botocore.yaml"
+```
+
+1. The two variants would normally only differ in their hash. Setting an
+   explicit build string with a readable prefix makes it easy to see which
+   variant of the package you are getting. The `hash` and `build_number`
+   variables are provided by Rattler-Build.
+2. Since `python_geq_310` is a boolean variant key, it can be used directly as
+   a condition in selectors.
+3. This is the reason for building two variants: on Python 3.10+, newer
+   versions of `urllib3` are supported.
+
+Building this recipe produces two `noarch` packages of the same name and
+version:
+
+```txt
+Build variant: botocore-1.34.56-pyge38_c34f5b3_0
+
+╭─────────────────┬──────────╮
+│ Variant         ┆ Version  │
+╞═════════════════╪══════════╡
+│ python_geq_310  ┆ false    │
+│ target_platform ┆ "noarch" │
+╰─────────────────┴──────────╯
+
+Build variant: botocore-1.34.56-pyge310_96c4f1e_0
+
+╭─────────────────┬──────────╮
+│ Variant         ┆ Version  │
+╞═════════════════╪══════════╡
+│ python_geq_310  ┆ true     │
+│ target_platform ┆ "noarch" │
+╰─────────────────┴──────────╯
+```
+
+In an environment with Python 3.8 or 3.9, only the `pyge38` variant is
+installable. With Python 3.10 or newer, both variants can be installed — but
+since the `pyge310` variant allows newer versions of `urllib3` (and the solver
+maximizes dependency versions), it is usually the one that gets picked. If you
+need explicit control over which variant the solver prefers, take a look at
+[prioritizing variants](../variants.md#prioritizing-variants).
+
+!!! tip "Variants based on other dependencies"
+    The same technique works for any dependency, not just Python itself. For
+    example, to ship one variant of your package for `pydantic` v1 and one for
+    `pydantic` v2, you can use the variant values directly in a dependency:
+
+    ```yaml title="variants.yaml"
+    pydantic:
+      - "1.*"
+      - "2.*"
+    ```
+
+    ```yaml title="recipe.yaml (excerpt)"
+    build:
+      noarch: python
+      string: pydantic${{ pydantic[0] }}_${{ hash }}_${{ build_number }}
+
+    requirements:
+      run:
+        - python >=3.9
+        - pydantic ${{ pydantic }}
+    ```
+
+    This builds `my-package-1.0.0-pydantic1_<hash>_0` and
+    `my-package-1.0.0-pydantic2_<hash>_0`, and the solver picks the variant
+    that is compatible with the `pydantic` version in your environment.
+
 ## A Python package with compiled extensions
 
 We will build a package for `numpy` – which contains compiled code.
