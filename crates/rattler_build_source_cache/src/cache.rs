@@ -6,6 +6,7 @@ use tokio::io::AsyncWriteExt;
 
 use crate::{
     builder::ProgressHandler,
+    content_hash::compute_content_hash,
     error::CacheError,
     index::{CacheEntry, CacheIndex, SourceType},
     lock::LockManager,
@@ -162,6 +163,7 @@ impl SourceCache {
             created: jiff::Timestamp::now(),
             lock_file: Some(_lock.path().to_path_buf()),
             attestation_verified: false,
+            content_sha256: None,
         };
 
         self.index.insert(key, entry).await?;
@@ -312,6 +314,31 @@ impl SourceCache {
             None
         };
 
+        // Compute content hash over the extracted directory (if extraction was performed).
+        let content_sha256 = if let Some(ref extracted_dir) = final_path {
+            match tokio::task::spawn_blocking({
+                let dir = extracted_dir.clone();
+                move || compute_content_hash(&dir)
+            })
+            .await
+            {
+                Ok(Ok(hash)) => {
+                    tracing::debug!("Computed content hash for {}: {}", url, hash);
+                    Some(hash)
+                }
+                Ok(Err(e)) => {
+                    tracing::warn!("Failed to compute content hash for {}: {}", url, e);
+                    None
+                }
+                Err(e) => {
+                    tracing::warn!("Content hash task panicked for {}: {}", url, e);
+                    None
+                }
+            }
+        } else {
+            None
+        };
+
         // Use the first checksum for the cache entry metadata
         let primary_checksum = checksums.first();
 
@@ -340,6 +367,7 @@ impl SourceCache {
             created: jiff::Timestamp::now(),
             lock_file: Some(_lock.path().to_path_buf()),
             attestation_verified: attestation.is_some(),
+            content_sha256,
         };
 
         self.index.insert(key, entry).await?;
