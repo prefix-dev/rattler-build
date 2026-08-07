@@ -288,3 +288,26 @@ pretty_assertions = { workspace = true }
 [[bench]]
 name = "parse_file"
 harness = false
+
+# TODO: drop once rattler_config with the shared config layer is released
+# (conda/rattler#2645). All rattler crates are patched to the same revision
+# so that only one version of each type exists in the dependency graph.
+[patch.crates-io]
+rattler = { git = "https://github.com/conda/rattler.git", rev = "17848a13d98568c3189a3c034f9ffd45be89df03" }
+rattler_cache = { git = "https://github.com/conda/rattler.git", rev = "17848a13d98568c3189a3c034f9ffd45be89df03" }
+rattler_conda_types = { git = "https://github.com/conda/rattler.git", rev = "17848a13d98568c3189a3c034f9ffd45be89df03" }
+rattler_config = { git = "https://github.com/conda/rattler.git", rev = "17848a13d98568c3189a3c034f9ffd45be89df03" }
+rattler_digest = { git = "https://github.com/conda/rattler.git", rev = "17848a13d98568c3189a3c034f9ffd45be89df03" }
+rattler_git = { git = "https://github.com/conda/rattler.git", rev = "17848a13d98568c3189a3c034f9ffd45be89df03" }
+rattler_index = { git = "https://github.com/conda/rattler.git", rev = "17848a13d98568c3189a3c034f9ffd45be89df03" }
+rattler_menuinst = { git = "https://github.com/conda/rattler.git", rev = "17848a13d98568c3189a3c034f9ffd45be89df03" }
+rattler_networking = { git = "https://github.com/conda/rattler.git", rev = "17848a13d98568c3189a3c034f9ffd45be89df03" }
+rattler_package_streaming = { git = "https://github.com/conda/rattler.git", rev = "17848a13d98568c3189a3c034f9ffd45be89df03" }
+rattler_prefix_guard = { git = "https://github.com/conda/rattler.git", rev = "17848a13d98568c3189a3c034f9ffd45be89df03" }
+rattler_redaction = { git = "https://github.com/conda/rattler.git", rev = "17848a13d98568c3189a3c034f9ffd45be89df03" }
+rattler_repodata_gateway = { git = "https://github.com/conda/rattler.git", rev = "17848a13d98568c3189a3c034f9ffd45be89df03" }
+rattler_s3 = { git = "https://github.com/conda/rattler.git", rev = "17848a13d98568c3189a3c034f9ffd45be89df03" }
+rattler_shell = { git = "https://github.com/conda/rattler.git", rev = "17848a13d98568c3189a3c034f9ffd45be89df03" }
+rattler_solve = { git = "https://github.com/conda/rattler.git", rev = "17848a13d98568c3189a3c034f9ffd45be89df03" }
+rattler_upload = { git = "https://github.com/conda/rattler.git", rev = "17848a13d98568c3189a3c034f9ffd45be89df03" }
+rattler_virtual_packages = { git = "https://github.com/conda/rattler.git", rev = "17848a13d98568c3189a3c034f9ffd45be89df03" }
