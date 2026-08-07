@@ -21,9 +21,10 @@
 //! pixi/rattler-build configuration; the embedding application stays in full
 //! control of where configuration comes from.
 
+use std::collections::BTreeSet;
 use std::path::PathBuf;
 
-use rattler_config::config::{ConfigBase, LoadError, MergeError};
+use rattler_config::config::{Config as _, ConfigBase, LoadError, MergeError};
 
 /// rattler-build specific configuration keys.
 /// Extend this struct to add configuration that only makes sense for
@@ -87,6 +88,12 @@ pub fn default_config_paths() -> Vec<PathBuf> {
 /// that `-v` runs can explain why a particular file was or was not picked up;
 /// the CLI separately logs the files that were actually loaded at the default
 /// level on startup.
+///
+/// Unknown keys are handled per file: files discovered from *pixi's*
+/// locations legitimately contain keys that only pixi understands (e.g.
+/// `detached-environments`), so unknown keys there are only logged at debug
+/// level. Unknown keys in rattler-build's own files are reported as
+/// warnings, since there they indicate typos or unsupported options.
 pub fn load_default_config() -> Result<Option<Config>, LoadError> {
     let candidates = default_config_paths();
     tracing::debug!("Configuration search paths (lowest precedence first): {candidates:?}");
@@ -101,7 +108,37 @@ pub fn load_default_config() -> Result<Option<Config>, LoadError> {
         return Ok(None);
     }
 
-    Config::load_from_files(&paths).map(Some)
+    let pixi_paths: BTreeSet<PathBuf> = rattler_config::locations::config_search_paths(&["pixi"])
+        .into_iter()
+        .collect();
+
+    // This mirrors `ConfigBase::load_from_files`, except that unknown keys
+    // in pixi-owned files are not warned about (see above).
+    let mut config = Config::default();
+    for path in paths {
+        let content = fs_err::read_to_string(&path)?;
+        let (mut other, unknown_keys) = Config::from_toml_str(&content)?;
+        for key in &unknown_keys {
+            if pixi_paths.contains(&path) {
+                tracing::debug!(
+                    "Ignoring configuration key `{key}` (not used by rattler-build) in {}",
+                    path.display()
+                );
+            } else {
+                tracing::warn!(
+                    "Ignoring unknown configuration key `{key}` in {}",
+                    path.display()
+                );
+            }
+        }
+        other.loaded_from.push(path.clone());
+        config = config
+            .merge_config(&other)
+            .map_err(|e| LoadError::MergeError(e, path))?;
+    }
+    config.validate()?;
+
+    Ok(Some(config))
 }
 
 #[cfg(test)]
