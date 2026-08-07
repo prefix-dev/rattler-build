@@ -49,7 +49,8 @@ rattler-build generate-recipe cran dplyr
 The `R` recipe generation supports some additional flags:
 
 - `-u/--universe` select an R universe to use (e.g. `bioconductor`)
-- `-t/--tree` generate multiple recipes, for every dependency as well
+- `-t/--tree` also generate recipes for dependencies that aren't yet available on conda-forge (recursively)
+- `-f/--full` used together with `-t/--tree`, generate recipes for every dependency instead, including ones already available on conda-forge
 
 R packages will be prefixed with `r-` to avoid name conflicts with Python packages. When the package declares a minimum R version (e.g. `Depends: R (>= 4.1.0)`), the generator emits a `skip` condition using the `r_base` variant key rather than pinning `r-base` to a version. The build script is also split into a platform-conditional list so that the correct environment-variable syntax (`${R_ARGS}` on Unix, `%R_ARGS%` on Windows) is used. The generated recipe for `dplyr` will look something like:
 

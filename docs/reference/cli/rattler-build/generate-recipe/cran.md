@@ -20,6 +20,8 @@ rattler-build generate-recipe cran [OPTIONS] <PACKAGE>
 - <a id="arg---universe" href="#arg---universe">`--universe (-u) <UNIVERSE>`</a>
 :  The R Universe to fetch the package from (defaults to `cran`)
 - <a id="arg---tree" href="#arg---tree">`--tree (-t)`</a>
-:  Whether to create recipes for the whole dependency tree or not
+:  Whether to recursively generate recipes for dependencies. By default, only dependencies missing from conda-forge are recursed into (mirrors grayskull's `--recursive`); pass `--full` as well to recurse into the whole dependency tree regardless of conda-forge status
+- <a id="arg---full" href="#arg---full">`--full (-f)`</a>
+:  Modifies `--tree` to recurse into every dependency, including ones already available on conda-forge. Has no effect unless `--tree` is also set
 - <a id="arg---write" href="#arg---write">`--write (-w)`</a>
 :  Whether to write the recipe to a folder

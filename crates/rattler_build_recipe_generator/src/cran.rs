@@ -6,7 +6,11 @@ use std::{collections::HashMap, collections::HashSet};
 use clap::Parser;
 use itertools::Itertools;
 use miette::IntoDiagnostic;
+#[cfg(not(target_arch = "wasm32"))]
+use rattler_conda_types::{Channel, ChannelConfig, PackageName, Platform};
 use rattler_digest::{Sha256Hash, compute_bytes_digest};
+#[cfg(not(target_arch = "wasm32"))]
+use rattler_repodata_gateway::{Gateway, GatewayError, RepoData};
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use url::Url;
@@ -71,9 +75,18 @@ pub struct CranOpts {
     #[cfg_attr(feature = "cli", arg(short, long))]
     pub universe: Option<String>,
 
-    /// Whether to create recipes for the whole dependency tree or not
+    /// Whether to recursively generate recipes for dependencies. By default,
+    /// only dependencies missing from conda-forge are recursed into (mirrors
+    /// grayskull's `--recursive`); pass `--full` as well to recurse into the
+    /// whole dependency tree regardless of conda-forge status.
     #[cfg_attr(feature = "cli", arg(short, long))]
     pub tree: bool,
+
+    /// Modifies `--tree` to recurse into every dependency, including ones
+    /// already available on conda-forge. Has no effect unless `--tree` is
+    /// also set.
+    #[cfg_attr(feature = "cli", arg(short, long))]
+    pub full: bool,
 
     /// Name of the package to generate
     pub package: String,
@@ -246,6 +259,115 @@ pub async fn fetch_package_sha256sum(url: &Url) -> Result<Sha256Hash, miette::Er
     let response = client.get(url.clone()).send().await.into_diagnostic()?;
     let bytes = response.bytes().await.into_diagnostic()?;
     Ok(compute_bytes_digest::<Sha256>(&bytes))
+}
+
+/// The default "conda-forge" channel, resolved against the standard
+/// `https://conda.anaconda.org` alias.
+#[cfg(not(target_arch = "wasm32"))]
+fn conda_forge_channel() -> Channel {
+    let channel_config = ChannelConfig::default_with_root_dir(
+        std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("/")),
+    );
+    Channel::from_name("conda-forge", &channel_config)
+}
+
+/// Query `channel` via the repodata gateway for which of `package_names`
+/// are present there, for the host platform or `noarch`. Queries every name
+/// in a single batched request rather than one at a time, since the
+/// gateway can fetch multiple packages concurrently.
+#[cfg(not(target_arch = "wasm32"))]
+async fn query_conda_forge_channel(
+    gateway: &Gateway,
+    channel: Channel,
+    package_names: Vec<PackageName>,
+) -> Result<HashSet<PackageName>, GatewayError> {
+    let output = gateway
+        .query(
+            vec![channel],
+            [Platform::current(), Platform::NoArch],
+            package_names,
+        )
+        .recursive(false)
+        .await?;
+    Ok(output
+        .iter()
+        .flat_map(RepoData::iter)
+        .map(|record| record.package_record.name.clone())
+        .collect())
+}
+
+/// Check `deps` against `channel`, returning those that aren't available
+/// there (as the original, non-prefixed dependency names). Checks all of
+/// `deps` in a single batched gateway query. Split out from
+/// [`find_missing_conda_forge_deps`] so tests can exercise the
+/// network-error branch deterministically by pointing it at an unreachable
+/// channel.
+///
+/// Network errors (and unparsable package names) are treated as "exists"
+/// so connectivity issues don't produce spurious warnings.
+#[cfg(not(target_arch = "wasm32"))]
+async fn find_missing_conda_forge_deps_in(channel: Channel, deps: &HashSet<String>) -> Vec<String> {
+    if deps.is_empty() {
+        return Vec::new();
+    }
+
+    let mut package_name_to_dep = HashMap::new();
+    for dep in deps {
+        let conda_name = format_r_package(dep, None);
+        match conda_name.parse::<PackageName>() {
+            Ok(package_name) => {
+                package_name_to_dep.insert(package_name, dep.clone());
+            }
+            Err(e) => {
+                // Fail open for this dep: an unparsable name can't be
+                // confirmed missing, so don't warn about it.
+                tracing::debug!("Invalid conda package name '{}': {}", conda_name, e);
+            }
+        }
+    }
+
+    let gateway = Gateway::new();
+    let package_names = package_name_to_dep.keys().cloned().collect();
+    let found = match query_conda_forge_channel(&gateway, channel, package_names).await {
+        Ok(found) => found,
+        Err(e) => {
+            // Fail open: a query-wide failure shouldn't produce spurious
+            // warnings for every dependency.
+            tracing::debug!("Failed to check conda-forge: {}", e);
+            return Vec::new();
+        }
+    };
+
+    package_name_to_dep
+        .into_iter()
+        .filter(|(name, _)| !found.contains(name))
+        .map(|(_, dep)| dep)
+        .collect()
+}
+
+/// Check `deps` against conda-forge, returning those that aren't available
+/// there yet (as the original, non-prefixed dependency names).
+///
+/// Unlike PyPI, CRAN package names map to conda-forge by a fixed convention
+/// (`foo` -> `r-foo`, see [`format_r_package`]), so no name-mapping lookup is
+/// needed here, only an existence check via the repodata gateway.
+#[cfg(not(target_arch = "wasm32"))]
+async fn find_missing_conda_forge_deps(deps: &HashSet<String>) -> Vec<String> {
+    find_missing_conda_forge_deps_in(conda_forge_channel(), deps).await
+}
+
+/// Warn about each dependency in `missing`, so the user knows upfront which
+/// recipes they need to package first.
+#[cfg(not(target_arch = "wasm32"))]
+fn warn_about_missing_conda_forge_deps(missing: &[String]) {
+    for dep in missing {
+        let conda_name = format_r_package(dep, None);
+        tracing::warn!(
+            "Dependency '{}' does not appear to be available on conda-forge as '{}'. You may need to create and publish a recipe for it first.",
+            dep,
+            conda_name
+        );
+    }
 }
 
 // Found when running `installed.packages()` in an `r-base` environment
@@ -519,7 +641,9 @@ pub async fn generate_r_recipe_string(
 ///
 /// If `opts.write` is true, the recipe is written to a folder named after the
 /// package. Otherwise, the YAML is printed to stdout. When `tree` is enabled,
-/// dependencies are recursively generated if they don't already exist locally.
+/// dependencies that don't already exist locally are recursively generated:
+/// by default only those missing from conda-forge, or every dependency if
+/// `full` is also set.
 pub async fn generate_r_recipe(opts: &CranOpts) -> miette::Result<()> {
     let (recipe, remaining_deps) =
         build_cran_recipe_and_deps(&opts.package, opts.universe.as_deref()).await?;
@@ -532,17 +656,58 @@ pub async fn generate_r_recipe(opts: &CranOpts) -> miette::Result<()> {
         print!("{}", final_recipe);
     }
 
-    if opts.tree {
-        for dep in remaining_deps {
-            let r_package = format_r_package(&dep, None);
+    let missing_deps = find_missing_conda_forge_deps(&remaining_deps).await;
+    warn_about_missing_conda_forge_deps(&missing_deps);
 
-            if !PathBuf::from(r_package).exists() {
-                let opts = CranOpts {
-                    package: dep,
-                    ..opts.clone()
-                };
-                generate_r_recipe(&opts).await?;
-            }
+    generate_recipes_for_deps(
+        select_deps_to_recurse(remaining_deps, missing_deps, opts),
+        opts,
+    )
+    .await?;
+
+    Ok(())
+}
+
+/// Decide which dependencies to recursively generate recipes for:
+/// - without `tree`, none;
+/// - with `tree` alone, only those missing from conda-forge (generating
+///   recipes for ones already available there isn't useful, since those
+///   boilerplate recipes would need further changes to be valid anyway);
+/// - with `tree` and `full`, every dependency, regardless of conda-forge
+///   status.
+#[cfg(not(target_arch = "wasm32"))]
+fn select_deps_to_recurse(
+    remaining_deps: HashSet<String>,
+    missing_deps: Vec<String>,
+    opts: &CranOpts,
+) -> Vec<String> {
+    if !opts.tree {
+        return Vec::new();
+    }
+
+    if opts.full {
+        remaining_deps.into_iter().collect()
+    } else {
+        missing_deps
+    }
+}
+
+/// Generate a recipe for each of `deps` that doesn't already have a local
+/// folder, reusing `opts` (except for the package name) for each one.
+#[cfg(not(target_arch = "wasm32"))]
+async fn generate_recipes_for_deps(
+    deps: impl IntoIterator<Item = String>,
+    opts: &CranOpts,
+) -> miette::Result<()> {
+    for dep in deps {
+        let r_package = format_r_package(&dep, None);
+
+        if !PathBuf::from(r_package).exists() {
+            let opts = CranOpts {
+                package: dep,
+                ..opts.clone()
+            };
+            generate_r_recipe(&opts).await?;
         }
     }
 
@@ -552,6 +717,7 @@ pub async fn generate_r_recipe(opts: &CranOpts) -> miette::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tracing_test::traced_test;
 
     #[test]
     fn test_license_mapping() {
@@ -649,5 +815,352 @@ mod tests {
             );
             assert_eq!(license_files, expected_files, "Failed for input: {}", input);
         }
+    }
+
+    /// A channel whose host is guaranteed to never resolve, so queries
+    /// against it deterministically exercise the network-error branch
+    /// regardless of the test environment's actual connectivity. `.invalid`
+    /// is an IANA-reserved TLD for exactly this purpose (RFC 2606).
+    fn unreachable_channel() -> Channel {
+        Channel {
+            base_url: Url::parse("https://conda-forge.invalid/conda-forge/")
+                .unwrap()
+                .into(),
+            name: Some("conda-forge".to_string()),
+            platforms: None,
+        }
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    async fn test_query_conda_forge_channel_finds_real_package() {
+        let gateway = Gateway::new();
+        let package_name = "r-jsonlite".parse().unwrap();
+
+        let found = query_conda_forge_channel(&gateway, conda_forge_channel(), vec![package_name])
+            .await
+            .unwrap();
+
+        assert!(!found.is_empty());
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    async fn test_query_conda_forge_channel_excludes_fake_package() {
+        let gateway = Gateway::new();
+        let package_name: PackageName = "r-this-package-does-not-exist-xyz123".parse().unwrap();
+
+        let found =
+            query_conda_forge_channel(&gateway, conda_forge_channel(), vec![package_name.clone()])
+                .await
+                .unwrap();
+
+        assert!(!found.contains(&package_name));
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    async fn test_find_missing_conda_forge_deps_in_fails_open_on_network_error() {
+        let mut deps = HashSet::new();
+        deps.insert("jsonlite".to_string());
+
+        // `.invalid` is an IANA-reserved TLD (RFC 2606) guaranteed never to
+        // resolve, so this deterministically exercises the network-error
+        // branch regardless of the test environment's actual connectivity.
+        let missing = find_missing_conda_forge_deps_in(unreachable_channel(), &deps).await;
+
+        // Fails open: a query-wide failure reports nothing as missing,
+        // rather than treating every dependency as missing.
+        assert!(missing.is_empty());
+        assert!(logs_contain("Failed to check conda-forge"));
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    async fn test_find_missing_conda_forge_deps_includes_fake_package() {
+        let dep = "this_package_does_not_exist_xyz123";
+        let mut deps = HashSet::new();
+        deps.insert(dep.to_string());
+
+        let missing = find_missing_conda_forge_deps(&deps).await;
+
+        if !missing.contains(&dep.to_string()) {
+            // The dependency is only excluded from the missing list if the
+            // conda-forge check itself failed open due to a network error.
+            // Confirm that's what happened, rather than a false positive.
+            let gateway = Gateway::new();
+            let package_name = format!("r-{dep}").parse().unwrap();
+            assert!(
+                query_conda_forge_channel(&gateway, conda_forge_channel(), vec![package_name])
+                    .await
+                    .is_err(),
+                "fake dependency unexpectedly reported as existing on conda-forge"
+            );
+        }
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    async fn test_find_missing_conda_forge_deps_excludes_real_package() {
+        let mut deps = HashSet::new();
+        deps.insert("jsonlite".to_string());
+
+        let missing = find_missing_conda_forge_deps(&deps).await;
+
+        assert!(missing.is_empty());
+    }
+
+    #[test]
+    #[traced_test]
+    fn test_warn_about_missing_conda_forge_deps_logs_warning() {
+        let missing = vec!["this_package_does_not_exist_xyz123".to_string()];
+
+        warn_about_missing_conda_forge_deps(&missing);
+
+        assert!(logs_contain(
+            "Dependency 'this_package_does_not_exist_xyz123' does not appear to be available on conda-forge as 'r-this_package_does_not_exist_xyz123'"
+        ));
+    }
+
+    #[test]
+    #[traced_test]
+    fn test_warn_about_missing_conda_forge_deps_silent_when_empty() {
+        warn_about_missing_conda_forge_deps(&[]);
+
+        assert!(!logs_contain(
+            "does not appear to be available on conda-forge"
+        ));
+    }
+
+    fn dummy_cran_opts() -> CranOpts {
+        CranOpts {
+            universe: None,
+            tree: false,
+            full: false,
+            package: "unused".to_string(),
+            write: false,
+        }
+    }
+
+    // The recursion tests fabricate the `missing_deps` set directly rather than
+    // querying conda-forge, so these two names are just placeholders whose
+    // conda-forge "status" is decided purely by which set a test puts them in.
+    // Neither is a real package on conda-forge or CRAN -- the absence from CRAN
+    // is what makes a recursion into either fail fast instead of downloading
+    // anything.
+
+    /// Placeholder the recursion tests treat as present on conda-forge, by
+    /// keeping it out of the fabricated `missing_deps`.
+    const DEP_ON_CONDA_FORGE: &str = "dep_on_conda_forge_xyz123";
+    /// Placeholder the recursion tests treat as missing from conda-forge, by
+    /// putting it in the fabricated `missing_deps`.
+    const DEP_MISSING_FROM_CONDA_FORGE: &str = "dep_missing_from_conda_forge_xyz123";
+
+    /// Build the `remaining_deps`/`missing_deps` pair that `generate_r_recipe`
+    /// would hand to `select_deps_to_recurse`.
+    fn deps_split() -> (HashSet<String>, Vec<String>) {
+        let remaining = HashSet::from([
+            DEP_ON_CONDA_FORGE.to_string(),
+            DEP_MISSING_FROM_CONDA_FORGE.to_string(),
+        ]);
+        let missing = vec![DEP_MISSING_FROM_CONDA_FORGE.to_string()];
+        (remaining, missing)
+    }
+
+    fn opts_with_flags(tree: bool, full: bool) -> CranOpts {
+        CranOpts {
+            tree,
+            full,
+            ..dummy_cran_opts()
+        }
+    }
+
+    #[test]
+    fn test_select_deps_to_recurse_without_tree_recurses_into_nothing() {
+        let (remaining, missing) = deps_split();
+
+        let selected = select_deps_to_recurse(remaining, missing, &opts_with_flags(false, false));
+
+        assert!(selected.is_empty());
+    }
+
+    #[test]
+    fn test_select_deps_to_recurse_full_without_tree_has_no_effect() {
+        let (remaining, missing) = deps_split();
+
+        // `--full` only modifies `--tree`'s behavior, so without `--tree` it
+        // still recurses into nothing.
+        let selected = select_deps_to_recurse(remaining, missing, &opts_with_flags(false, true));
+
+        assert!(selected.is_empty());
+    }
+
+    #[test]
+    fn test_select_deps_to_recurse_tree_only_recurses_into_missing() {
+        let (remaining, missing) = deps_split();
+
+        let selected = select_deps_to_recurse(remaining, missing, &opts_with_flags(true, false));
+
+        // `--tree` alone recurses only into dependencies missing from
+        // conda-forge.
+        assert_eq!(selected, vec![DEP_MISSING_FROM_CONDA_FORGE.to_string()]);
+    }
+
+    #[test]
+    fn test_select_deps_to_recurse_tree_full_recurses_into_everything() {
+        let (remaining, missing) = deps_split();
+
+        let selected = select_deps_to_recurse(remaining, missing, &opts_with_flags(true, true));
+
+        // `--tree --full` recurses into every dependency, on conda-forge or
+        // not.
+        assert_eq!(
+            selected.into_iter().collect::<HashSet<_>>(),
+            HashSet::from([
+                DEP_ON_CONDA_FORGE.to_string(),
+                DEP_MISSING_FROM_CONDA_FORGE.to_string()
+            ])
+        );
+    }
+
+    /// Mirror the tail of `generate_r_recipe` for a single fabricated
+    /// dependency: warn about it if it's flagged missing from conda-forge,
+    /// then recurse into it if `select_deps_to_recurse` picks it for these
+    /// flags. Only `dep` is in `remaining_deps` (so recursion never
+    /// short-circuits on a sibling), and `missing_deps` contains it only when
+    /// `missing_from_conda_forge` is set. `dep` isn't a real CRAN package, so a
+    /// selected recursion logs "Generating R recipe for <dep>" and then fails
+    /// fast -- the log is what the callers assert on.
+    async fn warn_and_recurse(dep: &str, missing_from_conda_forge: bool, opts: &CranOpts) {
+        let remaining = HashSet::from([dep.to_string()]);
+        let missing = if missing_from_conda_forge {
+            vec![dep.to_string()]
+        } else {
+            Vec::new()
+        };
+
+        warn_about_missing_conda_forge_deps(&missing);
+        let selected = select_deps_to_recurse(remaining, missing, opts);
+        let _ = generate_recipes_for_deps(selected, opts).await;
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    async fn test_recursion_without_tree_warns_but_never_recurses() {
+        let opts = opts_with_flags(false, false);
+
+        warn_and_recurse(DEP_MISSING_FROM_CONDA_FORGE, true, &opts).await;
+        // The missing dependency is warned about, but without `--tree` it is
+        // not recursed into.
+        assert!(logs_contain(&format!(
+            "Dependency '{DEP_MISSING_FROM_CONDA_FORGE}' does not appear to be available on conda-forge"
+        )));
+        assert!(!logs_contain(&format!(
+            "Generating R recipe for {DEP_MISSING_FROM_CONDA_FORGE}"
+        )));
+
+        warn_and_recurse(DEP_ON_CONDA_FORGE, false, &opts).await;
+        assert!(!logs_contain(&format!(
+            "Generating R recipe for {DEP_ON_CONDA_FORGE}"
+        )));
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    async fn test_recursion_full_without_tree_has_no_effect() {
+        let opts = opts_with_flags(false, true);
+
+        // `--full` only modifies `--tree`'s behavior, so without `--tree`
+        // nothing is recursed into, even a dependency missing from
+        // conda-forge.
+        warn_and_recurse(DEP_MISSING_FROM_CONDA_FORGE, true, &opts).await;
+        assert!(!logs_contain(&format!(
+            "Generating R recipe for {DEP_MISSING_FROM_CONDA_FORGE}"
+        )));
+
+        warn_and_recurse(DEP_ON_CONDA_FORGE, false, &opts).await;
+        assert!(!logs_contain(&format!(
+            "Generating R recipe for {DEP_ON_CONDA_FORGE}"
+        )));
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    async fn test_recursion_tree_only_recurses_into_missing() {
+        let opts = opts_with_flags(true, false);
+
+        warn_and_recurse(DEP_MISSING_FROM_CONDA_FORGE, true, &opts).await;
+        assert!(logs_contain(&format!(
+            "Dependency '{DEP_MISSING_FROM_CONDA_FORGE}' does not appear to be available on conda-forge"
+        )));
+        assert!(logs_contain(&format!(
+            "Generating R recipe for {DEP_MISSING_FROM_CONDA_FORGE}"
+        )));
+
+        // `--tree` alone only recurses into dependencies missing from
+        // conda-forge, so an already-available dependency is left alone.
+        warn_and_recurse(DEP_ON_CONDA_FORGE, false, &opts).await;
+        assert!(!logs_contain(&format!(
+            "Generating R recipe for {DEP_ON_CONDA_FORGE}"
+        )));
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    async fn test_recursion_tree_full_recurses_into_everything() {
+        let opts = opts_with_flags(true, true);
+
+        warn_and_recurse(DEP_MISSING_FROM_CONDA_FORGE, true, &opts).await;
+        assert!(logs_contain(&format!(
+            "Dependency '{DEP_MISSING_FROM_CONDA_FORGE}' does not appear to be available on conda-forge"
+        )));
+        assert!(logs_contain(&format!(
+            "Generating R recipe for {DEP_MISSING_FROM_CONDA_FORGE}"
+        )));
+
+        // `--tree --full` recurses into every dependency, including ones
+        // already on conda-forge.
+        warn_and_recurse(DEP_ON_CONDA_FORGE, false, &opts).await;
+        assert!(logs_contain(&format!(
+            "Generating R recipe for {DEP_ON_CONDA_FORGE}"
+        )));
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    async fn test_generate_recipes_for_deps_skips_dependency_with_existing_local_folder() {
+        let dep = "test-recurse-missing-fixture-existing";
+        let folder = format_r_package(dep, None);
+        fs_err::create_dir_all(&folder).unwrap();
+
+        let result = generate_recipes_for_deps([dep.to_string()], &dummy_cran_opts()).await;
+
+        fs_err::remove_dir_all(&folder).unwrap();
+
+        // A pre-existing local folder means the dependency is skipped
+        // entirely, so no network call is attempted and this can't fail.
+        assert!(
+            result.is_ok(),
+            "should skip recursion once a local folder for the dependency already exists"
+        );
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    async fn test_generate_recipes_for_deps_recurses_into_dependency_without_local_folder() {
+        let dep = "this-package-definitely-does-not-exist-anywhere-xyz123";
+        let folder = format_r_package(dep, None);
+        assert!(
+            !PathBuf::from(&folder).exists(),
+            "test fixture assumption violated: {folder} should not exist locally"
+        );
+
+        let result = generate_recipes_for_deps([dep.to_string()], &dummy_cran_opts()).await;
+
+        // No local folder means `generate_recipes_for_deps` recurses into
+        // `generate_r_recipe`, which looks the (nonexistent) package up on
+        // CRAN and fails -- proving recursion was actually attempted rather
+        // than silently skipped.
+        assert!(result.is_err());
     }
 }
