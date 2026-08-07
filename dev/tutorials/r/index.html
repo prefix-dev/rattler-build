@@ -3931,7 +3931,7 @@
 <p>Packaging a R package is similar to packaging a Python package!</p>
 <h2 id="generating-a-starting-point">Generating a starting point<a class="headerlink" href="#generating-a-starting-point" title="Permanent link">#</a></h2>
 <p>You can use Rattler-Build to generate a starting point for your recipe from the metadata on CRAN.</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>rattler-build<span class="w"> </span>generate-recipe<span class="w"> </span>cran<span class="w"> </span>r-knitr
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>rattler-build<span class="w"> </span>generate-recipe<span class="w"> </span>cran<span class="w"> </span>knitr
 </span></code></pre></div>
 <h2 id="building-a-r-package">Building a R Package<a class="headerlink" href="#building-a-r-package" title="Permanent link">#</a></h2>
 <div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">context</span><span class="p">:</span>
@@ -3978,7 +3978,8 @@
 </span><span id="__span-1-42"><a id="__codelineno-1-42" name="__codelineno-1-42" href="#__codelineno-1-42"></a><span class="w">    </span><span class="no">Provides a general-purpose tool for dynamic report</span>
 </span><span id="__span-1-43"><a id="__codelineno-1-43" name="__codelineno-1-43" href="#__codelineno-1-43"></a><span class="w">    </span><span class="no">generation in R using Literate Programming techniques.</span>
 </span><span id="__span-1-44"><a id="__codelineno-1-44" name="__codelineno-1-44" href="#__codelineno-1-44"></a><span class="w">  </span><span class="nt">license</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">GPL-2.0-only</span>
-</span><span id="__span-1-45"><a id="__codelineno-1-45" name="__codelineno-1-45" href="#__codelineno-1-45"></a><span class="w">  </span><span class="nt">repository</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://github.com/cran/knitr</span>
+</span><span id="__span-1-45"><a id="__codelineno-1-45" name="__codelineno-1-45" href="#__codelineno-1-45"></a><span class="w">  </span><span class="nt">license_file</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ PREFIX }}/lib/R/share/licenses/GPL-2</span>
+</span><span id="__span-1-46"><a id="__codelineno-1-46" name="__codelineno-1-46" href="#__codelineno-1-46"></a><span class="w">  </span><span class="nt">repository</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://github.com/cran/knitr</span>
 </span></code></pre></div>
 <ol>
 <li>The <code>script</code> section is where you specify the build commands to run. In this case, we are using <code>R CMD INSTALL --build .</code> to build the package.</li>

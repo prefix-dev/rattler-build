@@ -42,4 +42,5 @@ about:
     Provides a general-purpose tool for dynamic report
     generation in R using Literate Programming techniques.
   license: GPL-2.0-only
+  license_file: ${{ PREFIX }}/lib/R/share/licenses/GPL-2
   repository: https://github.com/cran/knitr
