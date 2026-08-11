@@ -47,7 +47,7 @@ use rattler_cache::validation::ValidationMode;
 
 use crate::{
     env_vars, metadata::PlatformWithVirtualPackages, render::solver::create_environment,
-    source::copy_dir::CopyDir, tool_configuration,
+    source::copy_dir::CopyDir, tool_configuration, utils::remove_dir_all_force,
 };
 
 /// Builds a `MatchSpec` that exactly matches the just-built artifact from its
@@ -722,7 +722,7 @@ pub async fn run_test(
             }
 
             if !config.keep_test_prefix {
-                fs::remove_dir_all(test_prefix)?;
+                remove_dir_all_force(&test_prefix)?;
             }
         }
 
