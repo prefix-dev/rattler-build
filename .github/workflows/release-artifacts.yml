@@ -178,6 +178,9 @@ jobs:
           file-digest: SHA256
           timestamp-rfc3161: http://timestamp.acs.microsoft.com
           timestamp-digest: SHA256
+          # Avoid stale/corrupt PowerShell module caches. A cache hit skips the
+          # install even when Invoke-ArtifactSigning is unavailable.
+          cache-dependencies: false
 
       - name: Copy signed Windows binary back
         if: contains(matrix.target, 'pc-windows')
