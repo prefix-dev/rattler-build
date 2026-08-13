@@ -248,8 +248,11 @@ jobs:
     permissions:
       contents: write
     steps:
+      # Check out the tagged tree so CHANGELOG.md and the source archive match
+      # the release exactly.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ needs.prepare.outputs.tag }}
           fetch-depth: 0
           persist-credentials: false
       - uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
