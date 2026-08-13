@@ -356,9 +356,7 @@ impl ResolvedDependencies {
 impl Display for ResolvedDependencies {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut table = comfy_table::Table::new();
-        table
-            .load_preset(comfy_table::presets::UTF8_FULL_CONDENSED)
-            .apply_modifier(comfy_table::modifiers::UTF8_ROUND_CORNERS);
+        table.load_style(comfy_table::presets::UTF8_FULL_CONDENSED.with_rounded_corners());
         write!(f, "{}", self.to_table(table, false))
     }
 }
@@ -518,9 +516,7 @@ impl FinalizedRunDependencies {
 impl Display for FinalizedRunDependencies {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut table = comfy_table::Table::new();
-        table
-            .load_preset(comfy_table::presets::UTF8_FULL_CONDENSED)
-            .apply_modifier(comfy_table::modifiers::UTF8_ROUND_CORNERS);
+        table.load_style(comfy_table::presets::UTF8_FULL_CONDENSED.with_rounded_corners());
         write!(f, "{}", self.to_table(table, false))
     }
 }

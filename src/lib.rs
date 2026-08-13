@@ -447,8 +447,7 @@ pub async fn get_build_output(
 
         let mut table = comfy_table::Table::new();
         table
-            .load_preset(comfy_table::presets::UTF8_FULL_CONDENSED)
-            .apply_modifier(comfy_table::modifiers::UTF8_ROUND_CORNERS)
+            .load_style(comfy_table::presets::UTF8_FULL_CONDENSED.with_rounded_corners())
             .set_header(["Variant", "Version"]);
         for (key, value) in discovered_output.used_vars.iter() {
             table.add_row([key.normalize(), format!("{:?}", value)]);

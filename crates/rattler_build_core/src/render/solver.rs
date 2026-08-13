@@ -15,9 +15,7 @@ use super::reporters::GatewayReporter;
 
 fn print_as_table(packages: &[RepoDataRecord]) {
     let mut table = Table::new();
-    table
-        .load_preset(comfy_table::presets::UTF8_FULL_CONDENSED)
-        .apply_modifier(comfy_table::modifiers::UTF8_ROUND_CORNERS);
+    table.load_style(comfy_table::presets::UTF8_FULL_CONDENSED.with_rounded_corners());
     table.set_header(vec![
         "Package", "Version", "Build", "Channel", "Size",
         // "License",
