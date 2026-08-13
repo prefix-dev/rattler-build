@@ -37,7 +37,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
+      - uses: prefix-dev/setup-pixi@f00437f565399d418b0acc85936d12c1fb668347 # v0.10.1
         with:
           environments: release
       - name: Extract version
@@ -99,7 +99,7 @@ jobs:
           mkdir -p ~/.pixi
           echo 'tool-platform = "win-64"' > ~/.pixi/config.toml
 
-      - uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
+      - uses: prefix-dev/setup-pixi@f00437f565399d418b0acc85936d12c1fb668347 # v0.10.1
         with:
           environments: release
 
@@ -120,7 +120,7 @@ jobs:
 
       - name: Install cross
         if: matrix.use-cross
-        uses: taiki-e/install-action@07b4745e0c39a41822af610387492e3e53aa222b # v2.83.4
+        uses: taiki-e/install-action@91ddec75689c4c78665b598d188dc821c5a43e5c # v2.85.9
         with:
           tool: cross
 
@@ -153,7 +153,7 @@ jobs:
 
       - name: Azure login (OIDC)
         if: contains(matrix.target, 'pc-windows')
-        uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3.0.0
+        uses: azure/login@f5d393ae46f8fde4be8b75f32e3fc50e654ad0ca # v3.0.1
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
@@ -224,7 +224,7 @@ jobs:
       actions: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
+      - uses: prefix-dev/setup-pixi@f00437f565399d418b0acc85936d12c1fb668347 # v0.10.1
         with:
           environments: release
       - name: Create and push tag
@@ -255,7 +255,7 @@ jobs:
           ref: ${{ needs.prepare.outputs.tag }}
           fetch-depth: 0
           persist-credentials: false
-      - uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
+      - uses: prefix-dev/setup-pixi@f00437f565399d418b0acc85936d12c1fb668347 # v0.10.1
         with:
           environments: release
       - name: Download all release artifacts
@@ -286,7 +286,7 @@ jobs:
           path: dist/
           merge-multiple: true
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b # release/v1
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # release/v1
         with:
           skip-existing: true
           packages-dir: dist/
