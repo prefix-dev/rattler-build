@@ -225,9 +225,10 @@ mod variable_evaluation_tests {
         let value = Value::new_template(true_template, None);
 
         let result = evaluate_value_to_variable(&value, &context).unwrap();
-        // Check it's a boolean
+        // Check it's a boolean. Do not assert on MiniJinja's display format;
+        // recent versions render booleans as `True` for Jinja2 compatibility.
         assert!(result.as_ref().is_true());
-        assert_eq!(result.as_ref().to_string(), "true");
+        assert_eq!(result.as_bool(), Some(true));
     }
 
     #[test]
