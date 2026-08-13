@@ -75,7 +75,7 @@ impl PlatformWithVirtualPackages {
         platform: Platform,
         overrides: &VirtualPackageOverrides,
     ) -> Result<Self, DetectVirtualPackageError> {
-        let virtual_packages = VirtualPackages::detect_for_platform(platform, overrides)?
+        let virtual_packages = VirtualPackages::detect_for_platform(platform, overrides, None)?
             .into_generic_virtual_packages()
             .collect();
         Ok(Self {

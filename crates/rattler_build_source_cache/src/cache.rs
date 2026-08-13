@@ -105,6 +105,7 @@ impl SourceCache {
             // the smudge filter during checkout; `Some(false)` force-skips the
             // smudge filter so checkouts contain pointer files only.
             lfs: Some(source.lfs),
+            ..Default::default()
         };
 
         let fetch_result = self
