@@ -1,6 +1,6 @@
 [package]
 name = "rattler-build"
-version = "0.72.2"
+version = "0.73.0"
 authors = ["rattler-build contributors <hi@prefix.dev>"]
 repository = "https://github.com/prefix-dev/rattler-build"
 edition = "2024"

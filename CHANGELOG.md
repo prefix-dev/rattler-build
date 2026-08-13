@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.73.0] - 2026-08-13
+### ✨ Highlights
+
+This release improves downstream-test reliability by selecting compatible Python builds, preserves executable-relative macOS rpaths, and makes test cleanup more robust. It also migrates the documentation toolchain from MkDocs to Zensical and corrects a documented target package name.
+
+### Documentation
+
+- Switch from mkdocs to zensical by @Hofer-Julian in [#2720](https://github.com/prefix-dev/rattler-build/pull/2720)
+- Correct target package name by @matthewfeickert in [#2726](https://github.com/prefix-dev/rattler-build/pull/2726)
+
+
+### Fixed
+
+- Preserve executable-relative macOS rpaths by @wolfv in [#2718](https://github.com/prefix-dev/rattler-build/pull/2718)
+- Select compatible Python for downstream tests by @wolfv in [#2725](https://github.com/prefix-dev/rattler-build/pull/2725)
+- Use `remove_dir_all_force` helper in `run_test.rs` by @lucascolley in [#2729](https://github.com/prefix-dev/rattler-build/pull/2729)
+
+
+
 ## [0.72.2] - 2026-07-31
 ### ✨ Highlights
 
