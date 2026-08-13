@@ -17,6 +17,10 @@ pub use rattler_build_script::{
     BuildScriptSection, ExecutionArgs, ExecutionContext, InterpreterError, ResolvedScriptContents,
     RuntimeEnv, SandboxArguments, SandboxConfiguration, Script, ScriptContent,
     platform_script_extensions,
+    runner::{
+        ExecSpec, ExecStatus, GuestInfo, GuestPath, HostPath, LocalRunner, Mount, OutputSink,
+        OutputStream, Runner, RunnerError, Session, SessionSpec,
+    },
 };
 
 use crate::{env_vars, metadata::Output};

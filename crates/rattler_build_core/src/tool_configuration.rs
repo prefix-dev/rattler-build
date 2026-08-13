@@ -5,6 +5,7 @@ use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
 use clap::ValueEnum;
 use rattler::package_cache::PackageCache;
+use rattler_build_script::runner::{LocalRunner, Runner};
 use rattler_conda_types::{ChannelConfig, Platform};
 #[cfg(feature = "s3")]
 use rattler_networking::s3_middleware;
@@ -82,6 +83,9 @@ pub struct Configuration {
 
     /// The source cache for downloading and caching source code
     pub source_cache: Option<Arc<rattler_build_source_cache::SourceCache>>,
+
+    /// The runner that executes build, staging, and test scripts
+    pub runner: Arc<dyn Runner>,
 
     /// Set this to true if you want to keep the build directory after the build
     /// is done
@@ -185,6 +189,7 @@ pub struct ConfigurationBuilder {
     cache_dir: Option<PathBuf>,
     fancy_log_handler: Option<LoggingOutputHandler>,
     client: Option<rattler_build_networking::BaseClient>,
+    runner: Option<Arc<dyn Runner>>,
     no_clean: bool,
     no_test: bool,
     test_strategy: TestStrategy,
@@ -219,6 +224,7 @@ impl ConfigurationBuilder {
             cache_dir: None,
             fancy_log_handler: None,
             client: None,
+            runner: None,
             no_clean: false,
             no_test: false,
             test_strategy: TestStrategy::default(),
@@ -346,6 +352,14 @@ impl ConfigurationBuilder {
         }
     }
 
+    /// Sets the runner used to execute build, staging, and test scripts.
+    pub fn with_runner(self, runner: Arc<dyn Runner>) -> Self {
+        Self {
+            runner: Some(runner),
+            ..self
+        }
+    }
+
     /// Sets whether tests should be executed.
     pub fn with_testing(self, testing_enabled: bool) -> Self {
         Self {
@@ -462,6 +476,9 @@ impl ConfigurationBuilder {
             fancy_log_handler: self.fancy_log_handler.unwrap_or_default(),
             client,
             source_cache: None, // Built lazily on first use
+            runner: self
+                .runner
+                .unwrap_or_else(|| Arc::new(LocalRunner::default())),
             no_clean: self.no_clean,
             test_strategy,
             use_zstd: self.use_zstd,
