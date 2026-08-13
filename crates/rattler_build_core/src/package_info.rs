@@ -239,8 +239,7 @@ fn output_human_readable(
     // Basic package information
     let mut table = comfy_table::Table::new();
     table
-        .load_preset(comfy_table::presets::UTF8_FULL_CONDENSED)
-        .apply_modifier(comfy_table::modifiers::UTF8_ROUND_CORNERS)
+        .load_style(comfy_table::presets::UTF8_FULL_CONDENSED.with_rounded_corners())
         .set_header(vec!["Property", "Value"]);
 
     table.add_row(vec!["Name", &index_json.name.as_normalized()]);
@@ -312,8 +311,7 @@ fn output_human_readable(
         tracing::info!("\nRun dependencies:");
         let mut dep_table = comfy_table::Table::new();
         dep_table
-            .load_preset(comfy_table::presets::UTF8_FULL_CONDENSED)
-            .apply_modifier(comfy_table::modifiers::UTF8_ROUND_CORNERS)
+            .load_style(comfy_table::presets::UTF8_FULL_CONDENSED.with_rounded_corners())
             .set_header(vec!["Package"]);
 
         for dep in &index_json.depends {
@@ -327,8 +325,7 @@ fn output_human_readable(
         tracing::info!("\nConstraints:");
         let mut constraint_table = comfy_table::Table::new();
         constraint_table
-            .load_preset(comfy_table::presets::UTF8_FULL_CONDENSED)
-            .apply_modifier(comfy_table::modifiers::UTF8_ROUND_CORNERS)
+            .load_style(comfy_table::presets::UTF8_FULL_CONDENSED.with_rounded_corners())
             .set_header(vec!["Constraint"]);
 
         for constraint in &index_json.constrains {
@@ -346,8 +343,7 @@ fn output_human_readable(
 
         let mut paths_table = comfy_table::Table::new();
         paths_table
-            .load_preset(comfy_table::presets::UTF8_FULL_CONDENSED)
-            .apply_modifier(comfy_table::modifiers::UTF8_ROUND_CORNERS)
+            .load_style(comfy_table::presets::UTF8_FULL_CONDENSED.with_rounded_corners())
             .set_header(vec!["Path", "Size", "Type", "Prefix", "SHA256"]);
 
         for entry in &paths.paths {
