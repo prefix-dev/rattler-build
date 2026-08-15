@@ -144,8 +144,8 @@ Local paths are relative to the recipe directory. A reusable file may contain
 either one step or a complete `steps:` pipeline. Pipeline DAG ordering and
 optional steps are supported. The referencing step may override the interpreter
 and working directory and extend/override the environment for every nested
-step. Requirements stay on the referencing recipe step because dependency
-solving happens before the reusable file is loaded.
+step. Reusable step requirements are preprocessed and included in the recipe's
+build or host solve.
 
 Package references use `provider:step` syntax:
 
@@ -154,18 +154,17 @@ Package references use `provider:step` syntax:
 ```
 
 With no explicit `name`, this step is named `cargo:build`, so it can be run as
-`rattler-build run cargo:build`. The reference automatically adds
-`cargo-rattler-build-steps` to the build solve. After
-environment installation, rattler-build looks for the first existing file at:
+`rattler-build run cargo:build`. Before solving the recipe environments,
+rattler-build resolves `cargo-rattler-build-steps` for the build platform and
+installs it into a dedicated provider prefix under the global cache. Provider
+packages never enter the recipe build or host prefix.
 
-```text
-$BUILD_PREFIX/etc/rattler-build/steps/cargo/build.yaml
-$HOST_PREFIX/etc/rattler-build/steps/cargo/build.yaml
-```
-
-An extensionless `build` file is accepted as a fallback. Provider packages
-should express tool dependencies such as `cargo` in their package metadata;
-reusable step files deliberately cannot add late requirements.
+Rattler-build loads `etc/rattler-build/steps/cargo/build.yaml` from that
+standalone prefix, stores the rendered steps and exact provider package
+identifier in the rendered recipe, and adds requirements declared by those
+steps to the recipe solve. An extensionless `build` file is accepted as a
+fallback. Provider packages should therefore contain step definitions only;
+tools such as `cargo` belong in the reusable step's `requirements.build`.
 
 !!! warning "Windows multiline steps"
     On Windows, a multiline `run: |` block is emitted as one command-list item.

@@ -315,6 +315,15 @@ pub fn parse_step_package_reference(reference: &str) -> Result<Option<(&str, &st
     Ok(Some((provider, step)))
 }
 
+/// Provenance and fully rendered contents of a reusable step.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ResolvedStep {
+    /// Exact provider package identifier, or the local reusable file path.
+    pub source: String,
+    /// Steps loaded from the reusable file after provider resolution.
+    pub steps: Vec<Step>,
+}
+
 /// A stage1 build step with evaluated metadata and script content.
 ///
 /// This is deliberately separate from [`Script`]: rendered recipes use
@@ -325,6 +334,9 @@ pub struct Step {
     /// Reusable step reference, either a recipe-relative path or `provider:step`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub uses: Option<String>,
+    /// Preprocessed reusable contents and exact source provenance.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resolved: Option<Box<ResolvedStep>>,
     /// Optional unique name used by the step DAG and CLI.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
@@ -356,6 +368,7 @@ impl Step {
     pub fn new(script: Script) -> Self {
         Self {
             uses: None,
+            resolved: None,
             name: None,
             optional: false,
             depends_on: Vec::new(),
@@ -418,6 +431,14 @@ impl BuildPlan {
         match self {
             Self::Script(_) => None,
             Self::Steps(steps) => Some(steps.as_slice()),
+        }
+    }
+
+    /// Mutably access explicit build steps.
+    pub fn steps_mut(&mut self) -> Option<&mut Vec<Step>> {
+        match self {
+            Self::Script(_) => None,
+            Self::Steps(steps) => Some(steps),
         }
     }
 

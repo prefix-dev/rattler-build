@@ -636,7 +636,7 @@ pub async fn get_build_output(
             .into_diagnostic()?;
 
         let virtual_package_override = VirtualPackageOverrides::from_env();
-        let output = Output {
+        let mut output = Output {
             recipe: discovered_output.recipe.clone(),
             build_configuration: BuildConfiguration {
                 target_platform: discovered_output.target_platform,
@@ -698,6 +698,8 @@ pub async fn get_build_output(
             ),
         };
 
+        rattler_build_core::step_provider::preprocess_reusable_steps(&mut output, tool_config)
+            .await?;
         outputs.push(output);
     }
 
