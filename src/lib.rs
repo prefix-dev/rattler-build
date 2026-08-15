@@ -56,7 +56,7 @@ use rattler_build_recipe::{stage0, stage1::TestType};
 use rattler_build_variant_config::VariantConfig;
 use rattler_conda_types::{
     MatchSpec, NamedChannelOrUrl, NoArchType, PackageName, ParseStrictness, Platform,
-    RepodataRevision, compression_level::CompressionLevel, package::CondaArchiveType,
+    RepodataRevision, Version, compression_level::CompressionLevel, package::CondaArchiveType,
 };
 use rattler_config::config::build::PackageFormatAndCompression;
 use rattler_index::ensure_channel_initialized_fs;
@@ -312,6 +312,54 @@ pub async fn load_variant_config_from_package(
 
     load_variant_config_from_prefix(prefix.path(), platform.platform)
         .wrap_err_with(|| format!("failed to load variant configuration from package `{package}`"))
+}
+
+fn apply_system_requirements_to_host(
+    platform: &mut PlatformWithVirtualPackages,
+    requirements: &rattler_build_recipe::stage1::SystemRequirements,
+) -> miette::Result<()> {
+    let mut replace = |name: &str, version: &str, build_string: String| -> miette::Result<()> {
+        let version = Version::from_str(version)
+            .into_diagnostic()
+            .wrap_err_with(|| format!("invalid system requirement version `{version}`"))?;
+        platform
+            .virtual_packages
+            .retain(|package| package.name.as_normalized() != name);
+        platform
+            .virtual_packages
+            .push(rattler_conda_types::GenericVirtualPackage {
+                name: PackageName::try_from(name).expect("static virtual package name is valid"),
+                version,
+                build_string,
+            });
+        Ok(())
+    };
+
+    if platform.platform.is_linux() {
+        if let Some(version) = &requirements.linux {
+            replace("__linux", version, "0".to_string())?;
+        }
+        if let Some(version) = requirements.glibc.as_ref().or(requirements.libc.as_ref()) {
+            replace("__glibc", version, "0".to_string())?;
+        }
+    }
+    if platform.platform.is_osx()
+        && let Some(version) = &requirements.macos
+    {
+        replace("__osx", version, "0".to_string())?;
+    }
+    if !platform.platform.is_osx()
+        && let Some(version) = &requirements.cuda
+    {
+        replace("__cuda", version, "0".to_string())?;
+    }
+    if let Some(archspec) = &requirements.archspec {
+        replace("__archspec", "1", archspec.clone())?;
+    }
+    platform
+        .virtual_packages
+        .sort_by(|left, right| left.name.cmp(&right.name));
+    Ok(())
 }
 
 /// Returns the output for the build.
@@ -626,15 +674,20 @@ pub async fn get_build_output(
             .into_diagnostic()?;
 
         let virtual_package_override = VirtualPackageOverrides::from_env();
+        let mut host_platform = PlatformWithVirtualPackages::detect_for_platform(
+            build_data.host_platform,
+            &virtual_package_override,
+        )
+        .into_diagnostic()?;
+        apply_system_requirements_to_host(
+            &mut host_platform,
+            &discovered_output.recipe.system_requirements,
+        )?;
         let output = Output {
             recipe: discovered_output.recipe.clone(),
             build_configuration: BuildConfiguration {
                 target_platform: discovered_output.target_platform,
-                host_platform: PlatformWithVirtualPackages::detect_for_platform(
-                    build_data.host_platform,
-                    &virtual_package_override,
-                )
-                .into_diagnostic()?,
+                host_platform,
                 build_platform: PlatformWithVirtualPackages::detect_for_platform(
                     build_data.build_platform,
                     &virtual_package_override,
@@ -1795,6 +1848,32 @@ pub async fn extract_package(args: opt::ExtractOpts) -> miette::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn system_requirements_override_host_virtual_packages() {
+        let mut platform = PlatformWithVirtualPackages {
+            platform: Platform::Linux64,
+            virtual_packages: vec![rattler_conda_types::GenericVirtualPackage {
+                name: PackageName::try_from("__glibc").unwrap(),
+                version: Version::from_str("2.17").unwrap(),
+                build_string: "0".to_string(),
+            }],
+        };
+        apply_system_requirements_to_host(
+            &mut platform,
+            &rattler_build_recipe::stage1::SystemRequirements {
+                glibc: Some("2.37".to_string()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let glibc = platform
+            .virtual_packages
+            .iter()
+            .find(|package| package.name.as_normalized() == "__glibc")
+            .unwrap();
+        assert_eq!(glibc.version.to_string(), "2.37");
+    }
 
     #[test]
     fn loads_variant_configuration_from_provider_prefix() {

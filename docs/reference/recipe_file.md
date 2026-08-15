@@ -1043,9 +1043,11 @@ system_requirements:
 
 `libc: "2.37"` is the Pixi scalar form and means glibc; `glibc` is accepted as
 an explicit alias. Do not specify both. Linux, macOS, CUDA, and libc values
-become `__linux`, `__osx`, `__cuda`, and `__glibc` run dependencies. `archspec`
-is retained as metadata but, matching current Pixi behavior, is not materialized
-as a virtual-package dependency.
+become `__linux`, `__osx`, `__cuda`, and `__glibc` run dependencies. They also
+override the corresponding detected/default virtual packages supplied to the
+host-environment solver, allowing cross-platform builds to solve against the
+declared baseline rather than the build machine's baseline. `archspec` overrides
+`__archspec` in the host solve and is retained in rendered metadata.
 
 In a multi-output recipe, place `system_requirements` on each package output:
 

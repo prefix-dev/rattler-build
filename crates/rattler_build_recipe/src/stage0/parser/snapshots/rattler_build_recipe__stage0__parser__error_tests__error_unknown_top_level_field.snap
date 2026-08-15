@@ -1,5 +1,6 @@
 ---
 source: crates/rattler_build_recipe/src/stage0/parser/error_tests.rs
+assertion_line: 87
 expression: error_with_source
 ---
   × invalid value for 'recipe': unknown top-level field 'unknown_section'
@@ -11,4 +12,4 @@ expression: error_with_source
  9 │   some_field: some_value
    ╰────
   help: valid top-level fields are: package, build, about, requirements,
-        extra, source, tests, schema_version, context
+        system_requirements, extra, source, tests, schema_version, context
