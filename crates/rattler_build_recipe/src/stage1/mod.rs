@@ -23,6 +23,7 @@ pub mod package;
 pub mod recipe;
 pub mod requirements;
 pub mod source;
+pub mod system_requirements;
 pub mod tests;
 
 #[cfg(test)]
@@ -38,6 +39,7 @@ use rattler_build_yaml_parser::ParseError;
 pub use recipe::{InheritsFrom, Recipe, StagingCache};
 pub use requirements::{Dependency, PinCompatible, PinSubpackage, Requirements};
 pub use source::Source;
+pub use system_requirements::SystemRequirements;
 pub use tests::TestType;
 
 // Re-export glob types from rattler_build_types

@@ -78,6 +78,29 @@ files, use the `--variant-config` or `-m` option:
 rattler-build build --variant-config ~/user_variants.yaml --variant-config /opt/rattler-build/global_variants.yaml --recipe myrecipe.yaml
 ```
 
+### Variant configuration packages
+
+Variant configurations can also be distributed as conda packages:
+
+```console
+rattler-build build \
+  --variant-config-package conda-forge-pinning \
+  --recipe ./recipe
+```
+
+Rattler-build solves and installs the package for the build platform, then loads
+`conda_build_config.yaml` from either the prefix root or
+`share/rattler-build/variants/conda_build_config.yaml`. The root layout is
+compatible with the published `conda-forge-pinning` package.
+
+Package configurations are baseline pinnings. Automatically discovered recipe
+files and explicit `--variant-config` files are merged afterward and therefore
+override package-provided keys. Multiple `--variant-config-package` arguments
+are processed in command-line order.
+
+The same behavior is available to library users through
+`load_variant_config_from_package` and `load_variant_config_from_prefix`.
+
 ### Merging of multiple variant configuration files
 
 When multiple variant configuration files are merged, the following rules apply:

@@ -1026,6 +1026,37 @@ the `package_metadata` by default. You can disable this by passing
     explanations and examples of the build keys documented above.
 
 
+## System requirements
+
+Package outputs can declare minimum host-system versions using Pixi-compatible
+keys. Rattler-build preserves the declaration in the rendered recipe and adds
+the corresponding virtual package to run requirements:
+
+```yaml
+system_requirements:
+  linux: "5.10"
+  glibc: "2.37"
+  cuda: "12"
+  macos: "13.0"
+  archspec: "zen3"
+```
+
+`libc: "2.37"` is the Pixi scalar form and means glibc; `glibc` is accepted as
+an explicit alias. Do not specify both. Linux, macOS, CUDA, and libc values
+become `__linux`, `__osx`, `__cuda`, and `__glibc` run dependencies. `archspec`
+is retained as metadata but, matching current Pixi behavior, is not materialized
+as a virtual-package dependency.
+
+In a multi-output recipe, place `system_requirements` on each package output:
+
+```yaml
+outputs:
+  - package:
+      name: compiled-output
+    system_requirements:
+      glibc: "2.37"
+```
+
 ## Requirements section
 
 Specifies the build and runtime requirements. Dependencies of these requirements

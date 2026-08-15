@@ -12,6 +12,7 @@ use crate::stage0::{
     package::{Package, PackageMetadata},
     requirements::Requirements,
     source::Source,
+    system_requirements::SystemRequirements,
     tests::TestType,
     types::{ConditionalList, Item, Value},
 };
@@ -40,6 +41,9 @@ pub struct SingleOutputRecipe {
     pub package: Package,
     pub build: Build,
     pub requirements: Requirements,
+    /// Minimum system requirements for consumers of this output.
+    #[serde(default, skip_serializing_if = "SystemRequirements::is_empty")]
+    pub system_requirements: SystemRequirements,
     pub about: About,
     pub extra: crate::stage0::extra::Extra,
     #[serde(default, skip_serializing_if = "ConditionalList::is_empty")]
@@ -167,6 +171,10 @@ pub struct PackageOutput {
     #[serde(default)]
     pub requirements: Requirements,
 
+    /// Minimum system requirements for consumers of this output.
+    #[serde(default, skip_serializing_if = "SystemRequirements::is_empty")]
+    pub system_requirements: SystemRequirements,
+
     /// Build configuration for this output
     #[serde(default)]
     pub build: Build,
@@ -252,6 +260,7 @@ impl SingleOutputRecipe {
             package,
             build: Build::default(),
             requirements: Requirements::default(),
+            system_requirements: SystemRequirements::default(),
             about: About::default(),
             extra: crate::stage0::extra::Extra::default(),
             source: ConditionalList::default(),
@@ -267,6 +276,7 @@ impl SingleOutputRecipe {
             package,
             build,
             requirements,
+            system_requirements,
             about,
             extra,
             source,
@@ -276,6 +286,7 @@ impl SingleOutputRecipe {
         let mut vars = package.used_variables();
         vars.extend(build.used_variables());
         vars.extend(requirements.used_variables());
+        vars.extend(system_requirements.used_variables());
         vars.extend(about.used_variables());
         vars.extend(extra.used_variables());
         for src_item in source {
@@ -465,6 +476,7 @@ impl PackageOutput {
             inherit,
             source,
             requirements,
+            system_requirements,
             build,
             about,
             tests,
@@ -476,6 +488,7 @@ impl PackageOutput {
             vars.extend(collect_source_item_variables(src_item));
         }
         vars.extend(requirements.used_variables());
+        vars.extend(system_requirements.used_variables());
         vars.extend(build.used_variables());
         vars.extend(about.used_variables());
         for test_item in tests {

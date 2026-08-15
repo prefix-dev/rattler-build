@@ -14,7 +14,8 @@ use crate::{
             StagingBuild, StagingMetadata, StagingOutput,
         },
         parser::{
-            ParseConfig, get_span, parse_about, parse_build, parse_extra, parse_source, parse_tests,
+            ParseConfig, get_span, parse_about, parse_build, parse_extra, parse_source,
+            parse_system_requirements, parse_tests,
         },
     },
 };
@@ -472,6 +473,12 @@ fn parse_package_output(
         crate::stage0::Requirements::default()
     };
 
+    let system_requirements = if let Some(node) = mapping.get("system_requirements") {
+        parse_system_requirements(node)?
+    } else {
+        crate::stage0::SystemRequirements::default()
+    };
+
     // Parse optional build
     let build = if let Some(build_node) = mapping.get("build") {
         parse_build(build_node)?
@@ -502,6 +509,7 @@ fn parse_package_output(
             "inherit",
             "source",
             "requirements",
+            "system_requirements",
             "build",
             "about",
             "tests",
@@ -513,6 +521,7 @@ fn parse_package_output(
         inherit,
         source,
         requirements,
+        system_requirements,
         build,
         about,
         tests,

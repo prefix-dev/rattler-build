@@ -25,6 +25,30 @@ package:
 }
 
 #[test]
+fn test_parse_system_requirements() {
+    let recipe = parse_recipe_from_source(
+        r#"
+package:
+  name: system-package
+  version: 1.0
+system_requirements:
+  glibc: "2.37"
+  linux: "5.10"
+"#,
+    )
+    .unwrap();
+
+    assert_eq!(
+        recipe.system_requirements.glibc.unwrap().into_concrete(),
+        Some("2.37".to_string())
+    );
+    assert_eq!(
+        recipe.system_requirements.linux.unwrap().into_concrete(),
+        Some("5.10".to_string())
+    );
+}
+
+#[test]
 fn test_parse_full_recipe() {
     let yaml_str = r#"
 package:

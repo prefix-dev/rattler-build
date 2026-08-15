@@ -26,7 +26,8 @@ mod unit_tests;
 use marked_yaml::{Node as MarkedNode, types::MarkedScalarNode};
 use rattler_build_jinja::Variable;
 use rattler_build_yaml_parser::{
-    ParseError, ParseResult, helpers::contains_jinja_template, parse_yaml, yaml::load_error_span,
+    ParseError, ParseResult, helpers::contains_jinja_template, parse_value_with_name, parse_yaml,
+    yaml::load_error_span,
 };
 use rattler_conda_types::RepodataRevision;
 
@@ -229,6 +230,12 @@ fn parse_single_output_recipe_with_config(
         crate::stage0::Requirements::default()
     };
 
+    let system_requirements = if let Some(node) = mapping.get("system_requirements") {
+        parse_system_requirements(node)?
+    } else {
+        crate::stage0::SystemRequirements::default()
+    };
+
     let extra = if let Some(extra_node) = mapping.get("extra") {
         parse_extra(extra_node)?
     } else {
@@ -259,6 +266,7 @@ fn parse_single_output_recipe_with_config(
                 | "build"
                 | "about"
                 | "requirements"
+                | "system_requirements"
                 | "extra"
                 | "source"
                 | "tests"
@@ -270,7 +278,7 @@ fn parse_single_output_recipe_with_config(
                 format!("unknown top-level field '{}'", key_str),
                 *key.span(),
             )
-            .with_suggestion("valid top-level fields are: package, build, about, requirements, extra, source, tests, schema_version, context"));
+            .with_suggestion("valid top-level fields are: package, build, about, requirements, system_requirements, extra, source, tests, schema_version, context"));
         }
     }
 
@@ -281,10 +289,55 @@ fn parse_single_output_recipe_with_config(
         build,
         about,
         requirements,
+        system_requirements,
         extra,
         source,
         tests,
     })
+}
+
+pub(crate) fn parse_system_requirements(
+    yaml: &MarkedNode,
+) -> ParseResult<crate::stage0::SystemRequirements> {
+    let mapping = yaml.as_mapping().ok_or_else(|| {
+        ParseError::expected_type("mapping", "non-mapping", helpers::get_span(yaml))
+            .with_message("system_requirements must be a mapping")
+    })?;
+    let parse = |key: &'static str| {
+        mapping
+            .get(key)
+            .map(|node| parse_value_with_name(node, key))
+            .transpose()
+    };
+    let requirements = crate::stage0::SystemRequirements {
+        linux: parse("linux")?,
+        macos: parse("macos")?,
+        cuda: parse("cuda")?,
+        libc: parse("libc")?,
+        glibc: parse("glibc")?,
+        archspec: parse("archspec")?,
+    };
+    if requirements.libc.is_some() && requirements.glibc.is_some() {
+        return Err(ParseError::invalid_value(
+            "system_requirements",
+            "`libc` and its `glibc` alias cannot both be specified",
+            helpers::get_span(yaml),
+        ));
+    }
+    for (key, _) in mapping.iter() {
+        if !matches!(
+            key.as_str(),
+            "linux" | "macos" | "cuda" | "libc" | "glibc" | "archspec"
+        ) {
+            return Err(ParseError::invalid_value(
+                "system_requirements",
+                format!("unknown system requirement `{}`", key.as_str()),
+                *key.span(),
+            )
+            .with_suggestion("Valid keys are: linux, macos, cuda, libc, glibc, archspec"));
+        }
+    }
+    Ok(requirements)
 }
 
 /// Parse the context section from YAML

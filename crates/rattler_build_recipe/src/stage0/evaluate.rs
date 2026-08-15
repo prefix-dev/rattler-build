@@ -2866,6 +2866,53 @@ fn evaluate_post_process_item(
     }
 }
 
+fn evaluate_system_requirements(
+    requirements: &crate::stage0::SystemRequirements,
+    context: &EvaluationContext,
+) -> Result<crate::stage1::SystemRequirements, ParseError> {
+    let evaluate = |value: &Option<crate::stage0::Value<String>>| {
+        value
+            .as_ref()
+            .map(|value| evaluate_string_value(value, context))
+            .transpose()
+    };
+    Ok(crate::stage1::SystemRequirements {
+        linux: evaluate(&requirements.linux)?,
+        macos: evaluate(&requirements.macos)?,
+        cuda: evaluate(&requirements.cuda)?,
+        libc: evaluate(&requirements.libc)?,
+        glibc: evaluate(&requirements.glibc)?,
+        archspec: evaluate(&requirements.archspec)?,
+    })
+}
+
+fn add_system_requirements(
+    system: &crate::stage1::SystemRequirements,
+    requirements: &mut crate::stage1::Requirements,
+) -> Result<(), ParseError> {
+    for (name, version) in [
+        ("__linux", system.linux.as_ref()),
+        ("__osx", system.macos.as_ref()),
+        ("__cuda", system.cuda.as_ref()),
+        ("__glibc", system.glibc.as_ref().or(system.libc.as_ref())),
+    ] {
+        if let Some(version) = version {
+            let spec = MatchSpec::from_str(&format!("{name} >={version}"), ParseStrictness::Strict)
+                .map_err(|error| {
+                    ParseError::invalid_value(
+                        "system_requirements",
+                        error.to_string(),
+                        Span::new_blank(),
+                    )
+                })?;
+            requirements
+                .run
+                .push(crate::stage1::Dependency::Spec(Box::new(spec)));
+        }
+    }
+    Ok(())
+}
+
 impl Evaluate for Stage0Recipe {
     type Output = Stage1Recipe;
 
@@ -2901,7 +2948,10 @@ impl Evaluate for Stage0Recipe {
         let package = self.package.evaluate(&context_with_vars)?;
         let build = self.build.evaluate(&context_with_vars)?;
         let about = self.about.evaluate(&context_with_vars)?;
-        let requirements = self.requirements.evaluate(&context_with_vars)?;
+        let mut requirements = self.requirements.evaluate(&context_with_vars)?;
+        let system_requirements =
+            evaluate_system_requirements(&self.system_requirements, &context_with_vars)?;
+        add_system_requirements(&system_requirements, &mut requirements)?;
         let extra = self.extra.evaluate(&context_with_vars)?;
 
         // Evaluate source list (conditionals expand to multiple sources)
@@ -3023,7 +3073,7 @@ impl Evaluate for Stage0Recipe {
         // added to the variant (which happens in variant_render.rs after evaluation).
         // The build string will remain unresolved until finalize_build_strings() is called.
 
-        Ok(Stage1Recipe::new(
+        let mut recipe = Stage1Recipe::new(
             package,
             build,
             about,
@@ -3033,7 +3083,9 @@ impl Evaluate for Stage0Recipe {
             tests,
             evaluated_context,
             actual_variant,
-        ))
+        );
+        recipe.system_requirements = system_requirements;
+        Ok(recipe)
     }
 }
 
@@ -3322,8 +3374,11 @@ fn evaluate_package_output_to_recipe(
         merge_stage1_about(toplevel_about, output_about)
     };
 
-    // Evaluate requirements
-    let requirements = output.requirements.evaluate(context)?;
+    // Evaluate requirements and materialize system requirements as virtual
+    // package run dependencies.
+    let mut requirements = output.requirements.evaluate(context)?;
+    let system_requirements = evaluate_system_requirements(&output.system_requirements, context)?;
+    add_system_requirements(&system_requirements, &mut requirements)?;
 
     // Use recipe-level extra (outputs don't have their own extra)
     let extra = recipe.extra.evaluate(context)?;
@@ -3454,7 +3509,7 @@ fn evaluate_package_output_to_recipe(
     // added to the variant (which happens in variant_render.rs after evaluation).
     // The build string will remain unresolved until finalize_build_strings() is called.
 
-    Ok(Some(Stage1Recipe::new(
+    let mut recipe = Stage1Recipe::new(
         package,
         build,
         about,
@@ -3464,7 +3519,9 @@ fn evaluate_package_output_to_recipe(
         tests,
         resolved_context,
         actual_variant,
-    )))
+    );
+    recipe.system_requirements = system_requirements;
+    Ok(Some(recipe))
 }
 
 /// Implement Evaluate for MultiOutputRecipe
@@ -6425,6 +6482,31 @@ package:
         let merged = merge_stage1_build(toplevel, output);
 
         assert_eq!(merged.plan.steps().map(<[_]>::len), Some(0));
+    }
+
+    #[test]
+    fn test_system_requirements_become_virtual_run_dependencies() {
+        let recipe = crate::stage0::parse_recipe_from_source(
+            r#"
+package:
+  name: system-package
+  version: 1.0
+system_requirements:
+  glibc: "2.37"
+  cuda: "12"
+"#,
+        )
+        .unwrap();
+        let evaluated = recipe.evaluate(&EvaluationContext::new()).unwrap();
+        let specs = evaluated
+            .requirements
+            .run
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>();
+        assert!(specs.iter().any(|spec| spec == "__glibc >=2.37"));
+        assert!(specs.iter().any(|spec| spec == "__cuda >=12"));
+        assert_eq!(evaluated.system_requirements.glibc.as_deref(), Some("2.37"));
     }
 
     #[test]

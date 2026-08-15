@@ -612,6 +612,11 @@ pub struct BuildOpts {
     #[arg(short = 'm', long)]
     pub variant_config: Option<Vec<PathBuf>>,
 
+    /// Load a `conda_build_config.yaml` from an installed package.
+    /// May be specified multiple times; for example `conda-forge-pinning`.
+    #[arg(long = "variant-config-package", action = clap::ArgAction::Append)]
+    pub variant_config_packages: Vec<String>,
+
     /// Override specific variant values (e.g. --variant python=3.12 or --variant python=3.12,3.11).
     /// Multiple values separated by commas will create multiple build variants.
     #[arg(long = "variant", value_parser = parse_variant_override, action = clap::ArgAction::Append)]
@@ -899,6 +904,7 @@ pub struct BuildData {
     /// instead of conflicting with it.
     pub channels_from_config: bool,
     pub variant_config: Vec<PathBuf>,
+    pub variant_config_packages: Vec<String>,
     pub variant_overrides: HashMap<String, Vec<String>>,
     pub ignore_recipe_variants: bool,
     pub render_only: bool,
@@ -975,6 +981,7 @@ impl BuildData {
             channels,
             channels_from_config: false,
             variant_config: variant_config.unwrap_or_default(),
+            variant_config_packages: Vec::new(),
             variant_overrides,
             ignore_recipe_variants,
             render_only,
@@ -1013,6 +1020,7 @@ impl BuildData {
     /// BuildOpts have higher priority than the pixi config.
     pub fn from_opts_and_config(opts: BuildOpts, config: Option<Config>) -> Self {
         let explicit_channels = opts.channels.is_some();
+        let variant_config_packages = opts.variant_config_packages.clone();
         let mut build_data = Self::new(
             opts.up_to,
             opts.build_platform,
@@ -1059,6 +1067,7 @@ impl BuildData {
             opts.markdown_summary,
         );
         build_data.channels_from_config = !explicit_channels && build_data.channels.is_some();
+        build_data.variant_config_packages = variant_config_packages;
         build_data
     }
 }
