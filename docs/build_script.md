@@ -166,6 +166,22 @@ steps to the recipe solve. An extensionless `build` file is accepted as a
 fallback. Provider packages should therefore contain step definitions only;
 tools such as `cargo` belong in the reusable step's `requirements.build`.
 
+A reusable step that generates license files can append late-bound globs to the
+package metadata:
+
+```yaml
+requirements:
+  build: [go, go-licenses]
+run: go-licenses save ./... --save_path "$PREFIX/share/licenses/go-dependencies"
+license_files:
+  - ${{ PREFIX }}/share/licenses/go-dependencies/**
+```
+
+During preprocessing, `license_files` entries are merged into
+`about.license_file`. They are collected after the build script runs, so files
+generated inside `PREFIX`, `BUILD_PREFIX`, or the source/build directories can
+be packaged under `info/licenses`.
+
 !!! warning "Windows multiline steps"
     On Windows, a multiline `run: |` block is emitted as one command-list item.
     Rattler-Build inserts fail-fast guards between list items, not between the

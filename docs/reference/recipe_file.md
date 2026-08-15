@@ -698,7 +698,9 @@ Packaged reusable steps are resolved and installed into standalone cached
 provider environments before the recipe solve. Their rendered contents and
 exact provider package identifier are stored in the rendered recipe; provider
 packages do not pollute the build or host prefix. Requirements in a reusable
-step are added to the corresponding recipe environment.
+step are added to the corresponding recipe environment. Reusable steps may also
+declare `license_files`; these globs are appended to `about.license_file`, which
+allows generated dependency licenses to be collected after the step runs.
 
 ```yaml title="recipe.yaml"
 build:
