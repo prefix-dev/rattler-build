@@ -24,7 +24,92 @@ pub use rattler_build_script::{
 };
 
 use crate::{env_vars, metadata::Output};
-use rattler_build_recipe::stage1::build::BuildPlan;
+use rattler_build_recipe::stage1::build::{BuildPlan, Step, parse_step_package_reference};
+
+fn reusable_step_path(
+    reference: &str,
+    recipe_dir: &Path,
+    context: &ExecutionContext,
+) -> Result<PathBuf, std::io::Error> {
+    let candidates = if let Some((provider, step)) = parse_step_package_reference(reference)
+        .map_err(|message| std::io::Error::new(std::io::ErrorKind::InvalidInput, message))?
+    {
+        [context.build().path(), context.host().path()]
+            .into_iter()
+            .flat_map(|prefix| {
+                let base = prefix
+                    .join("etc/rattler-build/steps")
+                    .join(provider)
+                    .join(step);
+                [base.with_extension("yaml"), base]
+            })
+            .collect::<Vec<_>>()
+    } else {
+        let path = PathBuf::from(reference);
+        let path = if path.is_absolute() {
+            path
+        } else {
+            recipe_dir.join(path)
+        };
+        vec![path.clone(), path.with_extension("yaml")]
+    };
+    candidates
+        .into_iter()
+        .find(|path| path.is_file())
+        .ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                format!("reusable build step `{reference}` was not found"),
+            )
+        })
+}
+
+fn resolve_reusable_step(
+    step: &Step,
+    recipe_dir: &Path,
+    context: &ExecutionContext,
+) -> Result<Script, std::io::Error> {
+    let Some(reference) = &step.uses else {
+        return Ok(step.to_script());
+    };
+    let path = reusable_step_path(reference, recipe_dir, context)?;
+    let contents = fs_err::read_to_string(&path)?;
+    let reusable: Step = serde_yaml::from_str(&contents).map_err(|error| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            format!("failed to parse reusable step {}: {error}", path.display()),
+        )
+    })?;
+    if reusable.uses.is_some()
+        || reusable.name.is_some()
+        || !reusable.depends_on.is_empty()
+        || !reusable.requirements.is_empty()
+        || reusable.optional
+    {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            format!(
+                "reusable step {} may only define run, interpreter, cwd, and env",
+                path.display()
+            ),
+        ));
+    }
+    if reusable.run.is_empty() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            format!("reusable step {} must define run", path.display()),
+        ));
+    }
+    let mut script = reusable.to_script();
+    if step.interpreter.is_some() {
+        script.interpreter.clone_from(&step.interpreter);
+    }
+    if step.cwd.is_some() {
+        script.cwd.clone_from(&step.cwd);
+    }
+    script.env.extend(step.env.clone());
+    Ok(script)
+}
 
 /// Prepare execution arguments for a stage1 build plan.
 ///
@@ -76,8 +161,11 @@ pub(crate) fn prepare_build_plan_execution_args(
         BuildPlan::Steps(steps) => steps
             .iter()
             .enumerate()
-            .map(|(index, step)| (step.to_script(), Some((index, step.name.clone()))))
-            .collect(),
+            .map(|(index, step)| {
+                resolve_reusable_step(step, recipe_dir, &context)
+                    .map(|script| (script, Some((index, step.name.clone()))))
+            })
+            .collect::<Result<_, _>>()?,
         BuildPlan::Script(script) => vec![(script.clone(), None)],
     };
 
@@ -263,5 +351,41 @@ impl Output {
 
         let exec_args = self.prepare_build_script().await?;
         rattler_build_script::create_build_script(exec_args).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rattler_conda_types::Platform;
+
+    #[test]
+    fn reusable_step_paths_resolve_local_and_packaged_files() {
+        let temp = tempfile::tempdir().unwrap();
+        let recipe = temp.path().join("recipe");
+        let build_prefix = temp.path().join("build");
+        let host_prefix = temp.path().join("host");
+        fs_err::create_dir_all(recipe.join("steps")).unwrap();
+        fs_err::write(recipe.join("steps/lint.yaml"), "run: lint\n").unwrap();
+        let packaged = build_prefix.join("etc/rattler-build/steps/cargo/build.yaml");
+        fs_err::create_dir_all(packaged.parent().unwrap()).unwrap();
+        fs_err::write(&packaged, "run: cargo build\n").unwrap();
+        let context = ExecutionContext::separate(
+            RuntimeEnv::current(),
+            &build_prefix,
+            Platform::current(),
+            &host_prefix,
+            Platform::current(),
+        );
+
+        assert_eq!(
+            reusable_step_path("./steps/lint.yaml", &recipe, &context).unwrap(),
+            recipe.join("steps/lint.yaml")
+        );
+        assert_eq!(
+            reusable_step_path("cargo:build", &recipe, &context).unwrap(),
+            packaged
+        );
+        assert!(reusable_step_path("cargo:missing", &recipe, &context).is_err());
     }
 }

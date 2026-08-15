@@ -685,7 +685,8 @@ changes apply only to that step. A step supports:
 - **`requirements.inherit`** - Controls inheritance from parent recipe
   environments. A boolean applies to both; a `{build, host}` mapping controls
   them separately.
-- **`run`** - Required inline command, multiline string, or list of commands.
+- **`run` / `uses`** - Exactly one is required. `uses` accepts a recipe-relative
+  YAML path or a packaged `provider:step` reference.
 - **`if`** - Optional Jinja selector expression evaluated before the step runs. Do not wrap expressions in `${{ }}`.
 - **`interpreter`** - Optional interpreter override for this step.
 - **`cwd`** - Optional working directory for this step. Relative paths are

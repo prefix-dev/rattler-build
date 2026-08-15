@@ -60,7 +60,8 @@ Each step is a scoped section of the generated build wrapper, so step-local
 - **`requirements.inherit`** - Whether the solve group includes the parent
   recipe environments. Use `false` to disable both, or a `{build, host}`
   mapping to control them separately.
-- **`run`** - Required inline command, multiline string, or list of commands.
+- **`run` / `uses`** - Exactly one is required. `run` is an inline command,
+  multiline string, or command list. `uses` references a reusable step.
 - **`if`** - Optional Jinja selector expression, such as `unix` or
   `target_platform == "linux-64"`. Do not wrap expressions in `${{ }}`.
 - **`interpreter`** - Optional interpreter override for this step.
@@ -112,6 +113,51 @@ deterministic prefixes, preventing packages from an earlier parent-based run
 from leaking into the tool environment. See
 [`examples/adjacent`](../examples/adjacent/README.md) for an independent lint
 step and an optional C++ test step.
+
+### Reusable steps
+
+A step can load its executable fields from a small YAML file:
+
+```yaml title="recipe.yaml"
+build:
+  steps:
+    - name: lint
+      uses: ./steps/lint.yaml
+      requirements:
+        inherit: false
+        build: [ruff]
+```
+
+```yaml title="steps/lint.yaml"
+run: ruff check .
+env:
+  RUFF_NO_CACHE: "1"
+```
+
+Local paths are relative to the recipe directory. The reusable file may define
+`run`, `interpreter`, `cwd`, and `env`. The referencing step may override the
+interpreter and working directory and extend/override its environment.
+Requirements and DAG metadata stay in the recipe because dependency solving
+happens before the reusable file is loaded.
+
+Package references use `provider:step` syntax:
+
+```yaml
+- name: build
+  uses: cargo:build
+```
+
+This automatically adds `cargo-rattler-build-steps` to the build solve. After
+environment installation, rattler-build looks for the first existing file at:
+
+```text
+$BUILD_PREFIX/etc/rattler-build/steps/cargo/build.yaml
+$HOST_PREFIX/etc/rattler-build/steps/cargo/build.yaml
+```
+
+An extensionless `build` file is accepted as a fallback. Provider packages
+should express tool dependencies such as `cargo` in their package metadata;
+reusable step files deliberately cannot add late requirements.
 
 !!! warning "Windows multiline steps"
     On Windows, a multiline `run: |` block is emitted as one command-list item.

@@ -128,6 +128,11 @@ impl StepRequirements {
 /// An inline `run` step that executes script content as part of the build.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
 pub struct RunStep {
+    /// A reusable step reference. Local paths are relative to the recipe;
+    /// `provider:step` references a step provider package.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub uses: Option<Value<String>>,
+
     /// Optional unique name used by `rattler-build run` and dependency edges.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
@@ -146,6 +151,7 @@ pub struct RunStep {
     pub requirements: StepRequirements,
 
     /// The script content to execute for this step.
+    #[serde(default, skip_serializing_if = "ConditionalList::is_empty")]
     pub run: ConditionalList<String>,
 
     /// Optional selector expression gating whether this step runs (e.g. `unix`).
@@ -182,6 +188,7 @@ impl RunStep {
     /// Collect all variables used in this run step.
     pub fn used_variables(&self) -> Vec<String> {
         let RunStep {
+            uses,
             name: _,
             optional: _,
             depends_on: _,
@@ -195,6 +202,9 @@ impl RunStep {
         } = self;
 
         let mut vars = run.used_variables();
+        if let Some(uses) = uses {
+            vars.extend(uses.used_variables());
+        }
         vars.extend(requirements.used_variables());
 
         if let Some(condition) = condition {

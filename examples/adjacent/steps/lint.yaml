@@ -1,0 +1,3 @@
+run: |
+  clang-format --version
+  test -f "$SRC_DIR/.clang-format"

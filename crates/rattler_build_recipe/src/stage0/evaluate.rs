@@ -1366,7 +1366,7 @@ pub fn evaluate_steps(
                 }
 
                 let commands = preserve_string_list(&run.run, context)?;
-                if commands.is_empty() {
+                if commands.is_empty() && run.uses.is_none() {
                     continue;
                 }
 
@@ -1388,6 +1388,11 @@ pub fn evaluate_steps(
                     cwd,
                     ..Default::default()
                 });
+                step.uses = run
+                    .uses
+                    .as_ref()
+                    .map(|uses| evaluate_string_value(uses, context))
+                    .transpose()?;
                 step.name.clone_from(&run.name);
                 step.optional = run.optional;
                 step.depends_on.clone_from(&run.depends_on);
@@ -1396,6 +1401,28 @@ pub fn evaluate_steps(
                 step.requirements.host = evaluate_dependency_list(&run.requirements.host, context)?;
                 step.requirements.inherit.build = run.requirements.inherit.build;
                 step.requirements.inherit.host = run.requirements.inherit.host;
+                if let Some(reference) = &step.uses
+                    && let Some((provider, _)) = crate::stage1::build::parse_step_package_reference(
+                        reference,
+                    )
+                    .map_err(|message| {
+                        ParseError::invalid_value("steps.uses", message, Span::new_blank())
+                    })?
+                {
+                    let package = format!("{provider}-rattler-build-steps");
+                    let spec = MatchSpec::from_str(&package, ParseStrictness::Strict).map_err(
+                        |error| {
+                            ParseError::invalid_value(
+                                "steps.uses",
+                                error.to_string(),
+                                Span::new_blank(),
+                            )
+                        },
+                    )?;
+                    step.requirements
+                        .build
+                        .push(crate::stage1::Dependency::Spec(Box::new(spec)));
+                }
                 scripts.push(step);
             }
         }
@@ -6386,6 +6413,25 @@ package:
         assert_eq!(
             steps[1].run,
             Stage1StepRun::Commands(vec!["echo b".to_string()])
+        );
+    }
+
+    #[test]
+    fn test_evaluate_package_step_adds_provider_to_build_requirements() {
+        let step = Stage0Step::Run(Stage0RunStep {
+            uses: Some(Value::new_concrete("cargo:build".to_string(), None)),
+            ..Default::default()
+        });
+        let ctx = EvaluationContext::new();
+        let steps = evaluate_steps(&[step], &ctx).unwrap();
+
+        assert_eq!(steps[0].uses.as_deref(), Some("cargo:build"));
+        assert_eq!(
+            steps[0].requirements.build[0]
+                .name()
+                .unwrap()
+                .as_normalized(),
+            "cargo-rattler-build-steps"
         );
     }
 

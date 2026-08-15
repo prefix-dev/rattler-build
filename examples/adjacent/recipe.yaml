@@ -30,9 +30,7 @@ build:
         inherit: false
         build:
           - clang-format
-      run: |
-        clang-format --version
-        test -f "$SRC_DIR/.clang-format"
+      uses: ./steps/lint.yaml
 
     # Normal package builds skip this local-only step. Selecting it pulls in
     # configure + build and adds valgrind to the existing host prefix.

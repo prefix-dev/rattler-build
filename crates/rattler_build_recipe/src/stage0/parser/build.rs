@@ -469,6 +469,7 @@ fn parse_step(node: &Node) -> Result<Step, ParseError> {
     })?;
 
     let mut run = None;
+    let mut uses = None;
     let mut name = None;
     let mut optional = false;
     let mut depends_on = Vec::new();
@@ -483,6 +484,9 @@ fn parse_step(node: &Node) -> Result<Step, ParseError> {
         let key = key_node.as_str();
 
         match key {
+            "uses" => {
+                uses = Some(parse_field!("steps.uses", value_node));
+            }
             "name" => {
                 name = Some(
                     value_node
@@ -551,22 +555,27 @@ fn parse_step(node: &Node) -> Result<Step, ParseError> {
                     format!("unknown field '{}' in step", key),
                     *key_node.span(),
                 )
-                .with_suggestion("Valid fields are: name, optional, depends_on, requirements, run, if, interpreter, cwd, env"));
+                .with_suggestion("Valid fields are: name, optional, depends_on, requirements, uses, run, if, interpreter, cwd, env"));
             }
         }
     }
 
-    let run = run.ok_or_else(|| {
-        ParseError::invalid_value("steps", "a step must contain a 'run' field", get_span(node))
-            .with_suggestion("Add a 'run:' field with the script to execute")
-    })?;
+    if run.is_some() == uses.is_some() {
+        return Err(ParseError::invalid_value(
+            "steps",
+            "a step must contain exactly one of 'run' or 'uses'",
+            get_span(node),
+        )
+        .with_suggestion("Add either a 'run:' script or a 'uses:' reference"));
+    }
 
     Ok(Step::Run(RunStep {
+        uses,
         name,
         optional,
         depends_on,
         requirements,
-        run,
+        run: run.unwrap_or_default(),
         condition,
         condition_span,
         interpreter,
@@ -1268,6 +1277,35 @@ steps:
                 assert!(second.env.contains_key("FOO"));
             }
         }
+    }
+
+    #[test]
+    fn test_parse_reusable_step_reference() {
+        let yaml = r#"
+steps:
+  - name: build
+    uses: cargo:build
+"#;
+        let node = marked_yaml::parse_yaml(0, yaml).unwrap();
+        let build = parse_build(&node).unwrap();
+        let Step::Run(step) = &build.plan.steps().unwrap()[0];
+        assert_eq!(
+            step.uses.as_ref().unwrap().as_concrete(),
+            Some(&"cargo:build".to_string())
+        );
+        assert!(step.run.is_empty());
+    }
+
+    #[test]
+    fn test_parse_step_rejects_run_and_uses() {
+        let yaml = "steps:\n  - uses: cargo:build\n    run: cargo build\n";
+        let node = marked_yaml::parse_yaml(0, yaml).unwrap();
+        assert!(
+            parse_build(&node)
+                .unwrap_err()
+                .to_string()
+                .contains("exactly one")
+        );
     }
 
     #[test]

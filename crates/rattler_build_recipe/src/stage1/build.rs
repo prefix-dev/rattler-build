@@ -180,6 +180,13 @@ impl Default for StepRun {
     }
 }
 
+impl StepRun {
+    /// Returns true when this payload has no commands.
+    pub fn is_empty(&self) -> bool {
+        matches!(self, Self::Commands(commands) if commands.is_empty())
+    }
+}
+
 impl From<StepRun> for ScriptContent {
     fn from(value: StepRun) -> Self {
         match value {
@@ -280,9 +287,32 @@ impl StepRequirementsInheritance {
 }
 
 impl StepRequirements {
-    fn is_empty(&self) -> bool {
+    /// Returns true when no requirements or inheritance overrides are present.
+    pub fn is_empty(&self) -> bool {
         self.build.is_empty() && self.host.is_empty() && self.inherit.is_default()
     }
+}
+
+/// Parse a package step reference (`provider:step`). Paths return `Ok(None)`.
+pub fn parse_step_package_reference(reference: &str) -> Result<Option<(&str, &str)>, String> {
+    if reference.contains('/') || reference.contains('\\') || !reference.contains(':') {
+        return Ok(None);
+    }
+    let (provider, step) = reference
+        .split_once(':')
+        .expect("contains(':') checked above");
+    let valid = |value: &str| {
+        !value.is_empty()
+            && value.chars().all(|character| {
+                character.is_ascii_alphanumeric() || matches!(character, '-' | '_')
+            })
+    };
+    if !valid(provider) || !valid(step) || step.contains(':') {
+        return Err(format!(
+            "invalid reusable step reference `{reference}`; expected `provider:step`"
+        ));
+    }
+    Ok(Some((provider, step)))
 }
 
 /// A stage1 build step with evaluated metadata and script content.
@@ -292,6 +322,9 @@ impl StepRequirements {
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Step {
+    /// Reusable step reference, either a recipe-relative path or `provider:step`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub uses: Option<String>,
     /// Optional unique name used by the step DAG and CLI.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
@@ -305,6 +338,7 @@ pub struct Step {
     #[serde(default, skip_serializing_if = "StepRequirements::is_empty")]
     pub requirements: StepRequirements,
     /// Script content to execute for this step.
+    #[serde(default, skip_serializing_if = "StepRun::is_empty")]
     pub run: StepRun,
     /// Optional interpreter override for this step.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -321,6 +355,7 @@ impl Step {
     /// Create a step from an evaluated script payload.
     pub fn new(script: Script) -> Self {
         Self {
+            uses: None,
             name: None,
             optional: false,
             depends_on: Vec::new(),
