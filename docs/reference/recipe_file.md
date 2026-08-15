@@ -678,6 +678,7 @@ Each step is a scoped build-wrapper section. Step-local `env` values and `cwd`
 changes apply only to that step. A step supports:
 
 - **`name`** - Optional unique name used by `rattler-build run <name>`.
+  Defaults to the `uses` reference when present.
 - **`optional`** - Excludes the step from normal builds when `true`.
 - **`depends_on`** - Names of prerequisite steps in the step DAG.
 - **`requirements.build` / `requirements.host`** - Extra dependencies added

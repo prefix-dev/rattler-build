@@ -1393,7 +1393,7 @@ pub fn evaluate_steps(
                     .as_ref()
                     .map(|uses| evaluate_string_value(uses, context))
                     .transpose()?;
-                step.name.clone_from(&run.name);
+                step.name = run.name.clone().or_else(|| step.uses.clone());
                 step.optional = run.optional;
                 step.depends_on.clone_from(&run.depends_on);
                 step.requirements.build =
@@ -6426,6 +6426,7 @@ package:
         let steps = evaluate_steps(&[step], &ctx).unwrap();
 
         assert_eq!(steps[0].uses.as_deref(), Some("cargo:build"));
+        assert_eq!(steps[0].name.as_deref(), Some("cargo:build"));
         assert_eq!(
             steps[0].requirements.build[0]
                 .name()

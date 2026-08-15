@@ -53,6 +53,7 @@ Each step is a scoped section of the generated build wrapper, so step-local
 `env` values and `cwd` changes do not leak into later steps. A step supports:
 
 - **`name`** - Optional unique name. Named steps can be selected from the CLI.
+  A `uses` reference becomes the default name when this is omitted.
 - **`optional`** - Exclude the step from normal package builds (default: `false`).
 - **`depends_on`** - Names of prerequisite steps, forming a DAG.
 - **`requirements.build` / `requirements.host`** - Extra dependencies added
@@ -129,25 +130,32 @@ build:
 ```
 
 ```yaml title="steps/lint.yaml"
-run: ruff check .
-env:
-  RUFF_NO_CACHE: "1"
+steps:
+  - name: check
+    run: ruff check .
+    env:
+      RUFF_NO_CACHE: "1"
+  - name: format
+    depends_on: [check]
+    run: ruff format --check .
 ```
 
-Local paths are relative to the recipe directory. The reusable file may define
-`run`, `interpreter`, `cwd`, and `env`. The referencing step may override the
-interpreter and working directory and extend/override its environment.
-Requirements and DAG metadata stay in the recipe because dependency solving
-happens before the reusable file is loaded.
+Local paths are relative to the recipe directory. A reusable file may contain
+either one step or a complete `steps:` pipeline. Pipeline DAG ordering and
+optional steps are supported. The referencing step may override the interpreter
+and working directory and extend/override the environment for every nested
+step. Requirements stay on the referencing recipe step because dependency
+solving happens before the reusable file is loaded.
 
 Package references use `provider:step` syntax:
 
 ```yaml
-- name: build
-  uses: cargo:build
+- uses: cargo:build
 ```
 
-This automatically adds `cargo-rattler-build-steps` to the build solve. After
+With no explicit `name`, this step is named `cargo:build`, so it can be run as
+`rattler-build run cargo:build`. The reference automatically adds
+`cargo-rattler-build-steps` to the build solve. After
 environment installation, rattler-build looks for the first existing file at:
 
 ```text

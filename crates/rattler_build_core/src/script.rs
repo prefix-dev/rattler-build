@@ -66,49 +66,99 @@ fn reusable_step_path(
 
 fn resolve_reusable_step(
     step: &Step,
+    step_index: usize,
     recipe_dir: &Path,
     context: &ExecutionContext,
-) -> Result<Script, std::io::Error> {
+) -> Result<Vec<(Script, Option<String>)>, std::io::Error> {
     let Some(reference) = &step.uses else {
-        return Ok(step.to_script());
+        let label = step
+            .name
+            .clone()
+            .unwrap_or_else(|| format!("step {step_index}"));
+        return Ok(vec![(step.to_script(), Some(label))]);
     };
     let path = reusable_step_path(reference, recipe_dir, context)?;
     let contents = fs_err::read_to_string(&path)?;
-    let reusable: Step = serde_yaml::from_str(&contents).map_err(|error| {
+    #[derive(serde::Deserialize)]
+    #[serde(untagged)]
+    enum ReusableFile {
+        Pipeline { steps: Vec<Step> },
+        Step(Box<Step>),
+    }
+    let reusable: ReusableFile = serde_yaml::from_str(&contents).map_err(|error| {
         std::io::Error::new(
             std::io::ErrorKind::InvalidData,
             format!("failed to parse reusable step {}: {error}", path.display()),
         )
     })?;
-    if reusable.uses.is_some()
-        || reusable.name.is_some()
-        || !reusable.depends_on.is_empty()
-        || !reusable.requirements.is_empty()
-        || reusable.optional
-    {
+    let reusable_steps =
+        match reusable {
+            ReusableFile::Pipeline { steps } => BuildPlan::Steps(steps)
+                .select_steps(None)
+                .map_err(|error| {
+                    std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        format!("invalid reusable pipeline {}: {error}", path.display()),
+                    )
+                })?,
+            ReusableFile::Step(step) => {
+                BuildPlan::Steps(vec![*step])
+                    .select_steps(None)
+                    .map_err(|error| {
+                        std::io::Error::new(
+                            std::io::ErrorKind::InvalidData,
+                            format!("invalid reusable step {}: {error}", path.display()),
+                        )
+                    })?
+            }
+        };
+    if reusable_steps.is_empty() {
         return Err(std::io::Error::new(
             std::io::ErrorKind::InvalidData,
             format!(
-                "reusable step {} may only define run, interpreter, cwd, and env",
+                "reusable pipeline {} contains no required steps",
                 path.display()
             ),
         ));
     }
-    if reusable.run.is_empty() {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::InvalidData,
-            format!("reusable step {} must define run", path.display()),
-        ));
+
+    let mut scripts = Vec::with_capacity(reusable_steps.len());
+    for (index, reusable) in reusable_steps.into_iter().enumerate() {
+        if reusable.uses.is_some() || !reusable.requirements.is_empty() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!(
+                    "reusable pipeline {} may not contain nested uses or requirements",
+                    path.display()
+                ),
+            ));
+        }
+        if reusable.run.is_empty() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("reusable step {} must define run", path.display()),
+            ));
+        }
+        let nested_name = reusable
+            .name
+            .clone()
+            .unwrap_or_else(|| format!("step {index}"));
+        let outer = step
+            .name
+            .clone()
+            .unwrap_or_else(|| format!("step {step_index}"));
+        let label = Some(format!("{outer}/{nested_name}"));
+        let mut script = reusable.to_script();
+        if step.interpreter.is_some() {
+            script.interpreter.clone_from(&step.interpreter);
+        }
+        if step.cwd.is_some() {
+            script.cwd.clone_from(&step.cwd);
+        }
+        script.env.extend(step.env.clone());
+        scripts.push((script, label));
     }
-    let mut script = reusable.to_script();
-    if step.interpreter.is_some() {
-        script.interpreter.clone_from(&step.interpreter);
-    }
-    if step.cwd.is_some() {
-        script.cwd.clone_from(&step.cwd);
-    }
-    script.env.extend(step.env.clone());
-    Ok(script)
+    Ok(scripts)
 }
 
 /// Prepare execution arguments for a stage1 build plan.
@@ -158,20 +208,19 @@ pub(crate) fn prepare_build_plan_execution_args(
     }
 
     let scripts: Vec<_> = match plan {
-        BuildPlan::Steps(steps) => steps
-            .iter()
-            .enumerate()
-            .map(|(index, step)| {
-                resolve_reusable_step(step, recipe_dir, &context)
-                    .map(|script| (script, Some((index, step.name.clone()))))
-            })
-            .collect::<Result<_, _>>()?,
+        BuildPlan::Steps(steps) => {
+            let mut scripts = Vec::new();
+            for (index, step) in steps.iter().enumerate() {
+                scripts.extend(resolve_reusable_step(step, index, recipe_dir, &context)?);
+            }
+            scripts
+        }
         BuildPlan::Script(script) => vec![(script.clone(), None)],
     };
 
     let mut secrets = IndexMap::new();
     let mut sections = Vec::with_capacity(scripts.len());
-    for (script, step_index) in scripts {
+    for (script, step_label) in scripts {
         let mut section_jinja = Jinja::new(selector_config.clone()).with_context(recipe_context);
         for (key, value) in env_vars.iter().chain(script.env()) {
             section_jinja
@@ -204,13 +253,13 @@ pub(crate) fn prepare_build_plan_execution_args(
         sections.push(BuildScriptSection {
             interpreter: script.interpreter.clone(),
             content,
-            env: if step_index.is_some() {
+            env: if step_label.is_some() {
                 script.env().clone()
             } else {
                 Default::default()
             },
             cwd,
-            label: step_index.map(|(index, name)| name.unwrap_or_else(|| format!("step {index}"))),
+            label: step_label,
         });
     }
 
@@ -366,7 +415,11 @@ mod tests {
         let build_prefix = temp.path().join("build");
         let host_prefix = temp.path().join("host");
         fs_err::create_dir_all(recipe.join("steps")).unwrap();
-        fs_err::write(recipe.join("steps/lint.yaml"), "run: lint\n").unwrap();
+        fs_err::write(
+            recipe.join("steps/lint.yaml"),
+            "steps:\n  - name: check\n    run: lint\n  - name: report\n    depends_on: [check]\n    run: report\n",
+        )
+        .unwrap();
         let packaged = build_prefix.join("etc/rattler-build/steps/cargo/build.yaml");
         fs_err::create_dir_all(packaged.parent().unwrap()).unwrap();
         fs_err::write(&packaged, "run: cargo build\n").unwrap();
@@ -387,5 +440,11 @@ mod tests {
             packaged
         );
         assert!(reusable_step_path("cargo:missing", &recipe, &context).is_err());
+
+        let wrapper: Step = serde_yaml::from_str("uses: ./steps/lint.yaml\n").unwrap();
+        let scripts = resolve_reusable_step(&wrapper, 0, &recipe, &context).unwrap();
+        assert_eq!(scripts.len(), 2);
+        assert_eq!(scripts[0].1.as_deref(), Some("step 0/check"));
+        assert_eq!(scripts[1].1.as_deref(), Some("step 0/report"));
     }
 }
