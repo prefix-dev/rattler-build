@@ -2889,13 +2889,25 @@ fn evaluate_system_requirements(
 fn add_system_requirements(
     system: &crate::stage1::SystemRequirements,
     requirements: &mut crate::stage1::Requirements,
+    target_platform: rattler_conda_types::Platform,
 ) -> Result<(), ParseError> {
+    let applicable = |name| match name {
+        "__linux" | "__glibc" => target_platform.is_linux(),
+        "__osx" => target_platform.is_osx(),
+        // macOS has not supported CUDA since 2019. Pixi likewise permits CUDA
+        // requirements on Linux and Windows, but filters them from macOS.
+        "__cuda" => !target_platform.is_osx(),
+        _ => true,
+    };
     for (name, version) in [
         ("__linux", system.linux.as_ref()),
         ("__osx", system.macos.as_ref()),
         ("__cuda", system.cuda.as_ref()),
         ("__glibc", system.glibc.as_ref().or(system.libc.as_ref())),
     ] {
+        if !applicable(name) {
+            continue;
+        }
         if let Some(version) = version {
             let spec = MatchSpec::from_str(&format!("{name} >={version}"), ParseStrictness::Strict)
                 .map_err(|error| {
@@ -2951,7 +2963,11 @@ impl Evaluate for Stage0Recipe {
         let mut requirements = self.requirements.evaluate(&context_with_vars)?;
         let system_requirements =
             evaluate_system_requirements(&self.system_requirements, &context_with_vars)?;
-        add_system_requirements(&system_requirements, &mut requirements)?;
+        add_system_requirements(
+            &system_requirements,
+            &mut requirements,
+            context_with_vars.jinja_config().target_platform,
+        )?;
         let extra = self.extra.evaluate(&context_with_vars)?;
 
         // Evaluate source list (conditionals expand to multiple sources)
@@ -3378,7 +3394,11 @@ fn evaluate_package_output_to_recipe(
     // package run dependencies.
     let mut requirements = output.requirements.evaluate(context)?;
     let system_requirements = evaluate_system_requirements(&output.system_requirements, context)?;
-    add_system_requirements(&system_requirements, &mut requirements)?;
+    add_system_requirements(
+        &system_requirements,
+        &mut requirements,
+        context.jinja_config().target_platform,
+    )?;
 
     // Use recipe-level extra (outputs don't have their own extra)
     let extra = recipe.extra.evaluate(context)?;
@@ -6497,7 +6517,11 @@ system_requirements:
 "#,
         )
         .unwrap();
-        let evaluated = recipe.evaluate(&EvaluationContext::new()).unwrap();
+        let evaluated = recipe
+            .evaluate(&EvaluationContext::for_platform(
+                rattler_conda_types::Platform::Linux64,
+            ))
+            .unwrap();
         let specs = evaluated
             .requirements
             .run
@@ -6507,6 +6531,38 @@ system_requirements:
         assert!(specs.iter().any(|spec| spec == "__glibc >=2.37"));
         assert!(specs.iter().any(|spec| spec == "__cuda >=12"));
         assert_eq!(evaluated.system_requirements.glibc.as_deref(), Some("2.37"));
+    }
+
+    #[test]
+    fn test_system_requirements_are_filtered_for_the_output_platform() {
+        let recipe = crate::stage0::parse_recipe_from_source(
+            r#"
+package:
+  name: system-package
+  version: 1.0
+system_requirements:
+  linux: "5.10"
+  glibc: "2.37"
+  macos: "13"
+  cuda: "12"
+"#,
+        )
+        .unwrap();
+        let evaluated = recipe
+            .evaluate(&EvaluationContext::for_platform(
+                rattler_conda_types::Platform::OsxArm64,
+            ))
+            .unwrap();
+        let specs = evaluated
+            .requirements
+            .run
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>();
+        assert_eq!(specs, ["__osx >=13"]);
+        // Inapplicable values remain available as rendered metadata.
+        assert_eq!(evaluated.system_requirements.linux.as_deref(), Some("5.10"));
+        assert_eq!(evaluated.system_requirements.cuda.as_deref(), Some("12"));
     }
 
     #[test]

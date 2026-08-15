@@ -1046,8 +1046,10 @@ an explicit alias. Do not specify both. Linux, macOS, CUDA, and libc values
 become `__linux`, `__osx`, `__cuda`, and `__glibc` run dependencies. They also
 override the corresponding detected/default virtual packages supplied to the
 host-environment solver, allowing cross-platform builds to solve against the
-declared baseline rather than the build machine's baseline. `archspec` overrides
-`__archspec` in the host solve and is retained in rendered metadata.
+declared baseline rather than the build machine's baseline. Requirements that do
+not apply to the output platform are retained as metadata but not materialized.
+`archspec` is retained as metadata but, matching current Pixi behavior, is
+deprecated and does not affect virtual packages.
 
 In a multi-output recipe, place `system_requirements` on each package output:
 

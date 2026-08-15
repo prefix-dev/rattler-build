@@ -353,9 +353,6 @@ fn apply_system_requirements_to_host(
     {
         replace("__cuda", version, "0".to_string())?;
     }
-    if let Some(archspec) = &requirements.archspec {
-        replace("__archspec", "1", archspec.clone())?;
-    }
     platform
         .virtual_packages
         .sort_by(|left, right| left.name.cmp(&right.name));
