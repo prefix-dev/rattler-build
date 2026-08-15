@@ -52,6 +52,14 @@ build:
 Each step is a scoped section of the generated build wrapper, so step-local
 `env` values and `cwd` changes do not leak into later steps. A step supports:
 
+- **`name`** - Optional unique name. Named steps can be selected from the CLI.
+- **`optional`** - Exclude the step from normal package builds (default: `false`).
+- **`depends_on`** - Names of prerequisite steps, forming a DAG.
+- **`requirements.build` / `requirements.host`** - Extra dependencies added
+  to the selected step's build or host solve group.
+- **`requirements.inherit`** - Whether the solve group includes the parent
+  recipe environments. Use `false` to disable both, or a `{build, host}`
+  mapping to control them separately.
 - **`run`** - Required inline command, multiline string, or list of commands.
 - **`if`** - Optional Jinja selector expression, such as `unix` or
   `target_platform == "linux-64"`. Do not wrap expressions in `${{ }}`.
@@ -72,10 +80,38 @@ build:
     - if: win
       run: copy %RECIPE_DIR%\my_script_with_recipe.bat %LIBRARY_BIN%\super-cool-script.bat
 
-    - run: python -m pip install . --no-deps
+    - name: build
+      run: python -m pip install . --no-deps
       env:
         SETUPTOOLS_SCM_PRETEND_VERSION: ${{ version }}
+
+    - name: test
+      optional: true
+      depends_on: [build]
+      requirements:
+        host: [pytest]
+      run: pytest
 ```
+
+Run a named step and its transitive prerequisites with:
+
+```console
+rattler-build run test --recipe . --source-dir . --experimental
+```
+
+`run` uses a deterministic build directory and updates its prefixes in place.
+With `--source-dir .`, commands execute directly in the project checkout,
+`SRC_DIR` points there, and tools such as CMake reuse the project's cache.
+This intentionally bypasses recipe source fetching and patch application; the
+checkout is treated as already prepared.
+Set `requirements.inherit: false` to create a standalone tool environment,
+such as for a Python `ruff` lint step, while retaining the step requirements.
+Use `inherit: {build: false, host: true}` (or the expanded YAML mapping) to
+control the parent environments independently. Isolated solves use their own
+deterministic prefixes, preventing packages from an earlier parent-based run
+from leaking into the tool environment. See
+[`examples/adjacent`](../examples/adjacent/README.md) for an independent lint
+step and an optional C++ test step.
 
 !!! warning "Windows multiline steps"
     On Windows, a multiline `run: |` block is emitted as one command-list item.

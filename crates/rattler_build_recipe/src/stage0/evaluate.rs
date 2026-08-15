@@ -1381,13 +1381,22 @@ pub fn evaluate_steps(
                     .map(|cwd| evaluate_string_value(cwd, context).map(PathBuf::from))
                     .transpose()?;
 
-                scripts.push(Stage1Step::new(rattler_build_script::Script {
+                let mut step = Stage1Step::new(rattler_build_script::Script {
                     interpreter,
                     env: evaluate_env_map("steps.env", &run.env, context)?,
                     content: ScriptContent::Commands(commands),
                     cwd,
                     ..Default::default()
-                }));
+                });
+                step.name.clone_from(&run.name);
+                step.optional = run.optional;
+                step.depends_on.clone_from(&run.depends_on);
+                step.requirements.build =
+                    evaluate_dependency_list(&run.requirements.build, context)?;
+                step.requirements.host = evaluate_dependency_list(&run.requirements.host, context)?;
+                step.requirements.inherit.build = run.requirements.inherit.build;
+                step.requirements.inherit.host = run.requirements.inherit.host;
+                scripts.push(step);
             }
         }
     }

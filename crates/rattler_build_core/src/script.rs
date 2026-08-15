@@ -72,11 +72,11 @@ pub(crate) fn prepare_build_plan_execution_args(
         env_vars.extend(script.env().clone());
     }
 
-    let scripts: Vec<(Script, Option<usize>)> = match plan {
+    let scripts: Vec<_> = match plan {
         BuildPlan::Steps(steps) => steps
             .iter()
             .enumerate()
-            .map(|(index, step)| (step.to_script(), Some(index)))
+            .map(|(index, step)| (step.to_script(), Some((index, step.name.clone()))))
             .collect(),
         BuildPlan::Script(script) => vec![(script.clone(), None)],
     };
@@ -122,7 +122,7 @@ pub(crate) fn prepare_build_plan_execution_args(
                 Default::default()
             },
             cwd,
-            label: step_index.map(|index| format!("step {index}")),
+            label: step_index.map(|(index, name)| name.unwrap_or_else(|| format!("step {index}"))),
         });
     }
 
@@ -185,7 +185,7 @@ impl Output {
             context.runtime(),
         ));
         env_vars.extend(env_vars::env_vars_from_variant(self.variant()));
-        prepare_build_plan_execution_args(
+        let mut args = prepare_build_plan_execution_args(
             &build.plan,
             &self.recipe.context,
             self.build_configuration.selector_config(),
@@ -196,7 +196,15 @@ impl Output {
             self.build_configuration.sandbox_config().cloned(),
             env_isolation,
             self.build_configuration.experimental,
-        )
+        )?;
+        if let Some(source_dir) = &self.build_configuration.directories.source_dir {
+            for section in &mut args.sections {
+                if section.cwd.is_none() {
+                    section.cwd = Some(source_dir.clone());
+                }
+            }
+        }
+        Ok(args)
     }
 
     /// Run the build script for the output as defined in the recipe's build section.

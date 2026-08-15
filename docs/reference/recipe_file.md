@@ -677,6 +677,14 @@ requirements:
 Each step is a scoped build-wrapper section. Step-local `env` values and `cwd`
 changes apply only to that step. A step supports:
 
+- **`name`** - Optional unique name used by `rattler-build run <name>`.
+- **`optional`** - Excludes the step from normal builds when `true`.
+- **`depends_on`** - Names of prerequisite steps in the step DAG.
+- **`requirements.build` / `requirements.host`** - Extra dependencies added
+  to the selected step solve group.
+- **`requirements.inherit`** - Controls inheritance from parent recipe
+  environments. A boolean applies to both; a `{build, host}` mapping controls
+  them separately.
 - **`run`** - Required inline command, multiline string, or list of commands.
 - **`if`** - Optional Jinja selector expression evaluated before the step runs. Do not wrap expressions in `${{ }}`.
 - **`interpreter`** - Optional interpreter override for this step.
