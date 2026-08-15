@@ -112,8 +112,8 @@ Use `inherit: {build: false, host: true}` (or the expanded YAML mapping) to
 control the parent environments independently. Isolated solves use their own
 deterministic prefixes, preventing packages from an earlier parent-based run
 from leaking into the tool environment. See
-[`examples/adjacent`](../examples/adjacent/README.md) for an independent lint
-step and an optional C++ test step.
+the [`examples/adjacent`](https://github.com/prefix-dev/rattler-build/tree/main/examples/adjacent)
+recipe for an independent lint step and an optional C++ test step.
 
 ### Reusable steps
 
