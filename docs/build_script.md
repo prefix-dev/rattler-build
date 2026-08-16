@@ -170,6 +170,8 @@ are not executed during preprocessing. Requirements declared by those steps are
 added to the recipe solve. An extensionless `build` file is accepted as a
 fallback. Provider packages should therefore contain step definitions only;
 tools such as `cargo` belong in the reusable step's `requirements.build`.
+Complete CMake, Meson, Rust, and Go recipes are available in
+[`examples/step-providers`](https://github.com/prefix-dev/rattler-build/tree/main/examples/step-providers).
 
 Reusable pipelines can declare typed inputs and use them in Jinja templates:
 
