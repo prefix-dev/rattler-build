@@ -165,8 +165,9 @@ prefix.
 Rattler-build loads `etc/rattler-build/steps/cargo/build.yaml` from that
 standalone prefix and stores the rendered steps, portable reference, content
 SHA-256, and exact provider package version, build, subdir, channel, and SHA-256
-in the rendered recipe. It adds requirements declared by those
-steps to the recipe solve. An extensionless `build` file is accepted as a
+in the rendered recipe. Provider installation is data-only: package link scripts
+are not executed during preprocessing. Requirements declared by those steps are
+added to the recipe solve. An extensionless `build` file is accepted as a
 fallback. Provider packages should therefore contain step definitions only;
 tools such as `cargo` belong in the reusable step's `requirements.build`.
 

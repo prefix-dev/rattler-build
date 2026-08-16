@@ -21,7 +21,7 @@ use sha2::{Digest, Sha256};
 
 use crate::{
     metadata::Output,
-    render::solver::{install_packages, solve_environment},
+    render::solver::{install_packages_without_link_scripts, solve_environment},
     script::parse_reusable_steps,
     tool_configuration::Configuration,
 };
@@ -354,7 +354,7 @@ impl StepProviderResolver {
                 &build_platform.platform.to_string(),
                 &records,
             ));
-        install_packages(
+        install_packages_without_link_scripts(
             &format!("step provider {provider}"),
             &records,
             build_platform.platform,
