@@ -423,39 +423,21 @@ pub async fn get_build_output(
         recipe_name,
     } = find_variants(&variant_config, recipe_path, &recipe_content, render_config)?;
 
-    tracing::info!("Found {} variants\n", outputs_and_variants.len());
-    for discovered_output in &outputs_and_variants {
-        let skipped = if discovered_output.recipe.build().skip {
-            console::style(" (skipped)").red().to_string()
-        } else {
-            String::new()
-        };
-
-        tracing::info!(
-            "\nBuild variant: {}-{}-{}{}",
-            discovered_output.name,
-            discovered_output.version,
-            discovered_output.build_string,
-            skipped
-        );
-
-        // Display V3 package variant flags, if any. These are not variant keys,
-        // so they are shown below the build string rather than in the table.
-        let flags = &discovered_output.recipe.build().flags;
-        if !flags.is_empty() {
-            let flags = flags.iter().map(|flag| flag.as_str()).collect::<Vec<_>>();
-            tracing::info!("Flags: {}", flags.join(", "));
-        }
-
-        let mut table = comfy_table::Table::new();
-        table
-            .load_style(comfy_table::presets::UTF8_FULL_CONDENSED.with_rounded_corners())
-            .set_header(["Variant", "Version"]);
-        for (key, value) in discovered_output.used_vars.iter() {
-            table.add_row([key.normalize(), format!("{:?}", value)]);
-        }
-        tracing::info!("\n{}\n", table);
+    if recipe_name.is_some()
+        && outputs_and_variants.iter().any(|output| {
+            output
+                .recipe
+                .build
+                .plan
+                .steps()
+                .is_some_and(|steps| steps.iter().any(|step| step.uses.is_some()))
+        })
+    {
+        return Err(miette::miette!(
+            "reusable build steps in multi-output recipes are not yet supported because provider requirements must participate in subpackage variant and pin resolution"
+        ));
     }
+    tracing::info!("Found {} variants\n", outputs_and_variants.len());
     drop(enter);
 
     let mut subpackages = BTreeMap::new();
@@ -469,6 +451,9 @@ pub async fn get_build_output(
         .unwrap_or_else(|| "build".to_string());
 
     let timestamp = jiff::Timestamp::now();
+    let configured_variant_keys = variant_config.variants.keys().cloned().collect();
+    let mut step_provider_resolver =
+        rattler_build_core::step_provider::StepProviderResolver::default();
 
     for mut discovered_output in outputs_and_variants {
         let mut inherit_parent_build = true;
@@ -698,9 +683,51 @@ pub async fn get_build_output(
             ),
         };
 
-        rattler_build_core::step_provider::preprocess_reusable_steps(&mut output, tool_config)
-            .await?;
+        rattler_build_core::step_provider::preprocess_reusable_steps(
+            &mut output,
+            tool_config,
+            &mut step_provider_resolver,
+            &configured_variant_keys,
+        )
+        .await?;
+        subpackages.insert(
+            output.name().clone(),
+            PackageIdentifier {
+                name: output.name().clone(),
+                version: output.recipe.package().version().clone(),
+                build_string: output.build_string().into_owned(),
+            },
+        );
+        output.build_configuration.subpackages = subpackages.clone();
         outputs.push(output);
+    }
+
+    for output in &outputs {
+        let skipped = if output.recipe.build().skip {
+            console::style(" (skipped)").red().to_string()
+        } else {
+            String::new()
+        };
+        tracing::info!("\nBuild variant: {}{}", output.identifier(), skipped);
+        let flags = &output.recipe.build().flags;
+        if !flags.is_empty() {
+            tracing::info!(
+                "Flags: {}",
+                flags
+                    .iter()
+                    .map(|flag| flag.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            );
+        }
+        let mut table = comfy_table::Table::new();
+        table
+            .load_style(comfy_table::presets::UTF8_FULL_CONDENSED.with_rounded_corners())
+            .set_header(["Variant", "Version"]);
+        for (key, value) in &output.build_configuration.variant {
+            table.add_row([key.normalize(), format!("{:?}", value)]);
+        }
+        tracing::info!("\n{}\n", table);
     }
 
     Ok(outputs)

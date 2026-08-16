@@ -687,7 +687,8 @@ changes apply only to that step. A step supports:
   environments. A boolean applies to both; a `{build, host}` mapping controls
   them separately.
 - **`run` / `uses`** - Exactly one is required. `uses` accepts a recipe-relative
-  YAML path or a packaged `provider:step` reference.
+  YAML path or a packaged `provider:step[@version]` reference.
+- **`with`** - Typed values passed to inputs declared by a reusable step.
 - **`if`** - Optional Jinja selector expression evaluated before the step runs. Do not wrap expressions in `${{ }}`.
 - **`interpreter`** - Optional interpreter override for this step.
 - **`cwd`** - Optional working directory for this step. Relative paths are
@@ -696,8 +697,8 @@ changes apply only to that step. A step supports:
 
 Packaged reusable steps are resolved and installed into standalone cached
 provider environments before the recipe solve. Their rendered contents and
-exact provider package identifier are stored in the rendered recipe; provider
-packages do not pollute the build or host prefix. Requirements in a reusable
+exact provider package provenance and content hash are stored in the rendered
+recipe; provider packages do not pollute the build or host prefix. Requirements in a reusable
 step are added to the corresponding recipe environment. Reusable steps may also
 declare `license_files`; these globs are appended to `about.license_file`, which
 allows generated dependency licenses to be collected after the step runs.

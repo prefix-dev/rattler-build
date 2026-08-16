@@ -1,0 +1,19 @@
+inputs:
+  message:
+    type: string
+    required: true
+steps:
+{% if win %}
+  - run: |
+      if not exist "%BUILD_DIR%\generated-licenses" mkdir "%BUILD_DIR%\generated-licenses"
+      echo ${{ inputs.message }}> "%BUILD_DIR%\generated-licenses\dependency.txt"
+      if not exist "%PREFIX%\share\reusable-steps" mkdir "%PREFIX%\share\reusable-steps"
+      echo done> "%PREFIX%\share\reusable-steps\marker.txt"
+{% else %}
+  - run: |
+      mkdir -p "$BUILD_DIR/generated-licenses" "$PREFIX/share/reusable-steps"
+      echo "${{ inputs.message }}" > "$BUILD_DIR/generated-licenses/dependency.txt"
+      echo done > "$PREFIX/share/reusable-steps/marker.txt"
+{% endif %}
+    license_files:
+      - ${{ BUILD_DIR }}/generated-licenses/**

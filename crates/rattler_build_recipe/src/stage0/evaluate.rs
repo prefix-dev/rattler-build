@@ -1393,6 +1393,13 @@ pub fn evaluate_steps(
                     .as_ref()
                     .map(|uses| evaluate_string_value(uses, context))
                     .transpose()?;
+                step.with = run
+                    .with
+                    .iter()
+                    .map(|(key, value)| {
+                        evaluate_value_to_variable(value, context).map(|value| (key.clone(), value))
+                    })
+                    .collect::<Result<_, _>>()?;
                 step.name = run.name.clone().or_else(|| step.uses.clone());
                 step.optional = run.optional;
                 step.depends_on.clone_from(&run.depends_on);

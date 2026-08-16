@@ -147,24 +147,58 @@ and working directory and extend/override the environment for every nested
 step. Reusable step requirements are preprocessed and included in the recipe's
 build or host solve.
 
-Package references use `provider:step` syntax:
+Package references use `provider:step` syntax and may include a conda version
+constraint after `@`:
 
 ```yaml
-- uses: cargo:build
+- uses: cargo:build@>=0.3,<0.4
 ```
 
 With no explicit `name`, this step is named `cargo:build`, so it can be run as
 `rattler-build run cargo:build`. Before solving the recipe environments,
 rattler-build resolves `cargo-rattler-build-steps` for the build platform and
-installs it into a dedicated provider prefix under the global cache. Provider
-packages never enter the recipe build or host prefix.
+installs it into a content-addressed provider prefix under the global cache.
+The cache identity includes the platform and complete solved records, channels,
+and artifact hashes. Provider packages never enter the recipe build or host
+prefix.
 
 Rattler-build loads `etc/rattler-build/steps/cargo/build.yaml` from that
-standalone prefix, stores the rendered steps and exact provider package
-identifier in the rendered recipe, and adds requirements declared by those
+standalone prefix and stores the rendered steps, portable reference, content
+SHA-256, and exact provider package version, build, subdir, channel, and SHA-256
+in the rendered recipe. It adds requirements declared by those
 steps to the recipe solve. An extensionless `build` file is accepted as a
 fallback. Provider packages should therefore contain step definitions only;
 tools such as `cargo` belong in the reusable step's `requirements.build`.
+
+Reusable pipelines can declare typed inputs and use them in Jinja templates:
+
+```yaml title="provider build.yaml"
+inputs:
+  extra_args:
+    type: list
+    default: []
+  install:
+    type: boolean
+    default: true
+steps:
+  - run: cmake -S "$SRC_DIR" -B "$BUILD_DIR/cmake" ${{ inputs.extra_args | join(' ') }}
+{% if inputs.install %}
+  - run: cmake --install "$BUILD_DIR/cmake"
+{% endif %}
+```
+
+```yaml title="recipe.yaml"
+build:
+  steps:
+    - uses: cmake:build
+      with:
+        extra_args: [-DBUILD_TESTING=ON]
+        install: false
+```
+
+Unknown inputs, missing required inputs, and values of the wrong declared type
+are rejected during preprocessing. Inputs may use recipe templates and therefore
+participate in normal used-variable tracking.
 
 A reusable step that generates license files can append late-bound globs to the
 package metadata:
@@ -172,15 +206,15 @@ package metadata:
 ```yaml
 requirements:
   build: [go, go-licenses]
-run: go-licenses save ./... --save_path "$PREFIX/share/licenses/go-dependencies"
+run: go-licenses save ./... --save_path "$BUILD_DIR/go-dependencies"
 license_files:
-  - ${{ PREFIX }}/share/licenses/go-dependencies/**
+  - ${{ BUILD_DIR }}/go-dependencies/**
 ```
 
 During preprocessing, `license_files` entries are merged into
 `about.license_file`. They are collected after the build script runs, so files
-generated inside `PREFIX`, `BUILD_PREFIX`, or the source/build directories can
-be packaged under `info/licenses`.
+generated in the build directory can be packaged under `info/licenses` without
+also becoming normal package payload.
 
 !!! warning "Windows multiline steps"
     On Windows, a multiline `run: |` block is emitted as one command-list item.

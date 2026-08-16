@@ -71,18 +71,24 @@ enum ReusableFile {
     Step(Box<Step>),
 }
 
-pub(crate) fn read_reusable_steps(path: &Path) -> Result<Vec<Step>, std::io::Error> {
-    let contents = fs_err::read_to_string(path)?;
-    let reusable: ReusableFile = serde_yaml::from_str(&contents).map_err(|error| {
+pub(crate) fn parse_reusable_steps(
+    contents: &str,
+    source: &str,
+) -> Result<Vec<Step>, std::io::Error> {
+    let reusable: ReusableFile = serde_yaml::from_str(contents).map_err(|error| {
         std::io::Error::new(
             std::io::ErrorKind::InvalidData,
-            format!("failed to parse reusable step {}: {error}", path.display()),
+            format!("failed to parse reusable step {source}: {error}"),
         )
     })?;
     Ok(match reusable {
         ReusableFile::Pipeline { steps } => steps,
         ReusableFile::Step(step) => vec![*step],
     })
+}
+
+pub(crate) fn read_reusable_steps(path: &Path) -> Result<Vec<Step>, std::io::Error> {
+    parse_reusable_steps(&fs_err::read_to_string(path)?, &path.display().to_string())
 }
 
 fn load_reusable_steps(path: &Path) -> Result<Vec<Step>, std::io::Error> {
@@ -110,17 +116,23 @@ fn resolve_reusable_step(
         return Ok(vec![(step.to_script(), Some(label))]);
     };
     let (source, reusable_steps) = if let Some(resolved) = &step.resolved {
+        let source = resolved.provider.as_ref().map_or_else(
+            || resolved.reference.clone(),
+            |provider| {
+                format!(
+                    "{} ({}-{}-{})",
+                    resolved.reference, provider.name, provider.version, provider.build
+                )
+            },
+        );
         (
-            resolved.source.clone(),
+            source.clone(),
             BuildPlan::Steps(resolved.steps.clone())
                 .select_steps(None)
                 .map_err(|error| {
                     std::io::Error::new(
                         std::io::ErrorKind::InvalidData,
-                        format!(
-                            "invalid resolved reusable pipeline {}: {error}",
-                            resolved.source
-                        ),
+                        format!("invalid resolved reusable pipeline {source}: {error}"),
                     )
                 })?,
         )
@@ -464,7 +476,16 @@ mod tests {
             r#"
 uses: cargo:build
 resolved:
-  source: cargo:build (cargo-rattler-build-steps-1.0-h0)
+  reference: cargo:build
+  provider:
+    name: cargo-rattler-build-steps
+    version: '1.0'
+    build: h0
+    subdir: noarch
+    channel: test
+    sha256: aabbcc
+  content_sha256: ddee
+  rendered_sha256: eeff
   steps:
     - name: build
       run: cargo build
