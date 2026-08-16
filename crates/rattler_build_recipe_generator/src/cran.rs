@@ -912,7 +912,14 @@ mod tests {
     /// Build a `CranOpts` configured to check the given channel names via
     /// `--skip-available`.
     fn opts_with_skip_available(channels: &[&str]) -> CranOpts {
+        opts_with_tree_and_skip_available(false, channels)
+    }
+
+    /// Build a `CranOpts` with `tree` set as given, configured to check the
+    /// given channel names via `--skip-available`.
+    fn opts_with_tree_and_skip_available(tree: bool, channels: &[&str]) -> CranOpts {
         CranOpts {
+            tree,
             skip_available: channels.iter().map(|c| c.parse().unwrap()).collect(),
             ..dummy_cran_opts()
         }
@@ -971,6 +978,84 @@ mod tests {
         let missing = find_missing_deps(&deps, &dummy_cran_opts()).await.unwrap();
 
         assert!(missing.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_find_missing_deps_returns_nothing_with_tree_but_no_channels_configured() {
+        let mut deps = HashSet::new();
+        deps.insert("this_package_does_not_exist_xyz123".to_string());
+        let opts = opts_with_tree_and_skip_available(true, &[]);
+
+        // `find_missing_deps` is governed solely by `--skip-available`;
+        // `--tree` being set doesn't change that no channels means no check
+        // is made.
+        let missing = find_missing_deps(&deps, &opts).await.unwrap();
+
+        assert!(missing.is_empty());
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    async fn test_find_missing_deps_with_tree_and_single_channel() {
+        let fake_dep = "this_package_does_not_exist_xyz123";
+        let mut deps = HashSet::new();
+        deps.insert("jsonlite".to_string());
+        deps.insert(fake_dep.to_string());
+        let opts = opts_with_tree_and_skip_available(true, &["conda-forge"]);
+
+        let missing = find_missing_deps(&deps, &opts).await.unwrap();
+
+        // `jsonlite` is on conda-forge, so `--tree --skip-available
+        // conda-forge` excludes it from `missing`.
+        assert!(!missing.contains(&"jsonlite".to_string()));
+        // The fake dependency isn't on conda-forge, so it's flagged missing
+        // -- unless the check itself failed open due to a network error,
+        // which we confirm below rather than assume.
+        if !missing.contains(&fake_dep.to_string()) {
+            let gateway = Gateway::new();
+            let package_name = format!("r-{fake_dep}").parse().unwrap();
+            assert!(
+                query_channels_for_packages(
+                    &gateway,
+                    vec![conda_forge_channel()],
+                    vec![package_name]
+                )
+                .await
+                .is_err(),
+                "fake dependency unexpectedly reported as existing on conda-forge"
+            );
+        }
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    async fn test_find_missing_deps_with_tree_and_multiple_channels() {
+        let fake_dep = "this_package_does_not_exist_xyz123";
+        let mut deps = HashSet::new();
+        deps.insert("jsonlite".to_string());
+        deps.insert(fake_dep.to_string());
+        let opts = opts_with_tree_and_skip_available(true, &["conda-forge", "bioconda"]);
+
+        let missing = find_missing_deps(&deps, &opts).await.unwrap();
+
+        // `jsonlite` is available in at least one of the configured channels
+        // (conda-forge), so passing multiple `--skip-available` channels
+        // still excludes it from `missing`.
+        assert!(!missing.contains(&"jsonlite".to_string()));
+        // The fake dependency isn't in either channel, so it's flagged
+        // missing -- unless the check itself failed open due to a network
+        // error, which we confirm below rather than assume.
+        if !missing.contains(&fake_dep.to_string()) {
+            let gateway = Gateway::new();
+            let package_name = format!("r-{fake_dep}").parse().unwrap();
+            let channels = resolve_skip_available_channels(&opts.skip_available).unwrap();
+            assert!(
+                query_channels_for_packages(&gateway, channels, vec![package_name])
+                    .await
+                    .is_err(),
+                "fake dependency unexpectedly reported as existing in conda-forge or bioconda"
+            );
+        }
     }
 
     #[test]
