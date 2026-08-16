@@ -147,13 +147,13 @@ fn test_script_serialization_with_sandbox() {
         secrets: Vec::new(),
         content: ScriptContent::Command("cargo build".to_string()),
         cwd: None,
-        sandbox: Some(SandboxRequest {
+        sandbox: Some(Box::new(SandboxRequest {
             network: true,
             read: Vec::new(),
             read_execute: Vec::new(),
             read_write: vec![PathBuf::from("/tmp/cargo")],
             reason: Some("cargo fetch".to_string()),
-        }),
+        })),
         content_explicit: false,
     };
 

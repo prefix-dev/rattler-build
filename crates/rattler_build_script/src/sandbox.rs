@@ -41,16 +41,22 @@ pub struct SandboxArguments {
 }
 
 impl SandboxArguments {
-    /// Returns true if either `--sandbox` or `--sandbox-config` was given.
+    /// Returns true if sandboxing or any host policy option was given.
     pub fn is_enabled(&self) -> bool {
-        self.sandbox || self.sandbox_config.is_some()
+        self.sandbox
+            || self.sandbox_config.is_some()
+            || self.allow_network
+            || !self.allow_read.is_empty()
+            || !self.allow_read_execute.is_empty()
+            || !self.allow_read_write.is_empty()
+            || self.overwrite_default_sandbox_config
     }
 }
 
-/// Recipe-declared sandbox escape request.
+/// Permissions required by a sandboxed recipe script.
 ///
-/// Applied additively on top of the host's resolved [`SandboxConfiguration`]: the recipe
-/// can grant *more* access (e.g. network, extra paths) but cannot tighten the host's policy.
+/// Requests are checked against the host's resolved [`SandboxConfiguration`]. Recipe
+/// metadata is untrusted and cannot expand the host policy.
 #[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq, Eq)]
 pub struct SandboxRequest {
     /// Request network access for the build
@@ -79,7 +85,7 @@ fn is_false(b: &bool) -> bool {
 }
 
 impl SandboxRequest {
-    /// Returns true if no escape was requested.
+    /// Returns true if no additional permission was requested.
     pub fn is_empty(&self) -> bool {
         !self.network
             && self.read.is_empty()
@@ -99,20 +105,96 @@ pub struct SandboxConfiguration {
 }
 
 impl SandboxConfiguration {
-    /// Merge an additive [`SandboxRequest`] into this configuration.
-    ///
-    /// The recipe can only *expand* permissions — `allow_network` becomes true if the
-    /// request asks for it, and path lists are appended. The configuration's existing
-    /// permissions are never reduced.
-    pub fn merge_request(&mut self, request: &SandboxRequest) {
-        if request.network {
-            self.allow_network = true;
+    /// Return the built-in sandbox policy for the current host.
+    pub fn for_current_platform() -> Self {
+        if cfg!(target_os = "linux") {
+            Self::for_linux()
+        } else if cfg!(target_os = "macos") {
+            Self::for_macos()
+        } else {
+            Self::default()
         }
-        self.read.extend(request.read.iter().cloned());
-        self.read_execute
-            .extend(request.read_execute.iter().cloned());
-        self.read_write.extend(request.read_write.iter().cloned());
     }
+
+    /// Verify that a recipe request is already permitted by the host policy.
+    ///
+    /// Recipe metadata is untrusted and must never expand the permissions selected by
+    /// the user. A request is permitted when an equal or stronger mount contains it.
+    pub fn authorize_request(&self, request: &SandboxRequest) -> std::io::Result<()> {
+        if request.network && !self.allow_network {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::PermissionDenied,
+                "recipe requests network access, but the host sandbox policy denies it",
+            ));
+        }
+
+        self.authorize_paths(
+            "read",
+            &request.read,
+            &[&self.read, &self.read_execute, &self.read_write],
+        )?;
+        self.authorize_paths("read_execute", &request.read_execute, &[&self.read_execute])?;
+        self.authorize_paths("read_write", &request.read_write, &[&self.read_write])?;
+        Ok(())
+    }
+
+    fn authorize_paths(
+        &self,
+        permission: &str,
+        requested: &[PathBuf],
+        allowed_groups: &[&Vec<PathBuf>],
+    ) -> std::io::Result<()> {
+        for path in requested {
+            let normalized = normalize_path(path)?;
+            let allowed = allowed_groups
+                .iter()
+                .flat_map(|paths| paths.iter())
+                .any(|root| {
+                    normalize_path(root)
+                        .is_ok_and(|normalized_root| normalized.starts_with(normalized_root))
+                });
+            if !allowed {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::PermissionDenied,
+                    format!(
+                        "recipe requests sandbox {permission} access to '{}', but the host policy does not allow it",
+                        path.display()
+                    ),
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+fn normalize_path(path: &Path) -> std::io::Result<PathBuf> {
+    use std::path::Component;
+
+    if !path.is_absolute() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            format!("sandbox paths must be absolute: '{}'", path.display()),
+        ));
+    }
+
+    let mut normalized = PathBuf::new();
+    for component in path.components() {
+        match component {
+            Component::Prefix(prefix) => normalized.push(prefix.as_os_str()),
+            Component::RootDir => normalized.push(component.as_os_str()),
+            Component::CurDir => {}
+            Component::ParentDir => {
+                if !normalized.pop() {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        format!("sandbox path escapes its root: '{}'", path.display()),
+                    ));
+                }
+            }
+            Component::Normal(component) => normalized.push(component),
+        }
+    }
+    Ok(normalized)
 }
 
 impl Display for SandboxConfiguration {
@@ -265,9 +347,8 @@ impl SandboxConfiguration {
 impl SandboxArguments {
     /// Resolve these CLI arguments into a sandbox configuration.
     ///
-    /// Returns `Ok(None)` if the sandbox was not enabled (neither `--sandbox` nor
-    /// `--sandbox-config` was given). Returns `Err` if a config file was specified
-    /// but could not be loaded or parsed.
+    /// Returns `Ok(None)` if no sandbox or host policy option was given. Returns
+    /// `Err` if a config file was specified but could not be loaded or parsed.
     #[cfg(feature = "execution")]
     pub fn try_into_configuration(self) -> std::io::Result<Option<SandboxConfiguration>> {
         if !self.is_enabled() {
@@ -317,52 +398,6 @@ impl SandboxArguments {
     }
 }
 
-impl From<SandboxArguments> for Option<SandboxConfiguration> {
-    /// Infallible conversion. A failed config-file load is surfaced as `None` and
-    /// a warning printed to stderr — prefer [`SandboxArguments::try_into_configuration`]
-    /// when error handling matters.
-    fn from(args: SandboxArguments) -> Self {
-        #[cfg(feature = "execution")]
-        {
-            match args.try_into_configuration() {
-                Ok(v) => v,
-                Err(e) => {
-                    eprintln!("warning: failed to load sandbox config: {e}");
-                    None
-                }
-            }
-        }
-        #[cfg(not(feature = "execution"))]
-        {
-            if !args.sandbox {
-                return None;
-            }
-            let mut result = if !args.overwrite_default_sandbox_config {
-                #[cfg(target_os = "linux")]
-                let default = SandboxConfiguration::for_linux();
-                #[cfg(target_os = "macos")]
-                let default = SandboxConfiguration::for_macos();
-                #[cfg(not(any(target_os = "linux", target_os = "macos")))]
-                let default = SandboxConfiguration::default();
-                default
-            } else {
-                SandboxConfiguration::default()
-            };
-            for path in args.allow_read {
-                result.read.push(path);
-            }
-            for path in args.allow_read_execute {
-                result.read_execute.push(path);
-            }
-            for path in args.allow_read_write {
-                result.read_write.push(path);
-            }
-            result.allow_network = args.allow_network;
-            Some(result)
-        }
-    }
-}
-
 /// Lightweight platform classification used by the sandbox config loader.
 ///
 /// We deliberately classify only the families the sandbox supports. Other
@@ -378,8 +413,8 @@ pub enum PlatformKind {
     Other,
 }
 
-/// Top-level schema for the host-side sandbox config file
-/// (`~/.rattler-build/sandbox.yaml` or `--sandbox-config <path>`).
+/// Top-level schema for a host-side sandbox config file supplied with
+/// `--sandbox-config <path>`.
 ///
 /// Each platform block extends the built-in baseline ([`SandboxConfiguration::for_linux`]
 /// / [`SandboxConfiguration::for_macos`]) unless [`PlatformOverride::replace`] is set.
@@ -482,12 +517,24 @@ impl SandboxConfigFile {
     pub fn from_path(path: impl AsRef<std::path::Path>) -> std::io::Result<Self> {
         let path = path.as_ref();
         let text = fs_err::read_to_string(path)?;
-        serde_yaml::from_str(&text).map_err(|e| {
+        let config: Self = serde_yaml::from_str(&text).map_err(|e| {
             std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
                 format!("invalid sandbox config at {}: {e}", path.display()),
             )
-        })
+        })?;
+        if let Some(version) = config.version
+            && version != 1
+        {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!(
+                    "unsupported sandbox config version {version} at {}; expected version 1",
+                    path.display()
+                ),
+            ));
+        }
+        Ok(config)
     }
 
     /// Resolve a sandbox configuration for `platform` from this config file.
@@ -597,12 +644,76 @@ windows:
         );
     }
 
+    #[test]
+    fn recipe_requests_cannot_expand_host_policy() {
+        let config = SandboxConfiguration {
+            allow_network: false,
+            read: vec![PathBuf::from("/")],
+            read_execute: vec![PathBuf::from("/usr/bin")],
+            read_write: vec![PathBuf::from("/tmp/build")],
+        };
+
+        assert!(
+            config
+                .authorize_request(&SandboxRequest {
+                    read_write: vec![PathBuf::from("/tmp/build/cache")],
+                    ..Default::default()
+                })
+                .is_ok()
+        );
+        assert!(
+            config
+                .authorize_request(&SandboxRequest {
+                    network: true,
+                    ..Default::default()
+                })
+                .is_err()
+        );
+        assert!(
+            config
+                .authorize_request(&SandboxRequest {
+                    read_write: vec![PathBuf::from("/tmp/build/../../etc")],
+                    ..Default::default()
+                })
+                .is_err()
+        );
+    }
+
     #[cfg(feature = "execution")]
     #[test]
-    fn args_neither_flag_disables_sandbox() {
+    fn config_file_rejects_unsupported_version() {
+        use std::io::Write;
+
+        let mut tmp = tempfile::NamedTempFile::new().unwrap();
+        tmp.write_all(b"version: 2\n").unwrap();
+        let error = SandboxConfigFile::from_path(tmp.path()).unwrap_err();
+        assert!(error.to_string().contains("expected version 1"));
+    }
+
+    #[cfg(feature = "execution")]
+    #[test]
+    fn args_without_policy_disables_sandbox() {
         let args = SandboxArguments::default();
         assert!(!args.is_enabled());
         assert!(args.try_into_configuration().unwrap().is_none());
+    }
+
+    #[cfg(feature = "execution")]
+    #[test]
+    fn permission_flag_enables_host_policy_for_recipe_requests() {
+        let args = SandboxArguments {
+            allow_network: true,
+            ..Default::default()
+        };
+        let config = args.try_into_configuration().unwrap().unwrap();
+        assert!(
+            config
+                .authorize_request(&SandboxRequest {
+                    network: true,
+                    ..Default::default()
+                })
+                .is_ok()
+        );
     }
 
     #[cfg(feature = "execution")]

@@ -15,7 +15,7 @@ use rattler_build_jinja::{Jinja, JinjaConfig, Variable};
 // Re-export from rattler_build_script
 pub use rattler_build_script::{
     BuildScriptSection, ExecutionArgs, ExecutionContext, InterpreterError, ResolvedScriptContents,
-    RuntimeEnv, SandboxArguments, SandboxConfiguration, Script, ScriptContent,
+    RuntimeEnv, SandboxArguments, SandboxConfiguration, SandboxRequest, Script, ScriptContent,
     platform_script_extensions,
     runner::{
         ExecSpec, ExecStatus, GuestInfo, GuestPath, HostPath, LocalRunner, Mount, OutputSink,
@@ -25,6 +25,87 @@ pub use rattler_build_script::{
 
 use crate::{env_vars, metadata::Output};
 use rattler_build_recipe::stage1::build::BuildPlan;
+
+fn resolve_sandbox_request(
+    request: &SandboxRequest,
+    env: &HashMap<String, Option<String>>,
+    work_dir: &Path,
+) -> Result<SandboxRequest, std::io::Error> {
+    let resolve_paths = |paths: &[PathBuf]| {
+        paths
+            .iter()
+            .map(|path| {
+                let expanded = expand_sandbox_path(path, env)?;
+                Ok(if expanded.is_absolute() {
+                    expanded
+                } else {
+                    work_dir.join(expanded)
+                })
+            })
+            .collect::<Result<Vec<_>, std::io::Error>>()
+    };
+
+    Ok(SandboxRequest {
+        network: request.network,
+        read: resolve_paths(&request.read)?,
+        read_execute: resolve_paths(&request.read_execute)?,
+        read_write: resolve_paths(&request.read_write)?,
+        reason: request.reason.clone(),
+    })
+}
+
+fn expand_sandbox_path(
+    path: &Path,
+    env: &HashMap<String, Option<String>>,
+) -> Result<PathBuf, std::io::Error> {
+    let input = path.to_string_lossy();
+    let chars: Vec<char> = input.chars().collect();
+    let mut output = String::new();
+    let mut index = 0;
+
+    while index < chars.len() {
+        if chars[index] == '$' {
+            let (name, next) = if chars.get(index + 1) == Some(&'{') {
+                let end = chars[index + 2..]
+                    .iter()
+                    .position(|character| *character == '}')
+                    .map(|offset| index + 2 + offset)
+                    .ok_or_else(|| invalid_sandbox_variable(&input, "missing closing `}`"))?;
+                (chars[index + 2..end].iter().collect::<String>(), end + 1)
+            } else {
+                let end = (index + 1..chars.len())
+                    .find(|position| {
+                        let character = chars[*position];
+                        !(character == '_' || character.is_ascii_alphanumeric())
+                    })
+                    .unwrap_or(chars.len());
+                if end == index + 1 {
+                    output.push(chars[index]);
+                    index += 1;
+                    continue;
+                }
+                (chars[index + 1..end].iter().collect::<String>(), end)
+            };
+            let value = env.get(&name).and_then(Option::as_deref).ok_or_else(|| {
+                invalid_sandbox_variable(&input, &format!("unknown variable `{name}`"))
+            })?;
+            output.push_str(value);
+            index = next;
+        } else {
+            output.push(chars[index]);
+            index += 1;
+        }
+    }
+
+    Ok(PathBuf::from(output))
+}
+
+fn invalid_sandbox_variable(path: &str, detail: &str) -> std::io::Error {
+    std::io::Error::new(
+        std::io::ErrorKind::InvalidInput,
+        format!("invalid recipe sandbox path '{path}': {detail}"),
+    )
+}
 
 /// Prepare execution arguments for a stage1 build plan.
 ///
@@ -40,7 +121,7 @@ pub(crate) fn prepare_build_plan_execution_args(
     work_dir: PathBuf,
     recipe_dir: &Path,
     context: ExecutionContext,
-    sandbox_config: Option<SandboxConfiguration>,
+    mut sandbox_config: Option<SandboxConfiguration>,
     env_isolation: rattler_build_script::EnvironmentIsolation,
     experimental: bool,
 ) -> Result<ExecutionArgs, std::io::Error> {
@@ -49,6 +130,17 @@ pub(crate) fn prepare_build_plan_execution_args(
             std::io::ErrorKind::InvalidInput,
             "`build.steps` is an experimental feature: provide the `--experimental` flag to enable it",
         ));
+    }
+
+    if let BuildPlan::Script(script) = plan
+        && let Some(request) = script.sandbox.as_ref()
+    {
+        let request = resolve_sandbox_request(request, &env_vars, &work_dir)?;
+        let config = sandbox_config.get_or_insert_with(SandboxConfiguration::for_current_platform);
+        config.with_cwd(&work_dir).authorize_request(&request)?;
+        if let Some(reason) = request.reason.as_deref() {
+            tracing::info!("authorized recipe sandbox request: {reason}");
+        }
     }
 
     if let Some(architecture) = context.windows_processor_architecture() {
@@ -185,15 +277,6 @@ impl Output {
             context.runtime(),
         ));
         env_vars.extend(env_vars::env_vars_from_variant(self.variant()));
-        let mut sandbox_config = self.build_configuration.sandbox_config().cloned();
-        if let (Some(config), BuildPlan::Script(script)) = (&mut sandbox_config, &build.plan)
-            && let Some(request) = script.sandbox.as_ref()
-        {
-            if let Some(reason) = request.reason.as_deref() {
-                tracing::info!("applying recipe sandbox request: {reason}");
-            }
-            config.merge_request(request);
-        }
 
         prepare_build_plan_execution_args(
             &build.plan,
@@ -203,7 +286,7 @@ impl Output {
             self.build_configuration.directories.work_dir.clone(),
             &self.build_configuration.directories.recipe_dir,
             context,
-            sandbox_config,
+            self.build_configuration.sandbox_config().cloned(),
             env_isolation,
             self.build_configuration.experimental,
         )
@@ -265,5 +348,41 @@ impl Output {
 
         let exec_args = self.prepare_build_script().await?;
         rattler_build_script::create_build_script(exec_args).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sandbox_paths_expand_build_environment_variables() {
+        let env = HashMap::from([
+            ("SRC_DIR".to_string(), Some("/work/source".to_string())),
+            ("CACHE".to_string(), Some("cache".to_string())),
+        ]);
+        let request = SandboxRequest {
+            read: vec![PathBuf::from("$SRC_DIR/include")],
+            read_write: vec![PathBuf::from("${SRC_DIR}/$CACHE")],
+            ..Default::default()
+        };
+
+        let resolved = resolve_sandbox_request(&request, &env, Path::new("/work")).unwrap();
+        assert_eq!(resolved.read, vec![PathBuf::from("/work/source/include")]);
+        assert_eq!(
+            resolved.read_write,
+            vec![PathBuf::from("/work/source/cache")]
+        );
+    }
+
+    #[test]
+    fn sandbox_paths_reject_unknown_variables() {
+        let request = SandboxRequest {
+            read: vec![PathBuf::from("$NOT_DEFINED/data")],
+            ..Default::default()
+        };
+        let error =
+            resolve_sandbox_request(&request, &HashMap::new(), Path::new("/work")).unwrap_err();
+        assert!(error.to_string().contains("NOT_DEFINED"));
     }
 }

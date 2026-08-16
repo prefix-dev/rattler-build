@@ -60,7 +60,7 @@ impl<T: ToString + Debug> IncludeExclude<T> {
     }
 }
 
-/// Recipe-declared sandbox escape requests (additive on top of host config)
+/// Recipe sandbox opt-in and permissions required from the host policy
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct Sandbox {
     /// Request network access for this build
@@ -85,7 +85,7 @@ pub struct Sandbox {
 }
 
 impl Sandbox {
-    /// Returns true if no escape was requested
+    /// Returns true if no additional permission was requested
     pub fn is_default(&self) -> bool {
         self.network.is_none()
             && self.read.is_empty()
@@ -139,7 +139,7 @@ pub struct Script {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cwd: Option<Value<String>>,
 
-    /// Recipe-declared sandbox escape requests (additive)
+    /// Recipe sandbox opt-in and required permissions
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sandbox: Option<Sandbox>,
 
@@ -208,7 +208,7 @@ impl Script {
             && self.cwd.is_none()
             && self.env.is_empty()
             && self.secrets.is_empty()
-            && self.sandbox.as_ref().is_none_or(Sandbox::is_default)
+            && self.sandbox.is_none()
     }
 
     /// Collect all variables used in this script

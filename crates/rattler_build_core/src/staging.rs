@@ -580,7 +580,7 @@ mod tests {
         Build, Requirements,
         build::{BuildPlan, Step, StepRun},
     };
-    use rattler_build_script::EnvironmentIsolation;
+    use rattler_build_script::{EnvironmentIsolation, SandboxRequest, Script};
     use rattler_conda_types::Platform;
 
     #[test]
@@ -627,5 +627,33 @@ mod tests {
             args.sections[0].env.get("FOO").map(String::as_str),
             Some("bar")
         );
+    }
+
+    #[test]
+    fn staging_script_can_opt_into_sandbox() {
+        let plan = BuildPlan::Script(Script {
+            sandbox: Some(Box::new(SandboxRequest::default())),
+            ..Default::default()
+        });
+        let args = prepare_build_plan_execution_args(
+            &plan,
+            &indexmap::IndexMap::new(),
+            JinjaConfig::default(),
+            std::collections::HashMap::new(),
+            PathBuf::from("/tmp/work"),
+            Path::new("."),
+            ExecutionContext::shared(
+                RuntimeEnv::for_test(Platform::current()),
+                Path::new("."),
+                Platform::current(),
+                Platform::current(),
+            ),
+            None,
+            EnvironmentIsolation::default(),
+            false,
+        )
+        .unwrap();
+
+        assert!(args.sandbox_config.is_some());
     }
 }

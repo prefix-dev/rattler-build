@@ -319,7 +319,7 @@ pub(crate) fn parse_script(node: &Node) -> Result<crate::stage0::types::Script, 
                     cwd = Some(parse_field!("script.cwd", value_node));
                 }
                 "sandbox" => {
-                    sandbox = Some(parse_sandbox(value_node)?);
+                    sandbox = parse_sandbox(value_node)?;
                 }
                 _ => {
                     return Err(ParseError::invalid_value(
@@ -357,12 +357,25 @@ pub(crate) fn parse_script(node: &Node) -> Result<crate::stage0::types::Script, 
 }
 
 /// Parse the `sandbox:` block of a script object.
-fn parse_sandbox(node: &Node) -> Result<crate::stage0::types::Sandbox, ParseError> {
+fn parse_sandbox(node: &Node) -> Result<Option<crate::stage0::types::Sandbox>, ParseError> {
     use crate::stage0::types::{ConditionalList, Sandbox};
 
+    if node.as_scalar().is_some() {
+        let enabled = parse_bool_value(node, "script.sandbox")?;
+        return match enabled.as_concrete() {
+            Some(true) => Ok(Some(Sandbox::default())),
+            Some(false) => Ok(None),
+            None => Err(ParseError::invalid_value(
+                "script.sandbox",
+                "templated sandbox enablement is not supported; use a conditional mapping instead",
+                get_span(node),
+            )),
+        };
+    }
+
     let mapping = node.as_mapping().ok_or_else(|| {
-        ParseError::expected_type("mapping", "non-mapping", get_span(node))
-            .with_message("Expected 'sandbox' to be a mapping")
+        ParseError::expected_type("boolean or mapping", "other", get_span(node))
+            .with_message("Expected 'sandbox' to be true, false, or a mapping")
     })?;
 
     let mut network: Option<Value<bool>> = None;
@@ -391,13 +404,13 @@ fn parse_sandbox(node: &Node) -> Result<crate::stage0::types::Sandbox, ParseErro
         }
     }
 
-    Ok(Sandbox {
+    Ok(Some(Sandbox {
         network,
         read,
         read_execute,
         read_write,
         reason,
-    })
+    }))
 }
 
 fn parse_env_key(field_name: &str, key_node: &MarkedScalarNode) -> Result<String, ParseError> {

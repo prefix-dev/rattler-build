@@ -253,6 +253,30 @@ build:
 }
 
 #[test]
+fn test_parse_script_sandbox_boolean() {
+    for (enabled, expected) in [("true", true), ("false", false)] {
+        let yaml = format!(
+            r#"
+package:
+  name: sandbox-boolean
+  version: 1
+build:
+  script:
+    sandbox: {enabled}
+    content: echo hi
+"#
+        );
+        let recipe = parse_recipe_from_source(&yaml).unwrap();
+        let has_sandbox = recipe
+            .build
+            .plan
+            .script()
+            .is_some_and(|script| script.sandbox.is_some());
+        assert_eq!(has_sandbox, expected);
+    }
+}
+
+#[test]
 fn test_parse_script_sandbox_rejects_unknown_field() {
     let yaml_str = r#"
 package:

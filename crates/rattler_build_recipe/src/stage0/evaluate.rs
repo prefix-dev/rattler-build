@@ -1330,17 +1330,12 @@ pub fn evaluate_script(
     // Use inferred interpreter if no explicit interpreter was set
     let final_interpreter = interpreter.or(inferred_interpreter);
 
-    // Evaluate the recipe-declared sandbox escape requests.
-    let sandbox = if let Some(sandbox) = &script.sandbox {
-        let evaluated = evaluate_sandbox(sandbox, context)?;
-        if evaluated.is_empty() {
-            None
-        } else {
-            Some(evaluated)
-        }
-    } else {
-        None
-    };
+    // Evaluate the recipe sandbox opt-in and required permissions.
+    let sandbox = script
+        .sandbox
+        .as_ref()
+        .map(|sandbox| evaluate_sandbox(sandbox, context).map(Box::new))
+        .transpose()?;
 
     Ok(Script {
         interpreter: final_interpreter,

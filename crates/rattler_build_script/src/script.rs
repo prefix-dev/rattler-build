@@ -23,10 +23,9 @@ pub struct Script {
     /// The current working directory for the script.
     pub cwd: Option<PathBuf>,
 
-    /// Recipe-declared sandbox escape requests. Applied additively on top of the host's
-    /// resolved sandbox configuration; the recipe can grant more access but cannot
-    /// tighten the host's policy.
-    pub sandbox: Option<SandboxRequest>,
+    /// Recipe-declared sandbox opt-in and required permissions. Requests are validated
+    /// against the host policy and cannot expand it.
+    pub sandbox: Option<Box<SandboxRequest>>,
 
     /// Whether content was explicitly specified via `content:` field.
     /// When true, serialization should always use `{content: ...}` structure.
@@ -86,7 +85,7 @@ impl Serialize for Script {
                 env: &self.env,
                 secrets: &self.secrets,
                 cwd: self.cwd.as_ref(),
-                sandbox: self.sandbox.as_ref(),
+                sandbox: self.sandbox.as_deref(),
                 content: match &self.content {
                     ScriptContent::Command(content) => Some(RawScriptContent::Command { content }),
                     ScriptContent::Commands(content) => {
@@ -158,7 +157,7 @@ impl<'de> Deserialize<'de> for Script {
                     env,
                     secrets,
                     cwd,
-                    sandbox: sandbox.map(|request| *request),
+                    sandbox,
                     content: match content {
                         Some(RawScriptContent::Command { content }) => {
                             ScriptContent::Command(content)
@@ -213,7 +212,7 @@ impl Script {
             && self.env.is_empty()
             && self.secrets.is_empty()
             && self.cwd.is_none()
-            && self.sandbox.as_ref().is_none_or(SandboxRequest::is_empty)
+            && self.sandbox.is_none()
     }
 }
 
