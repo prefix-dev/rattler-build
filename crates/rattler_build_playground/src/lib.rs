@@ -10,8 +10,12 @@ use rattler_build_recipe::{
     stage1::{Evaluate, EvaluationContext},
     variant_render::{RenderConfig, render_recipe_with_variant_config},
 };
+use rattler_build_recipe_generator::{
+    CpanOpts, PyPIOpts, generate_cpan_recipe_string, generate_pypi_recipe_string,
+    generate_r_recipe_string,
+};
 use rattler_build_variant_config::{VariantConfig, parse_conda_build_config};
-use rattler_conda_types::Platform;
+use rattler_conda_types::{Platform, RepodataRevision};
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
 
@@ -122,8 +126,8 @@ pub fn evaluate_recipe(yaml_source: &str, variables_json: &str, target_platform:
         ..Default::default()
     };
 
-    let context =
-        EvaluationContext::with_variables_and_config(variables, jinja_config).with_v3(true);
+    let context = EvaluationContext::with_variables_and_config(variables, jinja_config)
+        .with_repodata_revision(RepodataRevision::V3);
 
     match &recipe {
         Recipe::SingleOutput(r) => {
@@ -275,7 +279,7 @@ pub fn render_variants(
         .with_target_platform(platform)
         .with_host_platform(platform)
         .with_build_platform(platform)
-        .with_v3(true);
+        .with_repodata_revision(RepodataRevision::V3);
 
     // Render with variant config
     match render_recipe_with_variant_config(&stage0_recipe, &variant_config, render_config) {
@@ -445,5 +449,68 @@ fn format_parse_error(e: &rattler_build_yaml_parser::ParseError) -> String {
                 error_json(&message, None, None)
             }
         }
+    }
+}
+
+/// Build a JSON success response containing the raw generated recipe YAML.
+fn ok_recipe(yaml: &str) -> String {
+    serde_json::to_string(&serde_json::json!({
+        "ok": true,
+        "result": yaml,
+    }))
+    .expect("serialization of ok response cannot fail")
+}
+
+/// Generate a recipe from PyPI for the given package name (and optional version).
+///
+/// Returns a JSON string: `{ "ok": true, "result": "<yaml>" }` or
+/// `{ "ok": false, "error": {...} }`.
+#[wasm_bindgen]
+pub async fn generate_pypi_recipe(package: String, version: Option<String>) -> String {
+    let opts = PyPIOpts {
+        package,
+        version,
+        write: false,
+        use_mapping: true,
+        tree: false,
+        pypi_index_urls: vec!["https://pypi.org/pypi".to_string()],
+    };
+
+    match generate_pypi_recipe_string(&opts).await {
+        Ok(yaml) => ok_recipe(&yaml),
+        Err(e) => error_json(&format!("{e:?}"), None, None),
+    }
+}
+
+/// Generate a recipe from CRAN (via R-universe) for the given package name.
+///
+/// `universe` defaults to "cran" when `None`.
+///
+/// Returns a JSON string: `{ "ok": true, "result": "<yaml>" }` or
+/// `{ "ok": false, "error": {...} }`.
+#[wasm_bindgen]
+pub async fn generate_cran_recipe(package: String, universe: Option<String>) -> String {
+    match generate_r_recipe_string(&package, universe.as_deref()).await {
+        Ok(yaml) => ok_recipe(&yaml),
+        Err(e) => error_json(&format!("{e:?}"), None, None),
+    }
+}
+
+/// Generate a recipe from CPAN (via MetaCPAN) for the given package/module name.
+///
+/// Returns a JSON string: `{ "ok": true, "result": "<yaml>" }` or
+/// `{ "ok": false, "error": {...} }`.
+#[wasm_bindgen]
+pub async fn generate_cpan_recipe(package: String, version: Option<String>) -> String {
+    let opts = CpanOpts {
+        package,
+        version,
+        write: false,
+        tree: false,
+    };
+
+    match generate_cpan_recipe_string(&opts).await {
+        Ok(yaml) => ok_recipe(&yaml),
+        Err(e) => error_json(&format!("{e:?}"), None, None),
     }
 }

@@ -239,8 +239,7 @@ fn output_human_readable(
     // Basic package information
     let mut table = comfy_table::Table::new();
     table
-        .load_preset(comfy_table::presets::UTF8_FULL_CONDENSED)
-        .apply_modifier(comfy_table::modifiers::UTF8_ROUND_CORNERS)
+        .load_style(comfy_table::presets::UTF8_FULL_CONDENSED.with_rounded_corners())
         .set_header(vec!["Property", "Value"]);
 
     table.add_row(vec!["Name", &index_json.name.as_normalized()]);
@@ -255,8 +254,8 @@ fn output_human_readable(
     if let Some(timestamp) = index_json.timestamp {
         // Format timestamp as a readable date (e.g., "2025-11-25 07:56:45 UTC")
         let formatted_time = timestamp
-            .datetime()
-            .format("%Y-%m-%d %H:%M:%S UTC")
+            .jiff_timestamp()
+            .strftime("%Y-%m-%d %H:%M:%S UTC")
             .to_string();
         table.add_row(vec!["Timestamp", &formatted_time]);
     }
@@ -312,8 +311,7 @@ fn output_human_readable(
         tracing::info!("\nRun dependencies:");
         let mut dep_table = comfy_table::Table::new();
         dep_table
-            .load_preset(comfy_table::presets::UTF8_FULL_CONDENSED)
-            .apply_modifier(comfy_table::modifiers::UTF8_ROUND_CORNERS)
+            .load_style(comfy_table::presets::UTF8_FULL_CONDENSED.with_rounded_corners())
             .set_header(vec!["Package"]);
 
         for dep in &index_json.depends {
@@ -327,8 +325,7 @@ fn output_human_readable(
         tracing::info!("\nConstraints:");
         let mut constraint_table = comfy_table::Table::new();
         constraint_table
-            .load_preset(comfy_table::presets::UTF8_FULL_CONDENSED)
-            .apply_modifier(comfy_table::modifiers::UTF8_ROUND_CORNERS)
+            .load_style(comfy_table::presets::UTF8_FULL_CONDENSED.with_rounded_corners())
             .set_header(vec!["Constraint"]);
 
         for constraint in &index_json.constrains {
@@ -346,8 +343,7 @@ fn output_human_readable(
 
         let mut paths_table = comfy_table::Table::new();
         paths_table
-            .load_preset(comfy_table::presets::UTF8_FULL_CONDENSED)
-            .apply_modifier(comfy_table::modifiers::UTF8_ROUND_CORNERS)
+            .load_style(comfy_table::presets::UTF8_FULL_CONDENSED.with_rounded_corners())
             .set_header(vec!["Path", "Size", "Type", "Prefix", "SHA256"]);
 
         for entry in &paths.paths {
@@ -522,8 +518,8 @@ pub async fn extract_package(args: ExtractOpts) -> miette::Result<()> {
         console::style("✔").green(),
     );
     println!("  Destination: {}", destination.display());
-    println!("  SHA256: {:x}", result.sha256);
-    println!("  MD5: {:x}", result.md5);
+    println!("  SHA256: {}", hex::encode(result.sha256));
+    println!("  MD5: {}", hex::encode(result.md5));
     println!(
         "  Size: {} ({} bytes)",
         HumanBytes(result.total_size),

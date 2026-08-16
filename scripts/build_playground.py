@@ -19,7 +19,10 @@ def assemble_deploy() -> None:
     DEPLOY_DIR.mkdir(exist_ok=True)
 
     for f in (PLAYGROUND_CRATE / "www").iterdir():
-        shutil.copy2(f, DEPLOY_DIR / f.name)
+        if f.is_dir():
+            shutil.copytree(f, DEPLOY_DIR / f.name, dirs_exist_ok=True)
+        else:
+            shutil.copy2(f, DEPLOY_DIR / f.name)
 
     pkg_dir = PLAYGROUND_CRATE / "pkg"
     shutil.copy2(pkg_dir / "rattler_build_playground_bg.wasm", DEPLOY_DIR)

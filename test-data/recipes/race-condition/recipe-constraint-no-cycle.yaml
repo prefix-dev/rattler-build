@@ -1,0 +1,21 @@
+recipe:
+  name: openblas-split
+  version: "0.3.20"
+
+# Regression test for issue #2531: a non-exact run_constraints pin must not
+# create a build-order edge, so these mutual references are not a cycle.
+outputs:
+  - package:
+      name: libopenblas
+    build:
+      noarch: generic
+    requirements:
+      run_constraints:
+        - ${{ pin_subpackage('openblas', upper_bound='x.x.x') }}
+  - package:
+      name: openblas
+    build:
+      noarch: generic
+    requirements:
+      run:
+        - ${{ pin_subpackage('libopenblas', exact=True) }}

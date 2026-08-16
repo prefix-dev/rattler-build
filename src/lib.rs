@@ -23,6 +23,7 @@ pub use rattler_build_core::tool_configuration;
 pub use rattler_build_core::types;
 pub use rattler_build_core::utils;
 
+pub mod config;
 pub mod opt;
 
 // Re-export recipe generator
@@ -54,7 +55,7 @@ use rattler_build_core::consts;
 use rattler_build_recipe::{stage0, stage1::TestType};
 use rattler_build_variant_config::VariantConfig;
 use rattler_conda_types::{
-    MatchSpec, NamedChannelOrUrl, NoArchType, PackageName, Platform,
+    MatchSpec, NamedChannelOrUrl, NoArchType, PackageName, Platform, RepodataRevision,
     compression_level::CompressionLevel, package::CondaArchiveType,
 };
 use rattler_config::config::build::PackageFormatAndCompression;
@@ -64,6 +65,7 @@ use rattler_index::ensure_channel_initialized_s3;
 use rattler_solve::SolveStrategy;
 use rattler_virtual_packages::VirtualPackageOverrides;
 use render::resolved_dependencies::RunExportsDownload;
+use script::LocalRunner;
 use system_tools::SystemTools;
 use tool_configuration::{Configuration, ContinueOnFailure, SkipExisting, TestStrategy};
 use types::Directories;
@@ -75,10 +77,19 @@ use types::{
 use crate::metadata::{Output, PlatformWithVirtualPackages};
 use crate::publish::{
     BuildNumberOverride, PublishConfig, apply_build_number_override, fetch_highest_build_numbers,
-    upload_and_index_channel,
+    resolve_channel_for_repodata, upload_and_index_channel,
 };
 use indexmap::IndexSet;
 use rattler_build_recipe::topological_sort_by_dependencies;
+
+/// Convert the CLI `--v3` boolean flag into a [`RepodataRevision`].
+fn repodata_revision_from_v3_flag(v3: bool) -> RepodataRevision {
+    if v3 {
+        RepodataRevision::V3
+    } else {
+        RepodataRevision::Legacy
+    }
+}
 
 /// Result of finding variants, including the top-level recipe name if available
 struct FoundVariants {
@@ -102,7 +113,7 @@ fn find_variants(
     let stage0_recipe = rattler_build_recipe::parse_recipe_with_config(
         &source,
         rattler_build_recipe::stage0::ParseConfig {
-            v3: render_config.v3,
+            repodata_revision: render_config.repodata_revision,
         },
     )
     .wrap_err("Failed to parse recipe")?;
@@ -224,6 +235,7 @@ pub fn get_tool_config(
 
     let configuration_builder = Configuration::builder()
         .with_keep_build(build_data.keep_build)
+        .with_runner(Arc::new(LocalRunner::new(build_data.env_isolation)))
         .with_compression_threads(build_data.compression_threads)
         .with_reqwest_client(client)
         .with_test_strategy(build_data.test)
@@ -382,9 +394,12 @@ pub async fn get_build_output(
     // Get OS environment variable keys that can be overridden by variant config
     let os_env_var_keys = env_vars::os_vars(
         &std::path::PathBuf::new(),
+        &build_data.target_platform,
         &build_data.host_platform,
+        &build_data.build_platform,
         build_data.env_isolation,
         &std::path::PathBuf::new(),
+        &crate::script::RuntimeEnv::current(),
     )
     .keys()
     .cloned()
@@ -395,7 +410,7 @@ pub async fn get_build_output(
         build_platform: build_data.build_platform,
         host_platform: build_data.host_platform,
         experimental: build_data.common.experimental,
-        v3: build_data.common.v3,
+        repodata_revision: repodata_revision_from_v3_flag(build_data.common.v3),
         recipe_path: Some(recipe_path.to_path_buf()),
         os_env_var_keys,
         build_number_override: build_data.build_num_override,
@@ -424,10 +439,17 @@ pub async fn get_build_output(
             skipped
         );
 
+        // Display V3 package variant flags, if any. These are not variant keys,
+        // so they are shown below the build string rather than in the table.
+        let flags = &discovered_output.recipe.build().flags;
+        if !flags.is_empty() {
+            let flags = flags.iter().map(|flag| flag.as_str()).collect::<Vec<_>>();
+            tracing::info!("Flags: {}", flags.join(", "));
+        }
+
         let mut table = comfy_table::Table::new();
         table
-            .load_preset(comfy_table::presets::UTF8_FULL_CONDENSED)
-            .apply_modifier(comfy_table::modifiers::UTF8_ROUND_CORNERS)
+            .load_style(comfy_table::presets::UTF8_FULL_CONDENSED.with_rounded_corners())
             .set_header(["Variant", "Version"]);
         for (key, value) in discovered_output.used_vars.iter() {
             table.add_row([key.normalize(), format!("{:?}", value)]);
@@ -446,7 +468,7 @@ pub async fn get_build_output(
         .or_else(|| outputs_and_variants.first().map(|o| o.name.clone()))
         .unwrap_or_else(|| "build".to_string());
 
-    let timestamp = chrono::Utc::now();
+    let timestamp = jiff::Timestamp::now();
 
     for discovered_output in outputs_and_variants {
         let recipe = &discovered_output.recipe;
@@ -466,10 +488,10 @@ pub async fn get_build_output(
         if build_data.sandbox_configuration.is_none()
             && recipe
                 .build()
-                .script
-                .sandbox
-                .as_ref()
-                .is_some_and(|s| !s.is_empty())
+                .plan
+                .script()
+                .and_then(|script| script.sandbox.as_ref())
+                .is_some_and(|sandbox| !sandbox.is_empty())
         {
             return Err(miette::miette!(
                 "Recipe for `{}` declares a `script.sandbox` block, but the sandbox is not enabled. \
@@ -518,9 +540,15 @@ pub async fn get_build_output(
         // 3. channels from pixi_config
         // 4. conda-forge as fallback
         if variant_channels.is_some() && build_data.channels.is_some() {
-            return Err(miette::miette!(
-                "channel_sources and channels cannot both be set at the same time"
-            ));
+            if build_data.channels_from_config {
+                tracing::debug!(
+                    "ignoring `default-channels` from the configuration file because the variant config sets `channel_sources`"
+                );
+            } else {
+                return Err(miette::miette!(
+                    "channel_sources and channels cannot both be set at the same time"
+                ));
+            }
         }
         let channels = variant_channels.unwrap_or_else(|| {
             build_data
@@ -557,6 +585,7 @@ pub async fn get_build_output(
                     recipe_path,
                     &output_dir,
                     &timestamp,
+                    Platform::current(),
                 )
                 .no_build_id(build_data.no_build_id)
                 .merge_build_and_host(recipe.build().merge_build_and_host_envs)
@@ -574,10 +603,11 @@ pub async fn get_build_output(
                 ),
                 store_recipe: !build_data.no_include_recipe,
                 force_colors: build_data.color_build_log && console::colors_enabled(),
+                experimental: build_data.common.experimental,
                 env_isolation: build_data.env_isolation,
                 sandbox_config: build_data.sandbox_configuration.clone(),
                 exclude_newer: build_data.exclude_newer,
-                v3: build_data.common.v3,
+                repodata_revision: repodata_revision_from_v3_flag(build_data.common.v3),
             },
             finalized_dependencies: None,
             finalized_sources: None,
@@ -603,36 +633,54 @@ pub async fn get_build_output(
 }
 
 fn can_test(output: &Output, all_output_names: &[&PackageName], done_outputs: &[Output]) -> bool {
-    let check_if_matches = |spec: &MatchSpec, output: &Output| -> bool {
-        if spec.name.as_exact() != Some(&output.name().clone()) {
-            return false;
-        }
-        if let Some(version_spec) = &spec.version
-            && !version_spec.matches(output.recipe.package().version())
-        {
-            return false;
-        }
-        if let Some(build_string_spec) = &spec.build
-            && !build_string_spec.matches(&output.build_string())
-        {
-            return false;
-        }
-        true
-    };
+    fn check_if_matches(spec: &MatchSpec, output: &Output) -> bool {
+        spec.name.as_exact() == Some(output.name())
+            && spec
+                .version
+                .as_ref()
+                .is_none_or(|version| version.matches(output.recipe.package().version()))
+            && spec
+                .build
+                .as_ref()
+                .is_none_or(|build| build.matches(&output.build_string()))
+    }
 
-    // Check if any run dependencies are not built yet
-    if let Some(ref deps) = output.finalized_dependencies {
-        for dep in &deps.run.depends {
-            if all_output_names
-                .iter()
-                .any(|o| dep.spec().name.as_exact() == Some(*o))
-            {
-                // this dependency might not be built yet
-                if !done_outputs.iter().any(|o| check_if_matches(dep.spec(), o)) {
-                    return false;
-                }
-            }
+    fn run_dependencies_are_built(
+        output: &Output,
+        all_output_names: &[&PackageName],
+        done_outputs: &[Output],
+        visiting: &mut Vec<String>,
+    ) -> bool {
+        let identifier = output.identifier();
+        if visiting.contains(&identifier) {
+            return true;
         }
+        visiting.push(identifier);
+
+        let ready = output.finalized_dependencies.as_ref().is_none_or(|deps| {
+            deps.run.depends.iter().all(|dep| {
+                !all_output_names
+                    .iter()
+                    .any(|name| dep.spec().name.as_exact() == Some(*name))
+                    || done_outputs.iter().any(|candidate| {
+                        check_if_matches(dep.spec(), candidate)
+                            && run_dependencies_are_built(
+                                candidate,
+                                all_output_names,
+                                done_outputs,
+                                visiting,
+                            )
+                    })
+            })
+        });
+
+        visiting.pop();
+        ready
+    }
+
+    let mut visiting = Vec::new();
+    if !run_dependencies_are_built(output, all_output_names, done_outputs, &mut visiting) {
+        return false;
     }
 
     // Also check that for all script tests
@@ -649,15 +697,21 @@ fn can_test(output: &Output, all_output_names: &[&PackageName], done_outputs: &[
                     // this dependency might not be built yet
                     // For pin_subpackage/pin_compatible, we only check name match
                     // For regular specs, we also check version/build if specified
-                    let is_built = match dep {
-                        rattler_build_recipe::stage1::Dependency::Spec(spec) => {
-                            done_outputs.iter().any(|o| check_if_matches(spec, o))
-                        }
-                        _ => {
-                            // For pins, just check if any output with that name is built
-                            done_outputs.iter().any(|o| Some(o.name()) == dep_name)
-                        }
-                    };
+                    let is_built = done_outputs.iter().any(|output| {
+                        let matches = match dep {
+                            rattler_build_recipe::stage1::Dependency::Spec(spec) => {
+                                check_if_matches(spec, output)
+                            }
+                            _ => Some(output.name()) == dep_name,
+                        };
+                        matches
+                            && run_dependencies_are_built(
+                                output,
+                                all_output_names,
+                                done_outputs,
+                                &mut visiting,
+                            )
+                    });
                     if !is_built {
                         return false;
                     }
@@ -816,11 +870,16 @@ pub async fn run_build_from_args(
                             );
                         }
 
+                        let report = e.into_report();
                         if tool_configuration.continue_on_failure == ContinueOnFailure::Yes {
-                            tracing::error!("Test failed for {}: {}", output.identifier(), e);
-                            output.record_warning(&format!("Test failed: {}", e));
+                            tracing::error!(
+                                "Test failed for {}: {:?}",
+                                output.identifier(),
+                                report
+                            );
+                            output.record_warning(&format!("Test failed: {report:?}"));
                         } else {
-                            return Err(miette::miette!("Test failed: {}", e));
+                            return Err(report).context("Test failed");
                         }
                     }
                 }
@@ -958,7 +1017,7 @@ pub async fn run_test(
     let _enter = span.enter();
     package_test::run_test(&package_file, &test_options, None)
         .await
-        .into_diagnostic()?;
+        .map_err(|e| e.into_report())?;
 
     Ok(())
 }
@@ -1048,7 +1107,7 @@ pub async fn rebuild_package_core(
     let original_sha = rattler_digest::compute_file_digest::<rattler_digest::Sha256>(&package_path)
         .into_diagnostic()?;
 
-    tracing::info!("Original package SHA256: {:x}", original_sha);
+    tracing::info!("Original package SHA256: {}", hex::encode(original_sha));
     tracing::info!("Rebuilding \"{}\"", package_path.display());
 
     // we extract the recipe folder from the package file (info/recipe/*)
@@ -1073,6 +1132,10 @@ pub async fn rebuild_package_core(
     };
     output.system_tools.warn_if_changed(&current_build_tool);
     output.system_tools = SystemTools::new("rattler-build", env!("CARGO_PKG_VERSION"));
+
+    // Set invocation-only build configuration that is not serialized into the
+    // package's rendered recipe.
+    output.build_configuration.experimental = rebuild_data.common.experimental;
 
     // set recipe dir to the temp folder
     output.build_configuration.directories.recipe_dir = temp_dir;
@@ -1102,7 +1165,7 @@ pub async fn rebuild_package_core(
         run_build(output, &tool_config, WorkingDirectoryBehavior::Cleanup).await?;
 
     // Generate timestamp for the rebuilt package
-    let timestamp = chrono::Utc::now().format("%Y%m%d-%H%M%S");
+    let timestamp = jiff::Timestamp::now().strftime("%Y%m%d-%H%M%S");
 
     // Create final output directory
     let final_output_dir = rebuild_data.common.output_dir.clone();
@@ -1141,14 +1204,14 @@ pub async fn rebuild_package_core(
     let rebuilt_sha = rattler_digest::compute_file_digest::<rattler_digest::Sha256>(&rebuilt_path)
         .into_diagnostic()?;
 
-    tracing::info!("Rebuilt package SHA256: {:x}", rebuilt_sha);
+    tracing::info!("Rebuilt package SHA256: {}", hex::encode(rebuilt_sha));
     tracing::info!("Rebuilt package saved to: \"{:?}\"", rebuilt_path);
 
     Ok(RebuildOutput {
         original_path: package_path,
         rebuilt_path,
-        original_sha256: format!("{:x}", original_sha),
-        rebuilt_sha256: format!("{:x}", rebuilt_sha),
+        original_sha256: hex::encode(original_sha),
+        rebuilt_sha256: hex::encode(rebuilt_sha),
     })
 }
 
@@ -1337,9 +1400,12 @@ pub async fn publish_packages(
     // Create tool configuration for cache clearing and building
     let tool_config = get_tool_config(&publish_data.build, log_handler)?;
 
-    // Convert target to a channel URL
+    // The raw target (e.g. `cloudsmith://owner/repo`) drives upload backend dispatch, while
+    // repodata operations (channel init, build-number lookups, indexing) need a channel URL
+    // the resolver understands. Resolve once and reuse it for every repodata-facing step.
     let target_url = publish_data.to.clone();
-    let channel_url = target_url
+    let channel_target = resolve_channel_for_repodata(&target_url);
+    let channel_url = channel_target
         .clone()
         .into_base_url(&tool_config.channel_config)
         .into_diagnostic()?;
@@ -1455,7 +1521,7 @@ pub async fn publish_packages(
             let highest_build_numbers = match &build_number_override {
                 BuildNumberOverride::Relative(_) => {
                     fetch_highest_build_numbers(
-                        &target_url,
+                        &channel_target,
                         &outputs,
                         publish_data.build.target_platform,
                         &tool_config,
@@ -1545,6 +1611,7 @@ pub async fn debug_recipe(
         target_platform: debug_data.target_platform,
         host_platform: debug_data.host_platform,
         channels: debug_data.channels,
+        channels_from_config: false,
         common: debug_data.common,
         keep_build: true,
         test: TestStrategy::Skip,

@@ -166,27 +166,27 @@ impl DependencyInfo {
     pub fn render(&self, long: bool) -> String {
         if !long {
             match self {
-                DependencyInfo::Variant(spec) => format!("{} (V)", &spec.spec),
-                DependencyInfo::PinSubpackage(spec) => format!("{} (PS)", &spec.spec),
-                DependencyInfo::PinCompatible(spec) => format!("{} (PC)", &spec.spec),
+                DependencyInfo::Variant(spec) => format!("{} (V)", spec.spec),
+                DependencyInfo::PinSubpackage(spec) => format!("{} (PS)", spec.spec),
+                DependencyInfo::PinCompatible(spec) => format!("{} (PC)", spec.spec),
                 DependencyInfo::RunExport(spec) => format!(
                     "{} (RE of [{}: {}])",
-                    &spec.spec, &spec.from, &spec.source_package
+                    spec.spec, spec.from, spec.source_package
                 ),
                 DependencyInfo::Source(spec) => spec.spec.to_string(),
             }
         } else {
             match self {
-                DependencyInfo::Variant(spec) => format!("{} (from variant config)", &spec.spec),
+                DependencyInfo::Variant(spec) => format!("{} (from variant config)", spec.spec),
                 DependencyInfo::PinSubpackage(spec) => {
-                    format!("{} (from pin subpackage)", &spec.spec)
+                    format!("{} (from pin subpackage)", spec.spec)
                 }
                 DependencyInfo::PinCompatible(spec) => {
-                    format!("{} (from pin compatible)", &spec.spec)
+                    format!("{} (from pin compatible)", spec.spec)
                 }
                 DependencyInfo::RunExport(spec) => format!(
                     "{} (run export by {} in {} env)",
-                    &spec.spec, &spec.from, &spec.source_package
+                    spec.spec, spec.from, spec.source_package
                 ),
                 DependencyInfo::Source(spec) => spec.spec.to_string(),
             }
@@ -356,9 +356,7 @@ impl ResolvedDependencies {
 impl Display for ResolvedDependencies {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut table = comfy_table::Table::new();
-        table
-            .load_preset(comfy_table::presets::UTF8_FULL_CONDENSED)
-            .apply_modifier(comfy_table::modifiers::UTF8_ROUND_CORNERS);
+        table.load_style(comfy_table::presets::UTF8_FULL_CONDENSED.with_rounded_corners());
         write!(f, "{}", self.to_table(table, false))
     }
 }
@@ -475,6 +473,20 @@ impl FinalizedRunDependencies {
             has_previous_section = true;
         }
 
+        // Add a section for each extra (optional dependency group)
+        for (extra_name, extra_deps) in &self.extra_depends {
+            let extra_rendered = render_grouped_dependencies(extra_deps, long);
+            if extra_rendered.is_empty() {
+                continue;
+            }
+            if has_previous_section {
+                table.add_row(vec!["", ""]);
+            }
+            add_section_header(&mut table, &format!("Extra ({extra_name})"));
+            add_grouped_items(&mut table, &extra_rendered);
+            has_previous_section = true;
+        }
+
         // Add run exports sections if not empty
         if !self.run_exports.is_empty() {
             let sections = [
@@ -504,9 +516,7 @@ impl FinalizedRunDependencies {
 impl Display for FinalizedRunDependencies {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut table = comfy_table::Table::new();
-        table
-            .load_preset(comfy_table::presets::UTF8_FULL_CONDENSED)
-            .apply_modifier(comfy_table::modifiers::UTF8_ROUND_CORNERS);
+        table.load_style(comfy_table::presets::UTF8_FULL_CONDENSED.with_rounded_corners());
         write!(f, "{}", self.to_table(table, false))
     }
 }
@@ -809,9 +819,10 @@ pub(crate) async fn resolve_dependencies(
     let gateway = if download_missing_run_exports == RunExportsDownload::DownloadMissing {
         let client = tool_configuration.client.get_client().clone();
         let package_cache = tool_configuration.package_cache.clone();
+        let io_concurrency_limit = tool_configuration.io_concurrency_limit.unwrap_or(50);
         Some(
             Gateway::builder()
-                .with_max_concurrent_requests(50)
+                .with_max_concurrent_requests(io_concurrency_limit)
                 .with_client(client)
                 .with_package_cache(package_cache)
                 .finish(),
@@ -1257,5 +1268,34 @@ mod tests {
                 ("scipy".to_string(), r#"[when="python>=3.10"]"#.to_string()),
             ]
         );
+    }
+
+    #[test]
+    fn test_to_table_renders_extras() {
+        let source_dep = |spec: &str| -> DependencyInfo {
+            SourceDependency {
+                spec: MatchSpec::from_str(spec, ParseStrictness::Strict).unwrap(),
+            }
+            .into()
+        };
+
+        let mut extra_depends = BTreeMap::new();
+        extra_depends.insert("science".to_string(), vec![source_dep("numpy")]);
+        extra_depends.insert("plot".to_string(), vec![source_dep("matplotlib")]);
+
+        let run = FinalizedRunDependencies {
+            depends: vec![source_dep("python")],
+            constraints: vec![],
+            extra_depends,
+            run_exports: Default::default(),
+        };
+
+        let table = comfy_table::Table::new();
+        let rendered = run.to_table(table, false).to_string();
+
+        assert!(rendered.contains("Extra (science)"));
+        assert!(rendered.contains("numpy"));
+        assert!(rendered.contains("Extra (plot)"));
+        assert!(rendered.contains("matplotlib"));
     }
 }

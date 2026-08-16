@@ -1,6 +1,6 @@
 //! Functions for publishing conda packages to various backends (local filesystem, S3, Quetz, etc.)
 
-use miette::IntoDiagnostic;
+use miette::{Context, IntoDiagnostic};
 use rattler_conda_types::{
     Channel, ChannelUrl, MatchSpec, NamedChannelOrUrl, PackageName, Platform,
 };
@@ -144,6 +144,11 @@ pub async fn fetch_highest_build_numbers(
 
     match result {
         Ok(repo_data) => {
+            // Surface any non-fatal warnings gathered during the query
+            // instead of dropping them.
+            for warning in &repo_data.warnings {
+                tracing::warn!("{warning}");
+            }
             for repo in repo_data {
                 for record in repo.iter() {
                     let name = &record.package_record.name;
@@ -272,6 +277,7 @@ pub async fn upload_and_index_channel(
                 "quetz" => upload_to_quetz(url, package_paths, publish_config).await,
                 "artifactory" => upload_to_artifactory(url, package_paths, publish_config).await,
                 "prefix" => upload_to_prefix(url, package_paths, publish_config).await,
+                "cloudsmith" => upload_to_cloudsmith(url, package_paths, publish_config).await,
                 "file" => {
                     let path = url
                         .to_file_path()
@@ -291,13 +297,13 @@ pub async fn upload_and_index_channel(
                     } else {
                         Err(miette::miette!(
                             "Cannot determine upload backend from URL '{}'. \n\
-                            Supported hosts: prefix.dev, anaconda.org, or use explicit schemes: s3://, quetz://, artifactory://, prefix://",
+                            Supported hosts: prefix.dev, anaconda.org, or use explicit schemes: s3://, quetz://, artifactory://, prefix://, cloudsmith://",
                             url
                         ))
                     }
                 }
                 _ => Err(miette::miette!(
-                    "Unsupported URL scheme '{}'. Supported schemes: file://, s3://, quetz://, artifactory://, prefix://, http://, https://",
+                    "Unsupported URL scheme '{}'. Supported schemes: file://, s3://, quetz://, artifactory://, prefix://, cloudsmith://, http://, https://",
                     scheme
                 )),
             }
@@ -312,9 +318,11 @@ pub async fn upload_and_index_channel(
         )),
     }?;
 
-    // Clear repodata cache for the target channel after publishing
-    let channel = match target_url {
-        NamedChannelOrUrl::Url(url) => Channel::from_url(ChannelUrl::from(url.clone())),
+    // Clear repodata cache for the target channel after publishing. Resolve the target
+    // first so schemes the gateway can't read (e.g. `cloudsmith://`) map to the same
+    // channel URL that was used while building, and the correct cache is invalidated.
+    let channel = match resolve_channel_for_repodata(target_url) {
+        NamedChannelOrUrl::Url(url) => Channel::from_url(ChannelUrl::from(url)),
         NamedChannelOrUrl::Path(path) => {
             let url = url::Url::from_file_path(path.as_str())
                 .map_err(|_| miette::miette!("Invalid path: {}", path))?;
@@ -337,6 +345,93 @@ pub async fn upload_and_index_channel(
     tracing::debug!("Cleared repodata cache for target channel");
 
     Ok(())
+}
+
+/// Default host serving Cloudsmith conda channels. Override with `CLOUDSMITH_CHANNEL_HOST`.
+const DEFAULT_CLOUDSMITH_CHANNEL_HOST: &str = "conda.cloudsmith.io";
+
+/// Parse a `cloudsmith://owner/repo` URL into its `(owner, repo)` components.
+///
+/// Returns `None` unless the URL has exactly an owner (host) and a single non-empty
+/// repo path segment, letting callers decide how to handle a malformed target.
+fn parse_cloudsmith_owner_repo(url: &url::Url) -> Option<(String, String)> {
+    let owner = url.host_str()?.to_string();
+    let mut segments = url
+        .path_segments()
+        .map(|s| s.filter(|seg| !seg.is_empty()))?;
+    let repo = segments.next()?.to_string();
+    if segments.next().is_some() {
+        return None;
+    }
+    Some((owner, repo))
+}
+
+/// Resolve a publish target to the channel URL used for repodata operations: build-time
+/// dependency resolution, build-number lookups, and repodata cache clearing.
+///
+/// The repodata resolver can't read the `cloudsmith://` scheme, so a
+/// `cloudsmith://owner/repo` target is rewritten to `https://<host>/owner/repo` (host from
+/// `CLOUDSMITH_CHANNEL_HOST`, default [`DEFAULT_CLOUDSMITH_CHANNEL_HOST`]). The original
+/// `cloudsmith://` target is kept as the upload target elsewhere so upload dispatch stays
+/// host-independent. Any target that isn't a well-formed `cloudsmith://owner/repo` URL is
+/// returned unchanged.
+pub fn resolve_channel_for_repodata(target: &NamedChannelOrUrl) -> NamedChannelOrUrl {
+    let NamedChannelOrUrl::Url(url) = target else {
+        return target.clone();
+    };
+    if url.scheme() != "cloudsmith" {
+        return target.clone();
+    }
+    let Some((owner, repo)) = parse_cloudsmith_owner_repo(url) else {
+        return target.clone();
+    };
+
+    let host = std::env::var("CLOUDSMITH_CHANNEL_HOST")
+        .unwrap_or_else(|_| DEFAULT_CLOUDSMITH_CHANNEL_HOST.to_string());
+
+    match url::Url::parse(&format!(
+        "https://{}/{owner}/{repo}",
+        host.trim_end_matches('/')
+    )) {
+        Ok(converted) => NamedChannelOrUrl::Url(converted),
+        Err(_) => target.clone(),
+    }
+}
+
+/// Upload packages to Cloudsmith.
+async fn upload_to_cloudsmith(
+    url: &url::Url,
+    package_paths: &[PathBuf],
+    publish_config: &PublishConfig,
+) -> miette::Result<()> {
+    use rattler_upload::upload::opt::CloudsmithData;
+    use rattler_upload::upload::upload_package_to_cloudsmith;
+
+    tracing::info!("Uploading packages to Cloudsmith: {}", url);
+
+    let (owner, repo) = parse_cloudsmith_owner_repo(url).ok_or_else(|| {
+        miette::miette!(
+            "Invalid Cloudsmith URL '{}': expected cloudsmith://owner/repo",
+            url
+        )
+    })?;
+
+    let api_key = std::env::var("CLOUDSMITH_API_KEY").ok();
+    let api_url = std::env::var("CLOUDSMITH_API_URL")
+        .ok()
+        .map(|url| url.parse())
+        .transpose()
+        .into_diagnostic()
+        .context("Failed to parse CLOUDSMITH_API_URL")?;
+    let cloudsmith_data = CloudsmithData::new(owner, repo, api_key, api_url);
+
+    let auth_storage = tool_configuration::get_auth_store(publish_config.auth_file.clone())
+        .map_err(|e| miette::miette!("Failed to get authentication storage: {}", e))?;
+
+    upload_package_to_cloudsmith(&auth_storage, &package_paths.to_vec(), cloudsmith_data)
+        .await
+        .into_diagnostic()
+        .context("Failed to upload packages to Cloudsmith")
 }
 
 #[cfg(feature = "s3")]
@@ -377,7 +472,7 @@ async fn upload_to_s3(
     upload_package_to_s3(
         url.clone(),
         resolved_credentials.clone(),
-        &package_paths.to_vec(),
+        package_paths,
         publish_config.force,
     )
     .await
@@ -498,8 +593,9 @@ async fn upload_to_artifactory(
     // Remove the channel path from the URL to get just the base server URL
     server_url.set_path("");
 
-    // Create ArtifactoryData with server URL, channel, and optional token
-    let artifactory_data = ArtifactoryData::new(server_url, channel, None);
+    // Create ArtifactoryData with server URL and channel; credentials are
+    // resolved from the auth storage during upload
+    let artifactory_data = ArtifactoryData::new(server_url, channel);
 
     // Upload packages
     upload_package_to_artifactory(&auth_storage, &package_paths.to_vec(), artifactory_data)
@@ -509,6 +605,37 @@ async fn upload_to_artifactory(
     tracing::info!("Successfully uploaded packages to Artifactory");
     tracing::info!("Note: Artifactory handles indexing automatically on the server side");
     Ok(())
+}
+
+/// Split a Prefix channel URL into the server URL and channel identifier.
+///
+/// Prefix channels can be namespaced (for example,
+/// `https://beta.prefix.dev/wolfv/rattler-build-steps`), so the complete path
+/// identifies the channel rather than only its final segment.
+fn prefix_server_and_channel(url: &url::Url) -> miette::Result<(url::Url, String)> {
+    let channel = url
+        .path_segments()
+        .map(|segments| {
+            segments
+                .filter(|segment| !segment.is_empty())
+                .collect::<Vec<_>>()
+                .join("/")
+        })
+        .filter(|channel| !channel.is_empty())
+        .ok_or_else(|| miette::miette!("Invalid Prefix URL: missing channel name"))?;
+
+    let mut server_url = if url.scheme() == "prefix" {
+        url::Url::parse(&url.as_str().replacen("prefix:", "https:", 1))
+            .into_diagnostic()
+            .wrap_err("Failed to convert prefix:// URL to https://")?
+    } else {
+        url.clone()
+    };
+    server_url.set_path("");
+    server_url.set_query(None);
+    server_url.set_fragment(None);
+
+    Ok((server_url, channel))
 }
 
 /// Upload packages to Prefix.dev server
@@ -528,24 +655,7 @@ async fn upload_to_prefix(
     let auth_storage = tool_configuration::get_auth_store(publish_config.auth_file.clone())
         .map_err(|e| miette::miette!("Failed to get authentication storage: {}", e))?;
 
-    // Extract channel name from URL path
-    let channel = url
-        .path_segments()
-        .and_then(|mut segments| segments.next_back())
-        .ok_or_else(|| miette::miette!("Invalid Prefix URL: missing channel name"))?
-        .to_string();
-
-    // Convert prefix:// to https:// if needed, and strip the channel path from the URL
-    // The server_url should only contain the base URL (e.g., https://prefix.dev/)
-    // without the channel path, since the channel is passed separately to PrefixData
-    let mut server_url = url.clone();
-    if server_url.scheme() == "prefix" {
-        server_url
-            .set_scheme("https")
-            .map_err(|_| miette::miette!("Failed to convert prefix:// URL to https://"))?;
-    }
-    // Remove the channel path from the URL to get just the base server URL
-    server_url.set_path("");
+    let (server_url, channel) = prefix_server_and_channel(url)?;
 
     // Determine attestation source
     let attestation = if publish_config.generate_attestation {
@@ -708,4 +818,122 @@ async fn upload_to_local_filesystem(
 
     tracing::info!("Successfully indexed local channel");
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serial_test::serial;
+    use std::str::FromStr;
+
+    fn resolve(raw: &str) -> NamedChannelOrUrl {
+        resolve_channel_for_repodata(&NamedChannelOrUrl::from_str(raw).unwrap())
+    }
+
+    #[test]
+    fn prefix_channel_url_preserves_namespaces() {
+        for (raw, expected_server, expected_channel) in [
+            (
+                "https://prefix.dev/my-channel",
+                "https://prefix.dev/",
+                "my-channel",
+            ),
+            (
+                "https://beta.prefix.dev/wolfv/rattler-build-steps",
+                "https://beta.prefix.dev/",
+                "wolfv/rattler-build-steps",
+            ),
+            (
+                "prefix://beta.prefix.dev/wolfv/rattler-build-steps/?ignored=yes#fragment",
+                "https://beta.prefix.dev/",
+                "wolfv/rattler-build-steps",
+            ),
+        ] {
+            let (server, channel) =
+                prefix_server_and_channel(&url::Url::parse(raw).unwrap()).unwrap();
+            assert_eq!(server.as_str(), expected_server);
+            assert_eq!(channel, expected_channel);
+        }
+    }
+
+    #[test]
+    fn prefix_channel_url_requires_a_channel_path() {
+        let error = prefix_server_and_channel(&url::Url::parse("https://prefix.dev/").unwrap())
+            .unwrap_err();
+        assert!(error.to_string().contains("missing channel name"));
+    }
+
+    #[test]
+    fn parse_cloudsmith_owner_repo_extracts_components() {
+        let url = url::Url::parse("cloudsmith://my-org/my-repo").unwrap();
+        assert_eq!(
+            parse_cloudsmith_owner_repo(&url),
+            Some(("my-org".to_string(), "my-repo".to_string()))
+        );
+        // Missing repo or an extra segment is not a valid owner/repo pair.
+        assert_eq!(
+            parse_cloudsmith_owner_repo(&url::Url::parse("cloudsmith://my-org").unwrap()),
+            None
+        );
+        assert_eq!(
+            parse_cloudsmith_owner_repo(
+                &url::Url::parse("cloudsmith://my-org/my-repo/extra").unwrap()
+            ),
+            None
+        );
+    }
+
+    #[test]
+    #[serial]
+    fn resolve_channel_rewrites_cloudsmith_with_default_host() {
+        unsafe { std::env::remove_var("CLOUDSMITH_CHANNEL_HOST") };
+        assert_eq!(
+            resolve("cloudsmith://my-org/my-repo"),
+            NamedChannelOrUrl::Url(
+                url::Url::parse("https://conda.cloudsmith.io/my-org/my-repo").unwrap()
+            )
+        );
+    }
+
+    #[test]
+    #[serial]
+    fn resolve_channel_honors_custom_host_and_trailing_slash() {
+        unsafe { std::env::set_var("CLOUDSMITH_CHANNEL_HOST", "conda.example.com/") };
+        let resolved = resolve("cloudsmith://my-org/my-repo");
+        unsafe { std::env::remove_var("CLOUDSMITH_CHANNEL_HOST") };
+        assert_eq!(
+            resolved,
+            NamedChannelOrUrl::Url(
+                url::Url::parse("https://conda.example.com/my-org/my-repo").unwrap()
+            )
+        );
+    }
+
+    // Malformed cloudsmith targets short-circuit before the env var is read, so they need
+    // no `#[serial]`. They are passed through unchanged and rejected later by the upload.
+    #[test]
+    fn resolve_channel_passes_through_malformed_cloudsmith_targets() {
+        for raw in ["cloudsmith://my-org/my-repo/extra", "cloudsmith://my-org"] {
+            assert_eq!(
+                resolve(raw),
+                NamedChannelOrUrl::from_str(raw).unwrap(),
+                "{raw} should be passed through unchanged"
+            );
+        }
+    }
+
+    #[test]
+    fn resolve_channel_leaves_other_targets_untouched() {
+        for raw in [
+            "https://prefix.dev/my-channel",
+            "s3://my-bucket",
+            "conda-forge",
+        ] {
+            assert_eq!(
+                resolve(raw),
+                NamedChannelOrUrl::from_str(raw).unwrap(),
+                "{raw} should be unchanged"
+            );
+        }
+    }
 }

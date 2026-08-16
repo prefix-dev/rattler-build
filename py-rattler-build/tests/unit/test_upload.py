@@ -17,7 +17,10 @@ def test_upload_to_quetz_no_token() -> None:
 def test_upload_to_artifactory_no_token() -> None:
     url = "https://artifactory.io"
     channel = "some_channel"
-    with pytest.raises(rattler_build.RattlerBuildError, match="No bearer token was given"):
+    with pytest.raises(
+        rattler_build.RattlerBuildError,
+        match="No bearer token or HTTP basic auth credentials were given",
+    ):
         rattler_build.upload_package_to_artifactory([], url, channel)
 
 

@@ -1,0 +1,25 @@
+package:
+  name: patch-from-other-source
+  version: "0.1.0"
+
+source:
+  # First source ships a patch; it is extracted into the root of SRC_DIR.
+  - path: ./provider
+  # Second source is patched using a patch that lives in the first source,
+  # referenced through the late-bound ${{ SRC_DIR }} variable.
+  - path: ./lib
+    target_directory: lib
+    patches:
+      - ${{ SRC_DIR }}/fix.patch
+
+build:
+  script:
+    - if: unix
+      then:
+        - grep "hello patched" lib/hello.txt
+    - if: win
+      then:
+        - findstr /C:"hello patched" lib\hello.txt
+
+about:
+  summary: Applies a patch shipped by another source via SRC_DIR

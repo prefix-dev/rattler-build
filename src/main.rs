@@ -15,6 +15,7 @@ use std::{
 
 use clap::{CommandFactory, Parser};
 use miette::IntoDiagnostic;
+use rattler_build::config::{Config, load_default_config};
 use rattler_build::{
     build_recipes, bump_recipe,
     console_utils::init_logging,
@@ -26,7 +27,6 @@ use rattler_build::{
     publish_packages, rebuild, run_test, show_package_info,
     tool_configuration::APP_USER_AGENT,
 };
-use rattler_config::config::ConfigBase;
 use rattler_upload::upload_from_args;
 use tempfile::{TempDir, tempdir};
 
@@ -111,6 +111,19 @@ fn run_migrate_recipe(opts: MigrateRecipeOpts) -> miette::Result<()> {
 }
 
 fn main() -> miette::Result<()> {
+    let in_ci = matches!(std::env::var("CI").as_deref(), Ok("1" | "true"));
+    let no_wrap = matches!(
+        std::env::var("RATTLER_BUILD_NO_WRAP").as_deref(),
+        Ok("1" | "true")
+    );
+    miette::set_hook(Box::new(move |_| {
+        Box::new(
+            miette::MietteHandlerOpts::new()
+                .wrap_lines(!in_ci && !no_wrap)
+                .build(),
+        )
+    }))?;
+
     // Stack size varies significantly across platforms:
     // - Windows: only 1MB by default
     // - macOS/Linux: ~8MB by default
@@ -141,6 +154,48 @@ fn main() -> miette::Result<()> {
         .map_err(|_| miette::miette!("Thread panicked"))?
 }
 
+/// Load the configuration according to the command-line options and print a
+/// startup line with the version and the configuration files that were used.
+///
+/// Only subcommands that consume the configuration call this, so commands
+/// like `completion` produce no output besides their actual result.
+fn load_config(no_config: bool, config_file: Option<PathBuf>) -> miette::Result<Option<Config>> {
+    let config = if no_config {
+        // `--no-config` disables all loading and discovery: only built-in
+        // defaults and command-line arguments apply (the behavior before
+        // default config discovery was added).
+        None
+    } else if let Some(config_path) = config_file {
+        // An explicitly passed configuration file disables the automatic
+        // discovery and is used as-is.
+        Some(Config::load_from_files(&[config_path]).into_diagnostic()?)
+    } else {
+        // Otherwise, load and merge the configuration from the default
+        // locations (system-wide and global pixi configuration as well as
+        // rattler-build's own configuration files).
+        load_default_config().into_diagnostic()?
+    };
+
+    // Print a startup line so users can always see which version is running
+    // and exactly which configuration files were loaded (if any), making
+    // config resolution easy to trace. Shown at the default log level.
+    tracing::info!("rattler-build {}", env!("CARGO_PKG_VERSION"));
+    match config.as_ref() {
+        Some(config) if !config.loaded_from.is_empty() => tracing::info!(
+            "Loaded configuration from: {}",
+            config
+                .loaded_from
+                .iter()
+                .map(|p| p.display().to_string())
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
+        _ => tracing::info!("No configuration file loaded"),
+    }
+
+    Ok(config)
+}
+
 async fn async_main() -> miette::Result<()> {
     let app = App::parse();
     let log_handler = init_logging(
@@ -151,12 +206,6 @@ async fn async_main() -> miette::Result<()> {
         None::<fn() -> std::io::Stderr>,
     )
     .into_diagnostic()?;
-
-    let config = if let Some(config_path) = app.config_file {
-        Some(ConfigBase::<()>::load_from_files(&[config_path]).into_diagnostic()?)
-    } else {
-        None
-    };
 
     match app.subcommand {
         Some(SubCommands::Completion(ShellCompletion { shell })) => {
@@ -177,6 +226,7 @@ async fn async_main() -> miette::Result<()> {
             Ok(())
         }
         Some(SubCommands::Build(build_only)) => {
+            let config = load_config(app.no_config, app.config_file)?;
             let recipes = build_only.build.recipes.clone();
             let recipe_dir = build_only.build.recipe_dir.clone();
             let mut build_data = BuildData::from_opts_and_config(build_only.build, config)?;
@@ -198,11 +248,13 @@ async fn async_main() -> miette::Result<()> {
         }
 
         Some(SubCommands::Publish(publish_args)) => {
+            let config = load_config(app.no_config, app.config_file)?;
             let publish_data = PublishData::from_opts_and_config(publish_args, config)?;
             publish_packages(publish_data, &Some(log_handler)).await
         }
 
         Some(SubCommands::Test(test_args)) => {
+            let config = load_config(app.no_config, app.config_file)?;
             run_test(
                 TestData::from_opts_and_config(test_args, config),
                 Some(log_handler),
@@ -210,6 +262,7 @@ async fn async_main() -> miette::Result<()> {
             .await
         }
         Some(SubCommands::Rebuild(rebuild_args)) => {
+            let config = load_config(app.no_config, app.config_file)?;
             rebuild(
                 RebuildData::from_opts_and_config(rebuild_args, config),
                 log_handler,
@@ -224,14 +277,17 @@ async fn async_main() -> miette::Result<()> {
         Some(SubCommands::Auth(args)) => rattler::cli::auth::execute(args).await.into_diagnostic(),
         Some(SubCommands::Debug(args)) => match args.subcommand {
             DebugSubCommands::Setup(opts) => {
+                let config = load_config(app.no_config, app.config_file)?;
                 let debug_data = DebugData::from_setup_opts_and_config(opts, config);
                 debug_recipe(debug_data, &Some(log_handler)).await
             }
             DebugSubCommands::Shell(opts) => debug::debug_shell(opts).into_diagnostic(),
             DebugSubCommands::HostAdd(opts) => {
+                let config = load_config(app.no_config, app.config_file)?;
                 debug::debug_env_add("host", opts, config, &Some(log_handler)).await
             }
             DebugSubCommands::BuildAdd(opts) => {
+                let config = load_config(app.no_config, app.config_file)?;
                 debug::debug_env_add("build", opts, config, &Some(log_handler)).await
             }
             DebugSubCommands::Workdir(opts) => debug::debug_workdir(opts).into_diagnostic(),

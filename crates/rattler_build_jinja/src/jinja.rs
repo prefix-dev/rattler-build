@@ -180,6 +180,14 @@ impl Jinja {
             Value::from(config.host_platform.is_unix()),
         );
 
+        // Shared library extension for the target platform (e.g. `.so`, `.dylib`,
+        // `.dll`). Mirrors the `SHLIB_EXT` build-script environment variable so it
+        // can be used in templated fields such as `build.files`.
+        context.insert(
+            "SHLIB_EXT".to_string(),
+            Value::from(rattler_build_types::shlib_ext(&config.target_platform)),
+        );
+
         // Derive the host platform's family name (e.g., "linux" from "linux-64",
         // "emscripten" from "emscripten-wasm32")
         let host_family = config.host_platform.only_platform();
@@ -213,6 +221,16 @@ impl Jinja {
                 context.insert(family.to_string(), Value::from(Some(family) == host_family));
             }
         }
+
+        // `only_platform()` reports "iossimulator" for the simulator targets, so the
+        // derived `ios` family selector above would only match real devices. A recipe
+        // saying `if: ios` almost always means "building for iOS at all", so widen it
+        // to cover the simulator too (`iossimulator` stays available for the narrow
+        // case). This mirrors how `osx` covers every macOS architecture.
+        context.insert(
+            "ios".to_string(),
+            Value::from(config.host_platform.is_ios()),
+        );
 
         // Add variant variables to context
         for (key, value) in &config.variant {
@@ -282,8 +300,19 @@ impl Jinja {
         let tracking_context =
             TrackingContext::new(self.context.clone(), self.accessed_variables.clone());
 
-        let expr = self.env.compile_expression(str)?;
-        expr.eval(Value::from_object(tracking_context))
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let expr = self.env.compile_expression(str)?;
+            expr.eval(Value::from_object(tracking_context))
+        }))
+        .unwrap_or_else(|payload| {
+            Err(minijinja::Error::new(
+                minijinja::ErrorKind::SyntaxError,
+                format!(
+                    "failed to evaluate Jinja expression without panicking: {}",
+                    panic_payload_message(payload.as_ref())
+                ),
+            ))
+        })
     }
 
     /// Get the set of variables that were accessed during rendering
@@ -318,6 +347,16 @@ impl Jinja {
         if let Ok(mut accessed) = self.accessed_variables.lock() {
             accessed.clear();
         }
+    }
+}
+
+fn panic_payload_message(payload: &(dyn std::any::Any + Send)) -> String {
+    if let Some(message) = payload.downcast_ref::<&'static str>() {
+        (*message).to_string()
+    } else if let Some(message) = payload.downcast_ref::<String>() {
+        message.clone()
+    } else {
+        "unknown panic".to_string()
     }
 }
 
@@ -417,17 +456,25 @@ fn default_compiler(platform: Platform, language: &str) -> Option<Variable> {
     Some(
         match language {
             // Platform agnostic compilers
-            "fortran" => "gfortran",
+            "fortran" => {
+                if platform.is_windows() {
+                    "flang"
+                } else {
+                    "gfortran"
+                }
+            }
             lang if !["c", "cxx"].contains(&lang) => lang,
             // Platform specific compilers
             _ => {
                 if platform.is_windows() {
                     match language {
-                        "c" => "vs2017",
-                        "cxx" => "vs2017",
+                        "c" => "vs2022",
+                        "cxx" => "vs2022",
                         _ => unreachable!(),
                     }
-                } else if platform.is_osx() {
+                } else if platform.is_osx() || platform.is_ios() || platform.is_android() {
+                    // Apple platforms use Apple clang; the Android NDK also ships
+                    // clang as its only supported toolchain.
                     match language {
                         "c" => "clang",
                         "cxx" => "clangxx",
@@ -892,6 +939,12 @@ fn set_jinja(
     });
     env.add_function("is_unix", |platform: &str| {
         Ok(parse_platform(platform)?.is_unix())
+    });
+    env.add_function("is_ios", |platform: &str| {
+        Ok(parse_platform(platform)?.is_ios())
+    });
+    env.add_function("is_android", |platform: &str| {
+        Ok(parse_platform(platform)?.is_android())
     });
 
     register_io_functions(&mut env, experimental, recipe_path);
@@ -1366,7 +1419,22 @@ mod tests {
     }
 
     #[test]
+    fn eval_malformed_expression_errors_without_panic() {
+        let jinja = Jinja::new(JinjaConfig::default());
 
+        let err = jinja
+            .eval("target_platform }}")
+            .expect_err("malformed expression should return an error");
+
+        assert!(
+            err.to_string()
+                .contains("failed to evaluate Jinja expression")
+                || err.to_string().contains("unexpected"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
     fn eval() {
         let options = JinjaConfig {
             target_platform: Platform::Linux64,
@@ -1498,6 +1566,39 @@ mod tests {
         assert!(!jinja.eval("linux").expect("host is not linux").is_true());
         assert!(!jinja.eval("osx").expect("host is not osx").is_true());
         assert!(jinja.eval("x86_64").expect("host is x86_64").is_true());
+    }
+
+    #[test]
+    fn eval_shlib_ext() {
+        // `SHLIB_EXT` should be available in the Jinja context and resolve to the
+        // target platform's shared library extension (see issue #2532).
+        let cases = [
+            (Platform::Linux64, ".so"),
+            (Platform::LinuxAarch64, ".so"),
+            (Platform::OsxArm64, ".dylib"),
+            (Platform::Osx64, ".dylib"),
+            (Platform::Win64, ".dll"),
+            // iOS is Mach-O, Android is ELF
+            (Platform::IosArm64, ".dylib"),
+            (Platform::IosSimulatorArm64, ".dylib"),
+            (Platform::AndroidAarch64, ".so"),
+            (Platform::AndroidArmV7a, ".so"),
+        ];
+        for (target_platform, expected) in cases {
+            let jinja = Jinja::new(JinjaConfig {
+                target_platform,
+                host_platform: target_platform,
+                build_platform: target_platform,
+                ..Default::default()
+            });
+            assert_eq!(
+                jinja
+                    .render_str("foo${{ SHLIB_EXT }}")
+                    .expect("SHLIB_EXT should be defined"),
+                format!("foo{expected}"),
+                "unexpected SHLIB_EXT for {target_platform}"
+            );
+        }
     }
 
     #[test]
@@ -1830,6 +1931,66 @@ mod tests {
             jinja.eval("(var | split('.'))[2]").unwrap().to_string(),
             "3"
         );
+
+        // Regression test for https://github.com/prefix-dev/rattler-build/issues/2582:
+        // negative indexing and slicing must work on the result of `split`.
+        assert_eq!(
+            jinja.eval("(var | split('.'))[-1]").unwrap().to_string(),
+            "3"
+        );
+        assert_eq!(
+            jinja.eval("(var | split('.'))[-2]").unwrap().to_string(),
+            "2"
+        );
+        assert_eq!(
+            jinja.eval("(var | split('.'))[-1:]").unwrap().to_string(),
+            "[\"3\"]"
+        );
+        assert_eq!(
+            jinja.eval("(var | split('.'))[1:]").unwrap().to_string(),
+            "[\"2\", \"3\"]"
+        );
+        assert_eq!(
+            jinja
+                .eval("(var | split('.'))[-1] | int")
+                .unwrap()
+                .to_string(),
+            "3"
+        );
+    }
+
+    /// The other sequence-producing filters we register already return
+    /// indexable sequences in the current minijinja version. This test guards
+    /// against a future minijinja update turning any of them into a lazy
+    /// iterable (which would break negative indexing / slicing, see
+    /// https://github.com/prefix-dev/rattler-build/issues/2582). If it does,
+    /// wrap the affected filter with `materialize_iterable` like `split`.
+    #[test]
+    fn test_sequence_filters_support_negative_indexing() {
+        let jinja = Jinja::new(JinjaConfig::default());
+
+        // `reverse` on a sequence
+        assert_eq!(
+            jinja.eval("([1, 2, 3] | reverse)[-1]").unwrap().to_string(),
+            "1"
+        );
+        // `reverse` on a string still yields a reversed string
+        assert_eq!(jinja.eval("'abc' | reverse").unwrap().to_string(), "cba");
+        // `unique`
+        assert_eq!(
+            jinja
+                .eval("([1, 2, 2, 3] | unique)[-1]")
+                .unwrap()
+                .to_string(),
+            "3"
+        );
+        // `sort`
+        assert_eq!(
+            jinja.eval("([3, 1, 2] | sort)[-1]").unwrap().to_string(),
+            "3"
+        );
+        // `list`
+        assert_eq!(jinja.eval("('abc' | list)[-1]").unwrap().to_string(), "c");
     }
 
     #[test]
@@ -2135,16 +2296,117 @@ mod tests {
 
         let platform = Platform::Win64;
         assert_eq!(
-            "vs2017",
+            "vs2022",
             default_compiler(platform, "cxx").unwrap().to_string()
         );
         assert_eq!(
-            "vs2017",
+            "vs2022",
             default_compiler(platform, "c").unwrap().to_string()
         );
         assert_eq!(
             "cuda",
             default_compiler(platform, "cuda").unwrap().to_string()
         );
+        assert_eq!(
+            "flang",
+            default_compiler(platform, "fortran").unwrap().to_string()
+        );
+    }
+
+    #[test]
+    fn test_default_compiler_apple_and_android_use_clang() {
+        // Apple platforms and the Android NDK all use clang.
+        for platform in [
+            Platform::OsxArm64,
+            Platform::IosArm64,
+            Platform::IosSimulatorArm64,
+            Platform::IosSimulator64,
+            Platform::AndroidAarch64,
+            Platform::AndroidArmV7a,
+            Platform::Android64,
+            Platform::Android32,
+        ] {
+            assert_eq!(
+                "clang",
+                default_compiler(platform, "c").unwrap().to_string(),
+                "unexpected c compiler for {platform}"
+            );
+            assert_eq!(
+                "clangxx",
+                default_compiler(platform, "cxx").unwrap().to_string(),
+                "unexpected cxx compiler for {platform}"
+            );
+        }
+    }
+
+    #[test]
+    fn eval_ios_and_android_selectors() {
+        // The `ios` selector covers devices *and* simulators, while
+        // `iossimulator` stays narrow.
+        let jinja = Jinja::new(JinjaConfig {
+            target_platform: Platform::IosSimulatorArm64,
+            host_platform: Platform::IosSimulatorArm64,
+            build_platform: Platform::OsxArm64,
+            ..Default::default()
+        });
+        assert!(jinja.eval("ios").expect("host is ios").is_true());
+        assert!(
+            jinja
+                .eval("iossimulator")
+                .expect("host is iossimulator")
+                .is_true()
+        );
+        assert!(jinja.eval("unix").expect("ios is unix").is_true());
+        assert!(!jinja.eval("osx").expect("ios is not osx").is_true());
+
+        let jinja = Jinja::new(JinjaConfig {
+            target_platform: Platform::IosArm64,
+            host_platform: Platform::IosArm64,
+            build_platform: Platform::OsxArm64,
+            ..Default::default()
+        });
+        assert!(jinja.eval("ios").expect("host is ios").is_true());
+        assert!(
+            !jinja
+                .eval("iossimulator")
+                .expect("device is not a simulator")
+                .is_true()
+        );
+
+        let jinja = Jinja::new(JinjaConfig {
+            target_platform: Platform::AndroidAarch64,
+            host_platform: Platform::AndroidAarch64,
+            build_platform: Platform::Linux64,
+            ..Default::default()
+        });
+        assert!(jinja.eval("android").expect("host is android").is_true());
+        assert!(jinja.eval("unix").expect("android is unix").is_true());
+        assert!(!jinja.eval("linux").expect("android is not linux").is_true());
+        assert!(jinja.eval("aarch64").expect("host is aarch64").is_true());
+    }
+
+    #[test]
+    fn eval_is_ios_and_is_android_functions() {
+        let jinja = Jinja::new(JinjaConfig::default());
+        assert!(jinja.eval("is_ios('ios-arm64')").unwrap().is_true());
+        assert!(
+            jinja
+                .eval("is_ios('iossimulator-arm64')")
+                .unwrap()
+                .is_true()
+        );
+        assert!(!jinja.eval("is_ios('osx-arm64')").unwrap().is_true());
+        assert!(
+            jinja
+                .eval("is_android('android-aarch64')")
+                .unwrap()
+                .is_true()
+        );
+        assert!(!jinja.eval("is_android('linux-64')").unwrap().is_true());
+        // iOS/Android are unix but not osx/linux
+        assert!(jinja.eval("is_unix('ios-arm64')").unwrap().is_true());
+        assert!(jinja.eval("is_unix('android-64')").unwrap().is_true());
+        assert!(!jinja.eval("is_linux('android-64')").unwrap().is_true());
+        assert!(!jinja.eval("is_osx('ios-arm64')").unwrap().is_true());
     }
 }

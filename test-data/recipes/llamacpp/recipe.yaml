@@ -12,7 +12,7 @@ source:
 
 build:
   number: 0
-  script: cmake -B build
+  script: cmake --version
 
 requirements:
   build:

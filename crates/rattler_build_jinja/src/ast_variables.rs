@@ -20,7 +20,7 @@ pub struct JinjaTemplate {
 impl JinjaTemplate {
     /// Create a new JinjaTemplate, validating that it parses correctly
     pub fn new(source: String) -> Result<Self, String> {
-        let variables = extract_variables_from_template(&source)
+        let variables = catch_minijinja_panic(|| extract_variables_from_template(&source))
             .map_err(|e| format!("Failed to parse Jinja template: {}", e))?;
         Ok(Self { source, variables })
     }
@@ -78,8 +78,9 @@ pub struct JinjaExpression {
 impl JinjaExpression {
     /// Create a new JinjaExpression, validating that it parses correctly
     pub fn new(source: String) -> Result<Self, String> {
-        let variables = extract_variables_from_expression_checked(&source)
-            .map_err(|e| format!("Failed to parse Jinja expression: {}", e))?;
+        let variables =
+            catch_minijinja_panic(|| extract_variables_from_expression_checked(&source))
+                .map_err(|e| format!("Failed to parse Jinja expression: {}", e))?;
         Ok(Self { source, variables })
     }
 
@@ -117,6 +118,30 @@ impl<'de> Deserialize<'de> for JinjaExpression {
     {
         let source = String::deserialize(deserializer)?;
         JinjaExpression::new(source).map_err(serde::de::Error::custom)
+    }
+}
+
+fn catch_minijinja_panic<T>(
+    f: impl FnOnce() -> Result<T, minijinja::Error>,
+) -> Result<T, minijinja::Error> {
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(f)).unwrap_or_else(|payload| {
+        Err(minijinja::Error::new(
+            minijinja::ErrorKind::SyntaxError,
+            format!(
+                "failed to parse Jinja without panicking: {}",
+                panic_payload_message(payload.as_ref())
+            ),
+        ))
+    })
+}
+
+fn panic_payload_message(payload: &(dyn std::any::Any + Send)) -> String {
+    if let Some(message) = payload.downcast_ref::<&'static str>() {
+        (*message).to_string()
+    } else if let Some(message) = payload.downcast_ref::<String>() {
+        message.clone()
+    } else {
+        "unknown panic".to_string()
     }
 }
 
@@ -284,20 +309,17 @@ fn collect_variables_from_call(
                 // pin_subpackage(name) expands to the name variable (unless it's a string literal)
                 // pin_subpackage("literal") doesn't expand
                 for arg in &call.args {
-                    if let minijinja::machinery::ast::CallArg::Pos(expr) = arg {
-                        // Don't add string literals as variables
-                        if !matches!(expr, Expr::Const(_)) {
-                            collect_variables_from_expr(expr, variables);
-                        }
+                    let expr = call_arg_expr(arg);
+                    if !matches!(expr, Expr::Const(_)) {
+                        collect_variables_from_expr(expr, variables);
                     }
                 }
             }
             "pin_compatible" => {
                 // pin_compatible(name) expands to the name variable (unless it's a string literal)
                 for arg in &call.args {
-                    if let minijinja::machinery::ast::CallArg::Pos(expr) = arg
-                        && !matches!(expr, Expr::Const(_))
-                    {
+                    let expr = call_arg_expr(arg);
+                    if !matches!(expr, Expr::Const(_)) {
                         collect_variables_from_expr(expr, variables);
                     }
                 }
@@ -305,10 +327,7 @@ fn collect_variables_from_call(
             "match" => {
                 // match(var, spec) - first arg is a variable, second is a string
                 for arg in &call.args {
-                    if let minijinja::machinery::ast::CallArg::Pos(expr) = arg {
-                        // Both arguments could be variables
-                        collect_variables_from_expr(expr, variables);
-                    }
+                    collect_variables_from_expr(call_arg_expr(arg), variables);
                 }
             }
             "cdt" => {
@@ -345,22 +364,28 @@ fn extract_first_string_arg(args: &[minijinja::machinery::ast::CallArg]) -> Opti
     None
 }
 
+/// Return the inner expression of any CallArg variant.
+///
+/// Exhaustive on purpose: if minijinja adds a new CallArg variant, this fails
+/// to compile rather than silently dropping variables passed via that form.
+fn call_arg_expr<'a, 'b>(
+    arg: &'a minijinja::machinery::ast::CallArg<'b>,
+) -> &'a minijinja::machinery::ast::Expr<'b> {
+    use minijinja::machinery::ast::CallArg;
+    match arg {
+        CallArg::Pos(expr)
+        | CallArg::Kwarg(_, expr)
+        | CallArg::PosSplat(expr)
+        | CallArg::KwargSplat(expr) => expr,
+    }
+}
+
 /// Collect variables from a CallArg
 fn collect_variables_from_call_arg(
     arg: &minijinja::machinery::ast::CallArg,
     variables: &mut BTreeSet<String>,
 ) {
-    use minijinja::machinery::ast::CallArg;
-
-    // Match based on the CallArg variants available
-    match arg {
-        CallArg::Pos(expr) => {
-            collect_variables_from_expr(expr, variables);
-        }
-        _ => {
-            // Handle other CallArg variants if they exist
-        }
-    }
+    collect_variables_from_expr(call_arg_expr(arg), variables);
 }
 
 /// Recursively collect variable names from expressions
@@ -383,6 +408,12 @@ fn collect_variables_from_expr(
         Expr::BinOp(binop) => {
             collect_variables_from_expr(&binop.left, variables);
             collect_variables_from_expr(&binop.right, variables);
+        }
+        Expr::Compare(compare) => {
+            collect_variables_from_expr(&compare.expr, variables);
+            for op in &compare.ops {
+                collect_variables_from_expr(&op.expr, variables);
+            }
         }
         Expr::IfExpr(if_expr) => {
             collect_variables_from_expr(&if_expr.test_expr, variables);
@@ -481,6 +512,14 @@ mod tests {
     }
 
     #[test]
+    fn test_expression_malformed_errors_without_panic() {
+        let err = JinjaExpression::new("target_platform }}".to_string())
+            .expect_err("malformed expression should return an error");
+
+        assert!(err.contains("Failed to parse Jinja expression"), "{err}");
+    }
+
+    #[test]
     fn test_expression_complex() {
         let expr =
             JinjaExpression::new("target_platform == 'linux' and version >= '3.0'".to_string())
@@ -545,5 +584,33 @@ mod tests {
         let mut vars = template.used_variables().to_vec();
         vars.sort();
         assert_eq!(vars, vec!["a", "b", "c"]);
+    }
+
+    #[test]
+    fn test_template_with_chained_comparison() {
+        // Chained comparison `a < b < c` parses to a single Expr::Compare node
+        // in minijinja 2.20+ (previously two BinOps). Regression guard for the
+        // Expr enum gaining new variants.
+        let template = JinjaTemplate::new("${{ lo <= n < hi }}".to_string()).unwrap();
+        let mut vars = template.used_variables().to_vec();
+        vars.sort();
+        assert_eq!(vars, vec!["hi", "lo", "n"]);
+    }
+
+    #[test]
+    fn test_pin_subpackage_kwarg_form() {
+        let template =
+            JinjaTemplate::new("${{ pin_subpackage(name=somevar) }}".to_string()).unwrap();
+        assert_eq!(template.used_variables(), &["somevar"]);
+    }
+
+    #[test]
+    fn test_generic_call_with_kwarg_and_splat() {
+        // Kwarg and splat args must contribute their inner variables.
+        let template =
+            JinjaTemplate::new("${{ my_fn(foo, bar=baz, *args, **kwargs) }}".to_string()).unwrap();
+        let mut vars = template.used_variables().to_vec();
+        vars.sort();
+        assert_eq!(vars, vec!["args", "baz", "foo", "kwargs", "my_fn"]);
     }
 }

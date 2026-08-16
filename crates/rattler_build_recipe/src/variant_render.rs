@@ -18,7 +18,7 @@ use miette::Diagnostic;
 use petgraph::graph::{DiGraph, NodeIndex};
 use rattler_build_variant_config::VariantExpandError;
 use rattler_build_yaml_parser::ParseError;
-use rattler_conda_types::NoArchType;
+use rattler_conda_types::{NoArchType, RepodataRevision};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -93,8 +93,8 @@ pub struct RenderConfig {
     pub extra_context: IndexMap<String, Variable>,
     /// Whether experimental features are enabled
     pub experimental: bool,
-    /// Whether V3 recipe fields and MatchSpec syntax are enabled
-    pub v3: bool,
+    /// Repodata revision controlling which recipe fields and MatchSpec syntax are accepted.
+    pub repodata_revision: RepodataRevision,
     /// Path to the recipe file (for relative path resolution in Jinja functions)
     pub recipe_path: Option<PathBuf>,
     /// Target platform for the build
@@ -121,7 +121,7 @@ impl Default for RenderConfig {
         Self {
             extra_context: IndexMap::new(),
             experimental: false,
-            v3: false,
+            repodata_revision: RepodataRevision::Legacy,
             recipe_path: None,
             target_platform: rattler_conda_types::Platform::current(),
             build_platform: rattler_conda_types::Platform::current(),
@@ -151,9 +151,9 @@ impl RenderConfig {
         self
     }
 
-    /// Enable V3 recipe fields and MatchSpec syntax
-    pub fn with_v3(mut self, v3: bool) -> Self {
-        self.v3 = v3;
+    /// Set the repodata revision controlling which recipe fields and MatchSpec syntax are accepted.
+    pub fn with_repodata_revision(mut self, repodata_revision: RepodataRevision) -> Self {
+        self.repodata_revision = repodata_revision;
         self
     }
 
@@ -218,6 +218,9 @@ pub struct RenderedVariant {
     /// dependencies to their correct variants.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub full_combination: BTreeMap<NormalizedKey, Variable>,
+    /// Whether experimental features were enabled when this variant was rendered.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub experimental: bool,
     /// The rendered stage1 recipe
     pub recipe: Stage1Recipe,
     /// Pin subpackage dependencies that need to be tracked for exact pinning
@@ -913,12 +916,14 @@ fn build_evaluation_context(
     // NOTE: Do NOT call with_context() here - that will be done by Stage0Recipe::evaluate()
     // Calling it here would cause double-evaluation of context templates, leading to bugs
     // where e.g., `mpi: ${{ mpi ~ "foobar" }}` would evaluate to "blafoobarfoobar" instead of "blafoobar"
-    Ok(EvaluationContext::with_variables_config_os_env_keys_and_v3(
-        context_map,
-        jinja_config,
-        config.os_env_var_keys.clone(),
-        config.v3,
-    ))
+    Ok(
+        EvaluationContext::with_variables_config_os_env_keys_and_repodata_revision(
+            context_map,
+            jinja_config,
+            config.os_env_var_keys.clone(),
+            config.repodata_revision,
+        ),
+    )
 }
 
 /// Helper function to evaluate a recipe (handles both single and multi-output)
@@ -943,7 +948,7 @@ fn render_with_empty_combinations(
     let jinja_config = create_jinja_config(config, &empty_variant);
     let context =
         EvaluationContext::with_variables_and_config(config.extra_context.clone(), jinja_config)
-            .with_v3(config.v3);
+            .with_repodata_revision(config.repodata_revision);
 
     // Evaluate the recipe
     let outputs = evaluate_recipe(stage0_recipe, &context)?;
@@ -972,6 +977,7 @@ fn render_with_empty_combinations(
             RenderedVariant {
                 variant,
                 full_combination: BTreeMap::new(), // No combination when rendering with empty combinations
+                experimental: config.experimental,
                 recipe,
                 pin_subpackages: BTreeMap::new(),
                 hash_info: None,
@@ -1079,14 +1085,13 @@ fn finalize_build_string_single(
     Ok(())
 }
 
-/// Helper function to extract all dependency package names from a recipe.
+/// Extract the package names a recipe must be built after.
 ///
-/// This collects:
-/// - All named dependencies from build/host/run requirements
-/// - All pin_subpackage references from run_exports (these reference other outputs
-///   and create build-order dependencies even though they're not direct build deps)
+/// Collects build/host deps, pin_subpackage refs from run/run_exports, and
+/// *exact* pin_subpackage refs from run_constraints (non-exact constraints only
+/// pin a version, so they impose no build-order edge; see issue #2531).
 ///
-/// Note: May contain duplicates, which is acceptable for dependency graph construction.
+/// May contain duplicates, which is fine for graph construction.
 fn extract_dependency_names(recipe: &Stage1Recipe) -> Vec<rattler_conda_types::PackageName> {
     let requirements = recipe.requirements();
 
@@ -1095,29 +1100,36 @@ fn extract_dependency_names(recipe: &Stage1Recipe) -> Vec<rattler_conda_types::P
         .build_host()
         .filter_map(|dep| dep.name().cloned());
 
-    // Collect pin_subpackage references from run/run_constraints
-    // (we need those subpackages built first to resolve the pin,
-    // but plain run deps are not needed at build time and may contain cycles)
+    // pin_subpackage refs in run/run_exports must be built first to resolve the
+    // pin. (Plain run deps aren't needed at build time and may form cycles.)
     let run_pin_subpackages = requirements
         .run
         .iter()
-        .chain(requirements.run_constraints.iter())
+        .chain(requirements.run_exports.iter())
         .filter_map(|dep| match dep {
             Dependency::PinSubpackage(pin) => Some(pin.pin_subpackage.name.clone()),
             _ => None,
         });
 
-    // Collect pin_subpackage names from run_exports (these reference other outputs)
-    let run_export_pins = requirements
-        .run_exports_and_constraints()
-        .filter_map(|dep| match dep {
-            Dependency::PinSubpackage(pin) => Some(pin.pin_subpackage.name.clone()),
-            _ => None,
-        });
+    // Only *exact* run_constraints pins create an edge: they need the
+    // constrained package's build string. Non-exact constraints only pin a
+    // version (known from the recipe), so edging them produces false cycles
+    // (e.g. openblas runs on libopenblas, libopenblas run-constrains openblas).
+    // See https://github.com/prefix-dev/rattler-build/issues/2531.
+    let run_constraint_pin_subpackages =
+        requirements
+            .run_constraints
+            .iter()
+            .filter_map(|dep| match dep {
+                Dependency::PinSubpackage(pin) if pin.pin_subpackage.args.exact => {
+                    Some(pin.pin_subpackage.name.clone())
+                }
+                _ => None,
+            });
 
     build_host
         .chain(run_pin_subpackages)
-        .chain(run_export_pins)
+        .chain(run_constraint_pin_subpackages)
         .collect()
 }
 
@@ -1220,7 +1232,9 @@ pub fn render_recipe_with_variants(
 
     let stage0_recipe = stage0::parse_recipe_or_multi_from_source_with_config(
         &yaml_content,
-        stage0::ParseConfig { v3: config.v3 },
+        stage0::ParseConfig {
+            repodata_revision: config.repodata_revision,
+        },
     )?;
 
     // Load variant configuration
@@ -1405,6 +1419,7 @@ fn render_with_variants(
             results.push(RenderedVariant {
                 variant,
                 full_combination: combination.clone(), // Track the full combination for pin matching
+                experimental: config.experimental,
                 recipe,
                 pin_subpackages: BTreeMap::new(), // Will be populated after first build string resolution
                 hash_info: None,
@@ -1489,6 +1504,54 @@ python:
     }
 
     #[test]
+    fn test_build_steps_if_participates_in_variant_matrix() {
+        let recipe_yaml = r#"
+package:
+  name: test-pkg
+  version: "1.0.0"
+
+build:
+  steps:
+    - if: feature_enabled
+      run: echo enabled
+"#;
+
+        let variant_yaml = r#"
+feature_enabled:
+  - true
+  - false
+"#;
+
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config = VariantConfig::from_yaml_str(variant_yaml).unwrap();
+
+        let rendered = render_recipe_with_variant_config(
+            &stage0_recipe,
+            &variant_config,
+            RenderConfig::new().with_experimental(true),
+        )
+        .unwrap();
+
+        assert_eq!(rendered.len(), 2);
+        let variants = rendered
+            .iter()
+            .map(|r| {
+                r.variant
+                    .get(&"feature_enabled".into())
+                    .unwrap()
+                    .to_string()
+            })
+            .collect::<Vec<_>>();
+        assert!(variants.contains(&"true".to_string()), "{variants:?}");
+        assert!(variants.contains(&"false".to_string()), "{variants:?}");
+        assert!(
+            rendered
+                .iter()
+                .all(|r| r.recipe.build.plan.steps().is_some())
+        );
+    }
+
+    #[test]
     fn test_render_with_free_specs() {
         let recipe_yaml = r#"
 package:
@@ -1531,7 +1594,9 @@ requirements:
 
         let stage0_recipe = stage0::parse_recipe_or_multi_from_source_with_config(
             recipe_yaml,
-            stage0::ParseConfig { v3: true },
+            stage0::ParseConfig {
+                repodata_revision: RepodataRevision::V3,
+            },
         )
         .unwrap();
         let variant_config = VariantConfig::default();
@@ -1544,7 +1609,7 @@ requirements:
         let rendered = render_recipe_with_variant_config(
             &stage0_recipe,
             &variant_config,
-            RenderConfig::new().with_v3(true),
+            RenderConfig::new().with_repodata_revision(RepodataRevision::V3),
         )
         .unwrap();
         assert_eq!(rendered.len(), 1);
@@ -1582,7 +1647,7 @@ requirements:
         let rendered = render_recipe_with_variant_config(
             &stage0_recipe,
             &variant_config,
-            RenderConfig::new().with_v3(true),
+            RenderConfig::new().with_repodata_revision(RepodataRevision::V3),
         )
         .unwrap();
         assert_eq!(rendered.len(), 1);
@@ -1684,6 +1749,67 @@ outputs:
         assert!(
             build_string.ends_with("_1"),
             "cache-inherited output should resolve its build string with the inherited build number, got {build_string}"
+        );
+    }
+
+    /// Regression test for https://github.com/prefix-dev/rattler-build/issues/2497
+    ///
+    /// A package output that has its own `build` section and inherits from a
+    /// staging cache must still inherit top-level build settings (build number,
+    /// `files`, ...) that it does not override itself. Previously the
+    /// cache-inheritance merge only copied a hand-maintained subset of build
+    /// fields, so top-level settings such as `build.files` were silently lost.
+    #[test]
+    fn test_cache_inherited_output_inherits_top_level_build_settings() {
+        let recipe_yaml = r#"
+recipe:
+  name: libgdal-split
+  version: 3.21.3
+
+build:
+  number: 1
+  files:
+    - "*.txt"
+
+outputs:
+  - staging:
+      name: core-build
+    requirements:
+      build:
+    build:
+      script: build
+
+  - package:
+      name: libgdal-core
+    inherit: core-build
+    requirements:
+      build:
+    build:
+      script: build
+"#;
+
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config = VariantConfig::from_yaml_str("{}").unwrap();
+
+        let rendered =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, RenderConfig::new())
+                .unwrap();
+
+        assert_eq!(rendered.len(), 1);
+        let output = &rendered[0].recipe;
+        assert_eq!(output.package.name.as_normalized(), "libgdal-core");
+        // The top-level build number must be inherited.
+        assert_eq!(output.build.number, Some(1));
+        // The build string must end with the inherited build number.
+        let build_string = output.build.string.as_resolved().unwrap();
+        assert!(
+            build_string.ends_with("_1"),
+            "cache-inherited output should resolve its build string with the inherited build number, got {build_string}"
+        );
+        // Other top-level build settings (e.g. `files`) must be inherited too.
+        assert!(
+            !output.build.files.is_empty(),
+            "cache-inherited output should inherit the top-level build.files glob"
         );
     }
 
@@ -2114,6 +2240,103 @@ outputs:
 
         // Self-pin should be tracked but not cause ordering issues
         assert_eq!(sorted[0].pin_subpackages.len(), 1);
+    }
+
+    #[test]
+    fn test_non_exact_run_constraint_is_not_a_cycle() {
+        // Regression test for issue #2531: a non-exact run_constraints pin must
+        // not edge the graph, so mutual references aren't a false cycle.
+        let recipe_yaml = r#"
+schema_version: 1
+
+context:
+  version: "0.3.20"
+
+recipe:
+  name: openblas-split
+  version: ${{ version }}
+
+build:
+  number: 0
+
+outputs:
+  - package:
+      name: libopenblas
+    build:
+      noarch: generic
+    requirements:
+      run_constraints:
+        - ${{ pin_subpackage("openblas", upper_bound="x.x.x") }}
+
+  - package:
+      name: openblas
+    build:
+      noarch: generic
+    requirements:
+      run:
+        - ${{ pin_subpackage("libopenblas", exact=true) }}
+"#;
+
+        let variant_yaml = r#"{}"#;
+
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config = VariantConfig::from_yaml_str(variant_yaml).unwrap();
+
+        let rendered =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, RenderConfig::new())
+                .unwrap();
+
+        // No (false) cycle; libopenblas comes first via openblas's exact pin.
+        let sorted = topological_sort_variants(rendered).unwrap();
+        assert_eq!(sorted.len(), 2);
+        assert_eq!(sorted[0].recipe.package.name.as_normalized(), "libopenblas");
+        assert_eq!(sorted[1].recipe.package.name.as_normalized(), "openblas");
+    }
+
+    #[test]
+    fn test_exact_run_constraint_still_orders() {
+        // An exact run_constraints pin still edges the graph: base first.
+        let recipe_yaml = r#"
+schema_version: 1
+
+context:
+  version: "1.0.0"
+
+recipe:
+  name: split
+  version: ${{ version }}
+
+build:
+  number: 0
+
+outputs:
+  - package:
+      name: consumer
+    build:
+      noarch: generic
+    requirements:
+      run_constraints:
+        - ${{ pin_subpackage("base", exact=true) }}
+
+  - package:
+      name: base
+    build:
+      noarch: generic
+"#;
+
+        let variant_yaml = r#"{}"#;
+
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config = VariantConfig::from_yaml_str(variant_yaml).unwrap();
+
+        let rendered =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, RenderConfig::new())
+                .unwrap();
+
+        let sorted = topological_sort_variants(rendered).unwrap();
+        assert_eq!(sorted.len(), 2);
+        assert_eq!(sorted[0].recipe.package.name.as_normalized(), "base");
+        assert_eq!(sorted[1].recipe.package.name.as_normalized(), "consumer");
     }
 
     #[test]

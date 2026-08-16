@@ -7,6 +7,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.11](https://github.com/prefix-dev/rattler-build/compare/rattler_build_recipe-v0.1.10...rattler_build_recipe-v0.1.11) - 2026-07-25
+
+### Other
+
+- update dependencies and Rust toolchain to 1.97.1 ([#2679](https://github.com/prefix-dev/rattler-build/pull/2679))
+
+## [0.1.10](https://github.com/prefix-dev/rattler-build/compare/rattler_build_recipe-v0.1.9...rattler_build_recipe-v0.1.10) - 2026-07-11
+
+### Added
+
+- allow empty sha256 as all-zeros placeholder for recipe scaffolding ([#2610](https://github.com/prefix-dev/rattler-build/pull/2610))
+- support `source.filter` for URL and archive path sources ([#2608](https://github.com/prefix-dev/rattler-build/pull/2608))
+
+### Fixed
+
+- treat empty/null-like `noarch` as absent; hint `default` filter for undefined variant keys ([#2626](https://github.com/prefix-dev/rattler-build/pull/2626))
+- consolidate license_file and license_file_late_bound into single LicenseFiles type ([#2624](https://github.com/prefix-dev/rattler-build/pull/2624))
+- don't treat non-exact run_constraints pins as build-order edges ([#2537](https://github.com/prefix-dev/rattler-build/pull/2537))
+- preserve explicit empty license_file in output packages ([#2600](https://github.com/prefix-dev/rattler-build/pull/2600))
+- report YAML parse error location for malformed Jinja ([#2603](https://github.com/prefix-dev/rattler-build/pull/2603))
+
+### Other
+
+- fix down_prioritize_variant documentation and example value ([#2606](https://github.com/prefix-dev/rattler-build/pull/2606))
+
+## [0.1.9](https://github.com/prefix-dev/rattler-build/compare/rattler_build_recipe-v0.1.8...rattler_build_recipe-v0.1.9) - 2026-06-18
+
+### Added
+
+- support late-bound build directory variables in patches and license files ([#2554](https://github.com/prefix-dev/rattler-build/pull/2554))
+
+### Other
+
+- bump rattler crates to latest versions ([#2528](https://github.com/prefix-dev/rattler-build/pull/2528))
+
+## [0.1.8](https://github.com/prefix-dev/rattler-build/compare/rattler_build_recipe-v0.1.7...rattler_build_recipe-v0.1.8) - 2026-05-27
+
+### Other
+
+- use `RepodataRevision` enum instead of new `v3` boolean ([#2517](https://github.com/prefix-dev/rattler-build/pull/2517))
+
+## [0.1.7](https://github.com/prefix-dev/rattler-build/compare/rattler_build_recipe-v0.1.6...rattler_build_recipe-v0.1.7) - 2026-05-20
+
+### Added
+
+- v3 packages ([#2452](https://github.com/prefix-dev/rattler-build/pull/2452))
+- remove experimental guard for staging outputs ([#2432](https://github.com/prefix-dev/rattler-build/pull/2432))
+
+### Fixed
+
+- inherit build number for cache outputs ([#2460](https://github.com/prefix-dev/rattler-build/pull/2460))
+- variant tracking and env vars for staging cache inheritance ([#2455](https://github.com/prefix-dev/rattler-build/pull/2455))
+- disable build file auto-discovery for multi-output recipes ([#2436](https://github.com/prefix-dev/rattler-build/pull/2436))
+
+### Other
+
+- bump rattler dependencies ([#2457](https://github.com/prefix-dev/rattler-build/pull/2457))
+
 ## [0.1.6](https://github.com/prefix-dev/rattler-build/compare/rattler_build_recipe-v0.1.5...rattler_build_recipe-v0.1.6) - 2026-04-13
 
 ### Added

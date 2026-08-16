@@ -42,6 +42,47 @@ build:
         - copy %RECIPE_DIR%\my_script_with_recipe.bat %LIBRARY_BIN%\super-cool-script.bat
 ```
 
+## Experimental build steps
+
+`build.steps` is an experimental alternative to `build.script`. Enable it with
+`--experimental`. `script` and `steps` are mutually exclusive; even
+`steps: []` explicitly selects steps mode and prevents default `build.sh` /
+`build.bat` discovery.
+
+Each step is a scoped section of the generated build wrapper, so step-local
+`env` values and `cwd` changes do not leak into later steps. A step supports:
+
+- **`run`** - Required inline command, multiline string, or list of commands.
+- **`if`** - Optional Jinja selector expression, such as `unix` or
+  `target_platform == "linux-64"`. Do not wrap expressions in `${{ }}`.
+- **`interpreter`** - Optional interpreter override for this step.
+- **`cwd`** - Optional working directory for this step. Relative paths are
+  resolved against the host prefix (`$PREFIX` / `%PREFIX%`), and the wrapper
+  changes to it only for that step.
+- **`env`** - Optional environment variables scoped to this step.
+
+```yaml title="recipe.yaml"
+build:
+  steps:
+    - if: unix
+      run: |
+        mkdir -p "$PREFIX/bin"
+        cp "$RECIPE_DIR/my_script_with_recipe.sh" "$PREFIX/bin/super-cool-script.sh"
+
+    - if: win
+      run: copy %RECIPE_DIR%\my_script_with_recipe.bat %LIBRARY_BIN%\super-cool-script.bat
+
+    - run: python -m pip install . --no-deps
+      env:
+        SETUPTOOLS_SCM_PRETEND_VERSION: ${{ version }}
+```
+
+!!! warning "Windows multiline steps"
+    On Windows, a multiline `run: |` block is emitted as one command-list item.
+    Rattler-Build inserts fail-fast guards between list items, not between the
+    physical lines inside one multiline scalar, so check `%errorlevel%` yourself
+    when a multiline `cmd.exe` block needs per-line failure handling.
+
 ## Environment variables
 
 There are many environment variables that are automatically set during the build
@@ -79,8 +120,10 @@ for your script.
 So far, the following interpreters are supported:
 
 - `bash` (default on Unix)
-- `cmd.exe` (default on Windows)
+- `cmd` (Windows `cmd.exe`)
+- `powershell`
 - `nushell`
+- `brush`
 - `python`
 - `perl`
 - `rscript` (for R scripts)
@@ -88,8 +131,9 @@ So far, the following interpreters are supported:
 - `node` or `nodejs` (for NodeJS scripts)
 
 Rattler-Build automatically detects the interpreter based on the file extension
-(`.sh`, `.bat`, `.nu`, `.py`, `.pl`, `.r`, `.rb`, `.js`) or you can specify it in the
-`interpreter` key in the `script` section of your recipe.
+(`.sh`/`.bash`, `.bat`/`.cmd`, `.ps1`, `.nu`, `.py`, `.pl`, `.r`, `.rb`, `.js`) or you
+can specify it in the `interpreter` key in the `script` section of your recipe
+(use `interpreter: cmd` for Windows `cmd.exe`).
 
 ```yaml title="recipe.yaml"
 build:
@@ -105,6 +149,14 @@ requirements:
     `cmd.exe`. If you encounter any issues, please
     [open an issue](https://github.com/prefix-dev/rattler-build/issues/new).
 
+!!! tip "Put the interpreter in `build`"
+    An interpreter that runs the build script is a build-time tool, so the
+    correct place for it is the `build` section of `requirements`. The `host`
+    environment is searched as well (and, for most interpreters, the system
+    `PATH` as a last resort), so a `host` dependency also works — but `build` is
+    preferred. `brush` is the exception: it must be in `build`, and a system
+    copy is never used.
+
 ### Using `nushell`
 
 In order to use `nushell` you can select the `interpreter: nu` or have a
@@ -118,10 +170,31 @@ build:
     content: |
       echo "Hello from nushell!"
 
-# Note: it's required to have `nushell` in the `build` section of your recipe!
+# Note: add `nushell` to the `build` section of your recipe!
 requirements:
   build:
     - nushell
+```
+
+### Using `brush`
+
+[`brush`](https://github.com/reubeno/brush) is a bash-compatible shell written in Rust. Select it with `interpreter: brush`. Activation is handled by the native shell (`bash` on Unix, `cmd.exe` on Windows), which then invokes `brush` on your script, so existing bash scripts work unchanged across platforms.
+
+`brush` is always taken from the build environment, so it must be listed in `requirements/build`. A `brush` found on the system `PATH` is intentionally not used, which keeps builds reproducible.
+
+Scripts run with `set -euxo pipefail` semantics by default: `brush` is invoked with `-euxo pipefail`, so the script aborts on errors, unset variables and pipeline failures, and traces every command. A script can relax this where needed with e.g. `set +e` or `set +u`.
+
+```yaml title="recipe.yaml"
+build:
+  script:
+    interpreter: brush
+    content: |
+      echo "Hello from brush!"
+
+# Note: `brush` must be in the `build` section of your recipe!
+requirements:
+  build:
+    - brush
 ```
 
 ### Using `python`
@@ -137,7 +210,7 @@ build:
     content: |
       print("Hello from Python!")
 
-# Note: it's required to have `python` in the `build` section of your recipe!
+# Note: add `python` to the `build` section of your recipe!
 requirements:
   build:
     - python
@@ -156,7 +229,7 @@ build:
     content: |
       puts "Hello from Ruby!"
 
-# Note: it's required to have `ruby` in the `build` section of your recipe!
+# Note: add `ruby` to the `build` section of your recipe!
 requirements:
   build:
     - ruby
@@ -175,10 +248,74 @@ build:
     content: |
       console.log("Hello from NodeJS!");
 
-# Note: it's required to have `nodejs` in the `build` section of your recipe!
+# Note: add `nodejs` to the `build` section of your recipe!
 requirements:
   build:
     - nodejs
+```
+
+### Using `perl`
+
+In order to use `perl` you can select the `interpreter: perl` or have a
+`build.pl` file in your recipe directory and `perl` in the
+`requirements/build` section.
+
+```yaml title="recipe.yaml"
+build:
+  script:
+    interpreter: perl
+    content: |
+      print "Hello from Perl!\n";
+
+# Note: add `perl` to the `build` section of your recipe!
+requirements:
+  build:
+    - perl
+```
+
+### Using `rscript` (R)
+
+In order to run R scripts you can select the `interpreter: rscript` or have a
+`build.r` file in your recipe directory and `r-base` in the
+`requirements/build` section. The script is executed with `Rscript` from the
+build environment.
+
+```yaml title="recipe.yaml"
+build:
+  script:
+    interpreter: rscript
+    content: |
+      cat("Hello from R!\n")
+
+# Note: add `r-base` to the `build` section of your recipe!
+requirements:
+  build:
+    - r-base
+```
+
+### Using `powershell`
+
+In order to use `powershell` you can select the `interpreter: powershell` or
+have a `build.ps1` file in your recipe directory. On Windows, PowerShell is
+taken from the system, so no extra dependency is required. On other platforms
+`pwsh` must be available in the build environment, so add `powershell-core` to
+`requirements/build`. Rattler-Build prefers PowerShell 7.4+; on older versions
+errors from native commands may be skipped and you have to check `$?` or
+`$LASTEXITCODE` manually.
+
+```yaml title="recipe.yaml"
+build:
+  script:
+    interpreter: powershell
+    content: |
+      Write-Host "Hello from PowerShell!"
+
+# Note: on non-Windows platforms `powershell-core` must be in the `build` section!
+requirements:
+  build:
+    - if: not win
+      then:
+        - powershell-core
 ```
 
 

@@ -7,6 +7,100 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.10](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.9...rattler_build_core-v0.2.10) - 2026-07-25
+
+### Added
+
+- add iOS and Android platform support ([#2682](https://github.com/prefix-dev/rattler-build/pull/2682))
+- make CMD subprocesses match `build_platform` architecture when running emulated ([#2664](https://github.com/prefix-dev/rattler-build/pull/2664))
+
+### Fixed
+
+- package content tests for ios ([#2684](https://github.com/prefix-dev/rattler-build/pull/2684))
+- set `LIBRARY_PREFIX` and friends for noarch builds on Windows ([#2655](https://github.com/prefix-dev/rattler-build/pull/2655))
+
+### Other
+
+- update dependencies and Rust toolchain to 1.97.1 ([#2679](https://github.com/prefix-dev/rattler-build/pull/2679))
+
+## [0.2.9](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.8...rattler_build_core-v0.2.9) - 2026-07-11
+
+### Added
+
+- add tool-specific config extension and default config discovery ([#2636](https://github.com/prefix-dev/rattler-build/pull/2636))
+- detect and warn when patches are already applied ([#2635](https://github.com/prefix-dev/rattler-build/pull/2635))
+- warn about problematic entry point configurations ([#2623](https://github.com/prefix-dev/rattler-build/pull/2623))
+- display optional dependency groups (extras) in dependency tables ([#2621](https://github.com/prefix-dev/rattler-build/pull/2621))
+- adds support to publish --to cloudsmith ([#2516](https://github.com/prefix-dev/rattler-build/pull/2516))
+- make SHLIB_EXT available in Jinja templates ([#2612](https://github.com/prefix-dev/rattler-build/pull/2612))
+- support `source.filter` for URL and archive path sources ([#2608](https://github.com/prefix-dev/rattler-build/pull/2608))
+- improve package content test failure messages with expanded globs ([#2602](https://github.com/prefix-dev/rattler-build/pull/2602))
+
+### Fixed
+
+- consolidate license_file and license_file_late_bound into single LicenseFiles type ([#2624](https://github.com/prefix-dev/rattler-build/pull/2624))
+- `--render-only --with-solve` panic when output dir missing ([#2631](https://github.com/prefix-dev/rattler-build/pull/2631))
+- build test MatchSpec from typed components to support trailing-underscore versions ([#2618](https://github.com/prefix-dev/rattler-build/pull/2618))
+- write github output to stderr ([#2550](https://github.com/prefix-dev/rattler-build/pull/2550))
+
+## [0.2.8](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.7...rattler_build_core-v0.2.8) - 2026-06-26
+
+### Other
+
+- update Cargo.toml dependencies
+
+## [0.2.7](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.6...rattler_build_core-v0.2.7) - 2026-06-18
+
+### Added
+
+- support late-bound build directory variables in patches and license files ([#2554](https://github.com/prefix-dev/rattler-build/pull/2554))
+- Add brush interpreter support ([#2527](https://github.com/prefix-dev/rattler-build/pull/2527))
+
+### Fixed
+
+- separate build env vars and host env vars ([#2558](https://github.com/prefix-dev/rattler-build/pull/2558))
+- useful error messages for typos in `interpreter` ([#2540](https://github.com/prefix-dev/rattler-build/pull/2540))
+- honor io_concurrency_limit ([#2525](https://github.com/prefix-dev/rattler-build/pull/2525))
+
+### Other
+
+- update rattler to latest releases ([#2559](https://github.com/prefix-dev/rattler-build/pull/2559))
+- streamline script interpreters through a native shell wrapper ([#2535](https://github.com/prefix-dev/rattler-build/pull/2535))
+- bump rattler crates to latest versions ([#2528](https://github.com/prefix-dev/rattler-build/pull/2528))
+
+## [0.2.6](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.5...rattler_build_core-v0.2.6) - 2026-05-27
+
+### Other
+
+- use `RepodataRevision` enum instead of new `v3` boolean ([#2517](https://github.com/prefix-dev/rattler-build/pull/2517))
+
+## [0.2.5](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.4...rattler_build_core-v0.2.5) - 2026-05-20
+
+### Added
+
+- Allow build scripts to override package contents ([#2476](https://github.com/prefix-dev/rattler-build/pull/2476))
+- add warn when repodata unsupported ([#2472](https://github.com/prefix-dev/rattler-build/pull/2472))
+- v3 packages ([#2452](https://github.com/prefix-dev/rattler-build/pull/2452))
+
+### Fixed
+
+- validate source attestations ([#2338](https://github.com/prefix-dev/rattler-build/pull/2338))
+- improve error handling in DependencyResolutionError ([#2485](https://github.com/prefix-dev/rattler-build/pull/2485))
+- respect `.orig`-only sources in patch application ([#2470](https://github.com/prefix-dev/rattler-build/pull/2470))
+- variant tracking and env vars for staging cache inheritance ([#2455](https://github.com/prefix-dev/rattler-build/pull/2455))
+- remove PKG_* environment variables in staging cache, set variant values ([#2449](https://github.com/prefix-dev/rattler-build/pull/2449))
+- use force directory removal to handle Windows file locks ([#2444](https://github.com/prefix-dev/rattler-build/pull/2444))
+- prevent stacking of pending-rm suffixes on Windows cleanup ([#2439](https://github.com/prefix-dev/rattler-build/pull/2439))
+- set CONDA_BUILD env var in build_env.sh to fix env-isolation none ([#2433](https://github.com/prefix-dev/rattler-build/pull/2433))
+- include default env vars also in test environment ([#2425](https://github.com/prefix-dev/rattler-build/pull/2425))
+
+### Other
+
+- bump rattler crates ([#2502](https://github.com/prefix-dev/rattler-build/pull/2502))
+- bump rattler crates and migrate to reqwest 0.13 ([#2493](https://github.com/prefix-dev/rattler-build/pull/2493))
+- lazily initialize the `BaseClient` ([#2456](https://github.com/prefix-dev/rattler-build/pull/2456))
+- bump rattler dependencies ([#2457](https://github.com/prefix-dev/rattler-build/pull/2457))
+
 ## [0.2.4](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.3...rattler_build_core-v0.2.4) - 2026-04-13
 
 ### Added

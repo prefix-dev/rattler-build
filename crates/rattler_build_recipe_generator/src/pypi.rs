@@ -5,9 +5,11 @@ use miette::{IntoDiagnostic, WrapErr};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::io::{Cursor, Read as _};
+#[cfg(not(target_arch = "wasm32"))]
 use std::path::PathBuf;
 use zip::ZipArchive;
 
+#[cfg(not(target_arch = "wasm32"))]
 use super::write_recipe;
 use crate::serialize::{self, PythonTest, PythonTestInner, Test, UrlSourceElement};
 
@@ -250,14 +252,24 @@ fn format_requirement(req: &str) -> String {
 
     // Handle markers separately
     if let Some((version, marker)) = version.split_once(';') {
-        format!(
-            "{} {} ;MARKER; {}",
-            name.to_lowercase(),
-            version.trim(),
-            marker.trim()
-        )
+        let version = version.trim();
+        if version.is_empty() {
+            format!("{} ;MARKER; {}", name.to_lowercase(), marker.trim())
+        } else {
+            format!(
+                "{} {} ;MARKER; {}",
+                name.to_lowercase(),
+                version,
+                marker.trim()
+            )
+        }
     } else {
-        format!("{} {}", name.to_lowercase(), version.trim())
+        let version = version.trim();
+        if version.is_empty() {
+            name.to_lowercase()
+        } else {
+            format!("{} {}", name.to_lowercase(), version)
+        }
     }
 }
 
@@ -782,7 +794,7 @@ pub async fn create_recipe(
             .starts_with("https://files.pythonhosted.org/")
     {
         let simple_url = format!(
-            "https://pypi.org/packages/source/{}/{}/{}-{}.tar.gz",
+            "https://files.pythonhosted.org/packages/source/{}/{}/{}-{}.tar.gz",
             &metadata.info.name.to_lowercase()[..1],
             metadata.info.name.to_lowercase(),
             metadata.info.name.to_lowercase().replace("-", "_"),
@@ -809,12 +821,25 @@ pub async fn create_recipe(
     );
 
     if let Some(wheel_url) = &metadata.wheel_url {
-        let wheel_info = extract_wheel_info(wheel_url, client).await?;
-        if !wheel_info.entry_points.is_empty() {
-            recipe.build.python.entry_points = wheel_info.entry_points;
-        }
-        if !wheel_info.license_files.is_empty() {
-            recipe.about.license_file = wheel_info.license_files;
+        // Wheel extraction is best-effort: in restricted environments (e.g. WASM/browser
+        // with no CORS on files.pythonhosted.org) the request may fail. Treat that as
+        // non-fatal and continue producing the rest of the recipe.
+        match extract_wheel_info(wheel_url, client).await {
+            Ok(wheel_info) => {
+                if !wheel_info.entry_points.is_empty() {
+                    recipe.build.python.entry_points = wheel_info.entry_points;
+                }
+                if !wheel_info.license_files.is_empty() {
+                    recipe.about.license_file = wheel_info.license_files;
+                }
+            }
+            Err(e) => {
+                tracing::warn!(
+                    "Failed to extract wheel info for {}: {} — entry points and license files may be missing.",
+                    opts.package,
+                    e
+                );
+            }
         }
     } else {
         tracing::warn!(
@@ -848,12 +873,20 @@ pub async fn create_recipe(
         &HashMap::new()
     };
 
-    // Check for build requirements
-    let build_reqs = extract_build_requirements(&metadata.release.url, client).await?;
-    if !build_reqs.is_empty() {
-        for req in build_reqs {
-            let mapped_req = map_requirement(&req, mapping, opts.use_mapping).await;
-            recipe.requirements.host.push(mapped_req);
+    // Check for build requirements — best-effort, fall back to just pip.
+    match extract_build_requirements(&metadata.release.url, client).await {
+        Ok(build_reqs) => {
+            for req in build_reqs {
+                let mapped_req = map_requirement(&req, mapping, opts.use_mapping).await;
+                recipe.requirements.host.push(mapped_req);
+            }
+        }
+        Err(e) => {
+            tracing::warn!(
+                "Failed to extract build requirements for {}: {} — only pip will be added as a build dep.",
+                opts.package,
+                e
+            );
         }
     }
     recipe.requirements.host.push("pip".to_string());
@@ -916,6 +949,7 @@ pub async fn generate_pypi_recipe_string(opts: &PyPIOpts) -> miette::Result<Stri
 /// Generate a recipe for a PyPI package and either write it to disk or print it.
 ///
 /// If `opts.tree` is set, recursively generates recipes for runtime dependencies.
+#[cfg(not(target_arch = "wasm32"))]
 #[async_recursion::async_recursion]
 pub async fn generate_pypi_recipe(opts: &PyPIOpts) -> miette::Result<()> {
     tracing::info!("Generating recipe for {}", opts.package);
@@ -953,6 +987,20 @@ pub async fn generate_pypi_recipe(opts: &PyPIOpts) -> miette::Result<()> {
 mod tests {
     use super::*;
     use insta::assert_yaml_snapshot;
+
+    #[test]
+    fn test_format_requirement_no_trailing_space() {
+        assert_eq!(format_requirement("docopt"), "docopt");
+        assert_eq!(format_requirement("numpy>=2.0.0"), "numpy >=2.0.0");
+        assert_eq!(
+            format_requirement("requests; extra == 'foo'"),
+            "requests ;MARKER; extra == 'foo'"
+        );
+        assert_eq!(
+            format_requirement("numpy>=2.0.0; extra == 'foo'"),
+            "numpy >=2.0.0 ;MARKER; extra == 'foo'"
+        );
+    }
 
     #[tokio::test]
     async fn test_recipe_generation() {

@@ -1,3 +1,4 @@
+use rattler_build_types::LateBoundPath;
 use rattler_digest::{Md5, Md5Hash, Sha256, Sha256Hash, serde::SerializableHash};
 use serde::{Deserialize, Serialize};
 use serde_with::{OneOrMany, formats::PreferOne, serde_as};
@@ -127,7 +128,7 @@ pub struct GitSource {
 
     /// Patches to apply to the source code
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub patches: Vec<PathBuf>,
+    pub patches: Vec<LateBoundPath>,
 
     /// Optionally a folder name under the `work` directory
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -144,6 +145,10 @@ pub struct GitSource {
     /// Optionally an expected commit hash to verify after checkout
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub expected_commit: Option<String>,
+
+    /// Only take certain files from the checked-out tree (validated glob patterns)
+    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
+    pub filter: GlobVec,
 }
 
 fn is_false(value: &bool) -> bool {
@@ -313,7 +318,7 @@ pub struct UrlSource {
 
     /// Patches to apply to the source code
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub patches: Vec<PathBuf>,
+    pub patches: Vec<LateBoundPath>,
 
     /// Optionally a folder name under the `work` directory
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -322,6 +327,10 @@ pub struct UrlSource {
     /// Optional attestation verification configuration
     #[serde(default, skip_serializing_if = "attestation_is_none_or_empty")]
     pub attestation: Option<AttestationConfig>,
+
+    /// Only take certain files from the extracted source (validated glob patterns)
+    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
+    pub filter: GlobVec,
 }
 
 /// A local path source (evaluated)
@@ -343,7 +352,7 @@ pub struct PathSource {
 
     /// Patches to apply to the source code
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub patches: Vec<PathBuf>,
+    pub patches: Vec<LateBoundPath>,
 
     /// Optionally a folder name under the `work` directory
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -372,7 +381,7 @@ fn is_true(value: &bool) -> bool {
 
 impl Source {
     /// Get the patches for this source
-    pub fn patches(&self) -> &[PathBuf] {
+    pub fn patches(&self) -> &[LateBoundPath] {
         match self {
             Self::Git(git) => &git.patches,
             Self::Url(url) => &url.patches,

@@ -1,7 +1,8 @@
 use std::path::{Path, PathBuf};
 
-use chrono::{DateTime, Utc};
 use fs_err as fs;
+use jiff::Timestamp;
+use rattler_conda_types::Platform;
 use serde::{Deserialize, Serialize};
 
 use dunce::canonicalize;
@@ -14,7 +15,8 @@ pub struct DirectoriesBuilder<'a> {
     name: &'a str,
     recipe_path: &'a Path,
     output_dir: &'a Path,
-    timestamp: &'a DateTime<Utc>,
+    timestamp: &'a Timestamp,
+    platform: Platform,
     no_build_id: bool,
     merge_build_and_host: bool,
     skip_directory_creation: bool,
@@ -26,13 +28,15 @@ impl<'a> DirectoriesBuilder<'a> {
         name: &'a str,
         recipe_path: &'a Path,
         output_dir: &'a Path,
-        timestamp: &'a DateTime<Utc>,
+        timestamp: &'a Timestamp,
+        platform: Platform,
     ) -> Self {
         Self {
             name,
             recipe_path,
             output_dir,
             timestamp,
+            platform,
             no_build_id: false,
             merge_build_and_host: false,
             skip_directory_creation: false,
@@ -60,15 +64,7 @@ impl<'a> DirectoriesBuilder<'a> {
 
     /// Build the [`Directories`] struct.
     pub fn build(self) -> Result<Directories, std::io::Error> {
-        Directories::setup_internal(
-            self.name,
-            self.recipe_path,
-            self.output_dir,
-            self.no_build_id,
-            self.timestamp,
-            self.merge_build_and_host,
-            self.skip_directory_creation,
-        )
+        Directories::setup_internal(self)
     }
 }
 
@@ -100,13 +96,59 @@ pub struct Directories {
     pub output_dir: PathBuf,
 }
 
+/// The build tree as the executing build script sees it. Identical to the
+/// physical layout when the script executes directly on this machine.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExecutionDirectories {
+    /// Host dependency prefix as observed by the build script.
+    pub host_prefix: PathBuf,
+    /// Build dependency prefix as observed by the build script.
+    pub build_prefix: PathBuf,
+    /// Working directory as observed by the build script.
+    pub work_dir: PathBuf,
+    /// Build directory as observed by the build script.
+    pub build_dir: PathBuf,
+    /// Recipe directory as observed by the build script.
+    pub recipe_dir: PathBuf,
+}
+
+impl ExecutionDirectories {
+    /// Path to the file a build script may use to override packaged files.
+    pub fn package_files_list_path(&self) -> PathBuf {
+        self.build_dir.join(crate::consts::PACKAGE_FILES_LIST_NAME)
+    }
+}
+
+/// Host prefix directory under `build_dir` for the given platform. Windows
+/// uses the short `h_env`; other platforms pad `host_env` with `_placehold`
+/// repetitions so the absolute prefix path is 255 characters long.
+pub fn padded_host_prefix(build_dir: &Path, platform: Platform) -> PathBuf {
+    if platform.is_windows() {
+        build_dir.join("h_env")
+    } else {
+        let placeholder_template = "_placehold";
+        let mut placeholder = String::new();
+        let placeholder_length: usize = 255;
+
+        while placeholder.len() < placeholder_length {
+            placeholder.push_str(placeholder_template);
+        }
+
+        let placeholder = placeholder
+            [0..placeholder_length - build_dir.join("host_env").as_os_str().len()]
+            .to_string();
+
+        build_dir.join(format!("host_env{placeholder}"))
+    }
+}
+
 fn get_build_dir(
     output_dir: &Path,
     name: &str,
     no_build_id: bool,
-    timestamp: &DateTime<Utc>,
+    timestamp: &Timestamp,
 ) -> Result<PathBuf, std::io::Error> {
-    let since_the_epoch = timestamp.timestamp();
+    let since_the_epoch = timestamp.as_second();
 
     let dirname = if no_build_id {
         format!("rattler-build_{}", name)
@@ -122,21 +164,25 @@ impl Directories {
         name: &'a str,
         recipe_path: &'a Path,
         output_dir: &'a Path,
-        timestamp: &'a DateTime<Utc>,
+        timestamp: &'a Timestamp,
+        platform: Platform,
     ) -> DirectoriesBuilder<'a> {
-        DirectoriesBuilder::new(name, recipe_path, output_dir, timestamp)
+        DirectoriesBuilder::new(name, recipe_path, output_dir, timestamp, platform)
     }
 
     /// Internal setup function called by the builder.
-    fn setup_internal(
-        name: &str,
-        recipe_path: &Path,
-        output_dir: &Path,
-        no_build_id: bool,
-        timestamp: &DateTime<Utc>,
-        merge_build_and_host: bool,
-        skip_directory_creation: bool,
-    ) -> Result<Directories, std::io::Error> {
+    fn setup_internal(builder: DirectoriesBuilder<'_>) -> Result<Directories, std::io::Error> {
+        let DirectoriesBuilder {
+            name,
+            recipe_path,
+            output_dir,
+            timestamp,
+            platform,
+            no_build_id,
+            merge_build_and_host,
+            skip_directory_creation,
+        } = builder;
+
         let output_dir = if skip_directory_creation {
             output_dir.to_path_buf()
         } else {
@@ -166,23 +212,7 @@ impl Directories {
             })?
             .to_path_buf();
 
-        let host_prefix = if cfg!(target_os = "windows") {
-            build_dir.join("h_env")
-        } else {
-            let placeholder_template = "_placehold";
-            let mut placeholder = String::new();
-            let placeholder_length: usize = 255;
-
-            while placeholder.len() < placeholder_length {
-                placeholder.push_str(placeholder_template);
-            }
-
-            let placeholder = placeholder
-                [0..placeholder_length - build_dir.join("host_env").as_os_str().len()]
-                .to_string();
-
-            build_dir.join(format!("host_env{}", placeholder))
-        };
+        let host_prefix = padded_host_prefix(&build_dir, platform);
 
         let directories = Directories {
             build_dir: build_dir.clone(),
@@ -212,6 +242,17 @@ impl Directories {
     /// end up in the final package.
     pub fn package_files_list_path(&self) -> PathBuf {
         self.build_dir.join(crate::consts::PACKAGE_FILES_LIST_NAME)
+    }
+
+    /// The path strings the build script observes.
+    pub fn exec_view(&self) -> ExecutionDirectories {
+        ExecutionDirectories {
+            host_prefix: self.host_prefix.clone(),
+            build_prefix: self.build_prefix.clone(),
+            work_dir: self.work_dir.clone(),
+            build_dir: self.build_dir.clone(),
+            recipe_dir: self.recipe_dir.clone(),
+        }
     }
 
     /// Remove all directories except for the cache directory
@@ -321,16 +362,63 @@ mod tests {
     fn setup_build_dir_test() {
         // without build_id (aka timestamp)
         let dir = tempfile::tempdir().unwrap();
-        let p1 = get_build_dir(dir.path(), "name", true, &Utc::now()).unwrap();
+        let p1 = get_build_dir(dir.path(), "name", true, &Timestamp::now()).unwrap();
         let f1 = p1.file_name().unwrap();
         assert!(f1.eq("rattler-build_name"));
 
         // with build_id (aka timestamp)
-        let timestamp = &Utc::now();
+        let timestamp = &Timestamp::now();
         let p2 = get_build_dir(dir.path(), "name", false, timestamp).unwrap();
         let f2 = p2.file_name().unwrap();
-        let epoch = timestamp.timestamp();
+        let epoch = timestamp.as_second();
         assert!(f2.eq(format!("rattler-build_name_{epoch}").as_str()));
+    }
+
+    #[test]
+    fn padded_host_prefix_follows_the_platform() {
+        let tempdir = tempfile::tempdir().unwrap();
+        let build_dir = tempdir.path().join("build");
+
+        for platform in [Platform::Linux64, Platform::OsxArm64] {
+            assert_eq!(
+                padded_host_prefix(&build_dir, platform).as_os_str().len(),
+                255
+            );
+        }
+        assert_eq!(
+            padded_host_prefix(&build_dir, Platform::Win64),
+            build_dir.join("h_env")
+        );
+    }
+
+    #[test]
+    fn current_platform_padding_matches_built_directories() {
+        let tempdir = tempfile::tempdir().unwrap();
+        let directories = Directories::builder(
+            "name",
+            &tempdir.path().join("recipe"),
+            &tempdir.path().join("output"),
+            &Timestamp::now(),
+            Platform::current(),
+        )
+        .build()
+        .unwrap();
+
+        assert_eq!(
+            directories.host_prefix,
+            padded_host_prefix(&directories.build_dir, Platform::current())
+        );
+
+        let execution = directories.exec_view();
+        assert_eq!(execution.host_prefix, directories.host_prefix);
+        assert_eq!(execution.build_prefix, directories.build_prefix);
+        assert_eq!(execution.work_dir, directories.work_dir);
+        assert_eq!(execution.build_dir, directories.build_dir);
+        assert_eq!(execution.recipe_dir, directories.recipe_dir);
+        assert_eq!(
+            execution.package_files_list_path(),
+            directories.package_files_list_path()
+        );
     }
 
     #[test]
@@ -341,7 +429,8 @@ mod tests {
             "name",
             &tempdir.path().join("recipe"),
             &tempdir.path().join("output"),
-            &chrono::Utc::now(),
+            &Timestamp::now(),
+            Platform::current(),
         )
         .build()
         .unwrap();
@@ -374,7 +463,8 @@ mod tests {
             "name",
             &tempdir.path().join("recipe"),
             &tempdir.path().join("output"),
-            &chrono::Utc::now(),
+            &Timestamp::now(),
+            Platform::current(),
         )
         .build()
         .unwrap();

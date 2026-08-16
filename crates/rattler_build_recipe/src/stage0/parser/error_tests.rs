@@ -210,3 +210,37 @@ fn test_error_multi_output_empty_outputs() {
     let error_with_source = ParseErrorWithSource::new(source, err);
     assert_miette_snapshot!(error_with_source);
 }
+
+// ============================================================================
+// YAML load error location tests
+//
+// These guard against regressing the location reported for low-level YAML
+// load errors. A common mistake is writing `{{ var }}` instead of `${{ var }}`,
+// which YAML parses as a flow mapping and rejects with "Keys in mappings must
+// be scalar". The reported span must point at the offending line, not at the
+// top of the file (see https://github.com/prefix-dev/rattler-build/issues/2580).
+// ============================================================================
+
+#[test]
+fn test_error_missing_dollar_jinja_multi_output() {
+    let source = load_error_test("missing_dollar_jinja.yaml");
+    let result = parse_recipe_or_multi_from_source(source.as_ref());
+
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+
+    let error_with_source = ParseErrorWithSource::new(source, err);
+    assert_miette_snapshot!(error_with_source);
+}
+
+#[test]
+fn test_error_missing_dollar_jinja_single_output() {
+    let source = load_error_test("missing_dollar_jinja_single.yaml");
+    let result = parse_recipe_from_source(source.as_ref());
+
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+
+    let error_with_source = ParseErrorWithSource::new(source, err);
+    assert_miette_snapshot!(error_with_source);
+}

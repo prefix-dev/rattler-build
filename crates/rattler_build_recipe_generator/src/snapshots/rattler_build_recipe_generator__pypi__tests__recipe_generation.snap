@@ -10,7 +10,7 @@ package:
   name: numpy
   version: "${{ version }}"
 source:
-  - url: "https://pypi.org/packages/source/n/numpy/numpy-${{ version }}.tar.gz"
+  - url: "https://files.pythonhosted.org/packages/source/n/numpy/numpy-${{ version }}.tar.gz"
     sha256: c4ab7c9711fe6b235e86487ca74c1b092a6dd59a3cb45b63241ea0a148501853
 build:
   number: "${{ build_number }}"

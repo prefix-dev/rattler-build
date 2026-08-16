@@ -237,9 +237,9 @@ build:
 
     let sandbox = recipe
         .build
-        .script
-        .sandbox
-        .as_ref()
+        .plan
+        .script()
+        .and_then(|script| script.sandbox.as_ref())
         .expect("sandbox block should be parsed");
 
     assert_eq!(

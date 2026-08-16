@@ -12,6 +12,11 @@ extend-exclude = [
 ]
 ignore-hidden = false
 
+[default]
+# `pyton` is an intentional misspelling in a unit test that checks the
+# interpreter "did you mean" suggestion. Scope the ignore to that exact usage.
+extend-ignore-re = ['closest_interpreter\("pyton"\)']
+
 [default.extend-identifiers]
 ratatui = "ratatui"
 ND = "ND"

@@ -7,17 +7,22 @@
 //! * `imports` - import a list of modules and check if they can be imported
 //! * `files` - check if a list of files exist
 use fs_err as fs;
+use miette::WrapErr;
 use rattler_build_jinja::Variable;
 use rattler_build_recipe::stage1::{
     TestType,
     tests::{CommandsTest, DownstreamTest, PerlTest, PythonTest, PythonVersion, RTest, RubyTest},
 };
-use rattler_build_script::{EnvironmentIsolation, Script, ScriptContent};
+use rattler_build_script::{
+    EnvironmentIsolation, ExecutionContext, RuntimeEnv, Script, ScriptContent,
+};
 use rattler_build_types::NormalizedKey;
 use rattler_conda_types::{
-    Channel, ChannelUrl, MatchSpec, ParseStrictness, Platform,
+    Channel, ChannelUrl, MatchSpec, PackageName, PackageNameMatcher, ParseStrictness, Platform,
+    StringMatcher, Version, VersionSpec,
     compression_level::CompressionLevel,
-    package::{CondaArchiveIdentifier, IndexJson, PackageFile},
+    package::{ArchiveIdentifier, CondaArchiveIdentifier, IndexJson, PackageFile},
+    version_spec::EqualityOperator,
 };
 use rattler_index::{IndexFsConfig, index_fs};
 use rattler_package_streaming::write::write_conda_package;
@@ -42,8 +47,29 @@ use rattler_cache::validation::ValidationMode;
 
 use crate::{
     env_vars, metadata::PlatformWithVirtualPackages, render::solver::create_environment,
-    source::copy_dir::CopyDir, tool_configuration,
+    source::copy_dir::CopyDir, tool_configuration, utils::remove_dir_all_force,
 };
+
+/// Builds a `MatchSpec` that exactly matches the just-built artifact from its
+/// archive identifier (name, version, build string).
+fn match_spec_for_identifier(identifier: &ArchiveIdentifier) -> Result<MatchSpec, TestError> {
+    // Parse the name and version as typed values to avoid any ambiguity that a
+    // string re-parse could introduce.
+    let name = PackageName::try_from(identifier.name.as_str())
+        .map_err(|e| TestError::MatchSpecParse(e.to_string()))?;
+    let version = Version::from_str(&identifier.version)
+        .map_err(|e| TestError::MatchSpecParse(e.to_string()))?;
+
+    Ok(MatchSpec {
+        name: PackageNameMatcher::Exact(name),
+        // Match the version exactly (==); VersionOrder already supports the
+        // trailing-underscore convention.
+        version: Some(VersionSpec::Exact(EqualityOperator::Equals, version)),
+        // Match the build string literally, without glob/regex interpretation.
+        build: Some(StringMatcher::Exact(identifier.build_string.clone())),
+        ..Default::default()
+    })
+}
 
 #[allow(missing_docs)]
 #[derive(thiserror::Error, Debug)]
@@ -72,8 +98,8 @@ pub enum TestError {
     #[error("failed to parse MatchSpec: {0}")]
     MatchSpecParse(String),
 
-    #[error("failed to setup test environment: {0}")]
-    TestEnvironmentSetup(String),
+    #[error("{0}")]
+    TestEnvironmentSetup(miette::Report),
 
     #[error("failed to setup test environment: {0}")]
     TestEnvironmentActivation(#[from] ActivationError),
@@ -100,6 +126,27 @@ pub enum TestError {
         "no tests found in package. Expected `info/test/` (conda-build format) or `info/tests/tests.yaml` (rattler-build format)"
     )]
     NoTestsFound,
+}
+
+impl TestError {
+    /// Converts this error into a report without rendering nested reports.
+    pub fn into_report(self) -> miette::Report {
+        match self {
+            Self::TestEnvironmentSetup(report) => report,
+            error => miette::Report::from_err(error),
+        }
+    }
+}
+
+#[test]
+fn test_environment_setup_preserves_diagnostic() {
+    let diagnostic = miette::MietteDiagnostic::new("solver failed");
+    let report = Err::<(), _>(miette::Report::new(diagnostic))
+        .wrap_err("failed to setup test environment")
+        .unwrap_err();
+    let report = TestError::TestEnvironmentSetup(report).into_report();
+
+    assert!(report.downcast_ref::<miette::MietteDiagnostic>().is_some());
 }
 
 /// Create a `.conda` archive from an extracted package directory.
@@ -181,11 +228,17 @@ impl Tests {
             )))
         })?;
 
-        let platform = Platform::current();
-        let mut env_vars =
-            env_vars::os_vars(environment, &platform, config.env_isolation, tmp_dir.path());
+        let mut env_vars = env_vars::os_vars(
+            environment,
+            &target_platform,
+            &host_platform,
+            &build_platform,
+            config.env_isolation,
+            tmp_dir.path(),
+            &RuntimeEnv::current(),
+        );
         if config.env_isolation == EnvironmentIsolation::None {
-            env_vars.retain(|key, _| key != ShellEnum::default().path_var(&platform));
+            env_vars.retain(|key, _| key != ShellEnum::default().path_var(&build_platform));
         }
         env_vars.extend(env_vars::test_vars(
             target_platform,
@@ -195,13 +248,15 @@ impl Tests {
         env_vars.extend(env_vars::python_vars_from_records(
             resolved_records,
             environment,
-            platform,
+            host_platform,
         ));
         env_vars.extend(pkg_vars.iter().map(|(k, v)| (k.clone(), Some(v.clone()))));
         env_vars.insert(
             "PREFIX".to_string(),
             Some(environment.to_string_lossy().to_string()),
         );
+
+        let context = shared_test_context(environment, host_platform);
 
         match self {
             Tests::Commands(path) => {
@@ -215,8 +270,7 @@ impl Tests {
                         env_vars,
                         tmp_dir.path(),
                         cwd,
-                        environment,
-                        None,
+                        context,
                         None::<fn(&str) -> Result<String, String>>,
                         None,
                         config.env_isolation,
@@ -236,8 +290,7 @@ impl Tests {
                         env_vars,
                         tmp_dir.path(),
                         cwd,
-                        environment,
-                        None,
+                        context,
                         None::<fn(&str) -> Result<String, String>>,
                         None,
                         config.env_isolation,
@@ -310,9 +363,26 @@ pub struct TestConfiguration {
     /// The output directory to create the test prefixes in (will be `output_dir/test`)
     pub output_dir: PathBuf,
     /// Exclude packages newer than this date from the solver
-    pub exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
+    pub exclude_newer: Option<jiff::Timestamp>,
     /// The environment isolation mode for test scripts
     pub env_isolation: EnvironmentIsolation,
+}
+
+fn configured_test_platforms(config: &TestConfiguration) -> (Platform, Platform, Platform) {
+    let target_platform = config.target_platform.unwrap_or(Platform::current());
+    let build_platform = config.current_platform.platform;
+    let host_platform = config
+        .host_platform
+        .as_ref()
+        .map(|platform| platform.platform)
+        .unwrap_or(target_platform);
+    (target_platform, build_platform, host_platform)
+}
+
+/// Tests without a separate build environment execute programs from the test
+/// prefix, so their wrapper architecture must match the package host platform.
+fn shared_test_context(prefix: &Path, host_platform: Platform) -> ExecutionContext {
+    ExecutionContext::shared(RuntimeEnv::current(), prefix, host_platform, host_platform)
 }
 
 fn env_vars_from_package(index_json: &IndexJson) -> HashMap<String, String> {
@@ -478,13 +548,18 @@ pub async fn run_test(
     // Use the package cache to extract the package for reading test metadata.
     // This avoids manual extraction and reuses the cache properly.
     let cache_metadata = temp_package_cache
-        .get_or_fetch_from_path(package_file, None)
+        .get_or_fetch_from_path(package_file, None, None)
         .await
         .map_err(|e| TestError::TestFailed(format!("failed to cache package: {e}")))?;
     let package_folder = cache_metadata.path().to_path_buf();
 
     let mut channels = config.channels.clone();
-    channels.insert(0, Channel::from_directory(tmp_repo.path()).base_url);
+    channels.insert(
+        0,
+        Channel::try_from_directory(tmp_repo.path())
+            .expect("could not create channel from directory")
+            .base_url,
+    );
 
     let host_platform = config.host_platform.clone().unwrap_or_else(|| {
         if target_platform == Platform::NoArch {
@@ -541,15 +616,7 @@ pub async fn run_test(
             .map(|s| MatchSpec::from_str(s, ParseStrictness::Lenient))
             .collect::<Result<Vec<_>, _>>()?;
 
-        let match_spec = MatchSpec::from_str(
-            format!(
-                "{}={}={}",
-                pkg.identifier.name, pkg.identifier.version, pkg.identifier.build_string
-            )
-            .as_str(),
-            ParseStrictness::Lenient,
-        )
-        .map_err(|e| TestError::MatchSpecParse(e.to_string()))?;
+        let match_spec = match_spec_for_identifier(&pkg.identifier)?;
         dependencies.push(match_spec);
 
         let resolved_records = create_environment(
@@ -564,7 +631,8 @@ pub async fn run_test(
             config.exclude_newer,
         )
         .await
-        .map_err(|e| TestError::TestEnvironmentSetup(format!("{e:?}")))?;
+        .wrap_err("failed to setup test environment")
+        .map_err(TestError::TestEnvironmentSetup)?;
 
         // These are the legacy tests
         let (test_folder, tests) = legacy_tests_from_folder(&package_folder).await?;
@@ -616,7 +684,20 @@ pub async fn run_test(
                         .await?
                 }
                 TestType::Python { python } => {
-                    run_python_test(&python, &pkg, &package_folder, &test_prefix, &config).await?
+                    // A downstream package's Python test matrix describes the Python
+                    // versions supported by that package in isolation. When testing it
+                    // against a specific upstream artifact, let that artifact's
+                    // dependencies select the compatible Python version instead.
+                    let apply_python_version = downstream_package.is_none();
+                    run_python_test(
+                        &python,
+                        &pkg,
+                        &package_folder,
+                        &test_prefix,
+                        &config,
+                        apply_python_version,
+                    )
+                    .await?
                 }
                 TestType::Perl { perl } => {
                     run_perl_test(&perl, &pkg, &package_folder, &test_prefix, &config).await?
@@ -641,7 +722,7 @@ pub async fn run_test(
             }
 
             if !config.keep_test_prefix {
-                fs::remove_dir_all(test_prefix)?;
+                remove_dir_all_force(&test_prefix)?;
             }
         }
 
@@ -661,6 +742,7 @@ async fn run_python_test(
     path: &Path,
     prefix: &Path,
     config: &TestConfiguration,
+    apply_python_version: bool,
 ) -> Result<(), TestError> {
     let pkg_id = format!(
         "{}-{}-{}",
@@ -670,20 +752,18 @@ async fn run_python_test(
     let _guard = span.enter();
 
     // The version spec of the package being built
-    let match_spec = MatchSpec::from_str(
-        format!(
-            "{}={}={}",
-            pkg.identifier.name, pkg.identifier.version, pkg.identifier.build_string
-        )
-        .as_str(),
-        ParseStrictness::Lenient,
-    )?;
+    let match_spec = match_spec_for_identifier(&pkg.identifier)?;
 
     // The dependencies for the test environment
     // - python_version: null -> { "": ["mypackage=xx=xx"]}
     // - python_version: 3.12 -> { "3.12": ["python=3.12", "mypackage=xx=xx"]}
     // - python_version: [3.12, 3.13] -> { "3.12": ["python=3.12", "mypackage=xx=xx"], "3.13": ["python=3.13", "mypackage=xx=xx"]}
-    let mut dependencies_map: HashMap<String, Vec<MatchSpec>> = match &python_test.python_version {
+    let python_version = if apply_python_version {
+        &python_test.python_version
+    } else {
+        &PythonVersion::None
+    };
+    let mut dependencies_map: HashMap<String, Vec<MatchSpec>> = match python_version {
         PythonVersion::Multiple(versions) => versions
             .iter()
             .map(|version| {
@@ -765,7 +845,8 @@ async fn run_python_test_inner(
         config.exclude_newer,
     )
     .await
-    .map_err(|e| TestError::TestEnvironmentSetup(format!("{e:?}")))?;
+    .wrap_err("failed to setup test environment")
+    .map_err(TestError::TestEnvironmentSetup)?;
 
     let mut imports = String::new();
     for import in &python_test.imports {
@@ -778,18 +859,27 @@ async fn run_python_test_inner(
         ..Script::default()
     };
 
-    let platform = Platform::current();
+    let (target_platform, build_platform, host_platform) = configured_test_platforms(config);
     let test_dir = prefix.join("test");
     fs::create_dir_all(&test_dir)?;
-    let test_env_vars = env_vars::os_vars(&test_prefix, &platform, config.env_isolation, &test_dir);
+    let test_env_vars = env_vars::os_vars(
+        &test_prefix,
+        &target_platform,
+        &host_platform,
+        &build_platform,
+        config.env_isolation,
+        &test_dir,
+        &RuntimeEnv::current(),
+    );
+
+    let context = shared_test_context(&test_prefix, host_platform);
 
     script
         .run_script(
             test_env_vars.clone(),
             &test_dir,
             path,
-            &test_prefix,
-            None,
+            context.clone(),
             None::<fn(&str) -> Result<String, String>>,
             None,
             config.env_isolation,
@@ -812,8 +902,7 @@ async fn run_python_test_inner(
                 test_env_vars,
                 path,
                 path,
-                &test_prefix,
-                None,
+                context,
                 None::<fn(&str) -> Result<String, String>>,
                 None,
                 config.env_isolation,
@@ -844,14 +933,7 @@ async fn run_perl_test(
     let span = tracing::info_span!("Running perl test", span_color = pkg_id);
     let _guard = span.enter();
 
-    let match_spec = MatchSpec::from_str(
-        format!(
-            "{}={}={}",
-            pkg.identifier.name, pkg.identifier.version, pkg.identifier.build_string
-        )
-        .as_str(),
-        ParseStrictness::Lenient,
-    )?;
+    let match_spec = match_spec_for_identifier(&pkg.identifier)?;
 
     let dependencies = vec!["perl".parse().unwrap(), match_spec];
 
@@ -871,7 +953,8 @@ async fn run_perl_test(
         config.exclude_newer,
     )
     .await
-    .map_err(|e| TestError::TestEnvironmentSetup(format!("{e:?}")))?;
+    .wrap_err("failed to setup test environment")
+    .map_err(TestError::TestEnvironmentSetup)?;
 
     let mut imports = String::new();
     tracing::info!("Testing perl imports:\n");
@@ -891,17 +974,24 @@ async fn run_perl_test(
     let test_folder = prefix.join("test_files");
     fs::create_dir_all(&test_folder)?;
 
-    let platform = Platform::current();
-    let test_env_vars =
-        env_vars::os_vars(&test_prefix, &platform, config.env_isolation, &test_folder);
+    let (target_platform, build_platform, host_platform) = configured_test_platforms(config);
+    let test_env_vars = env_vars::os_vars(
+        &test_prefix,
+        &target_platform,
+        &host_platform,
+        &build_platform,
+        config.env_isolation,
+        &test_folder,
+        &RuntimeEnv::current(),
+    );
+    let context = shared_test_context(&test_prefix, host_platform);
 
     script
         .run_script(
             test_env_vars,
             &test_folder,
             path,
-            &test_prefix,
-            None,
+            context,
             None::<fn(&str) -> Result<String, String>>,
             None,
             config.env_isolation,
@@ -949,7 +1039,8 @@ async fn run_commands_test(
             config.exclude_newer,
         )
         .await
-        .map_err(|e| TestError::TestEnvironmentSetup(format!("{e:?}")))?;
+        .wrap_err("failed to setup test environment")
+        .map_err(TestError::TestEnvironmentSetup)?;
         Some(build_prefix)
     } else {
         None
@@ -959,14 +1050,7 @@ async fn run_commands_test(
         deps.run.iter().map(|d| d.as_match_spec().clone()).collect();
 
     // create environment with the test dependencies
-    dependencies.push(MatchSpec::from_str(
-        format!(
-            "{}={}={}",
-            pkg.identifier.name, pkg.identifier.version, pkg.identifier.build_string
-        )
-        .as_str(),
-        ParseStrictness::Lenient,
-    )?);
+    dependencies.push(match_spec_for_identifier(&pkg.identifier)?);
 
     let platform = config
         .host_platform
@@ -986,7 +1070,8 @@ async fn run_commands_test(
         config.exclude_newer,
     )
     .await
-    .map_err(|e| TestError::TestEnvironmentSetup(format!("{e:?}")))?;
+    .wrap_err("failed to setup test environment")
+    .map_err(TestError::TestEnvironmentSetup)?;
 
     let target_platform = config.target_platform.unwrap_or(Platform::current());
     let build_platform = config.current_platform.platform;
@@ -1006,10 +1091,17 @@ async fn run_commands_test(
         )))
     })?;
 
-    let platform = Platform::current();
-    let mut env_vars = env_vars::os_vars(&run_prefix, &platform, config.env_isolation, &test_dir);
+    let mut env_vars = env_vars::os_vars(
+        &run_prefix,
+        &target_platform,
+        &host_platform,
+        &build_platform,
+        config.env_isolation,
+        &test_dir,
+        &RuntimeEnv::current(),
+    );
     if config.env_isolation == EnvironmentIsolation::None {
-        env_vars.retain(|key, _| key != ShellEnum::default().path_var(&platform));
+        env_vars.retain(|key, _| key != ShellEnum::default().path_var(&build_platform));
     }
     env_vars.extend(env_vars::test_vars(
         target_platform,
@@ -1019,13 +1111,25 @@ async fn run_commands_test(
     env_vars.extend(env_vars::python_vars_from_records(
         &resolved_records,
         &run_prefix,
-        platform,
+        host_platform,
     ));
     env_vars.extend(pkg_vars.iter().map(|(k, v)| (k.clone(), Some(v.clone()))));
     env_vars.insert(
         "PREFIX".to_string(),
         Some(run_prefix.to_string_lossy().to_string()),
     );
+
+    let context = if let Some(build_prefix) = build_prefix {
+        ExecutionContext::separate(
+            RuntimeEnv::current(),
+            build_prefix,
+            build_platform,
+            &run_prefix,
+            host_platform,
+        )
+    } else {
+        shared_test_context(&run_prefix, host_platform)
+    };
 
     tracing::info!("Testing commands:");
     commands_test
@@ -1034,8 +1138,7 @@ async fn run_commands_test(
             env_vars,
             &test_dir,
             path,
-            &run_prefix,
-            build_prefix.as_ref(),
+            context,
             None::<fn(&str) -> Result<String, String>>,
             None,
             config.env_isolation,
@@ -1071,14 +1174,7 @@ async fn run_downstream_test(
     // current package
     let match_specs = [
         MatchSpec::from_str(&downstream_spec, ParseStrictness::Lenient)?,
-        MatchSpec::from_str(
-            format!(
-                "{}={}={}",
-                pkg.identifier.name, pkg.identifier.version, pkg.identifier.build_string
-            )
-            .as_str(),
-            ParseStrictness::Lenient,
-        )?,
+        match_spec_for_identifier(&pkg.identifier)?,
     ];
 
     let resolved = create_environment(
@@ -1168,14 +1264,7 @@ async fn run_r_test(
     let span = tracing::info_span!("Running R test", span_color = pkg_id);
     let _guard = span.enter();
 
-    let match_spec = MatchSpec::from_str(
-        format!(
-            "{}={}={}",
-            pkg.identifier.name, pkg.identifier.version, pkg.identifier.build_string
-        )
-        .as_str(),
-        ParseStrictness::Lenient,
-    )?;
+    let match_spec = match_spec_for_identifier(&pkg.identifier)?;
 
     let dependencies = vec!["r-base".parse().unwrap(), match_spec];
     let test_prefix = prefix.join("test_env");
@@ -1194,7 +1283,8 @@ async fn run_r_test(
         config.exclude_newer,
     )
     .await
-    .map_err(|e| TestError::TestEnvironmentSetup(format!("{e:?}")))?;
+    .wrap_err("failed to setup test environment")
+    .map_err(TestError::TestEnvironmentSetup)?;
 
     let mut libraries = String::new();
     tracing::info!("Testing R libraries:\n");
@@ -1214,17 +1304,24 @@ async fn run_r_test(
     let test_folder = prefix.join("test_files");
     fs::create_dir_all(&test_folder)?;
 
-    let platform = Platform::current();
-    let test_env_vars =
-        env_vars::os_vars(&test_prefix, &platform, config.env_isolation, &test_folder);
+    let (target_platform, build_platform, host_platform) = configured_test_platforms(config);
+    let test_env_vars = env_vars::os_vars(
+        &test_prefix,
+        &target_platform,
+        &host_platform,
+        &build_platform,
+        config.env_isolation,
+        &test_folder,
+        &RuntimeEnv::current(),
+    );
+    let context = shared_test_context(&test_prefix, host_platform);
 
     script
         .run_script(
             test_env_vars,
             &test_folder,
             path,
-            &test_prefix,
-            None,
+            context,
             None::<fn(&str) -> Result<String, String>>,
             None,
             config.env_isolation,
@@ -1250,14 +1347,7 @@ async fn run_ruby_test(
     let span = tracing::info_span!("Running Ruby test", span_color = pkg_id);
     let _guard = span.enter();
 
-    let match_spec = MatchSpec::from_str(
-        format!(
-            "{}={}={}",
-            pkg.identifier.name, pkg.identifier.version, pkg.identifier.build_string
-        )
-        .as_str(),
-        ParseStrictness::Lenient,
-    )?;
+    let match_spec = match_spec_for_identifier(&pkg.identifier)?;
 
     let dependencies = vec!["ruby".parse().unwrap(), match_spec];
 
@@ -1277,7 +1367,8 @@ async fn run_ruby_test(
         config.exclude_newer,
     )
     .await
-    .map_err(|e| TestError::TestEnvironmentSetup(format!("{e:?}")))?;
+    .wrap_err("failed to setup test environment")
+    .map_err(TestError::TestEnvironmentSetup)?;
 
     let mut requires = String::new();
     tracing::info!("Testing Ruby requires:\n");
@@ -1297,17 +1388,24 @@ async fn run_ruby_test(
     let test_folder = prefix.join("test_files");
     fs::create_dir_all(&test_folder)?;
 
-    let platform = Platform::current();
-    let test_env_vars =
-        env_vars::os_vars(&test_prefix, &platform, config.env_isolation, &test_folder);
+    let (target_platform, build_platform, host_platform) = configured_test_platforms(config);
+    let test_env_vars = env_vars::os_vars(
+        &test_prefix,
+        &target_platform,
+        &host_platform,
+        &build_platform,
+        config.env_isolation,
+        &test_folder,
+        &RuntimeEnv::current(),
+    );
+    let context = shared_test_context(&test_prefix, host_platform);
 
     script
         .run_script(
             test_env_vars,
             &test_folder,
             path,
-            &test_prefix,
-            None,
+            context,
             None::<fn(&str) -> Result<String, String>>,
             None,
             config.env_isolation,
@@ -1316,4 +1414,174 @@ async fn run_ruby_test(
         .map_err(|e| TestError::TestFailed(e.to_string()))?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn shared_test_context_executes_the_host_prefix_platform() {
+        let context = shared_test_context(Path::new("test-prefix"), Platform::WinArm64);
+        assert_eq!(context.build().path(), Path::new("test-prefix"));
+        assert_eq!(context.host().path(), Path::new("test-prefix"));
+        assert_eq!(context.build().platform(), Platform::WinArm64);
+        assert_eq!(context.host().platform(), Platform::WinArm64);
+    }
+
+    /// Verifies that a trailing-underscore version (the openssl ordering
+    /// convention, e.g. `3.7_`) is assembled into a `MatchSpec` that matches the
+    /// exact version, without degrading into the broken string re-parse result.
+    /// Reproduces and guards <https://github.com/prefix-dev/rattler-build/issues/2590>.
+    #[test]
+    fn match_spec_for_trailing_underscore_version() {
+        let identifier = ArchiveIdentifier {
+            name: "tmux".to_string(),
+            version: "3.7_".to_string(),
+            build_string: "hd811a6c_0".to_string(),
+        };
+
+        let spec = match_spec_for_identifier(&identifier).expect("should build a MatchSpec");
+
+        // Name matches exactly.
+        assert_eq!(
+            spec.name,
+            PackageNameMatcher::Exact(PackageName::try_from("tmux").unwrap())
+        );
+
+        // The version must equal `3.7_` exactly, not be truncated to `3.7`.
+        let expected_version = Version::from_str("3.7_").unwrap();
+        assert_eq!(
+            spec.version,
+            Some(VersionSpec::Exact(
+                EqualityOperator::Equals,
+                expected_version.clone()
+            ))
+        );
+
+        // The build string must be preserved fully, without swallowing the `_`.
+        assert_eq!(
+            spec.build,
+            Some(StringMatcher::Exact("hd811a6c_0".to_string()))
+        );
+
+        // Key regression point: `3.7_` and `3.7` are different versions; the
+        // trailing underscore must not be dropped.
+        assert_ne!(expected_version, Version::from_str("3.7").unwrap());
+    }
+
+    /// Same trailing-underscore bug, but with a letter before the underscore
+    /// (e.g. `3.7a_`). The old string round-trip truncates the version to `3.7a`
+    /// and swallows `_=` into the build string; the typed path must keep the
+    /// full `3.7a_` version and the intact build string.
+    /// Reproduces and guards <https://github.com/prefix-dev/rattler-build/issues/2590>.
+    #[test]
+    fn match_spec_for_trailing_underscore_after_letter_version() {
+        let identifier = ArchiveIdentifier {
+            name: "tmux".to_string(),
+            version: "3.7a_".to_string(),
+            build_string: "hd811a6c_0".to_string(),
+        };
+
+        let spec = match_spec_for_identifier(&identifier).expect("should build a MatchSpec");
+
+        // The version must equal `3.7a_` exactly, not be truncated to `3.7a`.
+        let expected_version = Version::from_str("3.7a_").unwrap();
+        assert_eq!(
+            spec.version,
+            Some(VersionSpec::Exact(
+                EqualityOperator::Equals,
+                expected_version.clone()
+            ))
+        );
+
+        // The build string must be preserved fully, without swallowing the `_`.
+        assert_eq!(
+            spec.build,
+            Some(StringMatcher::Exact("hd811a6c_0".to_string()))
+        );
+
+        // `3.7a_` and `3.7a` are different versions; the trailing underscore
+        // must not be dropped.
+        assert_ne!(expected_version, Version::from_str("3.7a").unwrap());
+    }
+
+    /// Directly compares the old "string round-trip parse" path against the new
+    /// typed-assembly path.
+    ///
+    /// The old path `MatchSpec::from_str("tmux=3.7_=hd811a6c_0")` used to
+    /// tokenize the `_=` incorrectly, yielding `version=3.7` (underscore
+    /// dropped) and `build="_=hd811a6c_0"` (the `_=` swallowed), which failed to
+    /// match the real artifact `version=3.7_`, `build=hd811a6c_0` and made the
+    /// solver report "No candidates were found". `rattler_conda_types` 0.49 fixed
+    /// that tokenization, so both paths now agree; we keep asserting on both so a
+    /// regression on either side is caught.
+    /// See <https://github.com/prefix-dev/rattler-build/issues/2590>.
+    #[test]
+    fn string_roundtrip_and_typed_path_agree() {
+        let (name, version, build) = ("tmux", "3.7_", "hd811a6c_0");
+
+        let legacy = MatchSpec::from_str(
+            &format!("{name}={version}={build}"),
+            ParseStrictness::Lenient,
+        )
+        .expect("string round-trip parses");
+        assert_eq!(
+            legacy.version,
+            Some(VersionSpec::Exact(
+                EqualityOperator::Equals,
+                Version::from_str("3.7_").unwrap()
+            )),
+            "the trailing underscore must be kept as part of the version"
+        );
+        assert_eq!(
+            legacy.build,
+            Some(StringMatcher::Exact(build.to_string())),
+            "the build string must not swallow the `_=`"
+        );
+
+        // New path: assembles the spec from typed fields, no parsing involved.
+        let fixed = match_spec_for_identifier(&ArchiveIdentifier {
+            name: name.to_string(),
+            version: version.to_string(),
+            build_string: build.to_string(),
+        })
+        .expect("new path builds a MatchSpec");
+        assert_eq!(
+            fixed.version,
+            Some(VersionSpec::Exact(
+                EqualityOperator::Equals,
+                Version::from_str("3.7_").unwrap()
+            ))
+        );
+        assert_eq!(fixed.build, Some(StringMatcher::Exact(build.to_string())));
+
+        assert_eq!(legacy.version, fixed.version);
+        assert_eq!(legacy.build, fixed.build);
+    }
+
+    /// A regular version (no trailing underscore) must also assemble correctly,
+    /// ensuring the fix introduces no regression.
+    #[test]
+    fn match_spec_for_regular_version() {
+        let identifier = ArchiveIdentifier {
+            name: "python".to_string(),
+            version: "3.12.1".to_string(),
+            build_string: "h1234567_0".to_string(),
+        };
+
+        let spec = match_spec_for_identifier(&identifier).expect("should build a MatchSpec");
+
+        assert_eq!(
+            spec.version,
+            Some(VersionSpec::Exact(
+                EqualityOperator::Equals,
+                Version::from_str("3.12.1").unwrap()
+            ))
+        );
+        assert_eq!(
+            spec.build,
+            Some(StringMatcher::Exact("h1234567_0".to_string()))
+        );
+    }
 }

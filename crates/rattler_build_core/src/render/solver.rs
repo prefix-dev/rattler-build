@@ -15,9 +15,7 @@ use super::reporters::GatewayReporter;
 
 fn print_as_table(packages: &[RepoDataRecord]) {
     let mut table = Table::new();
-    table
-        .load_preset(comfy_table::presets::UTF8_FULL_CONDENSED)
-        .apply_modifier(comfy_table::modifiers::UTF8_ROUND_CORNERS);
+    table.load_style(comfy_table::presets::UTF8_FULL_CONDENSED.with_rounded_corners());
     table.set_header(vec![
         "Package", "Version", "Build", "Channel", "Size",
         // "License",
@@ -62,7 +60,7 @@ pub async fn solve_environment(
     tool_configuration: &tool_configuration::Configuration,
     channel_priority: ChannelPriority,
     solve_strategy: SolveStrategy,
-    exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
+    exclude_newer: Option<jiff::Timestamp>,
 ) -> miette::Result<Vec<RepoDataRecord>> {
     let span_msg = format!("Resolving {name} environment");
     let span = tracing::info_span!("", message = %span_msg);
@@ -134,7 +132,7 @@ pub async fn create_environment(
     tool_configuration: &tool_configuration::Configuration,
     channel_priority: ChannelPriority,
     solve_strategy: SolveStrategy,
-    exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
+    exclude_newer: Option<jiff::Timestamp>,
 ) -> miette::Result<Vec<RepoDataRecord>> {
     let required_packages = solve_environment(
         name,
@@ -208,7 +206,15 @@ pub async fn load_repodatas(
         .clear()
         .unwrap();
 
-    Ok(result)
+    // `query` returns a `RepoDataQueryOutput`: repodata records plus any
+    // non-fatal warnings gathered during the query (e.g. CEP-42 channel
+    // relations). Surface the warnings to the user instead of dropping them,
+    // then return the records.
+    for warning in &result.warnings {
+        tracing::warn!("{warning}");
+    }
+
+    Ok(result.repodata)
 }
 
 pub async fn install_packages(

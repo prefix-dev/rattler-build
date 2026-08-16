@@ -5,6 +5,8 @@ use pyo3::types::PyDict;
 use pyo3::{IntoPyObjectExt, prelude::*};
 use rattler_build_recipe::stage0;
 
+use crate::repodata_revision::PyRepodataRevision;
+
 /// Stage0 Recipe - The parsed recipe before evaluation
 ///
 /// This is a union type that wraps either SingleOutputRecipe or MultiOutputRecipe.
@@ -19,18 +21,25 @@ pub struct PyStage0Recipe {
 impl PyStage0Recipe {
     /// Parse a recipe from YAML string
     #[staticmethod]
-    #[pyo3(signature = (yaml, v3=false))]
-    fn from_yaml(yaml: &str, v3: bool) -> PyResult<Self> {
-        let recipe =
-            stage0::parse_recipe_or_multi_from_source_with_config(yaml, stage0::ParseConfig { v3 })
-                .map_err(|e| RattlerBuildError::RecipeParse(format!("{}", e)))?;
+    #[pyo3(signature = (yaml, repodata_revision=None))]
+    fn from_yaml(yaml: &str, repodata_revision: Option<PyRepodataRevision>) -> PyResult<Self> {
+        let recipe = stage0::parse_recipe_or_multi_from_source_with_config(
+            yaml,
+            stage0::ParseConfig {
+                repodata_revision: repodata_revision.unwrap_or_default().into(),
+            },
+        )
+        .map_err(|e| RattlerBuildError::RecipeParse(format!("{}", e)))?;
         Ok(PyStage0Recipe { inner: recipe })
     }
 
     /// Create a recipe from a Python dictionary
     #[staticmethod]
-    #[pyo3(signature = (dict, v3=false))]
-    fn from_dict(dict: &Bound<'_, PyAny>, v3: bool) -> PyResult<Self> {
+    #[pyo3(signature = (dict, repodata_revision=None))]
+    fn from_dict(
+        dict: &Bound<'_, PyAny>,
+        repodata_revision: Option<PyRepodataRevision>,
+    ) -> PyResult<Self> {
         // Convert Python dict to JSON value via pythonize
         let json_value: serde_json::Value = pythonize::depythonize(dict).map_err(|e| {
             RattlerBuildError::RecipeParse(format!("Failed to convert Python dict to JSON: {}", e))
@@ -45,7 +54,9 @@ impl PyStage0Recipe {
         // Parse as YAML (YAML is a superset of JSON, so this works)
         let recipe = stage0::parse_recipe_or_multi_from_source_with_config(
             &json_string,
-            stage0::ParseConfig { v3 },
+            stage0::ParseConfig {
+                repodata_revision: repodata_revision.unwrap_or_default().into(),
+            },
         )
         .map_err(|e| RattlerBuildError::RecipeParse(format!("{}", e)))?;
 
@@ -452,14 +463,32 @@ impl PyStage0Build {
         }
     }
 
-    /// Get the build script configuration
+    /// Get the build script configuration, if this build uses script mode.
     #[getter]
-    fn script(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let json_value =
-            serde_json::to_value(&self.inner.script).map_err(RattlerBuildError::from)?;
-        pythonize::pythonize(py, &json_value)
-            .map(|obj| obj.into())
-            .map_err(|e| RattlerBuildError::RecipeParse(format!("{}", e)).into())
+    fn script(&self, py: Python<'_>) -> PyResult<Option<Py<PyAny>>> {
+        match self.inner.plan.script() {
+            Some(script) => {
+                let json_value = serde_json::to_value(script).map_err(RattlerBuildError::from)?;
+                let py_value = pythonize::pythonize(py, &json_value)
+                    .map_err(|e| RattlerBuildError::RecipeParse(format!("{}", e)))?;
+                Ok(Some(py_value.into()))
+            }
+            None => Ok(None),
+        }
+    }
+
+    /// Get the build steps, if this build uses steps mode.
+    #[getter]
+    fn steps(&self, py: Python<'_>) -> PyResult<Option<Py<PyAny>>> {
+        match self.inner.plan.steps() {
+            Some(steps) => {
+                let json_value = serde_json::to_value(steps).map_err(RattlerBuildError::from)?;
+                let py_value = pythonize::pythonize(py, &json_value)
+                    .map_err(|e| RattlerBuildError::RecipeParse(format!("{}", e)))?;
+                Ok(Some(py_value.into()))
+            }
+            None => Ok(None),
+        }
     }
 
     /// Get the noarch type (may be a template or None)

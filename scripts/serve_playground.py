@@ -21,9 +21,11 @@ WASM_FILES = [
 
 
 def sync_www() -> None:
-    """Copy all www/ files into deploy/."""
+    """Copy all www/ files (and asset subdirectories) into deploy/."""
     for f in WWW_DIR.iterdir():
-        if f.is_file():
+        if f.is_dir():
+            shutil.copytree(f, DEPLOY_DIR / f.name, dirs_exist_ok=True)
+        else:
             shutil.copy2(f, DEPLOY_DIR / f.name)
 
 

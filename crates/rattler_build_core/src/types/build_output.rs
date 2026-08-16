@@ -91,7 +91,7 @@ impl BuildOutput {
             "{}-{}-{}",
             self.name().as_normalized(),
             self.version(),
-            &self.build_string()
+            self.build_string()
         )
     }
 
@@ -106,7 +106,7 @@ impl BuildOutput {
 
     /// Record the start of the build
     pub fn record_build_start(&self) {
-        self.build_summary.lock().unwrap().build_start = Some(chrono::Utc::now());
+        self.build_summary.lock().unwrap().build_start = Some(jiff::Timestamp::now());
     }
 
     /// Record the artifact that was created during the build
@@ -119,7 +119,7 @@ impl BuildOutput {
     /// Record the end of the build
     pub fn record_build_end(&self) {
         let mut summary = self.build_summary.lock().unwrap();
-        summary.build_end = Some(chrono::Utc::now());
+        summary.build_end = Some(jiff::Timestamp::now());
     }
 
     /// Shorthand to retrieve the variant configuration for this output
@@ -319,17 +319,15 @@ impl BuildOutput {
     fn format_table_with_option(
         &self,
         f: &mut impl fmt::Write,
-        table_format: &str,
+        table_format: comfy_table::TableStyle,
         long: bool,
     ) -> std::fmt::Result {
         let template = || -> comfy_table::Table {
             let mut table = comfy_table::Table::new();
             if table_format == comfy_table::presets::UTF8_FULL {
-                table
-                    .load_preset(comfy_table::presets::UTF8_FULL_CONDENSED)
-                    .apply_modifier(comfy_table::modifiers::UTF8_ROUND_CORNERS);
+                table.load_style(comfy_table::presets::UTF8_FULL_CONDENSED.with_rounded_corners());
             } else {
-                table.load_preset(table_format);
+                table.load_style(table_format);
             }
             table
         };
@@ -355,7 +353,11 @@ impl BuildOutput {
                 writeln!(f, "{}\n", host.to_table(template(), long))?;
             }
 
-            if !finalized_dependencies.run.depends.is_empty() {
+            let run = &finalized_dependencies.run;
+            if !run.depends.is_empty()
+                || !run.constraints.is_empty()
+                || !run.extra_depends.is_empty()
+            {
                 writeln!(f, "Run dependencies:")?;
                 writeln!(
                     f,

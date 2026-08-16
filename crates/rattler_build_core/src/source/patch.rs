@@ -2,6 +2,7 @@
 use crate::system_tools::{SystemTools, Tool};
 
 use super::SourceError;
+use rattler_build_types::LateBoundPath;
 
 use std::io::Write;
 use std::{
@@ -11,8 +12,9 @@ use std::{
 };
 
 use flickzeug::{
-    ApplyConfig, ApplyError, Diff, FuzzyConfig, HunkRangeStrategy, ParsePatchError, ParserConfig,
-    Patch, apply_bytes_with_config, patch_from_bytes_with_config,
+    ApplyConfig, ApplyError, ApplyOutcome, Diff, FuzzyConfig, HunkRangeStrategy, ParsePatchError,
+    ParserConfig, Patch, apply_bytes_reporting, apply_bytes_with_config,
+    patch_from_bytes_with_config,
 };
 use fs_err::File;
 use itertools::Itertools;
@@ -165,20 +167,21 @@ fn patch_from_bytes_raw(input: &[u8]) -> Result<Patch<'_, [u8]>, ParsePatchError
     )
 }
 
-fn apply(base_image: &[u8], diff: &Diff<'_, [u8]>) -> Result<Vec<u8>, ApplyError> {
-    apply_bytes_with_config(
-        base_image,
-        diff,
-        &ApplyConfig {
-            fuzzy_config: FuzzyConfig {
-                max_fuzz: 2,
-                ignore_whitespace: true,
-                ignore_case: false,
-            },
-            ..Default::default()
+/// The fuzzy-matching configuration used for all patch application. Shared by
+/// `apply` and the already-applied detection so both agree on what "applies".
+fn apply_config() -> ApplyConfig {
+    ApplyConfig {
+        fuzzy_config: FuzzyConfig {
+            max_fuzz: 2,
+            ignore_whitespace: true,
+            ignore_case: false,
         },
-    )
-    .map(|(content, _stats)| content)
+        ..Default::default()
+    }
+}
+
+fn apply(base_image: &[u8], diff: &Diff<'_, [u8]>) -> Result<Vec<u8>, ApplyError> {
+    apply_bytes_with_config(base_image, diff, &apply_config()).map(|(content, _stats)| content)
 }
 
 // Returns number by which all patch paths must be stripped to be
@@ -358,6 +361,13 @@ pub fn apply_patch_custom(work_dir: &Path, patch_file_path: &Path) -> Result<(),
         .map_err(|_| SourceError::PatchParseFailed(patch_file_path.to_path_buf()))?;
     let strip_level = guess_strip_level(&patch, work_dir)?;
 
+    // Track whether every diff in the patch turned out to be a no-op because it
+    // was already applied (e.g. the change was merged upstream). If so, we warn
+    // that the patch can likely be dropped from the recipe rather than silently
+    // claiming to have applied it.
+    let mut saw_diff = false;
+    let mut all_already_applied = true;
+
     for diff in patch {
         let file_paths = custom_patch_stripped_paths(&diff, strip_level, work_dir);
         let absolute_file_paths = (
@@ -374,47 +384,103 @@ pub fn apply_patch_custom(work_dir: &Path, patch_file_path: &Path) -> Result<(),
         match absolute_file_paths {
             (None, None) => continue,
             (None, Some(m)) => {
+                saw_diff = true;
                 let new_file_content = apply(&[], &diff).map_err(SourceError::PatchApplyError)?;
+                // Already applied if the target already holds the produced content.
+                if fs_err::read(&m).is_ok_and(|existing| existing == new_file_content) {
+                    continue;
+                }
+                all_already_applied = false;
                 write_patch_content(&new_file_content, &m)?;
             }
             (Some(o), None) => {
-                fs_err::remove_file(work_dir.join(o)).map_err(SourceError::Io)?;
+                saw_diff = true;
+                // Already applied if the file to delete is already gone.
+                if o.exists() {
+                    all_already_applied = false;
+                    fs_err::remove_file(&o).map_err(SourceError::Io)?;
+                }
             }
             (Some(o), Some(m)) => {
+                saw_diff = true;
                 // Check if the original file exists
                 // If it doesn't, treat this as creating a new file
                 if !o.exists() {
+                    // A rename whose source is already gone and whose
+                    // destination exists is already applied; otherwise create
+                    // the new file from scratch.
+                    if o != m && m.exists() {
+                        continue;
+                    }
+                    all_already_applied = false;
                     let new_file_content =
                         apply(&[], &diff).map_err(SourceError::PatchApplyError)?;
                     write_patch_content(&new_file_content, &m)?;
                 } else {
                     let old_file_content = fs_err::read(&o).map_err(SourceError::Io)?;
 
-                    let new_file_content =
-                        apply(&old_file_content, &diff).map_err(SourceError::PatchApplyError)?;
-
-                    if o != m {
-                        fs_err::remove_file(&o).map_err(SourceError::Io)?;
+                    // `apply_bytes_reporting` reports whether the file already
+                    // reflects the patched state, which is reliable even under
+                    // the fuzzy matching we enable (a plain forward apply can
+                    // silently succeed as a no-op on already-patched content).
+                    match apply_bytes_reporting(&old_file_content, &diff, &apply_config()) {
+                        ApplyOutcome::AlreadyApplied(_) => continue,
+                        ApplyOutcome::Applied(new_file_content, _stats) => {
+                            all_already_applied = false;
+                            if o != m {
+                                fs_err::remove_file(&o).map_err(SourceError::Io)?;
+                            }
+                            write_patch_content(&new_file_content, &m)?;
+                        }
+                        ApplyOutcome::Failed(e) => return Err(SourceError::PatchApplyError(e)),
                     }
-
-                    write_patch_content(&new_file_content, &m)?;
                 }
             }
         }
     }
 
+    if saw_diff && all_already_applied {
+        tracing::warn!(
+            "Patch '{}' appears to be already applied; skipping. It may no longer be necessary and can likely be removed from the recipe.",
+            patch_file_path.display()
+        );
+    }
+
     Ok(())
 }
 
-/// Applies all patches in a list of patches to the specified work directory
+/// Applies all patches in a list of patches to the specified work directory.
+///
+/// Patch paths may reference a restricted set of late-bound build directory
+/// variables (`SRC_DIR`, `RECIPE_DIR`, `BUILD_DIR`) which are resolved here. A
+/// patch that does not reference any of these resolves to a path relative to
+/// the recipe directory, preserving the previous behavior.
+///
+/// * `dest_dir` is the directory the patch is applied to (the source folder).
+/// * `recipe_dir` / `src_dir` / `build_dir` are used both for late-bound
+///   resolution and (for `recipe_dir`) as the base for relative patch paths.
 pub(crate) fn apply_patches(
-    patches: &[PathBuf],
-    work_dir: &Path,
+    patches: &[LateBoundPath],
+    dest_dir: &Path,
     recipe_dir: &Path,
+    src_dir: &Path,
+    build_dir: &Path,
     apply_patch: impl Fn(&Path, &Path) -> Result<(), SourceError>,
 ) -> Result<(), SourceError> {
-    for patch_path_relative in patches {
-        let patch_file_path = recipe_dir.join(patch_path_relative);
+    for patch in patches {
+        // Resolve any late-bound variables (`${{ SRC_DIR }}`, ...). For a plain
+        // relative patch path this is a no-op and the path stays relative.
+        let resolved = patch.resolve(|var| match var {
+            "SRC_DIR" => Some(src_dir.to_path_buf()),
+            "RECIPE_DIR" => Some(recipe_dir.to_path_buf()),
+            "BUILD_DIR" => Some(build_dir.to_path_buf()),
+            _ => None,
+        });
+
+        // Joining an absolute path (e.g. a resolved `${{ SRC_DIR }}/...`) onto
+        // `recipe_dir` discards the base, so absolute and recipe-relative paths
+        // are both handled correctly.
+        let patch_file_path = recipe_dir.join(&resolved);
 
         tracing::info!("Applying patch: {}", patch_file_path.to_string_lossy());
 
@@ -422,7 +488,7 @@ pub(crate) fn apply_patches(
             return Err(SourceError::PatchNotFound(patch_file_path));
         }
 
-        apply_patch(work_dir, patch_file_path.as_path())?;
+        apply_patch(dest_dir, patch_file_path.as_path())?;
     }
     Ok(())
 }
@@ -525,8 +591,10 @@ mod tests {
 
         // Test with normal patch
         apply_patches(
-            &[PathBuf::from("test.patch")],
+            &[LateBoundPath::new("test.patch")],
             &tempdir.path().join("workdir"),
+            &tempdir.path().join("patches"),
+            &tempdir.path().join("patches"),
             &tempdir.path().join("patches"),
             apply_patch_custom,
         )
@@ -538,13 +606,134 @@ mod tests {
     }
 
     #[test]
+    fn test_already_applied_patch_is_skipped() {
+        // Applying the same patch a second time should be detected as
+        // already-applied and skipped, leaving the file untouched rather than
+        // corrupting it or erroring out.
+        let (tempdir, _) = setup_patch_test_dir();
+        let work_dir = tempdir.path().join("workdir");
+        let patches_dir = tempdir.path().join("patches");
+
+        apply_patches(
+            &[LateBoundPath::new(
+                "0001-increase-minimum-cmake-version.patch",
+            )],
+            &work_dir,
+            &patches_dir,
+            &patches_dir,
+            &patches_dir,
+            apply_patch_custom,
+        )
+        .expect("first application should succeed");
+
+        let cmake_list = work_dir.join("CMakeLists.txt");
+        let after_first = fs_err::read_to_string(&cmake_list).unwrap();
+        assert!(after_first.contains("cmake_minimum_required(VERSION 3.12)"));
+
+        // The patch is now fully applied. Re-applying it must be detected as a
+        // no-op and skipped rather than corrupting the file or erroring.
+        apply_patches(
+            &[LateBoundPath::new(
+                "0001-increase-minimum-cmake-version.patch",
+            )],
+            &work_dir,
+            &patches_dir,
+            &patches_dir,
+            &patches_dir,
+            apply_patch_custom,
+        )
+        .expect("re-applying an already-applied patch should not error");
+
+        // The file must be byte-for-byte identical after the second (skipped)
+        // application.
+        let after_second = fs_err::read_to_string(&cmake_list).unwrap();
+        assert_eq!(
+            after_first, after_second,
+            "already-applied patch must not modify the file again"
+        );
+    }
+
+    #[test]
+    fn test_deletion_only_patch_is_applied() {
+        // A patch that only deletes lines must actually be applied, not be
+        // misdetected as "already applied" and skipped. Regression test for
+        // https://github.com/prefix-dev/rattler-build/issues/2693
+        let (tempdir, _) = setup_patch_test_dir();
+        let work_dir = tempdir.path().join("workdir");
+        let patches_dir = tempdir.path().join("patches");
+
+        apply_patches(
+            &[LateBoundPath::new("test_deletion_only.patch")],
+            &work_dir,
+            &patches_dir,
+            &patches_dir,
+            &patches_dir,
+            apply_patch_custom,
+        )
+        .expect("deletion-only patch should apply");
+
+        let content = fs_err::read_to_string(work_dir.join("deletion_only.cmake")).unwrap();
+        assert!(
+            !content.contains("add_compile_options(/MTd)"),
+            "deletion-only patch was not applied:\n{content}"
+        );
+        assert!(content.contains("add_compile_options(/utf-8)"));
+
+        // Re-applying it now must be detected as already applied and skipped.
+        apply_patches(
+            &[LateBoundPath::new("test_deletion_only.patch")],
+            &work_dir,
+            &patches_dir,
+            &patches_dir,
+            &patches_dir,
+            apply_patch_custom,
+        )
+        .expect("re-applying an already-applied deletion-only patch should not error");
+
+        let after_second = fs_err::read_to_string(work_dir.join("deletion_only.cmake")).unwrap();
+        assert_eq!(content, after_second);
+    }
+
+    #[test]
+    fn test_deletion_only_patch_with_stale_context_fails() {
+        // Same deletion-only patch shape, but its trailing context references a
+        // line that does not exist in the target file (patch written against a
+        // newer upstream). GNU patch rejects this; we must error out instead of
+        // skipping it as "already applied".
+        let (tempdir, _) = setup_patch_test_dir();
+        let work_dir = tempdir.path().join("workdir");
+        let patches_dir = tempdir.path().join("patches");
+
+        let before = fs_err::read_to_string(work_dir.join("deletion_only_stale.cmake")).unwrap();
+
+        let result = apply_patches(
+            &[LateBoundPath::new("test_deletion_only_stale_context.patch")],
+            &work_dir,
+            &patches_dir,
+            &patches_dir,
+            &patches_dir,
+            apply_patch_custom,
+        );
+        assert!(
+            result.is_err(),
+            "patch with non-matching context must fail to apply"
+        );
+
+        // The target file must be left untouched.
+        let after = fs_err::read_to_string(work_dir.join("deletion_only_stale.cmake")).unwrap();
+        assert_eq!(before, after);
+    }
+
+    #[test]
     fn test_apply_patches_with_orig() {
         let (tempdir, _) = setup_patch_test_dir();
 
         // Test with normal patch
         apply_patches(
-            &[PathBuf::from("test_with_orig.patch")],
+            &[LateBoundPath::new("test_with_orig.patch")],
             &tempdir.path().join("workdir"),
+            &tempdir.path().join("patches"),
+            &tempdir.path().join("patches"),
             &tempdir.path().join("patches"),
             apply_patch_custom,
         )
@@ -573,8 +762,10 @@ mod tests {
         assert!(!work_dir.join("launcher.c").exists());
 
         apply_patches(
-            &[PathBuf::from("conda_launcher.patch")],
+            &[LateBoundPath::new("conda_launcher.patch")],
             &work_dir,
+            &tempdir.path().join("patches"),
+            &tempdir.path().join("patches"),
             &tempdir.path().join("patches"),
             apply_patch_custom,
         )
@@ -603,8 +794,10 @@ mod tests {
 
         // Test with .bak extension patch
         apply_patches(
-            &[PathBuf::from("test_with_bak.patch")],
+            &[LateBoundPath::new("test_with_bak.patch")],
             &tempdir.path().join("workdir"),
+            &tempdir.path().join("patches"),
+            &tempdir.path().join("patches"),
             &tempdir.path().join("patches"),
             apply_patch_custom,
         )
@@ -621,8 +814,10 @@ mod tests {
 
         // Test with patch that references both existing and non-existing files
         apply_patches(
-            &[PathBuf::from("test_simple_mixed.patch")],
+            &[LateBoundPath::new("test_simple_mixed.patch")],
             &tempdir.path().join("workdir"),
+            &tempdir.path().join("patches"),
+            &tempdir.path().join("patches"),
             &tempdir.path().join("patches"),
             apply_patch_custom,
         )
@@ -644,8 +839,10 @@ mod tests {
 
         // Test with patch that has deep paths but only some files exist
         apply_patches(
-            &[PathBuf::from("test_strip_level_edge_case.patch")],
+            &[LateBoundPath::new("test_strip_level_edge_case.patch")],
             &tempdir.path().join("workdir"),
+            &tempdir.path().join("patches"),
+            &tempdir.path().join("patches"),
             &tempdir.path().join("patches"),
             apply_patch_custom,
         )
@@ -795,8 +992,10 @@ mod tests {
 
         // Test with CRLF patch
         apply_patches(
-            &[PathBuf::from("test_crlf.patch")],
+            &[LateBoundPath::new("test_crlf.patch")],
             &tempdir.path().join("workdir"),
+            &tempdir.path().join("patches"),
+            &tempdir.path().join("patches"),
             &tempdir.path().join("patches"),
             apply_patch_custom,
         )
@@ -813,8 +1012,10 @@ mod tests {
 
         // Apply patch with pure renames (100% similarity, no content changes)
         apply_patches(
-            &[PathBuf::from("test_pure_rename.patch")],
+            &[LateBoundPath::new("test_pure_rename.patch")],
             &tempdir.path().join("workdir"),
+            &tempdir.path().join("patches"),
+            &tempdir.path().join("patches"),
             &tempdir.path().join("patches"),
             apply_patch_custom,
         )
@@ -860,8 +1061,10 @@ mod tests {
 
         // Apply patch with creation and deletion
         apply_patches(
-            &[PathBuf::from("test_create_delete.patch")],
+            &[LateBoundPath::new("test_create_delete.patch")],
             &tempdir.path().join("workdir"),
+            &tempdir.path().join("patches"),
+            &tempdir.path().join("patches"),
             &tempdir.path().join("patches"),
             apply_patch_custom,
         )
@@ -884,8 +1087,10 @@ mod tests {
 
         // Apply patch that creates multiple new files in one patch
         apply_patches(
-            &[PathBuf::from("test_multiple_new_files.patch")],
+            &[LateBoundPath::new("test_multiple_new_files.patch")],
             &tempdir.path().join("workdir"),
+            &tempdir.path().join("patches"),
+            &tempdir.path().join("patches"),
             &tempdir.path().join("patches"),
             apply_patch_custom,
         )
@@ -916,8 +1121,12 @@ mod tests {
         let (tempdir, _) = setup_patch_test_dir();
 
         apply_patches(
-            &[PathBuf::from("0001-increase-minimum-cmake-version.patch")],
+            &[LateBoundPath::new(
+                "0001-increase-minimum-cmake-version.patch",
+            )],
             &tempdir.path().join("workdir"),
+            &tempdir.path().join("patches"),
+            &tempdir.path().join("patches"),
             &tempdir.path().join("patches"),
             apply_patch_custom,
         )
@@ -935,8 +1144,12 @@ mod tests {
 
         // Apply the patches in the working directory
         apply_patches(
-            &[PathBuf::from("0001-increase-minimum-cmake-version.patch")],
+            &[LateBoundPath::new(
+                "0001-increase-minimum-cmake-version.patch",
+            )],
             &tempdir.path().join("workdir"),
+            &tempdir.path().join("patches"),
+            &tempdir.path().join("patches"),
             &tempdir.path().join("patches"),
             apply_patch_custom,
         )
@@ -956,8 +1169,10 @@ mod tests {
         // This could happen e.g. when git format-patch creates a file with a double period
         // due to a commit message ending with a period, and the user accidentally removes one period
         let result = apply_patches(
-            &[PathBuf::from("nonexistent-patch-file..patch")],
+            &[LateBoundPath::new("nonexistent-patch-file..patch")],
             &tempdir.path().join("workdir"),
+            &tempdir.path().join("patches"),
+            &tempdir.path().join("patches"),
             &tempdir.path().join("patches"),
             apply_patch_custom,
         );
@@ -984,8 +1199,10 @@ mod tests {
         // in the workdir (simulates file_name renaming the downloaded file).
         // This should NOT panic or produce "Is a directory" error.
         let result = apply_patches(
-            &[PathBuf::from("test_renamed_file.patch")],
+            &[LateBoundPath::new("test_renamed_file.patch")],
             &tempdir.path().join("workdir"),
+            &tempdir.path().join("patches"),
+            &tempdir.path().join("patches"),
             &tempdir.path().join("patches"),
             apply_patch_custom,
         );
@@ -1042,8 +1259,10 @@ index 0000000..638dd9c
         fs_err::write(patches_dir.join("git_format_new_file.patch"), patch_content).unwrap();
 
         let result = apply_patches(
-            &[PathBuf::from("git_format_new_file.patch")],
+            &[LateBoundPath::new("git_format_new_file.patch")],
             &work_dir,
+            &patches_dir,
+            &patches_dir,
             &patches_dir,
             apply_patch_custom,
         );
@@ -1103,8 +1322,10 @@ index 0000000..0f283b0
         fs_err::write(patches_dir.join("add_init_py.patch"), patch_content).unwrap();
 
         let result = apply_patches(
-            &[PathBuf::from("add_init_py.patch")],
+            &[LateBoundPath::new("add_init_py.patch")],
             &work_dir,
+            &patches_dir,
+            &patches_dir,
             &patches_dir,
             apply_patch_custom,
         );

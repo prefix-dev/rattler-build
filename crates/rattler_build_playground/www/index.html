@@ -1,69 +1,159 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light" data-layout="a">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>rattler-build Recipe Playground</title>
+  <link rel="icon" href="assets/favicon.png">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://fonts.prefix.dev" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
+
+  <!-- CodeMirror 6, loaded from a CDN as ES modules. Exact versions are
+       pinned and shared dependencies (@codemirror/state, @lezer/*, ...) are
+       marked `external` so every package resolves to the same singleton
+       through this import map - otherwise CodeMirror throws on duplicate
+       @codemirror/state instances. -->
+  <script type="importmap">
+  {
+    "imports": {
+      "@codemirror/state": "https://esm.sh/@codemirror/state@6.7.0",
+      "@codemirror/view": "https://esm.sh/@codemirror/view@6.43.4?external=@codemirror/state",
+      "@codemirror/language": "https://esm.sh/@codemirror/language@6.12.4?external=@codemirror/state,@codemirror/view,@lezer/common,@lezer/highlight,@lezer/lr",
+      "@codemirror/commands": "https://esm.sh/@codemirror/commands@6.10.4?external=@codemirror/state,@codemirror/view,@codemirror/language",
+      "@codemirror/search": "https://esm.sh/@codemirror/search@6.7.1?external=@codemirror/state,@codemirror/view",
+      "@codemirror/autocomplete": "https://esm.sh/@codemirror/autocomplete@6.20.3?external=@codemirror/state,@codemirror/view,@codemirror/language,@lezer/common",
+      "@codemirror/lang-yaml": "https://esm.sh/@codemirror/lang-yaml@6.1.3?external=@codemirror/state,@codemirror/view,@codemirror/language,@lezer/common,@lezer/highlight,@lezer/lr,@lezer/yaml",
+      "@codemirror/theme-one-dark": "https://esm.sh/@codemirror/theme-one-dark@6.1.3?external=@codemirror/state,@codemirror/view,@codemirror/language,@lezer/highlight",
+      "@lezer/common": "https://esm.sh/@lezer/common@1.5.2",
+      "@lezer/highlight": "https://esm.sh/@lezer/highlight@1.2.3?external=@lezer/common",
+      "@lezer/lr": "https://esm.sh/@lezer/lr@1.4.10?external=@lezer/common",
+      "@lezer/yaml": "https://esm.sh/@lezer/yaml@1.0.4?external=@lezer/common,@lezer/highlight,@lezer/lr"
+    }
+  }
+  </script>
 </head>
 <body>
   <div id="app">
-    <div class="toolbar">
-      <h1>rattler-build playground</h1>
+    <header class="toolbar">
+      <div class="brand">
+        <img class="logo logo-light" src="assets/prefix_logo_light.svg" alt="prefix.dev">
+        <img class="logo logo-dark" src="assets/prefix_logo_dark.svg" alt="prefix.dev">
+        <span class="brand-divider"></span>
+        <span class="brand-name">rattler-build</span>
+        <span class="brand-pill">playground</span>
+      </div>
+      <div class="toolbar-spacer"></div>
       <div class="toolbar-controls">
-        <label for="platform-select">Platform:</label>
-        <select id="platform-select"></select>
-
-        <div class="tab-group">
-          <button class="tab-btn active" data-mode="variants">Variants</button>
-          <button class="tab-btn" data-mode="stage1">Evaluated</button>
-          <button class="tab-btn" data-mode="stage0">Parsed</button>
+        <span class="platform-label">Platform</span>
+        <select id="platform-select" class="platform-select" aria-label="Target platform"></select>
+        <button id="theme-toggle" class="theme-track" title="Toggle light / dark" aria-label="Toggle light / dark theme">
+          <span class="theme-slot" data-theme-slot="light">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+          </span>
+          <span class="theme-slot" data-theme-slot="dark">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+          </span>
+        </button>
+        <div class="seg layout-seg" id="layout-seg" role="group" aria-label="Layout">
+          <button type="button" data-layout="a">Workbench</button>
+          <button type="button" data-layout="b">Studio</button>
         </div>
       </div>
-    </div>
+    </header>
 
-    <div class="main">
-      <div class="panel panel-left" id="panel-left">
-        <div class="recipe-pane">
-          <div class="panel-header">
-            Recipe YAML
+    <div class="main" id="main">
+      <section class="panel panel-recipe" data-area="recipe" data-screen-label="Recipe editor">
+        <div class="panel-header">
+          <div class="panel-title">
+            <img class="knob" src="assets/knob.svg" alt="">
+            <span class="file-tab">recipe.yaml</span>
+            <span class="title-text">Recipe</span>
           </div>
-          <div class="editor-container">
-            <pre class="editor-highlight" id="recipe-highlight"></pre>
-            <textarea id="recipe-editor" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off"></textarea>
-          </div>
-        </div>
-        <div class="divider-v" id="divider-v"></div>
-        <div class="variables-panel">
-          <div class="panel-header">
-            Variant Config
-            <button class="load-pinning-btn" id="load-pinning-btn" title="Insert conda-forge pinning into the editor">insert conda-forge pinning</button>
-            <div class="variant-format-toggle" id="variant-format-toggle">
-              <button class="variant-format-btn active" data-format="variants">variants.yaml</button>
-              <button class="variant-format-btn" data-format="conda_build_config">conda_build_config</button>
+          <div class="gen-wrap" id="gen-wrap">
+            <button type="button" class="btn-primary" id="gen-toggle">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .962 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.962 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/></svg>
+              New recipe
+            </button>
+            <div class="gen-panel" id="gen-panel" hidden>
+              <div class="gen-label">Start from an example</div>
+              <div class="gen-examples" id="gen-examples"></div>
+              <div class="gen-divider"></div>
+              <div class="gen-label">Generate from a registry</div>
+              <select id="gen-source" class="gen-select">
+                <option value="pypi">PyPI</option>
+                <option value="cran">CRAN</option>
+                <option value="cpan">CPAN</option>
+              </select>
+              <input id="gen-pkg" class="gen-input" type="text" placeholder="package name" spellcheck="false" autocomplete="off">
+              <input id="gen-ver" class="gen-input" type="text" placeholder="version (optional)" spellcheck="false" autocomplete="off">
+              <button type="button" class="gen-run" id="gen-run">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="m7 10 5 5 5-5"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/></svg>
+                Generate recipe
+              </button>
             </div>
           </div>
-          <div class="editor-container">
-            <pre class="editor-highlight" id="variants-highlight"></pre>
-            <textarea id="variants-editor" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" placeholder="python:
-  - &quot;3.11&quot;
-  - &quot;3.12&quot;"></textarea>
-          </div>
-          <div class="used-vars" id="used-vars"></div>
         </div>
-      </div>
+        <div class="editor-host" id="recipe-mount"></div>
+      </section>
 
-      <div class="divider-h" id="divider-h"></div>
-
-      <div class="panel panel-right" id="panel-right">
+      <section class="panel panel-variants" data-area="variants" data-screen-label="Variant config editor">
         <div class="panel-header">
-          Output
-          <span class="badge" id="output-badge"></span>
+          <div class="panel-title">
+            <span class="file-tab" id="variants-file-tab">variants.yaml</span>
+            <span class="title-text">Variant config</span>
+            <div class="seg seg-sm" id="format-seg" role="group" aria-label="Variant format">
+              <button type="button" data-format="variants">variants.yaml</button>
+              <button type="button" data-format="conda_build_config">conda_build_config</button>
+            </div>
+          </div>
+          <button type="button" class="btn-ghost" id="pin-btn">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg>
+            <span id="pin-label">+ conda-forge pinning</span>
+          </button>
         </div>
-        <div class="output-container" id="output-container">
-          <div class="output-placeholder">Loading WASM module...</div>
+        <div class="editor-host" id="variants-mount"></div>
+        <div class="used-vars" id="used-vars"></div>
+      </section>
+
+      <section class="panel panel-output" data-area="output" data-screen-label="Output">
+        <div class="panel-header">
+          <div class="panel-title">
+            <div class="seg" id="mode-seg" role="group" aria-label="Output mode">
+              <button type="button" data-mode="variants">Variants</button>
+              <button type="button" data-mode="stage0">Parsed</button>
+            </div>
+            <div class="seg seg-sm" id="view-seg" role="group" aria-label="Variants view">
+              <button type="button" data-view="matrix">Matrix</button>
+              <button type="button" data-view="yaml">YAML</button>
+            </div>
+          </div>
+          <div class="panel-actions">
+            <span class="status-badge" id="status-badge">…</span>
+            <button type="button" class="btn-ghost" id="copy-btn">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+              Copy YAML
+            </button>
+          </div>
         </div>
-      </div>
+        <div class="output-host" id="output-mount"></div>
+      </section>
+    </div>
+
+    <div class="overlay overlay-loading" id="loading-overlay">
+      <img src="assets/favicon.png" alt="" class="overlay-logo">
+      <div class="spinner"></div>
+      <div class="overlay-text">Booting the rattler-build engine<span class="muted"> · compiling WASM</span></div>
+    </div>
+
+    <div class="overlay overlay-error" id="error-overlay" hidden>
+      <img src="assets/paxton.png" alt="" class="overlay-mascot">
+      <div class="overlay-title">Couldn't load the engine</div>
+      <div class="overlay-text" id="error-message"></div>
+      <button type="button" class="btn-primary" id="retry-btn">Retry</button>
     </div>
   </div>
 

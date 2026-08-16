@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.9](https://github.com/prefix-dev/rattler-build/compare/rattler_build_recipe_generator-v0.1.8...rattler_build_recipe_generator-v0.1.9) - 2026-07-25
+
+### Other
+
+- update dependencies and Rust toolchain to 1.97.1 ([#2679](https://github.com/prefix-dev/rattler-build/pull/2679))
+
+## [0.1.8](https://github.com/prefix-dev/rattler-build/compare/rattler_build_recipe_generator-v0.1.7...rattler_build_recipe_generator-v0.1.8) - 2026-07-11
+
+### Added
+
+- improve CRAN recipe generation for R packages ([#2597](https://github.com/prefix-dev/rattler-build/pull/2597))
+- *(playground)* add PyPI/CRAN/CPAN recipe generator ([#2538](https://github.com/prefix-dev/rattler-build/pull/2538))
+
+### Fixed
+
+- trailing spaces in format_requirement for packages without versions ([#2634](https://github.com/prefix-dev/rattler-build/pull/2634))
+- CRAN recipe generation ([#2637](https://github.com/prefix-dev/rattler-build/pull/2637))
+- use `skip` condition and platform-split script in generated R recipes ([#2609](https://github.com/prefix-dev/rattler-build/pull/2609))
+- switch PyPI sources to use `files.pythonhosted.org` ([#2586](https://github.com/prefix-dev/rattler-build/pull/2586))
+
+## [0.1.7](https://github.com/prefix-dev/rattler-build/compare/rattler_build_recipe_generator-v0.1.6...rattler_build_recipe_generator-v0.1.7) - 2026-06-18
+
+### Other
+
+- bump rattler crates to latest versions ([#2528](https://github.com/prefix-dev/rattler-build/pull/2528))
+
+## [0.1.6](https://github.com/prefix-dev/rattler-build/compare/rattler_build_recipe_generator-v0.1.5...rattler_build_recipe_generator-v0.1.6) - 2026-05-20
+
+### Other
+
+- bump rattler crates and migrate to reqwest 0.13 ([#2493](https://github.com/prefix-dev/rattler-build/pull/2493))
+
 ## [0.1.5](https://github.com/prefix-dev/rattler-build/compare/rattler_build_recipe_generator-v0.1.4...rattler_build_recipe_generator-v0.1.5) - 2026-04-13
 
 ### Other

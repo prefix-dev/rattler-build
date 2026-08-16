@@ -2,7 +2,7 @@
 //! All the metadata that makes up a recipe file
 use std::{iter, path::PathBuf, str::FromStr};
 
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use rattler_conda_types::{
     Channel, ChannelUrl, GenericVirtualPackage, PackageName, Platform, VersionWithSource,
     compression_level::CompressionLevel,
@@ -23,7 +23,7 @@ mod directories;
 
 pub use build_configuration::BuildConfiguration;
 pub use build_output::BuildOutput as Output;
-pub use directories::Directories;
+pub use directories::{Directories, ExecutionDirectories, padded_host_prefix};
 
 /// Settings when creating the package (compression etc.)
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -75,7 +75,7 @@ impl PlatformWithVirtualPackages {
         platform: Platform,
         overrides: &VirtualPackageOverrides,
     ) -> Result<Self, DetectVirtualPackageError> {
-        let virtual_packages = VirtualPackages::detect_for_platform(platform, overrides)?
+        let virtual_packages = VirtualPackages::detect_for_platform(platform, overrides, None)?
             .into_generic_virtual_packages()
             .collect();
         Ok(Self {
@@ -129,9 +129,9 @@ pub struct PackageIdentifier {
 #[derive(Debug, Clone, Default)]
 pub struct BuildSummary {
     /// The start time of the build
-    pub build_start: Option<DateTime<Utc>>,
+    pub build_start: Option<Timestamp>,
     /// The end time of the build
-    pub build_end: Option<DateTime<Utc>>,
+    pub build_end: Option<Timestamp>,
 
     /// The path to the artifact
     pub artifact: Option<PathBuf>,
@@ -149,7 +149,20 @@ pub async fn build_reindexed_channels(
     tool_configuration: &tool_configuration::Configuration,
 ) -> Result<Vec<ChannelUrl>, std::io::Error> {
     let output_dir = &build_configuration.directories.output_dir;
-    let output_channel = Channel::from_directory(output_dir);
+
+    // If the output directory does not exist yet there are no locally built
+    // packages to index, so there is nothing to add as a local channel. Skip it
+    // and return only the configured channels. `Channel::from_directory` would
+    // otherwise panic with "path is a not a valid absolute path" while trying to
+    // canonicalize the missing path, which happened e.g. when running
+    // `--render-only --with-solve` without a pre-existing output directory
+    // (see issue #2611).
+    if !output_dir.exists() {
+        return Ok(build_configuration.channels.clone());
+    }
+
+    let output_channel =
+        Channel::try_from_directory(output_dir).expect("could not create channel from directory");
 
     // Clear the repodata gateway of any cached values for the output channel.
     // Clear all subdirs so that packages from other platforms (e.g. a linux-64

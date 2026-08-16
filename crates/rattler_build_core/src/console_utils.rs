@@ -731,6 +731,18 @@ impl field::Visit for GitHubActionsVisitor<'_> {
 
 struct GitHubActionsLayer(bool);
 
+fn write_github_actions_annotation(
+    level: &Level,
+    message: &str,
+    mut writer: impl io::Write,
+) -> io::Result<()> {
+    match *level {
+        Level::ERROR => writeln!(writer, "::error ::{}", message),
+        Level::WARN => writeln!(writer, "::warning ::{}", message),
+        _ => Ok(()),
+    }
+}
+
 impl<S: Subscriber> Layer<S> for GitHubActionsLayer {
     fn on_event(&self, event: &tracing::Event<'_>, _ctx: Context<'_, S>) {
         if !self.0 {
@@ -743,11 +755,7 @@ impl<S: Subscriber> Layer<S> for GitHubActionsLayer {
         let message = String::from_utf8_lossy(&message);
         let message = strip_ansi_codes(&message);
 
-        match *metadata.level() {
-            Level::ERROR => println!("::error ::{}", message),
-            Level::WARN => println!("::warning ::{}", message),
-            _ => {}
-        }
+        let _ = write_github_actions_annotation(metadata.level(), &message, io::stderr().lock());
     }
 }
 
@@ -869,4 +877,33 @@ pub fn github_integration_enabled() -> bool {
 /// Checks whether we are on GitHub Actions
 pub fn github_action_runner() -> bool {
     std::env::var(consts::GITHUB_ACTIONS) == Ok("true".to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn github_actions_annotation_formats_warnings_and_errors() {
+        let mut output = Vec::new();
+
+        write_github_actions_annotation(&Level::WARN, "careful", &mut output).unwrap();
+        write_github_actions_annotation(&Level::ERROR, "failed", &mut output).unwrap();
+
+        assert_eq!(
+            String::from_utf8(output).unwrap(),
+            "::warning ::careful\n::error ::failed\n"
+        );
+    }
+
+    #[test]
+    fn github_actions_annotation_ignores_lower_levels() {
+        let mut output = Vec::new();
+
+        write_github_actions_annotation(&Level::INFO, "status", &mut output).unwrap();
+        write_github_actions_annotation(&Level::DEBUG, "details", &mut output).unwrap();
+        write_github_actions_annotation(&Level::TRACE, "trace", &mut output).unwrap();
+
+        assert!(output.is_empty());
+    }
 }

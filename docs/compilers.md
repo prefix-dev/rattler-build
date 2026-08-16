@@ -31,6 +31,22 @@ When the template function is evaluated, it will look something like:
 you can use `${{ compiler('rust') }}` and `rust_compiler_{version}` in your
 variant config.
 
+### Default compilers
+
+If no `{lang}_compiler` is set in the variant config, `compiler('c')` and
+`compiler('cxx')` fall back to a per-platform default:
+
+| Target platform             | `compiler('c')` | `compiler('cxx')` |
+|-----------------------------|-----------------|-------------------|
+| Windows                     | `vs2022`        | `vs2022`          |
+| macOS, iOS, Android         | `clang`         | `clangxx`         |
+| `emscripten-wasm32`         | `emscripten`    | `emscripten`      |
+| Linux (and everything else) | `gcc`           | `gxx`             |
+
+For `compiler('fortran')` the default is `flang` on Windows and `gfortran`
+elsewhere. Any other language passes through unchanged, so `compiler('rust')`
+resolves to `rust_{target_platform}`.
+
 ## Cross-compilation
 
 Cross-compilation is supported by Rattler-Build and the compiler template

@@ -215,6 +215,23 @@ in the build recipe:
 : (this field is not used anymore as we rely on SPDX license identifiers)
 
 
+### `info/run_exports.json`
+
+Optional file. Contains the `run_exports` that this package defines (the
+requirements that are automatically added to packages that depend on this one).
+It is only written when the recipe actually defines any run exports.
+
+### `info/link.json`
+
+Contains information used at link (install) time, such as the `noarch` type and
+the version of the tool that created the package.
+
+### `info/hash_input.json`
+
+Contains the variant configuration that was used to compute the build hash of
+the package. This is the same information that conda-build stores and can be
+used to reproduce or inspect why a certain build hash was chosen.
+
 ### `info/recipe/<...>`
 
 A directory containing the full contents of the build recipe. This folder also
@@ -224,3 +241,28 @@ this format is still in flux and can change at any time.
 
 You can also use `--no-include-recipe` to disable the inclusion of the recipe in
 the package.
+
+## Differences from `conda-build` packages
+
+Packages built with Rattler-Build are fully installable with `conda`, `mamba`
+and `pixi`, but the set of files under `info/` differs slightly from what
+`conda-build` produces. Rattler-Build intentionally does **not** write the
+following legacy files:
+
+- `info/files`: a newline-separated list of all files in the package. This
+  information is fully contained in `info/paths.json` (in the `_path` field of
+  each entry), so the file is redundant.
+- `info/has_prefix`: the list of files that contain a build prefix that needs to
+  be replaced at install time. This is also captured in `info/paths.json` (via
+  the `prefix_placeholder` and `file_mode` fields of each entry).
+- `info/git`: information about the git source of the package. Rattler-Build
+  instead records the exact git reference that was used in the rendered recipe
+  (`info/recipe/rendered_recipe.yaml`).
+
+Modern versions of `conda`, `mamba` and `pixi` read `info/paths.json` and do not
+need these files. However, some older tooling still expects them. For example,
+older versions of the [Quetz](https://github.com/mamba-org/quetz) server relied
+on `info/files` when accepting uploads. If you run into a tool that fails on a
+Rattler-Build package because one of these files is missing, updating that tool
+to read `info/paths.json` is the recommended fix (see
+[#335](https://github.com/prefix-dev/rattler-build/issues/335) for background).

@@ -1,0 +1,20 @@
+package:
+  name: late-bound-license-traversal
+  version: "0.1.0"
+
+build:
+  script:
+    - if: unix
+      then:
+        - 'true'
+    - if: win
+      then:
+        - cd .
+
+about:
+  license: MIT
+  # A late-bound path that uses `..` to escape the prefix. This must be rejected
+  # rather than packaging an arbitrary host file without
+  # --allow-absolute-license-paths.
+  license_file:
+    - ${{ PREFIX }}/../../../../../../../../etc/hostname

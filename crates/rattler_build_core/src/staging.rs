@@ -11,9 +11,9 @@ use std::{
 
 use fs_err as fs;
 use miette::{Context, IntoDiagnostic};
-use minijinja::Value;
-use rattler_build_jinja::{Jinja, Variable};
+use rattler_build_jinja::Variable;
 use rattler_build_recipe::stage1::{InheritsFrom, StagingCache};
+use rattler_build_script::{ExecutionContext, RuntimeEnv};
 use rattler_build_types::NormalizedKey;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -26,6 +26,7 @@ use crate::{
     render::resolved_dependencies::{
         FinalizedDependencies, RunExportsDownload, install_environments, resolve_dependencies,
     },
+    script::prepare_build_plan_execution_args,
     source::{copy_dir::CopyDir, fetch_sources},
     utils::remove_dir_all_force,
 };
@@ -137,9 +138,10 @@ impl Output {
         let cache_key = (&staging, &selected_variant, self.prefix());
 
         // Serialize to JSON and hash
+        let json = serde_json::to_vec(&cache_key)?;
         let mut hasher = Sha256::new();
-        cache_key.serialize(&mut serde_json::Serializer::new(&mut hasher))?;
-        Ok(format!("{:x}", hasher.finalize()))
+        hasher.update(&json);
+        Ok(hex::encode(hasher.finalize()))
     }
 
     /// Build a staging cache or restore it if it already exists
@@ -273,12 +275,24 @@ impl Output {
 
         // Run the build script
         let target_platform = self.build_configuration.target_platform;
+        let host_platform = self.host_platform().platform;
+        let runtime = RuntimeEnv::current();
         let mut env_vars = env_vars::vars(self, "BUILD");
+        if let Some(host) = &finalized_dependencies.host {
+            env_vars.extend(env_vars::python_vars_from_records(
+                &host.resolved,
+                self.prefix(),
+                host_platform,
+            ));
+        }
         env_vars.extend(env_vars::os_vars(
             self.prefix(),
             &target_platform,
+            &host_platform,
+            &self.build_configuration.build_platform.platform,
             self.build_configuration.env_isolation,
             &self.build_configuration.directories.work_dir,
+            &runtime,
         ));
         // Use the staging cache's own used_variant rather than the inheriting
         // output's: the staging cache is shared across all inheritors, and the
@@ -299,47 +313,37 @@ impl Output {
             env_vars.remove(key);
         }
 
-        // Create Jinja context
-        let selector_config = self.build_configuration.selector_config();
-        let mut jinja = Jinja::new(selector_config.clone());
-
-        // Add context from the recipe
-        for (k, v) in self.recipe.context().iter() {
-            jinja.context_mut().insert(k.clone(), v.clone().into());
-        }
-
-        // Add env vars to jinja context
-        for (k, v) in &env_vars {
-            if let Some(value) = v {
-                jinja
-                    .context_mut()
-                    .insert(k.clone(), Value::from_safe_string(value.clone()));
-            }
-        }
-
-        let jinja_renderer = |template: &str| -> Result<String, String> {
-            jinja.render_str(template).map_err(|e| e.to_string())
-        };
-
-        let build_prefix = if staging.build.merge_build_and_host_envs {
-            None
-        } else {
-            Some(&self.build_configuration.directories.build_prefix)
-        };
-
-        staging
-            .build
-            .script
-            .run_script(
-                env_vars,
-                &self.build_configuration.directories.work_dir,
-                &self.build_configuration.directories.recipe_dir,
+        let context = if staging.build.merge_build_and_host_envs {
+            ExecutionContext::shared(
+                runtime.clone(),
                 &self.build_configuration.directories.host_prefix,
-                build_prefix,
-                Some(jinja_renderer),
-                self.build_configuration.sandbox_config(),
-                self.build_configuration.env_isolation,
+                self.build_configuration.build_platform.platform,
+                host_platform,
             )
+        } else {
+            ExecutionContext::separate(
+                runtime.clone(),
+                &self.build_configuration.directories.build_prefix,
+                self.build_configuration.build_platform.platform,
+                &self.build_configuration.directories.host_prefix,
+                host_platform,
+            )
+        };
+
+        let exec_args = prepare_build_plan_execution_args(
+            &staging.build.plan,
+            self.recipe.context(),
+            self.build_configuration.selector_config(),
+            env_vars,
+            self.build_configuration.directories.work_dir.clone(),
+            &self.build_configuration.directories.recipe_dir,
+            context,
+            self.build_configuration.sandbox_config().cloned(),
+            self.build_configuration.env_isolation,
+            self.build_configuration.experimental,
+        )
+        .into_diagnostic()?;
+        rattler_build_script::run_script(exec_args)
             .await
             .into_diagnostic()?;
 
@@ -566,4 +570,62 @@ pub fn get_staging_cache_name(inherits: &InheritsFrom) -> &str {
 /// Check if run_exports should be inherited from the staging cache
 pub fn should_inherit_run_exports(inherits: &InheritsFrom) -> bool {
     inherits.inherit_run_exports
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rattler_build_jinja::JinjaConfig;
+    use rattler_build_recipe::stage1::{
+        Build, Requirements,
+        build::{BuildPlan, Step, StepRun},
+    };
+    use rattler_build_script::EnvironmentIsolation;
+    use rattler_conda_types::Platform;
+
+    #[test]
+    fn staging_build_steps_prepare_as_sections() {
+        let staging = StagingCache::new(
+            "compile".to_string(),
+            Build {
+                plan: BuildPlan::Steps(vec![Step {
+                    run: StepRun::Commands(vec!["echo hi".to_string()]),
+                    env: [("FOO".to_string(), "bar".to_string())]
+                        .into_iter()
+                        .collect(),
+                    ..Default::default()
+                }]),
+                ..Default::default()
+            },
+            Requirements::default(),
+            Vec::new(),
+            BTreeMap::new(),
+        );
+
+        let args = prepare_build_plan_execution_args(
+            &staging.build.plan,
+            &indexmap::IndexMap::new(),
+            JinjaConfig::default(),
+            std::collections::HashMap::new(),
+            PathBuf::from("."),
+            Path::new("."),
+            ExecutionContext::shared(
+                RuntimeEnv::for_test(Platform::current()),
+                Path::new("."),
+                Platform::current(),
+                Platform::current(),
+            ),
+            None,
+            EnvironmentIsolation::default(),
+            true,
+        )
+        .unwrap();
+
+        assert_eq!(args.sections.len(), 1);
+        assert_eq!(args.sections[0].label.as_deref(), Some("step 0"));
+        assert_eq!(
+            args.sections[0].env.get("FOO").map(String::as_str),
+            Some("bar")
+        );
+    }
 }

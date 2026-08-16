@@ -57,7 +57,8 @@ pub async fn skip_existing(
 
     let channels = if only_local {
         vec![
-            Channel::from_directory(&first_output.build_configuration.directories.output_dir)
+            Channel::try_from_directory(&first_output.build_configuration.directories.output_dir)
+                .expect("could not create channel from directory")
                 .base_url,
         ]
     } else {
@@ -92,7 +93,7 @@ pub async fn skip_existing(
             "{}-{}-{}",
             output.name().as_normalized(),
             output.version(),
-            &output.build_string()
+            output.build_string()
         ));
         if exists {
             // The identifier should always be set at this point
@@ -183,10 +184,50 @@ pub async fn run_build(
             }
         });
 
+    let interpreter_field = if output.recipe.build().plan.steps().is_some() {
+        "build.steps[].interpreter"
+    } else {
+        "build.script.interpreter"
+    };
+
     match output.run_build_script().await {
         Ok(_) => {}
+        Err(InterpreterError::ExecutionFailed(err))
+            if err.kind() == std::io::ErrorKind::InvalidInput =>
+        {
+            return Err(miette::miette!("{err}"));
+        }
         Err(InterpreterError::ExecutionFailed(_)) => {
             return Err(miette::miette!("Script failed to execute"));
+        }
+        Err(InterpreterError::InterpreterNotFound(interpreter)) => {
+            return Err(miette::miette!(
+                help = format!(
+                    "Add `{interpreter}` to the `requirements/build` section of your recipe so it is provided by the build environment."
+                ),
+                "interpreter `{interpreter}` was not found in the build environment"
+            ));
+        }
+        Err(InterpreterError::InvalidInterpreter {
+            interpreter,
+            reason,
+        }) => {
+            return Err(miette::miette!(
+                "interpreter `{interpreter}` was found but is not valid: {reason}"
+            ));
+        }
+        Err(InterpreterError::UnsupportedInterpreter(interpreter)) => {
+            return Err(
+                match rattler_build_script::closest_interpreter(&interpreter) {
+                    Some(suggestion) => miette::miette!(
+                        help = format!("Did you mean `{suggestion}`?"),
+                        "unsupported interpreter `{interpreter}` in `{interpreter_field}`"
+                    ),
+                    None => miette::miette!(
+                        "unsupported interpreter `{interpreter}` in `{interpreter_field}`"
+                    ),
+                },
+            );
         }
     }
 
@@ -259,13 +300,21 @@ fn check_for_binary_prefix(output: &Output, paths_json: &PathsJson) -> Result<()
 }
 
 /// Check if the output has a Unix-specific virtual package (`__unix`, `__osx`,
-/// `__linux`, or `__glibc`) in its finalized run dependencies, indicating this
-/// package is only intended for Unix systems.
+/// `__linux`, `__glibc`, `__ios`, or `__android`) in its finalized run
+/// dependencies, indicating this package is only intended for Unix systems.
 fn has_unix_virtual_package(output: &Output) -> bool {
     output.finalized_dependencies.as_ref().is_some_and(|deps| {
         deps.run.depends.iter().any(|dep| {
             dep.spec().name.as_exact().is_some_and(|name| {
-                ["__unix", "__osx", "__linux", "__glibc"].contains(&name.as_normalized())
+                [
+                    "__unix",
+                    "__osx",
+                    "__linux",
+                    "__glibc",
+                    "__ios",
+                    "__android",
+                ]
+                .contains(&name.as_normalized())
             })
         })
     })

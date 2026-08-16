@@ -1,6 +1,5 @@
 ---
 source: crates/rattler_build_recipe/src/stage0/parser/snapshot_tests.rs
-assertion_line: 136
 expression: "serde_yaml::to_string(&recipe).unwrap()"
 ---
 schema_version: 1
@@ -10,6 +9,7 @@ source:
 - url:
   - https://example.com/top-level-source.tar.gz
   sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  filter: []
 build:
   number: 0
   script:

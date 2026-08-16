@@ -17,6 +17,7 @@ use walkdir::WalkDir;
 use crate::source::patch::{apply_patch_custom, summarize_single_patch};
 use crate::source::{SourceError, SourceInformation};
 use rattler_build_recipe::stage1::Source;
+use rattler_build_types::LateBoundPath;
 
 // ============================================================================
 // Section 1: Error types and type definitions
@@ -182,13 +183,15 @@ fn handle_url_source(
     let recipe_dir = source_info.recipe_path.parent().unwrap();
     let patch_output_dir = config.output_dir.unwrap_or(recipe_dir);
 
-    // Filter out the patch we're currently creating/overwriting from the baseline
-    let current_patch_name = PathBuf::from(format!("{}.patch", config.name));
+    // Filter out the patch we're currently creating/overwriting from the
+    // baseline. Late-bound patches (e.g. `${{ SRC_DIR }}/...`) are not recipe
+    // files we can read here, so they are excluded from the baseline.
+    let current_patch_name = format!("{}.patch", config.name);
     let existing_patches: Vec<PathBuf> = url_src
         .patches
         .iter()
-        .filter(|p| *p != &current_patch_name)
-        .cloned()
+        .filter(|p| !p.is_late_bound() && p.as_str() != current_patch_name)
+        .map(|p| PathBuf::from(p.as_str()))
         .collect();
 
     // Create full-directory diff, applying patches per file
@@ -342,21 +345,23 @@ pub fn create_patch<P: AsRef<Path>>(
             tracing::info!("Created patch file at: {}", patch_path.display());
 
             // Update the source information to include the newly created patch
-            let patch_file_name = PathBuf::from(format!("{}.patch", config.name));
+            let patch_file_name = format!("{}.patch", config.name);
+            let has_patch =
+                |patches: &[LateBoundPath]| patches.iter().any(|p| p.as_str() == patch_file_name);
             match &mut updated_source_info.sources[source_idx] {
                 Source::Url(url_src) => {
-                    if !url_src.patches.contains(&patch_file_name) {
-                        url_src.patches.push(patch_file_name);
+                    if !has_patch(&url_src.patches) {
+                        url_src.patches.push(LateBoundPath::new(patch_file_name));
                     }
                 }
                 Source::Git(git_src) => {
-                    if !git_src.patches.contains(&patch_file_name) {
-                        git_src.patches.push(patch_file_name);
+                    if !has_patch(&git_src.patches) {
+                        git_src.patches.push(LateBoundPath::new(patch_file_name));
                     }
                 }
                 Source::Path(path_src) => {
-                    if !path_src.patches.contains(&patch_file_name) {
-                        path_src.patches.push(patch_file_name);
+                    if !has_patch(&path_src.patches) {
+                        path_src.patches.push(LateBoundPath::new(patch_file_name));
                     }
                 }
             }

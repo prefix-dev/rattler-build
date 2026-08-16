@@ -34,6 +34,25 @@ def test_basic_staging(rattler_build: RattlerBuild, recipes: Path, tmp_path: Pat
     assert content1 == content2
 
 
+def test_staging_build_steps(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Test that staging outputs execute `build.steps` once and share the result."""
+    rattler_build.build(
+        recipes / "staging/build-steps.yaml",
+        tmp_path,
+        extra_args=["--experimental"],
+    )
+
+    pkg1 = get_extracted_package(tmp_path, "staging-build-steps-a")
+    pkg2 = get_extracted_package(tmp_path, "staging-build-steps-b")
+
+    content1 = (pkg1 / "staging-steps.txt").read_text().splitlines()
+    content2 = (pkg2 / "staging-steps.txt").read_text().splitlines()
+    assert content1 == ["one", "two"]
+    assert content2 == content1
+
+
 @pytest.mark.skipif(os.name == "nt", reason="symlinks not fully supported on Windows")
 def test_staging_symlinks(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     """Test that symlinks are properly cached and restored in staging outputs."""
@@ -251,7 +270,7 @@ def test_staging_with_variants(
 
 
 def test_multiple_staging_caches(
-    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, clean_path_on_win32
 ):
     """Test multiple independent staging outputs in one recipe.
 
@@ -325,7 +344,7 @@ def test_multiple_staging_caches(
 
 
 def test_staging_with_top_level_inherit(
-    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, clean_path_on_win32
 ):
     """Test mix of staging inheritance and top-level inheritance."""
     rattler_build.build(
@@ -395,7 +414,7 @@ def test_staging_work_dir_cache(
 
 
 def test_staging_complex_deps(
-    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, clean_path_on_win32
 ):
     """Test complex dependency scenarios with staging."""
     rattler_build.build(
@@ -607,7 +626,7 @@ def test_staging_run_exports_ignore_by_name(
 
 
 def test_staging_overlinking(
-    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, clean_path_on_win32
 ):
     """Test that overlinking checks pass for staging outputs via library name map.
 

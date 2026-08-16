@@ -96,7 +96,11 @@ impl Variable {
 
 impl Display for Variable {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
+        if let Some(value) = self.as_bool() {
+            write!(f, "{value}")
+        } else {
+            write!(f, "{}", self.0)
+        }
     }
 }
 

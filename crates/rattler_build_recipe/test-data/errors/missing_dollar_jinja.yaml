@@ -1,0 +1,19 @@
+context:
+  version: "22.1.8"
+  build_number: "3"
+  major_version: "22"
+
+recipe:
+  name: llvm-project
+  version: ${{ version }}
+
+source:
+  url: https://example.com/llvm-${{ version }}.tar.gz
+  folder: llvm-project
+
+build:
+  number: {{ build_number }}
+
+outputs:
+  - package:
+      name: libllvm

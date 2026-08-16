@@ -1,0 +1,22 @@
+recipe:
+  name: transitive-test-dependencies
+  version: "1.0"
+
+outputs:
+  - package:
+      name: transitive-test-root
+    requirements:
+      run:
+        - transitive-test-middle ==1.0
+    tests:
+      - script:
+          - echo "root test passed"
+
+  - package:
+      name: transitive-test-middle
+    requirements:
+      run:
+        - transitive-test-leaf ==1.0
+
+  - package:
+      name: transitive-test-leaf

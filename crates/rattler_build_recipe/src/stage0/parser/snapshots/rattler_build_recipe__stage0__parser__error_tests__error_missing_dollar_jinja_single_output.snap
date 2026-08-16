@@ -1,0 +1,12 @@
+---
+source: crates/rattler_build_recipe/src/stage0/parser/error_tests.rs
+assertion_line: 245
+expression: error_with_source
+---
+  × parse error: Failed to parse YAML: 10:12: Keys in mappings must be scalar
+    ╭─[missing_dollar_jinja_single.yaml:10:12]
+  9 │ build:
+ 10 │   number: {{ build_number }}
+    ·            ┬
+    ·            ╰── Failed to parse YAML: 10:12: Keys in mappings must be scalar
+    ╰────

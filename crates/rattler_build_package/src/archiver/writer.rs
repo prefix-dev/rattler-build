@@ -3,7 +3,7 @@
 use std::fs::File;
 use std::path::{Path, PathBuf};
 
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use rattler_conda_types::compression_level::CompressionLevel;
 use rattler_package_streaming::write::{write_conda_package, write_tar_bz2_package};
 
@@ -18,7 +18,7 @@ pub struct PackageWriter {
     compression_level: u8,
 
     /// Timestamp for reproducible builds
-    timestamp: Option<DateTime<Utc>>,
+    timestamp: Option<Timestamp>,
 
     /// Number of compression threads
     compression_threads: usize,
@@ -36,7 +36,7 @@ impl PackageWriter {
     }
 
     /// Set the timestamp for reproducible builds
-    pub fn with_timestamp(mut self, timestamp: DateTime<Utc>) -> Self {
+    pub fn with_timestamp(mut self, timestamp: Timestamp) -> Self {
         self.timestamp = Some(timestamp);
         self
     }

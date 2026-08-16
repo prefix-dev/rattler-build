@@ -4,12 +4,12 @@ use std::{path::PathBuf, str::FromStr};
 
 use miette::IntoDiagnostic;
 use rattler_build::{
+    config::Config,
     console_utils::LoggingOutputHandler,
     debug as core_debug,
     opt::{CreatePatchOpts, DebugEnvAddOpts, DebugRunOpts, DebugShellOpts, DebugWorkdirOpts},
     source::create_patch,
 };
-use rattler_config::config::ConfigBase;
 
 /// Open a debug shell from DebugShellOpts.
 pub fn debug_shell(opts: DebugShellOpts) -> std::io::Result<()> {
@@ -137,7 +137,7 @@ pub fn debug_create_patch(opts: CreatePatchOpts) -> miette::Result<()> {
 pub async fn debug_env_add(
     env_name: &str,
     opts: DebugEnvAddOpts,
-    _config: Option<ConfigBase<()>>,
+    _config: Option<Config>,
     log_handler: &Option<LoggingOutputHandler>,
 ) -> miette::Result<()> {
     let (_work_dir, directories_json) =

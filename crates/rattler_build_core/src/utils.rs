@@ -121,7 +121,7 @@ fn try_remove_with_retry(path: &Path, last_err: Option<std::io::Error>) -> std::
     // This frees the original path immediately; the actual deletion can
     // then proceed on the renamed path without blocking the caller.
     let trash_path = pending_removal_path(path);
-    let (target, renamed) = match std::fs::rename(path, &trash_path) {
+    let (target, renamed) = match fs::rename(path, &trash_path) {
         Ok(()) => {
             tracing::debug!(
                 "Renamed {:?} → {:?} for deferred deletion",

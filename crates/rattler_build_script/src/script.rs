@@ -212,6 +212,7 @@ impl Script {
             && self.interpreter.is_none()
             && self.env.is_empty()
             && self.secrets.is_empty()
+            && self.cwd.is_none()
             && self.sandbox.as_ref().is_none_or(SandboxRequest::is_empty)
     }
 }

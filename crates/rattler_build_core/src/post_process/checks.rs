@@ -505,11 +505,15 @@ fn find_system_libs(output: &Output) -> Result<SystemLibs, LinkingCheckError> {
     let mut deny_builder = GlobSetBuilder::new();
     let platform = &output.build_configuration.target_platform;
 
-    if platform.is_osx() {
+    if platform.is_osx() || platform.is_ios() {
+        // iOS links against Mach-O system libraries and frameworks, so it uses the
+        // same `.tbd` stub / framework discovery as macOS.
         add_osx_system_libs(output, &mut allow_builder)?;
     } else if platform.is_windows() {
         add_windows_system_libs(output, &mut allow_builder, &mut deny_builder)?;
     } else {
+        // Android falls through here: its `sysroot_android-*` package and `*.so*`
+        // libraries are discovered the same way as Linux.
         add_linux_system_libs(output, &mut allow_builder)?;
     }
 
@@ -565,8 +569,10 @@ pub fn perform_linking_checks(
                         resolved_libraries
                     );
                     for (lib, resolved) in &resolved_libraries {
-                        // filter out @self on macOS
-                        if target_platform.is_osx() && lib.to_str() == Some("self") {
+                        // filter out @self on Mach-O platforms (macOS, iOS)
+                        if (target_platform.is_osx() || target_platform.is_ios())
+                            && lib.to_str() == Some("self")
+                        {
                             continue;
                         }
 
@@ -620,8 +626,10 @@ pub fn perform_linking_checks(
         for lib in &package.shared_libraries {
             let lib = lib.strip_prefix(host_prefix).unwrap_or(lib);
 
-            // skip @self on macOS
-            if target_platform.is_osx() && lib.to_str() == Some("self") {
+            // skip @self on Mach-O platforms (macOS, iOS)
+            if (target_platform.is_osx() || target_platform.is_ios())
+                && lib.to_str() == Some("self")
+            {
                 continue;
             }
 

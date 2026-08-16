@@ -10,7 +10,7 @@ use fs_err as fs;
 use fs_err::File;
 use indicatif::HumanBytes;
 use metadata::clean_url;
-use rattler_build_types::GlobVec;
+use rattler_build_types::{GlobVec, LateBoundGlobVec};
 use rattler_conda_types::{
     ChannelUrl, Platform,
     compression_level::CompressionLevel,
@@ -32,6 +32,7 @@ use crate::{
     post_process,
     source::{self, copy_dir},
     tool_configuration,
+    utils::to_lexical_absolute,
 };
 
 #[allow(missing_docs)]
@@ -51,6 +52,9 @@ pub enum PackagingError {
 
     #[error("Could not open or create, or write to file")]
     IoError(#[from] std::io::Error),
+
+    #[error("license file path '{0}' escapes the build directories (resolved to '{1}')")]
+    LicenseFileTraversal(String, PathBuf),
 
     #[error("Could not strip a prefix from a Path")]
     StripPrefixError(#[from] std::path::StripPrefixError),
@@ -101,20 +105,48 @@ pub enum PackagingError {
     PackageFileMissing(PathBuf),
 }
 
+/// Split a path into the longest leading directory prefix that contains no glob
+/// metacharacters and the remaining glob pattern (components joined with `/`).
+///
+/// If the path contains no glob metacharacters the pattern is empty and the
+/// whole path is returned as the base.
+fn split_glob_base(path: &Path) -> (PathBuf, String) {
+    let has_glob = |s: &str| s.contains(['*', '?', '[', ']', '{', '}']);
+    let mut base = PathBuf::new();
+    let mut rest: Vec<String> = Vec::new();
+    for component in path.components() {
+        let comp_str = component.as_os_str().to_string_lossy();
+        if rest.is_empty() && !has_glob(&comp_str) {
+            base.push(component);
+        } else {
+            rest.push(comp_str.into_owned());
+        }
+    }
+    (base, rest.join("/"))
+}
+
 /// This function copies the license files to the info/licenses folder.
 /// License files are selected from the recipe directory and the source (work) folder.
 /// If the same file is found in both locations, the file from the recipe directory is used.
 /// Absolute paths are also supported when `allow_absolute_license_paths` is true.
+/// License paths that reference late-bound build directory variables (e.g.
+/// `${{ PREFIX }}/...`) are resolved here and are always permitted.
 fn copy_license_files(
     output: &Output,
     tmp_dir_path: &Path,
     allow_absolute_license_paths: bool,
 ) -> Result<Option<HashSet<PathBuf>>, PackagingError> {
-    let Some(license_file) = output.recipe.about().license_file.as_ref() else {
-        return Ok(None);
-    };
+    let about = output.recipe.about();
 
-    if license_file.is_empty() {
+    // `license_file` is a single list mixing ordinary (relative/absolute) glob
+    // patterns with late-bound entries (e.g. `${{ PREFIX }}/...`); the two are
+    // resolved differently below but come from a single recipe key.
+    let empty_license_files = LateBoundGlobVec::default();
+    let license_files = about.license_file.as_ref().unwrap_or(&empty_license_files);
+    let license_file = license_files.ordinary_globs();
+    let late_bound_license_files: Vec<_> = license_files.late_bound().collect();
+
+    if license_files.is_empty() {
         return Ok(None);
     }
 
@@ -223,6 +255,89 @@ fn copy_license_files(
                     }
                 } else {
                     missing_globs.push(glob_str.clone());
+                }
+            }
+        }
+    }
+
+    // Handle late-bound license files (e.g. `${{ PREFIX }}/share/licenses/...`).
+    // These reference build directory variables that are only known now, at
+    // packaging time. Because they resolve from a restricted, controlled set of
+    // variables they are always allowed (they do not require the
+    // `--allow-absolute-license-paths` flag).
+    if !late_bound_license_files.is_empty() {
+        let directories = &output.build_configuration.directories;
+        let resolve_var = |var: &str| -> Option<PathBuf> {
+            match var {
+                "PREFIX" => Some(directories.host_prefix.clone()),
+                "BUILD_PREFIX" => Some(directories.build_prefix.clone()),
+                "SRC_DIR" => Some(directories.work_dir.clone()),
+                "RECIPE_DIR" => Some(directories.recipe_dir.clone()),
+                "BUILD_DIR" => Some(directories.build_dir.clone()),
+                _ => None,
+            }
+        };
+
+        // The directories a resolved late-bound path is allowed to point into.
+        // These are exactly the roots `resolve_var` can substitute.
+        let license_roots = [
+            &directories.host_prefix,
+            &directories.build_prefix,
+            &directories.work_dir,
+            &directories.recipe_dir,
+            &directories.build_dir,
+        ];
+
+        for late_bound in late_bound_license_files {
+            let resolved = late_bound.resolve(resolve_var);
+
+            // Late-bound license paths bypass `--allow-absolute-license-paths`
+            // because they resolve from a controlled set of build directories.
+            // That guarantee only holds if the resolved path stays inside one of
+            // those directories: collapse any `.`/`..` components and reject the
+            // path if it escapes (e.g. `${{ PREFIX }}/../../etc/passwd`).
+            let normalized = to_lexical_absolute(&resolved, &directories.work_dir);
+            if !license_roots
+                .iter()
+                .any(|root| normalized.starts_with(root))
+            {
+                return Err(PackagingError::LicenseFileTraversal(
+                    late_bound.source().to_string(),
+                    resolved,
+                ));
+            }
+
+            // Split the resolved path into a non-glob base directory and a glob
+            // remainder so we can reuse the directory-copy + glob machinery.
+            let (base_dir, pattern) = split_glob_base(&resolved);
+
+            if pattern.is_empty() {
+                // A concrete path: copy the file directly.
+                if resolved.is_file() {
+                    let file_name = resolved.file_name().ok_or_else(|| {
+                        PackagingError::IoError(std::io::Error::new(
+                            std::io::ErrorKind::InvalidInput,
+                            format!("Invalid license file path: {}", resolved.display()),
+                        ))
+                    })?;
+                    let dest_path = licenses_folder.join(file_name);
+                    fs::copy(&resolved, &dest_path)?;
+                    copied_files.insert(dest_path);
+                } else {
+                    missing_globs.push(late_bound.source().to_string());
+                }
+            } else {
+                // A glob pattern rooted at the resolved base directory.
+                let glob_vec = GlobVec::from_vec(vec![&pattern], None);
+                let copy_result = copy_dir::CopyDir::new(&base_dir, &licenses_folder)
+                    .with_globvec(&glob_vec)
+                    .use_gitignore(false)
+                    .run()?;
+                let copied = copy_result.copied_paths();
+                if copied.is_empty() {
+                    missing_globs.push(late_bound.source().to_string());
+                } else {
+                    copied_files.extend(copied.iter().map(PathBuf::from));
                 }
             }
         }
@@ -471,6 +586,23 @@ fn print_enhanced_file_listing(
         perform_path_checks(output, &pj.paths);
     }
 
+    // Warn if the prefix contains spaces: shebang lines don't support quoted paths on
+    // Linux, so any generated entry point scripts may fail to execute at runtime.
+    let prefix_str = output.prefix().to_string_lossy();
+    if prefix_str.contains(' ') && !output.recipe.build().python.entry_points.is_empty() {
+        tracing::warn!(
+            "The prefix path '{}' contains spaces. Entry point shebang lines do not support \
+            quoted paths on Linux, so the generated scripts may fail to execute.",
+            prefix_str
+        );
+        output.record_warning(&format!(
+            "Prefix path '{}' contains spaces — entry point shebangs may not work on Linux",
+            prefix_str
+        ));
+    }
+
+    let is_noarch_python = output.is_python_version_independent();
+
     // Collect per-file warnings for content files
     let mut path_warnings: HashMap<&Path, Vec<String>> = HashMap::new();
     if let Some(ref pj) = paths_json {
@@ -487,6 +619,16 @@ fn print_enhanced_file_listing(
                 }
                 if path_str.len() > 200 {
                     warnings.push(format!("Path too long ({} > 200)", path_str.len()));
+                }
+                // For noarch: python packages, files under python-scripts/ were placed
+                // there because they are not registered as entry_points. Prefer
+                // entry_points over plain scripts (see issue #1129).
+                if is_noarch_python && path_str.starts_with("python-scripts/") {
+                    warnings.push(
+                        "not registered as an entry_point; consider adding to \
+                        'build.python.entry_points' (e.g. `cmd = pkg.module:main`)"
+                            .to_string(),
+                    );
                 }
             }
 
@@ -657,7 +799,7 @@ fn print_enhanced_file_listing(
             .iter()
             .filter(|e| e.size_in_bytes.is_some() && e.size_in_bytes.unwrap() > 0)
             .collect();
-        files_with_sizes.sort_by(|a, b| b.size_in_bytes.cmp(&a.size_in_bytes));
+        files_with_sizes.sort_by_key(|b| std::cmp::Reverse(b.size_in_bytes));
 
         if !files_with_sizes.is_empty() {
             tracing::info!("Largest files:");
@@ -915,6 +1057,19 @@ mod packaging_tests {
     use std::os::unix::ffi::OsStrExt;
     #[cfg(windows)]
     use std::os::windows::ffi::OsStringExt;
+
+    #[test]
+    fn test_split_glob_base() {
+        // No glob metacharacters: whole path is the base.
+        let (base, pattern) = split_glob_base(Path::new("/opt/conda/lib/LICENSE"));
+        assert_eq!(base, PathBuf::from("/opt/conda/lib/LICENSE"));
+        assert_eq!(pattern, "");
+
+        // A glob component splits the base from the relative pattern.
+        let (base, pattern) = split_glob_base(Path::new("/opt/conda/share/licenses/*/LICENSE"));
+        assert_eq!(base, PathBuf::from("/opt/conda/share/licenses"));
+        assert_eq!(pattern, "*/LICENSE");
+    }
 
     #[test]
     fn test_find_case_insensitive_collisions_detects() {

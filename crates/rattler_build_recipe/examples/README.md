@@ -149,7 +149,7 @@ The `build` section supports the following fields:
 **Variant Configuration:**
 - `variant.use_keys`: Variant keys to use
 - `variant.ignore_keys`: Variant keys to ignore
-- `variant.down_prioritize_variant`: Down-prioritize variant (negative integer)
+- `variant.down_prioritize_variant`: Down-prioritize variant (integer; higher is less preferred)
 
 **Prefix Detection:**
 - `prefix_detection.force_file_type.text`: Force files to be treated as text (glob patterns)

@@ -4,10 +4,13 @@ use miette::{IntoDiagnostic, WrapErr};
 use serde::Deserialize;
 use std::{
     collections::{HashMap, HashSet},
-    process::Command,
     sync::OnceLock,
 };
 
+#[cfg(not(target_arch = "wasm32"))]
+use std::process::Command;
+
+#[cfg(not(target_arch = "wasm32"))]
 use super::write_recipe;
 use crate::serialize::{self, ScriptTest, Test, UrlSourceElement};
 
@@ -71,7 +74,10 @@ struct CpanReleaseMetadata {
 #[allow(dead_code)]
 struct CpanModule {
     name: String,
-    version: Option<String>,
+    /// MetaCPAN may return this as either a string (e.g. `"1.647"`) or a number
+    /// (e.g. `1.647`), so we accept arbitrary JSON.
+    #[serde(default)]
+    version: Option<serde_json::Value>,
     author: String,
     authorized: bool,
     indexed: bool,
@@ -112,14 +118,11 @@ struct MetaCpanResponse<T> {
 #[allow(dead_code)]
 struct MetaCpanHits<T> {
     hits: Vec<MetaCpanHit<T>>,
-    total: MetaCpanTotal,
-}
-
-#[derive(Deserialize, Debug, Clone)]
-#[allow(dead_code)]
-struct MetaCpanTotal {
-    value: i32,
-    relation: String,
+    /// MetaCPAN's elasticsearch may serialize this as either a plain integer
+    /// (old behavior) or as a `{ value, relation }` object (Elasticsearch 7+),
+    /// so we accept arbitrary JSON.
+    #[serde(default)]
+    total: serde_json::Value,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -138,6 +141,7 @@ pub struct CpanMetadata {
 
 static CORE_MODULES: OnceLock<HashSet<String>> = OnceLock::new();
 
+#[cfg(not(target_arch = "wasm32"))]
 fn get_core_modules_from_perl() -> Result<HashSet<String>, std::io::Error> {
     let output = Command::new("perl")
         .arg("-e")
@@ -234,21 +238,30 @@ fn get_fallback_core_modules() -> HashSet<String> {
 }
 
 fn initialize_core_modules() -> &'static HashSet<String> {
-    CORE_MODULES.get_or_init(|| match get_core_modules_from_perl() {
-        Ok(modules) => {
-            tracing::info!(
-                "Successfully loaded {} core modules from system Perl",
-                modules.len()
-            );
-            modules
+    CORE_MODULES.get_or_init(|| {
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            match get_core_modules_from_perl() {
+                Ok(modules) => {
+                    tracing::info!(
+                        "Successfully loaded {} core modules from system Perl",
+                        modules.len()
+                    );
+                    modules
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        "Warning: Failed to get core modules from system Perl: {}",
+                        e
+                    );
+                    tracing::warn!("Falling back to hardcoded core module list.");
+                    tracing::warn!("Consider installing Perl with: pixi global install perl");
+                    get_fallback_core_modules()
+                }
+            }
         }
-        Err(e) => {
-            tracing::warn!(
-                "Warning: Failed to get core modules from system Perl: {}",
-                e
-            );
-            tracing::warn!("Falling back to hardcoded core module list.");
-            tracing::warn!("Consider installing Perl with: pixi global install perl");
+        #[cfg(target_arch = "wasm32")]
+        {
             get_fallback_core_modules()
         }
     })
@@ -639,6 +652,7 @@ pub async fn generate_cpan_recipe_string(opts: &CpanOpts) -> miette::Result<Stri
     Ok(format_cpan_recipe_with_tests(&recipe))
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 #[async_recursion::async_recursion]
 /// Generate a CPAN recipe from `CpanOpts` and either print it or write it to disk.
 ///

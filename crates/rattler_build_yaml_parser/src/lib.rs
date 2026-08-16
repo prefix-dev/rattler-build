@@ -47,7 +47,7 @@ pub mod yaml;
 pub use conditional::{
     parse_conditional_list, parse_conditional_list_or_item,
     parse_conditional_list_or_item_with_converter, parse_conditional_list_with_converter,
-    parse_item_with_converter,
+    parse_item_with_converter, parse_jinja_expression,
 };
 pub use converter::{BoolConverter, FromStrConverter, NodeConverter};
 pub use error::{FileParseError, ParseError, ParseErrorWithSource, ParseResult, WithSourceCode};

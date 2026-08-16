@@ -1,7 +1,7 @@
 """Determine cargo build/test options for a given target and write to GITHUB_OUTPUT.
 
 Outputs:
-    cargo-build-options - extra flags for cargo build (e.g. --no-default-features --features rustls-tls)
+    cargo-build-options - extra flags for cargo build (e.g. --no-default-features --features rustls)
     cargo-test-options  - extra flags for cargo test (e.g. --lib --bin rattler-build)
 
 Usage:
@@ -23,7 +23,7 @@ def main() -> None:
 
     # musl targets need rustls instead of native TLS
     if "-musl" in target:
-        build_options = "--no-default-features --features rustls-tls"
+        build_options = "--no-default-features --features rustls"
     else:
         build_options = ""
 

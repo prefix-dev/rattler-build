@@ -1,14 +1,22 @@
 //! Script execution types and utilities.
+//!
+//! This module resolves script contents, generates build scripts with
+//! [`generate_build_script`], executes them with [`run_script`], and provides
+//! subprocess output handling via [`run_process_with_replacements`].
 
 use crate::sandbox::SandboxConfiguration;
 use crate::script::{Script, ScriptContent};
+use crate::{
+    execution_context::ExecutionContext, runner::resolve_process_env, runtime::RuntimeEnv,
+};
 use fs_err as fs;
 use futures::TryStreamExt;
 use indexmap::IndexMap;
-use itertools::Itertools;
-use rattler_conda_types::Platform;
+use rattler_shell::shell::Shell;
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 use std::collections::HashMap;
+use std::ffi::{OsStr, OsString};
 use std::fmt;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -68,20 +76,16 @@ impl std::str::FromStr for EnvironmentIsolation {
 /// Arguments for executing a script in a given interpreter.
 #[derive(Debug)]
 pub struct ExecutionArgs {
-    /// Contents of the script to execute
-    pub script: ResolvedScriptContents,
+    /// The ordered sections the build wrapper is composed of. Each section runs
+    /// in its own scope with its own interpreter and step-local `env`.
+    pub sections: Vec<BuildScriptSection>,
     /// Environment variables to set before executing the script
     pub env_vars: IndexMap<String, String>,
     /// Secrets to set as env vars and replace in the output
     pub secrets: IndexMap<String, String>,
 
-    /// The platform on which the script should be executed
-    pub execution_platform: Platform,
-
-    /// The build prefix that should contain the interpreter to use
-    pub build_prefix: Option<PathBuf>,
-    /// The prefix to use for the script execution
-    pub run_prefix: PathBuf,
+    /// Process and platform-aware build and host prefixes for this execution.
+    pub context: ExecutionContext,
 
     /// The working directory (`cwd`) in which the script should execute
     pub work_dir: PathBuf,
@@ -97,16 +101,14 @@ impl ExecutionArgs {
     /// Returns strings that should be replaced. The template argument can be used to specify
     /// a nice "variable" syntax, e.g. "$((var))" for bash or "%((var))%" for cmd.exe. The `var` part
     /// will be replaced with the actual variable name.
-    pub fn replacements(&self, template: &str) -> HashMap<String, String> {
+    pub(crate) fn replacements(&self, template: &str) -> HashMap<String, String> {
         let mut replacements = HashMap::new();
-        if let Some(build_prefix) = &self.build_prefix {
-            replacements.insert(
-                build_prefix.display().to_string(),
-                template.replace("((var))", "BUILD_PREFIX"),
-            );
-        };
         replacements.insert(
-            self.run_prefix.display().to_string(),
+            self.context.build().path().display().to_string(),
+            template.replace("((var))", "BUILD_PREFIX"),
+        );
+        replacements.insert(
+            self.context.host().path().display().to_string(),
             template.replace("((var))", "PREFIX"),
         );
 
@@ -137,17 +139,22 @@ pub enum ResolvedScriptContents {
     Path(PathBuf, String),
     /// The script contents from an inline YAML string
     Inline(String),
+    /// A list of inline commands; the interpreter assembles them at generation
+    /// time (so kept as a list, not joined here).
+    Commands(Vec<String>),
     /// There are no script contents
     Missing,
 }
 
 impl ResolvedScriptContents {
-    /// Get the script contents as a string
-    pub fn script(&self) -> &str {
+    /// The script contents as text (a command list is plainly newline-joined;
+    /// interpreter-specific assembly happens at generation time).
+    pub fn script(&self) -> Cow<'_, str> {
         match self {
-            ResolvedScriptContents::Path(_, script) => script,
-            ResolvedScriptContents::Inline(script) => script,
-            ResolvedScriptContents::Missing => "",
+            ResolvedScriptContents::Path(_, script) => Cow::Borrowed(script),
+            ResolvedScriptContents::Inline(script) => Cow::Borrowed(script),
+            ResolvedScriptContents::Commands(commands) => Cow::Owned(commands.join("\n")),
+            ResolvedScriptContents::Missing => Cow::Borrowed(""),
         }
     }
 
@@ -160,7 +167,7 @@ impl ResolvedScriptContents {
     }
 
     /// Determine interpreter based on file extension from the path
-    pub fn infer_interpreter(&self) -> Option<String> {
+    pub(crate) fn infer_interpreter(&self) -> Option<String> {
         self.path()
             .and_then(crate::script::determine_interpreter_from_path)
     }
@@ -181,8 +188,7 @@ impl Script {
         env_vars: HashMap<String, Option<String>>,
         work_dir: &Path,
         recipe_dir: &Path,
-        run_prefix: &Path,
-        build_prefix: Option<&PathBuf>,
+        context: ExecutionContext,
         jinja_renderer: Option<F>,
         sandbox_config: Option<&SandboxConfiguration>,
         env_isolation: EnvironmentIsolation,
@@ -193,7 +199,7 @@ impl Script {
         let env_vars = env_vars
             .into_iter()
             .filter_map(|(k, v)| v.map(|v| (k, v)))
-            .chain(self.env().clone().into_iter())
+            .chain(self.env().clone())
             .collect::<IndexMap<String, String>>();
 
         let contents = self.resolve_content(
@@ -202,14 +208,16 @@ impl Script {
             crate::platform_script_extensions(),
         )?;
 
+        let runtime = context.runtime();
+
         let secrets = self
             .secrets()
             .iter()
             .filter_map(|k| {
                 let secret = k.to_string();
 
-                if let Ok(value) = std::env::var(&secret) {
-                    Some((secret, value))
+                if let Some(value) = runtime.var(&secret) {
+                    Some((secret, value.to_string()))
                 } else {
                     tracing::warn!("Secret {} not found in environment", secret);
                     None
@@ -217,41 +225,28 @@ impl Script {
             })
             .collect::<IndexMap<String, String>>();
 
-        let work_dir = if let Some(cwd) = self.cwd.as_ref() {
-            run_prefix.join(cwd)
-        } else {
-            work_dir.to_owned()
-        };
+        let section_cwd = self.cwd.as_ref().map(|cwd| context.host().path().join(cwd));
+        let work_dir = work_dir.to_owned();
 
         tracing::debug!("Running script in {}", work_dir.display());
 
-        // Determine the interpreter to use:
-        // 1. Use explicitly specified interpreter if set
-        // 2. Try to infer from the resolved script path (if it's a file)
-        // 3. Finally fall back to platform default (bash/cmd)
-        let inferred_interpreter = contents.infer_interpreter();
-        let interpreter = if self.interpreter.is_some() {
-            self.interpreter()
-        } else if let Some(ref inferred) = inferred_interpreter {
-            tracing::debug!("Inferred interpreter '{}' from script file path", inferred);
-            inferred.as_str()
-        } else {
-            self.interpreter()
-        };
-
         let exec_args = ExecutionArgs {
-            script: contents,
+            sections: vec![BuildScriptSection {
+                interpreter: self.interpreter.clone(),
+                content: contents,
+                env: IndexMap::new(),
+                cwd: section_cwd,
+                label: None,
+            }],
             env_vars,
             secrets,
-            build_prefix: build_prefix.map(|p| p.to_owned()),
-            run_prefix: run_prefix.to_owned(),
-            execution_platform: Platform::current(),
+            context,
             work_dir,
             sandbox_config: sandbox_config.cloned(),
             env_isolation,
         };
 
-        crate::execution::run_script(exec_args, interpreter).await?;
+        crate::execution::run_script(exec_args).await?;
 
         Ok(())
     }
@@ -336,35 +331,36 @@ impl Script {
                     }
                 }
             }
+            // Keep the list; the interpreter assembles it in `generate_build_script`.
             ScriptContent::Commands(commands) => {
-                if self.interpreter() == "cmd" {
-                    // add in an `if %errorlevel% neq 0` check
-                    Ok(ResolvedScriptContents::Inline(
-                        commands
-                            .iter()
-                            .map(|c| format!("{}\nif %errorlevel% neq 0 exit /b %errorlevel%", c))
-                            .join("\n"),
-                    ))
-                } else {
-                    Ok(ResolvedScriptContents::Inline(commands.iter().join("\n")))
-                }
+                Ok(ResolvedScriptContents::Commands(commands.clone()))
             }
             ScriptContent::Command(command) => {
                 Ok(ResolvedScriptContents::Inline(command.to_owned()))
             }
         };
 
-        // render jinja if it is an inline script
+        // Render jinja for inline content, each command individually; file-backed
+        // scripts are not rendered.
         if let Some(renderer) = jinja_renderer {
+            let render = |script: &str| -> Result<String, std::io::Error> {
+                renderer(script).map_err(|e| {
+                    std::io::Error::other(format!(
+                        "Failed to render jinja template in build script content: {}",
+                        e
+                    ))
+                })
+            };
             match script_content? {
                 ResolvedScriptContents::Inline(script) => {
-                    let rendered = renderer(&script).map_err(|e| {
-                        std::io::Error::other(format!(
-                            "Failed to render jinja template in build `script`: {}",
-                            e
-                        ))
-                    })?;
-                    Ok(ResolvedScriptContents::Inline(rendered))
+                    Ok(ResolvedScriptContents::Inline(render(&script)?))
+                }
+                ResolvedScriptContents::Commands(commands) => {
+                    let rendered = commands
+                        .iter()
+                        .map(|c| render(c))
+                        .collect::<Result<Vec<_>, _>>()?;
+                    Ok(ResolvedScriptContents::Commands(rendered))
                 }
                 other => Ok(other),
             }
@@ -375,16 +371,116 @@ impl Script {
 }
 
 /// An AsyncRead wrapper that replaces carriage return (\r) bytes with newline (\n) bytes.
-pub fn normalize_crlf<R: AsyncRead + Unpin>(reader: R) -> impl AsyncRead + Unpin {
+pub(crate) fn normalize_crlf<R: AsyncRead + Send + Unpin>(
+    reader: R,
+) -> impl AsyncRead + Send + Unpin {
     FramedRead::new(reader, CrLfNormalizer::default())
         .into_async_read()
         .compat()
 }
 
+/// One CRLF-normalized line of subprocess output, tagged with its stream.
+#[derive(Debug)]
+pub(crate) struct OutputLine {
+    pub(crate) text: String,
+    pub(crate) is_stderr: bool,
+}
+
+type NormalizedLines = tokio::io::Lines<tokio::io::BufReader<Box<dyn AsyncRead + Send + Unpin>>>;
+
+/// A spawned script process streaming CRLF-normalized output lines.
+pub(crate) struct SpawnedProcess {
+    child: tokio::process::Child,
+    stdout: NormalizedLines,
+    stderr: NormalizedLines,
+    stdout_closed: bool,
+    stderr_closed: bool,
+}
+
+/// Spawns `program` with `args` in `cwd` with exactly `env` as the child
+/// environment plus `PWD` set to `cwd`. stdin is null; stdout/stderr are piped
+/// and CRLF-normalized.
+pub(crate) fn spawn_process(
+    program: &OsStr,
+    args: &[String],
+    cwd: &Path,
+    env: &IndexMap<String, String>,
+) -> io::Result<SpawnedProcess> {
+    let mut command = tokio::process::Command::new(program);
+    command
+        .env_clear()
+        .envs(env)
+        .current_dir(cwd)
+        // when using `pixi global install bash` the current work dir
+        // causes some strange issues that are fixed when setting the `PWD`
+        .env("PWD", cwd)
+        .args(args)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+
+    let mut child = command.spawn()?;
+    let stdout: Box<dyn AsyncRead + Send + Unpin> = Box::new(normalize_crlf(
+        child.stdout.take().expect("Failed to take stdout"),
+    ));
+    let stderr: Box<dyn AsyncRead + Send + Unpin> = Box::new(normalize_crlf(
+        child.stderr.take().expect("Failed to take stderr"),
+    ));
+
+    Ok(SpawnedProcess {
+        child,
+        stdout: tokio::io::BufReader::new(stdout).lines(),
+        stderr: tokio::io::BufReader::new(stderr).lines(),
+        stdout_closed: false,
+        stderr_closed: false,
+    })
+}
+
+impl SpawnedProcess {
+    /// Returns the next line from either stream, or `None` once both close.
+    pub(crate) async fn next_line(&mut self) -> Option<io::Result<OutputLine>> {
+        loop {
+            tokio::select! {
+                line = self.stdout.next_line(), if !self.stdout_closed => match line {
+                    Ok(Some(text)) => return Some(Ok(OutputLine { text, is_stderr: false })),
+                    Ok(None) => self.stdout_closed = true,
+                    Err(error) => return Some(Err(error)),
+                },
+                line = self.stderr.next_line(), if !self.stderr_closed => match line {
+                    Ok(Some(text)) => return Some(Ok(OutputLine { text, is_stderr: true })),
+                    Ok(None) => self.stderr_closed = true,
+                    Err(error) => return Some(Err(error)),
+                },
+                else => return None,
+            }
+        }
+    }
+
+    /// Discards all remaining output from both streams.
+    pub(crate) async fn drain_output(&mut self) -> io::Result<()> {
+        let mut stdout_sink = tokio::io::sink();
+        let mut stderr_sink = tokio::io::sink();
+        let (stdout_result, stderr_result) = tokio::join!(
+            tokio::io::copy(self.stdout.get_mut(), &mut stdout_sink),
+            tokio::io::copy(self.stderr.get_mut(), &mut stderr_sink),
+        );
+        self.stdout_closed = true;
+        self.stderr_closed = true;
+        stdout_result?;
+        stderr_result?;
+        Ok(())
+    }
+
+    /// Waits for the process to exit. Call after draining its output.
+    pub(crate) async fn wait(&mut self) -> io::Result<std::process::ExitStatus> {
+        self.child.wait().await
+    }
+}
+
 /// Codec that normalizes CR and CRLF to LF
 #[derive(Default)]
-pub struct CrLfNormalizer {
-    last_was_cr: bool,
+pub(crate) struct CrLfNormalizer {
+    pub(crate) last_was_cr: bool,
 }
 
 impl Decoder for CrLfNormalizer {
@@ -424,180 +520,348 @@ impl Decoder for CrLfNormalizer {
     }
 }
 
-use crate::interpreter::{
-    BASH_PREAMBLE, BashInterpreter, CMDEXE_PREAMBLE, CmdExeInterpreter, Interpreter,
-    NodeJsInterpreter, NuShellInterpreter, PerlInterpreter, PowerShellInterpreter,
-    PythonInterpreter, RInterpreter, RubyInterpreter,
-};
-use rattler_shell::shell;
+/// An owned build-wrapper section carried on [`ExecutionArgs::sections`].
+///
+/// One per build step (or one for a plain `build.script`), with its resolved
+/// content, explicit interpreter, step-local `env`, optional `cwd`, and label.
+/// It is borrowed into a [`ScriptSection`] during wrapper generation.
+#[derive(Debug)]
+pub struct BuildScriptSection {
+    /// Explicit interpreter for this section, or `None` to fall back to the
+    /// wrapper shell.
+    pub interpreter: Option<String>,
+    /// Resolved content for this section.
+    pub content: ResolvedScriptContents,
+    /// Environment variables scoped to this section only.
+    pub env: IndexMap<String, String>,
+    /// Optional working directory for this section.
+    pub cwd: Option<PathBuf>,
+    /// Optional annotation rendered as a boundary comment above the section.
+    pub label: Option<String>,
+}
 
-/// Run a script with the given execution arguments and interpreter
-pub async fn run_script(
-    exec_args: ExecutionArgs,
-    interpreter: &str,
-) -> Result<(), crate::InterpreterError> {
-    match interpreter {
-        "nushell" | "nu" => NuShellInterpreter.run(exec_args).await?,
-        "bash" => BashInterpreter.run(exec_args).await?,
-        "cmd" => CmdExeInterpreter.run(exec_args).await?,
-        "python" => PythonInterpreter.run(exec_args).await?,
-        "perl" => PerlInterpreter.run(exec_args).await?,
-        "rscript" => RInterpreter.run(exec_args).await?,
-        "ruby" => RubyInterpreter.run(exec_args).await?,
-        "node" | "nodejs" => NodeJsInterpreter.run(exec_args).await?,
-        "powershell" => PowerShellInterpreter.run(exec_args).await?,
+/// One unit of a generated build wrapper: content run in a single interpreter,
+/// with optional step-local `env`, optional `cwd`, and a boundary-comment label.
+///
+/// `env` is scoped to the section (see `ShellDialect::scope_section`) and is
+/// distinct from [`ExecutionArgs::env_vars`], the whole-build environment. The
+/// wrapper is built from one [`ScriptSection`] per [`ExecutionArgs::sections`] entry.
+pub(crate) struct ScriptSection<'a> {
+    /// Explicit interpreter, or `None` to infer from a file-backed path and
+    /// otherwise fall back to the wrapper shell.
+    pub interpreter: Option<&'a str>,
+    /// Resolved content for this section.
+    pub content: &'a ResolvedScriptContents,
+    /// Environment variables scoped to this section only.
+    pub env: &'a IndexMap<String, String>,
+    /// Optional working directory for this section.
+    pub cwd: Option<&'a Path>,
+    /// Optional annotation rendered as a boundary comment above the section.
+    pub label: Option<&'a str>,
+}
+
+/// A section's place in the wrapper. Used only for naming the interpreter script
+/// file so the single-section case keeps its historic name.
+#[derive(Clone, Copy)]
+struct SectionIndex {
+    position: usize,
+    total: usize,
+}
+
+/// Names the file an interpreter section's content is written to. A sole section
+/// keeps the historic `conda_build_script.<ext>` name (asserted by tests and
+/// referenced by the debugging docs); multiple sections are numbered.
+fn section_script_filename(extension: &str, index: SectionIndex) -> String {
+    if index.total == 1 {
+        format!("conda_build_script.{extension}")
+    } else {
+        format!("conda_build_step{}.{extension}", index.position)
+    }
+}
+
+/// Returns the path to the generated native build wrapper script.
+///
+/// The wrapper sources the activation script, then runs the ordered
+/// [`ExecutionArgs::sections`], each wrapped in an isolated scope (see
+/// `scope_section`). Sections with no interpreter, or with the native wrapper
+/// shell itself (`cmd` on Windows, `bash` on Unix), are appended directly to the
+/// wrapper; sections with a specialized interpreter are written to script files
+/// and invoked via the resolved interpreter.
+pub(crate) async fn generate_build_script(
+    args: &ExecutionArgs,
+) -> Result<PathBuf, crate::InterpreterError> {
+    let dialect = crate::shell_dialect::shell_dialect(args.context.runtime().process_platform());
+    let shell = dialect.shell();
+
+    let script_extension = shell.extension();
+    let activation_script_path = args.work_dir.join(format!("build_env.{script_extension}"));
+    let build_script_path = args
+        .work_dir
+        .join(format!("conda_build.{script_extension}"));
+
+    let activation_script = crate::activation::activation_script(args, shell.clone())
+        .map_err(|err| std::io::Error::other(err.to_string()))?;
+    tokio::fs::write(
+        &activation_script_path,
+        crate::shell_dialect::write_shell_script(shell.clone(), &activation_script)?,
+    )
+    .await?;
+
+    let sections: Vec<ScriptSection> = args
+        .sections
+        .iter()
+        .map(|section| ScriptSection {
+            interpreter: section.interpreter.as_deref(),
+            content: &section.content,
+            env: &section.env,
+            cwd: section.cwd.as_deref(),
+            label: section.label.as_deref(),
+        })
+        .collect();
+
+    let total = sections.len();
+    let mut fragments = Vec::with_capacity(total);
+    for (position, section) in sections.iter().enumerate() {
+        let body = build_section_body(
+            args,
+            dialect.as_ref(),
+            &shell,
+            section,
+            SectionIndex { position, total },
+        )
+        .await?;
+        // Drop empty sections: an empty bash subshell `()` is a syntax error,
+        // and no-script recipes stay preamble-only.
+        if body.trim().is_empty() {
+            continue;
+        }
+        fragments.push(dialect.scope_section(section.label, section.env, section.cwd, &body)?);
+    }
+
+    let build_script = format!(
+        "{}\n{}",
+        dialect.preamble(&activation_script_path),
+        fragments.join("\n"),
+    );
+    tokio::fs::write(
+        &build_script_path,
+        crate::shell_dialect::write_shell_script(shell, &build_script)?,
+    )
+    .await?;
+
+    #[cfg(unix)]
+    {
+        if build_script_path.extension().and_then(|e| e.to_str()) == Some("sh") {
+            use std::{fs::Permissions, os::unix::fs::PermissionsExt};
+            let permissions = Permissions::from_mode(0o755);
+            tokio::fs::set_permissions(&build_script_path, permissions).await?;
+        }
+    }
+
+    Ok(build_script_path)
+}
+
+/// Builds the raw (unscoped) wrapper body for one section: native code when no
+/// interpreter applies, otherwise an invocation of the resolved interpreter.
+async fn build_section_body(
+    args: &ExecutionArgs,
+    dialect: &dyn crate::shell_dialect::ShellDialect,
+    shell: &rattler_shell::shell::ShellEnum,
+    section: &ScriptSection<'_>,
+    index: SectionIndex,
+) -> Result<String, crate::InterpreterError> {
+    // Inference runs after resolution: only file-backed scripts infer from their
+    // path; inline scripts use the explicit interpreter or stay native code.
+    let explicit_or_inferred = section
+        .interpreter
+        .map(str::to_string)
+        .or_else(|| section.content.infer_interpreter());
+
+    // No interpreter specified: default to the wrapper shell.
+    let interpreter_name = explicit_or_inferred
+        .clone()
+        .unwrap_or_else(|| dialect.default_interpreter().to_string());
+    let interpreter = crate::interpreter::SelectedInterpreter::from_recipe_name(&interpreter_name)
+        .ok_or_else(|| crate::InterpreterError::UnsupportedInterpreter(interpreter_name.clone()))?;
+
+    // Whether the content needs a specialized interpreter invocation. An
+    // interpreter that matches the wrapper shell itself (`cmd` on Windows,
+    // `bash` on Unix) is *not* specialized: the wrapper is already executed by
+    // that shell, so its body is inlined directly rather than resolving the
+    // interpreter executable from the build environment and re-invoking it.
+    // This matters most for `cmd`, which is a system shell rather than a
+    // conda-provided executable and would otherwise fail to resolve.
+    let needs_specialized_interpreter = explicit_or_inferred
+        .as_deref()
+        .is_some_and(|name| name != dialect.default_interpreter());
+
+    // Assemble the rendered content; the interpreter joins a command list.
+    let script_text = match section.content {
+        ResolvedScriptContents::Commands(commands) => interpreter.join_commands(commands),
+        ResolvedScriptContents::Inline(script) => script.clone(),
+        ResolvedScriptContents::Path(_, script) => script.clone(),
+        ResolvedScriptContents::Missing => String::new(),
+    };
+
+    if !needs_specialized_interpreter {
+        // No interpreter, or one that matches the wrapper shell: the content is
+        // native wrapper code. Most shells can inline it directly, but cmd.exe
+        // needs call indirection so `exit /b` exits only this section instead
+        // of terminating the whole wrapper.
+        if let Some(native_command) = dialect.native_section_script_command(
+            &args
+                .work_dir
+                .join(section_script_filename(shell.extension(), index)),
+        ) && !script_text.trim().is_empty()
+        {
+            let script_path = args
+                .work_dir
+                .join(section_script_filename(shell.extension(), index));
+            tokio::fs::write(
+                &script_path,
+                crate::shell_dialect::write_shell_script(shell.clone(), &script_text)?,
+            )
+            .await?;
+            let quoted = native_command
+                .iter()
+                .map(|arg| crate::shell_dialect::quote_arg(shell, arg))
+                .collect::<Vec<_>>();
+            let command_refs = quoted.iter().map(String::as_str).collect::<Vec<_>>();
+            let mut body = String::new();
+            shell
+                .run_command(&mut body, command_refs)
+                .map_err(std::io::Error::other)?;
+            return Ok(body);
+        }
+
+        return Ok(script_text);
+    }
+
+    // Specialized interpreter: invoke a script file (the original path, or one
+    // written next to the wrapper).
+    let script_path = match section.content {
+        ResolvedScriptContents::Path(path, _) => path.clone(),
         _ => {
-            return Err(
-                std::io::Error::other(format!("Unsupported interpreter: {}", interpreter)).into(),
-            );
+            let path = args
+                .work_dir
+                .join(section_script_filename(interpreter.extension(), index));
+            tokio::fs::write(&path, interpreter.script_contents(&script_text)).await?;
+            path
         }
     };
 
+    // Resolve from the activated environment (build/host prefix, then PATH).
+    let executable = interpreter.resolve_executable(&args.context)?;
+
+    // Quote so a prefix or script path with spaces survives the native shell.
+    let mut command = vec![executable.to_string_lossy().into_owned()];
+    command.extend(interpreter.args(&script_path));
+    let quoted = command
+        .iter()
+        .map(|arg| crate::shell_dialect::quote_arg(shell, arg))
+        .collect::<Vec<_>>();
+    let command_refs = quoted.iter().map(String::as_str).collect::<Vec<_>>();
+    let mut body = String::new();
+    shell
+        .run_command(&mut body, command_refs)
+        .map_err(std::io::Error::other)?;
+    Ok(body)
+}
+
+/// Runs a script with the given execution arguments.
+///
+/// Most callers use [`Script::run_script`], which builds the [`ExecutionArgs`]
+/// from a single script. This lower-level entry point runs a pre-built
+/// `ExecutionArgs` directly and is used when composing multiple sections.
+pub async fn run_script(exec_args: ExecutionArgs) -> Result<(), crate::InterpreterError> {
+    let dialect =
+        crate::shell_dialect::shell_dialect(exec_args.context.runtime().process_platform());
+    let build_script_path = generate_build_script(&exec_args).await?;
+    let command_spec = dialect.command_to_run_script(&build_script_path, &exec_args.context);
+
+    let process_env = resolve_process_env(
+        exec_args.env_isolation,
+        &exec_args.env_vars,
+        &exec_args.secrets,
+        exec_args.context.runtime(),
+    );
+
+    let output = crate::execution::run_process_with_replacements(
+        &command_spec,
+        &exec_args.work_dir,
+        &exec_args.replacements(dialect.replacements_template()),
+        &process_env,
+        if dialect.supports_sandbox() {
+            exec_args.sandbox_config.as_ref()
+        } else {
+            None
+        },
+        exec_args.context.runtime(),
+    )
+    .await?;
+
+    if !output.status.success() {
+        let status_code = output.status.code().unwrap_or(1);
+        let debug_info = dialect.debug_info(&exec_args.work_dir, &exec_args.context);
+        tracing::error!("Script failed with status {}", status_code);
+        tracing::error!("{}", debug_info);
+        return Err(crate::InterpreterError::ExecutionFailed(
+            std::io::Error::other(format!(
+                "Script failed with status {}{}",
+                status_code, debug_info
+            )),
+        ));
+    }
+
     Ok(())
 }
 
-/// Create build script files without executing them
+/// Creates build script files without executing them.
 pub async fn create_build_script(exec_args: ExecutionArgs) -> Result<(), std::io::Error> {
-    let interpreter = if cfg!(windows) { "cmd" } else { "bash" };
-    let work_dir = &exec_args.work_dir;
+    let build_script_path = generate_build_script(&exec_args)
+        .await
+        .map_err(|err| match err {
+            crate::InterpreterError::ExecutionFailed(err) => err,
+            crate::InterpreterError::InterpreterNotFound(interpreter) => std::io::Error::other(
+                format!("interpreter '{interpreter}' was not found in the build environment"),
+            ),
+            crate::InterpreterError::InvalidInterpreter {
+                interpreter,
+                reason,
+            } => std::io::Error::other(format!(
+                "interpreter '{interpreter}' was found but is not valid: {reason}"
+            )),
+            crate::InterpreterError::UnsupportedInterpreter(interpreter) => {
+                let suggestion = crate::interpreter::closest_interpreter(&interpreter)
+                    .map(|s| format!(". Did you mean `{s}`?"))
+                    .unwrap_or_default();
+                std::io::Error::other(format!(
+                    "unsupported interpreter '{interpreter}'{suggestion}"
+                ))
+            }
+        })?;
 
-    if interpreter == "bash" {
-        let script = BashInterpreter
-            .get_script(&exec_args, shell::Bash::default())
-            .unwrap();
-        let build_env_path = work_dir.join("build_env.sh");
-        let build_script_path = work_dir.join("conda_build.sh");
-
-        tokio::fs::write(&build_env_path, script).await?;
-
-        let preamble = BASH_PREAMBLE.replace("((script_path))", &build_env_path.to_string_lossy());
-        let script = format!("{}\n{}", preamble, exec_args.script.script());
-        tokio::fs::write(&build_script_path, script).await?;
-
-        tracing::info!("Build script created at {}", build_script_path.display());
-    } else if interpreter == "cmd" {
-        let script = CmdExeInterpreter
-            .get_script(&exec_args, shell::CmdExe)
-            .unwrap();
-        let build_env_path = work_dir.join("build_env.bat");
-        let build_script_path = work_dir.join("conda_build.bat");
-
-        tokio::fs::write(&build_env_path, script).await?;
-
-        let build_script = format!(
-            "{}\n{}",
-            CMDEXE_PREAMBLE.replace("((script_path))", &build_env_path.to_string_lossy()),
-            exec_args.script.script()
-        );
-        tokio::fs::write(
-            &build_script_path,
-            &build_script.replace('\n', "\r\n").as_bytes(),
-        )
-        .await?;
-
-        tracing::info!("Build script created at {}", build_script_path.display());
-    }
-
+    tracing::info!("Build script created at {}", build_script_path.display());
     Ok(())
 }
 
-/// Find the rattler-sandbox executable in PATH
-fn find_rattler_sandbox() -> Option<PathBuf> {
-    which::which("rattler-sandbox").ok()
-}
-
-/// Environment variables that are passed through from the host environment
-/// into the build subprocess. These are variables that cannot be computed
-/// by rattler-build but are needed for builds to function correctly.
-const PASSTHROUGH_ENV_VARS: &[&str] = &[
-    // TLS certificates (needed for https in build scripts)
-    "SSL_CERT_FILE",
-    "SSL_CERT_DIR",
-    // Python requests CA bundle (needed for pip/requests in corporate environments)
-    "REQUESTS_CA_BUNDLE",
-    // SSH agent (needed for private git repo access)
-    "SSH_AUTH_SOCK",
-    // Display server (needed for GUI-related builds on Linux)
-    "DISPLAY",
-    // Proxy configuration (needed in corporate/CI environments)
-    "http_proxy",
-    "https_proxy",
-    "HTTP_PROXY",
-    "HTTPS_PROXY",
-    "no_proxy",
-    "NO_PROXY",
-];
-
-/// Platform-critical environment variables that must always be passed through
-/// to avoid breaking fundamental OS functionality.
-#[cfg(target_os = "windows")]
-const PLATFORM_PASSTHROUGH_ENV_VARS: &[&str] = &[
-    // Required for Winsock/networking and DLL loading
-    "SYSTEMROOT",
-    "WINDIR",
-    // Command interpreter
-    "COMSPEC",
-    // Temp directories
-    "TEMP",
-    "TMP",
-    // Executable extension resolution
-    "PATHEXT",
-];
-
-/// Platform-critical environment variables that must always be passed through
-/// to avoid breaking fundamental OS functionality.
-#[cfg(target_os = "macos")]
-const PLATFORM_PASSTHROUGH_ENV_VARS: &[&str] = &[
-    // macOS uses per-session temp directories
-    "TMPDIR",
-    // CoreFoundation text encoding
-    "__CF_USER_TEXT_ENCODING",
-];
-
-/// Platform-critical environment variables that must always be passed through
-/// to avoid breaking fundamental OS functionality.
-#[cfg(not(any(target_os = "windows", target_os = "macos")))]
-const PLATFORM_PASSTHROUGH_ENV_VARS: &[&str] = &[];
-
-/// Configures the subprocess environment for the given isolation mode.
-fn configure_subprocess_env(
-    command: &mut tokio::process::Command,
-    env_vars: &IndexMap<String, String>,
-    secrets: &IndexMap<String, String>,
-    env_isolation: EnvironmentIsolation,
-) {
-    match env_isolation {
-        EnvironmentIsolation::Strict | EnvironmentIsolation::CondaBuild => {
-            command.env_clear();
-
-            for var in PASSTHROUGH_ENV_VARS
-                .iter()
-                .chain(PLATFORM_PASSTHROUGH_ENV_VARS)
-            {
-                if let Ok(value) = std::env::var(var) {
-                    command.env(var, value);
-                }
-            }
-
-            command.envs(env_vars);
-            command.envs(secrets.iter());
-        }
-        EnvironmentIsolation::None => {
-            command.envs(env_vars);
-        }
-    }
+/// Finds the rattler-sandbox executable on the runtime `PATH`.
+fn find_rattler_sandbox(runtime: &RuntimeEnv) -> Option<PathBuf> {
+    which::which_in_global("rattler-sandbox", Some(runtime.path()))
+        .ok()?
+        .next()
 }
 
 /// Spawns a process and replaces the given strings in the output with the given replacements.
 /// This is used to replace the host prefix with $PREFIX and the build prefix with $BUILD_PREFIX
-pub async fn run_process_with_replacements(
-    args: &[&str],
+#[allow(clippy::too_many_arguments)]
+pub(crate) async fn run_process_with_replacements(
+    command_spec: &crate::shell_dialect::CommandSpec,
     cwd: &Path,
     replacements: &HashMap<String, String>,
-    env_vars: &IndexMap<String, String>,
-    secrets: &IndexMap<String, String>,
-    env_isolation: EnvironmentIsolation,
+    process_env: &IndexMap<String, String>,
     sandbox_config: Option<&SandboxConfiguration>,
+    runtime: &RuntimeEnv,
 ) -> Result<std::process::Output, std::io::Error> {
     // Create or open the build log file
     let log_file_path = cwd.join("conda_build.log");
@@ -606,22 +870,18 @@ pub async fn run_process_with_replacements(
         .append(true)
         .open(&log_file_path)
         .await?;
-    let mut command = if let Some(sandbox_config) = sandbox_config {
+    let (program, process_args) = if let Some(sandbox_config) = sandbox_config {
         tracing::info!("{}", sandbox_config);
 
         // Try to find rattler-sandbox executable
-        if let Some(sandbox_exe) = find_rattler_sandbox() {
-            let mut cmd = tokio::process::Command::new(sandbox_exe);
+        if let Some(sandbox_exe) = find_rattler_sandbox(runtime) {
+            let mut sandbox_args = sandbox_config.with_cwd(cwd).to_args();
 
-            // Add sandbox configuration arguments
-            let sandbox_args = sandbox_config.with_cwd(cwd).to_args();
-            cmd.args(&sandbox_args);
+            // Add the actual command to execute as positional arguments.
+            sandbox_args.push(command_spec.program.clone());
+            sandbox_args.extend(command_spec.args.iter().cloned());
 
-            // Add the actual command to execute (as positional arguments)
-            cmd.arg(args[0]);
-            cmd.args(&args[1..]);
-
-            cmd
+            (sandbox_exe.into_os_string(), sandbox_args)
         } else {
             tracing::error!("rattler-sandbox executable not found in PATH");
             tracing::error!("Please install it by running: pixi global install rattler-sandbox");
@@ -631,50 +891,24 @@ pub async fn run_process_with_replacements(
             ));
         }
     } else {
-        tokio::process::Command::new(args[0])
+        (
+            OsString::from(&command_spec.program),
+            command_spec.args.clone(),
+        )
     };
 
-    configure_subprocess_env(&mut command, env_vars, secrets, env_isolation);
-
-    command
-        .current_dir(cwd)
-        // when using `pixi global install bash` the current work dir
-        // causes some strange issues that are fixed when setting the `PWD`
-        .env("PWD", cwd)
-        .args(&args[1..])
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-
-    let mut child = command.spawn()?;
-
-    let stdout = child.stdout.take().expect("Failed to take stdout");
-    let stderr = child.stderr.take().expect("Failed to take stderr");
-
-    let stdout_wrapped = normalize_crlf(stdout);
-    let stderr_wrapped = normalize_crlf(stderr);
-
-    let mut stdout_lines = tokio::io::BufReader::new(stdout_wrapped).lines();
-    let mut stderr_lines = tokio::io::BufReader::new(stderr_wrapped).lines();
+    let mut process = spawn_process(&program, &process_args, cwd, process_env)?;
 
     let mut stdout_log = String::new();
     let mut stderr_log = String::new();
-    let mut closed = (false, false);
-
-    loop {
-        let (line, is_stderr) = tokio::select! {
-            line = stdout_lines.next_line() => (line, false),
-            line = stderr_lines.next_line() => (line, true),
-            else => break,
-        };
-
+    while let Some(line) = process.next_line().await {
         match line {
-            Ok(Some(line)) => {
+            Ok(line) => {
                 let filtered_line = replacements
                     .iter()
-                    .fold(line, |acc, (from, to)| acc.replace(from, to));
+                    .fold(line.text, |acc, (from, to)| acc.replace(from, to));
 
-                if is_stderr {
+                if line.is_stderr {
                     stderr_log.push_str(&filtered_line);
                     stderr_log.push('\n');
                 } else {
@@ -692,21 +926,14 @@ pub async fn run_process_with_replacements(
 
                 tracing::info!("{}", filtered_line);
             }
-            Ok(None) if !is_stderr => closed.0 = true,
-            Ok(None) if is_stderr => closed.1 = true,
-            Ok(None) => unreachable!(),
             Err(e) => {
                 tracing::warn!("Error reading output: {:?}", e);
                 break;
             }
-        };
-        // make sure we close the loop when both stdout and stderr are closed
-        if closed == (true, true) {
-            break;
         }
     }
 
-    let status = child.wait().await?;
+    let status = process.wait().await?;
 
     // Flush and close the log file
     if let Err(e) = log_file.flush().await {
@@ -723,13 +950,14 @@ pub async fn run_process_with_replacements(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ExecutionContext;
+    use rattler_conda_types::Platform;
     use tokio_util::bytes::BytesMut;
 
     /// `CONDA_BUILD=1` must live inside the sourced activation script so that
     /// nested shells inherit it while the outer subprocess starts without it.
     #[test]
     fn test_conda_build_marker_written_into_build_env_script() {
-        use crate::interpreter::BashInterpreter;
         use rattler_shell::shell;
 
         let tmp = tempfile::tempdir().unwrap();
@@ -737,20 +965,21 @@ mod tests {
         fs_err::create_dir_all(&prefix).unwrap();
 
         let args = ExecutionArgs {
-            script: ResolvedScriptContents::Inline(String::new()),
+            sections: Vec::new(),
             env_vars: IndexMap::new(),
             secrets: IndexMap::new(),
-            execution_platform: Platform::current(),
-            build_prefix: None,
-            run_prefix: prefix,
+            context: ExecutionContext::shared(
+                RuntimeEnv::for_test(Platform::current()),
+                prefix,
+                Platform::current(),
+                Platform::current(),
+            ),
             work_dir: tmp.path().to_path_buf(),
             sandbox_config: None,
             env_isolation: EnvironmentIsolation::None,
         };
 
-        let script = BashInterpreter
-            .get_script(&args, shell::Bash::default())
-            .unwrap();
+        let script = crate::activation::activation_script(&args, shell::Bash::default()).unwrap();
         assert!(
             script.contains("CONDA_BUILD") && script.contains("1"),
             "build_env.sh must set CONDA_BUILD=1 for nested-shell re-entrancy, got:\n{script}"
@@ -764,22 +993,23 @@ mod tests {
         let env_vars = IndexMap::new();
         let secrets = IndexMap::new();
 
-        let mut command = tokio::process::Command::new("true");
-        configure_subprocess_env(
-            &mut command,
+        let process_env = resolve_process_env(
+            EnvironmentIsolation::None,
             &env_vars,
             &secrets,
-            EnvironmentIsolation::None,
+            &RuntimeEnv::for_test(Platform::current()),
         );
 
         assert!(
-            !command.as_std().get_envs().any(|(k, _)| k == "CONDA_BUILD"),
+            !process_env.contains_key("CONDA_BUILD"),
             "CONDA_BUILD must not be set on the outer subprocess"
         );
     }
 
+    /// `resolve_content` keeps a command list as `Commands`, unjoined and
+    /// without shell-specific error handling (the interpreter's job).
     #[test]
-    fn test_cmd_errorlevel_injected() {
+    fn test_commands_resolved_as_list() {
         use crate::script::{Script, ScriptContent};
         let commands = vec!["echo Hello".to_string(), "echo World".to_string()];
         let script = Script {
@@ -792,31 +1022,86 @@ mod tests {
             content_explicit: false,
         };
 
-        // Use dummy paths for recipe_dir and extensions
-        let recipe_dir = std::path::Path::new(".");
-        let extensions = &["bat"];
-
         let resolved = script
             .resolve_content(
-                recipe_dir,
+                std::path::Path::new("."),
                 None::<fn(&str) -> Result<String, String>>,
-                extensions,
+                &["bat"],
             )
             .unwrap();
 
-        if cfg!(windows) {
-            let expected = "echo Hello\nif %errorlevel% neq 0 exit /b %errorlevel%\necho World\nif %errorlevel% neq 0 exit /b %errorlevel%";
-            match resolved {
-                ResolvedScriptContents::Inline(s) => assert_eq!(s, expected),
-                _ => panic!("Expected Inline variant"),
-            }
-        } else {
-            let expected = "echo Hello\necho World";
-            match resolved {
-                ResolvedScriptContents::Inline(s) => assert_eq!(s, expected),
-                _ => panic!("Expected Inline variant"),
-            }
+        match resolved {
+            ResolvedScriptContents::Commands(c) => assert_eq!(c, commands),
+            other => panic!("expected Commands variant, got {other:?}"),
         }
+    }
+
+    /// A command list is jinja-rendered per command in `resolve_content`.
+    #[test]
+    fn test_command_list_rendered_per_command() {
+        use crate::script::{Script, ScriptContent};
+        let script = Script {
+            content: ScriptContent::Commands(vec![
+                "echo MARK one".to_string(),
+                "echo MARK two".to_string(),
+            ]),
+            ..Script::default()
+        };
+        let renderer = |s: &str| -> Result<String, String> { Ok(s.replace("MARK", "rendered")) };
+
+        let resolved = script
+            .resolve_content(std::path::Path::new("."), Some(renderer), &["sh"])
+            .unwrap();
+
+        match resolved {
+            ResolvedScriptContents::Commands(c) => {
+                assert_eq!(c, vec!["echo rendered one", "echo rendered two"]);
+            }
+            other => panic!("expected Commands variant, got {other:?}"),
+        }
+    }
+
+    /// Unified path: a command list with no interpreter, on a Windows runtime,
+    /// is assembled by `cmd` (errorlevel) into the generated `.bat`, on any host.
+    #[tokio::test]
+    async fn test_command_list_errorlevel_in_generated_cmd_wrapper() {
+        let tmp = tempfile::tempdir().unwrap();
+        let prefix = tmp.path().join("prefix");
+        fs::create_dir_all(&prefix).unwrap();
+
+        let args = ExecutionArgs {
+            sections: vec![BuildScriptSection {
+                interpreter: None,
+                content: ResolvedScriptContents::Commands(vec![
+                    "echo Hello".to_string(),
+                    "echo World".to_string(),
+                ]),
+                env: IndexMap::new(),
+                cwd: None,
+                label: None,
+            }],
+            env_vars: IndexMap::new(),
+            secrets: IndexMap::new(),
+            context: ExecutionContext::shared(
+                RuntimeEnv::for_test(Platform::Win64),
+                prefix,
+                Platform::Win64,
+                Platform::Win64,
+            ),
+            work_dir: tmp.path().to_path_buf(),
+            sandbox_config: None,
+            env_isolation: EnvironmentIsolation::None,
+        };
+
+        crate::execution::generate_build_script(&args)
+            .await
+            .unwrap();
+
+        let script = fs::read_to_string(tmp.path().join("conda_build_script.bat")).unwrap();
+        assert!(
+            script.contains("if %errorlevel% neq 0 exit /b %errorlevel%"),
+            "cmd section script must propagate errors between commands, got:\n{script}"
+        );
     }
 
     #[test]
@@ -999,5 +1284,788 @@ mod tests {
             .unwrap()
             .to_owned();
         assert_eq!(ext, if cfg!(windows) { "bat" } else { "sh" });
+    }
+
+    use rattler_shell::activation::prefix_path_entries;
+
+    /// Mirrors the interpreter-module test helper: places a 0-byte executable in
+    /// the prefix's bin directory and returns its path.
+    fn create_fake_executable(prefix: &Path, name: &str) -> PathBuf {
+        let exe_name = format!("{}{}", name, std::env::consts::EXE_SUFFIX);
+        let bin_dir = prefix_path_entries(prefix, &Platform::current())
+            .into_iter()
+            .next()
+            .expect("prefix has executable path entries");
+        fs::create_dir_all(&bin_dir).unwrap();
+        let exe = bin_dir.join(exe_name);
+        fs::write(&exe, "").unwrap();
+        #[cfg(unix)]
+        {
+            use std::{fs::Permissions, os::unix::fs::PermissionsExt};
+            fs::set_permissions(&exe, Permissions::from_mode(0o755)).unwrap();
+        }
+        exe
+    }
+
+    fn execution_args(
+        work_dir: PathBuf,
+        run_prefix: PathBuf,
+        script: ResolvedScriptContents,
+        interpreter: Option<&str>,
+    ) -> ExecutionArgs {
+        ExecutionArgs {
+            sections: vec![BuildScriptSection {
+                interpreter: interpreter.map(str::to_string),
+                content: script,
+                env: IndexMap::new(),
+                cwd: None,
+                label: None,
+            }],
+            env_vars: IndexMap::new(),
+            secrets: IndexMap::new(),
+            context: ExecutionContext::shared(
+                RuntimeEnv::current(),
+                run_prefix,
+                Platform::current(),
+                Platform::current(),
+            ),
+            work_dir,
+            sandbox_config: None,
+            env_isolation: EnvironmentIsolation::None,
+        }
+    }
+
+    /// In Strict mode the subprocess env is cleared, only the passthrough
+    /// whitelist is forwarded from the host, and explicit env_vars + secrets are
+    /// applied on top. The host vars are injected through `RuntimeEnv`, so the
+    /// test does not touch the real process environment.
+    #[test]
+    fn test_strict_env_clear_and_passthrough_whitelist() {
+        let runtime = RuntimeEnv::for_test(Platform::current())
+            .with_var("RB_TEST_RANDOM_VAR", "should-not-leak")
+            .with_var("SSL_CERT_FILE", "/host/cacert.pem");
+
+        let mut env_vars = IndexMap::new();
+        env_vars.insert("EXPLICIT_VAR".to_string(), "explicit".to_string());
+        let mut secrets = IndexMap::new();
+        secrets.insert("SECRET_VAR".to_string(), "secret".to_string());
+
+        let resolve = |isolation: EnvironmentIsolation| {
+            resolve_process_env(isolation, &env_vars, &secrets, &runtime)
+        };
+
+        let strict = resolve(EnvironmentIsolation::Strict);
+        assert!(
+            !strict.contains_key("RB_TEST_RANDOM_VAR"),
+            "non-whitelisted host var must be absent in Strict mode"
+        );
+        assert_eq!(
+            strict.get("SSL_CERT_FILE").map(String::as_str),
+            Some("/host/cacert.pem"),
+            "whitelisted host var must be passed through"
+        );
+        assert_eq!(
+            strict.get("EXPLICIT_VAR").map(String::as_str),
+            Some("explicit")
+        );
+        assert_eq!(strict.get("SECRET_VAR").map(String::as_str), Some("secret"));
+
+        // CondaBuild also clears the env and applies the same whitelist.
+        let conda_build = resolve(EnvironmentIsolation::CondaBuild);
+        assert!(
+            !conda_build.contains_key("RB_TEST_RANDOM_VAR"),
+            "non-whitelisted host var must be absent in CondaBuild mode"
+        );
+        assert_eq!(
+            conda_build.get("SSL_CERT_FILE").map(String::as_str),
+            Some("/host/cacert.pem")
+        );
+    }
+
+    #[test]
+    fn test_none_env_uses_injected_runtime_with_explicit_overrides() {
+        let runtime = RuntimeEnv::for_test(Platform::Linux64)
+            .with_var("RUNTIME_ONLY", "runtime")
+            .with_var("OVERLAY", "runtime");
+        let mut env_vars = IndexMap::new();
+        env_vars.insert("OVERLAY".to_string(), "explicit".to_string());
+        env_vars.insert("EXPLICIT_ONLY".to_string(), "explicit".to_string());
+        let mut secrets = IndexMap::new();
+        secrets.insert("SECRET_ONLY".to_string(), "secret".to_string());
+
+        let process_env =
+            resolve_process_env(EnvironmentIsolation::None, &env_vars, &secrets, &runtime);
+
+        assert_eq!(
+            process_env.get("RUNTIME_ONLY").map(String::as_str),
+            Some("runtime")
+        );
+        assert_eq!(
+            process_env.get("OVERLAY").map(String::as_str),
+            Some("explicit")
+        );
+        assert_eq!(
+            process_env.get("EXPLICIT_ONLY").map(String::as_str),
+            Some("explicit")
+        );
+        assert!(
+            !process_env.contains_key("SECRET_ONLY"),
+            "None mode relies on secrets captured in RuntimeEnv"
+        );
+    }
+
+    #[test]
+    fn test_platform_passthrough_follows_runtime_platform() {
+        let env_vars = IndexMap::new();
+        let secrets = IndexMap::new();
+        let runtime = RuntimeEnv::for_test(Platform::Win64).with_var("SYSTEMROOT", "C:\\Windows");
+
+        let windows_env =
+            resolve_process_env(EnvironmentIsolation::Strict, &env_vars, &secrets, &runtime);
+        assert_eq!(
+            windows_env.get("SYSTEMROOT").map(String::as_str),
+            Some("C:\\Windows")
+        );
+
+        let linux_env = resolve_process_env(
+            EnvironmentIsolation::Strict,
+            &env_vars,
+            &secrets,
+            &runtime.with_process_platform(Platform::Linux64),
+        );
+        assert!(!linux_env.contains_key("SYSTEMROOT"));
+    }
+
+    #[cfg(windows)]
+    fn command_that_writes_stdout_and_stderr() -> (OsString, Vec<String>) {
+        (
+            OsString::from("cmd"),
+            vec![
+                "/d".to_string(),
+                "/c".to_string(),
+                "echo stdout & echo stderr 1>&2".to_string(),
+            ],
+        )
+    }
+
+    #[cfg(not(windows))]
+    fn command_that_writes_stdout_and_stderr() -> (OsString, Vec<String>) {
+        (
+            OsString::from("sh"),
+            vec![
+                "-c".to_string(),
+                "printf 'stdout\\r\\n'; printf 'stderr\\r\\n' >&2".to_string(),
+            ],
+        )
+    }
+
+    #[cfg(windows)]
+    fn command_that_lists_environment() -> (OsString, Vec<String>) {
+        (
+            OsString::from("cmd"),
+            vec!["/d".to_string(), "/c".to_string(), "set".to_string()],
+        )
+    }
+
+    #[cfg(not(windows))]
+    fn command_that_lists_environment() -> (OsString, Vec<String>) {
+        (OsString::from("env"), Vec::new())
+    }
+
+    #[tokio::test]
+    async fn test_spawn_process_streams_normalized_tagged_lines() {
+        let tmp = tempfile::tempdir().unwrap();
+        let env = IndexMap::new();
+        let (program, args) = command_that_writes_stdout_and_stderr();
+        let mut process = spawn_process(&program, &args, tmp.path(), &env).unwrap();
+        let mut lines = Vec::new();
+
+        while let Some(line) = process.next_line().await {
+            let line = line.unwrap();
+            lines.push((line.text, line.is_stderr));
+        }
+
+        assert!(process.wait().await.unwrap().success());
+        assert_eq!(lines.len(), 2);
+        assert!(lines.iter().any(|(text, is_stderr)| {
+            text.trim() == "stdout" && !*is_stderr && !text.contains('\r')
+        }));
+        assert!(lines.iter().any(|(text, is_stderr)| {
+            text.trim() == "stderr" && *is_stderr && !text.contains('\r')
+        }));
+    }
+
+    #[tokio::test]
+    async fn test_spawn_process_applies_exact_environment() {
+        assert!(
+            std::env::var_os("PATH").is_some(),
+            "the test requires PATH in the parent environment"
+        );
+
+        let tmp = tempfile::tempdir().unwrap();
+        let mut env = IndexMap::new();
+        env.insert("RB_SPAWN_PROCESS_ENV".to_string(), "passed".to_string());
+        let (program, args) = command_that_lists_environment();
+        let mut process = spawn_process(&program, &args, tmp.path(), &env).unwrap();
+        let mut lines = Vec::new();
+
+        while let Some(line) = process.next_line().await {
+            lines.push(line.unwrap().text);
+        }
+
+        assert!(process.wait().await.unwrap().success());
+        assert!(
+            lines
+                .iter()
+                .any(|line| line == "RB_SPAWN_PROCESS_ENV=passed"),
+            "explicit environment variable must be passed to the child"
+        );
+        assert!(
+            lines
+                .iter()
+                .any(|line| { line == &format!("PWD={}", tmp.path().to_string_lossy()) }),
+            "the child PWD must be the requested working directory"
+        );
+        assert!(
+            !lines.iter().any(|line| {
+                line.split_once('=')
+                    .is_some_and(|(name, _)| name.eq_ignore_ascii_case("PATH"))
+            }),
+            "parent PATH must not leak into the child"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_run_process_with_replacements_keeps_output_handling_host_side() {
+        let tmp = tempfile::tempdir().unwrap();
+        let process_env = IndexMap::new();
+        let mut replacements = HashMap::new();
+        replacements.insert("RAW_PREFIX".to_string(), "$PREFIX".to_string());
+        replacements.insert("raw-secret".to_string(), "***".to_string());
+
+        #[cfg(windows)]
+        let command = [
+            "cmd".to_string(),
+            "/d".to_string(),
+            "/c".to_string(),
+            "echo RAW_PREFIX raw-secret & echo RAW_PREFIX raw-secret 1>&2".to_string(),
+        ];
+        #[cfg(not(windows))]
+        let command = [
+            "sh".to_string(),
+            "-c".to_string(),
+            "printf 'RAW_PREFIX raw-secret\\n'; printf 'RAW_PREFIX raw-secret\\n' >&2".to_string(),
+        ];
+        let command_spec = crate::shell_dialect::CommandSpec {
+            program: command[0].clone(),
+            args: command[1..].to_vec(),
+        };
+
+        let output = run_process_with_replacements(
+            &command_spec,
+            tmp.path(),
+            &replacements,
+            &process_env,
+            None,
+            &RuntimeEnv::for_test(Platform::current()),
+        )
+        .await
+        .unwrap();
+
+        assert!(output.status.success());
+        let stdout = String::from_utf8(output.stdout).unwrap();
+        let stderr = String::from_utf8(output.stderr).unwrap();
+        let log = fs::read_to_string(tmp.path().join("conda_build.log")).unwrap();
+        for content in [&stdout, &stderr, &log] {
+            assert!(content.contains("$PREFIX ***"), "got:\n{content}");
+            assert!(!content.contains("RAW_PREFIX"), "got:\n{content}");
+            assert!(!content.contains("raw-secret"), "got:\n{content}");
+        }
+    }
+
+    /// The PowerShell prologue is written verbatim into the generated script
+    /// file for an inline body.
+    #[tokio::test]
+    async fn test_powershell_prologue_written_into_script_file() {
+        let tmp = tempfile::tempdir().unwrap();
+        let prefix = tmp.path().join("prefix");
+        fs::create_dir_all(&prefix).unwrap();
+        // The fake pwsh is 0 bytes; `is_pwsh_new_enough` will fail to parse a
+        // version and only warn, so resolution still succeeds.
+        create_fake_executable(&prefix, "pwsh");
+
+        let args = execution_args(
+            tmp.path().to_path_buf(),
+            prefix,
+            ResolvedScriptContents::Inline("Write-Output 'hi'".to_string()),
+            Some("powershell"),
+        );
+
+        generate_build_script(&args).await.unwrap();
+
+        let script_file = tmp.path().join("conda_build_script.ps1");
+        let contents = fs::read_to_string(&script_file).unwrap();
+        assert!(
+            contents.contains("$ErrorActionPreference = 'Stop'"),
+            "missing ErrorActionPreference, got:\n{contents}"
+        );
+        assert!(
+            contents.contains("$PSNativeCommandUseErrorActionPreference"),
+            "missing PSNativeCommandUseErrorActionPreference, got:\n{contents}"
+        );
+        assert!(
+            contents.contains("Write-Output 'hi'"),
+            "user body must be appended after the prologue"
+        );
+    }
+
+    /// `create_build_script` maps `InterpreterNotFound` to an io::Error whose
+    /// message mentions the build environment. `brush` is build-prefix-only, so
+    /// it errors when absent (unlike `python`, which falls back to `PATH`).
+    #[tokio::test]
+    async fn test_create_build_script_missing_interpreter_error() {
+        let tmp = tempfile::tempdir().unwrap();
+        let prefix = tmp.path().join("prefix");
+        fs::create_dir_all(&prefix).unwrap();
+
+        let args = execution_args(
+            tmp.path().to_path_buf(),
+            prefix,
+            ResolvedScriptContents::Inline("echo hi".to_string()),
+            Some("brush"),
+        );
+
+        let err = create_build_script(args).await.unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("was not found in the build environment"),
+            "unexpected error: {err}"
+        );
+    }
+
+    /// An unsupported interpreter name surfaces as an `unsupported interpreter`
+    /// io::Error, with a "did you mean" suggestion for near-misses only.
+    #[tokio::test]
+    async fn test_create_build_script_unsupported_interpreter_error() {
+        let tmp = tempfile::tempdir().unwrap();
+        let prefix = tmp.path().join("prefix");
+        fs::create_dir_all(&prefix).unwrap();
+
+        let unsupported_error = |interpreter: &str| {
+            let args = execution_args(
+                tmp.path().to_path_buf(),
+                tmp.path().join("prefix"),
+                ResolvedScriptContents::Inline("noop".to_string()),
+                Some(interpreter),
+            );
+            async { create_build_script(args).await.unwrap_err().to_string() }
+        };
+
+        let message = unsupported_error("not-a-real-interp").await;
+        assert!(
+            message.contains("unsupported interpreter 'not-a-real-interp'"),
+            "unexpected error: {message}"
+        );
+        assert!(
+            !message.contains("Did you mean"),
+            "no suggestion expected for an unrelated name: {message}"
+        );
+
+        let message = unsupported_error("brus").await;
+        assert!(
+            message.contains("Did you mean `brush`?"),
+            "unexpected error: {message}"
+        );
+    }
+
+    /// A typo in the recipe `interpreter` (issue #2530) surfaces as
+    /// `UnsupportedInterpreter` instead of a generic execution failure.
+    #[tokio::test]
+    async fn test_generate_build_script_interpreter_typo_error() {
+        let tmp = tempfile::tempdir().unwrap();
+        let prefix = tmp.path().join("prefix");
+        fs::create_dir_all(&prefix).unwrap();
+
+        let args = execution_args(
+            tmp.path().to_path_buf(),
+            prefix,
+            ResolvedScriptContents::Inline("echo \"Hello from brush!\"".to_string()),
+            Some("brus"),
+        );
+
+        let err = generate_build_script(&args).await.unwrap_err();
+        assert!(
+            matches!(err, crate::InterpreterError::UnsupportedInterpreter(ref name) if name == "brus"),
+            "expected UnsupportedInterpreter, got {err:?}"
+        );
+    }
+
+    /// `EnvironmentIsolation` round-trips between `FromStr` and `Display`, and an
+    /// unknown value errors with the documented message.
+    #[test]
+    fn test_environment_isolation_round_trip() {
+        use std::str::FromStr;
+
+        for (text, value) in [
+            ("strict", EnvironmentIsolation::Strict),
+            ("conda-build", EnvironmentIsolation::CondaBuild),
+            ("none", EnvironmentIsolation::None),
+        ] {
+            assert_eq!(EnvironmentIsolation::from_str(text).unwrap(), value);
+            assert_eq!(value.to_string(), text);
+        }
+
+        let err = EnvironmentIsolation::from_str("bogus").unwrap_err();
+        assert!(
+            err.contains("unknown environment isolation mode 'bogus'"),
+            "unexpected error: {err}"
+        );
+    }
+
+    fn bash_wrapper_body(wrapper: &str) -> String {
+        let normalized = wrapper.replace("\r\n", "\n");
+        let body = normalized
+            .split_once("## End of preamble")
+            .map(|(_, body)| body.trim_start())
+            .unwrap_or_else(|| panic!("missing bash preamble marker:\n{wrapper}"));
+
+        // The command-tracing prologue is part of the native wrapper preamble,
+        // even though it is intentionally emitted after activation.
+        body.strip_prefix(
+            "# Trace each command as it runs so a failing line is visible (see #2264).\n\
+             # Placed after activation so the sourced environment setup is not traced.\n\
+             set -x\n",
+        )
+        .unwrap_or(body)
+        .trim()
+        .to_string()
+    }
+
+    fn cmd_wrapper_body(wrapper: &str, work_dir: &Path) -> String {
+        let normalized = wrapper.replace("\r\n", "\n").replace('\\', "/");
+        let normalized = if let Ok(command_processor) = std::env::var("COMSPEC") {
+            normalized.replace(&command_processor.replace('\\', "/"), "cmd.exe")
+        } else {
+            normalized
+        };
+        let work_dir = work_dir.to_string_lossy().replace('\\', "/");
+        let normalized = normalized.replace(&work_dir, "$WORK_DIR");
+        let start = normalized
+            .find("@rem ===")
+            .or_else(|| normalized.find("setlocal"))
+            .unwrap_or_else(|| panic!("missing cmd section body:\n{wrapper}"));
+        normalized[start..].trim().to_string()
+    }
+
+    /// The single section is subshell-wrapped on bash (uniform isolation).
+    #[tokio::test]
+    async fn test_bash_single_section_wrapped_in_subshell() {
+        let tmp = tempfile::tempdir().unwrap();
+        let prefix = tmp.path().join("prefix");
+        fs::create_dir_all(&prefix).unwrap();
+        let args = execution_args(
+            tmp.path().to_path_buf(),
+            prefix,
+            ResolvedScriptContents::Inline("echo hi".to_string()),
+            None,
+        );
+        let args = ExecutionArgs {
+            context: args
+                .context
+                .with_runtime(RuntimeEnv::for_test(Platform::Linux64)),
+            ..args
+        };
+        generate_build_script(&args).await.unwrap();
+        let wrapper = fs::read_to_string(tmp.path().join("conda_build.sh")).unwrap();
+        insta::assert_snapshot!(bash_wrapper_body(&wrapper), @r###"
+(
+echo hi
+)
+"###);
+    }
+
+    /// A recipe with no build script stays preamble-only: no empty subshell.
+    #[tokio::test]
+    async fn test_bash_missing_script_is_preamble_only() {
+        let tmp = tempfile::tempdir().unwrap();
+        let prefix = tmp.path().join("prefix");
+        fs::create_dir_all(&prefix).unwrap();
+        let args = execution_args(
+            tmp.path().to_path_buf(),
+            prefix,
+            ResolvedScriptContents::Missing,
+            None,
+        );
+        let args = ExecutionArgs {
+            context: args
+                .context
+                .with_runtime(RuntimeEnv::for_test(Platform::Linux64)),
+            ..args
+        };
+        generate_build_script(&args).await.unwrap();
+        let wrapper = fs::read_to_string(tmp.path().join("conda_build.sh")).unwrap();
+        insta::assert_snapshot!(bash_wrapper_body(&wrapper), @"");
+    }
+
+    /// The single section is `setlocal`/`endlocal`-scoped on cmd, `pushd` /
+    /// `popd`-scoped for cwd, with a trailing errorlevel guard.
+    #[tokio::test]
+    async fn test_cmd_single_section_setlocal_and_guard() {
+        let tmp = tempfile::tempdir().unwrap();
+        let prefix = tmp.path().join("prefix");
+        fs::create_dir_all(&prefix).unwrap();
+        let args = execution_args(
+            tmp.path().to_path_buf(),
+            prefix,
+            ResolvedScriptContents::Inline("echo hi".to_string()),
+            None,
+        );
+        let args = ExecutionArgs {
+            context: args
+                .context
+                .with_runtime(RuntimeEnv::for_test(Platform::Win64)),
+            ..args
+        };
+        generate_build_script(&args).await.unwrap();
+        let wrapper = fs::read_to_string(tmp.path().join("conda_build.bat")).unwrap();
+        insta::assert_snapshot!(cmd_wrapper_body(&wrapper, tmp.path()), @r###"
+setlocal
+pushd "." || exit /b 1
+@cmd.exe /d /c call $WORK_DIR/conda_build_script.bat
+set "RB_SECTION_ERRORLEVEL=%errorlevel%"
+popd
+if %RB_SECTION_ERRORLEVEL% equ 0 if %errorlevel% neq 0 set "RB_SECTION_ERRORLEVEL=%errorlevel%"
+endlocal & if %RB_SECTION_ERRORLEVEL% neq 0 exit /b %RB_SECTION_ERRORLEVEL%
+"###);
+    }
+
+    /// Native cmd sections are invoked through a nested `cmd /c call` so `exit /b`
+    /// and bare `exit` inside a section script return to the wrapper instead of
+    /// skipping later steps.
+    #[tokio::test]
+    async fn test_cmd_sections_use_call_indirection() {
+        let tmp = tempfile::tempdir().unwrap();
+        let prefix = tmp.path().join("prefix");
+        fs::create_dir_all(&prefix).unwrap();
+        let base = execution_args(
+            tmp.path().to_path_buf(),
+            prefix,
+            ResolvedScriptContents::Missing,
+            None,
+        );
+
+        let args = ExecutionArgs {
+            context: ExecutionContext::shared(
+                RuntimeEnv::for_test(Platform::Win64),
+                base.context.host().path(),
+                Platform::Win64,
+                Platform::Win64,
+            ),
+            sections: vec![
+                BuildScriptSection {
+                    interpreter: None,
+                    content: ResolvedScriptContents::Inline("echo one\nexit /b 0".to_string()),
+                    env: IndexMap::new(),
+                    cwd: None,
+                    label: Some("step 0".to_string()),
+                },
+                BuildScriptSection {
+                    interpreter: None,
+                    content: ResolvedScriptContents::Inline("echo two".to_string()),
+                    env: IndexMap::new(),
+                    cwd: None,
+                    label: Some("step 1".to_string()),
+                },
+            ],
+            ..base
+        };
+
+        generate_build_script(&args).await.unwrap();
+        let wrapper = fs::read_to_string(tmp.path().join("conda_build.bat")).unwrap();
+        insta::assert_snapshot!(cmd_wrapper_body(&wrapper, tmp.path()), @r###"
+@rem === step 0 ===
+setlocal
+pushd "." || exit /b 1
+@cmd.exe /d /c call $WORK_DIR/conda_build_step0.bat
+set "RB_SECTION_ERRORLEVEL=%errorlevel%"
+popd
+if %RB_SECTION_ERRORLEVEL% equ 0 if %errorlevel% neq 0 set "RB_SECTION_ERRORLEVEL=%errorlevel%"
+endlocal & if %RB_SECTION_ERRORLEVEL% neq 0 exit /b %RB_SECTION_ERRORLEVEL%
+@rem === step 1 ===
+setlocal
+pushd "." || exit /b 1
+@cmd.exe /d /c call $WORK_DIR/conda_build_step1.bat
+set "RB_SECTION_ERRORLEVEL=%errorlevel%"
+popd
+if %RB_SECTION_ERRORLEVEL% equ 0 if %errorlevel% neq 0 set "RB_SECTION_ERRORLEVEL=%errorlevel%"
+endlocal & if %RB_SECTION_ERRORLEVEL% neq 0 exit /b %RB_SECTION_ERRORLEVEL%
+"###);
+    }
+
+    #[tokio::test]
+    async fn test_cmd_call_indirection_escapes_percent_paths() {
+        let tmp = tempfile::tempdir().unwrap();
+        let work_dir = tmp.path().join("%NO_SUCH_VAR%");
+        let prefix = work_dir.join("prefix");
+        fs::create_dir_all(&prefix).unwrap();
+        let args = execution_args(
+            work_dir.clone(),
+            prefix,
+            ResolvedScriptContents::Inline("echo hi".to_string()),
+            None,
+        );
+        let args = ExecutionArgs {
+            context: ExecutionContext::shared(
+                RuntimeEnv::for_test(Platform::Win64),
+                args.context.host().path(),
+                Platform::Win64,
+                Platform::Win64,
+            ),
+            ..args
+        };
+
+        generate_build_script(&args).await.unwrap();
+        let wrapper = fs::read_to_string(work_dir.join("conda_build.bat")).unwrap();
+
+        assert!(
+            wrapper.contains("cmd.exe /d /c call"),
+            "native cmd sections should use nested cmd call indirection:\n{wrapper}"
+        );
+        assert!(
+            wrapper.contains("%%NO_SUCH_VAR%%"),
+            "percent signs in call paths must be escaped for the outer batch context:\n{wrapper}"
+        );
+    }
+
+    #[cfg(windows)]
+    #[tokio::test]
+    async fn test_cmd_bare_exit_does_not_skip_later_sections() {
+        let tmp = tempfile::tempdir().unwrap();
+        let prefix = tmp.path().join("prefix");
+        fs::create_dir_all(&prefix).unwrap();
+        let base = execution_args(
+            tmp.path().to_path_buf(),
+            prefix,
+            ResolvedScriptContents::Missing,
+            None,
+        );
+
+        let args = ExecutionArgs {
+            context: ExecutionContext::shared(
+                RuntimeEnv::for_test(Platform::Win64),
+                base.context.host().path(),
+                Platform::Win64,
+                Platform::Win64,
+            ),
+            sections: vec![
+                BuildScriptSection {
+                    interpreter: None,
+                    content: ResolvedScriptContents::Inline("echo one\nexit 0".to_string()),
+                    env: IndexMap::new(),
+                    cwd: None,
+                    label: Some("step 0".to_string()),
+                },
+                BuildScriptSection {
+                    interpreter: None,
+                    content: ResolvedScriptContents::Inline("echo two> marker.txt".to_string()),
+                    env: IndexMap::new(),
+                    cwd: None,
+                    label: Some("step 1".to_string()),
+                },
+            ],
+            ..base
+        };
+
+        run_script(args).await.unwrap();
+
+        assert!(
+            tmp.path().join("marker.txt").exists(),
+            "bare `exit 0` in the first cmd section must not skip the second section"
+        );
+    }
+
+    /// Multiple sections compose in order, each scoped, with labels and env.
+    #[tokio::test]
+    async fn test_multiple_sections_composed_in_order() {
+        let tmp = tempfile::tempdir().unwrap();
+        let prefix = tmp.path().join("prefix");
+        fs::create_dir_all(&prefix).unwrap();
+        let base = execution_args(
+            tmp.path().to_path_buf(),
+            prefix,
+            ResolvedScriptContents::Missing,
+            None,
+        );
+
+        let mut env0 = IndexMap::new();
+        env0.insert("FOO".to_string(), "bar".to_string());
+
+        let args = ExecutionArgs {
+            context: ExecutionContext::shared(
+                RuntimeEnv::for_test(Platform::Linux64),
+                base.context.host().path(),
+                Platform::Linux64,
+                Platform::Linux64,
+            ),
+            sections: vec![
+                BuildScriptSection {
+                    interpreter: None,
+                    content: ResolvedScriptContents::Inline("echo one".to_string()),
+                    env: env0,
+                    cwd: Some(PathBuf::from("/tmp/step0")),
+                    label: Some("step 0".to_string()),
+                },
+                BuildScriptSection {
+                    interpreter: None,
+                    content: ResolvedScriptContents::Inline("echo two".to_string()),
+                    env: IndexMap::new(),
+                    cwd: None,
+                    label: Some("step 1".to_string()),
+                },
+            ],
+            ..base
+        };
+
+        generate_build_script(&args).await.unwrap();
+        let wrapper = fs::read_to_string(tmp.path().join("conda_build.sh")).unwrap();
+
+        insta::assert_snapshot!(bash_wrapper_body(&wrapper), @r###"
+# === step 0 ===
+(
+export FOO=bar
+cd /tmp/step0
+echo one
+)
+# === step 1 ===
+(
+echo two
+)
+"###);
+    }
+
+    /// A sole section keeps the historic file name; multiple are numbered.
+    #[test]
+    fn test_section_script_filename_single_vs_multi() {
+        let single = SectionIndex {
+            position: 0,
+            total: 1,
+        };
+        assert_eq!(
+            section_script_filename("py", single),
+            "conda_build_script.py"
+        );
+        let first = SectionIndex {
+            position: 0,
+            total: 2,
+        };
+        let second = SectionIndex {
+            position: 1,
+            total: 2,
+        };
+        assert_eq!(section_script_filename("py", first), "conda_build_step0.py");
+        assert_eq!(
+            section_script_filename("py", second),
+            "conda_build_step1.py"
+        );
     }
 }

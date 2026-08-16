@@ -684,7 +684,7 @@ pub async fn bump_recipe(
 
         tracing::info!("Fetching {}", new_url);
         let sha256 = fetch_sha256(client, &new_url).await?;
-        let sha256_str = format!("{:x}", sha256);
+        let sha256_str = hex::encode(sha256);
         tracing::debug!("Fetched SHA256: {}", sha256_str);
 
         new_sha256s.push(sha256_str);

@@ -2,7 +2,6 @@
 
 use std::{collections::HashMap, error::Error, path::PathBuf, str::FromStr};
 
-use chrono;
 use clap::{Parser, ValueEnum, builder::ArgPredicate, crate_version};
 use clap_complete::{Generator, shells};
 use clap_complete_nushell::Nushell;
@@ -11,7 +10,6 @@ use rattler_build_script::{SandboxArguments, SandboxConfiguration};
 use rattler_conda_types::{
     NamedChannelOrUrl, Platform, compression_level::CompressionLevel, package::CondaArchiveType,
 };
-use rattler_config::config::ConfigBase;
 use rattler_config::config::build::PackageFormatAndCompression;
 use rattler_networking::mirror_middleware;
 #[cfg(feature = "s3")]
@@ -22,6 +20,7 @@ use serde_json::{Value, json};
 use url::Url;
 
 use crate::{
+    config::Config,
     console_utils::{Color, LogStyle},
     tool_configuration::{ContinueOnFailure, SkipExisting, TestStrategy},
 };
@@ -378,9 +377,20 @@ pub struct App {
     )]
     pub wrap_log_lines: Option<bool>,
 
-    /// The Rattler-Build configuration file to use
+    /// The Rattler-Build configuration file to use.
+    /// If not set, configuration is loaded from the default locations
+    /// (the system-wide and global pixi configuration files as well as
+    /// rattler-build's own configuration files)
     #[arg(long, global = true)]
     pub config_file: Option<PathBuf>,
+
+    /// Do not load any configuration.
+    /// Disables the automatic discovery of pixi/rattler-build configuration
+    /// files so that only built-in defaults and command-line arguments are
+    /// used (the behavior of rattler-build versions before default config
+    /// discovery was added). Mutually exclusive with `--config-file`.
+    #[arg(long, global = true, conflicts_with = "config_file")]
+    pub no_config: bool,
 
     /// Enable or disable colored output from Rattler-Build.
     /// Also honors the `CLICOLOR` and `CLICOLOR_FORCE` environment variable.
@@ -463,7 +473,7 @@ impl CommonData {
         experimental: bool,
         v3: bool,
         auth_file: Option<PathBuf>,
-        config: ConfigBase<()>,
+        config: Config,
         channel_priority: Option<ChannelPriority>,
         allow_insecure_host: Option<Vec<String>>,
         use_zstd: bool,
@@ -519,7 +529,7 @@ impl CommonData {
     }
 
     /// Create from CLI options and config file
-    pub fn from_opts_and_config(value: CommonOpts, config: ConfigBase<()>) -> Self {
+    pub fn from_opts_and_config(value: CommonOpts, config: Config) -> Self {
         Self::new(
             value.output_dir,
             value.experimental,
@@ -718,7 +728,7 @@ pub struct BuildOpts {
 
     /// Exclude packages newer than this date from the solver, in RFC3339 format (e.g. 2024-03-15T12:00:00Z)
     #[arg(long, help_heading = "Modifying result", value_parser = parse_datetime)]
-    pub exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
+    pub exclude_newer: Option<jiff::Timestamp>,
 }
 
 /// Publish options for the `publish` command.
@@ -740,6 +750,7 @@ pub struct PublishOpts {
     /// Examples:
     /// - prefix.dev: https://prefix.dev/my-channel
     /// - anaconda.org: https://anaconda.org/my-org
+    /// - Cloudsmith: cloudsmith://my-org/my-repository
     /// - S3: s3://my-bucket
     /// - Filesystem: file:///path/to/channel or /path/to/channel
     /// - Quetz: quetz://server.company.com/channel
@@ -789,10 +800,7 @@ pub struct PublishData {
 
 impl PublishData {
     /// Generate a new PublishData struct from PublishOpts and an optional config.
-    pub fn from_opts_and_config(
-        opts: PublishOpts,
-        config: Option<ConfigBase<()>>,
-    ) -> miette::Result<Self> {
+    pub fn from_opts_and_config(opts: PublishOpts, config: Option<Config>) -> miette::Result<Self> {
         // Separate package files from recipe paths based on file extension
         let mut package_files = Vec::new();
         let mut recipe_paths = Vec::new();
@@ -850,14 +858,14 @@ impl PublishData {
 
         // Prepend the --to channel to the list of channels for dependency resolution
         let mut build_opts = opts.build;
-        let to_channel = opts.to.clone();
+        let to_channel = rattler_build_core::publish::resolve_channel_for_repodata(&opts.to);
 
         // Add the to channel as the first channel (highest priority)
         let channels = if let Some(mut channels) = build_opts.channels.take() {
-            channels.insert(0, to_channel.clone());
+            channels.insert(0, to_channel);
             Some(channels)
         } else {
-            Some(vec![to_channel.clone()])
+            Some(vec![to_channel])
         };
 
         build_opts.channels = channels;
@@ -885,6 +893,11 @@ pub struct BuildData {
     pub target_platform: Platform,
     pub host_platform: Platform,
     pub channels: Option<Vec<NamedChannelOrUrl>>,
+    /// Whether `channels` was filled from the configuration file's
+    /// `default-channels` rather than passed explicitly. Config channels are a
+    /// fallback, so they lose against `channel_sources` from a variant config
+    /// instead of conflicting with it.
+    pub channels_from_config: bool,
     pub variant_config: Vec<PathBuf>,
     pub variant_overrides: HashMap<String, Vec<String>>,
     pub ignore_recipe_variants: bool,
@@ -908,7 +921,7 @@ pub struct BuildData {
     pub error_prefix_in_binary: bool,
     pub allow_symlinks_on_windows: bool,
     pub allow_absolute_license_paths: bool,
-    pub exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
+    pub exclude_newer: Option<jiff::Timestamp>,
     pub build_num_override: Option<u64>,
     pub build_string_prefix: Option<String>,
     pub markdown_summary: Option<PathBuf>,
@@ -945,7 +958,7 @@ impl BuildData {
         error_prefix_in_binary: bool,
         allow_symlinks_on_windows: bool,
         allow_absolute_license_paths: bool,
-        exclude_newer: Option<chrono::DateTime<chrono::Utc>>,
+        exclude_newer: Option<jiff::Timestamp>,
         build_num_override: Option<u64>,
         build_string_prefix: Option<String>,
         markdown_summary: Option<PathBuf>,
@@ -960,6 +973,7 @@ impl BuildData {
                 .or(target_platform)
                 .unwrap_or(Platform::current()),
             channels,
+            channels_from_config: false,
             variant_config: variant_config.unwrap_or_default(),
             variant_overrides,
             ignore_recipe_variants,
@@ -997,16 +1011,14 @@ impl BuildData {
 impl BuildData {
     /// Generate a new BuildData struct from BuildOpts and an optional pixi config.
     /// BuildOpts have higher priority than the pixi config.
-    pub fn from_opts_and_config(
-        opts: BuildOpts,
-        config: Option<ConfigBase<()>>,
-    ) -> miette::Result<Self> {
+    pub fn from_opts_and_config(opts: BuildOpts, config: Option<Config>) -> miette::Result<Self> {
+        let explicit_channels = opts.channels.is_some();
         let sandbox_configuration = opts
             .sandbox_arguments
             .try_into_configuration()
             .map_err(|e| miette::miette!("failed to load sandbox config: {e}"))?;
 
-        Ok(Self::new(
+        let mut build_data = Self::new(
             opts.up_to,
             opts.build_platform,
             opts.target_platform, // todo: read this from config as well
@@ -1050,7 +1062,9 @@ impl BuildData {
             None, // build_num_override — set by caller (BuildOnlyOpts or PublishOpts)
             None, // build_string_prefix — set by caller (BuildOnlyOpts or PublishOpts)
             opts.markdown_summary,
-        ))
+        );
+        build_data.channels_from_config = !explicit_channels && build_data.channels.is_some();
+        Ok(build_data)
     }
 }
 
@@ -1086,15 +1100,13 @@ fn parse_variant_override(
 }
 
 /// Parse a datetime string in RFC3339 format
-fn parse_datetime(s: &str) -> Result<chrono::DateTime<chrono::Utc>, String> {
-    chrono::DateTime::parse_from_rfc3339(s)
-        .map(|dt| dt.with_timezone(&chrono::Utc))
-        .map_err(|e| {
-            format!(
-                "Invalid datetime format '{}': {}. Expected RFC3339 format (e.g., 2024-03-15T12:00:00Z)",
-                s, e
-            )
-        })
+fn parse_datetime(s: &str) -> Result<jiff::Timestamp, String> {
+    s.parse::<jiff::Timestamp>().map_err(|e| {
+        format!(
+            "Invalid datetime format '{}': {}. Expected RFC3339 format (e.g., 2024-03-15T12:00:00Z)",
+            s, e
+        )
+    })
 }
 
 /// Test options.
@@ -1134,7 +1146,7 @@ pub struct TestData {
 impl TestData {
     /// Generate a new TestData struct from TestOpts and an optional pixi config.
     /// TestOpts have higher priority than the pixi config.
-    pub fn from_opts_and_config(value: TestOpts, config: Option<ConfigBase<()>>) -> Self {
+    pub fn from_opts_and_config(value: TestOpts, config: Option<Config>) -> Self {
         Self::new(
             value.package_file,
             value.channels,
@@ -1204,7 +1216,7 @@ pub struct RebuildData {
 impl RebuildData {
     /// Generate a new RebuildData struct from RebuildOpts and an optional pixi config.
     /// RebuildOpts have higher priority than the pixi config.
-    pub fn from_opts_and_config(value: RebuildOpts, config: Option<ConfigBase<()>>) -> Self {
+    pub fn from_opts_and_config(value: RebuildOpts, config: Option<Config>) -> Self {
         Self::new(
             value.package_file,
             value.test.unwrap_or(if value.no_test {
@@ -1263,10 +1275,7 @@ pub struct DebugData {
 impl DebugData {
     /// Generate a new DebugData struct from DebugSetupOpts and an optional
     /// config.
-    pub fn from_setup_opts_and_config(
-        opts: DebugSetupOpts,
-        config: Option<ConfigBase<()>>,
-    ) -> Self {
+    pub fn from_setup_opts_and_config(opts: DebugSetupOpts, config: Option<Config>) -> Self {
         Self {
             recipe_path: opts.recipe,
             output_dir: opts

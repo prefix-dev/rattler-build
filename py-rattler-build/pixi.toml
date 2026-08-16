@@ -9,6 +9,70 @@ preview = ["pixi-build"]
 # We are using the oldest supported python version as the build variant here
 build-variants = { python = ["3.10"] }
 
+[dependencies]
+requests = ">=2.34.2,<3"
+sccache = ">=0.16.0,<0.17"
+types-requests = ">=2.33.0.20260518,<3"
+
+[activation.env]
+RUSTC_WRAPPER = "sccache"
+
+[feature.test.dependencies]
+py-rattler-build = { path = "." }
+lua = ">=5.5.0,<6"
+
+# Python 3.10 is the minimum supported version, so we use that for testing
+python = ">=3.10.20,<3.11"
+
+ty = ">=0.0.51,<0.0.52"
+
+pytest = ">=9.1.1,<10"
+pytest-asyncio = ">=1.4.0,<2"
+pytest-xprocess = ">=1.0.2,<2"
+inline-snapshot = ">=0.34.2,<0.35"
+# used in examples
+typer = ">=0.26.7,<0.27"
+rich = ">=15.0.0,<16"
+zstandard = ">=0.25.0,<0.26"
+
+[feature.test.pypi-dependencies]
+types-networkx = ">=3.6.1.20260612, <4"
+
+[feature.test.tasks]
+check-cargo-lock = "cargo check --locked --manifest-path rust/Cargo.toml"
+test = { cmd = "pytest --durations=0 ./tests", depends-on = ["type-check"] }
+type-check = { cmd = "ty check" }
+
+[environments.default]
+features = ["test"]
+solve-group = "default"
+
+[environments.default.dependencies]
+jupyter = ">=1.1.1,<2"
+
+[environments.test]
+features = ["test"]
+solve-group = "default"
+
+[environments.lint.dependencies]
+# we need rust for cargo-fmt and clippy
+rust = ">=1.97.1,<1.98"
+ruff = ">=0.15.18,<0.16"
+
+[environments.lint.tasks]
+
+fmt-rust = "cargo fmt --all --manifest-path rust/Cargo.toml"
+# checks for the CI
+fmt-rust-check = "cargo fmt --all --check --manifest-path rust/Cargo.toml"
+
+lint-python = "ruff check ."
+lint-rust = "cargo clippy --all-targets --workspace --manifest-path rust/Cargo.toml -- -D warnings"
+
+lint = { depends-on = ["lint-python", "lint-rust", "fmt-rust"] }
+
+# -------------------------------------------------------------------------------------------------
+# Pixi package definition
+# -------------------------------------------------------------------------------------------------
 [package.build.backend]
 name = "pixi-build-python"
 version = "*"
@@ -22,68 +86,9 @@ env = { AWS_LC_SYS_CMAKE_BUILDER = "1" }
 
 [package.host-dependencies]
 python = "*"
-maturin = "~=1.12.0"
+maturin = "~=1.14.1"
 
-[package.target.linux.build-dependencies]
+[package.build-dependencies."if(linux)"]
 patchelf = "~=0.17.2"
 cmake = ">=4,<5"
 make = ">=4,<5"
-
-[feature.lint.dependencies]
-# we need rust for cargo-fmt and clippy
-rust = ">=1.93.1,<1.94"
-ruff = ">=0.3.3,<0.4"
-
-[feature.lint.tasks]
-
-fmt-rust = "cargo fmt --all --manifest-path rust/Cargo.toml"
-# checks for the CI
-fmt-rust-check = "cargo fmt --all --check --manifest-path rust/Cargo.toml"
-
-lint-python = "ruff check ."
-lint-rust = "cargo clippy --all-targets --workspace --manifest-path rust/Cargo.toml -- -D warnings"
-
-lint = { depends-on = ["lint-python", "lint-rust", "fmt-rust"] }
-
-[feature.test.dependencies]
-py-rattler-build = { path = "." }
-lua = "*"
-
-# Python 3.10 is the minimum supported version, so we use that for testing
-python = "3.10.*"
-
-mypy = "~=1.5.1"
-
-pytest = ">=8.3"
-pytest-asyncio = "1.2.*"
-pytest-xprocess = "1.0.*"
-inline-snapshot = ">=0.31.0"
-# used in examples
-typer = "*"
-rich = ">=14.2.0,<15"
-zstandard = ">=0.25.0,<0.26"
-
-[feature.test.pypi-dependencies]
-types-networkx = "*"
-
-[feature.test.tasks]
-check-cargo-lock = "cargo check --locked --manifest-path rust/Cargo.toml"
-test = { cmd = "pytest --durations=0 ./tests", depends-on = ["type-check"] }
-type-check = { cmd = "mypy" }
-
-[feature.notebooks.dependencies]
-jupyter = ">=1.1.1,<2"
-
-
-[environments]
-default = { features = ["test", "notebooks"], solve-group = "default" }
-test = { features = ["test"], solve-group = "default" }
-lint = { features = ["lint"] }
-
-[dependencies]
-requests = ">=2.32.3,<2.33"
-sccache = ">=0.12,<0.13"
-types-requests = ">=2.32.0.20240602,<2.32.1"
-
-[activation.env]
-RUSTC_WRAPPER = "sccache"

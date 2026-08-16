@@ -352,7 +352,7 @@ We also see some output that shows us against _what_ the binaries are linking. S
 
 We try to prevent linking against libraries that are not "allow-listed" on the system (ie. always installed on Linux/macOS/Windows) or not provided by any package from the dependencies (that is over-linking or under-depending). All linked libraries should either come from a declared dependency or from the allowed system libraries.
 
-There are additional options to control this behavior in the [dynamic linking configuration](build_options.md/#dynamic-linking-configuration).
+There are additional options to control this behavior in the [dynamic linking configuration](build_options.md#dynamic-linking-configuration).
 
 ```
  │ │ Post-processing done!

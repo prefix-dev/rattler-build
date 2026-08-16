@@ -87,7 +87,7 @@ impl PyToolConfiguration {
             })
             .transpose()?;
 
-        let config = rattler_config::config::ConfigBase::<()>::default();
+        let config = rattler_build::config::Config::default();
 
         let mut builder = Configuration::builder()
             .with_keep_build(keep_build)
@@ -100,7 +100,7 @@ impl PyToolConfiguration {
             .with_zstd_repodata_enabled(use_zstd)
             .with_bz2_repodata_enabled(use_bz2)
             .with_sharded_repodata_enabled(use_sharded)
-            .with_channel_config(config.channel_config);
+            .with_channel_config(config.common.channel_config);
 
         if let Some(threads) = compression_threads {
             builder = builder.with_compression_threads(Some(threads));

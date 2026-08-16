@@ -46,10 +46,10 @@ pub struct CacheEntry {
     pub extracted_path: Option<PathBuf>,
 
     /// When this entry was last accessed
-    pub last_accessed: chrono::DateTime<chrono::Utc>,
+    pub last_accessed: jiff::Timestamp,
 
     /// When this entry was created
-    pub created: chrono::DateTime<chrono::Utc>,
+    pub created: jiff::Timestamp,
 
     /// Lock file path for this entry
     pub lock_file: Option<PathBuf>,
@@ -177,7 +177,7 @@ impl CacheIndex {
     pub async fn touch(&self, key: &str) -> Result<(), CacheError> {
         let mut entries = self.entries.write().await;
         if let Some(entry) = entries.get_mut(key) {
-            entry.last_accessed = chrono::Utc::now();
+            entry.last_accessed = jiff::Timestamp::now();
             let updated_entry = entry.clone();
             drop(entries); // Release lock before writing to disk
 
@@ -228,8 +228,11 @@ impl CacheIndex {
     }
 
     /// Clean up entries that haven't been accessed in the specified duration
-    pub async fn cleanup_old_entries(&self, max_age: chrono::Duration) -> Result<(), CacheError> {
-        let cutoff = chrono::Utc::now() - max_age;
+    pub async fn cleanup_old_entries(
+        &self,
+        max_age: std::time::Duration,
+    ) -> Result<(), CacheError> {
+        let cutoff = jiff::Timestamp::now() - max_age;
         let entries = self.list_entries().await;
 
         for (key, entry) in entries {

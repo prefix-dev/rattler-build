@@ -1,15 +1,17 @@
 //! Functions to collect environment variables that are used during the build process.
+use std::collections::HashMap;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
-use std::{collections::HashMap, env};
 
 use rattler_build_jinja::Variable;
-use rattler_build_script::EnvironmentIsolation;
+use rattler_build_script::{EnvironmentIsolation, RuntimeEnv};
 use rattler_build_types::NormalizedKey;
 use rattler_conda_types::{Platform, RepoDataRecord};
 use std::collections::BTreeMap;
 
+use crate::android;
 use crate::consts;
+use crate::ios;
 use crate::linux;
 use crate::macos;
 use crate::metadata::Output;
@@ -30,8 +32,16 @@ fn get_stdlib_dir(prefix: &Path, platform: Platform, py_ver: &str) -> PathBuf {
     }
 }
 
-fn get_sitepackages_dir(prefix: &Path, platform: Platform, py_ver: &str) -> PathBuf {
-    get_stdlib_dir(prefix, platform, py_ver).join("site-packages")
+fn get_sitepackages_dir(
+    prefix: &Path,
+    platform: Platform,
+    py_ver: &str,
+    python_site_packages_path: Option<&str>,
+) -> PathBuf {
+    python_site_packages_path.map_or_else(
+        || get_stdlib_dir(prefix, platform, py_ver).join("site-packages"),
+        |path| prefix.join(path),
+    )
 }
 
 /// Returns a map of environment variables for Python that are used in the build process.
@@ -56,17 +66,18 @@ pub fn python_vars(output: &Output) -> HashMap<String, Option<String>> {
     }
 
     // find python in the host dependencies
-    let mut python_version = output
+    let python_record = output
+        .find_resolved_package("python")
+        .map(|(record, _)| record);
+    let python_version = output
         .variant()
         .get(&"python".into())
-        .map(|s| s.to_string());
-    if python_version.is_none()
-        && let Some((record, _)) = output.find_resolved_package("python")
-    {
-        // Use the resolved python version even if it's a transitive dependency
-        // (e.g. pulled in by pip in noarch python packages)
-        python_version = Some(record.package_record.version.to_string());
-    }
+        .map(|s| s.to_string())
+        .or_else(|| {
+            // Use the resolved python version even if it's a transitive dependency
+            // (e.g. pulled in by pip in noarch python packages)
+            python_record.map(|record| record.package_record.version.to_string())
+        });
 
     if let Some(py_ver) = python_version {
         let py_ver: Vec<_> = py_ver.split('.').take(2).collect();
@@ -80,6 +91,8 @@ pub fn python_vars(output: &Output) -> HashMap<String, Option<String>> {
             output.prefix(),
             output.host_platform().platform,
             &py_ver_str,
+            python_record
+                .and_then(|record| record.package_record.python_site_packages_path.as_deref()),
         );
         let py3k = if py_ver[0] == "3" { "1" } else { "0" };
         insert!(result, "PY3K", py3k);
@@ -118,16 +131,24 @@ pub fn python_vars_from_records(
         insert!(result, "PYTHON", python.to_string_lossy());
     }
 
-    let python_version = records
+    let python_record = records
         .iter()
-        .find(|r| r.package_record.name.as_normalized() == "python")
-        .map(|r| r.package_record.version.to_string());
+        .find(|r| r.package_record.name.as_normalized() == "python");
 
-    if let Some(py_ver) = python_version {
+    if let Some(python_record) = python_record {
+        let py_ver = python_record.package_record.version.to_string();
         let py_ver: Vec<_> = py_ver.split('.').take(2).collect();
         let py_ver_str = py_ver.join(".");
         let stdlib_dir = get_stdlib_dir(prefix, platform, &py_ver_str);
-        let site_packages_dir = get_sitepackages_dir(prefix, platform, &py_ver_str);
+        let site_packages_dir = get_sitepackages_dir(
+            prefix,
+            platform,
+            &py_ver_str,
+            python_record
+                .package_record
+                .python_site_packages_path
+                .as_deref(),
+        );
         let py3k = if py_ver[0] == "3" { "1" } else { "0" };
         insert!(result, "PY3K", py3k);
         insert!(result, "PY_VER", py_ver_str);
@@ -202,12 +223,23 @@ pub fn language_vars(output: &Output) -> HashMap<String, Option<String>> {
 pub fn os_vars(
     prefix: &Path,
     target_platform: &Platform,
+    host_platform: &Platform,
+    build_platform: &Platform,
     env_isolation: EnvironmentIsolation,
     work_dir: &Path,
+    runtime: &RuntimeEnv,
 ) -> HashMap<String, Option<String>> {
     let mut vars = HashMap::new();
 
-    let path_var = if target_platform.is_windows() {
+    // For `noarch` outputs, fall back to the host platform so Windows target
+    // vars (e.g. `LIBRARY_PREFIX`) are still emitted. See issue #2475.
+    let os_platform = if *target_platform == Platform::NoArch {
+        host_platform
+    } else {
+        target_platform
+    };
+
+    let path_var = if os_platform.is_windows() {
         "Path"
     } else {
         "PATH"
@@ -216,7 +248,10 @@ pub fn os_vars(
     insert!(
         vars,
         "CPU_COUNT",
-        env::var("CPU_COUNT").unwrap_or_else(|_| num_cpus::get().to_string())
+        runtime
+            .var("CPU_COUNT")
+            .map(str::to_owned)
+            .unwrap_or_else(|| num_cpus::get().to_string())
     );
 
     match env_isolation {
@@ -227,45 +262,77 @@ pub fn os_vars(
         }
         EnvironmentIsolation::CondaBuild | EnvironmentIsolation::None => {
             // Forward locale from host (conda-build behavior)
-            vars.insert("LANG".to_string(), env::var("LANG").ok());
-            vars.insert("LC_ALL".to_string(), env::var("LC_ALL").ok());
-            vars.insert("MAKEFLAGS".to_string(), env::var("MAKEFLAGS").ok());
+            vars.insert("LANG".to_string(), runtime.var("LANG").map(str::to_owned));
+            vars.insert(
+                "LC_ALL".to_string(),
+                runtime.var("LC_ALL").map(str::to_owned),
+            );
+            vars.insert(
+                "MAKEFLAGS".to_string(),
+                runtime.var("MAKEFLAGS").map(str::to_owned),
+            );
         }
     }
 
-    let shlib_ext = if target_platform.is_windows() {
-        ".dll"
-    } else if target_platform.is_osx() {
-        ".dylib"
-    } else if target_platform.is_linux() {
-        ".so"
-    } else {
-        ".not_implemented"
-    };
+    insert!(
+        vars,
+        "SHLIB_EXT",
+        rattler_build_types::shlib_ext(os_platform)
+    );
+    vars.insert(
+        path_var.to_string(),
+        runtime.var(path_var).map(str::to_owned),
+    );
 
-    insert!(vars, "SHLIB_EXT", shlib_ext);
-    vars.insert(path_var.to_string(), env::var(path_var).ok());
-
-    if target_platform.is_windows() {
-        vars.extend(windows::env::default_env_vars(prefix, target_platform));
-    } else if target_platform.is_osx() {
-        vars.extend(macos::env::default_env_vars(prefix, target_platform));
-    } else if target_platform.is_linux() {
-        vars.extend(linux::env::default_env_vars(
+    if os_platform.is_windows() {
+        vars.extend(windows::env::default_env_vars_target(prefix, runtime));
+    } else if os_platform.is_osx() {
+        vars.extend(macos::env::default_env_vars_target(
             prefix,
-            target_platform,
+            os_platform,
+            runtime,
+        ));
+    } else if os_platform.is_ios() {
+        vars.extend(ios::env::default_env_vars_target(
+            prefix,
+            os_platform,
+            runtime,
+        ));
+    } else if os_platform.is_android() {
+        vars.extend(android::env::default_env_vars_target(
+            prefix,
+            os_platform,
+            runtime,
+        ));
+    } else if os_platform.is_linux() {
+        vars.extend(linux::env::default_env_vars_target(
+            prefix,
+            os_platform,
             env_isolation,
+            runtime,
         ));
     }
+    if build_platform.is_windows() {
+        vars.extend(windows::env::default_env_vars_build(
+            build_platform,
+            runtime,
+        ));
+    } else if build_platform.is_osx() {
+        vars.extend(macos::env::default_env_vars_build(build_platform));
+    } else if build_platform.is_linux() {
+        vars.extend(linux::env::default_env_vars_build(build_platform));
+    }
 
-    let build_platform = Platform::current();
     if build_platform.is_windows() {
         match env_isolation {
             EnvironmentIsolation::Strict => {
                 insert!(vars, "USERPROFILE", work_dir.to_string_lossy());
             }
             EnvironmentIsolation::CondaBuild => {
-                vars.insert("USERPROFILE".to_string(), env::var("USERPROFILE").ok());
+                vars.insert(
+                    "USERPROFILE".to_string(),
+                    runtime.var("USERPROFILE").map(str::to_owned),
+                );
             }
             EnvironmentIsolation::None => {}
         }
@@ -281,7 +348,7 @@ pub fn os_vars(
             EnvironmentIsolation::CondaBuild => {
                 vars.insert(
                     "HOME".to_string(),
-                    Some(env::var("HOME").unwrap_or_else(|_| "UNKNOWN".to_string())),
+                    Some(runtime.var("HOME").unwrap_or("UNKNOWN").to_owned()),
                 );
             }
             EnvironmentIsolation::None => {}
@@ -321,7 +388,7 @@ pub fn vars(output: &Output, build_state: &str) -> HashMap<String, Option<String
         insert!(vars, "ARCH", host_arch);
     }
 
-    let directories = &output.build_configuration.directories;
+    let directories = output.build_configuration.directories.exec_view();
     insert!(
         vars,
         "CONDA_DEFAULT_ENV",
@@ -419,7 +486,7 @@ pub fn vars(output: &Output, build_state: &str) -> HashMap<String, Option<String
 
     // for reproducibility purposes, set the SOURCE_DATE_EPOCH to the configured timestamp
     // this value will be taken from the previous package for rebuild purposes
-    let timestamp_epoch_secs = output.build_configuration.timestamp.timestamp();
+    let timestamp_epoch_secs = output.build_configuration.timestamp.as_second();
     insert!(vars, "SOURCE_DATE_EPOCH", timestamp_epoch_secs);
 
     vars
@@ -476,4 +543,125 @@ pub fn env_vars_from_variant(
             }
         })
         .collect()
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn python_vars_use_site_packages_path_from_repodata() {
+        use rattler_conda_types::{PackageName, PackageRecord, VersionWithSource};
+        use std::str::FromStr;
+        use url::Url;
+
+        let mut package_record = PackageRecord::new(
+            PackageName::from_str("python").unwrap(),
+            "3.13.1".parse::<VersionWithSource>().unwrap(),
+            "cp313t".to_string(),
+        );
+        package_record.python_site_packages_path =
+            Some("lib/python3.13t/site-packages".to_string());
+        let record = RepoDataRecord {
+            package_record,
+            identifier: "python-3.13.1-cp313t.conda".parse().unwrap(),
+            url: Url::parse("https://example.com/python-3.13.1-cp313t.conda").unwrap(),
+            channel: None,
+        };
+
+        let prefix = Path::new("prefix");
+        let vars = python_vars_from_records(&[record], prefix, Platform::Linux64);
+
+        assert_eq!(
+            vars.get("SP_DIR")
+                .and_then(|value| value.as_deref())
+                .map(Path::new),
+            Some(prefix.join("lib/python3.13t/site-packages").as_path())
+        );
+    }
+
+    #[test]
+    fn os_vars_uses_the_injected_runtime_environment() {
+        let runtime = RuntimeEnv::for_test(Platform::Linux64).with_var("PATH", "/injected/bin");
+
+        let vars = os_vars(
+            Path::new("/some/prefix"),
+            &Platform::Linux64,
+            &Platform::Linux64,
+            &Platform::Linux64,
+            EnvironmentIsolation::CondaBuild,
+            Path::new("/some/work"),
+            &runtime,
+        );
+
+        assert_eq!(
+            vars.get("PATH").and_then(|value| value.as_deref()),
+            Some("/injected/bin")
+        );
+        assert_eq!(vars.get("LANG"), Some(&None));
+    }
+
+    /// noarch on a Windows host still emits Windows target vars (issue #2475).
+    #[test]
+    fn test_noarch_uses_host_platform_for_os_vars() {
+        let prefix = Path::new("/some/prefix");
+        let work_dir = Path::new("/some/work");
+
+        let vars = os_vars(
+            prefix,
+            &Platform::NoArch,
+            &Platform::Win64,
+            &Platform::Win64,
+            EnvironmentIsolation::Strict,
+            work_dir,
+            &RuntimeEnv::for_test(Platform::Win64),
+        );
+
+        assert!(vars.contains_key("LIBRARY_PREFIX"));
+        assert!(vars.contains_key("LIBRARY_BIN"));
+        assert!(vars.contains_key("SCRIPTS"));
+        assert!(vars.contains_key("Path"));
+        assert_eq!(
+            vars.get("SHLIB_EXT").and_then(|v| v.as_deref()),
+            Some(".dll")
+        );
+    }
+
+    #[test]
+    fn build_vars_follow_configured_build_platform() {
+        let vars = os_vars(
+            Path::new("/some/prefix"),
+            &Platform::WinArm64,
+            &Platform::WinArm64,
+            &Platform::WinArm64,
+            EnvironmentIsolation::Strict,
+            Path::new("/some/work"),
+            &RuntimeEnv::for_test(Platform::WinArm64),
+        );
+
+        assert_eq!(
+            vars.get("BUILD").and_then(|value| value.as_deref()),
+            Some("arm64-pc-windows-19.0.0")
+        );
+    }
+
+    /// noarch on a non-Windows host does not emit Windows target vars.
+    #[test]
+    fn test_noarch_non_windows_host_has_no_windows_vars() {
+        let prefix = Path::new("/some/prefix");
+        let work_dir = Path::new("/some/work");
+
+        let vars = os_vars(
+            prefix,
+            &Platform::NoArch,
+            &Platform::Linux64,
+            &Platform::Linux64,
+            EnvironmentIsolation::Strict,
+            work_dir,
+            &RuntimeEnv::for_test(Platform::Linux64),
+        );
+
+        assert!(!vars.contains_key("LIBRARY_PREFIX"));
+        assert!(vars.contains_key("PATH"));
+    }
 }

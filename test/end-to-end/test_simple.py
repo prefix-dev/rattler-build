@@ -28,6 +28,15 @@ def test_functionality(rattler_build: RattlerBuild):
     assert text[0] == f"Usage: rattler-build{suffix} [OPTIONS] [COMMAND]"
 
 
+def test_completion_stderr_is_clean(rattler_build: RattlerBuild):
+    """Shell completions are sourced at shell startup, so stderr must stay
+    free of startup banners like the version or config-loading messages."""
+    result = rattler_build("completion", "--shell", "nushell", capture_output=True)
+    assert result.returncode == 0
+    assert "extern" in result.stdout
+    assert result.stderr == ""
+
+
 def test_license_glob(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     rattler_build.build(recipes / "globtest", tmp_path)
     pkg = get_extracted_package(tmp_path, "globtest")
@@ -305,6 +314,39 @@ def test_render_only_does_not_create_output_dir(
         "output directory should not be created with --render-only"
     )
     assert result.returncode == 0, f"render-only failed: {result.stderr}"
+
+
+def test_render_only_with_solve_missing_output_dir(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Test that --render-only --with-solve works when the output directory
+    does not exist yet.
+
+    Solving used to register the output directory as a local channel
+    unconditionally, which panicked with "path is a not a valid absolute path"
+    when the directory was missing (see issue #2611). It should now solve
+    successfully and, consistent with plain --render-only, not create the
+    output directory.
+    """
+    output_dir = tmp_path / "does" / "not" / "exist"
+    assert not output_dir.exists()
+
+    result = rattler_build.render(
+        recipes / "toml",
+        output_dir,
+        with_solve=True,
+        custom_channels=["conda-forge"],
+        raw=True,
+    )
+
+    assert result.returncode == 0, f"render-only with solve failed: {result.stderr}"
+    assert "is a not a valid absolute path" not in (result.stderr or "")
+    assert not output_dir.exists(), (
+        "output directory should not be created with --render-only"
+    )
+
+    outputs = json.loads(result.stdout or "[]")
+    assert isinstance(outputs, list) and len(outputs) >= 1
 
 
 def test_run_exports(
@@ -1288,6 +1330,18 @@ def test_source_filter(rattler_build: RattlerBuild, recipes: Path, tmp_path: Pat
     rattler_build(*args)
 
 
+def test_source_filter_archive(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    # The filter is applied to the extracted contents of an archive source.
+    path_to_recipe = recipes / "source_filter_archive"
+    args = rattler_build.build_args(
+        path_to_recipe,
+        tmp_path,
+    )
+    rattler_build(*args)
+
+
 def test_nushell_script_detection(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
@@ -1300,6 +1354,21 @@ def test_nushell_script_detection(
     assert (pkg / "info/paths.json").exists()
     content = (pkg / "hello.txt").read_text()
     assert "Hello, world!" == content
+
+
+def test_brush(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    # Builds a recipe with `interpreter: brush`. `brush` is pulled from the
+    # build environment (requirements/build), the bash wrapper activates the
+    # environment, and brush then runs the bash-syntax script.
+    rattler_build.build(
+        recipes / "brush-test/recipe.yaml",
+        tmp_path,
+    )
+    pkg = get_extracted_package(tmp_path, "brush-test")
+
+    assert (pkg / "info/paths.json").exists()
+    content = (pkg / "hello.txt").read_text()
+    assert "Hello from brush!" == content.strip()
 
 
 def test_channel_specific(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
@@ -1382,12 +1451,10 @@ def test_noarch_flask(
 
     assert (pkg / "info/tests/tests.yaml").exists()
 
-    # check that the snapshot matches (different on windows vs. unix)
+    # The serialized test script stores the command list verbatim (the same on
+    # all platforms); per-command error handling is applied when the test runs.
     test_yaml = (pkg / "info/tests/tests.yaml").read_text()
-    if os.name == "nt":
-        assert "if %errorlevel% neq 0 exit /b %errorlevel%" in test_yaml
-    else:
-        assert test_yaml == snapshot
+    assert test_yaml == snapshot
 
     # make sure that the entry point does not exist
     assert not (pkg / "python-scripts/flask").exists()
@@ -1398,13 +1465,17 @@ def test_noarch_flask(
 def test_downstream_test(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
 ):
+    # The downstream noarch package's own Python test matrix includes a version
+    # incompatible with the arch-specific upstream artifact. Build both outputs
+    # first, then verify the downstream test selects the compatible version.
     rattler_build.build(
         recipes / "downstream_test/succeed.yaml",
         tmp_path,
+        extra_args=["--no-test"],
     )
 
     pkg = next(tmp_path.rglob("**/upstream-good-*"))
-    test_result = rattler_build.test(pkg, "-c", str(tmp_path))
+    test_result = rattler_build.test(pkg, "-c", str(tmp_path), "-c", "conda-forge")
 
     assert "Running downstream test for package: downstream-good" in test_result
     assert "Downstream test could not run" not in test_result
@@ -1564,6 +1635,13 @@ def test_pin_subpackage(
     assert (pkg / "info/index.json").exists()
 
 
+def test_transitive_test_dependencies(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    rattler_build.build(recipes / "transitive-test-dependencies", tmp_path)
+    assert get_package(tmp_path, "transitive-test-root").exists()
+
+
 def test_testing_strategy(
     rattler_build: RattlerBuild,
     recipes: Path,
@@ -1699,6 +1777,21 @@ def test_cycle_detection(rattler_build: RattlerBuild, recipes: Path, tmp_path: P
         )
     stdout = e.value.output
     assert "Cycle detected in recipe outputs: bazbus, foobar" in stdout
+
+
+def test_non_exact_run_constraint_no_cycle(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    # Issue #2531: a non-exact run_constraints pin must not edge the graph.
+    rendered = rattler_build.render(
+        recipes / "race-condition" / "recipe-constraint-no-cycle.yaml",
+        tmp_path,
+    )
+    # libopenblas first via openblas's exact run pin.
+    assert [rx["recipe"]["package"]["name"] for rx in rendered] == [
+        "libopenblas",
+        "openblas",
+    ]
 
 
 def test_sibling_run_dep_ordering(
@@ -1903,7 +1996,9 @@ def test_relink_rpath(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
     rattler_build.build(recipes / "test-relink", tmp_path)
 
 
-def test_ignore_run_exports(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+def test_ignore_run_exports(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, clean_path_on_win32
+):
     rattler_build.build(
         recipes / "test-parsing/recipe_ignore_run_exports.yaml",
         tmp_path,
@@ -1921,7 +2016,7 @@ def test_ignore_run_exports(rattler_build: RattlerBuild, recipes: Path, tmp_path
     elif current_subdir.startswith("osx"):
         expected_compiler = f"clangxx_{current_subdir}"
     elif current_subdir.startswith("win"):
-        expected_compiler = f"vs2017_{current_subdir}"
+        expected_compiler = f"vs2022_{current_subdir}"
     else:
         pytest.fail(f"Unsupported platform for compiler check: {current_subdir}")
 
@@ -2048,6 +2143,27 @@ def test_channel_sources(
         recipes / "channel_sources",
         tmp_path,
         extra_args=["--render-only"],
+    )
+
+    output_json = json.loads(output)
+    assert output_json[0]["build_configuration"]["channels"] == [
+        "https://conda.anaconda.org/conda-forge/label/rust_dev",
+        "https://conda.anaconda.org/conda-forge",
+    ]
+
+
+def test_channel_sources_with_default_channels_config(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    # default-channels from the configuration file is a fallback, so
+    # channel_sources takes precedence instead of raising a conflict error
+    config = tmp_path / "config.toml"
+    config.write_text('default-channels = ["https://prefix.dev/conda-forge"]\n')
+
+    output = rattler_build.build(
+        recipes / "channel_sources",
+        tmp_path,
+        extra_args=["--render-only", "--config-file", str(config)],
     )
 
     output_json = json.loads(output)
@@ -3176,6 +3292,53 @@ def test_absolute_path_license_with_flag(
     assert (pkg / "info/licenses/external_license.txt").exists()
 
 
+def test_late_bound_license_path(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    # A license file installed into ${{ PREFIX }} during the build is collected
+    # without requiring --allow-absolute-license-paths.
+    rattler_build.build(recipes / "late_bound_license", tmp_path)
+    pkg = get_extracted_package(tmp_path, "late-bound-license")
+    license_file = pkg / "info/licenses/LICENSE"
+    assert license_file.exists()
+    assert "late bound license content" in license_file.read_text()
+
+
+def test_late_bound_license_glob(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    # A glob rooted at a late-bound ${{ PREFIX }} path collects every matching
+    # license file, preserving the directory structure under info/licenses.
+    rattler_build.build(recipes / "late_bound_license_glob", tmp_path)
+    pkg = get_extracted_package(tmp_path, "late-bound-license-glob")
+    foo_license = pkg / "info/licenses/foo/LICENSE"
+    bar_license = pkg / "info/licenses/bar/LICENSE"
+    assert foo_license.exists()
+    assert bar_license.exists()
+    assert "foo license content" in foo_license.read_text()
+    assert "bar license content" in bar_license.read_text()
+
+
+def test_late_bound_license_traversal_rejected(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    # A late-bound license path that escapes the build directories via `..` must
+    # be rejected, otherwise it would be an absolute-path backdoor around
+    # --allow-absolute-license-paths.
+    with pytest.raises(CalledProcessError):
+        rattler_build.build(recipes / "late_bound_license_traversal", tmp_path)
+
+
+def test_patch_from_other_source(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    # A patch that ships inside another source can be applied by referencing it
+    # through the late-bound ${{ SRC_DIR }} variable. The build script fails if
+    # the patch was not applied.
+    rattler_build.build(recipes / "patch_from_other_source", tmp_path)
+    get_extracted_package(tmp_path, "patch-from-other-source")
+
+
 def test_sourceforge_redirects(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
@@ -3196,6 +3359,13 @@ def test_target_platform_in_variant_config_warning(
         tmp_path,
         variant_config=variant_config,
         raw=True,
+        # Use JSON log style so the warning is emitted on stderr as plain ASCII
+        # on a single line. The default "fancy" style wraps lines to the
+        # terminal width and uses box-drawing characters, which breaks the
+        # substring check (and capture) on the Windows CI console.
+        extra_args=["--log-style=json"],
+        encoding="utf-8",
+        errors="replace",
     )
     combined = (result.stdout or "") + "\n" + (result.stderr or "")
     assert (
@@ -3205,7 +3375,9 @@ def test_target_platform_in_variant_config_warning(
     assert "Please use the '--target-platform' command-line flag" in combined
 
 
-def test_c_compilation(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+def test_c_compilation(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, clean_path_on_win32
+):
     rattler_build.build(recipes / "c_compilation", tmp_path)
     pkg = get_extracted_package(tmp_path, "c_compilation")
     if platform.system() == "Windows":

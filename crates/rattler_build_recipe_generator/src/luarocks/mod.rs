@@ -406,9 +406,11 @@ fn rockspec_to_recipe(rockspec: &LuarocksRockspec) -> miette::Result<Recipe> {
         source: vec![source_element],
         build: Build {
             number: "${{ build_number }}".to_string(),
+            skip: None,
             script: "# Take the first `rockspec` we find (in non-deterministic places unfortunately)\nROCK=$(find . -name \"*.rockspec\" | sort -n -r | head -n 1)\nluarocks install ${ROCK} --tree=${{ PREFIX }}".to_string(),
             python: Python::default(),
             noarch: None,
+            dynamic_linking: None,
         },
         requirements: Requirements {
             build: vec!["luarocks".to_string()],
@@ -491,7 +493,7 @@ fn normalize_lua_name(name: &str) -> miette::Result<PackageName> {
 
     // Convert to conda-friendly name, but don't double-prefix lua-
     let normalized = if clean_name.starts_with("lua-") || clean_name.starts_with("lua_") {
-        format!("lua-{}", &clean_name[4..].replace('_', "-").to_lowercase())
+        format!("lua-{}", clean_name[4..].replace('_', "-").to_lowercase())
     } else {
         format!("lua-{}", clean_name.replace('_', "-").to_lowercase())
     };
