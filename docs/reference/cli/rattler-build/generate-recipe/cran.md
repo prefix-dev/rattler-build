@@ -20,8 +20,9 @@ rattler-build generate-recipe cran [OPTIONS] <PACKAGE>
 - <a id="arg---universe" href="#arg---universe">`--universe (-u) <UNIVERSE>`</a>
 :  The R Universe to fetch the package from (defaults to `cran`)
 - <a id="arg---tree" href="#arg---tree">`--tree (-t)`</a>
-:  Whether to recursively generate recipes for dependencies. By default, only dependencies missing from conda-forge are recursed into (mirrors grayskull's `--recursive`); pass `--full` as well to recurse into the whole dependency tree regardless of conda-forge status
-- <a id="arg---full" href="#arg---full">`--full (-f)`</a>
-:  Modifies `--tree` to recurse into every dependency, including ones already available on conda-forge. Has no effect unless `--tree` is also set
+:  Whether to recursively generate recipes for dependencies that don't already exist locally. By default every dependency is recursed into; pass `--skip-available` to skip ones already available in a channel
+- <a id="arg---skip-available" href="#arg---skip-available">`--skip-available <SKIP_AVAILABLE>`</a>
+:  Channel(s) to check dependencies against. Dependencies already available in any of the given channels are skipped when recursing with `--tree` (mirrors grayskull's `--recursive`), and are not warned about as missing. May be passed multiple times to check against more than one channel, e.g. `--skip-available conda-forge --skip-available bioconda`. If unset, nothing is checked and no network requests are made
+<br>May be provided more than once.
 - <a id="arg---write" href="#arg---write">`--write (-w)`</a>
 :  Whether to write the recipe to a folder
