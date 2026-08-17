@@ -33,6 +33,7 @@ pub mod package_info;
 mod post_process;
 pub mod publish;
 pub mod rebuild;
+mod recipe_patch;
 mod unix;
 mod windows;
 

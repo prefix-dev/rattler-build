@@ -15,7 +15,7 @@ use rattler_build_recipe::stage1::{
         parse_step_package_reference_detailed,
     },
 };
-use rattler_build_types::{LateBoundGlobVec, NormalizedKey};
+use rattler_build_types::NormalizedKey;
 use rattler_conda_types::{MatchSpec, ParseStrictness, RepoDataRecord};
 use sha2::{Digest, Sha256};
 
@@ -97,26 +97,70 @@ fn input_matches_type(value: &Variable, kind: &str) -> bool {
     }
 }
 
+fn evaluate_yaml_selectors(
+    value: serde_yaml::Value,
+    jinja: &Jinja,
+    source: &str,
+) -> miette::Result<serde_yaml::Value> {
+    match value {
+        serde_yaml::Value::Sequence(items) => {
+            let mut selected = Vec::new();
+            for item in items {
+                let selector = item.as_mapping().and_then(|mapping| {
+                    let then = mapping.get("then")?;
+                    let condition = mapping.get("if")?.as_str()?;
+                    Some((
+                        condition.to_string(),
+                        then.clone(),
+                        mapping.get("else").cloned(),
+                    ))
+                });
+                let item = if let Some((condition, then, otherwise)) = selector {
+                    let result = jinja.eval(&condition).map_err(|error| {
+                        miette::miette!(
+                            "failed to evaluate selector `{condition}` in reusable step {source}: {error}"
+                        )
+                    })?;
+                    if result.is_undefined() {
+                        return Err(miette::miette!(
+                            "undefined variable in selector `{condition}` in reusable step {source}"
+                        ));
+                    }
+                    if result.is_true() {
+                        Some(then)
+                    } else {
+                        otherwise
+                    }
+                } else {
+                    Some(item)
+                };
+                let Some(item) = item else { continue };
+                match evaluate_yaml_selectors(item, jinja, source)? {
+                    serde_yaml::Value::Sequence(items) => selected.extend(items),
+                    item => selected.push(item),
+                }
+            }
+            Ok(serde_yaml::Value::Sequence(selected))
+        }
+        serde_yaml::Value::Mapping(mapping) => Ok(serde_yaml::Value::Mapping(
+            mapping
+                .into_iter()
+                .map(|(key, value)| {
+                    evaluate_yaml_selectors(value, jinja, source).map(|value| (key, value))
+                })
+                .collect::<miette::Result<_>>()?,
+        )),
+        value => Ok(value),
+    }
+}
+
 fn render_reusable_steps(
     contents: &str,
     source: &str,
     supplied: &IndexMap<String, Variable>,
     output: &Output,
 ) -> miette::Result<Vec<rattler_build_recipe::stage1::build::Step>> {
-    // Control-flow template lines are not YAML until rendered. Comment them
-    // out for the header-only input schema pass.
-    let header_yaml = contents
-        .lines()
-        .map(|line| {
-            if line.trim_start().starts_with("{%") {
-                format!("# {line}")
-            } else {
-                line.to_string()
-            }
-        })
-        .collect::<Vec<_>>()
-        .join("\n");
-    let header: ReusableHeader = serde_yaml::from_str(&header_yaml)
+    let header: ReusableHeader = serde_yaml::from_str(contents)
         .into_diagnostic()
         .wrap_err_with(|| format!("failed to read inputs from reusable step {source}"))?;
     for key in supplied.keys() {
@@ -182,13 +226,19 @@ fn render_reusable_steps(
         protected = protected.replace(&token, &sentinel);
         sentinels.push((sentinel, token));
     }
-    let mut rendered = Jinja::new(output.build_configuration.selector_config())
-        .with_context(&context)
+    let jinja = Jinja::new(output.build_configuration.selector_config()).with_context(&context);
+    let mut rendered = jinja
         .render_str(&protected)
         .map_err(|error| miette::miette!("failed to render reusable step {source}: {error}"))?;
     for (sentinel, token) in sentinels {
         rendered = rendered.replace(&sentinel, &token);
     }
+    let yaml = serde_yaml::from_str(&rendered)
+        .into_diagnostic()
+        .wrap_err_with(|| format!("failed to parse reusable step {source} as YAML"))?;
+    let rendered = serde_yaml::to_string(&evaluate_yaml_selectors(yaml, &jinja, source)?)
+        .into_diagnostic()
+        .wrap_err_with(|| format!("failed to serialize reusable step {source}"))?;
     parse_reusable_steps(&rendered, source).into_diagnostic()
 }
 
@@ -224,39 +274,6 @@ fn apply_provider_hash(output: &mut Output, fingerprints: &[String]) {
         output.recipe.build.string = BuildString::resolved(updated);
     }
     output.build_configuration.hash = new_hash;
-}
-
-fn append_generated_license_files(
-    about: &mut rattler_build_recipe::stage1::About,
-    generated: Vec<String>,
-) -> miette::Result<()> {
-    if generated.is_empty() {
-        return Ok(());
-    }
-    let existing = about.license_file.as_ref();
-    let mut include = existing
-        .map(|files| {
-            files
-                .entries()
-                .iter()
-                .map(|entry| entry.source().to_string())
-                .collect::<Vec<_>>()
-        })
-        .unwrap_or_default();
-    for generated in generated {
-        if !include.contains(&generated) {
-            include.push(generated);
-        }
-    }
-    let exclude = existing
-        .map(|files| files.exclude().to_vec())
-        .unwrap_or_default();
-    about.license_file = Some(
-        LateBoundGlobVec::from_sources(include, exclude)
-            .into_diagnostic()
-            .wrap_err("invalid license file glob generated by reusable step")?,
-    );
-    Ok(())
 }
 
 fn resolved_provider(record: &RepoDataRecord) -> ResolvedProvider {
@@ -397,7 +414,6 @@ pub async fn preprocess_reusable_steps(
         .to_path_buf();
     let mut build_requirements = Vec::new();
     let mut host_requirements = Vec::new();
-    let mut generated_license_files = Vec::new();
     let mut fingerprints = Vec::new();
 
     for (index, (reference, inputs)) in references.into_iter().enumerate() {
@@ -457,7 +473,6 @@ pub async fn preprocess_reusable_steps(
             }
             build_requirements.extend(nested.requirements.build);
             host_requirements.extend(nested.requirements.host);
-            generated_license_files.extend(nested.license_files);
         }
         fingerprints.push(format!(
             "{}|{}|{}|{}",
@@ -489,7 +504,7 @@ pub async fn preprocess_reusable_steps(
     apply_provider_hash(output, &fingerprints);
     output.recipe.requirements.build.extend(build_requirements);
     output.recipe.requirements.host.extend(host_requirements);
-    append_generated_license_files(&mut output.recipe.about, generated_license_files)
+    Ok(())
 }
 
 #[cfg(test)]
@@ -497,34 +512,35 @@ mod tests {
     use super::*;
 
     #[test]
-    fn generated_license_files_extend_recipe_metadata_without_reordering() {
-        let mut about = rattler_build_recipe::stage1::About {
-            license_file: Some(
-                LateBoundGlobVec::from_sources(
-                    vec!["LICENSE".to_string()],
-                    vec!["LICENSE.private".to_string()],
-                )
-                .unwrap(),
-            ),
-            ..Default::default()
-        };
-        append_generated_license_files(
-            &mut about,
-            vec![
-                "${{ BUILD_DIR }}/go-dependencies/**".to_string(),
-                "LICENSE".to_string(),
-            ],
+    fn reusable_step_selectors_are_valid_yaml_and_flatten_selected_branch() {
+        let mut context = IndexMap::new();
+        context.insert("enabled".to_string(), Variable::from(false));
+        let jinja = Jinja::new(Default::default()).with_context(&context);
+        let yaml = serde_yaml::from_str(
+            r#"
+steps:
+  - if: enabled
+    then:
+      - run: enabled
+    else:
+      - run: fallback
+  - run: always
+"#,
         )
         .unwrap();
-        let files = about.license_file.unwrap();
+
+        let selected = evaluate_yaml_selectors(yaml, &jinja, "test.yaml").unwrap();
+        let rendered = serde_yaml::to_string(&selected).unwrap();
+        let steps = parse_reusable_steps(&rendered, "test.yaml").unwrap();
+
+        assert_eq!(steps.len(), 2);
         assert_eq!(
-            files
-                .entries()
-                .iter()
-                .map(|entry| entry.source())
-                .collect::<Vec<_>>(),
-            ["LICENSE", "${{ BUILD_DIR }}/go-dependencies/**"]
+            steps[0].run,
+            rattler_build_recipe::stage1::build::StepRun::Command("fallback".to_string())
         );
-        assert_eq!(files.exclude(), ["LICENSE.private"]);
+        assert_eq!(
+            steps[1].run,
+            rattler_build_recipe::stage1::build::StepRun::Command("always".to_string())
+        );
     }
 }

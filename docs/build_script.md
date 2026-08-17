@@ -185,9 +185,9 @@ inputs:
     default: true
 steps:
   - run: cmake -S "$SRC_DIR" -B "$BUILD_DIR/cmake" ${{ inputs.extra_args | join(' ') }}
-{% if inputs.install %}
-  - run: cmake --install "$BUILD_DIR/cmake"
-{% endif %}
+  - if: inputs.install
+    then:
+      - run: cmake --install "$BUILD_DIR/cmake"
 ```
 
 ```yaml title="recipe.yaml"
@@ -201,23 +201,33 @@ build:
 
 Unknown inputs, missing required inputs, and values of the wrong declared type
 are rejected during preprocessing. Inputs may use recipe templates and therefore
-participate in normal used-variable tracking.
+participate in normal used-variable tracking. Reusable files use the same valid-YAML
+`if` / `then` / `else` preprocessing selectors as recipes; `{% if %}` template
+blocks are not supported.
 
-A reusable step that generates license files can append late-bound globs to the
-package metadata:
+Every build-step section receives a unique `OUTPUT_FILE` environment variable.
+A step can write an [RFC 6902 JSON Patch](https://datatracker.ietf.org/doc/html/rfc6902)
+to this file to update packaging metadata after all steps finish and before the
+package is created. For example, a reusable step can register generated license
+files:
 
 ```yaml
 requirements:
   build: [go, go-licenses]
-run: go-licenses save ./... --save_path "$BUILD_DIR/go-dependencies"
-license_files:
-  - ${{ BUILD_DIR }}/go-dependencies/**
+run: |
+  go-licenses save ./... --save_path "$BUILD_DIR/go-dependencies"
+  dollar='$'
+  printf '%s\n' '[{"op":"add","path":"/about/license_file/include/-","value":"'"$dollar"'{{ BUILD_DIR }}/go-dependencies/**"}]' > "$OUTPUT_FILE"
 ```
 
-During preprocessing, `license_files` entries are merged into
-`about.license_file`. They are collected after the build script runs, so files
-generated in the build directory can be packaged under `info/licenses` without
-also becoming normal package payload.
+Output patches are applied in step execution order. Commonly extended arrays,
+including `about.license_file` and the dynamic-linking allowlists, are
+materialized even when omitted from the recipe, so standard JSON Patch `/-`
+array appends work. Post-build patches may update `about.*` and packaging-time
+fields under `build.dynamic_linking`, `build.prefix_detection`, `build.files`,
+`build.always_copy_files`, `build.always_include_files`, and
+`build.post_process`. Fields already consumed by rendering, solving, or script
+execution are rejected as too late to modify.
 
 !!! warning "Windows multiline steps"
     On Windows, a multiline `run: |` block is emitted as one command-list item.

@@ -243,7 +243,18 @@ pub(crate) fn prepare_build_plan_execution_args(
 
     let mut secrets = IndexMap::new();
     let mut sections = Vec::with_capacity(scripts.len());
-    for (script, step_label) in scripts {
+    for (index, (mut script, step_label)) in scripts.into_iter().enumerate() {
+        if matches!(plan, BuildPlan::Steps(_)) {
+            let output_file = crate::recipe_patch::output_file(&work_dir, index)
+                .to_string_lossy()
+                .into_owned();
+            script
+                .env
+                .insert("OUTPUT_FILE".to_string(), output_file.clone());
+            script
+                .env
+                .insert("RATTLER_BUILD_OUTPUT_FILE".to_string(), output_file);
+        }
         let mut section_jinja = Jinja::new(selector_config.clone()).with_context(recipe_context);
         for (key, value) in env_vars.iter().chain(script.env()) {
             section_jinja
@@ -396,6 +407,11 @@ impl Output {
             Err(err) => return Err(err.into()),
         }
 
+        if self.recipe.build().plan.steps().is_some() {
+            crate::recipe_patch::prepare_output_directory(
+                &self.build_configuration.directories.work_dir,
+            )?;
+        }
         let exec_args = self.prepare_build_script().await?;
         rattler_build_script::run_script(exec_args).await?;
 
@@ -421,6 +437,11 @@ impl Output {
         let span = tracing::info_span!("Creating build script");
         let _enter = span.enter();
 
+        if self.recipe.build().plan.steps().is_some() {
+            crate::recipe_patch::prepare_output_directory(
+                &self.build_configuration.directories.work_dir,
+            )?;
+        }
         let exec_args = self.prepare_build_script().await?;
         rattler_build_script::create_build_script(exec_args).await
     }
