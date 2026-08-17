@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.11](https://github.com/prefix-dev/rattler-build/compare/rattler_build_source_cache-v0.1.10...rattler_build_source_cache-v0.1.11) - 2026-08-17
+
+### Added
+
+- read the shared config layer instead of pixi's config files ([#2724](https://github.com/prefix-dev/rattler-build/pull/2724))
+
 ## [0.1.10](https://github.com/prefix-dev/rattler-build/compare/rattler_build_source_cache-v0.1.9...rattler_build_source_cache-v0.1.10) - 2026-07-25
 
 ### Added
