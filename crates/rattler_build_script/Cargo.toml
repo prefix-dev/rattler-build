@@ -20,7 +20,6 @@ execution = [
   "tokio-util",
   "rattler_conda_types",
   "rattler_shell",
-  "fs-err",
   "which",
   "minijinja",
   "strsim",
@@ -28,7 +27,9 @@ execution = [
 
 [dependencies]
 # Core dependencies (always needed)
+fs-err = { workspace = true }
 indexmap = { workspace = true }
+regex = { workspace = true }
 serde = { workspace = true }
 
 # Sandbox dependencies
@@ -49,7 +50,6 @@ tokio = { workspace = true, features = [
 tokio-util = { workspace = true, optional = true }
 rattler_conda_types = { workspace = true, optional = true }
 rattler_shell = { workspace = true, optional = true }
-fs-err = { workspace = true, optional = true }
 which = { workspace = true, optional = true }
 minijinja = { workspace = true, optional = true }
 strsim = { workspace = true, optional = true }

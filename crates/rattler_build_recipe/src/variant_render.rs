@@ -671,12 +671,14 @@ fn stable_topological_sort(
 /// - Always-included variables (target_platform, etc.)
 /// - OS environment variable keys (passed via RenderConfig)
 /// - use_keys from build.variant.use_keys (forces keys into the variant matrix)
+/// - Environment variables referenced by build scripts (e.g. `${TARGET}` in
+///   `build.sh`), detected via best-effort scanning
 ///
 /// Returns only variables that exist in the variant config.
 fn collect_used_variables(
     stage0_recipe: &Stage0Recipe,
     variant_config: &VariantConfig,
-    os_env_var_keys: &HashSet<String>,
+    config: &RenderConfig,
 ) -> HashSet<NormalizedKey> {
     let mut used_vars = HashSet::new();
 
@@ -698,7 +700,7 @@ fn collect_used_variables(
     // Insert OS environment variable keys that can be overridden by variant config
     // These come from env_vars::os_vars() and include platform-specific vars like
     // MACOSX_DEPLOYMENT_TARGET
-    for key in os_env_var_keys {
+    for key in &config.os_env_var_keys {
         used_vars.insert(NormalizedKey::from(key.as_str()));
     }
 
@@ -709,11 +711,30 @@ fn collect_used_variables(
         used_vars.insert(NormalizedKey::from(key.as_str()));
     }
 
+    // Auto-detect environment variables referenced by build scripts (inline
+    // content, explicit script files, and default `build.sh` / `build.bat`
+    // discovery). Variant values are exported to the build script environment,
+    // so a variable like `${TARGET}` in `build.sh` is a real usage even when
+    // the recipe itself never mentions it.
+    for var in crate::script_variables::stage0_script_variables(
+        stage0_recipe,
+        recipe_directory(config),
+        config.build_platform.is_windows(),
+    ) {
+        used_vars.insert(NormalizedKey::from(var));
+    }
+
     // Filter to only variants that exist in the config
     used_vars
         .into_iter()
         .filter(|v| variant_config.get(v).is_some())
         .collect()
+}
+
+/// The directory containing the recipe file, used to resolve build script
+/// files (e.g. the default `build.sh` / `build.bat`).
+fn recipe_directory(config: &RenderConfig) -> Option<&std::path::Path> {
+    config.recipe_path.as_deref().and_then(|p| p.parent())
 }
 
 /// Evaluate requirements with a variant combination and extract free specs
@@ -1364,8 +1385,9 @@ fn render_with_variants(
     variant_config: &VariantConfig,
     config: RenderConfig,
 ) -> Result<Vec<RenderedVariant>, RenderError> {
-    // Collect initially used variables (from templates and stage0 free specs)
-    let used_vars = collect_used_variables(stage0_recipe, variant_config, &config.os_env_var_keys);
+    // Collect initially used variables (from templates, stage0 free specs, and
+    // build scripts)
+    let used_vars = collect_used_variables(stage0_recipe, variant_config, &config);
 
     // Compute initial variant combinations
     let initial_combinations = variant_config.combinations(&used_vars)?;
@@ -1403,6 +1425,21 @@ fn render_with_variants(
             for key in &use_keys {
                 if let Some(value) = combination.get(key) {
                     variant.insert(key.clone(), value.clone());
+                }
+            }
+
+            // Add variant variables referenced by this output's build script
+            // (e.g. `${TARGET}` in build.sh). They are exported to the script
+            // environment, so they must participate in the variant (and thus
+            // the build hash) even though the recipe never references them.
+            for var in crate::script_variables::stage1_script_variables(
+                &recipe,
+                recipe_directory(&config),
+                config.build_platform.is_windows(),
+            ) {
+                let key = NormalizedKey::from(var);
+                if let Some(value) = combination.get(&key) {
+                    variant.insert(key, value.clone());
                 }
             }
 
@@ -3552,6 +3589,295 @@ package:
         assert!(
             bs_override.ends_with("_7"),
             "overridden build string should end with '_7', got '{bs_override}'"
+        );
+    }
+
+    /// A variable that is only used inside `build.sh` (as `${TARGET}`) is
+    /// auto-detected and cross-referenced with the variant config, expanding
+    /// the build matrix without an explicit `build.variant.use_keys` entry.
+    #[test]
+    fn test_script_file_variable_expands_variant_matrix() {
+        let recipe_yaml = r#"
+package:
+  name: test-pkg
+  version: "1.0.0"
+"#;
+
+        let variant_yaml = r#"
+TARGET:
+  - aarch64-unknown-linux-gnu
+  - x86_64-unknown-linux-gnu
+"#;
+
+        let dir = tempfile::tempdir().unwrap();
+        fs_err::write(
+            dir.path().join("build.sh"),
+            "cmake -DCMAKE_C_COMPILER_TARGET=${TARGET} ..\n",
+        )
+        .unwrap();
+
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config = VariantConfig::from_yaml_str(variant_yaml).unwrap();
+
+        let config = RenderConfig::new()
+            .with_target_platform(rattler_conda_types::Platform::Linux64)
+            .with_build_platform(rattler_conda_types::Platform::Linux64)
+            .with_recipe_path(dir.path().join("recipe.yaml"));
+
+        let rendered =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, config).unwrap();
+
+        assert_eq!(rendered.len(), 2);
+        let mut targets: Vec<String> = rendered
+            .iter()
+            .map(|r| r.variant.get(&"TARGET".into()).unwrap().to_string())
+            .collect();
+        targets.sort();
+        assert_eq!(
+            targets,
+            ["aarch64-unknown-linux-gnu", "x86_64-unknown-linux-gnu"]
+        );
+
+        // The variant participates in the hash, so the build strings differ.
+        let build_strings: HashSet<_> = rendered
+            .iter()
+            .map(|r| r.recipe.build.string.as_resolved().unwrap().to_string())
+            .collect();
+        assert_eq!(build_strings.len(), 2);
+    }
+
+    /// Inline scripts are scanned too: `script: echo $TARGET`.
+    #[test]
+    fn test_inline_script_variable_expands_variant_matrix() {
+        let recipe_yaml = r#"
+package:
+  name: test-pkg
+  version: "1.0.0"
+
+build:
+  script: echo $TARGET
+"#;
+
+        let variant_yaml = r#"
+TARGET:
+  - a
+  - b
+"#;
+
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config = VariantConfig::from_yaml_str(variant_yaml).unwrap();
+
+        let config = RenderConfig::new()
+            .with_target_platform(rattler_conda_types::Platform::Linux64)
+            .with_build_platform(rattler_conda_types::Platform::Linux64);
+
+        let rendered =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, config).unwrap();
+
+        assert_eq!(rendered.len(), 2);
+        let mut targets: Vec<String> = rendered
+            .iter()
+            .map(|r| r.variant.get(&"TARGET".into()).unwrap().to_string())
+            .collect();
+        targets.sort();
+        assert_eq!(targets, ["a", "b"]);
+    }
+
+    /// On a Windows build platform the default script discovery scans
+    /// `build.bat` and understands `%VAR%` / `!VAR!` spellings.
+    #[test]
+    fn test_bat_script_variable_expands_variant_matrix() {
+        let recipe_yaml = r#"
+package:
+  name: test-pkg
+  version: "1.0.0"
+"#;
+
+        let variant_yaml = r#"
+TARGET:
+  - a
+  - b
+"#;
+
+        let dir = tempfile::tempdir().unwrap();
+        fs_err::write(
+            dir.path().join("build.bat"),
+            "cmake -DTARGET=%TARGET% ..\r\nif \"!TARGET!\" == \"a\" echo on\r\n",
+        )
+        .unwrap();
+
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config = VariantConfig::from_yaml_str(variant_yaml).unwrap();
+
+        let config = RenderConfig::new()
+            .with_target_platform(rattler_conda_types::Platform::Win64)
+            .with_build_platform(rattler_conda_types::Platform::Win64)
+            .with_recipe_path(dir.path().join("recipe.yaml"));
+
+        let rendered =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, config).unwrap();
+
+        assert_eq!(rendered.len(), 2);
+        assert!(
+            rendered
+                .iter()
+                .all(|r| r.variant.contains_key(&"TARGET".into()))
+        );
+    }
+
+    /// Script variables that do not exist in the variant config are ignored
+    /// and do not expand the matrix.
+    #[test]
+    fn test_script_variable_not_in_variant_config_is_ignored() {
+        let recipe_yaml = r#"
+package:
+  name: test-pkg
+  version: "1.0.0"
+
+build:
+  script: echo $NOT_A_VARIANT
+"#;
+
+        let variant_yaml = r#"
+some_unused_key:
+  - "1"
+  - "2"
+"#;
+
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config = VariantConfig::from_yaml_str(variant_yaml).unwrap();
+
+        let rendered =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, RenderConfig::new())
+                .unwrap();
+
+        assert_eq!(rendered.len(), 1);
+        assert!(!rendered[0].variant.contains_key(&"NOT_A_VARIANT".into()));
+    }
+
+    /// In multi-output recipes only outputs whose script references the
+    /// variable record it in their variant; other outputs are unaffected
+    /// (their renders across combinations stay identical).
+    #[test]
+    fn test_multi_output_script_variable_only_affects_using_output() {
+        let recipe_yaml = r#"
+schema_version: 1
+
+recipe:
+  name: multi-pkg
+  version: "1.0.0"
+
+outputs:
+  - package:
+      name: uses-target
+      version: "1.0.0"
+    build:
+      script: echo $TARGET
+
+  - package:
+      name: no-target
+      version: "1.0.0"
+    build:
+      script: echo hello
+"#;
+
+        let variant_yaml = r#"
+TARGET:
+  - a
+  - b
+"#;
+
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config = VariantConfig::from_yaml_str(variant_yaml).unwrap();
+
+        let config = RenderConfig::new()
+            .with_target_platform(rattler_conda_types::Platform::Linux64)
+            .with_build_platform(rattler_conda_types::Platform::Linux64);
+
+        let rendered =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, config).unwrap();
+
+        // Two combinations, two outputs each.
+        assert_eq!(rendered.len(), 4);
+
+        let uses_target: Vec<_> = rendered
+            .iter()
+            .filter(|r| r.recipe.package.name.as_normalized() == "uses-target")
+            .collect();
+        let no_target: Vec<_> = rendered
+            .iter()
+            .filter(|r| r.recipe.package.name.as_normalized() == "no-target")
+            .collect();
+
+        assert_eq!(uses_target.len(), 2);
+        assert!(
+            uses_target
+                .iter()
+                .all(|r| r.variant.contains_key(&"TARGET".into()))
+        );
+        let hashes: HashSet<_> = uses_target
+            .iter()
+            .map(|r| r.recipe.build.string.as_resolved().unwrap().to_string())
+            .collect();
+        assert_eq!(hashes.len(), 2, "hashes must differ per TARGET value");
+
+        // The output that never touches TARGET renders identically in both
+        // combinations (and is deduplicated downstream).
+        assert_eq!(no_target.len(), 2);
+        assert!(
+            no_target
+                .iter()
+                .all(|r| !r.variant.contains_key(&"TARGET".into()))
+        );
+        let hashes: HashSet<_> = no_target
+            .iter()
+            .map(|r| r.recipe.build.string.as_resolved().unwrap().to_string())
+            .collect();
+        assert_eq!(hashes.len(), 1);
+    }
+
+    /// A python `script.file` is scanned with Python env-var spellings.
+    #[test]
+    fn test_python_script_file_variable_expands_variant_matrix() {
+        let recipe_yaml = r#"
+package:
+  name: test-pkg
+  version: "1.0.0"
+
+build:
+  script:
+    file: install.py
+"#;
+
+        let variant_yaml = r#"
+TARGET:
+  - a
+  - b
+"#;
+
+        let dir = tempfile::tempdir().unwrap();
+        fs_err::write(
+            dir.path().join("install.py"),
+            "import os\nprint(os.environ['TARGET'])\n",
+        )
+        .unwrap();
+
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config = VariantConfig::from_yaml_str(variant_yaml).unwrap();
+
+        let config = RenderConfig::new()
+            .with_target_platform(rattler_conda_types::Platform::Linux64)
+            .with_build_platform(rattler_conda_types::Platform::Linux64)
+            .with_recipe_path(dir.path().join("recipe.yaml"));
+
+        let rendered =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, config).unwrap();
+
+        assert_eq!(rendered.len(), 2);
+        assert!(
+            rendered
+                .iter()
+                .all(|r| r.variant.contains_key(&"TARGET".into()))
         );
     }
 }

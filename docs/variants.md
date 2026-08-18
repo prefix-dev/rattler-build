@@ -103,6 +103,50 @@ To build against multiple Python versions you can separate the variant strings b
 
 This will follow the same logic as using multiple variant files: the CLI will overwrite any variant keys set by files that were loaded.
 
+## Variables used in build scripts
+
+Variant variables are exported as environment variables to the build script.
+Because of that, `rattler-build` also scans the build scripts of a recipe for
+environment variable usage and cross-references the found names with the
+variant configuration. Any variant key that is referenced in a build script
+counts as a "used variable" — exactly as if it had been referenced with
+`${{ ... }}` in the recipe — and becomes part of the variant matrix and the
+package hash.
+
+For example, with the following variant configuration:
+
+```yaml title="variants.yaml"
+TARGET:
+  - aarch64-unknown-linux-gnu
+  - x86_64-unknown-linux-gnu
+```
+
+... and a `build.sh` that contains `${TARGET}` (or `$TARGET`), two variants
+are built, without needing to forward the variable manually via
+`build.variant.use_keys`.
+
+The scan covers inline scripts, script files referenced via `script.file`, and
+the default `build.sh` / `build.bat` discovery. It understands the most common
+environment variable spellings for each supported interpreter:
+
+| Interpreter          | Detected spellings                                                          |
+| -------------------- | --------------------------------------------------------------------------- |
+| `bash` / `brush`     | `$VAR`, `${VAR}`, `${VAR:-default}`, ...                                     |
+| `cmd.exe`            | `%VAR%`, `%VAR:a=b%`, `!VAR!`                                                |
+| `powershell`         | `$env:VAR`, `${env:VAR}`, `[Environment]::GetEnvironmentVariable("VAR")`     |
+| `python`             | `os.environ["VAR"]`, `os.environ.get("VAR")`, `os.getenv("VAR")`             |
+| `nushell`            | `$env.VAR`, `$env."VAR"`                                                     |
+| `perl`               | `$ENV{VAR}`                                                                  |
+| `rscript`            | `Sys.getenv("VAR")`                                                          |
+| `ruby`               | `ENV["VAR"]`, `ENV.fetch("VAR")`                                             |
+| `node`               | `process.env.VAR`, `process.env["VAR"]`                                      |
+
+The scan is a best-effort text scan, not a full parser: names that do not
+appear in the variant configuration are simply ignored, and dynamically
+constructed variable names cannot be detected. In those cases you can still
+use `build.variant.use_keys` to forward a variant key explicitly, or
+`build.variant.ignore_keys` to opt out of a detected one.
+
 ## Package hash from variant
 
 You might have wondered what the role of the build string is. The build string is (if not explicitly set) computed from the variant configuration.

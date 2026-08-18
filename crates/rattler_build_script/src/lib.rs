@@ -11,11 +11,13 @@
 
 pub mod sandbox;
 mod script;
+pub mod variable_scan;
 
 pub use sandbox::{SandboxArguments, SandboxConfiguration};
 pub use script::{
     Script, ScriptContent, determine_interpreter_from_path, platform_script_extensions,
 };
+pub use variable_scan::{ScriptDialect, script_extensions_for_platform};
 
 #[cfg(feature = "execution")]
 mod activation;
