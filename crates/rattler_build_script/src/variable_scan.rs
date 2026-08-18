@@ -1,156 +1,63 @@
-//! Best-effort detection of environment variables referenced by build scripts.
+//! Best-effort detection of variant variables referenced by build scripts.
 //!
 //! Recipes frequently consume variant variables directly from the environment
 //! of their build script (e.g. `${TARGET}` in `build.sh`) without ever
-//! referencing them in the recipe itself. This module scans script sources for
-//! the most common environment variable access spellings of each supported
-//! interpreter so that callers can cross-reference the found names with the
-//! variant configuration.
+//! referencing them in the recipe itself. Since variant values are exported to
+//! the build script environment under their (normalized) key names, a script
+//! that mentions a variant key is very likely using it.
 //!
-//! The scanners are intentionally *not* full parsers: they over-approximate
-//! (e.g. they do not understand quoting or comments). That is fine for the
-//! intended use case, because the resulting names are only ever intersected
-//! with the keys of the variant configuration.
+//! The detection is deliberately simple: given the list of variant
+//! configuration keys, we search the script text for **literal occurrences**
+//! of each key name, bounded by non-identifier characters. There is no
+//! per-interpreter syntax parsing — `$TARGET`, `%TARGET%`,
+//! `os.environ["TARGET"]`, and even a plain mention of `TARGET` all count.
+//! This over-approximates (a key mentioned in a comment matches too), which is
+//! fine: erring towards "the variable is defined and exported" is safer than
+//! silently expanding to an empty string, and only names that the user
+//! explicitly declared in the variant configuration can ever match.
 
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
-use std::sync::LazyLock;
-
-use regex::Regex;
 
 use crate::{Script, ScriptContent};
 
-/// The scripting language dialect used to scan for environment variable
-/// references. Maps 1:1 to the interpreters supported by rattler-build.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ScriptDialect {
-    /// POSIX-ish shells: `bash`, `sh`, `zsh`, and `brush`.
-    Bash,
-    /// Windows `cmd.exe` batch files.
-    CmdExe,
-    /// PowerShell (`powershell` / `pwsh`).
-    PowerShell,
-    /// Python.
-    Python,
-    /// NuShell.
-    NuShell,
-    /// Perl.
-    Perl,
-    /// R (`rscript`).
-    R,
-    /// Ruby.
-    Ruby,
-    /// Node.js.
-    NodeJs,
+/// Returns true for characters that can be part of an environment variable
+/// identifier. A key match must not be surrounded by these characters, so
+/// that the key `TARGET` does not match inside `TARGET_ARCH` or `MYTARGET`.
+fn is_identifier_char(c: u8) -> bool {
+    c.is_ascii_alphanumeric() || c == b'_'
 }
 
-impl ScriptDialect {
-    /// Map a recipe-facing interpreter name to a dialect.
-    pub fn from_interpreter(interpreter: &str) -> Option<Self> {
-        match interpreter.to_lowercase().as_str() {
-            "bash" | "sh" | "zsh" | "dash" | "brush" => Some(Self::Bash),
-            "cmd" | "cmd.exe" => Some(Self::CmdExe),
-            "powershell" | "pwsh" => Some(Self::PowerShell),
-            "python" | "python3" => Some(Self::Python),
-            "nushell" | "nu" => Some(Self::NuShell),
-            "perl" => Some(Self::Perl),
-            "rscript" | "r" => Some(Self::R),
-            "ruby" => Some(Self::Ruby),
-            "node" | "nodejs" => Some(Self::NodeJs),
-            _ => None,
+/// Check whether `key` occurs in `content` as a standalone word
+/// (i.e. not embedded in a longer identifier). Matching is case-sensitive.
+fn contains_key(content: &str, key: &str) -> bool {
+    if key.is_empty() {
+        return false;
+    }
+    let bytes = content.as_bytes();
+    for (idx, _) in content.match_indices(key) {
+        let before_ok = idx == 0 || !is_identifier_char(bytes[idx - 1]);
+        let end = idx + key.len();
+        let after_ok = end >= bytes.len() || !is_identifier_char(bytes[end]);
+        if before_ok && after_ok {
+            return true;
         }
     }
-
-    /// Infer the dialect from a script file extension.
-    pub fn from_path(path: &Path) -> Option<Self> {
-        crate::determine_interpreter_from_path(path)
-            .as_deref()
-            .and_then(Self::from_interpreter)
-    }
-
-    /// The dialect of the default (native) shell for a platform.
-    pub fn default_for_platform(is_windows: bool) -> Self {
-        if is_windows { Self::CmdExe } else { Self::Bash }
-    }
-
-    /// Extract all environment variable names referenced in `content` using
-    /// the common spellings of this dialect.
-    pub fn extract_env_variables(&self, content: &str) -> BTreeSet<String> {
-        let patterns: &[&LazyLock<Regex>] = match self {
-            // `$VAR`, `${VAR}`, `${VAR:-default}`, `${VAR%suffix}`, `${#VAR}`,
-            // `${!VAR}` — but not Jinja `${{ var }}`, `$1`, `$@` or `$(cmd)`.
-            Self::Bash => &[&BASH_VAR],
-            // `%VAR%`, `%VAR:a=b%` and delayed expansion `!VAR!`.
-            Self::CmdExe => &[&CMD_PERCENT_VAR, &CMD_DELAYED_VAR],
-            // `$env:VAR`, `${env:VAR}` and `[Environment]::GetEnvironmentVariable("VAR")`.
-            Self::PowerShell => &[&POWERSHELL_ENV_VAR, &POWERSHELL_GETENV],
-            // `os.environ["VAR"]`, `os.environ.get("VAR")` and `os.getenv("VAR")`.
-            Self::Python => &[&PYTHON_ENVIRON, &PYTHON_GETENV],
-            // `$env.VAR` and `$env."SOME VAR"`.
-            Self::NuShell => &[&NUSHELL_ENV_VAR, &NUSHELL_ENV_QUOTED],
-            // `$ENV{VAR}`, `$ENV{'VAR'}`.
-            Self::Perl => &[&PERL_ENV_VAR],
-            // `Sys.getenv("VAR")`.
-            Self::R => &[&R_GETENV],
-            // `ENV["VAR"]` and `ENV.fetch("VAR")`.
-            Self::Ruby => &[&RUBY_ENV_VAR],
-            // `process.env.VAR` and `process.env["VAR"]`.
-            Self::NodeJs => &[&NODEJS_ENV_DOT, &NODEJS_ENV_INDEX],
-        };
-
-        let mut variables = BTreeSet::new();
-        for pattern in patterns {
-            for captures in pattern.captures_iter(content) {
-                if let Some(name) = captures.get(1) {
-                    variables.insert(name.as_str().to_string());
-                }
-            }
-        }
-        variables
-    }
+    false
 }
 
-/// A valid environment variable identifier.
-const IDENT: &str = "[A-Za-z_][A-Za-z0-9_]*";
-
-macro_rules! lazy_regex {
-    ($name:ident, $pattern:expr) => {
-        static $name: LazyLock<Regex> =
-            LazyLock::new(|| Regex::new(&$pattern.replace("{IDENT}", IDENT)).expect("valid regex"));
-    };
+/// Return the subset of `candidates` that occur literally (word-bounded,
+/// case-sensitive) in `content`.
+pub fn find_referenced_variables<'a>(
+    content: &str,
+    candidates: impl IntoIterator<Item = &'a str>,
+) -> BTreeSet<String> {
+    candidates
+        .into_iter()
+        .filter(|key| contains_key(content, key))
+        .map(str::to_string)
+        .collect()
 }
-
-// `${VAR...}` (also `${#VAR}` / `${!VAR}`) or plain `$VAR`. Jinja templates
-// (`${{ var }}`) do not match because `{` is not a valid identifier start.
-lazy_regex!(BASH_VAR, r"\$(?:\{[!#]?)?({IDENT})");
-lazy_regex!(CMD_PERCENT_VAR, r"%({IDENT})(?::[^%\r\n]*)?%");
-lazy_regex!(CMD_DELAYED_VAR, r"!({IDENT})!");
-lazy_regex!(POWERSHELL_ENV_VAR, r"(?i)\$\{?env:({IDENT})\}?");
-lazy_regex!(
-    POWERSHELL_GETENV,
-    r#"(?i)\[(?:System\.)?Environment\]\s*::\s*GetEnvironmentVariable\(\s*["']({IDENT})["']"#
-);
-lazy_regex!(
-    PYTHON_ENVIRON,
-    r#"environ\s*(?:\.\s*get\s*\(|\[)\s*["']({IDENT})["']"#
-);
-lazy_regex!(
-    PYTHON_GETENV,
-    r#"os\s*\.\s*getenv\s*\(\s*["']({IDENT})["']"#
-);
-lazy_regex!(NUSHELL_ENV_VAR, r"\$env\.({IDENT})");
-lazy_regex!(NUSHELL_ENV_QUOTED, r#"\$env\."([^"]+)""#);
-lazy_regex!(PERL_ENV_VAR, r#"\$ENV\{\s*["']?({IDENT})["']?\s*\}"#);
-lazy_regex!(R_GETENV, r#"Sys\.getenv\(\s*["']({IDENT})["']"#);
-lazy_regex!(
-    RUBY_ENV_VAR,
-    r#"ENV\s*(?:\[\s*|\.\s*fetch\s*\(\s*)["']({IDENT})["']"#
-);
-lazy_regex!(NODEJS_ENV_DOT, r"process\s*\.\s*env\s*\.\s*({IDENT})");
-lazy_regex!(
-    NODEJS_ENV_INDEX,
-    r#"process\s*\.\s*env\s*\[\s*["']({IDENT})["']"#
-);
 
 /// Returns the script file extensions to try for a target platform, in
 /// priority order (mirrors [`crate::platform_script_extensions`], but for an
@@ -182,73 +89,54 @@ fn find_script_file(recipe_dir: &Path, extensions: &[&str], path: &Path) -> Opti
 }
 
 impl Script {
-    /// Detect environment variables referenced by this script, using the
-    /// common access spellings of the script's interpreter.
+    /// Detect which of the `candidates` (variant configuration key names, in
+    /// their normalized spelling) are referenced by this script.
     ///
-    /// This is a best-effort, read-only scan:
-    /// - inline content is scanned directly (Jinja templates like
-    ///   `${{ var }}` are ignored by the scanners),
+    /// This is a best-effort, read-only literal search (see the module docs):
+    /// - inline content is searched directly,
     /// - file-backed scripts (including the default `build.sh` / `build.bat`
     ///   discovery) are read from `recipe_dir` when it is provided,
     /// - missing or unreadable files simply contribute no variables.
-    ///
-    /// The dialect is chosen from the explicit interpreter first, then from
-    /// the script file extension, and falls back to the native shell of the
-    /// target platform (`bash` on Unix, `cmd.exe` on Windows).
     pub fn detect_used_variables(
         &self,
+        candidates: &[String],
         recipe_dir: Option<&Path>,
         is_windows: bool,
     ) -> BTreeSet<String> {
+        if candidates.is_empty() {
+            return BTreeSet::new();
+        }
         let extensions = script_extensions_for_platform(is_windows);
-        let explicit_dialect = self
-            .interpreter
-            .as_deref()
-            .and_then(ScriptDialect::from_interpreter);
-        let fallback_dialect =
-            explicit_dialect.unwrap_or_else(|| ScriptDialect::default_for_platform(is_windows));
+        let candidates = candidates.iter().map(String::as_str);
 
-        let scan_file = |path: &Path| -> BTreeSet<String> {
-            let Some(recipe_dir) = recipe_dir else {
-                return BTreeSet::new();
-            };
-            let Some(resolved) = find_script_file(recipe_dir, extensions, path) else {
-                return BTreeSet::new();
-            };
-            let Ok(content) = fs_err::read_to_string(&resolved) else {
-                return BTreeSet::new();
-            };
-            let dialect = explicit_dialect
-                .or_else(|| ScriptDialect::from_path(&resolved))
-                .unwrap_or(fallback_dialect);
-            dialect.extract_env_variables(&content)
+        let scan_file = |path: &Path| -> Option<BTreeSet<String>> {
+            let recipe_dir = recipe_dir?;
+            let resolved = find_script_file(recipe_dir, extensions, path)?;
+            let content = fs_err::read_to_string(&resolved).ok()?;
+            Some(find_referenced_variables(&content, candidates.clone()))
         };
 
         match &self.content {
-            ScriptContent::Default => scan_file(Path::new("build")),
-            ScriptContent::Path(path) => scan_file(path),
+            ScriptContent::Default => scan_file(Path::new("build")).unwrap_or_default(),
+            ScriptContent::Path(path) => scan_file(path).unwrap_or_default(),
             ScriptContent::CommandOrPath(command_or_path) => {
                 // Single-line strings may reference a script file; multi-line
                 // strings are always inline content.
-                if !command_or_path.contains('\n') {
-                    let from_file = scan_file(Path::new(command_or_path));
-                    if !from_file.is_empty() {
-                        return from_file;
-                    }
-                    // If the string names an existing but empty/unreadable
-                    // file we may still fall through here; scanning the file
-                    // name as inline content is harmless.
+                if !command_or_path.contains('\n')
+                    && let Some(from_file) = scan_file(Path::new(command_or_path))
+                {
+                    return from_file;
                 }
-                fallback_dialect.extract_env_variables(command_or_path)
+                find_referenced_variables(command_or_path, candidates)
             }
             ScriptContent::Commands(commands) => {
                 let mut variables = BTreeSet::new();
                 for command in commands {
-                    variables.extend(fallback_dialect.extract_env_variables(command));
+                    variables.extend(find_referenced_variables(command, candidates.clone()));
                 }
                 variables
             }
-            ScriptContent::Command(command) => fallback_dialect.extract_env_variables(command),
+            ScriptContent::Command(command) => find_referenced_variables(command, candidates),
         }
     }
 }
@@ -257,152 +145,67 @@ impl Script {
 mod tests {
     use super::*;
 
-    fn extract(dialect: ScriptDialect, content: &str) -> Vec<String> {
-        dialect.extract_env_variables(content).into_iter().collect()
+    fn find(content: &str, candidates: &[&str]) -> Vec<String> {
+        find_referenced_variables(content, candidates.iter().copied())
+            .into_iter()
+            .collect()
     }
 
     #[test]
-    fn bash_spellings() {
-        let script = r#"
-            #!/bin/bash
-            cmake -DCMAKE_INSTALL_PREFIX=$PREFIX ..
-            echo "target: ${TARGET}"
-            export CFLAGS="${CFLAGS:-} -O2"
-            suffix=${VERSION%%.*}
-            len=${#NAME}
-            indirect=${!REF}
-        "#;
+    fn matches_common_spellings_across_interpreters() {
+        let candidates = &["TARGET", "PREFIX", "MY_VAR"];
+        // Any interpreter syntax matches, because the search is literal.
+        assert_eq!(find("cmake -DT=${TARGET} ..", candidates), ["TARGET"]);
+        assert_eq!(find("echo $TARGET", candidates), ["TARGET"]);
+        assert_eq!(find("echo %TARGET%", candidates), ["TARGET"]);
+        assert_eq!(find("echo !TARGET!", candidates), ["TARGET"]);
+        assert_eq!(find("$env:TARGET", candidates), ["TARGET"]);
+        assert_eq!(find("os.environ['TARGET']", candidates), ["TARGET"]);
+        assert_eq!(find("ENV.fetch('TARGET')", candidates), ["TARGET"]);
+        assert_eq!(find("$env.TARGET", candidates), ["TARGET"]);
+        assert_eq!(find("process.env.TARGET", candidates), ["TARGET"]);
         assert_eq!(
-            extract(ScriptDialect::Bash, script),
-            ["CFLAGS", "NAME", "PREFIX", "REF", "TARGET", "VERSION"]
+            find("install --prefix=$PREFIX --target=${TARGET}", candidates),
+            ["PREFIX", "TARGET"]
         );
     }
 
     #[test]
-    fn bash_skips_positional_special_and_jinja() {
-        let script = r#"
-            echo $1 $@ $? $# $$
-            echo ${{ jinja_var }}
-            result=$(uname)
-            math=$((3 + 4))
-        "#;
-        assert_eq!(extract(ScriptDialect::Bash, script), Vec::<String>::new());
-    }
-
-    #[test]
-    fn cmd_spellings() {
-        let script = r#"
-            @echo off
-            cmake -DCMAKE_INSTALL_PREFIX=%LIBRARY_PREFIX% ..
-            echo %TARGET%
-            set "TRIMMED=%VERSION:.=_%"
-            if "!DELAYED!" == "1" echo on
-            for %%i in (a b c) do echo %%i
-            nmake /f Makefile.vc %1
-        "#;
+    fn plain_mentions_match_too() {
+        // Deliberately "not smart": a bare mention (even in a comment) counts.
         assert_eq!(
-            extract(ScriptDialect::CmdExe, script),
-            ["DELAYED", "LIBRARY_PREFIX", "TARGET", "VERSION"]
+            find("# adjust TARGET before building", &["TARGET"]),
+            ["TARGET"]
         );
     }
 
     #[test]
-    fn powershell_spellings() {
-        let script = r#"
-            Write-Host $env:TARGET
-            Write-Host ${env:LIBRARY_PREFIX}
-            $v = [Environment]::GetEnvironmentVariable("PKG_VERSION")
-            $w = [System.Environment]::GetEnvironmentVariable('PKG_NAME')
-        "#;
+    fn respects_identifier_boundaries_and_case() {
+        let candidates = &["TARGET"];
+        // Not standalone: embedded in longer identifiers.
+        assert!(find("echo $TARGET_ARCH", candidates).is_empty());
+        assert!(find("echo $MYTARGET", candidates).is_empty());
+        assert!(find("echo TARGET2", candidates).is_empty());
+        // Case-sensitive: variant values are exported under the exact key name.
+        assert!(find("echo $target", candidates).is_empty());
+        // Standalone at string edges.
+        assert_eq!(find("TARGET", candidates), ["TARGET"]);
+        assert_eq!(find("x=TARGET", candidates), ["TARGET"]);
+    }
+
+    #[test]
+    fn normalized_lowercase_keys_match() {
+        // Free-spec style keys (e.g. package names) use their normalized form.
         assert_eq!(
-            extract(ScriptDialect::PowerShell, script),
-            ["LIBRARY_PREFIX", "PKG_NAME", "PKG_VERSION", "TARGET"]
+            find("echo $cuda_compiler_version", &["cuda_compiler_version"]),
+            ["cuda_compiler_version"]
         );
     }
 
     #[test]
-    fn python_spellings() {
-        let script = r#"
-            import os
-            from os import environ
-            target = os.environ["TARGET"]
-            prefix = os.environ.get("PREFIX", "/opt")
-            version = os.getenv('PKG_VERSION')
-            name = environ['PKG_NAME']
-        "#;
-        assert_eq!(
-            extract(ScriptDialect::Python, script),
-            ["PKG_NAME", "PKG_VERSION", "PREFIX", "TARGET"]
-        );
-    }
-
-    #[test]
-    fn nushell_spellings() {
-        let script = r#"
-            echo $env.TARGET
-            echo $env."MY VAR"
-        "#;
-        assert_eq!(
-            extract(ScriptDialect::NuShell, script),
-            ["MY VAR", "TARGET"]
-        );
-    }
-
-    #[test]
-    fn perl_spellings() {
-        let script = r#"
-            my $target = $ENV{TARGET};
-            my $prefix = $ENV{'PREFIX'};
-            my $name = $ENV{ "PKG_NAME" };
-        "#;
-        assert_eq!(
-            extract(ScriptDialect::Perl, script),
-            ["PKG_NAME", "PREFIX", "TARGET"]
-        );
-    }
-
-    #[test]
-    fn r_spellings() {
-        let script = r#"
-            target <- Sys.getenv("TARGET")
-            prefix <- Sys.getenv('PREFIX', unset = "/opt")
-        "#;
-        assert_eq!(extract(ScriptDialect::R, script), ["PREFIX", "TARGET"]);
-    }
-
-    #[test]
-    fn ruby_spellings() {
-        let script = r#"
-            target = ENV["TARGET"]
-            prefix = ENV.fetch('PREFIX', '/opt')
-        "#;
-        assert_eq!(extract(ScriptDialect::Ruby, script), ["PREFIX", "TARGET"]);
-    }
-
-    #[test]
-    fn nodejs_spellings() {
-        let script = r#"
-            const target = process.env.TARGET;
-            const prefix = process.env["PREFIX"];
-        "#;
-        assert_eq!(extract(ScriptDialect::NodeJs, script), ["PREFIX", "TARGET"]);
-    }
-
-    #[test]
-    fn interpreter_name_mapping() {
-        assert_eq!(
-            ScriptDialect::from_interpreter("brush"),
-            Some(ScriptDialect::Bash)
-        );
-        assert_eq!(
-            ScriptDialect::from_interpreter("nu"),
-            Some(ScriptDialect::NuShell)
-        );
-        assert_eq!(
-            ScriptDialect::from_interpreter("rscript"),
-            Some(ScriptDialect::R)
-        );
-        assert_eq!(ScriptDialect::from_interpreter("unknown"), None);
+    fn empty_candidates_and_empty_keys_are_safe() {
+        assert!(find("echo $TARGET", &[]).is_empty());
+        assert!(find("echo $TARGET", &[""]).is_empty());
     }
 
     #[test]
@@ -414,12 +217,13 @@ mod tests {
         )
         .unwrap();
 
+        let candidates = vec!["TARGET".to_string(), "UNUSED".to_string()];
         let script = Script::default();
-        let vars = script.detect_used_variables(Some(dir.path()), false);
+        let vars = script.detect_used_variables(&candidates, Some(dir.path()), false);
         assert_eq!(vars.into_iter().collect::<Vec<_>>(), ["TARGET"]);
 
         // Without a recipe dir nothing is scanned.
-        let vars = script.detect_used_variables(None, false);
+        let vars = script.detect_used_variables(&candidates, None, false);
         assert!(vars.is_empty());
     }
 
@@ -432,8 +236,9 @@ mod tests {
         )
         .unwrap();
 
+        let candidates = vec!["TARGET".to_string(), "LIBRARY_PREFIX".to_string()];
         let script = Script::default();
-        let vars = script.detect_used_variables(Some(dir.path()), true);
+        let vars = script.detect_used_variables(&candidates, Some(dir.path()), true);
         assert_eq!(
             vars.into_iter().collect::<Vec<_>>(),
             ["LIBRARY_PREFIX", "TARGET"]
@@ -441,7 +246,7 @@ mod tests {
     }
 
     #[test]
-    fn explicit_file_uses_extension_dialect() {
+    fn explicit_file_is_scanned() {
         let dir = tempfile::tempdir().unwrap();
         fs_err::write(
             dir.path().join("install.py"),
@@ -449,11 +254,12 @@ mod tests {
         )
         .unwrap();
 
+        let candidates = vec!["TARGET".to_string()];
         let script = Script {
             content: ScriptContent::Path(PathBuf::from("install.py")),
             ..Default::default()
         };
-        let vars = script.detect_used_variables(Some(dir.path()), false);
+        let vars = script.detect_used_variables(&candidates, Some(dir.path()), false);
         assert_eq!(vars.into_iter().collect::<Vec<_>>(), ["TARGET"]);
     }
 
@@ -462,12 +268,14 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         fs_err::write(dir.path().join("build.sh"), "echo ${FROM_FILE}\n").unwrap();
 
+        let candidates = vec!["FROM_FILE".to_string(), "INLINE_VAR".to_string()];
+
         // Resolves to the file next to the recipe.
         let script = Script {
             content: ScriptContent::CommandOrPath("build.sh".to_string()),
             ..Default::default()
         };
-        let vars = script.detect_used_variables(Some(dir.path()), false);
+        let vars = script.detect_used_variables(&candidates, Some(dir.path()), false);
         assert_eq!(vars.into_iter().collect::<Vec<_>>(), ["FROM_FILE"]);
 
         // Not a file: treated as an inline command.
@@ -475,21 +283,20 @@ mod tests {
             content: ScriptContent::CommandOrPath("echo $INLINE_VAR".to_string()),
             ..Default::default()
         };
-        let vars = script.detect_used_variables(Some(dir.path()), false);
+        let vars = script.detect_used_variables(&candidates, Some(dir.path()), false);
         assert_eq!(vars.into_iter().collect::<Vec<_>>(), ["INLINE_VAR"]);
     }
 
     #[test]
-    fn inline_commands_use_explicit_interpreter() {
+    fn inline_commands_are_scanned() {
         let script = Script {
-            interpreter: Some("python".to_string()),
             content: ScriptContent::Commands(vec![
                 "import os".to_string(),
                 "print(os.environ['TARGET'])".to_string(),
             ]),
             ..Default::default()
         };
-        let vars = script.detect_used_variables(None, false);
+        let vars = script.detect_used_variables(&["TARGET".to_string()], None, false);
         assert_eq!(vars.into_iter().collect::<Vec<_>>(), ["TARGET"]);
     }
 }

@@ -5118,7 +5118,6 @@ dependencies = [
  "minijinja",
  "rattler_conda_types",
  "rattler_shell",
- "regex",
  "serde",
  "serde_yaml",
  "strsim",

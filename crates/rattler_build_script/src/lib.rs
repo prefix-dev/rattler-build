@@ -17,7 +17,7 @@ pub use sandbox::{SandboxArguments, SandboxConfiguration};
 pub use script::{
     Script, ScriptContent, determine_interpreter_from_path, platform_script_extensions,
 };
-pub use variable_scan::{ScriptDialect, script_extensions_for_platform};
+pub use variable_scan::{find_referenced_variables, script_extensions_for_platform};
 
 #[cfg(feature = "execution")]
 mod activation;

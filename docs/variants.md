@@ -126,26 +126,22 @@ are built, without needing to forward the variable manually via
 `build.variant.use_keys`.
 
 The scan covers inline scripts, script files referenced via `script.file`, and
-the default `build.sh` / `build.bat` discovery. It understands the most common
-environment variable spellings for each supported interpreter:
+the default `build.sh` / `build.bat` discovery.
 
-| Interpreter          | Detected spellings                                                          |
-| -------------------- | --------------------------------------------------------------------------- |
-| `bash` / `brush`     | `$VAR`, `${VAR}`, `${VAR:-default}`, ...                                     |
-| `cmd.exe`            | `%VAR%`, `%VAR:a=b%`, `!VAR!`                                                |
-| `powershell`         | `$env:VAR`, `${env:VAR}`, `[Environment]::GetEnvironmentVariable("VAR")`     |
-| `python`             | `os.environ["VAR"]`, `os.environ.get("VAR")`, `os.getenv("VAR")`             |
-| `nushell`            | `$env.VAR`, `$env."VAR"`                                                     |
-| `perl`               | `$ENV{VAR}`                                                                  |
-| `rscript`            | `Sys.getenv("VAR")`                                                          |
-| `ruby`               | `ENV["VAR"]`, `ENV.fetch("VAR")`                                             |
-| `node`               | `process.env.VAR`, `process.env["VAR"]`                                      |
+The rule is deliberately simple and interpreter-agnostic: a variant key counts
+as used when its (normalized) name occurs **literally** in the script text as
+a standalone word — case-sensitive, and not embedded in a longer identifier.
+So `${TARGET}`, `$TARGET`, `%TARGET%`, `os.environ["TARGET"]`, and even a bare
+mention of `TARGET` all match, while `$TARGET_ARCH` or `$target` do not match
+the key `TARGET`. This works the same for every interpreter rattler-build
+supports (bash, brush, cmd.exe, powershell, python, nushell, perl, R, ruby,
+node).
 
-The scan is a best-effort text scan, not a full parser: names that do not
-appear in the variant configuration are simply ignored, and dynamically
-constructed variable names cannot be detected. In those cases you can still
-use `build.variant.use_keys` to forward a variant key explicitly, or
-`build.variant.ignore_keys` to opt out of a detected one.
+Because the search is literal rather than a full parser, a key mentioned in a
+comment matches too, and dynamically constructed variable names cannot be
+detected. In those cases you can use `build.variant.use_keys` to forward a
+variant key explicitly, or `build.variant.ignore_keys` to opt out of a
+detected one.
 
 ## Package hash from variant
 

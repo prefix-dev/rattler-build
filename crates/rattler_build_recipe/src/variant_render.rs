@@ -711,13 +711,19 @@ fn collect_used_variables(
         used_vars.insert(NormalizedKey::from(key.as_str()));
     }
 
-    // Auto-detect environment variables referenced by build scripts (inline
-    // content, explicit script files, and default `build.sh` / `build.bat`
-    // discovery). Variant values are exported to the build script environment,
-    // so a variable like `${TARGET}` in `build.sh` is a real usage even when
-    // the recipe itself never mentions it.
+    // Auto-detect variant keys referenced by build scripts (inline content,
+    // explicit script files, and default `build.sh` / `build.bat` discovery).
+    // Variant values are exported to the build script environment, so a
+    // literal occurrence of a variant key like `TARGET` in `build.sh` is a
+    // real usage even when the recipe itself never mentions it.
+    let candidate_keys: Vec<String> = variant_config
+        .variants
+        .keys()
+        .map(|key| key.normalize())
+        .collect();
     for var in crate::script_variables::stage0_script_variables(
         stage0_recipe,
+        &candidate_keys,
         recipe_directory(config),
         config.build_platform.is_windows(),
     ) {
@@ -1428,12 +1434,15 @@ fn render_with_variants(
                 }
             }
 
-            // Add variant variables referenced by this output's build script
-            // (e.g. `${TARGET}` in build.sh). They are exported to the script
+            // Add variant keys referenced by this output's build script
+            // (e.g. `TARGET` in build.sh). They are exported to the script
             // environment, so they must participate in the variant (and thus
             // the build hash) even though the recipe never references them.
+            let candidate_keys: Vec<String> =
+                combination.keys().map(|key| key.normalize()).collect();
             for var in crate::script_variables::stage1_script_variables(
                 &recipe,
+                &candidate_keys,
                 recipe_directory(&config),
                 config.build_platform.is_windows(),
             ) {
@@ -3681,6 +3690,45 @@ TARGET:
             .collect();
         targets.sort();
         assert_eq!(targets, ["a", "b"]);
+    }
+
+    /// The detection is a literal, interpreter-agnostic key search: a
+    /// word-bounded mention of the key counts, while embedding it in a longer
+    /// identifier or using different casing does not.
+    #[test]
+    fn test_literal_key_matching_semantics() {
+        let variant_yaml = r#"
+TARGET:
+  - a
+  - b
+"#;
+        let variant_config = VariantConfig::from_yaml_str(variant_yaml).unwrap();
+        let config = || {
+            RenderConfig::new()
+                .with_target_platform(rattler_conda_types::Platform::Linux64)
+                .with_build_platform(rattler_conda_types::Platform::Linux64)
+        };
+        let render = |script: &str| {
+            let recipe_yaml = format!(
+                r#"
+package:
+  name: test-pkg
+  version: "1.0.0"
+
+build:
+  script: "{script}"
+"#
+            );
+            let stage0_recipe = stage0::parse_recipe_or_multi_from_source(&recipe_yaml).unwrap();
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, config()).unwrap()
+        };
+
+        // A bare mention counts (no `$` sigil required).
+        assert_eq!(render("do-something --target TARGET").len(), 2);
+        // Embedded in a longer identifier: no match.
+        assert_eq!(render("echo $TARGET_ARCH").len(), 1);
+        // Different casing: no match.
+        assert_eq!(render("echo $target").len(), 1);
     }
 
     /// On a Windows build platform the default script discovery scans

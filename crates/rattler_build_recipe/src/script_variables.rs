@@ -8,11 +8,10 @@
 //!
 //! This module walks the build scripts of a recipe (inline content, explicit
 //! script files, and the default `build.sh` / `build.bat` discovery) and
-//! extracts the environment variables they reference, using the common
-//! spellings of each supported interpreter (bash/brush, cmd.exe, PowerShell,
-//! Python, NuShell, Perl, R, Ruby, Node.js). The caller cross-references the
-//! detected names with the variant configuration, so over-approximation by
-//! the scanners is harmless.
+//! checks which variant configuration keys occur literally in the script
+//! text (see [`rattler_build_script::variable_scan`]). The search is
+//! deliberately interpreter-agnostic: any word-bounded, case-sensitive
+//! occurrence of a key name counts as a usage.
 
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
@@ -58,12 +57,6 @@ fn collect_nested(items: &NestedItemList<String>, out: &mut Vec<String>) {
 /// contains the concrete (non-template) parts, mirroring the content shapes
 /// produced by stage0 evaluation.
 fn stage0_script_to_executable(script: &Stage0Script) -> ExecutableScript {
-    let interpreter = script
-        .interpreter
-        .as_ref()
-        .and_then(|value| value.as_concrete())
-        .cloned();
-
     let content = if let Some(file) = script.file.as_ref().and_then(|value| value.as_concrete()) {
         ScriptContent::Path(PathBuf::from(file))
     } else if let Some(content) = &script.content {
@@ -81,7 +74,6 @@ fn stage0_script_to_executable(script: &Stage0Script) -> ExecutableScript {
     };
 
     ExecutableScript {
-        interpreter,
         content,
         ..Default::default()
     }
@@ -110,13 +102,7 @@ fn stage0_plan_scripts(
                 let Stage0Step::Run(run) = step;
                 let mut commands = Vec::new();
                 collect_concrete_strings(run.run.iter(), &mut commands);
-                let interpreter = run
-                    .interpreter
-                    .as_ref()
-                    .and_then(|value| value.as_concrete())
-                    .cloned();
                 out.push(ExecutableScript {
-                    interpreter,
                     // Steps are always inline; they never reference files.
                     content: ScriptContent::Commands(commands),
                     ..Default::default()
@@ -126,10 +112,12 @@ fn stage0_plan_scripts(
     }
 }
 
-/// Detect environment variables referenced by any build script of a stage0
-/// recipe (before evaluation). Used to seed the variant combination matrix.
+/// Detect which of the `candidates` (variant configuration keys, in their
+/// normalized spelling) are referenced by any build script of a stage0 recipe
+/// (before evaluation). Used to seed the variant combination matrix.
 pub fn stage0_script_variables(
     recipe: &Stage0Recipe,
+    candidates: &[String],
     recipe_dir: Option<&Path>,
     is_windows: bool,
 ) -> BTreeSet<String> {
@@ -156,27 +144,31 @@ pub fn stage0_script_variables(
 
     let mut variables = BTreeSet::new();
     for script in scripts {
-        variables.extend(script.detect_used_variables(recipe_dir, is_windows));
+        variables.extend(script.detect_used_variables(candidates, recipe_dir, is_windows));
     }
     variables
 }
 
-/// Detect environment variables referenced by the build script of a single
+/// Detect which of the `candidates` (variant configuration keys, in their
+/// normalized spelling) are referenced by the build script of a single
 /// evaluated (stage1) output. Used to record script-referenced variant
 /// variables in the output's variant so they participate in the build hash.
 pub fn stage1_script_variables(
     recipe: &Stage1Recipe,
+    candidates: &[String],
     recipe_dir: Option<&Path>,
     is_windows: bool,
 ) -> BTreeSet<String> {
     match &recipe.build.plan {
-        Stage1BuildPlan::Script(script) => script.detect_used_variables(recipe_dir, is_windows),
+        Stage1BuildPlan::Script(script) => {
+            script.detect_used_variables(candidates, recipe_dir, is_windows)
+        }
         Stage1BuildPlan::Steps(steps) => {
             let mut variables = BTreeSet::new();
             for step in steps {
                 variables.extend(
                     step.to_script()
-                        .detect_used_variables(recipe_dir, is_windows),
+                        .detect_used_variables(candidates, recipe_dir, is_windows),
                 );
             }
             variables
