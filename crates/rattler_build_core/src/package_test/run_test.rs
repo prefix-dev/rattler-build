@@ -303,7 +303,10 @@ impl Tests {
     }
 }
 
-async fn legacy_tests_from_folder(pkg: &Path) -> Result<(PathBuf, Vec<Tests>), std::io::Error> {
+async fn legacy_tests_from_folder(
+    pkg: &Path,
+    host_platform: Platform,
+) -> Result<(PathBuf, Vec<Tests>), std::io::Error> {
     let mut tests = Vec::new();
 
     let test_folder = pkg.join("info/test");
@@ -312,6 +315,11 @@ async fn legacy_tests_from_folder(pkg: &Path) -> Result<(PathBuf, Vec<Tests>), s
         return Ok((test_folder, tests));
     }
 
+    let command_test = if host_platform.is_windows() {
+        "run_test.bat"
+    } else {
+        "run_test.sh"
+    };
     let mut read_dir = tokio::fs::read_dir(&test_folder).await?;
 
     while let Some(entry) = read_dir.next_entry().await? {
@@ -322,7 +330,7 @@ async fn legacy_tests_from_folder(pkg: &Path) -> Result<(PathBuf, Vec<Tests>), s
         let Some(file_name) = path.file_name() else {
             continue;
         };
-        if file_name.eq("run_test.sh") || file_name.eq("run_test.bat") {
+        if file_name.eq(command_test) {
             tracing::info!("test {}", file_name.to_string_lossy());
             tests.push(Tests::Commands(path));
         } else if file_name.eq("run_test.py") {
@@ -635,7 +643,8 @@ pub async fn run_test(
         .map_err(TestError::TestEnvironmentSetup)?;
 
         // These are the legacy tests
-        let (test_folder, tests) = legacy_tests_from_folder(&package_folder).await?;
+        let (test_folder, tests) =
+            legacy_tests_from_folder(&package_folder, host_platform.platform).await?;
 
         for test in tests {
             test.run(&prefix, &test_folder, &env, &resolved_records, &config)
@@ -1419,6 +1428,38 @@ async fn run_ruby_test(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn legacy_tests_use_host_platform_scripts() {
+        let package = tempfile::tempdir().unwrap();
+        let test_folder = package.path().join("info/test");
+        fs::create_dir_all(&test_folder).unwrap();
+        for file in ["run_test.sh", "run_test.bat", "run_test.py"] {
+            fs::write(test_folder.join(file), "").unwrap();
+        }
+
+        for (platform, command_test) in [
+            (Platform::Linux64, "run_test.sh"),
+            (Platform::Win64, "run_test.bat"),
+        ] {
+            let (_, tests) = legacy_tests_from_folder(package.path(), platform)
+                .await
+                .unwrap();
+            let mut test_files = tests
+                .into_iter()
+                .map(|test| match test {
+                    Tests::Commands(path) | Tests::Python(path) => {
+                        path.file_name().unwrap().to_string_lossy().into_owned()
+                    }
+                })
+                .collect::<Vec<_>>();
+            test_files.sort();
+
+            let mut expected = vec![command_test.to_string(), "run_test.py".to_string()];
+            expected.sort();
+            assert_eq!(test_files, expected);
+        }
+    }
 
     #[test]
     fn shared_test_context_executes_the_host_prefix_platform() {
