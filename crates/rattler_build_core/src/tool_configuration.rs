@@ -1,7 +1,11 @@
 //! Configuration for the Rattler-Build tool
 //! This is useful when using Rattler-Build as a library
 
-use std::{collections::HashMap, path::PathBuf, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    path::PathBuf,
+    sync::{Arc, Mutex},
+};
 
 use clap::ValueEnum;
 use rattler::package_cache::PackageCache;
@@ -125,6 +129,13 @@ pub struct Configuration {
 
     /// The repodata gateway to use for querying repodata
     pub repodata_gateway: Gateway,
+
+    /// CEP-6 notices already displayed during this invocation.
+    ///
+    /// A build can solve several environments against the same channel. Sharing
+    /// this set between cloned configurations prevents repeating a notice for
+    /// every solve.
+    pub(crate) displayed_channel_notices: Arc<Mutex<HashSet<(String, String)>>>,
 
     /// What channel priority to use in solving
     pub channel_priority: ChannelPriority,
@@ -491,6 +502,7 @@ impl ConfigurationBuilder {
             io_concurrency_limit: self.io_concurrency_limit,
             package_cache,
             repodata_gateway,
+            displayed_channel_notices: Arc::new(Mutex::new(HashSet::new())),
             channel_priority: self.channel_priority,
             allow_insecure_host: self.allow_insecure_host,
             continue_on_failure: self.continue_on_failure,
