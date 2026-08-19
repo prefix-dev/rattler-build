@@ -8,13 +8,23 @@
 //!
 //! The detection is deliberately simple: given the list of variant
 //! configuration keys, we search the script text for **literal occurrences**
-//! of each key name, bounded by non-identifier characters. There is no
-//! per-interpreter syntax parsing — `$TARGET`, `%TARGET%`,
-//! `os.environ["TARGET"]`, and even a plain mention of `TARGET` all count.
-//! This over-approximates (a key mentioned in a comment matches too), which is
-//! fine: erring towards "the variable is defined and exported" is safer than
-//! silently expanding to an empty string, and only names that the user
-//! explicitly declared in the variant configuration can ever match.
+//! of each key name, bounded by non-identifier characters and preceded by a
+//! "usage sigil" — one of the characters that environment variable accesses
+//! start with across the supported interpreters (see [`is_usage_sigil`]).
+//! There is no per-interpreter syntax parsing: `$TARGET`, `${TARGET}`,
+//! `%TARGET%`, `os.environ["TARGET"]`, and `$env.TARGET` all count, while a
+//! bare prose mention of `TARGET` (e.g. in a comment) or an unrelated command
+//! name that happens to equal a variant key (e.g. running `cmake` while the
+//! config pins `cmake`) does not.
+//!
+//! The sigil set is the union across interpreters rather than per-dialect,
+//! because scripts routinely embed one interpreter in another (e.g. `bash`
+//! running `python -c "... os.environ['TARGET'] ..."`), which makes dialect
+//! attribution unreliable. The remaining over-approximation (a sigil-prefixed
+//! key inside a comment or string still matches) errs towards "the variable
+//! is defined and exported", which is safer than silently expanding to an
+//! empty string — and only names the user explicitly declared in the variant
+//! configuration can ever match.
 
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
@@ -22,24 +32,51 @@ use std::path::{Path, PathBuf};
 use crate::{Script, ScriptContent};
 
 /// Returns true for characters that can be part of an environment variable
-/// identifier. A key match must not be surrounded by these characters, so
-/// that the key `TARGET` does not match inside `TARGET_ARCH` or `MYTARGET`.
+/// identifier. A key match must not run into these characters, so that the
+/// key `TARGET` does not match inside `TARGET_ARCH` or `MYTARGET`.
 fn is_identifier_char(c: u8) -> bool {
     c.is_ascii_alphanumeric() || c == b'_'
 }
 
-/// Check whether `key` occurs in `content` as a standalone word
-/// (i.e. not embedded in a longer identifier). Matching is case-sensitive.
+/// Characters that start an environment variable access in at least one
+/// supported interpreter:
+/// - `$` — bash/brush `$VAR`, powershell `$env:VAR`
+/// - `{` — bash `${VAR}` / `${VAR:-default}`, perl `$ENV{VAR}`
+/// - `#`, `!` — bash `${#VAR}` (length) and `${!VAR}` (indirection),
+///   cmd.exe delayed expansion `!VAR!`
+/// - `%` — cmd.exe `%VAR%` / `%VAR:a=b%`
+/// - `:` — powershell `$env:VAR` / `${env:VAR}`
+/// - `"`, `'` — quoted lookups: python `os.environ["VAR"]`, ruby
+///   `ENV['VAR']`, R `Sys.getenv("VAR")`, powershell
+///   `[Environment]::GetEnvironmentVariable("VAR")`
+const SIGIL_CHARS: &[u8] = b"${#!%:\"'";
+
+/// Check whether the character(s) directly before a key occurrence at `start`
+/// mark it as an environment variable usage.
+fn is_usage_sigil(content: &str, start: usize) -> bool {
+    let Some(prev) = start.checked_sub(1).map(|i| content.as_bytes()[i]) else {
+        // Start of the script: a bare mention, not a usage.
+        return false;
+    };
+    if SIGIL_CHARS.contains(&prev) {
+        return true;
+    }
+    // `env.VAR` — nushell `$env.TARGET`, node.js `process.env.TARGET`.
+    prev == b'.' && content[..start - 1].ends_with("env")
+}
+
+/// Check whether `key` occurs in `content` as a standalone word (not embedded
+/// in a longer identifier) preceded by a usage sigil. Matching is
+/// case-sensitive.
 fn contains_key(content: &str, key: &str) -> bool {
     if key.is_empty() {
         return false;
     }
     let bytes = content.as_bytes();
     for (idx, _) in content.match_indices(key) {
-        let before_ok = idx == 0 || !is_identifier_char(bytes[idx - 1]);
         let end = idx + key.len();
         let after_ok = end >= bytes.len() || !is_identifier_char(bytes[end]);
-        if before_ok && after_ok {
+        if after_ok && is_usage_sigil(content, idx) {
             return true;
         }
     }
@@ -47,7 +84,7 @@ fn contains_key(content: &str, key: &str) -> bool {
 }
 
 /// Return the subset of `candidates` that occur literally (word-bounded,
-/// case-sensitive) in `content`.
+/// sigil-prefixed, case-sensitive) in `content`.
 pub fn find_referenced_variables<'a>(
     content: &str,
     candidates: impl IntoIterator<Item = &'a str>,
@@ -154,14 +191,32 @@ mod tests {
     #[test]
     fn matches_common_spellings_across_interpreters() {
         let candidates = &["TARGET", "PREFIX", "MY_VAR"];
-        // Any interpreter syntax matches, because the search is literal.
+        // Every interpreter's access spelling starts with a sigil character,
+        // so all of them match without per-dialect parsing.
         assert_eq!(find("cmake -DT=${TARGET} ..", candidates), ["TARGET"]);
         assert_eq!(find("echo $TARGET", candidates), ["TARGET"]);
+        assert_eq!(find("echo \"${TARGET:-default}\"", candidates), ["TARGET"]);
+        assert_eq!(
+            find("len=${#TARGET} ind=${!TARGET}", candidates),
+            ["TARGET"]
+        );
         assert_eq!(find("echo %TARGET%", candidates), ["TARGET"]);
+        assert_eq!(find("set \"T=%TARGET:.=_%\"", candidates), ["TARGET"]);
         assert_eq!(find("echo !TARGET!", candidates), ["TARGET"]);
         assert_eq!(find("$env:TARGET", candidates), ["TARGET"]);
+        assert_eq!(find("${env:TARGET}", candidates), ["TARGET"]);
+        assert_eq!(
+            find(
+                "[Environment]::GetEnvironmentVariable(\"TARGET\")",
+                candidates
+            ),
+            ["TARGET"]
+        );
         assert_eq!(find("os.environ['TARGET']", candidates), ["TARGET"]);
+        assert_eq!(find("os.getenv(\"TARGET\")", candidates), ["TARGET"]);
         assert_eq!(find("ENV.fetch('TARGET')", candidates), ["TARGET"]);
+        assert_eq!(find("Sys.getenv(\"TARGET\")", candidates), ["TARGET"]);
+        assert_eq!(find("$ENV{TARGET}", candidates), ["TARGET"]);
         assert_eq!(find("$env.TARGET", candidates), ["TARGET"]);
         assert_eq!(find("process.env.TARGET", candidates), ["TARGET"]);
         assert_eq!(
@@ -171,12 +226,19 @@ mod tests {
     }
 
     #[test]
-    fn plain_mentions_match_too() {
-        // Deliberately "not smart": a bare mention (even in a comment) counts.
-        assert_eq!(
-            find("# adjust TARGET before building", &["TARGET"]),
-            ["TARGET"]
-        );
+    fn bare_mentions_do_not_match() {
+        // A key needs a usage sigil in front of it: prose mentions in
+        // comments and bare command names do not count.
+        assert!(find("# adjust TARGET before building", &["TARGET"]).is_empty());
+        assert!(find("cmake --build .", &["cmake"]).is_empty());
+        assert!(find("# link against openssl", &["openssl"]).is_empty());
+        assert!(find("make TARGET=install", &["TARGET"]).is_empty());
+        // Start / end of the script without a sigil.
+        assert!(find("TARGET", &["TARGET"]).is_empty());
+        assert!(find("x=TARGET", &["TARGET"]).is_empty());
+        // A plain `.` prefix is not enough (file extensions etc.) — only
+        // `env.` marks a usage.
+        assert!(find("include(Config.cmake)", &["cmake"]).is_empty());
     }
 
     #[test]
@@ -185,12 +247,9 @@ mod tests {
         // Not standalone: embedded in longer identifiers.
         assert!(find("echo $TARGET_ARCH", candidates).is_empty());
         assert!(find("echo $MYTARGET", candidates).is_empty());
-        assert!(find("echo TARGET2", candidates).is_empty());
+        assert!(find("echo $TARGET2", candidates).is_empty());
         // Case-sensitive: variant values are exported under the exact key name.
         assert!(find("echo $target", candidates).is_empty());
-        // Standalone at string edges.
-        assert_eq!(find("TARGET", candidates), ["TARGET"]);
-        assert_eq!(find("x=TARGET", candidates), ["TARGET"]);
     }
 
     #[test]

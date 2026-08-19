@@ -10,8 +10,9 @@
 //! script files, and the default `build.sh` / `build.bat` discovery) and
 //! checks which variant configuration keys occur literally in the script
 //! text (see [`rattler_build_script::variable_scan`]). The search is
-//! deliberately interpreter-agnostic: any word-bounded, case-sensitive
-//! occurrence of a key name counts as a usage.
+//! deliberately interpreter-agnostic: a word-bounded, case-sensitive
+//! occurrence of a key name preceded by a usage sigil (`$`, `{`, `%`,
+//! quotes, ...) counts as a usage.
 
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};

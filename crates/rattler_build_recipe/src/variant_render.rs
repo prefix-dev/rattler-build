@@ -714,8 +714,8 @@ fn collect_used_variables(
     // Auto-detect variant keys referenced by build scripts (inline content,
     // explicit script files, and default `build.sh` / `build.bat` discovery).
     // Variant values are exported to the build script environment, so a
-    // literal occurrence of a variant key like `TARGET` in `build.sh` is a
-    // real usage even when the recipe itself never mentions it.
+    // sigil-prefixed occurrence of a variant key like `${TARGET}` in
+    // `build.sh` is a real usage even when the recipe itself never mentions it.
     let candidate_keys: Vec<String> = variant_config
         .variants
         .keys()
@@ -3692,9 +3692,10 @@ TARGET:
         assert_eq!(targets, ["a", "b"]);
     }
 
-    /// The detection is a literal, interpreter-agnostic key search: a
-    /// word-bounded mention of the key counts, while embedding it in a longer
-    /// identifier or using different casing does not.
+    /// The detection is a literal, interpreter-agnostic key search that
+    /// requires a usage sigil (`$`, `{`, `%`, quotes, ...) directly before
+    /// the key: bare prose mentions, longer identifiers, and different casing
+    /// do not count.
     #[test]
     fn test_literal_key_matching_semantics() {
         let variant_yaml = r#"
@@ -3723,8 +3724,12 @@ build:
             render_recipe_with_variant_config(&stage0_recipe, &variant_config, config()).unwrap()
         };
 
-        // A bare mention counts (no `$` sigil required).
-        assert_eq!(render("do-something --target TARGET").len(), 2);
+        // Sigil-prefixed usages count, whatever the interpreter syntax.
+        assert_eq!(render("echo $TARGET").len(), 2);
+        assert_eq!(render("echo %TARGET%").len(), 2);
+        assert_eq!(render("py -c \\\"print(os.environ['TARGET'])\\\"").len(), 2);
+        // A bare mention (no sigil) does not count.
+        assert_eq!(render("do-something --target TARGET").len(), 1);
         // Embedded in a longer identifier: no match.
         assert_eq!(render("echo $TARGET_ARCH").len(), 1);
         // Different casing: no match.

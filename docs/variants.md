@@ -130,18 +130,25 @@ the default `build.sh` / `build.bat` discovery.
 
 The rule is deliberately simple and interpreter-agnostic: a variant key counts
 as used when its (normalized) name occurs **literally** in the script text as
-a standalone word — case-sensitive, and not embedded in a longer identifier.
-So `${TARGET}`, `$TARGET`, `%TARGET%`, `os.environ["TARGET"]`, and even a bare
-mention of `TARGET` all match, while `$TARGET_ARCH` or `$target` do not match
-the key `TARGET`. This works the same for every interpreter rattler-build
-supports (bash, brush, cmd.exe, powershell, python, nushell, perl, R, ruby,
-node).
+a standalone word — case-sensitive, not embedded in a longer identifier — and
+is directly preceded by a *usage sigil*: one of `$`, `{`, `%`, `!`, `#`, `:`,
+a quote (`"` or `'`), or an `env.` prefix. This covers the access spellings of
+every interpreter rattler-build supports (bash, brush, cmd.exe, powershell,
+python, nushell, perl, R, ruby, node):
 
-Because the search is literal rather than a full parser, a key mentioned in a
-comment matches too, and dynamically constructed variable names cannot be
-detected. In those cases you can use `build.variant.use_keys` to forward a
-variant key explicitly, or `build.variant.ignore_keys` to opt out of a
-detected one.
+- matches: `$TARGET`, `${TARGET}`, `${TARGET:-default}`, `%TARGET%`,
+  `!TARGET!`, `$env:TARGET`, `os.environ["TARGET"]`, `Sys.getenv("TARGET")`,
+  `ENV['TARGET']`, `$ENV{TARGET}`, `$env.TARGET`, `process.env.TARGET`
+- does not match: a bare prose mention (`# adjust TARGET here`), a command
+  name that happens to equal a variant key (running `cmake` while the config
+  pins `cmake`), a longer identifier (`$TARGET_ARCH`), or different casing
+  (`$target`)
+
+Because the search is a heuristic rather than a full parser, a sigil-prefixed
+key inside a comment or string still matches, and dynamically constructed
+variable names cannot be detected. In those cases you can use
+`build.variant.use_keys` to forward a variant key explicitly, or
+`build.variant.ignore_keys` to opt out of a detected one.
 
 ## Package hash from variant
 
