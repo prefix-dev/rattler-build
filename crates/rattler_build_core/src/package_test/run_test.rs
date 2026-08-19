@@ -305,7 +305,7 @@ impl Tests {
 
 async fn legacy_tests_from_folder(
     pkg: &Path,
-    host_platform: Platform,
+    build_platform: Platform,
 ) -> Result<(PathBuf, Vec<Tests>), std::io::Error> {
     let mut tests = Vec::new();
 
@@ -315,7 +315,7 @@ async fn legacy_tests_from_folder(
         return Ok((test_folder, tests));
     }
 
-    let command_test = if host_platform.is_windows() {
+    let command_test = if build_platform.is_windows() {
         "run_test.bat"
     } else {
         "run_test.sh"
@@ -644,7 +644,7 @@ pub async fn run_test(
 
         // These are the legacy tests
         let (test_folder, tests) =
-            legacy_tests_from_folder(&package_folder, host_platform.platform).await?;
+            legacy_tests_from_folder(&package_folder, config.current_platform.platform).await?;
 
         for test in tests {
             test.run(&prefix, &test_folder, &env, &resolved_records, &config)
@@ -1430,7 +1430,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn legacy_tests_use_host_platform_scripts() {
+    async fn legacy_tests_use_build_platform_scripts() {
         let package = tempfile::tempdir().unwrap();
         let test_folder = package.path().join("info/test");
         fs::create_dir_all(&test_folder).unwrap();
