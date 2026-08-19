@@ -115,6 +115,44 @@ from leaking into the tool environment. See
 the [`examples/adjacent`](https://github.com/prefix-dev/rattler-build/tree/main/examples/adjacent)
 recipe for an independent lint step and an optional C++ test step.
 
+### Caching build steps
+
+Each build step receives `RATTLER_BUILD_STEP_CACHE`, pointing to a persistent
+file under the build directory. A successful step can write cache conditions to
+this file. On later invocations, rattler-build skips the step when all matching
+inputs and outputs are unchanged:
+
+```yaml
+- name: compile
+  run: |
+    cmake --build "$SRC_DIR/build"
+    cat > "$RATTLER_BUILD_STEP_CACHE" <<'EOF'
+    input-hash: CMakeLists.txt
+    input-hash: src/**
+    output-mtime: build/**
+    EOF
+```
+
+On Windows, write the same lines to `%RATTLER_BUILD_STEP_CACHE%`. The format is
+one `KEY: GLOB` declaration per line (blank lines and `#` comments are ignored):
+
+- `input-hash` / `output-hash` compare matching paths and file contents.
+- `input-mtime` / `output-mtime` compare matching paths, sizes, and modification
+  times.
+
+Globs use `/` separators, are relative to the step working directory, and may
+not be absolute or contain `..`. Every condition must match at least one file;
+a missing input or deleted output is a cache miss. Changes to the step's script,
+interpreter, environment, or working directory also invalidate its cache.
+Rattler-build stores the fingerprints next to the declaration file after the
+step succeeds. It removes the old declaration before a cache-miss execution, so
+a step must write the file again to remain cacheable. Failed steps never update
+cache state.
+
+The declaration file is intentionally simple to generate from shell scripts;
+the adjacent executor-owned `.state.json` file is an implementation detail and
+should not be edited by the step.
+
 ### Reusable steps
 
 A step can load its executable fields from a small YAML file:

@@ -11,6 +11,7 @@ use std::{
 use indexmap::IndexMap;
 use minijinja::Value;
 use rattler_build_jinja::{Jinja, JinjaConfig, Variable};
+use sha2::{Digest, Sha256};
 
 // Re-export from rattler_build_script
 pub use rattler_build_script::{
@@ -254,6 +255,17 @@ pub(crate) fn prepare_build_plan_execution_args(
             script
                 .env
                 .insert("RATTLER_BUILD_OUTPUT_FILE".to_string(), output_file);
+
+            let build_dir = work_dir.parent().unwrap_or(&work_dir);
+            let cache_file = build_dir
+                .join(crate::consts::STEP_CACHE_DIRECTORY_NAME)
+                .join(format!("{index}.cache"))
+                .to_string_lossy()
+                .into_owned();
+            script.env.insert(
+                crate::consts::RATTLER_BUILD_STEP_CACHE.to_string(),
+                cache_file,
+            );
         }
         let mut section_jinja = Jinja::new(selector_config.clone()).with_context(recipe_context);
         for (key, value) in env_vars.iter().chain(script.env()) {
@@ -306,6 +318,26 @@ pub(crate) fn prepare_build_plan_execution_args(
         sandbox_config,
         env_isolation,
     })
+}
+
+fn cache_identity(section: &BuildScriptSection) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(section.interpreter.as_deref().unwrap_or_default());
+    hasher.update([0]);
+    hasher.update(section.content.script().as_bytes());
+    hasher.update([0]);
+    if let Some(cwd) = &section.cwd {
+        hasher.update(cwd.to_string_lossy().as_bytes());
+    }
+    for (key, value) in &section.env {
+        if key != crate::consts::RATTLER_BUILD_STEP_CACHE {
+            hasher.update([0]);
+            hasher.update(key);
+            hasher.update([0]);
+            hasher.update(value);
+        }
+    }
+    hex::encode(hasher.finalize())
 }
 
 impl Output {
@@ -413,7 +445,64 @@ impl Output {
             )?;
         }
         let exec_args = self.prepare_build_script().await?;
-        rattler_build_script::run_script(exec_args).await?;
+        if self.recipe.build().plan.steps().is_none() {
+            rattler_build_script::run_script(exec_args).await?;
+            return Ok(());
+        }
+
+        // Execute steps individually so cache declarations written by one step
+        // can be fingerprinted immediately and later invocations can omit the
+        // process entirely. Sections already have isolated env/cwd scopes, so
+        // this preserves their wrapper semantics.
+        fs_err::create_dir_all(
+            self.build_configuration
+                .directories
+                .build_dir
+                .join(crate::consts::STEP_CACHE_DIRECTORY_NAME),
+        )?;
+        for section in exec_args.sections.iter().cloned() {
+            let cache_path = section
+                .env
+                .get(crate::consts::RATTLER_BUILD_STEP_CACHE)
+                .map(PathBuf::from)
+                .expect("build steps always receive a cache declaration path");
+            let root = section
+                .cwd
+                .clone()
+                .unwrap_or_else(|| exec_args.work_dir.clone());
+            let identity = cache_identity(&section);
+            let cache_hit = match crate::step_cache::can_skip(&cache_path, &root, &identity) {
+                Ok(hit) => hit,
+                Err(error) => {
+                    tracing::warn!(
+                        "Ignoring invalid build step cache {}: {}",
+                        cache_path.display(),
+                        error
+                    );
+                    false
+                }
+            };
+            if cache_hit {
+                tracing::info!(
+                    "Skipping build step {} (cache hit)",
+                    section.label.as_deref().unwrap_or("unnamed")
+                );
+                continue;
+            }
+
+            // A step must opt in on every successful execution. Removing the
+            // old declaration prevents stale conditions surviving a changed
+            // step implementation that no longer writes the file.
+            match fs_err::remove_file(&cache_path) {
+                Ok(()) => {}
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => return Err(error.into()),
+            }
+            let mut section_args = exec_args.clone();
+            section_args.sections = vec![section];
+            rattler_build_script::run_script(section_args).await?;
+            crate::step_cache::update(&cache_path, &root, &identity)?;
+        }
 
         Ok(())
     }

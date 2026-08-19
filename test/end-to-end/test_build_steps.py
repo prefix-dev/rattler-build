@@ -1,3 +1,4 @@
+import shutil
 from pathlib import Path
 
 from helpers import RattlerBuild, get_extracted_package, get_package
@@ -67,6 +68,35 @@ def test_packaged_step_provider_uses_standalone_environment(
         pkg / "share" / "step-provider" / "marker.txt"
     ).read_text().strip() == "exact-provider-worked"
     assert not any(pkg.rglob("test-rattler-build-steps*"))
+
+
+def test_step_cache_skips_and_invalidates(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Step-written input/output conditions skip work until an input changes."""
+    project = tmp_path / "project"
+    shutil.copytree(recipes / "step_cache", project)
+    output = tmp_path / "output"
+    args = (
+        "run",
+        "cached",
+        "--recipe",
+        str(project),
+        "--source-dir",
+        str(project),
+        "--output-dir",
+        str(output),
+        "--experimental",
+    )
+
+    rattler_build(*args)
+    rattler_build(*args)
+    assert (project / "run-count.txt").read_text().splitlines() == ["run"]
+
+    (project / "input.txt").write_text("changed\n")
+    rattler_build(*args)
+    assert (project / "run-count.txt").read_text().splitlines() == ["run", "run"]
+    assert (project / "generated.txt").read_text() == "changed\n"
 
 
 def test_default_build_script_still_runs(
