@@ -54,6 +54,41 @@ def test_metadata_step_runs_before_solving_and_defines_build_plan(
     assert rendered["build"]["steps"][0]["name"] == "install"
 
 
+def test_python_metadata_backend_builds_noarch_wheel_package(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """A custom pyproject backend emits requirements, entry points, and wheel steps."""
+    rattler_build.build(
+        recipes / "metadata_python_backend", tmp_path, extra_args=["--experimental"]
+    )
+    pkg = get_extracted_package(tmp_path, "tingy-rich-demo")
+
+    index = json.loads((pkg / "info" / "index.json").read_text())
+    assert index["noarch"] == "python"
+    assert "python >=3.10" in index["depends"]
+    assert "rich <15,>=13.9" in index["depends"]
+    link = json.loads((pkg / "info" / "link.json").read_text())
+    assert link["noarch"]["entry_points"] == ["tingy-rich-demo = tingy_rich_demo:main"]
+    about = json.loads((pkg / "info" / "about.json").read_text())
+    assert about["license"] == "MIT"
+    assert about["summary"].startswith("A tiny Rich application")
+    rendered = yaml.safe_load(
+        (pkg / "info" / "recipe" / "rendered_recipe.yaml").read_text()
+    )["recipe"]
+    assert rendered["requirements"]["host"] == [
+        "python",
+        "pip",
+        "python-build",
+        "hatchling >=1.26",
+    ]
+    assert [step["name"] for step in rendered["build"]["steps"]] == [
+        "build-wheel",
+        "install-wheel",
+    ]
+    assert (pkg / "site-packages" / "tingy_rich_demo" / "__init__.py").exists()
+    assert (pkg / "info" / "licenses" / "LICENSE").exists()
+
+
 def test_reusable_steps_inputs_and_generated_licenses(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):

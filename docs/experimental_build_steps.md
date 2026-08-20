@@ -108,7 +108,8 @@ about.repository https://github.com/example/project
 ```
 
 Requirement fields are append-only. `build.steps` and `build.script` can be set
-or extended, and the normal post-build mutable fields can also be changed.
+or extended, and `build.python.entry_points` can be appended for generated
+Python console scripts. The normal post-build mutable fields can also be changed.
 Arrays and objects use JSON syntax. Emitted dependency values must be concrete
 match specs; selectors and variant expansion have already happened. Generated
 script content still receives the normal late-bound build-script rendering.
@@ -149,6 +150,10 @@ arbitrary PyPI, CMake, Cargo, or other ecosystem dependencies into conda package
 names remains the responsibility of the metadata script or a future dedicated
 provider. A complete runnable version is available in
 [`examples/metadata-step`](https://github.com/prefix-dev/rattler-build/tree/main/examples/metadata-step).
+For a fuller backend-style example that reads PEP 621 metadata, maps PyPI
+requirements to conda requirements, generates wheel build/install steps, and
+builds a tested noarch package, see
+[`examples/python-metadata-backend`](https://github.com/prefix-dev/rattler-build/tree/main/examples/python-metadata-backend).
 
 ## Caching build steps
 

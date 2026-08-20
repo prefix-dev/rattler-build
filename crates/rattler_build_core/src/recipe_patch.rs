@@ -44,7 +44,9 @@ fn allowed_path(path: &str, phase: OutputPhase) -> bool {
             || path == "/build/steps"
             || path.starts_with("/build/steps/")
             || path == "/build/script"
-            || path.starts_with("/build/script/")))
+            || path.starts_with("/build/script/")
+            || path == "/build/python/entry_points"
+            || path.starts_with("/build/python/entry_points/")))
         || path.starts_with("/about/")
         || path == "/requirements/run"
         || path.starts_with("/requirements/run/")
@@ -125,6 +127,7 @@ fn normalize_patch_document(document: &mut Value) {
         normalize_globs(document, &["build", "dynamic_linking"], key);
     }
     ensure_object(document, &["build", "prefix_detection"]);
+    ensure_array(document, &["build", "python"], "entry_points");
     for key in ["files", "always_copy_files", "always_include_files"] {
         normalize_globs(document, &["build"], key);
     }
@@ -428,6 +431,7 @@ requirements.run_exports.strong.append ["abi >=2"]
             &path,
             r#"requirements.build.append ["python"]
 requirements.host.append ["zlib"]
+build.python.entry_points.append ["generated = package:main"]
 build.steps.append {"name":"generated","run":"echo generated"}
 "#,
         )
@@ -438,6 +442,7 @@ build.steps.append {"name":"generated","run":"echo generated"}
 
         assert_eq!(recipe.requirements.build.len(), 1);
         assert_eq!(recipe.requirements.host.len(), 1);
+        assert_eq!(recipe.build.python.entry_points.len(), 1);
         let steps = recipe.build.plan.steps().unwrap();
         assert_eq!(steps.len(), 1);
         assert_eq!(steps[0].name.as_deref(), Some("generated"));

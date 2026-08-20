@@ -1,0 +1,32 @@
+schema_version: 1
+
+# Package identity is needed before metadata runs. The experimental file loader
+# avoids duplicating these two values from pyproject.toml.
+context:
+  project: ${{ load_from_file("project/pyproject.toml").project }}
+
+package:
+  name: ${{ project.name }}
+  version: ${{ project.version }}
+
+source:
+  path: project
+
+build:
+  noarch: python
+  metadata:
+    requirements:
+      build: [python >=3.11, packaging]
+    interpreter: python
+    run: |
+      import os
+      from pathlib import Path
+
+      backend = Path(os.environ["RECIPE_DIR"]) / "python_metadata_backend.py"
+      exec(compile(backend.read_text(), backend, "exec"), {"__name__": "__main__"})
+
+tests:
+  - python:
+      imports: [tingy_rich_demo]
+  - script:
+      - tingy-rich-demo
