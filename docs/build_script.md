@@ -153,6 +153,11 @@ The declaration file is intentionally simple to generate from shell scripts;
 the adjacent executor-owned `.state.json` file is an implementation detail and
 should not be edited by the step.
 
+See [`examples/step-cache`](https://github.com/prefix-dev/rattler-build/tree/main/examples/step-cache)
+for a small cross-platform, two-step example using both hash and mtime checks.
+The [`examples/adjacent`](https://github.com/prefix-dev/rattler-build/tree/main/examples/adjacent)
+recipe shows the same feature around a real CMake configure/build pipeline.
+
 ### Reusable steps
 
 A step can load its executable fields from a small YAML file:
@@ -244,10 +249,11 @@ participate in normal used-variable tracking. Reusable files use the same valid-
 blocks are not supported.
 
 Every build-step section receives a unique `OUTPUT_FILE` environment variable.
-A step can write an [RFC 6902 JSON Patch](https://datatracker.ietf.org/doc/html/rfc6902)
-to this file to update packaging metadata after all steps finish and before the
-package is created. For example, a reusable step can register generated license
-files:
+A step can write line-oriented metadata to this file after generating files or
+inspecting build-system output. Each line contains a dotted field, an optional
+`.append` operation, whitespace, and a value. Plain values are strings; lists
+and objects use JSON syntax so they remain unambiguous and easy to generate with
+`cat`:
 
 ```yaml
 requirements:
@@ -255,17 +261,34 @@ requirements:
 run: |
   go-licenses save ./... --save_path "$BUILD_DIR/go-dependencies"
   dollar='$'
-  printf '%s\n' '[{"op":"add","path":"/about/license_file/include/-","value":"'"$dollar"'{{ BUILD_DIR }}/go-dependencies/**"}]' > "$OUTPUT_FILE"
+  cat > "$OUTPUT_FILE" <<EOF
+  about.repository https://github.com/example/project
+  about.license_file.include.append ["$dollar{{ BUILD_DIR }}/go-dependencies/**"]
+  requirements.run.append ["libgcc >=14", "zlib"]
+  requirements.run_exports.strong.append ["project-abi >=1,<2"]
+  EOF
 ```
 
-Output patches are applied in step execution order. Commonly extended arrays,
-including `about.license_file` and the dynamic-linking allowlists, are
-materialized even when omitted from the recipe, so standard JSON Patch `/-`
-array appends work. Post-build patches may update `about.*` and packaging-time
-fields under `build.dynamic_linking`, `build.prefix_detection`, `build.files`,
+Outputs are applied in step execution order after all build steps finish and
+before packaging. Supported requirement collections are `requirements.run`,
+`requirements.run_constraints`, and the `noarch`, `strong`, `weak`,
+`strong_constraints`, and `weak_constraints` collections below
+`requirements.run_exports`. These update `index.json` and `run_exports.json` in
+the resulting package. Requirement fields are append-only because replacing an
+already finalized dependency set would be ambiguous.
+
+`requirements.build` and `requirements.host` cannot be emitted at runtime: the
+step is already running by then, so those environments have necessarily been
+solved and installed. Reusable steps must declare build and host requirements
+in their YAML metadata; rattler-build collects those requirements before the
+recipe solve.
+
+Post-build output may also update `about.*` and packaging-time fields under
+`build.dynamic_linking`, `build.prefix_detection`, `build.files`,
 `build.always_copy_files`, `build.always_include_files`, and
-`build.post_process`. Fields already consumed by rendering, solving, or script
-execution are rejected as too late to modify.
+`build.post_process`. Append targets are materialized even when omitted from the
+recipe. This line format replaces the prototype's RFC 6902 JSON Patch format so
+step output remains straightforward to inspect and generate.
 
 !!! warning "Windows multiline steps"
     On Windows, a multiline `run: |` block is emitted as one command-list item.

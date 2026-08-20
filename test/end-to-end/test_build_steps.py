@@ -1,3 +1,4 @@
+import json
 import shutil
 from pathlib import Path
 
@@ -44,6 +45,13 @@ def test_reusable_steps_inputs_and_generated_licenses(
     license_file = pkg / "info" / "licenses" / "dependency.txt"
     assert license_file.read_text().strip() == "dependency-license"
     assert not (pkg / "generated-licenses").exists()
+
+    index = json.loads((pkg / "info" / "index.json").read_text())
+    assert "zlib" in index["depends"]
+    run_exports = json.loads((pkg / "info" / "run_exports.json").read_text())
+    assert run_exports["strong"] == ["reusable-abi"]
+    about = json.loads((pkg / "info" / "about.json").read_text())
+    assert about["dev_url"] == "https://example.com/reusable-step"
 
 
 def test_packaged_step_provider_uses_standalone_environment(

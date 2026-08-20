@@ -2,21 +2,20 @@
 
 use std::path::{Path, PathBuf};
 
-use json_patch::{Patch, PatchOperation};
 use miette::{IntoDiagnostic, WrapErr};
-use rattler_build_recipe::stage1::Recipe;
+use rattler_build_recipe::stage1::{Dependency, Recipe, requirements::RunExports};
 use serde_json::{Map, Value};
 
 const OUTPUT_DIRECTORY: &str = ".rattler-build/step-outputs";
 
-/// Directory containing the RFC 6902 JSON Patch files emitted by build steps.
+/// Directory containing metadata output files emitted by build steps.
 pub(crate) fn output_directory(work_dir: &Path) -> PathBuf {
     work_dir.join(OUTPUT_DIRECTORY)
 }
 
 /// Path exposed to a particular build-script section as `OUTPUT_FILE`.
 pub(crate) fn output_file(work_dir: &Path, index: usize) -> PathBuf {
-    output_directory(work_dir).join(format!("{index:06}.json"))
+    output_directory(work_dir).join(format!("{index:06}.txt"))
 }
 
 /// Remove stale outputs and create the output directory before script execution.
@@ -32,6 +31,12 @@ pub(crate) fn prepare_output_directory(work_dir: &Path) -> std::io::Result<()> {
 
 fn allowed_path(path: &str) -> bool {
     path.starts_with("/about/")
+        || path == "/requirements/run"
+        || path.starts_with("/requirements/run/")
+        || path == "/requirements/run_constraints"
+        || path.starts_with("/requirements/run_constraints/")
+        || path == "/requirements/run_exports"
+        || path.starts_with("/requirements/run_exports/")
         || path == "/build/dynamic_linking"
         || path.starts_with("/build/dynamic_linking/")
         || path == "/build/prefix_detection"
@@ -44,32 +49,6 @@ fn allowed_path(path: &str) -> bool {
         ]
         .iter()
         .any(|prefix| path == *prefix || path.starts_with(&format!("{prefix}/")))
-}
-
-fn validate_patch(patch: &Patch, source: &Path) -> miette::Result<()> {
-    for operation in &patch.0 {
-        let path = operation.path().to_string();
-        if !allowed_path(&path) {
-            return Err(miette::miette!(
-                "recipe patch {} cannot modify `{path}` after the build environment has been solved",
-                source.display()
-            ));
-        }
-        let from = match operation {
-            PatchOperation::Move(operation) => Some(operation.from.to_string()),
-            PatchOperation::Copy(operation) => Some(operation.from.to_string()),
-            _ => None,
-        };
-        if let Some(from) = from
-            && !allowed_path(&from)
-        {
-            return Err(miette::miette!(
-                "recipe patch {} cannot read `{from}` outside the post-build mutable fields",
-                source.display()
-            ));
-        }
-    }
-    Ok(())
 }
 
 fn object(value: &mut Value) -> &mut Map<String, Value> {
@@ -135,30 +114,107 @@ fn normalize_patch_document(document: &mut Value) {
         normalize_globs(document, &["build"], key);
     }
     ensure_array(document, &["build"], "post_process");
+
+    for key in ["run", "run_constraints"] {
+        ensure_array(document, &["requirements"], key);
+    }
+    for key in [
+        "noarch",
+        "strong",
+        "strong_constraints",
+        "weak",
+        "weak_constraints",
+    ] {
+        ensure_array(document, &["requirements", "run_exports"], key);
+    }
+}
+
+fn parse_output_value(raw: &str) -> Value {
+    if matches!(raw.as_bytes().first(), Some(b'[' | b'{' | b'"')) {
+        serde_json::from_str(raw).unwrap_or_else(|_| Value::String(raw.to_string()))
+    } else {
+        Value::String(raw.to_string())
+    }
+}
+
+fn apply_text_output(document: &mut Value, contents: &str, source: &Path) -> miette::Result<()> {
+    for (index, raw_line) in contents.lines().enumerate() {
+        let line = raw_line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        let (directive, raw_value) = line.split_once(char::is_whitespace).ok_or_else(|| {
+            miette::miette!(
+                "invalid build-step output {} line {}: expected `PATH VALUE`",
+                source.display(),
+                index + 1
+            )
+        })?;
+        let (dotted_path, append) = directive
+            .strip_suffix(".append")
+            .map_or((directive, false), |path| (path, true));
+        let pointer = format!("/{}", dotted_path.replace('.', "/"));
+        if dotted_path == "requirements.build" || dotted_path == "requirements.host" {
+            return Err(miette::miette!(
+                "build-step output {} cannot add `{dotted_path}` after environments have been solved; declare build/host requirements on the reusable step",
+                source.display()
+            ));
+        }
+        if !allowed_path(&pointer) {
+            return Err(miette::miette!(
+                "build-step output {} cannot modify `{dotted_path}` after build execution",
+                source.display()
+            ));
+        }
+        if pointer.starts_with("/requirements/") && !append {
+            return Err(miette::miette!(
+                "build-step output {} must use `.append` for post-build requirements",
+                source.display()
+            ));
+        }
+
+        let value = parse_output_value(raw_value.trim());
+        if append {
+            let target = document.pointer_mut(&pointer).ok_or_else(|| {
+                miette::miette!(
+                    "build-step output {} cannot append to unknown collection `{dotted_path}`",
+                    source.display()
+                )
+            })?;
+            let array = target.as_array_mut().ok_or_else(|| {
+                miette::miette!(
+                    "build-step output {} target `{dotted_path}` is not a collection",
+                    source.display()
+                )
+            })?;
+            match value {
+                Value::Array(values) => array.extend(values),
+                value => array.push(value),
+            }
+        } else {
+            let (parent_path, key) = pointer.rsplit_once('/').expect("pointer starts with slash");
+            let parent = document.pointer_mut(parent_path).ok_or_else(|| {
+                miette::miette!(
+                    "build-step output {} has unknown parent for `{dotted_path}`",
+                    source.display()
+                )
+            })?;
+            object(parent).insert(key.to_string(), value);
+        }
+    }
+    Ok(())
 }
 
 fn apply_patch_file(recipe: &mut Recipe, path: &Path) -> miette::Result<()> {
     let contents = fs_err::read_to_string(path)
         .into_diagnostic()
         .wrap_err_with(|| format!("failed to read recipe patch {}", path.display()))?;
-    let patch: Patch = serde_json::from_str(&contents)
-        .into_diagnostic()
-        .wrap_err_with(|| {
-            format!(
-                "failed to parse recipe patch {} as RFC 6902 JSON Patch",
-                path.display()
-            )
-        })?;
-    validate_patch(&patch, path)?;
-
     let used_variant = recipe.used_variant.clone();
     let mut document = serde_json::to_value(&*recipe)
         .into_diagnostic()
         .wrap_err("failed to serialize recipe before applying build-step output")?;
     normalize_patch_document(&mut document);
-    json_patch::patch(&mut document, &patch)
-        .into_diagnostic()
-        .wrap_err_with(|| format!("failed to apply recipe patch {}", path.display()))?;
+    apply_text_output(&mut document, &contents, path)?;
     let mut updated: Recipe = serde_json::from_value(document)
         .into_diagnostic()
         .wrap_err_with(|| {
@@ -172,26 +228,51 @@ fn apply_patch_file(recipe: &mut Recipe, path: &Path) -> miette::Result<()> {
     Ok(())
 }
 
+/// Requirements that were appended after the build completed.
+#[derive(Debug, Default)]
+pub(crate) struct PostBuildRequirements {
+    pub(crate) run: Vec<Dependency>,
+    pub(crate) run_constraints: Vec<Dependency>,
+    pub(crate) run_exports: RunExports,
+}
+
 /// Apply all step outputs in deterministic execution order.
-pub(crate) fn apply_outputs(recipe: &mut Recipe, work_dir: &Path) -> miette::Result<()> {
+pub(crate) fn apply_outputs(
+    recipe: &mut Recipe,
+    work_dir: &Path,
+) -> miette::Result<PostBuildRequirements> {
     let directory = output_directory(work_dir);
     if !directory.is_dir() {
-        return Ok(());
+        return Ok(PostBuildRequirements::default());
     }
+    let original_run = recipe.requirements.run.len();
+    let original_constraints = recipe.requirements.run_constraints.len();
+    let original_exports = recipe.requirements.run_exports.clone();
     let mut outputs = fs_err::read_dir(&directory)
         .into_diagnostic()?
         .filter_map(Result::ok)
         .map(|entry| entry.path())
-        .filter(|path| {
-            path.extension()
-                .is_some_and(|extension| extension == "json")
-        })
+        .filter(|path| path.is_file())
         .collect::<Vec<_>>();
     outputs.sort();
     for output in outputs {
         apply_patch_file(recipe, &output)?;
     }
-    Ok(())
+    let exports = &recipe.requirements.run_exports;
+    Ok(PostBuildRequirements {
+        run: recipe.requirements.run[original_run..].to_vec(),
+        run_constraints: recipe.requirements.run_constraints[original_constraints..].to_vec(),
+        run_exports: RunExports {
+            noarch: exports.noarch[original_exports.noarch.len()..].to_vec(),
+            strong: exports.strong[original_exports.strong.len()..].to_vec(),
+            strong_constraints: exports.strong_constraints
+                [original_exports.strong_constraints.len()..]
+                .to_vec(),
+            weak: exports.weak[original_exports.weak.len()..].to_vec(),
+            weak_constraints: exports.weak_constraints[original_exports.weak_constraints.len()..]
+                .to_vec(),
+        },
+    })
 }
 
 #[cfg(test)]
@@ -223,10 +304,7 @@ mod tests {
         prepare_output_directory(temp.path()).unwrap();
         fs_err::write(
             output_file(temp.path(), 0),
-            r#"[
-  {"op":"add","path":"/about/license_file/include/-","value":"/generated/LICENSE*"},
-  {"op":"replace","path":"/build/dynamic_linking/rpaths","value":["lib/","lib/custom"]}
-]"#,
+            "about.license_file.include.append /generated/LICENSE*\nbuild.dynamic_linking.rpaths [\"lib/\",\"lib/custom\"]\n",
         )
         .unwrap();
         let mut recipe = recipe();
@@ -263,21 +341,61 @@ mod tests {
     }
 
     #[test]
+    fn applies_cat_friendly_metadata_and_requirement_outputs() {
+        let temp = tempfile::tempdir().unwrap();
+        prepare_output_directory(temp.path()).unwrap();
+        fs_err::write(
+            output_file(temp.path(), 0),
+            r#"# plain values are strings; arrays use JSON
+about.repository https://example.com/source
+about.summary generated by a reusable step
+requirements.run.append ["runtime >=1", "helper"]
+requirements.run_exports.strong.append ["abi >=2"]
+"#,
+        )
+        .unwrap();
+        let mut recipe = recipe();
+
+        let changes = apply_outputs(&mut recipe, temp.path()).unwrap();
+
+        assert_eq!(
+            recipe.about.repository.as_ref().unwrap().as_str(),
+            "https://example.com/source"
+        );
+        assert_eq!(
+            recipe.about.summary.as_deref(),
+            Some("generated by a reusable step")
+        );
+        assert_eq!(changes.run.len(), 2);
+        assert_eq!(changes.run_exports.strong.len(), 1);
+        assert_eq!(recipe.requirements.run.len(), 2);
+    }
+
+    #[test]
     fn rejects_fields_consumed_before_build_execution() {
         let temp = tempfile::tempdir().unwrap();
         prepare_output_directory(temp.path()).unwrap();
         fs_err::write(
             output_file(temp.path(), 0),
-            r#"[{"op":"replace","path":"/requirements/build","value":[]}]"#,
+            "requirements.build.append [\"too-late\"]\n",
         )
         .unwrap();
         let mut recipe = recipe();
 
         let error = apply_outputs(&mut recipe, temp.path()).unwrap_err();
+        assert!(error.to_string().contains("after environments have been solved"));
+
+        prepare_output_directory(temp.path()).unwrap();
+        fs_err::write(
+            output_file(temp.path(), 0),
+            "requirements.host.append [\"too-late\"]\n",
+        )
+        .unwrap();
+        let error = apply_outputs(&mut recipe, temp.path()).unwrap_err();
         assert!(
             error
                 .to_string()
-                .contains("cannot modify `/requirements/build`")
+                .contains("after environments have been solved")
         );
     }
 }
