@@ -218,6 +218,19 @@ pub async fn run_metadata_step(
             .wrap_err("failed to read metadata-step output")?;
         crate::recipe_patch::apply_metadata_output(&mut output.recipe, &output_file)?;
         apply_metadata_hash(output, &contents);
+
+        // Show the effective recipe fields produced by metadata before provider
+        // preprocessing and dependency solving. The metadata executor itself is
+        // consumed at this point and only obscures the generated result.
+        let mut generated_recipe = output.recipe.clone();
+        generated_recipe.build.metadata = None;
+        let generated_yaml = serde_yaml::to_string(&generated_recipe)
+            .into_diagnostic()
+            .wrap_err("failed to serialize generated metadata recipe")?;
+        tracing::info!(
+            "Generated recipe after build.metadata:\n{}",
+            generated_yaml.trim_end()
+        );
     }
 
     // Keep the bootstrap output alive until execution has completely finished.

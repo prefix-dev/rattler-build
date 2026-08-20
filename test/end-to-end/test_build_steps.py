@@ -1,6 +1,7 @@
 import json
 import shutil
 from pathlib import Path
+from subprocess import STDOUT
 
 import yaml
 
@@ -64,12 +65,17 @@ def test_python_metadata_backend_builds_external_rich_source(
     rattler_build.build(recipes / "metadata_python_provider", provider_output)
     provider = get_package(provider_output, "python-rattler-build-steps")
     rattler_build("publish", str(provider), "--to", str(channel))
-    rattler_build.build(
+    build_args = rattler_build.build_args(
         recipes / "metadata_python_backend",
         consumer_output,
         custom_channels=[channel.as_uri(), "conda-forge"],
         extra_args=["--experimental"],
     )
+    build_output = rattler_build(*build_args, stderr=STDOUT)
+    assert "Generated recipe after build.metadata:" in build_output
+    assert "- uses: python:build@==0.1.0" in build_output
+    assert "summary: Render rich text" in build_output
+    assert "Ignoring prefix-detection" not in build_output
     pkg = get_extracted_package(consumer_output, "rich")
 
     index = json.loads((pkg / "info" / "index.json").read_text())

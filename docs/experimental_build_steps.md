@@ -116,7 +116,10 @@ Python console scripts. The normal post-build mutable fields can also be changed
 Arrays and objects use JSON syntax. Emitted dependency values must be concrete
 match specs; selectors and variant expansion have already happened. Generated
 script content still receives the normal late-bound build-script rendering.
-The output content is included in the package variant hash.
+The output content is included in the package variant hash. After a successful
+metadata step, rattler-build prints the effective generated recipe as YAML before
+resolving its emitted step providers and dependencies, so the dynamic result is
+visible during a normal build.
 
 For example, a project can keep conda-specific dependency declarations in
 `pyproject.toml` and generate its build pipeline:
