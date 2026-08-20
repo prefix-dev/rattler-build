@@ -261,6 +261,63 @@ pub fn get_tool_config(
     Ok(configuration_builder.finish())
 }
 
+fn select_build_steps(
+    recipe: &mut rattler_build_recipe::stage1::Recipe,
+    requested_steps: Option<&[String]>,
+) -> miette::Result<(bool, bool)> {
+    let mut inherit_parent_build = true;
+    let mut inherit_parent_host = true;
+    if recipe.build.plan.steps().is_some() {
+        let selected = recipe
+            .build
+            .plan
+            .select_steps(requested_steps)
+            .map_err(|error| miette::miette!("invalid build steps: {error}"))?;
+        if let Some(requested_steps) = requested_steps {
+            let mut root_inheritance = requested_steps.iter().map(|requested| {
+                selected
+                    .iter()
+                    .find(|step| step.name.as_deref() == Some(requested.as_str()))
+                    .expect("selected root must be present after DAG resolution")
+                    .requirements
+                    .inherit
+                    .clone()
+            });
+            if let Some(first) = root_inheritance.next() {
+                if root_inheritance.any(|inherit| inherit != first) {
+                    return Err(miette::miette!(
+                        "selected build steps use incompatible parent environment inheritance; run them separately"
+                    ));
+                }
+                inherit_parent_build = first.build;
+                inherit_parent_host = first.host;
+            }
+            if !inherit_parent_build {
+                recipe.requirements.build.clear();
+            }
+            if !inherit_parent_host {
+                recipe.requirements.host.clear();
+            }
+        }
+        for step in &selected {
+            recipe
+                .requirements
+                .build
+                .extend(step.requirements.build.clone());
+            recipe
+                .requirements
+                .host
+                .extend(step.requirements.host.clone());
+        }
+        recipe.build.plan = rattler_build_recipe::stage1::build::BuildPlan::Steps(selected);
+    } else if requested_steps.is_some() {
+        return Err(miette::miette!(
+            "named steps were requested, but this recipe uses build.script"
+        ));
+    }
+    Ok((inherit_parent_build, inherit_parent_host))
+}
+
 /// Returns the output for the build.
 pub async fn get_build_output(
     build_data: &BuildData,
@@ -423,7 +480,8 @@ pub async fn get_build_output(
         recipe_name,
     } = find_variants(&variant_config, recipe_path, &recipe_content, render_config)?;
 
-    if recipe_name.is_some()
+    let is_multi_output_recipe = recipe_name.is_some();
+    if is_multi_output_recipe
         && outputs_and_variants.iter().any(|output| {
             output
                 .recipe
@@ -455,68 +513,7 @@ pub async fn get_build_output(
     let mut step_provider_resolver =
         rattler_build_core::step_provider::StepProviderResolver::default();
 
-    for mut discovered_output in outputs_and_variants {
-        let mut inherit_parent_build = true;
-        let mut inherit_parent_host = true;
-        // Resolve the step DAG before solving so step-local host requirements
-        // participate in environment creation. A normal build selects all
-        // non-optional roots; `run` supplies explicit roots.
-        if discovered_output.recipe.build.plan.steps().is_some() {
-            let selected = discovered_output
-                .recipe
-                .build
-                .plan
-                .select_steps(build_data.selected_steps.as_deref())
-                .map_err(|error| miette::miette!("invalid build steps: {error}"))?;
-            if let Some(requested_steps) = build_data.selected_steps.as_deref() {
-                // The explicitly requested roots define the solve group. DAG
-                // prerequisites execute in that same environment; their own
-                // inheritance setting applies only when selected directly.
-                let mut root_inheritance = requested_steps.iter().map(|requested| {
-                    selected
-                        .iter()
-                        .find(|step| step.name.as_deref() == Some(requested.as_str()))
-                        .expect("selected root must be present after DAG resolution")
-                        .requirements
-                        .inherit
-                        .clone()
-                });
-                if let Some(first) = root_inheritance.next() {
-                    if root_inheritance.any(|inherit| inherit != first) {
-                        return Err(miette::miette!(
-                            "selected build steps use incompatible parent environment inheritance; run them separately"
-                        ));
-                    }
-                    inherit_parent_build = first.build;
-                    inherit_parent_host = first.host;
-                }
-                if !inherit_parent_build {
-                    discovered_output.recipe.requirements.build.clear();
-                }
-                if !inherit_parent_host {
-                    discovered_output.recipe.requirements.host.clear();
-                }
-            }
-            for step in &selected {
-                discovered_output
-                    .recipe
-                    .requirements
-                    .build
-                    .extend(step.requirements.build.clone());
-                discovered_output
-                    .recipe
-                    .requirements
-                    .host
-                    .extend(step.requirements.host.clone());
-            }
-            discovered_output.recipe.build.plan =
-                rattler_build_recipe::stage1::build::BuildPlan::Steps(selected);
-        } else if build_data.selected_steps.is_some() {
-            return Err(miette::miette!(
-                "named steps were requested, but this recipe uses build.script"
-            ));
-        }
-
+    for discovered_output in outputs_and_variants {
         let recipe = &discovered_output.recipe;
 
         // Check if this build should be skipped based on skip conditions
@@ -546,35 +543,6 @@ pub async fn get_build_output(
         } else {
             recipe.package().name().as_normalized().to_string()
         };
-        // An isolated local solve gets its own deterministic prefixes. This
-        // prevents packages left by a previous parent-based solve from leaking
-        // into a standalone lint/tool environment.
-        if build_data.selected_steps.is_some() && (!inherit_parent_build || !inherit_parent_host) {
-            let step_group = build_data
-                .selected_steps
-                .as_deref()
-                .unwrap_or_default()
-                .join("-")
-                .chars()
-                .map(|character| {
-                    if character.is_ascii_alphanumeric() || matches!(character, '-' | '_') {
-                        character
-                    } else {
-                        '_'
-                    }
-                })
-                .collect::<String>();
-            build_name.push_str(&format!(
-                "-steps-{step_group}{}{}",
-                if !inherit_parent_build {
-                    "-no-build"
-                } else {
-                    ""
-                },
-                if !inherit_parent_host { "-no-host" } else { "" },
-            ));
-        }
-
         let variant_channels = if let Some(channel_sources) = discovered_output
             .used_vars
             .get(&NormalizedKey("channel_sources".to_string()))
@@ -682,6 +650,62 @@ pub async fn get_build_output(
                     .collect(),
             ),
         };
+
+        rattler_build_core::metadata_step::run_metadata_step(&mut output, tool_config).await?;
+        if is_multi_output_recipe
+            && output
+                .recipe
+                .build
+                .plan
+                .steps()
+                .is_some_and(|steps| steps.iter().any(|step| step.uses.is_some()))
+        {
+            return Err(miette::miette!(
+                "reusable build steps in multi-output recipes are not yet supported because provider requirements must participate in subpackage variant and pin resolution"
+            ));
+        }
+
+        // Metadata can add or replace `build.steps`, so resolve the final DAG only
+        // after the metadata phase and before provider/dependency resolution.
+        let (inherit_parent_build, inherit_parent_host) =
+            select_build_steps(&mut output.recipe, build_data.selected_steps.as_deref())?;
+        if build_data.selected_steps.is_some() && (!inherit_parent_build || !inherit_parent_host) {
+            let step_group = build_data
+                .selected_steps
+                .as_deref()
+                .unwrap_or_default()
+                .join("-")
+                .chars()
+                .map(|character| {
+                    if character.is_ascii_alphanumeric() || matches!(character, '-' | '_') {
+                        character
+                    } else {
+                        '_'
+                    }
+                })
+                .collect::<String>();
+            build_name.push_str(&format!(
+                "-steps-{step_group}{}{}",
+                if !inherit_parent_build {
+                    "-no-build"
+                } else {
+                    ""
+                },
+                if !inherit_parent_host { "-no-host" } else { "" },
+            ));
+            output.build_configuration.directories = Directories::builder(
+                &build_name,
+                recipe_path,
+                &output_dir,
+                &timestamp,
+                Platform::current(),
+            )
+            .no_build_id(build_data.no_build_id)
+            .merge_build_and_host(output.recipe.build().merge_build_and_host_envs)
+            .skip_directory_creation(build_data.render_only)
+            .build()
+            .into_diagnostic()?;
+        }
 
         rattler_build_core::step_provider::preprocess_reusable_steps(
             &mut output,

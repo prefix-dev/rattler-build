@@ -310,6 +310,10 @@ pub struct Build {
     #[serde(default, flatten)]
     pub plan: BuildPlan,
 
+    /// Experimental step that emits recipe metadata before dependency solving.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<Step>,
+
     /// Noarch type - python or generic
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub noarch: Option<Value<NoArchType>>,
@@ -365,6 +369,7 @@ impl Default for Build {
             number: None,
             string: None,
             plan: BuildPlan::default(),
+            metadata: None,
             noarch: None,
             flags: ConditionalList::default(),
             python: PythonBuild::default(),
@@ -549,6 +554,7 @@ impl Build {
             number,
             string,
             plan,
+            metadata,
             noarch,
             flags,
             python,
@@ -574,6 +580,9 @@ impl Build {
         }
 
         vars.extend(plan.used_variables());
+        if let Some(metadata) = metadata {
+            vars.extend(metadata.used_variables());
+        }
 
         if let Some(noarch) = noarch {
             vars.extend(noarch.used_variables());

@@ -668,7 +668,15 @@ requirements:
     - nushell
 ```
 
-#### Build steps (experimental)
+#### Metadata and build steps (experimental)
+
+`build.metadata` is a single pre-solve bootstrap step. Its own
+`requirements.build` and `requirements.host` are installed in a temporary
+environment; the step can then emit final build/host requirements and set or
+extend `build.steps`. It runs after initial recipe rendering but before reusable
+step resolution, DAG selection, source fetching, and the final dependency solve.
+It can inspect local files using `RECIPE_DIR` as a reference point; remote
+recipe sources are not yet available.
 
 `build.steps` is an experimental alternative to `build.script` and requires
 `--experimental`. `script` and `steps` are mutually exclusive, including
@@ -721,8 +729,10 @@ build:
     Fail-fast guards are inserted between list items, not between the physical
     lines inside one multiline scalar.
 
-See [Build script](../build_script.md) for more examples and the full
-behaviour of environment variables, secrets, and interpreters.
+See [Experimental build steps](../experimental_build_steps.md) for metadata
+outputs, reusable providers, DAG execution, caching, and post-build output
+examples. See [Build script](../build_script.md) for environment variables,
+secrets, and interpreters.
 
 ### Skipping builds
 

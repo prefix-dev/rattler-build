@@ -745,6 +745,10 @@ pub struct Build {
     #[serde(default, flatten, skip_serializing_if = "BuildPlan::is_default")]
     pub plan: BuildPlan,
 
+    /// Experimental step that emits recipe metadata before dependency solving.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<Step>,
+
     /// Noarch type - "python" or "generic" if set
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub noarch: Option<NoArchType>,
@@ -835,6 +839,8 @@ struct BuildDeserialize {
     #[serde(default)]
     steps: PresentField<Vec<Step>>,
     #[serde(default)]
+    metadata: Option<Step>,
+    #[serde(default)]
     noarch: Option<NoArchType>,
     #[serde(default)]
     flags: Vec<Flag>,
@@ -879,6 +885,7 @@ impl TryFrom<BuildDeserialize> for Build {
             number: raw.number,
             string: raw.string,
             plan,
+            metadata: raw.metadata,
             noarch: raw.noarch,
             flags: raw.flags,
             python: raw.python,
