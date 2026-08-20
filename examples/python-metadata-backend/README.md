@@ -84,15 +84,26 @@ fetches the source before metadata execution, creates a bootstrap Python
 environment for the extractor, solves the emitted final requirements, executes
 the provider's wheel steps, and tests both `import rich` and Rich rendering.
 
-A provider artifact can instead be uploaded with:
+The example provider is also published on the beta prefix.dev channel. After
+building this feature branch's `rattler-build`, try Rich directly with:
+
+```console
+rattler-build build \
+  --recipe examples/python-metadata-backend \
+  --channel https://beta.prefix.dev/wolfv/rattler-build-steps \
+  --channel conda-forge \
+  --experimental
+```
+
+To upload a rebuilt provider with rattler-build 0.74.0 or newer:
 
 ```console
 rattler-build publish \
   output/provider/noarch/python-rattler-build-steps-0.1.0-*.conda \
-  --to https://beta.prefix.dev/wolfv/rattler-build-steps
+  --to prefix://beta.prefix.dev/wolfv/rattler-build-steps
 ```
 
-Publishing requires a prefix.dev API key in the keychain or environment.
+Publishing requires an authenticated prefix.dev account with upload permission.
 
 ## Provider layout
 
