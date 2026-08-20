@@ -195,7 +195,14 @@ pub async fn run_metadata_step(
     } else {
         source_dir.clone()
     };
+    let reserved_env_keys = env.keys().cloned().collect::<Vec<_>>();
     let mut script = step.to_script();
+    // Executor-provided metadata variables are reserved. `Script::run_script`
+    // normally lets script-local values override its base environment, so
+    // remove collisions before execution.
+    for key in env.keys() {
+        script.env.shift_remove(key);
+    }
     // Keep generated wrappers in the temporary workspace while running the
     // actual command in the local project directory.
     script.cwd = Some(work_dir);
@@ -212,25 +219,49 @@ pub async fn run_metadata_step(
         .await
         .map_err(|error| miette::miette!("metadata step failed: {error}"))?;
 
-    if output_file.is_file() {
-        let contents = fs_err::read(&output_file)
-            .into_diagnostic()
-            .wrap_err("failed to read metadata-step output")?;
-        crate::recipe_patch::apply_metadata_output(&mut output.recipe, &output_file)?;
-        apply_metadata_hash(output, &contents);
+    if !output_file.is_file() {
+        return Err(miette::miette!(
+            "metadata step completed without creating OUTPUT_FILE at {}",
+            output_file.display()
+        ));
+    }
+    let contents = fs_err::read(&output_file)
+        .into_diagnostic()
+        .wrap_err("failed to read metadata-step output")?;
+    crate::recipe_patch::apply_metadata_output(&mut output.recipe, &output_file)?;
+    apply_metadata_hash(output, &contents);
 
-        // Show the effective recipe fields produced by metadata before provider
-        // preprocessing and dependency solving. The metadata executor itself is
-        // consumed at this point and only obscures the generated result.
-        let mut generated_recipe = output.recipe.clone();
-        generated_recipe.build.metadata = None;
-        let generated_yaml = serde_yaml::to_string(&generated_recipe)
-            .into_diagnostic()
-            .wrap_err("failed to serialize generated metadata recipe")?;
-        tracing::info!(
-            "Generated recipe after build.metadata:\n{}",
-            generated_yaml.trim_end()
-        );
+    // Show the effective mutable metadata before provider preprocessing and
+    // dependency solving. Do not print package sources, context, or tests:
+    // unlike these generated fields, they may contain credentials or other
+    // unrelated recipe data.
+    #[derive(serde::Serialize)]
+    struct GeneratedMetadata<'a> {
+        build: &'a rattler_build_recipe::stage1::Build,
+        requirements: &'a Requirements,
+        about: &'a rattler_build_recipe::stage1::About,
+    }
+    let mut generated_recipe = output.recipe.clone();
+    generated_recipe.build.metadata = None;
+    let generated_yaml = serde_yaml::to_string(&GeneratedMetadata {
+        build: &generated_recipe.build,
+        requirements: &generated_recipe.requirements,
+        about: &generated_recipe.about,
+    })
+    .into_diagnostic()
+    .wrap_err("failed to serialize generated recipe metadata")?;
+    tracing::info!(
+        "Generated metadata after build.metadata:\n{}",
+        generated_yaml.trim_end()
+    );
+
+    // Keep portable provider provenance, but do not serialize this machine's
+    // absolute provider cache path into the rendered recipe stored in packages.
+    if let Some(metadata) = &mut output.recipe.build.metadata {
+        for key in &reserved_env_keys {
+            metadata.env.shift_remove(key);
+        }
+        metadata.env.shift_remove("RATTLER_BUILD_PROVIDER_PREFIX");
     }
 
     // Keep the bootstrap output alive until execution has completely finished.

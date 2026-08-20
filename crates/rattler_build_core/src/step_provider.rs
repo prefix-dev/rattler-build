@@ -16,7 +16,7 @@ use rattler_build_recipe::stage1::{
     },
 };
 use rattler_build_types::NormalizedKey;
-use rattler_conda_types::{MatchSpec, ParseStrictness, RepoDataRecord};
+use rattler_conda_types::{ChannelUrl, MatchSpec, ParseStrictness, RepoDataRecord};
 use sha2::{Digest, Sha256};
 
 use crate::{
@@ -250,6 +250,33 @@ fn file_sha256(path: &Path) -> miette::Result<String> {
     Ok(sha256_bytes(&fs_err::read(path).into_diagnostic()?))
 }
 
+/// Reject dependencies introduced after variant expansion when their configured
+/// variant value was not part of the initial render. Without this guard, a
+/// metadata/provider-generated `python` or compiler dependency could silently
+/// collapse several configured variants into one artifact.
+pub fn validate_late_variant_dependencies<'a>(
+    source: &str,
+    dependencies: impl IntoIterator<Item = &'a rattler_build_recipe::stage1::Dependency>,
+    output: &Output,
+    configured_variant_keys: &BTreeSet<NormalizedKey>,
+) -> miette::Result<()> {
+    for dependency in dependencies {
+        if let Some(name) = dependency.name() {
+            let key = NormalizedKey::from(name.as_normalized());
+            if configured_variant_keys.contains(&key)
+                && !output.build_configuration.variant.contains_key(&key)
+            {
+                return Err(miette::miette!(
+                    "{source} introduces variant dependency `{}` after recipe rendering; reference the `{}` variant in the initial recipe (or pass it through provider `with`) so it participates in variant expansion",
+                    name.as_normalized(),
+                    key.normalize()
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
 fn apply_provider_hash(output: &mut Output, fingerprints: &[String]) {
     if fingerprints.is_empty() {
         return;
@@ -277,12 +304,19 @@ fn apply_provider_hash(output: &mut Output, fingerprints: &[String]) {
 }
 
 fn resolved_provider(record: &RepoDataRecord) -> ResolvedProvider {
+    let channel = record
+        .channel
+        .as_deref()
+        .and_then(|channel| channel.parse::<url::Url>().ok())
+        .map(ChannelUrl::from)
+        .map(|channel| crate::packaging::metadata::clean_url(&channel))
+        .unwrap_or_else(|| record.channel.clone().unwrap_or_default());
     ResolvedProvider {
         name: record.package_record.name.as_normalized().to_string(),
         version: record.package_record.version.to_string(),
         build: record.package_record.build.clone(),
         subdir: record.package_record.subdir.clone(),
-        channel: record.channel.clone().unwrap_or_default(),
+        channel,
         sha256: record.package_record.sha256.map(hex::encode),
     }
 }
@@ -403,6 +437,11 @@ pub async fn preprocess_metadata_step(
     let Some(reference) = wrapper.uses.clone() else {
         return Ok(());
     };
+    if wrapper.optional || !wrapper.depends_on.is_empty() {
+        return Err(miette::miette!(
+            "`build.metadata` cannot be optional or depend on normal build steps"
+        ));
+    }
     let recipe_dir = output
         .build_configuration
         .directories
@@ -449,6 +488,10 @@ pub async fn preprocess_metadata_step(
     }
     step.requirements.build.extend(wrapper.requirements.build);
     step.requirements.host.extend(wrapper.requirements.host);
+    step.env.extend(wrapper.env);
+    // Provider identity is executor-owned. Apply it after wrapper overrides so
+    // a consumer cannot accidentally redirect the packaged backend to another
+    // prefix or make it emit references to a different version.
     if let Some(prefix) = provider_prefix {
         step.env.insert(
             "RATTLER_BUILD_PROVIDER_PREFIX".to_string(),
@@ -461,7 +504,6 @@ pub async fn preprocess_metadata_step(
             provider.version.clone(),
         );
     }
-    step.env.extend(wrapper.env);
     if wrapper.interpreter.is_some() {
         step.interpreter = wrapper.interpreter;
     }
@@ -558,25 +600,16 @@ pub async fn preprocess_reusable_steps(
                     "reusable step `{reference}` changes requirements.inherit; inheritance must be configured on the referencing recipe step"
                 ));
             }
-            for dependency in nested
-                .requirements
-                .build
-                .iter()
-                .chain(&nested.requirements.host)
-            {
-                if let Some(name) = dependency.name() {
-                    let key = NormalizedKey::from(name.as_normalized());
-                    if configured_variant_keys.contains(&key)
-                        && !output.build_configuration.variant.contains_key(&key)
-                    {
-                        return Err(miette::miette!(
-                            "reusable step `{reference}` introduces variant dependency `{}` after recipe rendering; pass the `{}` variant through `with` so it participates in variant expansion",
-                            name.as_normalized(),
-                            key.normalize()
-                        ));
-                    }
-                }
-            }
+            validate_late_variant_dependencies(
+                &format!("reusable step `{reference}`"),
+                nested
+                    .requirements
+                    .build
+                    .iter()
+                    .chain(&nested.requirements.host),
+                output,
+                configured_variant_keys,
+            )?;
             build_requirements.extend(nested.requirements.build);
             host_requirements.extend(nested.requirements.host);
         }

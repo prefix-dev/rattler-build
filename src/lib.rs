@@ -651,17 +651,22 @@ pub async fn get_build_output(
             ),
         };
 
+        output.build_configuration.directories.source_dir = build_data.local_source_dir.clone();
+
         rattler_build_core::step_provider::preprocess_metadata_step(
             &mut output,
             tool_config,
             &mut step_provider_resolver,
         )
         .await?;
-        if output.recipe.build.metadata.is_some() {
+        if output.recipe.build.metadata.is_some()
+            && output.build_configuration.directories.source_dir.is_none()
+        {
             // Metadata may inspect the fetched project (for example,
             // pyproject.toml) before producing the final solve requirements.
             // The normal build recreates this work directory and restores the
-            // source from cache after output selection.
+            // source from cache after output selection. `rattler-build run
+            // --source-dir` instead points metadata directly at that tree.
             output
                 .build_configuration
                 .directories
@@ -676,6 +681,19 @@ pub async fn get_build_output(
                 .into_diagnostic()?;
         }
         rattler_build_core::metadata_step::run_metadata_step(&mut output, tool_config).await?;
+        if output.recipe.build.metadata.is_some() {
+            rattler_build_core::step_provider::validate_late_variant_dependencies(
+                "build.metadata",
+                output
+                    .recipe
+                    .requirements
+                    .build
+                    .iter()
+                    .chain(&output.recipe.requirements.host),
+                &output,
+                &configured_variant_keys,
+            )?;
+        }
         if is_multi_output_recipe
             && output
                 .recipe
@@ -729,6 +747,7 @@ pub async fn get_build_output(
             .skip_directory_creation(build_data.render_only)
             .build()
             .into_diagnostic()?;
+            output.build_configuration.directories.source_dir = build_data.local_source_dir.clone();
         }
 
         rattler_build_core::step_provider::preprocess_reusable_steps(
@@ -1761,6 +1780,25 @@ pub async fn run_steps(
     build_data.no_build_id = true;
     build_data.keep_build = true;
     build_data.test = TestStrategy::Skip;
+    build_data.local_source_dir = source_dir
+        .map(|source_dir| {
+            let source_dir = canonicalize(&source_dir)
+                .into_diagnostic()
+                .wrap_err_with(|| {
+                    format!(
+                        "failed to resolve source directory {}",
+                        source_dir.display()
+                    )
+                })?;
+            if !source_dir.is_dir() {
+                return Err(miette::miette!(
+                    "source directory is not a directory: {}",
+                    source_dir.display()
+                ));
+            }
+            Ok(source_dir)
+        })
+        .transpose()?;
     let recipe_path = get_recipe_path(&recipe_path)?;
     let tool_config = get_tool_config(&build_data, log_handler)?;
     let outputs = get_build_output(&build_data, &recipe_path, &tool_config).await?;
@@ -1772,23 +1810,8 @@ pub async fn run_steps(
     }
 
     let mut output = outputs.into_iter().next().expect("one output");
-    if let Some(source_dir) = source_dir {
-        let source_dir = canonicalize(&source_dir)
-            .into_diagnostic()
-            .wrap_err_with(|| {
-                format!(
-                    "failed to resolve source directory {}",
-                    source_dir.display()
-                )
-            })?;
-        if !source_dir.is_dir() {
-            return Err(miette::miette!(
-                "source directory is not a directory: {}",
-                source_dir.display()
-            ));
-        }
+    if let Some(source_dir) = &output.build_configuration.directories.source_dir {
         tracing::info!("Executing steps in source tree {}", source_dir.display());
-        output.build_configuration.directories.source_dir = Some(source_dir);
     }
     output
         .build_configuration
@@ -1873,6 +1896,7 @@ pub async fn debug_recipe(
         build_string_prefix: None,
         markdown_summary: None,
         selected_steps: None,
+        local_source_dir: None,
     };
 
     let tool_config = get_tool_config(&build_data, log_handler)?;

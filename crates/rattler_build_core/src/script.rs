@@ -320,23 +320,62 @@ pub(crate) fn prepare_build_plan_execution_args(
     })
 }
 
-fn cache_identity(section: &BuildScriptSection) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(section.interpreter.as_deref().unwrap_or_default());
-    hasher.update([0]);
-    hasher.update(section.content.script().as_bytes());
-    hasher.update([0]);
-    if let Some(cwd) = &section.cwd {
-        hasher.update(cwd.to_string_lossy().as_bytes());
-    }
-    for (key, value) in &section.env {
-        if key != crate::consts::RATTLER_BUILD_STEP_CACHE {
-            hasher.update([0]);
+fn cache_identity(
+    section: &BuildScriptSection,
+    base_env: &IndexMap<String, String>,
+    secrets: &IndexMap<String, String>,
+    dependencies: &[u8],
+) -> String {
+    fn update_map(hasher: &mut Sha256, values: &IndexMap<String, String>, skip: &[&str]) {
+        let mut values = values
+            .iter()
+            .filter(|(key, _)| !skip.contains(&key.as_str()))
+            .collect::<Vec<_>>();
+        values.sort_unstable_by_key(|(key, _)| *key);
+        for (key, value) in values {
+            hasher.update((key.len() as u64).to_le_bytes());
             hasher.update(key);
-            hasher.update([0]);
+            hasher.update((value.len() as u64).to_le_bytes());
             hasher.update(value);
         }
     }
+
+    fn update_bytes(hasher: &mut Sha256, bytes: &[u8]) {
+        hasher.update((bytes.len() as u64).to_le_bytes());
+        hasher.update(bytes);
+    }
+
+    let mut hasher = Sha256::new();
+    update_bytes(
+        &mut hasher,
+        section
+            .interpreter
+            .as_deref()
+            .unwrap_or_default()
+            .as_bytes(),
+    );
+    update_bytes(&mut hasher, section.content.script().as_bytes());
+    update_bytes(
+        &mut hasher,
+        section
+            .cwd
+            .as_ref()
+            .map(|cwd| cwd.to_string_lossy())
+            .as_deref()
+            .unwrap_or_default()
+            .as_bytes(),
+    );
+    update_map(
+        &mut hasher,
+        &section.env,
+        &[crate::consts::RATTLER_BUILD_STEP_CACHE],
+    );
+    // A new command gets a new recipe timestamp even when its effective build
+    // environment is otherwise identical. Including SOURCE_DATE_EPOCH would
+    // therefore make persistent caches miss unconditionally.
+    update_map(&mut hasher, base_env, &["SOURCE_DATE_EPOCH"]);
+    update_map(&mut hasher, secrets, &[]);
+    hasher.update(dependencies);
     hex::encode(hasher.finalize())
 }
 
@@ -439,16 +478,21 @@ impl Output {
             Err(err) => return Err(err.into()),
         }
 
-        if self.recipe.build().plan.steps().is_some() {
-            crate::recipe_patch::prepare_output_directory(
-                &self.build_configuration.directories.work_dir,
-            )?;
-        }
         let exec_args = self.prepare_build_script().await?;
         if self.recipe.build().plan.steps().is_none() {
             rattler_build_script::run_script(exec_args).await?;
             return Ok(());
         }
+
+        // Preserve output metadata from cache-hit sections, while removing
+        // outputs belonging to sections that no longer exist.
+        let output_root = self
+            .build_configuration
+            .directories
+            .source_dir
+            .as_ref()
+            .unwrap_or(&self.build_configuration.directories.work_dir);
+        crate::recipe_patch::prepare_cached_outputs(output_root, exec_args.sections.len())?;
 
         // Execute steps individually so cache declarations written by one step
         // can be fingerprinted immediately and later invocations can omit the
@@ -460,7 +504,9 @@ impl Output {
                 .build_dir
                 .join(crate::consts::STEP_CACHE_DIRECTORY_NAME),
         )?;
-        for section in exec_args.sections.iter().cloned() {
+        let dependency_identity =
+            serde_json::to_vec(&self.finalized_dependencies).map_err(std::io::Error::other)?;
+        for (section_index, section) in exec_args.sections.iter().cloned().enumerate() {
             let cache_path = section
                 .env
                 .get(crate::consts::RATTLER_BUILD_STEP_CACHE)
@@ -470,7 +516,12 @@ impl Output {
                 .cwd
                 .clone()
                 .unwrap_or_else(|| exec_args.work_dir.clone());
-            let identity = cache_identity(&section);
+            let identity = cache_identity(
+                &section,
+                &exec_args.env_vars,
+                &exec_args.secrets,
+                &dependency_identity,
+            );
             let cache_hit = match crate::step_cache::can_skip(&cache_path, &root, &identity) {
                 Ok(hit) => hit,
                 Err(error) => {
@@ -494,6 +545,14 @@ impl Output {
             // old declaration prevents stale conditions surviving a changed
             // step implementation that no longer writes the file.
             match fs_err::remove_file(&cache_path) {
+                Ok(()) => {}
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => return Err(error.into()),
+            }
+            // A rerun must also opt in to metadata output again. Cache hits
+            // intentionally retain the previous successful output above.
+            let output_file = crate::recipe_patch::output_file(output_root, section_index);
+            match fs_err::remove_file(output_file) {
                 Ok(()) => {}
                 Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
                 Err(error) => return Err(error.into()),
@@ -527,9 +586,13 @@ impl Output {
         let _enter = span.enter();
 
         if self.recipe.build().plan.steps().is_some() {
-            crate::recipe_patch::prepare_output_directory(
-                &self.build_configuration.directories.work_dir,
-            )?;
+            let output_root = self
+                .build_configuration
+                .directories
+                .source_dir
+                .as_ref()
+                .unwrap_or(&self.build_configuration.directories.work_dir);
+            crate::recipe_patch::prepare_output_directory(output_root)?;
         }
         let exec_args = self.prepare_build_script().await?;
         rattler_build_script::create_build_script(exec_args).await
@@ -540,6 +603,45 @@ impl Output {
 mod tests {
     use super::*;
     use rattler_conda_types::Platform;
+
+    #[test]
+    fn cache_identity_tracks_effective_environment_but_not_command_timestamp() {
+        let section = BuildScriptSection {
+            interpreter: Some("bash".to_string()),
+            content: ResolvedScriptContents::Inline("build".to_string()),
+            env: IndexMap::new(),
+            cwd: None,
+            label: Some("build".to_string()),
+        };
+        let mut env = IndexMap::from([
+            ("SOURCE_DATE_EPOCH".to_string(), "1".to_string()),
+            ("FLAGS".to_string(), "first".to_string()),
+        ]);
+        let mut secrets = IndexMap::from([("TOKEN".to_string(), "one".to_string())]);
+        let identity = cache_identity(&section, &env, &secrets, b"solve-one");
+
+        env.insert("SOURCE_DATE_EPOCH".to_string(), "2".to_string());
+        assert_eq!(
+            identity,
+            cache_identity(&section, &env, &secrets, b"solve-one")
+        );
+        env.insert("FLAGS".to_string(), "second".to_string());
+        assert_ne!(
+            identity,
+            cache_identity(&section, &env, &secrets, b"solve-one")
+        );
+        env.insert("FLAGS".to_string(), "first".to_string());
+        secrets.insert("TOKEN".to_string(), "two".to_string());
+        assert_ne!(
+            identity,
+            cache_identity(&section, &env, &secrets, b"solve-one")
+        );
+        secrets.insert("TOKEN".to_string(), "one".to_string());
+        assert_ne!(
+            identity,
+            cache_identity(&section, &env, &secrets, b"solve-two")
+        );
+    }
 
     #[test]
     fn reusable_step_paths_resolve_local_and_packaged_files() {

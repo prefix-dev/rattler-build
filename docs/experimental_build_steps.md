@@ -80,9 +80,9 @@ emit dependencies or the executable build plan itself. If metadata itself uses
 a provider, that one provider is resolved before source fetching.
 
 !!! warning
-    Metadata runs arbitrary recipe code during both builds and render-only
-    operations. Do not render an untrusted recipe with experimental features
-    enabled.
+Metadata runs arbitrary recipe code during both builds and render-only
+operations. Do not render an untrusted recipe with experimental features
+enabled.
 
 The recipe is initially parsed and rendered to discover outputs and variants
 before this phase. Consequently, a metadata step cannot change package identity,
@@ -101,7 +101,9 @@ The step receives `OUTPUT_FILE`, `RATTLER_BUILD_OUTPUT_FILE`, `RECIPE_DIR`,
 `SRC_DIR`, `PKG_NAME`, `PKG_VERSION`, `BUILD_PLATFORM`, `HOST_PLATFORM`, and
 `TARGET_PLATFORM`. A packaged metadata provider additionally receives
 `RATTLER_BUILD_PROVIDER_PREFIX` and `RATTLER_BUILD_PROVIDER_VERSION` so code
-and version-pinned normal build-step definitions can live in the same package. The step writes the same line-oriented format as [post-build outputs](#post-build-metadata-outputs):
+and version-pinned normal build-step definitions can live in the same package. A successful metadata command must create
+`OUTPUT_FILE` (it may be empty when no changes are needed); otherwise the phase
+fails. The step writes the same line-oriented format as [post-build outputs](#post-build-metadata-outputs):
 
 ```text
 requirements.build.append ["cmake", "ninja"]
@@ -114,12 +116,16 @@ Requirement fields are append-only. `build.steps` and `build.script` can be set
 or extended, and `build.python.entry_points` can be appended for generated
 Python console scripts. The normal post-build mutable fields can also be changed.
 Arrays and objects use JSON syntax. Emitted dependency values must be concrete
-match specs; selectors and variant expansion have already happened. Generated
-script content still receives the normal late-bound build-script rendering.
-The output content is included in the package variant hash. After a successful
-metadata step, rattler-build prints the effective generated recipe as YAML before
-resolving its emitted step providers and dependencies, so the dynamic result is
-visible during a normal build.
+match specs; selectors and variant expansion have already happened. If a
+metadata-generated build/host dependency has a configured variant (for example
+`python`), the initial recipe must reference that variant or pass
+`${{ python }}` through the metadata provider's `with`; rattler-build rejects a
+late dependency that would silently bypass variant expansion. Generated script
+content still receives the normal late-bound build-script rendering. The output
+content is included in the package variant hash. After a successful metadata
+step, rattler-build prints the effective `build`, `requirements`, and `about`
+metadata as YAML before resolving emitted step providers and dependencies, so
+the dynamic result is visible without logging unrelated source or context data.
 
 For example, a project can keep conda-specific dependency declarations in
 `pyproject.toml` and generate its build pipeline:
@@ -189,11 +195,13 @@ one `KEY: GLOB` declaration per line (blank lines and `#` comments are ignored):
 Globs use `/` separators, are relative to the step working directory, and may
 not be absolute or contain `..`. Every condition must match at least one file;
 a missing input or deleted output is a cache miss. Changes to the step's script,
-interpreter, environment, or working directory also invalidate its cache.
+interpreter, effective environment (including secret values), resolved dependency
+set, or working directory also invalidate its cache.
 Rattler-build stores the fingerprints next to the declaration file after the
 step succeeds. It removes the old declaration before a cache-miss execution, so
 a step must write the file again to remain cacheable. Failed steps never update
-cache state.
+cache state. On a cache hit, the executor also retains that section's previous
+`OUTPUT_FILE`, so generated post-build metadata is replayed consistently.
 
 The declaration file is intentionally simple to generate from shell scripts;
 the adjacent executor-owned `.state.json` file is an implementation detail and
@@ -338,8 +346,7 @@ recipe. This line format replaces the prototype's RFC 6902 JSON Patch format so
 step output remains straightforward to inspect and generate.
 
 !!! warning "Windows multiline steps"
-    On Windows, a multiline `run: |` block is emitted as one command-list item.
-    Rattler-Build inserts fail-fast guards between list items, not between the
-    physical lines inside one multiline scalar, so check `%errorlevel%` yourself
-    when a multiline `cmd.exe` block needs per-line failure handling.
-
+On Windows, a multiline `run: |` block is emitted as one command-list item.
+Rattler-Build inserts fail-fast guards between list items, not between the
+physical lines inside one multiline scalar, so check `%errorlevel%` yourself
+when a multiline `cmd.exe` block needs per-line failure handling.

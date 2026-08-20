@@ -15,6 +15,10 @@ build:
   noarch: python
   metadata:
     uses: python:metadata@0.1.*
+    env:
+      # Resolved provider identity must override consumer-supplied values.
+      RATTLER_BUILD_PROVIDER_PREFIX: should-not-be-used
+      RATTLER_BUILD_PROVIDER_VERSION: "9.9.9"
 
 tests:
   - python:

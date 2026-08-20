@@ -74,9 +74,13 @@ def emit(path: str, value: object, *, append: bool = False) -> str:
 
 def read_metadata(manifest: dict) -> tuple[dict, list[str], list[str], list[str]]:
     """Return project metadata, build requirements, run requirements, entry points."""
-    mapping = DEFAULT_PYPI_TO_CONDA | manifest.get("tool", {}).get(
-        "rattler-build", {}
-    ).get("pypi-to-conda", {})
+    configured_mapping = (
+        manifest.get("tool", {}).get("rattler-build", {}).get("pypi-to-conda", {})
+    )
+    mapping = DEFAULT_PYPI_TO_CONDA | {
+        normalized_name(name): conda_name
+        for name, conda_name in configured_mapping.items()
+    }
     build_requires = [
         dependency
         for raw in manifest.get("build-system", {}).get("requires", [])
@@ -96,15 +100,21 @@ def read_metadata(manifest: dict) -> tuple[dict, list[str], list[str], list[str]
             f"{name} = {target}" for name, target in project.get("scripts", {}).items()
         ]
         urls = project.get("urls", {})
+        license_value = project.get("license")
+        license_files = list(project.get("license-files", []))
+        if isinstance(license_value, dict):
+            if license_file := license_value.get("file"):
+                license_files.append(license_file)
+            license_value = license_value.get("text")
         metadata = {
             "name": project["name"],
             "version": project["version"],
             "summary": project.get("description"),
-            "license": project.get("license"),
+            "license": license_value,
             "homepage": urls.get("Homepage"),
             "repository": urls.get("Repository"),
             "documentation": urls.get("Documentation"),
-            "license_files": project.get("license-files", []),
+            "license_files": license_files,
         }
         return metadata, build_requires, run, entry_points
 

@@ -55,6 +55,62 @@ def test_metadata_step_runs_before_solving_and_defines_build_plan(
     assert rendered["build"]["steps"][0]["name"] == "install"
 
 
+def test_metadata_requires_output_file(rattler_build: RattlerBuild, tmp_path: Path):
+    """A successful command that forgets the metadata protocol is an error."""
+    recipe = tmp_path / "missing-output" / "recipe.yaml"
+    recipe.parent.mkdir()
+    recipe.write_text(
+        """schema_version: 1
+package:
+  name: missing-metadata-output
+  version: 1.0.0
+build:
+  metadata:
+    run: echo metadata command ran
+"""
+    )
+    result = rattler_build(
+        "build",
+        "--recipe",
+        str(recipe),
+        "--output-dir",
+        str(tmp_path / "output"),
+        "--render-only",
+        "--experimental",
+        capture_output=True,
+    )
+
+    assert result.returncode != 0
+    assert "completed without creating OUTPUT_FILE" in result.stderr
+
+
+def test_run_metadata_uses_external_source_tree(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """`run --source-dir` is visible to metadata, not only generated steps."""
+    source = tmp_path / "external-source"
+    source.mkdir()
+    (source / "pyproject.toml").write_text(
+        '[tool.rattler-build]\nbuild = ["python"]\nhost = []\n'
+    )
+    output = rattler_build(
+        "run",
+        "install",
+        "--recipe",
+        str(recipes / "metadata_step"),
+        "--source-dir",
+        str(source),
+        "--output-dir",
+        str(tmp_path / "output"),
+        "--experimental",
+        stderr=STDOUT,
+    )
+
+    assert "Generated metadata after build.metadata:" in output
+    assert str(source) in output
+    assert "- zlib" not in output
+
+
 def test_python_metadata_backend_builds_external_rich_source(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
@@ -72,7 +128,7 @@ def test_python_metadata_backend_builds_external_rich_source(
         extra_args=["--experimental"],
     )
     build_output = rattler_build(*build_args, stderr=STDOUT)
-    assert "Generated recipe after build.metadata:" in build_output
+    assert "Generated metadata after build.metadata:" in build_output
     assert "- uses: python:build@==0.1.0" in build_output
     assert "summary: Render rich text" in build_output
     assert "Ignoring prefix-detection" not in build_output
@@ -96,6 +152,9 @@ def test_python_metadata_backend_builds_external_rich_source(
         "poetry-core >=1.0.0",
     ]
     assert rendered["build"]["steps"][0]["uses"] == "python:build@==0.1.0"
+    metadata_env = rendered["build"]["metadata"]["env"]
+    assert "RATTLER_BUILD_PROVIDER_PREFIX" not in metadata_env
+    assert metadata_env["RATTLER_BUILD_PROVIDER_VERSION"] == "0.1.0"
     assert (pkg / "site-packages" / "rich" / "__init__.py").exists()
     assert (pkg / "info" / "licenses" / "LICENSE").exists()
 

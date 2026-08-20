@@ -18,7 +18,19 @@ pub(crate) fn output_file(work_dir: &Path, index: usize) -> PathBuf {
     output_directory(work_dir).join(format!("{index:06}.txt"))
 }
 
-/// Remove stale outputs and create the output directory before script execution.
+fn output_index(path: &Path) -> Option<usize> {
+    let name = path.file_name()?.to_str()?;
+    if name.len() != "000000.txt".len() {
+        return None;
+    }
+    let index = name.strip_suffix(".txt")?;
+    index
+        .chars()
+        .all(|character| character.is_ascii_digit())
+        .then(|| index.parse().expect("six ASCII digits fit in usize"))
+}
+
+/// Remove all stale outputs and create the output directory.
 pub(crate) fn prepare_output_directory(work_dir: &Path) -> std::io::Result<()> {
     let directory = output_directory(work_dir);
     match fs_err::remove_dir_all(&directory) {
@@ -27,6 +39,29 @@ pub(crate) fn prepare_output_directory(work_dir: &Path) -> std::io::Result<()> {
         Err(error) => return Err(error),
     }
     fs_err::create_dir_all(directory)
+}
+
+/// Prepare outputs for cache-aware execution.
+///
+/// Outputs belonging to still-present sections are retained so a cache hit can
+/// replay metadata emitted by the previous successful execution. Outputs for
+/// removed sections and unrelated files are deleted.
+pub(crate) fn prepare_cached_outputs(work_dir: &Path, section_count: usize) -> std::io::Result<()> {
+    let directory = output_directory(work_dir);
+    fs_err::create_dir_all(&directory)?;
+    for entry in fs_err::read_dir(&directory)? {
+        let entry = entry?;
+        let path = entry.path();
+        let retain = output_index(&path).is_some_and(|index| index < section_count);
+        if !retain {
+            if entry.file_type()?.is_dir() {
+                fs_err::remove_dir_all(path)?;
+            } else {
+                fs_err::remove_file(path)?;
+            }
+        }
+    }
+    Ok(())
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -304,7 +339,7 @@ pub(crate) fn apply_outputs(
         .into_diagnostic()?
         .filter_map(Result::ok)
         .map(|entry| entry.path())
-        .filter(|path| path.is_file())
+        .filter(|path| path.is_file() && output_index(path).is_some())
         .collect::<Vec<_>>();
     outputs.sort();
     for output in outputs {
@@ -446,6 +481,26 @@ build.steps.append {"name":"generated","run":"echo generated"}
         let steps = recipe.build.plan.steps().unwrap();
         assert_eq!(steps.len(), 1);
         assert_eq!(steps[0].name.as_deref(), Some("generated"));
+    }
+
+    #[test]
+    fn cached_outputs_retain_selected_sections_and_remove_stale_files() {
+        let temp = tempfile::tempdir().unwrap();
+        prepare_output_directory(temp.path()).unwrap();
+        fs_err::write(output_file(temp.path(), 0), "about.summary cached\n").unwrap();
+        fs_err::write(output_file(temp.path(), 1), "about.summary stale\n").unwrap();
+        fs_err::write(output_directory(temp.path()).join("unexpected"), "ignored").unwrap();
+        fs_err::write(output_directory(temp.path()).join("0.txt"), "ignored").unwrap();
+
+        prepare_cached_outputs(temp.path(), 1).unwrap();
+
+        assert!(output_file(temp.path(), 0).is_file());
+        assert!(!output_file(temp.path(), 1).exists());
+        assert!(!output_directory(temp.path()).join("unexpected").exists());
+        assert!(!output_directory(temp.path()).join("0.txt").exists());
+        let mut recipe = recipe();
+        apply_outputs(&mut recipe, temp.path()).unwrap();
+        assert_eq!(recipe.about.summary.as_deref(), Some("cached"));
     }
 
     #[test]

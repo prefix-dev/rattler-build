@@ -136,10 +136,17 @@ DEFAULT_PYPI_TO_CONDA = {
 }
 ```
 
+Projects can add normalized overrides without changing the provider:
+
+```toml
+[tool.rattler-build.pypi-to-conda]
+Some_PyPI_Name = "different-conda-name"
+```
+
 A production backend should query and cache the prefix.dev PyPI-to-conda
-mapping service and support user overrides for missing or ambiguous names.
-Keeping the map local makes this example reproducible and avoids hiding that
-important conversion step.
+mapping service for missing or ambiguous names. Keeping the default map local
+makes this example reproducible and avoids hiding that important conversion
+step.
 
 ## Current holes and deliberate limitations
 
@@ -159,10 +166,5 @@ important conversion step.
   `prepare_metadata_for_build_wheel`; it only reads static TOML.
 - **Generated tests are unsupported:** metadata may generate requirements,
   `about`, Python entry points, and build steps/scripts, but not recipe tests.
-- **Provider prefixes are process-local:** the metadata wrapper receives the
-  resolved provider prefix as an environment variable. Rendered provider
-  provenance remains stable, but that absolute execution path is not portable
-  to another machine outside a fresh render/build.
-
-This is an executable protocol demonstration, not yet a replacement for
-`pixi-build-python`.
+  This is an executable protocol demonstration, not yet a replacement for
+  `pixi-build-python`.

@@ -11,6 +11,10 @@ build:
   metadata:
     requirements:
       build: [python]
+    env:
+      # Executor-owned protocol variables must override recipe values.
+      OUTPUT_FILE: should-not-be-used.txt
+      SRC_DIR: should-not-be-used
     interpreter: python
     run: |
       import json
