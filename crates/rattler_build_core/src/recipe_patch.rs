@@ -383,7 +383,11 @@ requirements.run_exports.strong.append ["abi >=2"]
         let mut recipe = recipe();
 
         let error = apply_outputs(&mut recipe, temp.path()).unwrap_err();
-        assert!(error.to_string().contains("after environments have been solved"));
+        assert!(
+            error
+                .to_string()
+                .contains("after environments have been solved")
+        );
 
         prepare_output_directory(temp.path()).unwrap();
         fs_err::write(
