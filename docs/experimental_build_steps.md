@@ -94,7 +94,8 @@ The metadata step uses the normal step fields `run`, `uses`, `with`,
 `interpreter`, `env`, `cwd`, and `requirements.build` / `requirements.host`.
 Its `cwd` is relative to `SRC_DIR`. Its requirements are solved and installed
 into a temporary bootstrap environment separate from the final package
-environments. A metadata `uses` file must resolve to exactly one executable
+environments. Execution uses strict environment isolation and the build's
+configured sandbox policy. A metadata `uses` file must resolve to exactly one executable
 step; it cannot be optional or depend on normal build steps.
 
 The step receives `OUTPUT_FILE`, `RATTLER_BUILD_OUTPUT_FILE`, `RECIPE_DIR`,

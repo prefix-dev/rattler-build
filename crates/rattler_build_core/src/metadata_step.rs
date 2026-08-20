@@ -213,7 +213,7 @@ pub async fn run_metadata_step(
             recipe_dir,
             context,
             Some(output.jinja_renderer()),
-            None,
+            output.build_configuration.sandbox_config(),
             EnvironmentIsolation::Strict,
         )
         .await
