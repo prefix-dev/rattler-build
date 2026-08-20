@@ -651,6 +651,30 @@ pub async fn get_build_output(
             ),
         };
 
+        rattler_build_core::step_provider::preprocess_metadata_step(
+            &mut output,
+            tool_config,
+            &mut step_provider_resolver,
+        )
+        .await?;
+        if output.recipe.build.metadata.is_some() {
+            // Metadata may inspect the fetched project (for example,
+            // pyproject.toml) before producing the final solve requirements.
+            // The normal build recreates this work directory and restores the
+            // source from cache after output selection.
+            output
+                .build_configuration
+                .directories
+                .create_build_dir(true)
+                .into_diagnostic()?;
+            output = output
+                .fetch_sources(
+                    tool_config,
+                    rattler_build_core::source::patch::apply_patch_custom,
+                )
+                .await
+                .into_diagnostic()?;
+        }
         rattler_build_core::metadata_step::run_metadata_step(&mut output, tool_config).await?;
         if is_multi_output_recipe
             && output

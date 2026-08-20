@@ -73,10 +73,11 @@ recipe for an independent lint step and an optional C++ test step.
 
 ## Pre-solve metadata step
 
-`build.metadata` is a single bootstrap step that runs before reusable-step
-resolution, final build-step DAG selection, source fetching, and the final
-build/host dependency solve. It can inspect project metadata next to the recipe
-and emit dependencies or the executable build plan itself.
+`build.metadata` is a single bootstrap step that runs after source fetching but
+before normal reusable-step resolution, final build-step DAG selection, and the
+final build/host dependency solve. It can inspect the prepared source tree and
+emit dependencies or the executable build plan itself. If metadata itself uses
+a provider, that one provider is resolved before source fetching.
 
 !!! warning
     Metadata runs arbitrary recipe code during both builds and render-only
@@ -85,20 +86,22 @@ and emit dependencies or the executable build plan itself.
 
 The recipe is initially parsed and rendered to discover outputs and variants
 before this phase. Consequently, a metadata step cannot change package identity,
-sources, outputs, or variant selection. Remote recipe sources have not been
-fetched yet: only files already available locally can be inspected. `RECIPE_DIR`
-is provided as the stable reference point for locating a project checkout.
+sources, outputs, or variant selection. URL, Git, and path sources are fetched,
+verified, extracted, and patched first, so metadata can inspect them through
+`SRC_DIR`. `RECIPE_DIR` remains available for recipe-local support files.
 
-The metadata step uses the normal step fields `run`, `interpreter`, `env`, `cwd`,
-and `requirements.build` / `requirements.host`. Its `cwd` is relative to
-`RECIPE_DIR`, unlike a normal build step. Its requirements are solved and
-installed into a temporary bootstrap environment that is separate from the
-final package environments. It cannot use `uses`, be optional, or depend on
-normal build steps.
+The metadata step uses the normal step fields `run`, `uses`, `with`,
+`interpreter`, `env`, `cwd`, and `requirements.build` / `requirements.host`.
+Its `cwd` is relative to `SRC_DIR`. Its requirements are solved and installed
+into a temporary bootstrap environment separate from the final package
+environments. A metadata `uses` file must resolve to exactly one executable
+step; it cannot be optional or depend on normal build steps.
 
 The step receives `OUTPUT_FILE`, `RATTLER_BUILD_OUTPUT_FILE`, `RECIPE_DIR`,
-`BUILD_PLATFORM`, `HOST_PLATFORM`, and `TARGET_PLATFORM`. It writes the same
-line-oriented format as [post-build outputs](#post-build-metadata-outputs):
+`SRC_DIR`, `PKG_NAME`, `PKG_VERSION`, `BUILD_PLATFORM`, `HOST_PLATFORM`, and
+`TARGET_PLATFORM`. A packaged metadata provider additionally receives
+`RATTLER_BUILD_PROVIDER_PREFIX` and `RATTLER_BUILD_PROVIDER_VERSION` so code
+and version-pinned normal build-step definitions can live in the same package. The step writes the same line-oriented format as [post-build outputs](#post-build-metadata-outputs):
 
 ```text
 requirements.build.append ["cmake", "ninja"]

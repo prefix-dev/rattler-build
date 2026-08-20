@@ -130,6 +130,16 @@ pub async fn run_metadata_step(
                 .into_owned(),
         ),
     );
+    let source_dir = output
+        .build_configuration
+        .directories
+        .source_dir
+        .as_ref()
+        .unwrap_or(&output.build_configuration.directories.work_dir);
+    env.insert(
+        "SRC_DIR".to_string(),
+        Some(source_dir.to_string_lossy().into_owned()),
+    );
     env.insert(
         "BUILD_PLATFORM".to_string(),
         Some(
@@ -154,6 +164,14 @@ pub async fn run_metadata_step(
         "TARGET_PLATFORM".to_string(),
         Some(output.build_configuration.target_platform.to_string()),
     );
+    env.insert(
+        "PKG_NAME".to_string(),
+        Some(output.recipe.package.name.as_normalized().to_string()),
+    );
+    env.insert(
+        "PKG_VERSION".to_string(),
+        Some(output.recipe.package.version.to_string()),
+    );
 
     let context = ExecutionContext::separate(
         RuntimeEnv::current(),
@@ -170,12 +188,12 @@ pub async fn run_metadata_step(
                 .any(|component| matches!(component, Component::ParentDir))
         {
             return Err(miette::miette!(
-                "`build.metadata.cwd` must stay within the recipe directory"
+                "`build.metadata.cwd` must stay within the source directory"
             ));
         }
-        recipe_dir.join(cwd)
+        source_dir.join(cwd)
     } else {
-        recipe_dir.clone()
+        source_dir.clone()
     };
     let mut script = step.to_script();
     // Keep generated wrappers in the temporary workspace while running the

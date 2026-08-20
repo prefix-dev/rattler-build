@@ -17,5 +17,5 @@ required to produce the final rendered recipe:
 rattler-build build --recipe examples/metadata-step --experimental --render-only
 ```
 
-The metadata phase can only inspect files already available locally;
-`RECIPE_DIR` is its reference point and remote sources are fetched later.
+Sources are fetched and prepared before metadata runs. `SRC_DIR` points to that
+source tree, while `RECIPE_DIR` remains available for recipe-local helpers.

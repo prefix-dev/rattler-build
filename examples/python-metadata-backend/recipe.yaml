@@ -1,32 +1,23 @@
 schema_version: 1
 
-# Package identity is needed before metadata runs. The experimental file loader
-# avoids duplicating these two values from pyproject.toml.
 context:
-  project: ${{ load_from_file("project/pyproject.toml").project }}
+  version: "14.2.0"
 
 package:
-  name: ${{ project.name }}
-  version: ${{ project.version }}
+  name: rich
+  version: ${{ version }}
 
 source:
-  path: project
+  url: https://pypi.io/packages/source/r/rich/rich-${{ version }}.tar.gz
+  sha256: 73ff50c7c0c1c77c8243079283f4edb376f0f6442433aecb8ce7e6d0b92d1fe4
 
 build:
   noarch: python
   metadata:
-    requirements:
-      build: [python >=3.11, packaging]
-    interpreter: python
-    run: |
-      import os
-      from pathlib import Path
-
-      backend = Path(os.environ["RECIPE_DIR"]) / "python_metadata_backend.py"
-      exec(compile(backend.read_text(), backend, "exec"), {"__name__": "__main__"})
+    uses: python:metadata@0.1.*
 
 tests:
   - python:
-      imports: [tingy_rich_demo]
+      imports: [rich]
   - script:
-      - tingy-rich-demo
+      - python -c "from rich.console import Console; Console().print('[bold green]external Rich package works![/]')"

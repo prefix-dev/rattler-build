@@ -1,134 +1,157 @@
-# Tiny Python metadata backend
+# Pack external Rich with a Python metadata provider
 
-This is a complete, deliberately small analogue of `pixi-build-python`. A
-custom Python program reads standard PEP 621 metadata from `pyproject.toml`,
-emits conda requirements and package metadata during `build.metadata`, and
-creates two normal rattler-build steps that build and install a wheel.
+This example literally downloads the Rich 14.2.0 sdist from PyPI, reads its
+`pyproject.toml`, derives conda metadata, builds a wheel, installs it into a
+noarch package, and runs package tests. The consumer recipe has no Python host
+or run requirements and no build script of its own.
 
-The Python project depends on `rich`, so the resulting noarch conda package can
-run this generated console entry point:
+The same `python-rattler-build-steps` conda package supplies both halves:
 
-```console
-$ tingy-rich-demo
-tingy metadata backend works!
-```
+- `python:metadata` reads PEP 621 or Poetry `pyproject.toml` metadata and emits
+  host/run requirements, `about` fields, license files, entry points, and a
+  `python:build` step reference.
+- `python:build` builds a wheel with `python-build`, then installs it with pip.
 
-## Build it
-
-From the repository root:
-
-```console
-rattler-build build \
-  --recipe examples/python-metadata-backend \
-  --experimental
-```
-
-The package tests import `tingy_rich_demo` and execute `tingy-rich-demo`.
-
-## Minimal recipe
-
-All Python-specific host/run requirements, `about` metadata, and executable
-build steps come from `pyproject.toml`. The recipe only supplies the fields that
-must exist during initial output discovery, the local source, the noarch mode,
-the metadata backend bootstrap, and tests:
+## Minimal Rich recipe
 
 ```yaml
 schema_version: 1
 
 context:
-  project: ${{ load_from_file("project/pyproject.toml").project }}
+  version: "14.2.0"
 
 package:
-  name: ${{ project.name }}
-  version: ${{ project.version }}
+  name: rich
+  version: ${{ version }}
 
 source:
-  path: project
+  url: https://pypi.io/packages/source/r/rich/rich-${{ version }}.tar.gz
+  sha256: 73ff50c7c0c1c77c8243079283f4edb376f0f6442433aecb8ce7e6d0b92d1fe4
 
 build:
   noarch: python
   metadata:
-    requirements:
-      build: [python >=3.11, packaging]
-    interpreter: python
-    run: |
-      import os
-      from pathlib import Path
-
-      backend = Path(os.environ["RECIPE_DIR"]) / "python_metadata_backend.py"
-      exec(compile(backend.read_text(), backend, "exec"), {"__name__": "__main__"})
+    uses: python:metadata@0.1.*
 
 tests:
   - python:
-      imports: [tingy_rich_demo]
-  - script:
-      - tingy-rich-demo
+      imports: [rich]
 ```
 
-`python_metadata_backend.py` performs three jobs:
-
-1. Parse `[project]` and `[build-system]` with `tomllib` and PEP 508 strings
-   with `packaging.Requirement`.
-2. Write host/run requirements and `about.*` fields to `OUTPUT_FILE`.
-3. Set `build.steps` to a `python-build` wheel step followed by a `pip install
-   --no-deps --no-build-isolation` step in the activated host prefix.
-
-Its relevant output is equivalent to:
+`package`, `source`, and `noarch` are required before metadata executes. All of
+these fields are generated from the fetched `pyproject.toml`:
 
 ```text
-requirements.host.append ["python","pip","python-build","hatchling >=1.26"]
-requirements.run.append ["python >=3.10","rich <15,>=13.9"]
-build.python.entry_points.append ["tingy-rich-demo = tingy_rich_demo:main"]
-about.summary "A tiny Rich application built by a custom rattler-build metadata backend"
+requirements.host.append ["python","pip","python-build","poetry-core >=1.0.0"]
+requirements.run.append ["python >=3.8.0","pygments >=2.13.0,<3","markdown-it-py >=2.2.0"]
+about.summary "Render rich text, tables, progress bars, syntax highlighting, markdown and more to the terminal"
 about.license "MIT"
 about.license_file.include.append "LICENSE"
-build.steps [{"name":"build-wheel",...},{"name":"install-wheel",...}]
+build.steps [{"uses":"python:build@==0.1.0"}]
 ```
+
+## Run the complete example locally
+
+First build the package containing both providers:
+
+```console
+rattler-build build \
+  --recipe examples/python-metadata-backend/provider \
+  --output-dir output/provider
+```
+
+Publish that artifact to a temporary local channel:
+
+```console
+rattler-build publish \
+  output/provider/noarch/python-rattler-build-steps-0.1.0-*.conda \
+  --to output/provider-channel
+```
+
+If your package format is `tar.bz2`, use that filename instead. Then build Rich:
+
+```console
+rattler-build build \
+  --recipe examples/python-metadata-backend \
+  --output-dir output/rich \
+  --channel "file://$PWD/output/provider-channel" \
+  --channel conda-forge \
+  --experimental
+```
+
+The build downloads and verifies the upstream sdist, resolves the provider,
+fetches the source before metadata execution, creates a bootstrap Python
+environment for the extractor, solves the emitted final requirements, executes
+the provider's wheel steps, and tests both `import rich` and Rich rendering.
+
+A provider artifact can instead be uploaded with:
+
+```console
+rattler-build publish \
+  output/provider/noarch/python-rattler-build-steps-0.1.0-*.conda \
+  --to https://beta.prefix.dev/wolfv/rattler-build-steps
+```
+
+Publishing requires a prefix.dev API key in the keychain or environment.
+
+## Provider layout
+
+The package recipe installs these files together:
+
+```text
+etc/rattler-build/steps/python/
+├── metadata.yaml
+├── build.yaml
+└── python_metadata_backend.py
+```
+
+The metadata wrapper receives `SRC_DIR`, `RECIPE_DIR`, `PKG_NAME`,
+`PKG_VERSION`, `RATTLER_BUILD_PROVIDER_PREFIX`, and
+`RATTLER_BUILD_PROVIDER_VERSION`. The Python extractor reads
+`$SRC_DIR/pyproject.toml`, verifies that its name/version agree with the recipe,
+and writes the line-oriented protocol to `OUTPUT_FILE`. Its emitted
+`python:build` reference resolves from the same already-cached provider package.
 
 ## PyPI-to-conda mapping
 
-A production backend cannot assume PyPI and conda package names are identical.
-The example combines a tiny built-in map with project overrides:
+PyPI and conda names cannot generally be assumed to match. The example has a
+small deterministic map for Rich and its Poetry build backend:
 
 ```python
-DEFAULT_PYPI_TO_CONDA = {"hatchling": "hatchling"}
+DEFAULT_PYPI_TO_CONDA = {
+    "markdown-it-py": "markdown-it-py",
+    "poetry-core": "poetry-core",
+    "pygments": "pygments",
+}
 ```
 
-```toml
-[tool.rattler-build.pypi-to-conda]
-rich = "rich"
-```
-
-That is sufficient here because both names happen to match. A real backend
-should query the prefix.dev PyPI-to-conda mapping service, cache its answers,
-and support user overrides for missing or ambiguous mappings. It must also
-translate version syntax more carefully than this example's intentionally
-small `>=`/`<` overlap.
+A production backend should query and cache the prefix.dev PyPI-to-conda
+mapping service and support user overrides for missing or ambiguous names.
+Keeping the map local makes this example reproducible and avoids hiding that
+important conversion step.
 
 ## Current holes and deliberate limitations
 
-- **Package identity is too early:** `package.name` and `package.version` cannot
-  be emitted by metadata because output discovery needs them first. This local
-  example bridges that gap with experimental `load_from_file`; a remote source
-  still cannot provide identity this way.
-- **Noarch is too early:** `build.noarch: python` also has to remain in the
-  recipe because platform/output setup has already started.
-- **Remote source is too late:** metadata runs before normal source fetching.
-  This example therefore uses a local `project/` directory. A recipe for
-  an upstream sdist cannot inspect that sdist's `pyproject.toml` in this phase
-  without downloading it independently, which would duplicate source logic.
-- **Dependency conversion is incomplete:** arbitrary PEP 440 operators, extras,
-  direct URLs, environment markers for a cross-compilation target, optional
-  dependencies, and build-backend-specific dynamic metadata need a real
-  converter. This backend supports the straightforward dependencies used here.
-- **Markers use the bootstrap machine:** `packaging` evaluates markers in the
-  metadata environment, not against rattler-build's target platform.
-- **Dynamic PEP 621 fields are unsupported:** this reads static TOML; it does
-  not call PEP 517 `prepare_metadata_for_build_wheel`.
-- **Tests cannot be generated:** the current pre-solve output allowlist covers
-  requirements, `about`, and `build.script`/`build.steps`, but not recipe tests.
-- **The backend is loaded by a tiny inline shim:** metadata steps do not yet
-  support a local or packaged `uses` provider directly.
+- **Identity and noarch are still static:** output discovery needs
+  `package.name`, `package.version`, and `build.noarch` before metadata runs.
+- **Sources are prepared twice:** source archives are downloaded once into the
+  source cache, but currently extracted/copied for metadata and restored again
+  for the normal build. The second pass uses the cache rather than downloading
+  the archive again.
+- **Dependency conversion is partial:** the extractor supports the static PEP
+  621 subset and the Poetry constraints used by Rich. Arbitrary PEP 440/Poetry
+  operators, direct URLs, extras, dependency groups, and dynamic metadata need
+  a production-grade converter.
+- **Marker evaluation is incomplete:** PEP 508 markers are evaluated in the
+  bootstrap environment rather than a complete target-platform marker context.
+- **Dynamic PEP 517 metadata is not queried:** the extractor does not call
+  `prepare_metadata_for_build_wheel`; it only reads static TOML.
+- **Generated tests are unsupported:** metadata may generate requirements,
+  `about`, Python entry points, and build steps/scripts, but not recipe tests.
+- **Provider prefixes are process-local:** the metadata wrapper receives the
+  resolved provider prefix as an environment variable. Rendered provider
+  provenance remains stable, but that absolute execution path is not portable
+  to another machine outside a fresh render/build.
 
-These constraints are why this is an executable protocol example rather than a
-replacement for `pixi-build-python`.
+This is an executable protocol demonstration, not yet a replacement for
+`pixi-build-python`.

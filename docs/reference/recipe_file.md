@@ -673,10 +673,10 @@ requirements:
 `build.metadata` is a single pre-solve bootstrap step. Its own
 `requirements.build` and `requirements.host` are installed in a temporary
 environment; the step can then emit final build/host requirements and set or
-extend `build.steps`. It runs after initial recipe rendering but before reusable
-step resolution, DAG selection, source fetching, and the final dependency solve.
-It can inspect local files using `RECIPE_DIR` as a reference point; remote
-recipe sources are not yet available.
+extend `build.steps`. It runs after initial recipe rendering and source fetching,
+but before normal reusable-step resolution, DAG selection, and the final
+dependency solve. It inspects the prepared source through `SRC_DIR` and may load
+its own local or packaged provider with `uses`.
 
 `build.steps` is an experimental alternative to `build.script` and requires
 `--experimental`. `script` and `steps` are mutually exclusive, including

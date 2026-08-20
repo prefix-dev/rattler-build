@@ -388,6 +388,112 @@ impl StepProviderResolver {
     }
 }
 
+/// Resolve a local or packaged `build.metadata.uses` reference before source
+/// fetching and final dependency solving. Metadata providers contain exactly
+/// one executable step; they may emit normal `build.steps` that use the same
+/// provider package later in preprocessing.
+pub async fn preprocess_metadata_step(
+    output: &mut Output,
+    tool_configuration: &Configuration,
+    resolver: &mut StepProviderResolver,
+) -> miette::Result<()> {
+    let Some(wrapper) = output.recipe.build.metadata.clone() else {
+        return Ok(());
+    };
+    let Some(reference) = wrapper.uses.clone() else {
+        return Ok(());
+    };
+    let recipe_dir = output
+        .build_configuration
+        .directories
+        .recipe_path
+        .parent()
+        .unwrap_or_else(|| Path::new("."));
+    let parsed = parse_step_package_reference_detailed(&reference)
+        .map_err(|error| miette::miette!("invalid metadata provider `{reference}`: {error}"))?;
+    let (path, provider, provider_prefix) = if let Some(parsed) = parsed {
+        let environment = resolver
+            .resolve(parsed.provider, parsed.version, output, tool_configuration)
+            .await?;
+        (
+            provider_step_path(&environment.prefix, parsed.provider, parsed.step)?,
+            Some(environment.provider),
+            Some(environment.prefix),
+        )
+    } else {
+        (local_step_path(&reference, recipe_dir)?, None, None)
+    };
+    let content_sha256 = file_sha256(&path)?;
+    let contents = fs_err::read_to_string(&path).into_diagnostic()?;
+    let rendered_steps = render_reusable_steps(&contents, &reference, &wrapper.with, output)
+        .wrap_err_with(|| format!("failed to preprocess metadata provider `{reference}`"))?;
+    let rendered_sha256 = sha256_bytes(
+        &serde_json::to_vec(&rendered_steps)
+            .into_diagnostic()
+            .wrap_err("failed to hash rendered metadata provider")?,
+    );
+    let mut selected = BuildPlan::Steps(rendered_steps.clone())
+        .select_steps(None)
+        .map_err(|error| miette::miette!("invalid metadata provider `{reference}`: {error}"))?;
+    if selected.len() != 1 {
+        return Err(miette::miette!(
+            "metadata provider `{reference}` must resolve to exactly one step, found {}",
+            selected.len()
+        ));
+    }
+    let mut step = selected.remove(0);
+    if step.uses.is_some() {
+        return Err(miette::miette!(
+            "metadata provider `{reference}` cannot delegate to another `uses` reference"
+        ));
+    }
+    step.requirements.build.extend(wrapper.requirements.build);
+    step.requirements.host.extend(wrapper.requirements.host);
+    if let Some(prefix) = provider_prefix {
+        step.env.insert(
+            "RATTLER_BUILD_PROVIDER_PREFIX".to_string(),
+            prefix.to_string_lossy().into_owned(),
+        );
+    }
+    if let Some(provider) = &provider {
+        step.env.insert(
+            "RATTLER_BUILD_PROVIDER_VERSION".to_string(),
+            provider.version.clone(),
+        );
+    }
+    step.env.extend(wrapper.env);
+    if wrapper.interpreter.is_some() {
+        step.interpreter = wrapper.interpreter;
+    }
+    if wrapper.cwd.is_some() {
+        step.cwd = wrapper.cwd;
+    }
+    step.resolved = Some(Box::new(ResolvedStep {
+        reference: reference.clone(),
+        provider: provider.clone(),
+        content_sha256: content_sha256.clone(),
+        rendered_sha256: rendered_sha256.clone(),
+        steps: rendered_steps,
+    }));
+    output.recipe.build.metadata = Some(step);
+    apply_provider_hash(
+        output,
+        &[format!(
+            "metadata|{}|{}|{}|{}",
+            reference,
+            provider
+                .as_ref()
+                .map(serde_json::to_string)
+                .transpose()
+                .into_diagnostic()?
+                .unwrap_or_default(),
+            content_sha256,
+            rendered_sha256
+        )],
+    );
+    Ok(())
+}
+
 /// Resolve and render packaged reusable steps before the recipe's build and host
 /// environments are solved. Provider packages are installed in dedicated cache
 /// prefixes and never enter either recipe prefix.

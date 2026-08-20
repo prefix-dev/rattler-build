@@ -54,24 +54,32 @@ def test_metadata_step_runs_before_solving_and_defines_build_plan(
     assert rendered["build"]["steps"][0]["name"] == "install"
 
 
-def test_python_metadata_backend_builds_noarch_wheel_package(
+def test_python_metadata_backend_builds_external_rich_source(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
-    """A custom pyproject backend emits requirements, entry points, and wheel steps."""
+    """One provider package supplies both pyproject metadata and wheel steps."""
+    provider_output = tmp_path / "provider-output"
+    channel = tmp_path / "channel"
+    consumer_output = tmp_path / "consumer-output"
+    rattler_build.build(recipes / "metadata_python_provider", provider_output)
+    provider = get_package(provider_output, "python-rattler-build-steps")
+    rattler_build("publish", str(provider), "--to", str(channel))
     rattler_build.build(
-        recipes / "metadata_python_backend", tmp_path, extra_args=["--experimental"]
+        recipes / "metadata_python_backend",
+        consumer_output,
+        custom_channels=[channel.as_uri(), "conda-forge"],
+        extra_args=["--experimental"],
     )
-    pkg = get_extracted_package(tmp_path, "tingy-rich-demo")
+    pkg = get_extracted_package(consumer_output, "rich")
 
     index = json.loads((pkg / "info" / "index.json").read_text())
     assert index["noarch"] == "python"
-    assert "python >=3.10" in index["depends"]
-    assert "rich <15,>=13.9" in index["depends"]
-    link = json.loads((pkg / "info" / "link.json").read_text())
-    assert link["noarch"]["entry_points"] == ["tingy-rich-demo = tingy_rich_demo:main"]
+    assert "python >=3.8.0" in index["depends"]
+    assert "markdown-it-py >=2.2.0" in index["depends"]
+    assert "pygments >=2.13.0,<3" in index["depends"]
     about = json.loads((pkg / "info" / "about.json").read_text())
     assert about["license"] == "MIT"
-    assert about["summary"].startswith("A tiny Rich application")
+    assert about["summary"].startswith("Render rich text")
     rendered = yaml.safe_load(
         (pkg / "info" / "recipe" / "rendered_recipe.yaml").read_text()
     )["recipe"]
@@ -79,13 +87,10 @@ def test_python_metadata_backend_builds_noarch_wheel_package(
         "python",
         "pip",
         "python-build",
-        "hatchling >=1.26",
+        "poetry-core >=1.0.0",
     ]
-    assert [step["name"] for step in rendered["build"]["steps"]] == [
-        "build-wheel",
-        "install-wheel",
-    ]
-    assert (pkg / "site-packages" / "tingy_rich_demo" / "__init__.py").exists()
+    assert rendered["build"]["steps"][0]["uses"] == "python:build@==0.1.0"
+    assert (pkg / "site-packages" / "rich" / "__init__.py").exists()
     assert (pkg / "info" / "licenses" / "LICENSE").exists()
 
 
