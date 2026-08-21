@@ -372,9 +372,11 @@ The attestation config has the following fields:
 
 - **`publishers`** - A list of publisher identities in `github:owner/repo` format. At least one
   publisher must match for verification to succeed.
-- **`bundle_url`** (optional) - URL to the Sigstore bundle file. For PyPI sources, this is
-  automatically derived from the PyPI attestation API. For GitHub releases, use the pattern
-  `https://github.com/{owner}/{repo}/releases/download/{tag}/{filename}.sigstore.json`.
+- **`bundle_url`** (optional) - URL to the Sigstore bundle file. It is automatically derived
+  from the PyPI attestation API and, for uploaded GitHub release assets, from the GitHub
+  repository attestations API. GitHub's dynamically generated source archives are not covered
+  by release attestations; upload the source archive as a release asset instead. A direct bundle
+  URL can still be used when a project publishes a standalone `.sigstore.json` file.
 
 See the [Sigstore source attestation documentation](../sigstore.md#source-attestation-verification)
 for more details and examples.
