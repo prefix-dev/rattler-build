@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.12](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.11...rattler_build_core-v0.2.12) - 2026-08-21
+
+### Added
+
+- display CEP-6 channel notices ([#2749](https://github.com/prefix-dev/rattler-build/pull/2749))
+
+### Fixed
+
+- select platform-appropriate legacy test scripts ([#2751](https://github.com/prefix-dev/rattler-build/pull/2751))
+
 ## [0.2.11](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.10...rattler_build_core-v0.2.11) - 2026-08-17
 
 ### Added
