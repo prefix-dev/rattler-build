@@ -1,0 +1,6 @@
+steps:
+  - name: version
+    run: clang-format --version
+  - name: check-config
+    depends_on: [version]
+    run: test -f "$SRC_DIR/.clang-format"

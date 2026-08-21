@@ -1,0 +1,29 @@
+inputs:
+  message:
+    type: string
+    required: true
+steps:
+  - if: win
+    then:
+      - run: |
+          if not exist "%BUILD_DIR%\generated-licenses" mkdir "%BUILD_DIR%\generated-licenses"
+          echo ${{ inputs.message }}> "%BUILD_DIR%\generated-licenses\dependency.txt"
+          if not exist "%PREFIX%\share\reusable-steps" mkdir "%PREFIX%\share\reusable-steps"
+          echo done> "%PREFIX%\share\reusable-steps\marker.txt"
+          set "DOLLAR=$"
+          echo about.repository https://example.com/reusable-step> "%OUTPUT_FILE%"
+          echo requirements.run.append ["zlib"]>> "%OUTPUT_FILE%"
+          echo requirements.run_exports.strong.append ["reusable-abi"]>> "%OUTPUT_FILE%"
+          echo about.license_file.include.append ["%DOLLAR%{{ BUILD_DIR }}/generated-licenses/**"]>> "%OUTPUT_FILE%"
+    else:
+      - run: |
+          mkdir -p "$BUILD_DIR/generated-licenses" "$PREFIX/share/reusable-steps"
+          echo "${{ inputs.message }}" > "$BUILD_DIR/generated-licenses/dependency.txt"
+          echo done > "$PREFIX/share/reusable-steps/marker.txt"
+          dollar='$'
+          cat > "$OUTPUT_FILE" <<EOF
+          about.repository https://example.com/reusable-step
+          requirements.run.append ["zlib"]
+          requirements.run_exports.strong.append ["reusable-abi"]
+          about.license_file.include.append ["$dollar{{ BUILD_DIR }}/generated-licenses/**"]
+          EOF

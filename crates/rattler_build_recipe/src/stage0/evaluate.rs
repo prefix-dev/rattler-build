@@ -1366,7 +1366,7 @@ pub fn evaluate_steps(
                 }
 
                 let commands = preserve_string_list(&run.run, context)?;
-                if commands.is_empty() {
+                if commands.is_empty() && run.uses.is_none() {
                     continue;
                 }
 
@@ -1381,13 +1381,34 @@ pub fn evaluate_steps(
                     .map(|cwd| evaluate_string_value(cwd, context).map(PathBuf::from))
                     .transpose()?;
 
-                scripts.push(Stage1Step::new(rattler_build_script::Script {
+                let mut step = Stage1Step::new(rattler_build_script::Script {
                     interpreter,
                     env: evaluate_env_map("steps.env", &run.env, context)?,
                     content: ScriptContent::Commands(commands),
                     cwd,
                     ..Default::default()
-                }));
+                });
+                step.uses = run
+                    .uses
+                    .as_ref()
+                    .map(|uses| evaluate_string_value(uses, context))
+                    .transpose()?;
+                step.with = run
+                    .with
+                    .iter()
+                    .map(|(key, value)| {
+                        evaluate_value_to_variable(value, context).map(|value| (key.clone(), value))
+                    })
+                    .collect::<Result<_, _>>()?;
+                step.name = run.name.clone().or_else(|| step.uses.clone());
+                step.optional = run.optional;
+                step.depends_on.clone_from(&run.depends_on);
+                step.requirements.build =
+                    evaluate_dependency_list(&run.requirements.build, context)?;
+                step.requirements.host = evaluate_dependency_list(&run.requirements.host, context)?;
+                step.requirements.inherit.build = run.requirements.inherit.build;
+                step.requirements.inherit.host = run.requirements.inherit.host;
+                scripts.push(step);
             }
         }
     }
@@ -2179,6 +2200,20 @@ impl Evaluate for Stage0Build {
         // empty or all steps filter out, so outputs don't accidentally inherit a
         // top-level script.
         let plan = evaluate_build_plan(&self.plan, context)?;
+        let metadata = if let Some(step) = &self.metadata {
+            if !context.jinja_config().experimental {
+                return Err(ParseError::invalid_value(
+                    "build.metadata",
+                    "`build.metadata` is an experimental feature: provide the `--experimental` flag to enable it",
+                    Span::new_blank(),
+                ));
+            }
+            evaluate_steps(std::slice::from_ref(step), context)?
+                .into_iter()
+                .next()
+        } else {
+            None
+        };
 
         // Evaluate noarch
         //
@@ -2284,6 +2319,7 @@ impl Evaluate for Stage0Build {
             number,
             string,
             plan,
+            metadata,
             noarch,
             flags,
             python,
@@ -3152,6 +3188,7 @@ fn merge_stage1_build(
 
     stage1::Build {
         plan,
+        metadata: output.metadata.or(toplevel.metadata),
         number,
         string,
         noarch,
@@ -6353,6 +6390,38 @@ package:
     }
 
     #[test]
+    fn test_build_metadata_requires_experimental() {
+        let build = Stage0Build {
+            metadata: Some(run_step("echo metadata")),
+            ..Default::default()
+        };
+        let err = build.evaluate(&EvaluationContext::new()).unwrap_err();
+        assert!(err.to_string().contains("experimental"));
+    }
+
+    #[test]
+    fn test_build_evaluate_uses_metadata_step() {
+        let build = Stage0Build {
+            metadata: Some(run_step("echo metadata")),
+            ..Default::default()
+        };
+        let ctx = EvaluationContext::with_variables_and_config(
+            IndexMap::new(),
+            JinjaConfig {
+                experimental: true,
+                ..Default::default()
+            },
+        );
+
+        let stage1 = build.evaluate(&ctx).unwrap();
+
+        assert_eq!(
+            stage1.metadata.unwrap().run,
+            Stage1StepRun::Commands(vec!["echo metadata".to_string()])
+        );
+    }
+
+    #[test]
     fn test_build_evaluate_uses_steps() {
         let build = Stage0Build {
             plan: Stage0BuildPlan::Steps(vec![run_step("echo a"), run_step("echo b")]),
@@ -6378,6 +6447,20 @@ package:
             steps[1].run,
             Stage1StepRun::Commands(vec!["echo b".to_string()])
         );
+    }
+
+    #[test]
+    fn test_evaluate_package_step_leaves_provider_for_preprocessing() {
+        let step = Stage0Step::Run(Stage0RunStep {
+            uses: Some(Value::new_concrete("cargo:build".to_string(), None)),
+            ..Default::default()
+        });
+        let ctx = EvaluationContext::new();
+        let steps = evaluate_steps(&[step], &ctx).unwrap();
+
+        assert_eq!(steps[0].uses.as_deref(), Some("cargo:build"));
+        assert_eq!(steps[0].name.as_deref(), Some("cargo:build"));
+        assert!(steps[0].requirements.build.is_empty());
     }
 
     #[test]

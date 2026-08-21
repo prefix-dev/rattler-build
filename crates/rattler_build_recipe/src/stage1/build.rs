@@ -180,6 +180,13 @@ impl Default for StepRun {
     }
 }
 
+impl StepRun {
+    /// Returns true when this payload has no commands.
+    pub fn is_empty(&self) -> bool {
+        matches!(self, Self::Commands(commands) if commands.is_empty())
+    }
+}
+
 impl From<StepRun> for ScriptContent {
     fn from(value: StepRun) -> Self {
         match value {
@@ -206,6 +213,172 @@ impl From<&ScriptContent> for StepRun {
     }
 }
 
+/// Evaluated dependencies added to a step's solve group.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct StepRequirements {
+    /// Additional packages for the build prefix.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub build: Vec<super::requirements::Dependency>,
+    /// Additional packages for the host prefix.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub host: Vec<super::requirements::Dependency>,
+    /// Controls inheritance from the parent recipe environments.
+    #[serde(
+        default,
+        skip_serializing_if = "StepRequirementsInheritance::is_default"
+    )]
+    pub inherit: StepRequirementsInheritance,
+}
+
+/// Parent recipe environment inheritance for an evaluated step.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct StepRequirementsInheritance {
+    /// Inherit the recipe's build requirements.
+    #[serde(default = "default_true")]
+    pub build: bool,
+    /// Inherit the recipe's host requirements.
+    #[serde(default = "default_true")]
+    pub host: bool,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+impl Default for StepRequirementsInheritance {
+    fn default() -> Self {
+        Self {
+            build: true,
+            host: true,
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for StepRequirementsInheritance {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum Raw {
+            Shorthand(bool),
+            Detailed {
+                #[serde(default = "default_true")]
+                build: bool,
+                #[serde(default = "default_true")]
+                host: bool,
+            },
+        }
+        Ok(match Raw::deserialize(deserializer)? {
+            Raw::Shorthand(inherit) => Self {
+                build: inherit,
+                host: inherit,
+            },
+            Raw::Detailed { build, host } => Self { build, host },
+        })
+    }
+}
+
+impl StepRequirementsInheritance {
+    /// Returns true when both parent environments are inherited.
+    pub fn is_default(&self) -> bool {
+        self.build && self.host
+    }
+}
+
+impl StepRequirements {
+    /// Returns true when no requirements or inheritance overrides are present.
+    pub fn is_empty(&self) -> bool {
+        self.build.is_empty() && self.host.is_empty() && self.inherit.is_default()
+    }
+}
+
+/// Parsed packaged reusable-step reference.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct StepPackageReference<'a> {
+    /// Provider name.
+    pub provider: &'a str,
+    /// Step name inside the provider package.
+    pub step: &'a str,
+    /// Optional conda version constraint following `@`.
+    pub version: Option<&'a str>,
+}
+
+/// Parse `provider:step` or `provider:step@version`. Paths return `Ok(None)`.
+pub fn parse_step_package_reference_detailed(
+    reference: &str,
+) -> Result<Option<StepPackageReference<'_>>, String> {
+    if reference.contains('/') || reference.contains('\\') || !reference.contains(':') {
+        return Ok(None);
+    }
+    let (provider, step_and_version) = reference
+        .split_once(':')
+        .expect("contains(':') checked above");
+    let (step, version) = step_and_version
+        .split_once('@')
+        .map_or((step_and_version, None), |(step, version)| {
+            (step, Some(version))
+        });
+    let valid = |value: &str| {
+        !value.is_empty()
+            && value.chars().all(|character| {
+                character.is_ascii_alphanumeric() || matches!(character, '-' | '_')
+            })
+    };
+    if !valid(provider) || !valid(step) || step.contains(':') || version.is_some_and(str::is_empty)
+    {
+        return Err(format!(
+            "invalid reusable step reference `{reference}`; expected `provider:step[@version]`"
+        ));
+    }
+    Ok(Some(StepPackageReference {
+        provider,
+        step,
+        version,
+    }))
+}
+
+/// Parse a package step reference while ignoring its optional version.
+pub fn parse_step_package_reference(reference: &str) -> Result<Option<(&str, &str)>, String> {
+    Ok(parse_step_package_reference_detailed(reference)?
+        .map(|reference| (reference.provider, reference.step)))
+}
+
+/// Exact provenance for a packaged reusable-step provider.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ResolvedProvider {
+    /// Provider package name.
+    pub name: String,
+    /// Resolved package version.
+    pub version: String,
+    /// Resolved package build string.
+    pub build: String,
+    /// Resolved package subdirectory.
+    pub subdir: String,
+    /// Canonical channel recorded by repodata.
+    pub channel: String,
+    /// SHA-256 of the provider artifact when available.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sha256: Option<String>,
+}
+
+/// Provenance and fully rendered contents of a reusable step.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ResolvedStep {
+    /// Original portable `uses` reference.
+    pub reference: String,
+    /// Exact provider package, absent for recipe-local reusable files.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider: Option<ResolvedProvider>,
+    /// SHA-256 of the reusable YAML contents.
+    pub content_sha256: String,
+    /// SHA-256 of the rendered step payload, including resolved inputs.
+    pub rendered_sha256: String,
+    /// Steps loaded from the reusable file after provider resolution.
+    pub steps: Vec<Step>,
+}
+
 /// A stage1 build step with evaluated metadata and script content.
 ///
 /// This is deliberately separate from [`Script`]: rendered recipes use
@@ -213,7 +386,29 @@ impl From<&ScriptContent> for StepRun {
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Step {
+    /// Reusable step reference, either a recipe-relative path or `provider:step`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub uses: Option<String>,
+    /// Evaluated typed arguments passed to the reusable step.
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
+    pub with: IndexMap<String, rattler_build_jinja::Variable>,
+    /// Preprocessed reusable contents and exact source provenance.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resolved: Option<Box<ResolvedStep>>,
+    /// Optional unique name used by the step DAG and CLI.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    /// Whether this step is excluded from a normal package build.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub optional: bool,
+    /// Names of prerequisite steps.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub depends_on: Vec<String>,
+    /// Additional build and host dependencies for this step's solve group.
+    #[serde(default, skip_serializing_if = "StepRequirements::is_empty")]
+    pub requirements: StepRequirements,
     /// Script content to execute for this step.
+    #[serde(default, skip_serializing_if = "StepRun::is_empty")]
     pub run: StepRun,
     /// Optional interpreter override for this step.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -230,6 +425,13 @@ impl Step {
     /// Create a step from an evaluated script payload.
     pub fn new(script: Script) -> Self {
         Self {
+            uses: None,
+            with: IndexMap::new(),
+            resolved: None,
+            name: None,
+            optional: false,
+            depends_on: Vec::new(),
+            requirements: StepRequirements::default(),
             run: step_run_from_content(script.content),
             interpreter: script.interpreter,
             env: script.env,
@@ -290,6 +492,108 @@ impl BuildPlan {
             Self::Steps(steps) => Some(steps.as_slice()),
         }
     }
+
+    /// Mutably access explicit build steps.
+    pub fn steps_mut(&mut self) -> Option<&mut Vec<Step>> {
+        match self {
+            Self::Script(_) => None,
+            Self::Steps(steps) => Some(steps),
+        }
+    }
+
+    /// Select named steps (or all non-optional steps when `names` is `None`),
+    /// include their transitive dependencies, and return them topologically sorted.
+    pub fn select_steps(&self, names: Option<&[String]>) -> Result<Vec<Step>, String> {
+        let Self::Steps(steps) = self else {
+            return Err("this recipe uses build.script, not build.steps".to_string());
+        };
+        let mut by_name = std::collections::HashMap::new();
+        for (index, step) in steps.iter().enumerate() {
+            if step.optional && step.name.is_none() {
+                return Err(format!(
+                    "optional build step at index {index} must have a name"
+                ));
+            }
+            if let Some(name) = &step.name {
+                if name.is_empty() {
+                    return Err(format!("build step at index {index} has an empty name"));
+                }
+                if by_name.insert(name.as_str(), index).is_some() {
+                    return Err(format!("duplicate build step name `{name}`"));
+                }
+            }
+        }
+
+        let roots: Vec<usize> = match names {
+            Some(names) => names
+                .iter()
+                .map(|name| {
+                    by_name
+                        .get(name.as_str())
+                        .copied()
+                        .ok_or_else(|| format!("unknown build step `{name}`"))
+                })
+                .collect::<Result<_, _>>()?,
+            None => steps
+                .iter()
+                .enumerate()
+                .filter_map(|(index, step)| (!step.optional).then_some(index))
+                .collect(),
+        };
+
+        fn visit(
+            index: usize,
+            steps: &[Step],
+            by_name: &std::collections::HashMap<&str, usize>,
+            state: &mut [u8],
+            result: &mut Vec<Step>,
+        ) -> Result<(), String> {
+            if state[index] == 2 {
+                return Ok(());
+            }
+            if state[index] == 1 {
+                return Err(format!(
+                    "cycle in build steps at `{}`",
+                    steps[index].name.as_deref().unwrap_or("<unnamed>")
+                ));
+            }
+            state[index] = 1;
+            for dependency in &steps[index].depends_on {
+                let dependency_index =
+                    by_name.get(dependency.as_str()).copied().ok_or_else(|| {
+                        format!(
+                            "build step `{}` depends on unknown step `{dependency}`",
+                            steps[index].name.as_deref().unwrap_or("<unnamed>")
+                        )
+                    })?;
+                visit(dependency_index, steps, by_name, state, result)?;
+            }
+            state[index] = 2;
+            result.push(steps[index].clone());
+            Ok(())
+        }
+
+        // Validate the complete graph, including optional nodes that were not
+        // selected, so malformed recipes fail consistently.
+        let mut validation_state = vec![0; steps.len()];
+        let mut discarded = Vec::new();
+        for index in 0..steps.len() {
+            visit(
+                index,
+                steps,
+                &by_name,
+                &mut validation_state,
+                &mut discarded,
+            )?;
+        }
+
+        let mut state = vec![0; steps.len()];
+        let mut result = Vec::new();
+        for root in roots {
+            visit(root, steps, &by_name, &mut state, &mut result)?;
+        }
+        Ok(result)
+    }
 }
 
 /// Variant key usage configuration (evaluated)
@@ -316,6 +620,10 @@ impl VariantKeyUsage {
     }
 }
 
+fn default_prefix_detection_ignore() -> AllOrGlobVec {
+    AllOrGlobVec::All(false)
+}
+
 /// Prefix detection configuration
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PrefixDetection {
@@ -323,7 +631,10 @@ pub struct PrefixDetection {
     #[serde(default, skip_serializing_if = "ForceFileType::is_default")]
     pub force_file_type: ForceFileType,
     /// Files to ignore for prefix replacement
-    #[serde(default, skip_serializing_if = "AllOrGlobVec::is_none")]
+    #[serde(
+        default = "default_prefix_detection_ignore",
+        skip_serializing_if = "AllOrGlobVec::is_none"
+    )]
     pub ignore: AllOrGlobVec,
     /// Ignore binary files for prefix replacement (Unix only)
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
@@ -334,7 +645,7 @@ impl Default for PrefixDetection {
     fn default() -> Self {
         Self {
             force_file_type: ForceFileType::default(),
-            ignore: AllOrGlobVec::All(false),
+            ignore: default_prefix_detection_ignore(),
             ignore_binary_files: false,
         }
     }
@@ -441,6 +752,10 @@ pub struct Build {
     #[serde(default, flatten, skip_serializing_if = "BuildPlan::is_default")]
     pub plan: BuildPlan,
 
+    /// Experimental step that emits recipe metadata before dependency solving.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<Step>,
+
     /// Noarch type - "python" or "generic" if set
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub noarch: Option<NoArchType>,
@@ -531,6 +846,8 @@ struct BuildDeserialize {
     #[serde(default)]
     steps: PresentField<Vec<Step>>,
     #[serde(default)]
+    metadata: Option<Step>,
+    #[serde(default)]
     noarch: Option<NoArchType>,
     #[serde(default)]
     flags: Vec<Flag>,
@@ -575,6 +892,7 @@ impl TryFrom<BuildDeserialize> for Build {
             number: raw.number,
             string: raw.string,
             plan,
+            metadata: raw.metadata,
             noarch: raw.noarch,
             flags: raw.flags,
             python: raw.python,
@@ -770,6 +1088,13 @@ mod tests {
     }
 
     #[test]
+    fn prefix_detection_does_not_ignore_files_when_ignore_is_omitted() {
+        let build: Build = serde_yaml::from_str("prefix_detection: {}\n").unwrap();
+        assert_eq!(build.prefix_detection.ignore, AllOrGlobVec::All(false));
+        assert!(build.prefix_detection.is_default());
+    }
+
+    #[test]
     fn test_build_with_script() {
         use rattler_build_script::ScriptContent;
 
@@ -904,6 +1229,96 @@ steps:
                 "expected null script/steps to be rejected: {yaml:?}"
             );
         }
+    }
+
+    #[test]
+    fn test_parse_versioned_step_package_reference() {
+        let parsed = parse_step_package_reference_detailed("cmake:build@>=0.3,<0.4")
+            .unwrap()
+            .unwrap();
+        assert_eq!(parsed.provider, "cmake");
+        assert_eq!(parsed.step, "build");
+        assert_eq!(parsed.version, Some(">=0.3,<0.4"));
+        assert!(
+            parse_step_package_reference_detailed("./steps/build.yaml")
+                .unwrap()
+                .is_none()
+        );
+        assert!(parse_step_package_reference_detailed("cmake:build@").is_err());
+    }
+
+    #[test]
+    fn test_select_steps_resolves_dag_and_optional_roots() {
+        let build: Build = serde_yaml::from_str(
+            r#"
+steps:
+  - name: configure
+    run: cmake .
+  - name: build
+    depends_on: [configure]
+    run: cmake --build .
+  - name: lint
+    run: clang-format --dry-run main.cpp
+  - name: test
+    optional: true
+    depends_on: [build]
+    requirements:
+      inherit: false
+      host: [catch2]
+    run: ctest
+"#,
+        )
+        .unwrap();
+
+        let normal = build.plan.select_steps(None).unwrap();
+        assert_eq!(
+            normal
+                .iter()
+                .filter_map(|step| step.name.as_deref())
+                .collect::<Vec<_>>(),
+            ["configure", "build", "lint"]
+        );
+        let test = build
+            .plan
+            .select_steps(Some(&["test".to_string()]))
+            .unwrap();
+        assert_eq!(
+            test.iter()
+                .filter_map(|step| step.name.as_deref())
+                .collect::<Vec<_>>(),
+            ["configure", "build", "test"]
+        );
+        let lint = build
+            .plan
+            .select_steps(Some(&["lint".to_string()]))
+            .unwrap();
+        assert_eq!(
+            lint.iter()
+                .filter_map(|step| step.name.as_deref())
+                .collect::<Vec<_>>(),
+            ["lint"]
+        );
+    }
+
+    #[test]
+    fn test_select_steps_rejects_invalid_dags() {
+        let missing: Build = serde_yaml::from_str(
+            "steps:\n  - name: lint\n    depends_on: [missing]\n    run: lint\n",
+        )
+        .unwrap();
+        assert!(
+            missing
+                .plan
+                .select_steps(None)
+                .unwrap_err()
+                .contains("unknown step")
+        );
+
+        let cycle: Build = serde_yaml::from_str(
+            "steps:\n  - name: a\n    depends_on: [b]\n    run: a\n  - name: b\n    depends_on: [a]\n    run: b\n",
+        )
+        .unwrap();
+        assert!(cycle.plan.select_steps(None).unwrap_err().contains("cycle"));
     }
 
     #[test]

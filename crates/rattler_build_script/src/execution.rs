@@ -74,7 +74,7 @@ impl std::str::FromStr for EnvironmentIsolation {
 }
 
 /// Arguments for executing a script in a given interpreter.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ExecutionArgs {
     /// The ordered sections the build wrapper is composed of. Each section runs
     /// in its own scope with its own interpreter and step-local `env`.
@@ -133,7 +133,7 @@ impl ExecutionArgs {
 }
 
 /// The resolved contents of a script.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum ResolvedScriptContents {
     /// The script contents as loaded from a file (path, contents)
     Path(PathBuf, String),
@@ -582,7 +582,7 @@ impl Decoder for CrLfNormalizer {
 /// One per build step (or one for a plain `build.script`), with its resolved
 /// content, explicit interpreter, step-local `env`, optional `cwd`, and label.
 /// It is borrowed into a [`ScriptSection`] during wrapper generation.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct BuildScriptSection {
     /// Explicit interpreter for this section, or `None` to fall back to the
     /// wrapper shell.
@@ -909,6 +909,29 @@ fn find_rattler_sandbox(runtime: &RuntimeEnv) -> Option<PathBuf> {
         .next()
 }
 
+fn launcher_environment(
+    process_env: &IndexMap<String, String>,
+    sandboxed: bool,
+    runtime: &RuntimeEnv,
+) -> IndexMap<String, String> {
+    let mut launcher_env = process_env.clone();
+    if sandboxed {
+        // `rattler-sandbox` itself needs PATH even when the command is absolute. The generated
+        // wrapper replaces it with the isolated build PATH before running recipe code.
+        let has_path = launcher_env.keys().any(|key| {
+            if runtime.process_platform().is_windows() {
+                key.eq_ignore_ascii_case("PATH")
+            } else {
+                key == "PATH"
+            }
+        });
+        if !has_path {
+            launcher_env.insert("PATH".to_string(), runtime.path().to_string());
+        }
+    }
+    launcher_env
+}
+
 /// Spawns a process and replaces the given strings in the output with the given replacements.
 /// This is used to replace the host prefix with $PREFIX and the build prefix with $BUILD_PREFIX
 #[allow(clippy::too_many_arguments)]
@@ -934,8 +957,18 @@ pub(crate) async fn run_process_with_replacements(
         if let Some(sandbox_exe) = find_rattler_sandbox(runtime) {
             let mut sandbox_args = sandbox_config.with_cwd(cwd).to_args();
 
+            // The sandbox process receives the deliberately minimal build environment. Resolve
+            // bare commands before entering it instead of relying on a host `PATH` variable that
+            // strict isolation intentionally does not forward.
+            let sandboxed_program =
+                which::which_in_global(&command_spec.program, Some(runtime.path()))
+                    .ok()
+                    .and_then(|mut paths| paths.next())
+                    .map(|path| path.to_string_lossy().into_owned())
+                    .unwrap_or_else(|| command_spec.program.clone());
+
             // Add the actual command to execute as positional arguments.
-            sandbox_args.push(command_spec.program.clone());
+            sandbox_args.push(sandboxed_program);
             sandbox_args.extend(command_spec.args.iter().cloned());
 
             (sandbox_exe.into_os_string(), sandbox_args)
@@ -954,7 +987,8 @@ pub(crate) async fn run_process_with_replacements(
         )
     };
 
-    let mut process = spawn_process(&program, &process_args, cwd, process_env)?;
+    let launcher_env = launcher_environment(process_env, sandbox_config.is_some(), runtime);
+    let mut process = spawn_process(&program, &process_args, cwd, &launcher_env)?;
 
     let mut stdout_log = String::new();
     let mut stderr_log = String::new();
@@ -1015,6 +1049,40 @@ mod tests {
     use crate::ExecutionContext;
     use rattler_conda_types::Platform;
     use tokio_util::bytes::BytesMut;
+
+    #[test]
+    fn sandbox_launcher_receives_path_under_strict_isolation() {
+        let runtime = RuntimeEnv::for_test(Platform::current()).with_var("PATH", "runtime-path");
+        let strict_env = IndexMap::from_iter([("EXPLICIT".to_string(), "value".to_string())]);
+
+        let sandboxed = launcher_environment(&strict_env, true, &runtime);
+        assert_eq!(
+            sandboxed.get("PATH").map(String::as_str),
+            Some("runtime-path")
+        );
+        assert_eq!(sandboxed.get("EXPLICIT").map(String::as_str), Some("value"));
+
+        let unsandboxed = launcher_environment(&strict_env, false, &runtime);
+        assert!(!unsandboxed.contains_key("PATH"));
+
+        let explicit_path =
+            IndexMap::from_iter([("PATH".to_string(), "explicit-path".to_string())]);
+        let preserved = launcher_environment(&explicit_path, true, &runtime);
+        assert_eq!(
+            preserved.get("PATH").map(String::as_str),
+            Some("explicit-path")
+        );
+
+        let windows_runtime =
+            RuntimeEnv::for_test(Platform::Win64).with_var("PATH", "runtime-path");
+        let windows_path = IndexMap::from_iter([("Path".to_string(), "windows-path".to_string())]);
+        let preserved = launcher_environment(&windows_path, true, &windows_runtime);
+        assert_eq!(
+            preserved.get("Path").map(String::as_str),
+            Some("windows-path")
+        );
+        assert!(!preserved.contains_key("PATH"));
+    }
 
     /// `CONDA_BUILD=1` must live inside the sourced activation script so that
     /// nested shells inherit it while the outer subprocess starts without it.

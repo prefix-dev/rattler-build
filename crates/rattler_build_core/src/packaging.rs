@@ -21,7 +21,7 @@ use unicode_normalization::UnicodeNormalization;
 
 mod file_finder;
 mod file_mapper;
-mod metadata;
+pub(crate) mod metadata;
 pub use file_finder::{Files, TempFiles, content_type, read_package_files_list, record_files};
 pub use metadata::{contains_prefix_binary, contains_prefix_text, create_prefix_placeholder};
 use tempfile::NamedTempFile;

@@ -11,6 +11,7 @@ use std::{
 use indexmap::IndexMap;
 use minijinja::Value;
 use rattler_build_jinja::{Jinja, JinjaConfig, Variable};
+use sha2::{Digest, Sha256};
 
 // Re-export from rattler_build_script
 pub use rattler_build_script::{
@@ -24,7 +25,165 @@ pub use rattler_build_script::{
 };
 
 use crate::{env_vars, metadata::Output};
-use rattler_build_recipe::stage1::build::BuildPlan;
+use rattler_build_recipe::stage1::build::{BuildPlan, Step, parse_step_package_reference};
+
+fn reusable_step_path(
+    reference: &str,
+    recipe_dir: &Path,
+    context: &ExecutionContext,
+) -> Result<PathBuf, std::io::Error> {
+    let candidates = if let Some((provider, step)) = parse_step_package_reference(reference)
+        .map_err(|message| std::io::Error::new(std::io::ErrorKind::InvalidInput, message))?
+    {
+        [context.build().path(), context.host().path()]
+            .into_iter()
+            .flat_map(|prefix| {
+                let base = prefix
+                    .join("etc/rattler-build/steps")
+                    .join(provider)
+                    .join(step);
+                [base.with_extension("yaml"), base]
+            })
+            .collect::<Vec<_>>()
+    } else {
+        let path = PathBuf::from(reference);
+        let path = if path.is_absolute() {
+            path
+        } else {
+            recipe_dir.join(path)
+        };
+        vec![path.clone(), path.with_extension("yaml")]
+    };
+    candidates
+        .into_iter()
+        .find(|path| path.is_file())
+        .ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                format!("reusable build step `{reference}` was not found"),
+            )
+        })
+}
+
+#[derive(serde::Deserialize)]
+#[serde(untagged)]
+enum ReusableFile {
+    Pipeline { steps: Vec<Step> },
+    Step(Box<Step>),
+}
+
+pub(crate) fn parse_reusable_steps(
+    contents: &str,
+    source: &str,
+) -> Result<Vec<Step>, std::io::Error> {
+    let reusable: ReusableFile = serde_yaml::from_str(contents).map_err(|error| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            format!("failed to parse reusable step {source}: {error}"),
+        )
+    })?;
+    Ok(match reusable {
+        ReusableFile::Pipeline { steps } => steps,
+        ReusableFile::Step(step) => vec![*step],
+    })
+}
+
+pub(crate) fn read_reusable_steps(path: &Path) -> Result<Vec<Step>, std::io::Error> {
+    parse_reusable_steps(&fs_err::read_to_string(path)?, &path.display().to_string())
+}
+
+fn load_reusable_steps(path: &Path) -> Result<Vec<Step>, std::io::Error> {
+    BuildPlan::Steps(read_reusable_steps(path)?)
+        .select_steps(None)
+        .map_err(|error| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("invalid reusable pipeline {}: {error}", path.display()),
+            )
+        })
+}
+
+fn resolve_reusable_step(
+    step: &Step,
+    step_index: usize,
+    recipe_dir: &Path,
+    context: &ExecutionContext,
+) -> Result<Vec<(Script, Option<String>)>, std::io::Error> {
+    let Some(reference) = &step.uses else {
+        let label = step
+            .name
+            .clone()
+            .unwrap_or_else(|| format!("step {step_index}"));
+        return Ok(vec![(step.to_script(), Some(label))]);
+    };
+    let (source, reusable_steps) = if let Some(resolved) = &step.resolved {
+        let source = resolved.provider.as_ref().map_or_else(
+            || resolved.reference.clone(),
+            |provider| {
+                format!(
+                    "{} ({}-{}-{})",
+                    resolved.reference, provider.name, provider.version, provider.build
+                )
+            },
+        );
+        (
+            source.clone(),
+            BuildPlan::Steps(resolved.steps.clone())
+                .select_steps(None)
+                .map_err(|error| {
+                    std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        format!("invalid resolved reusable pipeline {source}: {error}"),
+                    )
+                })?,
+        )
+    } else {
+        let path = reusable_step_path(reference, recipe_dir, context)?;
+        let steps = load_reusable_steps(&path)?;
+        (path.display().to_string(), steps)
+    };
+    if reusable_steps.is_empty() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            format!("reusable pipeline {source} contains no required steps"),
+        ));
+    }
+
+    let mut scripts = Vec::with_capacity(reusable_steps.len());
+    for (index, reusable) in reusable_steps.into_iter().enumerate() {
+        if reusable.uses.is_some() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("reusable pipeline {source} may not contain nested uses"),
+            ));
+        }
+        if reusable.run.is_empty() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("reusable step {source} must define run"),
+            ));
+        }
+        let nested_name = reusable
+            .name
+            .clone()
+            .unwrap_or_else(|| format!("step {index}"));
+        let outer = step
+            .name
+            .clone()
+            .unwrap_or_else(|| format!("step {step_index}"));
+        let label = Some(format!("{outer}/{nested_name}"));
+        let mut script = reusable.to_script();
+        if step.interpreter.is_some() {
+            script.interpreter.clone_from(&step.interpreter);
+        }
+        if step.cwd.is_some() {
+            script.cwd.clone_from(&step.cwd);
+        }
+        script.env.extend(step.env.clone());
+        scripts.push((script, label));
+    }
+    Ok(scripts)
+}
 
 /// Prepare execution arguments for a stage1 build plan.
 ///
@@ -72,18 +231,42 @@ pub(crate) fn prepare_build_plan_execution_args(
         env_vars.extend(script.env().clone());
     }
 
-    let scripts: Vec<(Script, Option<usize>)> = match plan {
-        BuildPlan::Steps(steps) => steps
-            .iter()
-            .enumerate()
-            .map(|(index, step)| (step.to_script(), Some(index)))
-            .collect(),
+    let scripts: Vec<_> = match plan {
+        BuildPlan::Steps(steps) => {
+            let mut scripts = Vec::new();
+            for (index, step) in steps.iter().enumerate() {
+                scripts.extend(resolve_reusable_step(step, index, recipe_dir, &context)?);
+            }
+            scripts
+        }
         BuildPlan::Script(script) => vec![(script.clone(), None)],
     };
 
     let mut secrets = IndexMap::new();
     let mut sections = Vec::with_capacity(scripts.len());
-    for (script, step_index) in scripts {
+    for (index, (mut script, step_label)) in scripts.into_iter().enumerate() {
+        if matches!(plan, BuildPlan::Steps(_)) {
+            let output_file = crate::recipe_patch::output_file(&work_dir, index)
+                .to_string_lossy()
+                .into_owned();
+            script
+                .env
+                .insert("OUTPUT_FILE".to_string(), output_file.clone());
+            script
+                .env
+                .insert("RATTLER_BUILD_OUTPUT_FILE".to_string(), output_file);
+
+            let build_dir = work_dir.parent().unwrap_or(&work_dir);
+            let cache_file = build_dir
+                .join(crate::consts::STEP_CACHE_DIRECTORY_NAME)
+                .join(format!("{index}.cache"))
+                .to_string_lossy()
+                .into_owned();
+            script.env.insert(
+                crate::consts::RATTLER_BUILD_STEP_CACHE.to_string(),
+                cache_file,
+            );
+        }
         let mut section_jinja = Jinja::new(selector_config.clone()).with_context(recipe_context);
         for (key, value) in env_vars.iter().chain(script.env()) {
             section_jinja
@@ -116,13 +299,13 @@ pub(crate) fn prepare_build_plan_execution_args(
         sections.push(BuildScriptSection {
             interpreter: script.interpreter.clone(),
             content,
-            env: if step_index.is_some() {
+            env: if step_label.is_some() {
                 script.env().clone()
             } else {
                 Default::default()
             },
             cwd,
-            label: step_index.map(|index| format!("step {index}")),
+            label: step_label,
         });
     }
 
@@ -135,6 +318,65 @@ pub(crate) fn prepare_build_plan_execution_args(
         sandbox_config,
         env_isolation,
     })
+}
+
+fn cache_identity(
+    section: &BuildScriptSection,
+    base_env: &IndexMap<String, String>,
+    secrets: &IndexMap<String, String>,
+    dependencies: &[u8],
+) -> String {
+    fn update_map(hasher: &mut Sha256, values: &IndexMap<String, String>, skip: &[&str]) {
+        let mut values = values
+            .iter()
+            .filter(|(key, _)| !skip.contains(&key.as_str()))
+            .collect::<Vec<_>>();
+        values.sort_unstable_by_key(|(key, _)| *key);
+        for (key, value) in values {
+            hasher.update((key.len() as u64).to_le_bytes());
+            hasher.update(key);
+            hasher.update((value.len() as u64).to_le_bytes());
+            hasher.update(value);
+        }
+    }
+
+    fn update_bytes(hasher: &mut Sha256, bytes: &[u8]) {
+        hasher.update((bytes.len() as u64).to_le_bytes());
+        hasher.update(bytes);
+    }
+
+    let mut hasher = Sha256::new();
+    update_bytes(
+        &mut hasher,
+        section
+            .interpreter
+            .as_deref()
+            .unwrap_or_default()
+            .as_bytes(),
+    );
+    update_bytes(&mut hasher, section.content.script().as_bytes());
+    update_bytes(
+        &mut hasher,
+        section
+            .cwd
+            .as_ref()
+            .map(|cwd| cwd.to_string_lossy())
+            .as_deref()
+            .unwrap_or_default()
+            .as_bytes(),
+    );
+    update_map(
+        &mut hasher,
+        &section.env,
+        &[crate::consts::RATTLER_BUILD_STEP_CACHE],
+    );
+    // A new command gets a new recipe timestamp even when its effective build
+    // environment is otherwise identical. Including SOURCE_DATE_EPOCH would
+    // therefore make persistent caches miss unconditionally.
+    update_map(&mut hasher, base_env, &["SOURCE_DATE_EPOCH"]);
+    update_map(&mut hasher, secrets, &[]);
+    hasher.update(dependencies);
+    hex::encode(hasher.finalize())
 }
 
 impl Output {
@@ -185,7 +427,7 @@ impl Output {
             context.runtime(),
         ));
         env_vars.extend(env_vars::env_vars_from_variant(self.variant()));
-        prepare_build_plan_execution_args(
+        let mut args = prepare_build_plan_execution_args(
             &build.plan,
             &self.recipe.context,
             self.build_configuration.selector_config(),
@@ -196,7 +438,15 @@ impl Output {
             self.build_configuration.sandbox_config().cloned(),
             env_isolation,
             self.build_configuration.experimental,
-        )
+        )?;
+        if let Some(source_dir) = &self.build_configuration.directories.source_dir {
+            for section in &mut args.sections {
+                if section.cwd.is_none() {
+                    section.cwd = Some(source_dir.clone());
+                }
+            }
+        }
+        Ok(args)
     }
 
     /// Run the build script for the output as defined in the recipe's build section.
@@ -229,7 +479,89 @@ impl Output {
         }
 
         let exec_args = self.prepare_build_script().await?;
-        rattler_build_script::run_script(exec_args).await?;
+        if self.recipe.build().plan.steps().is_none() {
+            rattler_build_script::run_script(exec_args).await?;
+            return Ok(());
+        }
+
+        // Preserve output metadata from cache-hit sections, while removing
+        // outputs belonging to sections that no longer exist.
+        let output_root = self
+            .build_configuration
+            .directories
+            .source_dir
+            .as_ref()
+            .unwrap_or(&self.build_configuration.directories.work_dir);
+        crate::recipe_patch::prepare_cached_outputs(output_root, exec_args.sections.len())?;
+
+        // Execute steps individually so cache declarations written by one step
+        // can be fingerprinted immediately and later invocations can omit the
+        // process entirely. Sections already have isolated env/cwd scopes, so
+        // this preserves their wrapper semantics.
+        fs_err::create_dir_all(
+            self.build_configuration
+                .directories
+                .build_dir
+                .join(crate::consts::STEP_CACHE_DIRECTORY_NAME),
+        )?;
+        let dependency_identity =
+            serde_json::to_vec(&self.finalized_dependencies).map_err(std::io::Error::other)?;
+        for (section_index, section) in exec_args.sections.iter().cloned().enumerate() {
+            let cache_path = section
+                .env
+                .get(crate::consts::RATTLER_BUILD_STEP_CACHE)
+                .map(PathBuf::from)
+                .expect("build steps always receive a cache declaration path");
+            let root = section
+                .cwd
+                .clone()
+                .unwrap_or_else(|| exec_args.work_dir.clone());
+            let identity = cache_identity(
+                &section,
+                &exec_args.env_vars,
+                &exec_args.secrets,
+                &dependency_identity,
+            );
+            let cache_hit = match crate::step_cache::can_skip(&cache_path, &root, &identity) {
+                Ok(hit) => hit,
+                Err(error) => {
+                    tracing::warn!(
+                        "Ignoring invalid build step cache {}: {}",
+                        cache_path.display(),
+                        error
+                    );
+                    false
+                }
+            };
+            if cache_hit {
+                tracing::info!(
+                    "Skipping build step {} (cache hit)",
+                    section.label.as_deref().unwrap_or("unnamed")
+                );
+                continue;
+            }
+
+            // A step must opt in on every successful execution. Removing the
+            // old declaration prevents stale conditions surviving a changed
+            // step implementation that no longer writes the file.
+            match fs_err::remove_file(&cache_path) {
+                Ok(()) => {}
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => return Err(error.into()),
+            }
+            // A rerun must also opt in to metadata output again. Cache hits
+            // intentionally retain the previous successful output above.
+            let output_file = crate::recipe_patch::output_file(output_root, section_index);
+            match fs_err::remove_file(output_file) {
+                Ok(()) => {}
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => return Err(error.into()),
+            }
+            let mut section_args = exec_args.clone();
+            section_args.sections = vec![section];
+            rattler_build_script::run_script(section_args).await?;
+            crate::step_cache::update(&cache_path, &root, &identity)?;
+        }
 
         Ok(())
     }
@@ -253,7 +585,127 @@ impl Output {
         let span = tracing::info_span!("Creating build script");
         let _enter = span.enter();
 
+        if self.recipe.build().plan.steps().is_some() {
+            let output_root = self
+                .build_configuration
+                .directories
+                .source_dir
+                .as_ref()
+                .unwrap_or(&self.build_configuration.directories.work_dir);
+            crate::recipe_patch::prepare_output_directory(output_root)?;
+        }
         let exec_args = self.prepare_build_script().await?;
         rattler_build_script::create_build_script(exec_args).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rattler_conda_types::Platform;
+
+    #[test]
+    fn cache_identity_tracks_effective_environment_but_not_command_timestamp() {
+        let section = BuildScriptSection {
+            interpreter: Some("bash".to_string()),
+            content: ResolvedScriptContents::Inline("build".to_string()),
+            env: IndexMap::new(),
+            cwd: None,
+            label: Some("build".to_string()),
+        };
+        let mut env = IndexMap::from([
+            ("SOURCE_DATE_EPOCH".to_string(), "1".to_string()),
+            ("FLAGS".to_string(), "first".to_string()),
+        ]);
+        let mut secrets = IndexMap::from([("TOKEN".to_string(), "one".to_string())]);
+        let identity = cache_identity(&section, &env, &secrets, b"solve-one");
+
+        env.insert("SOURCE_DATE_EPOCH".to_string(), "2".to_string());
+        assert_eq!(
+            identity,
+            cache_identity(&section, &env, &secrets, b"solve-one")
+        );
+        env.insert("FLAGS".to_string(), "second".to_string());
+        assert_ne!(
+            identity,
+            cache_identity(&section, &env, &secrets, b"solve-one")
+        );
+        env.insert("FLAGS".to_string(), "first".to_string());
+        secrets.insert("TOKEN".to_string(), "two".to_string());
+        assert_ne!(
+            identity,
+            cache_identity(&section, &env, &secrets, b"solve-one")
+        );
+        secrets.insert("TOKEN".to_string(), "one".to_string());
+        assert_ne!(
+            identity,
+            cache_identity(&section, &env, &secrets, b"solve-two")
+        );
+    }
+
+    #[test]
+    fn reusable_step_paths_resolve_local_and_packaged_files() {
+        let temp = tempfile::tempdir().unwrap();
+        let recipe = temp.path().join("recipe");
+        let build_prefix = temp.path().join("build");
+        let host_prefix = temp.path().join("host");
+        fs_err::create_dir_all(recipe.join("steps")).unwrap();
+        fs_err::write(
+            recipe.join("steps/lint.yaml"),
+            "steps:\n  - name: check\n    run: lint\n  - name: report\n    depends_on: [check]\n    run: report\n",
+        )
+        .unwrap();
+        let packaged = build_prefix.join("etc/rattler-build/steps/cargo/build.yaml");
+        fs_err::create_dir_all(packaged.parent().unwrap()).unwrap();
+        fs_err::write(&packaged, "run: cargo build\n").unwrap();
+        let context = ExecutionContext::separate(
+            RuntimeEnv::current(),
+            &build_prefix,
+            Platform::current(),
+            &host_prefix,
+            Platform::current(),
+        );
+
+        assert_eq!(
+            reusable_step_path("./steps/lint.yaml", &recipe, &context).unwrap(),
+            recipe.join("steps/lint.yaml")
+        );
+        assert_eq!(
+            reusable_step_path("cargo:build", &recipe, &context).unwrap(),
+            packaged
+        );
+        assert!(reusable_step_path("cargo:missing", &recipe, &context).is_err());
+
+        let wrapper: Step = serde_yaml::from_str("uses: ./steps/lint.yaml\n").unwrap();
+        let scripts = resolve_reusable_step(&wrapper, 0, &recipe, &context).unwrap();
+        assert_eq!(scripts.len(), 2);
+        assert_eq!(scripts[0].1.as_deref(), Some("step 0/check"));
+        assert_eq!(scripts[1].1.as_deref(), Some("step 0/report"));
+
+        // Preprocessed provider contents execute without the provider being
+        // present in either the build or host prefix.
+        let resolved: Step = serde_yaml::from_str(
+            r#"
+uses: cargo:build
+resolved:
+  reference: cargo:build
+  provider:
+    name: cargo-rattler-build-steps
+    version: '1.0'
+    build: h0
+    subdir: noarch
+    channel: test
+    sha256: aabbcc
+  content_sha256: ddee
+  rendered_sha256: eeff
+  steps:
+    - name: build
+      run: cargo build
+"#,
+        )
+        .unwrap();
+        let scripts = resolve_reusable_step(&resolved, 0, &recipe, &context).unwrap();
+        assert_eq!(scripts.len(), 1);
+        assert_eq!(scripts[0].1.as_deref(), Some("step 0/build"));
     }
 }

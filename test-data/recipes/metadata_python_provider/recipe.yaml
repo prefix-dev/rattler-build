@@ -1,0 +1,31 @@
+schema_version: 1
+
+package:
+  name: python-rattler-build-steps
+  version: 0.1.0
+
+source:
+  path: .
+
+build:
+  number: 1
+  noarch: generic
+  script:
+    interpreter: python
+    content: |
+      import os
+      from pathlib import Path
+      import shutil
+
+      source = Path(os.environ["SRC_DIR"])
+      target = Path(os.environ["PREFIX"]) / "etc" / "rattler-build" / "steps" / "python"
+      target.mkdir(parents=True, exist_ok=True)
+      for name in ["metadata.yaml", "build.yaml", "python_metadata_backend.py"]:
+          shutil.copy2(source / name, target / name)
+
+requirements:
+  build: [python]
+
+about:
+  summary: Example Python metadata and wheel build-step provider
+  license: MIT

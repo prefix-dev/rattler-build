@@ -8,6 +8,7 @@ pub mod bump_recipe;
 pub mod console_utils;
 pub mod debug;
 pub mod metadata;
+pub mod metadata_step;
 pub mod migrate_recipe;
 pub mod package_test;
 pub mod packaging;
@@ -15,6 +16,7 @@ pub mod render;
 pub mod script;
 pub mod source;
 pub mod staging;
+pub mod step_provider;
 pub mod system_tools;
 pub mod tool_configuration;
 
@@ -32,6 +34,8 @@ pub mod package_info;
 mod post_process;
 pub mod publish;
 pub mod rebuild;
+mod recipe_patch;
+mod step_cache;
 mod unix;
 mod windows;
 

@@ -668,7 +668,15 @@ requirements:
     - nushell
 ```
 
-#### Build steps (experimental)
+#### Metadata and build steps (experimental)
+
+`build.metadata` is a single pre-solve bootstrap step. Its own
+`requirements.build` and `requirements.host` are installed in a temporary
+environment; the step can then emit final build/host requirements and set or
+extend `build.steps`. It runs after initial recipe rendering and source fetching,
+but before normal reusable-step resolution, DAG selection, and the final
+dependency solve. It inspects the prepared source through `SRC_DIR` and may load
+its own local or packaged provider with `uses`.
 
 `build.steps` is an experimental alternative to `build.script` and requires
 `--experimental`. `script` and `steps` are mutually exclusive, including
@@ -677,12 +685,31 @@ requirements:
 Each step is a scoped build-wrapper section. Step-local `env` values and `cwd`
 changes apply only to that step. A step supports:
 
-- **`run`** - Required inline command, multiline string, or list of commands.
+- **`name`** - Optional unique name used by `rattler-build run <name>`.
+  Defaults to the `uses` reference when present.
+- **`optional`** - Excludes the step from normal builds when `true`.
+- **`depends_on`** - Names of prerequisite steps in the step DAG.
+- **`requirements.build` / `requirements.host`** - Extra dependencies added
+  to the selected step solve group.
+- **`requirements.inherit`** - Controls inheritance from parent recipe
+  environments. A boolean applies to both; a `{build, host}` mapping controls
+  them separately.
+- **`run` / `uses`** - Exactly one is required. `uses` accepts a recipe-relative
+  YAML path or a packaged `provider:step[@version]` reference.
+- **`with`** - Typed values passed to inputs declared by a reusable step.
 - **`if`** - Optional Jinja selector expression evaluated before the step runs. Do not wrap expressions in `${{ }}`.
 - **`interpreter`** - Optional interpreter override for this step.
 - **`cwd`** - Optional working directory for this step. Relative paths are
   resolved against the host prefix (`$PREFIX` / `%PREFIX%`).
 - **`env`** - Optional environment variables scoped to this step.
+
+Packaged reusable steps are resolved and installed into standalone cached
+provider environments before the recipe solve. Their rendered contents and
+exact provider package provenance and content hash are stored in the rendered
+recipe; provider packages do not pollute the build or host prefix. Requirements in a reusable
+step are added to the corresponding recipe environment. Reusable steps may also
+declare `license_files`; these globs are appended to `about.license_file`, which
+allows generated dependency licenses to be collected after the step runs.
 
 ```yaml title="recipe.yaml"
 build:
@@ -702,8 +729,10 @@ build:
     Fail-fast guards are inserted between list items, not between the physical
     lines inside one multiline scalar.
 
-See [Build script](../build_script.md) for more examples and the full
-behaviour of environment variables, secrets, and interpreters.
+See [Experimental build steps](../experimental_build_steps.md) for metadata
+outputs, reusable providers, DAG execution, caching, and post-build output
+examples. See [Build script](../build_script.md) for environment variables,
+secrets, and interpreters.
 
 ### Skipping builds
 

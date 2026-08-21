@@ -5,7 +5,10 @@ use marked_yaml::Span;
 use rattler_conda_types::{Flag, NoArchType, package::EntryPoint};
 use serde::{Deserialize, Serialize};
 
-use crate::stage0::types::{ConditionalList, IncludeExclude, Item, JinjaExpression, Script, Value};
+use crate::stage0::{
+    SerializableMatchSpec,
+    types::{ConditionalList, IncludeExclude, Item, JinjaExpression, Script, Value},
+};
 
 /// Variant key usage configuration
 #[derive(Debug, Serialize, Deserialize, Default, Clone, PartialEq)]
@@ -35,10 +38,124 @@ pub enum Step {
     Run(RunStep),
 }
 
+/// Dependencies added to the selected step solve group.
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
+pub struct StepRequirements {
+    /// Additional packages for the build prefix.
+    #[serde(default, skip_serializing_if = "ConditionalList::is_empty")]
+    pub build: ConditionalList<SerializableMatchSpec>,
+    /// Additional packages for the host prefix.
+    #[serde(default, skip_serializing_if = "ConditionalList::is_empty")]
+    pub host: ConditionalList<SerializableMatchSpec>,
+    /// Controls inheritance from the parent recipe environments.
+    #[serde(
+        default,
+        skip_serializing_if = "StepRequirementsInheritance::is_default"
+    )]
+    pub inherit: StepRequirementsInheritance,
+}
+
+/// Parent recipe environment inheritance for a step solve group.
+#[derive(Debug, Serialize, Clone, PartialEq)]
+pub struct StepRequirementsInheritance {
+    /// Inherit the recipe's build requirements.
+    #[serde(default = "default_true")]
+    pub build: bool,
+    /// Inherit the recipe's host requirements.
+    #[serde(default = "default_true")]
+    pub host: bool,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+impl Default for StepRequirementsInheritance {
+    fn default() -> Self {
+        Self {
+            build: true,
+            host: true,
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for StepRequirementsInheritance {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum Raw {
+            Shorthand(bool),
+            Detailed {
+                #[serde(default = "default_true")]
+                build: bool,
+                #[serde(default = "default_true")]
+                host: bool,
+            },
+        }
+        Ok(match Raw::deserialize(deserializer)? {
+            Raw::Shorthand(inherit) => Self {
+                build: inherit,
+                host: inherit,
+            },
+            Raw::Detailed { build, host } => Self { build, host },
+        })
+    }
+}
+
+impl StepRequirementsInheritance {
+    fn is_default(&self) -> bool {
+        self.build && self.host
+    }
+}
+
+impl StepRequirements {
+    fn is_empty(&self) -> bool {
+        self.build.is_empty() && self.host.is_empty() && self.inherit.is_default()
+    }
+
+    fn used_variables(&self) -> Vec<String> {
+        self.build
+            .used_variables()
+            .into_iter()
+            .chain(self.host.used_variables())
+            .collect()
+    }
+}
+
 /// An inline `run` step that executes script content as part of the build.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
 pub struct RunStep {
+    /// A reusable step reference. Local paths are relative to the recipe;
+    /// `provider:step` references a step provider package.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub uses: Option<Value<String>>,
+
+    /// Typed arguments passed to a reusable step provider.
+    #[serde(default, skip_serializing_if = "indexmap::IndexMap::is_empty")]
+    pub with: indexmap::IndexMap<String, Value<rattler_build_jinja::Variable>>,
+
+    /// Optional unique name used by `rattler-build run` and dependency edges.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+
+    /// Do not include this step in a normal package build. It can still be
+    /// selected explicitly with `rattler-build run <name>`.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub optional: bool,
+
+    /// Names of prerequisite steps. Dependencies are executed first.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub depends_on: Vec<String>,
+
+    /// Additional build and host packages for this step's solve group.
+    #[serde(default, skip_serializing_if = "StepRequirements::is_empty")]
+    pub requirements: StepRequirements,
+
     /// The script content to execute for this step.
+    #[serde(default, skip_serializing_if = "ConditionalList::is_empty")]
     pub run: ConditionalList<String>,
 
     /// Optional selector expression gating whether this step runs (e.g. `unix`).
@@ -75,6 +192,12 @@ impl RunStep {
     /// Collect all variables used in this run step.
     pub fn used_variables(&self) -> Vec<String> {
         let RunStep {
+            uses,
+            with,
+            name: _,
+            optional: _,
+            depends_on: _,
+            requirements,
             run,
             condition,
             condition_span: _,
@@ -84,6 +207,13 @@ impl RunStep {
         } = self;
 
         let mut vars = run.used_variables();
+        if let Some(uses) = uses {
+            vars.extend(uses.used_variables());
+        }
+        for value in with.values() {
+            vars.extend(value.used_variables());
+        }
+        vars.extend(requirements.used_variables());
 
         if let Some(condition) = condition {
             vars.extend(condition.used_variables().iter().cloned());
@@ -180,6 +310,10 @@ pub struct Build {
     #[serde(default, flatten)]
     pub plan: BuildPlan,
 
+    /// Experimental step that emits recipe metadata before dependency solving.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<Step>,
+
     /// Noarch type - python or generic
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub noarch: Option<Value<NoArchType>>,
@@ -235,6 +369,7 @@ impl Default for Build {
             number: None,
             string: None,
             plan: BuildPlan::default(),
+            metadata: None,
             noarch: None,
             flags: ConditionalList::default(),
             python: PythonBuild::default(),
@@ -419,6 +554,7 @@ impl Build {
             number,
             string,
             plan,
+            metadata,
             noarch,
             flags,
             python,
@@ -444,6 +580,9 @@ impl Build {
         }
 
         vars.extend(plan.used_variables());
+        if let Some(metadata) = metadata {
+            vars.extend(metadata.used_variables());
+        }
 
         if let Some(noarch) = noarch {
             vars.extend(noarch.used_variables());
