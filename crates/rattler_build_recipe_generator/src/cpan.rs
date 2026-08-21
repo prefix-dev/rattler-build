@@ -622,6 +622,7 @@ make install"#
             "perl -M{} -e 'print \"Module loaded successfully\\n\"'",
             main_module
         )],
+        ..Default::default()
     }));
 
     Ok(recipe)

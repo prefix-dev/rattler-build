@@ -1,0 +1,45 @@
+---
+source: crates/rattler_build_recipe_generator/src/serialize.rs
+expression: recipe.to_string()
+---
+schema_version: 1
+
+context:
+  version: "1.0"
+  build_number: "0"
+  name: ${{ env.get('NAME') }}
+  mirror: https://example.com
+
+package:
+  name: demo
+  version: ${{ version }}
+
+source:
+  - url: https://example.com/demo-${{ version }}.tar.gz
+    sha256: abc
+  - git: https://example.com/demo.git
+    tag: v1.0
+
+build:
+  number: 0
+  noarch: generic
+  script: make install
+
+requirements:
+  build:
+    - ${{ compiler('c') }}
+  host:
+    - r-base
+
+tests: []
+
+about:
+  summary: 'A demo: with a colon'
+  description: |-
+    First line.
+
+    Third line, indented:
+      - item
+  license: MIT
+  license_file:
+    - LICENSE

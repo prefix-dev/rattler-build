@@ -1,3 +1,4 @@
+use std::io::Read;
 #[cfg(not(target_arch = "wasm32"))]
 use std::path::PathBuf;
 use std::{collections::HashMap, collections::HashSet};
@@ -6,12 +7,15 @@ use std::{collections::HashMap, collections::HashSet};
 use clap::Parser;
 use itertools::Itertools;
 use miette::IntoDiagnostic;
-use rattler_digest::{Sha256Hash, compute_bytes_digest};
+use rattler_digest::compute_bytes_digest;
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use url::Url;
 
-use crate::serialize::{self, ScriptTest, Test, UrlSourceElement};
+use crate::serialize::{
+    self, RTest, RTestInner, ScriptTest, ScriptTestFiles, ScriptTestRequirements, Test,
+    UrlSourceElement,
+};
 #[cfg(not(target_arch = "wasm32"))]
 use crate::write_recipe;
 /// Package metadata returned by the R-universe/CRAN API.
@@ -40,12 +44,17 @@ pub struct PackageInfo {
     pub _created: String,
     pub _published: String,
     pub _upstream: String,
+    /// Development repository detected by R-universe (e.g. the GitHub project),
+    /// as opposed to `_upstream`, which is the CRAN mirror on GitHub.
+    pub _devurl: Option<String>,
     pub _commit: Commit,
     pub _maintainer: Maintainer,
     pub _distro: String,
     pub _host: String,
     pub _status: String,
     pub _pkgdocs: Option<String>,
+    /// URL of the package's pkgdown documentation site, if any.
+    pub _pkgdown: Option<String>,
     pub _srconly: Option<String>,
     pub _winbinary: Option<String>,
     pub _macbinary: Option<String>,
@@ -81,6 +90,18 @@ pub struct CranOpts {
     /// Whether to write the recipe to a folder
     #[cfg_attr(feature = "cli", arg(short, long))]
     pub write: bool,
+
+    /// GitHub handle(s) to list under `extra.recipe-maintainers` (repeatable)
+    #[cfg_attr(
+        feature = "cli",
+        arg(short, long = "maintainer", value_name = "GITHUB_ID")
+    )]
+    pub maintainers: Vec<String>,
+
+    /// Append the package's DESCRIPTION file as a comment block at the end of
+    /// the recipe, as conda-forge's staged-recipes reviewers ask for
+    #[cfg_attr(feature = "cli", arg(long))]
+    pub staged_recipes: bool,
 }
 
 /// Commit information from the R-universe/CRAN API.
@@ -240,12 +261,55 @@ fn format_r_package(package: &str, version: Option<&String>) -> String {
     res
 }
 
-/// Download the package at `url` and compute its SHA256 checksum.
-pub async fn fetch_package_sha256sum(url: &Url) -> Result<Sha256Hash, miette::Error> {
+/// Download the package tarball at `url`.
+pub async fn fetch_package_tarball(url: &Url) -> Result<Vec<u8>, miette::Error> {
     let client = reqwest::Client::new();
     let response = client.get(url.clone()).send().await.into_diagnostic()?;
     let bytes = response.bytes().await.into_diagnostic()?;
-    Ok(compute_bytes_digest::<Sha256>(&bytes))
+    Ok(bytes.to_vec())
+}
+
+/// Extract the `DESCRIPTION` file (`<package>/DESCRIPTION`) from a CRAN
+/// source tarball. Deeper `DESCRIPTION` files (e.g. test fixtures under
+/// `inst/`) are ignored.
+fn extract_description(tarball: &[u8]) -> miette::Result<Option<String>> {
+    let tar = flate2::read::GzDecoder::new(tarball);
+    let mut archive = tar::Archive::new(tar);
+    for entry in archive.entries().into_diagnostic()? {
+        let mut entry = entry.into_diagnostic()?;
+        let is_top_level_description = {
+            let path = entry.path().into_diagnostic()?;
+            let depth = path
+                .components()
+                .filter(|c| matches!(c, std::path::Component::Normal(_)))
+                .count();
+            depth == 2 && path.file_name().is_some_and(|name| name == "DESCRIPTION")
+        };
+        if is_top_level_description {
+            let mut contents = String::new();
+            entry.read_to_string(&mut contents).into_diagnostic()?;
+            return Ok(Some(contents));
+        }
+    }
+    Ok(None)
+}
+
+/// Append the package's DESCRIPTION file to the rendered recipe as a comment
+/// block, in the format `conda skeleton cran` used, so that reviewers can check
+/// the recipe against the upstream metadata without opening the tarball.
+fn append_description_comment(recipe: &str, description: &str) -> String {
+    let mut out = recipe.trim_end_matches('\n').to_string();
+    out.push_str("\n\n# The original CRAN metadata for this package was:\n\n");
+    for line in description
+        .lines()
+        .map(str::trim_end)
+        .filter(|line| !line.is_empty())
+    {
+        out.push_str("# ");
+        out.push_str(line);
+        out.push('\n');
+    }
+    out
 }
 
 // Found when running `installed.packages()` in an `r-base` environment
@@ -275,10 +339,25 @@ const R_BUILTINS: &[&str] = &[
 /// keeps the post-processing match simple.
 const CROSS_R_BASE_MARKER: &str = "CROSS_R_BASE_PLACEHOLDER";
 
-/// Placeholder stored in `build.script`. Expanded by
+/// Placeholder stored in `build.script` for *compiled* packages. Expanded by
 /// [`format_cran_recipe_with_suggests`] into a platform-conditional list that
-/// uses `${R_ARGS}` on Unix and `%R_ARGS%` on Windows.
+/// uses `${R_ARGS}` on Unix and `%R_ARGS%` on Windows, so that recipe authors
+/// can inject e.g. `--configure-args`. Pure-R packages use [`R_CMD_INSTALL`].
 const CRAN_R_SCRIPT_MARKER: &str = "CRAN_R_SCRIPT_PLACEHOLDER";
+
+/// Build script for pure-R (`noarch: generic`) packages. `${{ R }}` resolves
+/// to the R binary of the host prefix at build time.
+const R_CMD_INSTALL: &str = "${{ R }} CMD INSTALL --build .";
+
+/// Default value of the `cran_mirror` context variable. conda-forge provides
+/// `cran_mirror` through its variant config; defining it in `context` keeps the
+/// recipe buildable without one (a `context` variable shadows a variant key of
+/// the same name).
+const CRAN_MIRROR: &str = "https://cran.r-project.org";
+
+/// Placeholder maintainer when none is given on the command line (the same
+/// convention grayskull uses).
+const DEFAULT_MAINTAINER: &str = "AddYourGitHubIdHere";
 
 /// Convert an R `Depends: R (>= x.y.z)` version string into a rattler-build
 /// `skip` expression. Only `>=` constraints are handled; returns `None` for
@@ -330,7 +409,7 @@ fn format_cran_recipe_with_suggests(recipe: &serialize::Recipe) -> String {
         } else if line.contains("SUGGEST") {
             final_recipe.push_str(&format!(
                 "{}  # suggested\n",
-                line.replace(" - SUGGEST", " # - ")
+                line.replace("- SUGGEST ", "# - ")
             ));
         } else {
             final_recipe.push_str(&format!("{}\n", line));
@@ -339,73 +418,70 @@ fn format_cran_recipe_with_suggests(recipe: &serialize::Recipe) -> String {
     final_recipe
 }
 
-async fn build_cran_recipe_and_deps(
-    package: &str,
-    universe: Option<&str>,
-) -> miette::Result<(serialize::Recipe, HashSet<String>)> {
-    let universe = universe.unwrap_or("cran");
-    tracing::info!("Generating R recipe for {}", package);
-    let package_info = reqwest::get(&format!(
-        "https://{universe}.r-universe.dev/api/packages/{}",
-        package
+/// Fetch the metadata of `package` from the R-universe API of `universe`.
+pub async fn fetch_package_info(package: &str, universe: &str) -> miette::Result<PackageInfo> {
+    reqwest::get(&format!(
+        "https://{universe}.r-universe.dev/api/packages/{package}"
     ))
     .await
     .into_diagnostic()?
     .json::<PackageInfo>()
     .await
-    .into_diagnostic()?;
+    .into_diagnostic()
+}
 
+/// Turn R-universe package metadata into a recipe.
+///
+/// `sha256` is the checksum of the CRAN tarball when it could be computed;
+/// otherwise the MD5 reported by R-universe is used. `maintainers` fills
+/// `extra.recipe-maintainers` (a placeholder is used when empty). Also returns
+/// the R packages the recipe depends on, for `--tree`.
+fn package_info_to_recipe(
+    info: &PackageInfo,
+    sha256: Option<String>,
+    maintainers: &[String],
+) -> (serialize::Recipe, HashSet<String>) {
     let mut recipe = serialize::Recipe::default();
 
     recipe
         .context
-        .insert("build_number".to_string(), "0".to_string());
+        .insert("version".to_string(), info.Version.clone());
+    recipe
+        .context
+        .insert("cran_mirror".to_string(), CRAN_MIRROR.to_string());
 
-    recipe.package.name = format_r_package(&package_info.Package.to_lowercase(), None);
-    // some versions have a `-` in them (i think that's like a build number in debian)
-    // we just replace it with a `.`
-    recipe.package.version = package_info.Version.replace('-', ".").clone();
+    recipe.package.name = format_r_package(&info.Package, None);
+    // CRAN allows `-` in versions (e.g. `0.7-5.1`), conda does not; conda-forge
+    // maps it to `_`.
+    recipe.package.version = if info.Version.contains('-') {
+        "${{ version | replace(\"-\", \"_\") }}".to_string()
+    } else {
+        "${{ version }}".to_string()
+    };
 
-    let url = Url::parse(&format!(
-        "https://cran.r-project.org/src/contrib/{}",
-        package_info._file
-    ))
-    .expect("Failed to parse URL");
-
-    // It looks like CRAN moves the package to the archive for old versions
-    // so let's add that as a fallback mirror
-    let url_archive = Url::parse(&format!(
-        "https://cran.r-project.org/src/contrib/Archive/{}",
-        package_info._file
-    ))
-    .expect("Failed to parse URL");
-
-    // Fetching the tarball to hash it is best-effort: in restricted environments
-    // (e.g. WASM/browser with no CORS on cran.r-project.org) we fall back to the
-    // MD5 the R-universe API already gave us.
-    let (sha256, md5) = match fetch_package_sha256sum(&url).await {
-        Ok(hash) => (Some(hex::encode(hash)), None),
-        Err(e) => {
-            tracing::warn!(
-                "Failed to fetch SHA256 for {}: {} — falling back to MD5 from R-universe.",
-                package_info._file,
-                e
-            );
-            (None, package_info.MD5sum.clone())
+    // CRAN moves superseded versions to `Archive/<pkg>/`, so list that as a
+    // fallback mirror.
+    let tarball = format!("{}_${{{{ version }}}}.tar.gz", info.Package);
+    recipe.source.push(
+        UrlSourceElement {
+            url: vec![
+                format!("${{{{ cran_mirror }}}}/src/contrib/{tarball}"),
+                format!(
+                    "${{{{ cran_mirror }}}}/src/contrib/Archive/{}/{tarball}",
+                    info.Package
+                ),
+            ],
+            md5: if sha256.is_none() {
+                info.MD5sum.clone()
+            } else {
+                None
+            },
+            sha256,
         }
-    };
+        .into(),
+    );
 
-    let source = UrlSourceElement {
-        url: vec![url.to_string(), url_archive.to_string()],
-        md5,
-        sha256,
-    };
-    recipe.source.push(source.into());
-
-    recipe.build.number = "${{ build_number }}".to_string();
-    // Expanded by `format_cran_recipe_with_suggests` into a platform-specific
-    // list (${R_ARGS} on Unix, %R_ARGS% on Windows).
-    recipe.build.script = CRAN_R_SCRIPT_MARKER.to_string();
+    recipe.build.number = "0".to_string();
 
     let build_tools = vec![
         "${{ compiler('c') }}".to_string(),
@@ -416,7 +492,10 @@ async fn build_cran_recipe_and_deps(
     // Whether the package contains code that has to be compiled. Packages that
     // declare `LinkingTo` dependencies also compile against those headers, so
     // they need a compiler even if `NeedsCompilation` is not set to `yes`.
-    let mut needs_compilation = package_info.NeedsCompilation == "yes";
+    let mut needs_compilation = info.NeedsCompilation == "yes";
+    // Packages that suggest `testthat` ship their test suite in
+    // `tests/testthat.R` by convention.
+    let mut has_testthat = false;
 
     // `r-base` is always listed without a version pin; instead a minimum-R
     // constraint from `Depends: R (>= x.y.z)` is expressed as a `skip`
@@ -426,7 +505,7 @@ async fn build_cran_recipe_and_deps(
     let mut run = Vec::new();
 
     let mut remaining_deps = HashSet::new();
-    for dep in package_info._dependencies.iter() {
+    for dep in info._dependencies.iter() {
         if dep.package == "R" {
             if let Some(ver) = &dep.version {
                 recipe.build.skip = r_dep_version_to_skip(ver);
@@ -450,6 +529,7 @@ async fn build_cran_recipe_and_deps(
             run.push(spec);
             remaining_deps.insert(dep.package.clone());
         } else if dep.role == "Suggests" {
+            has_testthat |= dep.package == "testthat";
             run.push(format!(
                 "SUGGEST {}",
                 format_r_package(&dep.package, dep.version.as_ref())
@@ -472,36 +552,131 @@ async fn build_cran_recipe_and_deps(
         recipe.build.dynamic_linking = Some(serialize::DynamicLinking {
             rpaths: vec!["lib/R/lib/".to_string(), "lib/".to_string()],
         });
+        // Expanded by `format_cran_recipe_with_suggests` into a platform-specific
+        // list (${R_ARGS} on Unix, %R_ARGS% on Windows).
+        recipe.build.script = CRAN_R_SCRIPT_MARKER.to_string();
     } else {
-        // Pure-R packages are architecture independent.
+        // Pure-R packages are architecture independent and have no configure
+        // step, so there is nothing to pass through `R_ARGS`.
         recipe.build.noarch = Some("generic".to_string());
+        recipe.build.script = R_CMD_INSTALL.to_string();
     }
 
-    if let Some(url) = package_info.URL.clone() {
-        let url = url.split_once(',').unwrap_or((url.as_str(), "")).0;
+    if let Some(url) = &info.URL {
+        let url = url
+            .split_once(',')
+            .map_or(url.as_str(), |(first, _)| first)
+            .trim();
         recipe.about.homepage = Some(url.to_string());
     }
 
-    recipe.about.summary = Some(package_info.Title.clone());
-    recipe.about.description = Some(package_info.Description.clone());
-    let (license, license_files) = map_license(&package_info.License);
+    recipe.about.summary = Some(info.Title.clone());
+    // Trailing whitespace would force the description into a quoted scalar
+    // instead of a readable `|-` block.
+    recipe.about.description = Some(
+        info.Description
+            .lines()
+            .map(str::trim_end)
+            .collect::<Vec<_>>()
+            .join("\n"),
+    );
+    let (license, license_files) = map_license(&info.License);
     recipe.about.license = license;
     recipe.about.license_file = license_files;
-    recipe.about.repository = Some(package_info._upstream.clone());
-    if let Some(pkgdocs) = &package_info._pkgdocs
-        && url::Url::parse(pkgdocs).is_ok()
+    recipe.about.repository = Some(
+        info._devurl
+            .clone()
+            .unwrap_or_else(|| info._upstream.clone()),
+    );
+    if let Some(docs) = info._pkgdown.as_ref().or(info._pkgdocs.as_ref())
+        && Url::parse(docs).is_ok()
     {
-        recipe.about.documentation = Some(pkgdocs.clone());
+        recipe.about.documentation = Some(docs.clone());
     }
 
-    recipe.tests.push(Test::Script(ScriptTest {
-        script: vec![format!(
-            "Rscript -e 'library(\"{}\")'",
-            package_info.Package
-        )],
+    recipe.tests.push(Test::R(RTest {
+        r: RTestInner {
+            libraries: vec![info.Package.clone()],
+        },
     }));
+    if has_testthat {
+        recipe.tests.push(Test::Script(ScriptTest {
+            files: Some(ScriptTestFiles {
+                source: vec!["tests/".to_string()],
+            }),
+            requirements: Some(ScriptTestRequirements {
+                run: vec!["r-testthat".to_string()],
+            }),
+            script: vec![
+                r#"Rscript -e "testthat::test_file('tests/testthat.R', stop_on_failure=TRUE)""#
+                    .to_string(),
+            ],
+        }));
+    }
 
-    Ok((recipe, remaining_deps))
+    recipe.extra.recipe_maintainers = if maintainers.is_empty() {
+        vec![DEFAULT_MAINTAINER.to_string()]
+    } else {
+        maintainers.to_vec()
+    };
+
+    (recipe, remaining_deps)
+}
+
+/// Fetch the package metadata, build the recipe and, when `with_description`
+/// is set, also return the package's DESCRIPTION file.
+async fn build_cran_recipe_and_deps(
+    package: &str,
+    universe: Option<&str>,
+    maintainers: &[String],
+    with_description: bool,
+) -> miette::Result<(serialize::Recipe, HashSet<String>, Option<String>)> {
+    let universe = universe.unwrap_or("cran");
+    tracing::info!("Generating R recipe for {}", package);
+    let package_info = fetch_package_info(package, universe).await?;
+
+    // Download the tarball CRAN currently serves to hash it (and to read its
+    // DESCRIPTION). This is best-effort: in restricted environments (e.g.
+    // WASM/browser with no CORS on cran.r-project.org) we fall back to the MD5
+    // the R-universe API gave us.
+    let url = Url::parse(&format!("{CRAN_MIRROR}/src/contrib/{}", package_info._file))
+        .expect("Failed to parse URL");
+    let (sha256, description) = match fetch_package_tarball(&url).await {
+        Ok(bytes) => {
+            let sha256 = Some(hex::encode(compute_bytes_digest::<Sha256>(&bytes)));
+            let description = if with_description {
+                match extract_description(&bytes) {
+                    Ok(Some(description)) => Some(description),
+                    Ok(None) => {
+                        tracing::warn!("No DESCRIPTION file found in {}", package_info._file);
+                        None
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            "Failed to read DESCRIPTION from {}: {}",
+                            package_info._file,
+                            e
+                        );
+                        None
+                    }
+                }
+            } else {
+                None
+            };
+            (sha256, description)
+        }
+        Err(e) => {
+            tracing::warn!(
+                "Failed to fetch {}: {} — falling back to MD5 from R-universe.",
+                package_info._file,
+                e
+            );
+            (None, None)
+        }
+    };
+
+    let (recipe, remaining_deps) = package_info_to_recipe(&package_info, sha256, maintainers);
+    Ok((recipe, remaining_deps, description))
 }
 
 /// Generate a CRAN recipe for `package` and return the YAML as a string.
@@ -509,7 +684,8 @@ pub async fn generate_r_recipe_string(
     package: &str,
     universe: Option<&str>,
 ) -> miette::Result<String> {
-    let (recipe, _remaining_deps) = build_cran_recipe_and_deps(package, universe).await?;
+    let (recipe, _remaining_deps, _description) =
+        build_cran_recipe_and_deps(package, universe, &[], false).await?;
     Ok(format_cran_recipe_with_suggests(&recipe))
 }
 
@@ -521,10 +697,18 @@ pub async fn generate_r_recipe_string(
 /// package. Otherwise, the YAML is printed to stdout. When `tree` is enabled,
 /// dependencies are recursively generated if they don't already exist locally.
 pub async fn generate_r_recipe(opts: &CranOpts) -> miette::Result<()> {
-    let (recipe, remaining_deps) =
-        build_cran_recipe_and_deps(&opts.package, opts.universe.as_deref()).await?;
+    let (recipe, remaining_deps, description) = build_cran_recipe_and_deps(
+        &opts.package,
+        opts.universe.as_deref(),
+        &opts.maintainers,
+        opts.staged_recipes,
+    )
+    .await?;
 
-    let final_recipe = format_cran_recipe_with_suggests(&recipe);
+    let mut final_recipe = format_cran_recipe_with_suggests(&recipe);
+    if let Some(description) = description {
+        final_recipe = append_description_comment(&final_recipe, &description);
+    }
 
     if opts.write {
         write_recipe(&recipe.package.name, &final_recipe).into_diagnostic()?;
@@ -552,6 +736,103 @@ pub async fn generate_r_recipe(opts: &CranOpts) -> miette::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Verbatim responses of `https://cran.r-universe.dev/api/packages/<pkg>`.
+    fn fixture(name: &str) -> PackageInfo {
+        let json = match name {
+            "tinkr" => include_str!("../test-data/cran/tinkr.json"),
+            "gmp" => include_str!("../test-data/cran/gmp.json"),
+            other => panic!("unknown fixture {other}"),
+        };
+        serde_json::from_str(json).expect("fixture must deserialize as PackageInfo")
+    }
+
+    /// Pure-R package: `noarch: generic`, single-line script, `r:` test plus a
+    /// testthat test, dev repository and pkgdown site from R-universe.
+    #[test]
+    fn tinkr_noarch_with_testthat() {
+        let info = fixture("tinkr");
+        let (recipe, deps) = package_info_to_recipe(
+            &info,
+            Some("425bc04af76483b8cf713ad141bdebb963cf54dd363fbdbee3a709820ec4d23e".to_string()),
+            &[],
+        );
+        assert!(deps.contains("commonmark"));
+        assert!(deps.contains("R6"));
+        assert!(!deps.contains("testthat"), "Suggests are not recursed into");
+        insta::assert_snapshot!(format_cran_recipe_with_suggests(&recipe));
+    }
+
+    /// Compiled package with a `-` in its version: compilers, cross-r-base,
+    /// rpaths, platform-split script, no testthat test, explicit maintainers.
+    #[test]
+    fn gmp_compiled_with_dash_version() {
+        let info = fixture("gmp");
+        let (recipe, deps) = package_info_to_recipe(
+            &info,
+            None,
+            &["octocat".to_string(), "conda-forge/r".to_string()],
+        );
+        assert!(deps.is_empty(), "gmp only depends on base R packages");
+        insta::assert_snapshot!(format_cran_recipe_with_suggests(&recipe));
+    }
+
+    /// Build an in-memory `.tar.gz` with the given `(path, contents)` entries.
+    fn tarball_with(files: &[(&str, &str)]) -> Vec<u8> {
+        let encoder = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
+        let mut builder = tar::Builder::new(encoder);
+        for (path, contents) in files {
+            let mut header = tar::Header::new_gnu();
+            header.set_size(contents.len() as u64);
+            header.set_mode(0o644);
+            header.set_cksum();
+            builder
+                .append_data(&mut header, path, contents.as_bytes())
+                .unwrap();
+        }
+        builder.into_inner().unwrap().finish().unwrap()
+    }
+
+    #[test]
+    fn extracts_only_the_top_level_description() {
+        let tarball = tarball_with(&[
+            ("tinkr/R/tinkr.R", "NULL\n"),
+            ("tinkr/inst/extdata/DESCRIPTION", "Package: not-this-one\n"),
+            ("tinkr/DESCRIPTION", "Package: tinkr\nVersion: 0.3.1\n"),
+        ]);
+        assert_eq!(
+            extract_description(&tarball).unwrap().as_deref(),
+            Some("Package: tinkr\nVersion: 0.3.1\n")
+        );
+
+        let without = tarball_with(&[("tinkr/R/tinkr.R", "NULL\n")]);
+        assert_eq!(extract_description(&without).unwrap(), None);
+    }
+
+    #[test]
+    fn description_is_appended_as_a_comment_block() {
+        let recipe = "package:\n  name: r-tinkr\n";
+        let description =
+            "Package: tinkr\nTitle: Cast '(R)Markdown' Files\n    to 'XML'  \n\nLicense: GPL-3\n";
+        insta::assert_snapshot!(append_description_comment(recipe, description));
+    }
+
+    #[test]
+    fn test_r_dep_version_to_skip() {
+        assert_eq!(
+            r_dep_version_to_skip(">= 4.1.0").as_deref(),
+            Some("match(r_base, \"<4.1\")")
+        );
+        assert_eq!(
+            r_dep_version_to_skip(">=3.5").as_deref(),
+            Some("match(r_base, \"<3.5\")")
+        );
+        assert_eq!(
+            r_dep_version_to_skip("> 4").as_deref(),
+            Some("match(r_base, \"<4\")")
+        );
+        assert_eq!(r_dep_version_to_skip(""), None);
+    }
 
     #[test]
     fn test_license_mapping() {

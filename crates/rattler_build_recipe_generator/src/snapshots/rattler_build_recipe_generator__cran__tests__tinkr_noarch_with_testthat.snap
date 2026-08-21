@@ -1,0 +1,90 @@
+---
+source: crates/rattler_build_recipe_generator/src/cran.rs
+expression: format_cran_recipe_with_suggests(&recipe)
+---
+schema_version: 1
+
+context:
+  version: "0.3.1"
+  cran_mirror: https://cran.r-project.org
+
+package:
+  name: r-tinkr
+  version: ${{ version }}
+
+source:
+  url:
+    - ${{ cran_mirror }}/src/contrib/tinkr_${{ version }}.tar.gz
+    - ${{ cran_mirror }}/src/contrib/Archive/tinkr/tinkr_${{ version }}.tar.gz
+  sha256: 425bc04af76483b8cf713ad141bdebb963cf54dd363fbdbee3a709820ec4d23e
+
+build:
+  number: 0
+  skip: match(r_base, "<4.1")
+  noarch: generic
+  script: ${{ R }} CMD INSTALL --build .
+
+requirements:
+  host:
+    - r-base
+    - r-commonmark >=1.6
+    - r-glue
+    - r-lifecycle
+    - r-magrittr
+    - r-purrr
+    - r-r6
+    - r-rlang >=0.4.5
+    - r-xml2
+    - r-xslt
+  run:
+    - r-base
+    - r-commonmark >=1.6
+    - r-glue
+    - r-lifecycle
+    - r-magrittr
+    - r-purrr
+    - r-r6
+    - r-rlang >=0.4.5
+    - r-xml2
+    - r-xslt
+    # - r-knitr  # suggested
+    # - r-rmarkdown  # suggested
+    # - r-covr  # suggested
+    # - r-testthat >=3.0.0  # suggested
+    # - r-withr  # suggested
+
+tests:
+  - r:
+      libraries:
+        - tinkr
+  - files:
+      source:
+        - tests/
+    requirements:
+      run:
+        - r-testthat
+    script:
+      - Rscript -e "testthat::test_file('tests/testthat.R', stop_on_failure=TRUE)"
+
+about:
+  homepage: https://docs.ropensci.org/tinkr/
+  summary: Cast '(R)Markdown' Files to 'XML' and Back Again
+  description: |-
+    Parsing '(R)Markdown' files with numerous regular
+    expressions can be fraught with peril, but it does not have to
+    be this way. Converting '(R)Markdown' files to 'XML' using the
+    'commonmark' package allows in-memory editing via of 'markdown'
+    elements via 'XPath' through the extensible 'R6' class called
+    'yarn'. These modified 'XML' representations can be written to
+    '(R)Markdown' documents via an 'xslt' stylesheet which
+    implements an extended version of 'GitHub'-flavoured 'markdown'
+    so that you can tinker to your hearts content.
+  license: GPL-3.0-only
+  license_file:
+    - ${{ PREFIX }}/lib/R/share/licenses/GPL-3
+  repository: https://github.com/ropensci/tinkr
+  documentation: https://docs.ropensci.org/tinkr/
+
+extra:
+  recipe-maintainers:
+    - AddYourGitHubIdHere
