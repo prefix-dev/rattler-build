@@ -146,9 +146,11 @@ def _read_map(data: bytes, offset: int, length: int) -> tuple[dict[Any, Any], in
 def assert_v3_index_json(index_json: dict[str, Any]) -> None:
     assert index_json["repodata_revision"] == 3
     assert index_json["flags"] == ["cuda", "blas:openblas"]
+    assert index_json["depends"].count('python[version=">=3.10"]') == 1
+    assert index_json["constrains"] == ['python[version="<4"]']
     assert index_json["extra_depends"] == {
-        "full": ["pandas >=2", "rich[extras=[jupyter]]"],
-        "plot": ["matplotlib >=3.8"],
+        "full": ['pandas[version=">=2"]', "rich[extras=[jupyter]]"],
+        "plot": ['matplotlib[version=">=3.8"]'],
     }
     assert 'scipy[when="python>=3.10"]' in index_json["depends"]
     assert "blas-provider[flags=[blas:*]]" in index_json["depends"]
@@ -158,6 +160,8 @@ def assert_legacy_index_json(index_json: dict[str, Any]) -> None:
     assert "repodata_revision" not in index_json
     assert "flags" not in index_json
     assert "extra_depends" not in index_json
+    assert index_json["depends"].count("python >=3.10") == 1
+    assert index_json["constrains"] == ["python <4"]
 
 
 def test_v3_build_writes_v3_index_json(rattler_build: RattlerBuild, tmp_path: Path):

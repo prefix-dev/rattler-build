@@ -95,6 +95,14 @@ pub enum PackagingError {
     #[error("Invalid Metadata: {0}")]
     InvalidMetadata(String),
 
+    #[error("could not render {field} MatchSpec `{spec}` canonically: {source}")]
+    CanonicalMatchSpec {
+        field: String,
+        spec: String,
+        #[source]
+        source: rattler_conda_types::CanonicalMatchSpecError,
+    },
+
     #[error("Invalid MenuInst schema file: {0} - {1}")]
     InvalidMenuInstSchema(PathBuf, serde_json::Error),
 
