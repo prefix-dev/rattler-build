@@ -245,6 +245,7 @@ impl Step {
             secrets: Vec::new(),
             content: self.run.clone().into(),
             cwd: self.cwd.clone(),
+            sandbox: None,
             content_explicit: false,
         }
     }
