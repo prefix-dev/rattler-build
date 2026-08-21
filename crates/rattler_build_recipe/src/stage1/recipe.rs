@@ -4,7 +4,7 @@ use indexmap::IndexMap;
 use rattler_build_jinja::Variable;
 use serde::{Deserialize, Serialize};
 
-use super::{About, Build, Extra, Package, Requirements, Source, TestType};
+use super::{About, Build, Extra, Package, Requirements, Source, SystemRequirements, TestType};
 
 /// Staging cache - a build artifact that doesn't produce a package
 ///
@@ -125,6 +125,10 @@ pub struct Recipe {
     #[serde(default)]
     pub requirements: Requirements,
 
+    /// Minimum system requirements for consumers of this output.
+    #[serde(default, skip_serializing_if = "SystemRequirements::is_empty")]
+    pub system_requirements: SystemRequirements,
+
     /// Tests (can be multiple tests)
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tests: Vec<TestType>,
@@ -176,6 +180,7 @@ impl Recipe {
             build,
             about,
             requirements,
+            system_requirements: SystemRequirements::default(),
             extra,
             source,
             tests,
@@ -207,6 +212,7 @@ impl Recipe {
             build,
             about,
             requirements,
+            system_requirements: SystemRequirements::default(),
             extra,
             source,
             tests,
