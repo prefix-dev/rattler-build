@@ -1659,6 +1659,58 @@ requirements:
     }
 
     #[test]
+    fn test_render_future_repodata_revision_supports_v3_features() {
+        let recipe_yaml = r#"
+package:
+  name: test-pkg
+  version: "1.0.0"
+
+build:
+  flags:
+    - cuda
+
+requirements:
+  run:
+    - 'foo[when="python >=3.11"]'
+    - 'bar[flags=[cuda]]'
+  extras:
+    dev:
+      - 'pytest[extras=[test]]'
+"#;
+
+        let revision = RepodataRevision::Unknown(4);
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source_with_config(
+            recipe_yaml,
+            stage0::ParseConfig {
+                repodata_revision: revision,
+            },
+        )
+        .unwrap();
+
+        let rendered = render_recipe_with_variant_config(
+            &stage0_recipe,
+            &VariantConfig::default(),
+            RenderConfig::new().with_repodata_revision(revision),
+        )
+        .unwrap();
+
+        assert_eq!(rendered.len(), 1);
+        assert_eq!(rendered[0].recipe.build.flags[0].as_str(), "cuda");
+        assert_eq!(
+            rendered[0].recipe.requirements.run[0].to_string(),
+            "foo[when=\"python>=3.11\"]"
+        );
+        assert_eq!(
+            rendered[0].recipe.requirements.run[1].to_string(),
+            "bar[flags=[cuda]]"
+        );
+        assert_eq!(
+            rendered[0].recipe.requirements.extras["dev"][0].to_string(),
+            "pytest[extras=[test]]"
+        );
+    }
+
+    #[test]
     fn test_render_multi_output_simple() {
         let recipe_yaml = r#"
 schema_version: 1

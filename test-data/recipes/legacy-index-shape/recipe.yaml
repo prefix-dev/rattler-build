@@ -4,6 +4,14 @@ package:
   name: legacy-index-shape
   version: 1.0.0
 
+requirements:
+  run:
+    - python >=3.10
+    - python >=3.10
+  run_constraints:
+    - python <4
+    - python <4
+
 build:
   script:
     - if: win
