@@ -499,6 +499,7 @@ async fn build_cran_recipe_and_deps(
             "Rscript -e 'library(\"{}\")'",
             package_info.Package
         )],
+        ..Default::default()
     }));
 
     Ok((recipe, remaining_deps))

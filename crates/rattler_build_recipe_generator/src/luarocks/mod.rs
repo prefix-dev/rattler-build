@@ -425,6 +425,7 @@ fn rockspec_to_recipe(rockspec: &LuarocksRockspec) -> miette::Result<Recipe> {
             description: rockspec.description.detailed.as_deref().map(str::trim).map(ToOwned::to_owned).clone(),
             ..Default::default()
         },
+        ..Default::default()
     };
 
     // Add dependencies
@@ -464,7 +465,10 @@ fn generate_require_test(spec: &LuarocksRockspec) -> Test {
         .into_iter()
         .map(|m| format!("lua -e \"require('{}')\"", m))
         .collect();
-    Test::Script(ScriptTest { script })
+    Test::Script(ScriptTest {
+        script,
+        ..Default::default()
+    })
 }
 
 fn normalize_lua_name(name: &str) -> miette::Result<PackageName> {
