@@ -51,6 +51,7 @@ PackageTestType = Union[
     "RubyTest",
     "DownstreamTest",
     "PackageContentsTest",
+    "AbiCheckTest",
 ]
 
 
@@ -422,6 +423,8 @@ def _wrap_test(inner: Any) -> PackageTestType:
         return DownstreamTest(inner)
     elif isinstance(inner, _package.PackageContentsTest):
         return PackageContentsTest(inner)
+    elif isinstance(inner, _package.AbiCheckTest):
+        return AbiCheckTest(inner)
     else:
         raise TypeError(f"Unknown test type: {type(inner)}")
 
@@ -713,6 +716,48 @@ class PackageContentsTest:
 
     def __repr__(self) -> str:
         return f"PackageContentsTest(strict={self.strict})"
+
+
+class AbiCheckTest:
+    """ABI check test - compares the ABI surface of the shared libraries with a previously
+    published version of the package.
+
+    Attributes:
+        index: Index of this test in the package's test list
+        pin: The pin expression (`x.x` syntax) selecting the compatible version range
+        libraries: Glob patterns selecting the libraries to check (empty = all shared libraries)
+        ignore_symbols: Glob patterns for exported symbol names to ignore in the comparison
+    """
+
+    def __init__(self, inner: _package.AbiCheckTest) -> None:
+        self._inner = inner
+
+    @property
+    def index(self) -> int:
+        """Index of this test in the package's test list."""
+        return self._inner.index
+
+    @property
+    def pin(self) -> str:
+        """The pin expression (`x.x` syntax) selecting the compatible version range."""
+        return self._inner.pin
+
+    @property
+    def libraries(self) -> list[str]:
+        """Glob patterns selecting the libraries to check (empty = all shared libraries)."""
+        return self._inner.libraries
+
+    @property
+    def ignore_symbols(self) -> list[str]:
+        """Glob patterns for exported symbol names to ignore in the comparison."""
+        return self._inner.ignore_symbols
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to a dictionary."""
+        return self._inner.to_dict()
+
+    def __repr__(self) -> str:
+        return f"AbiCheckTest(pin='{self.pin}')"
 
 
 class FileChecks:
