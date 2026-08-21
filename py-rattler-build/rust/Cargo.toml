@@ -35,11 +35,11 @@ tokio = { version = "1.53.1", features = [
   "rt-multi-thread",
   "process",
 ] }
-rattler_conda_types = "0.50"
+rattler_conda_types = "0.51"
 rattler_config = "0.7"
 rattler_networking = { version = "0.30.3" }
 rattler_solve = "9.0"
-rattler_virtual_packages = "5.0.0"
+rattler_virtual_packages = "5.1.0"
 clap = "4.6.4"
 url = "2.5.8"
 jiff = "0.2.35"
