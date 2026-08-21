@@ -51,6 +51,7 @@ The `R` recipe generation supports some additional flags:
 - `-u/--universe` select an R universe to use (e.g. `bioconductor`)
 - `-t/--tree` generate multiple recipes, for every dependency as well
 - `-m/--maintainer` GitHub handle to list under `extra.recipe-maintainers`; can be given multiple times (e.g. `-m conda-forge/r -m your-handle`). A placeholder is used otherwise.
+- `--staged-recipes` append the package's `DESCRIPTION` file as a comment block at the end of the recipe; the conda-forge R team asks for this on `staged-recipes` submissions so they can review the recipe against the upstream metadata.
 
 R packages will be prefixed with `r-` to avoid name conflicts with Python packages. The generated recipe follows the conventions of conda-forge's R recipes:
 

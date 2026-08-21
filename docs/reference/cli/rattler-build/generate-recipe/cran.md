@@ -26,3 +26,5 @@ rattler-build generate-recipe cran [OPTIONS] <PACKAGE>
 - <a id="arg---maintainer" href="#arg---maintainer">`--maintainer (-m) <GITHUB_ID>`</a>
 :  GitHub handle(s) to list under `extra.recipe-maintainers` (repeatable)
 <br>May be provided more than once.
+- <a id="arg---staged-recipes" href="#arg---staged-recipes">`--staged-recipes`</a>
+:  Append the package's DESCRIPTION file as a comment block at the end of the recipe, as conda-forge's staged-recipes reviewers ask for
