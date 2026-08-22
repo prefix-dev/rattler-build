@@ -13,7 +13,7 @@ use crate::stage0::{
     requirements::Requirements,
     source::Source,
     tests::TestType,
-    types::{ConditionalList, Item, Value},
+    types::{ConditionalList, IncludeExclude, Item, Script, Value},
 };
 
 /// A recipe can be either a single-output or multi-output recipe
@@ -178,6 +178,49 @@ pub struct PackageOutput {
     /// Tests for this output
     #[serde(default, skip_serializing_if = "ConditionalList::is_empty")]
     pub tests: ConditionalList<TestType>,
+
+    /// Packages split from the files produced by this output.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub subpackages: Vec<SubpackageOutput>,
+}
+
+/// A package split from a parent package output without rerunning its build.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct SubpackageOutput {
+    /// Package identity. The version defaults to the parent package version.
+    pub package: PackageMetadata,
+
+    /// File selection and optional dynamic selector.
+    pub split: SubpackageSplit,
+
+    /// Replacement requirements. Omitted requirements inherit from the parent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub requirements: Option<Requirements>,
+
+    /// Build metadata overrides. Executable plans are not allowed here.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub build: Option<Build>,
+
+    /// About metadata overlaid on the parent metadata.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub about: Option<About>,
+
+    /// Replacement tests. Omitted tests inherit from the parent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tests: Option<ConditionalList<TestType>>,
+}
+
+/// How files are selected for a subpackage.
+#[derive(Debug, Clone, PartialEq, Serialize, Default)]
+pub struct SubpackageSplit {
+    /// Static include/exclude globs, relative to the package prefix.
+    #[serde(default)]
+    pub files: IncludeExclude,
+
+    /// Optional selector script that writes additional paths/globs to the file
+    /// named by `RATTLER_BUILD_SUBPACKAGE_FILES`.
+    #[serde(default, skip_serializing_if = "Script::is_default")]
+    pub script: Script,
 }
 
 /// Serialize TopLevel as null
@@ -460,47 +503,81 @@ impl StagingOutput {
 impl PackageOutput {
     /// Get all used variables in this package output
     pub fn used_variables(&self) -> Vec<String> {
-        let PackageOutput {
-            package,
-            inherit,
-            source,
-            requirements,
-            build,
-            about,
-            tests,
-        } = self;
-
-        let mut vars = package.used_variables();
-        vars.extend(inherit.used_variables());
-        for src_item in source {
+        let mut vars = self.package.used_variables();
+        vars.extend(self.inherit.used_variables());
+        for src_item in &self.source {
             vars.extend(collect_source_item_variables(src_item));
         }
-        vars.extend(requirements.used_variables());
-        vars.extend(build.used_variables());
-        vars.extend(about.used_variables());
-        for test_item in tests {
+        vars.extend(self.requirements.used_variables());
+        vars.extend(self.build.used_variables());
+        vars.extend(self.about.used_variables());
+        for test_item in &self.tests {
             vars.extend(collect_test_item_variables(test_item));
+        }
+        for subpackage in &self.subpackages {
+            vars.extend(subpackage.used_variables());
         }
         vars.sort();
         vars.dedup();
         vars
     }
 
-    /// Get all free specs (specs without version or build constraints) in this package output
+    /// Get all free specs (specs without version or build constraints) in this output and its splits.
     pub fn free_specs(&self) -> Vec<rattler_conda_types::PackageName> {
-        self.requirements.free_specs()
+        let mut specs = self.requirements.free_specs();
+        for subpackage in &self.subpackages {
+            if let Some(requirements) = &subpackage.requirements {
+                specs.extend(requirements.free_specs());
+            }
+        }
+        specs
     }
 
-    /// Get all use_keys from build.variant.use_keys
-    ///
-    /// These are variant keys that should be forcibly included in the variant matrix.
+    /// Get all use_keys from build.variant.use_keys in this output and its splits.
     pub fn use_keys(&self) -> Vec<String> {
-        self.build
+        let mut keys = self
+            .build
             .variant
             .use_keys
             .iter()
             .filter_map(|item| item.as_value().and_then(|v| v.as_concrete().cloned()))
-            .collect()
+            .collect::<Vec<_>>();
+        for subpackage in &self.subpackages {
+            if let Some(build) = &subpackage.build {
+                keys.extend(
+                    build
+                        .variant
+                        .use_keys
+                        .iter()
+                        .filter_map(|item| item.as_value().and_then(|v| v.as_concrete().cloned())),
+                );
+            }
+        }
+        keys
+    }
+}
+
+impl SubpackageOutput {
+    /// Get all template and selector variables used by this subpackage.
+    pub fn used_variables(&self) -> Vec<String> {
+        let mut vars = self.package.used_variables();
+        vars.extend(self.split.files.used_variables());
+        vars.extend(self.split.script.used_variables());
+        if let Some(requirements) = &self.requirements {
+            vars.extend(requirements.used_variables());
+        }
+        if let Some(build) = &self.build {
+            vars.extend(build.used_variables());
+        }
+        if let Some(about) = &self.about {
+            vars.extend(about.used_variables());
+        }
+        if let Some(tests) = &self.tests {
+            for test in tests {
+                vars.extend(collect_test_item_variables(test));
+            }
+        }
+        vars
     }
 }
 

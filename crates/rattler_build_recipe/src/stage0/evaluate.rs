@@ -3037,6 +3037,178 @@ impl Evaluate for Stage0Recipe {
     }
 }
 
+fn no_op_build_plan() -> Stage1BuildPlan {
+    Stage1BuildPlan::Script(rattler_build_script::Script {
+        content: ScriptContent::Commands(Vec::new()),
+        ..Default::default()
+    })
+}
+
+fn package_runtime_requirements(mut requirements: Stage1Requirements) -> Stage1Requirements {
+    requirements.build.clear();
+    requirements.host.clear();
+    requirements.ignore_run_exports = Stage1IgnoreRunExports::default();
+    requirements
+}
+
+fn staging_requirements(mut requirements: Stage1Requirements) -> Stage1Requirements {
+    requirements.run.clear();
+    requirements.run_constraints.clear();
+    requirements.extras.clear();
+    requirements.run_exports = Stage1RunExports::default();
+    requirements
+}
+
+fn augment_used_variant(
+    recipe: &mut Stage1Recipe,
+    context: &EvaluationContext,
+    requirements: &Stage1Requirements,
+) {
+    let accessed = context.accessed_variables();
+    let free_specs = requirements
+        .free_specs()
+        .into_iter()
+        .map(NormalizedKey::from)
+        .collect::<HashSet<_>>();
+    for (key, value) in context.variables() {
+        if accessed.contains(key) || free_specs.contains(&NormalizedKey::from(key.as_str())) {
+            recipe
+                .used_variant
+                .insert(NormalizedKey::from(key.as_str()), value.clone());
+        }
+    }
+}
+
+fn evaluate_subpackage_family(
+    mut parent: Stage1Recipe,
+    output: &stage0::PackageOutput,
+    context: &EvaluationContext,
+) -> Result<Vec<Stage1Recipe>, ParseError> {
+    context.clear_accessed();
+    let mut selections = Vec::with_capacity(output.subpackages.len());
+    for subpackage in &output.subpackages {
+        let name = PackageName::from_str(&evaluate_value_to_string(
+            &subpackage.package.name,
+            context,
+        )?)
+        .map_err(|error| {
+            ParseError::invalid_value("subpackage name", error.to_string(), Span::new_blank())
+        })?;
+        let files = evaluate_glob_vec(&subpackage.split.files, context)?;
+        let script = evaluate_script(&subpackage.split.script, context)?;
+        selections.push(stage1::SubpackageSelection {
+            name,
+            files,
+            script,
+        });
+    }
+
+    let parent_name = parent.package.name.clone();
+    let mut seen = HashSet::from([parent_name.as_normalized().to_string()]);
+    for selection in &selections {
+        if !seen.insert(selection.name.as_normalized().to_string()) {
+            return Err(ParseError::invalid_value(
+                "subpackages",
+                format!(
+                    "duplicate split package name '{}'",
+                    selection.name.as_normalized()
+                ),
+                Span::new_blank(),
+            ));
+        }
+    }
+
+    let parent_requirements = parent.requirements.clone();
+    augment_used_variant(&mut parent, context, &parent_requirements);
+
+    let cache_name = format!("__rattler_build_split_{}", parent_name.as_normalized());
+    let mut cache = stage1::StagingCache::new(
+        cache_name.clone(),
+        parent.build.clone(),
+        staging_requirements(parent.requirements.clone()),
+        parent.source.clone(),
+        parent.used_variant.clone(),
+    );
+    // The common cache must retain every produced file. The parent's `build.files`
+    // filter is applied only when packaging the parent; children may select files outside it.
+    cache.build.files = GlobVec::default();
+    cache.subpackage_selectors = selections.clone();
+    cache.package_identity = Some(stage1::StagingPackageIdentity {
+        package: parent.package.clone(),
+        build_number: parent.build.number.unwrap_or(0),
+        build_string: None,
+        hash: None,
+    });
+
+    let split_for = |current: PackageName| stage1::SubpackageSplit {
+        parent: parent_name.clone(),
+        current,
+        children: selections.clone(),
+    };
+
+    parent.build.plan = no_op_build_plan();
+    parent.requirements = package_runtime_requirements(parent.requirements);
+    parent.source.clear();
+    parent.staging_caches = vec![cache.clone()];
+    parent.inherits_from = Some(stage1::InheritsFrom::new(cache_name.clone()));
+    parent.subpackage_split = Some(split_for(parent_name.clone()));
+    let parent_runtime_requirements = parent.requirements.clone();
+    let parent_about = parent.about.clone();
+    let parent_tests = parent.tests.clone();
+
+    let mut result = vec![parent.clone()];
+    for (subpackage, selection) in output.subpackages.iter().zip(&selections) {
+        context.clear_accessed();
+        let mut child = parent.clone();
+        child.package.name = selection.name.clone();
+        if let Some(version) = &subpackage.package.version {
+            child.package.version = VersionWithSource::from_str(&evaluate_value_to_string(
+                version, context,
+            )?)
+            .map_err(|error| {
+                ParseError::invalid_value(
+                    "subpackage version",
+                    error.to_string(),
+                    Span::new_blank(),
+                )
+            })?;
+        }
+
+        child.requirements = if let Some(requirements) = &subpackage.requirements {
+            requirements.evaluate(context)?
+        } else {
+            parent_runtime_requirements.clone()
+        };
+        if let Some(build) = &subpackage.build {
+            child.build = merge_stage1_build(child.build, build.evaluate(context)?);
+        }
+        child.build.plan = no_op_build_plan();
+        child.build.files = GlobVec::default();
+        child.about = if let Some(about) = &subpackage.about {
+            merge_stage1_about(parent_about.clone(), about.evaluate(context)?)
+        } else {
+            parent_about.clone()
+        };
+        child.tests = if let Some(tests) = &subpackage.tests {
+            let mut evaluated = Vec::new();
+            for test in tests {
+                evaluated.extend(evaluate_test(test, context)?);
+            }
+            evaluated
+        } else {
+            parent_tests.clone()
+        };
+        child.subpackage_split = Some(split_for(selection.name.clone()));
+        child.inherits_from = Some(stage1::InheritsFrom::new(cache_name.clone()));
+        child.staging_caches = vec![cache.clone()];
+        let child_requirements = child.requirements.clone();
+        augment_used_variant(&mut child, context, &child_requirements);
+        result.push(child);
+    }
+
+    Ok(result)
+}
+
 fn build_plan_inherits_from_toplevel(toplevel: &Stage1BuildPlan, output: &Stage1BuildPlan) -> bool {
     matches!(
         output,
@@ -3586,6 +3758,15 @@ impl Evaluate for crate::stage0::MultiOutputRecipe {
                 };
 
                 recipe.context = evaluated_context.clone();
+
+                if !pkg_output.subpackages.is_empty() {
+                    evaluated_outputs.extend(evaluate_subpackage_family(
+                        recipe,
+                        pkg_output,
+                        &context_with_vars,
+                    )?);
+                    continue;
+                }
 
                 // Set staging_caches and inherits_from based on the inherit field
                 match &pkg_output.inherit {
@@ -6463,6 +6644,79 @@ package:
         let r = render_template(r#"${{ foo | default("x") | upper }}"#, &ctx, None);
         assert!(r.is_ok(), "default then upper must work: {:?}", r.err());
         assert_eq!(r.unwrap(), "X");
+    }
+
+    #[test]
+    fn nested_subpackages_expand_to_one_staging_build_and_split_outputs() {
+        let yaml = r#"
+recipe:
+  version: 1.2.3
+about:
+  license: MIT
+  summary: parent
+outputs:
+  - package:
+      name: demo
+    build:
+      script: echo build
+    requirements:
+      run: [runtime]
+    subpackages:
+      - package:
+          name: demo-dev
+        split:
+          files: [include/**]
+          script: echo 'lib/cmake/**' >> "$RATTLER_BUILD_SUBPACKAGE_FILES"
+        requirements: {}
+        about:
+          summary: development
+"#;
+        let parsed = parse_recipe_or_multi_from_source(yaml).unwrap();
+        let stage0::Recipe::MultiOutput(recipe) = parsed else {
+            panic!("expected multi-output recipe");
+        };
+        let recipes = recipe
+            .evaluate(&EvaluationContext::for_platform(
+                rattler_conda_types::Platform::Linux64,
+            ))
+            .unwrap();
+
+        assert_eq!(recipes.len(), 2);
+        let parent = &recipes[0];
+        let child = &recipes[1];
+        assert_eq!(parent.package.name.as_normalized(), "demo");
+        assert_eq!(child.package.name.as_normalized(), "demo-dev");
+        assert_eq!(parent.staging_caches.len(), 1);
+        assert_eq!(child.staging_caches.len(), 1);
+        assert_eq!(parent.staging_caches[0].subpackage_selectors.len(), 1);
+        assert!(parent.source.is_empty());
+        assert!(
+            parent
+                .requirements
+                .run
+                .iter()
+                .any(|dep| dep.to_string() == "runtime")
+        );
+        assert!(child.requirements.is_empty());
+        assert_eq!(child.about.summary.as_deref(), Some("development"));
+        assert_eq!(
+            child
+                .about
+                .license
+                .as_ref()
+                .map(ToString::to_string)
+                .as_deref(),
+            Some("MIT")
+        );
+        assert_eq!(
+            child
+                .subpackage_split
+                .as_ref()
+                .unwrap()
+                .parent
+                .as_normalized(),
+            "demo"
+        );
     }
 
     #[test]

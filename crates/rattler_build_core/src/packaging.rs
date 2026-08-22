@@ -1,7 +1,7 @@
 //! This module contains the functions to package a conda package from a given
 //! output.
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     io::Write,
     path::{Component, Path, PathBuf},
 };
@@ -103,6 +103,20 @@ pub enum PackagingError {
 
     #[error("Package file `{0}` listed in $RATTLER_BUILD_PACKAGE_FILES does not exist")]
     PackageFileMissing(PathBuf),
+
+    #[error(
+        "Invalid generated subpackage pattern `{0}`: patterns must be prefix-relative and cannot contain `..`"
+    )]
+    InvalidSubpackagePattern(String),
+
+    #[error("Generated subpackage selection `{0}` must be a regular file")]
+    InvalidSubpackageSelectionFile(PathBuf),
+
+    #[error("Subpackage selector did not produce `{0}`")]
+    MissingSubpackageSelectionFile(PathBuf),
+
+    #[error("File `{path}` is selected by more than one subpackage: {packages}")]
+    OverlappingSubpackageSelection { path: PathBuf, packages: String },
 }
 
 /// Split a path into the longest leading directory prefix that contains no glob
@@ -1002,6 +1016,103 @@ fn create_empty_build_folder(
     Ok(())
 }
 
+fn generated_subpackage_globs(
+    output: &Output,
+    selection: &rattler_build_recipe::stage1::SubpackageSelection,
+) -> Result<Option<GlobVec>, PackagingError> {
+    let path = output
+        .build_configuration
+        .directories
+        .work_dir
+        .join(crate::consts::SUBPACKAGE_FILES_DIR)
+        .join(format!("{}.txt", selection.name.as_normalized()));
+    let file_type = match fs::symlink_metadata(&path) {
+        Ok(metadata) => metadata.file_type(),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            if selection.script.is_default() {
+                return Ok(None);
+            }
+            return Err(PackagingError::MissingSubpackageSelectionFile(path));
+        }
+        Err(error) => return Err(error.into()),
+    };
+    if !file_type.is_file() || file_type.is_symlink() {
+        return Err(PackagingError::InvalidSubpackageSelectionFile(path));
+    }
+
+    let mut patterns = Vec::new();
+    for line in fs::read_to_string(path)?.lines() {
+        let pattern = line.trim();
+        if pattern.is_empty() || pattern.starts_with('#') {
+            continue;
+        }
+        let candidate = Path::new(pattern);
+        if candidate.is_absolute()
+            || candidate.components().any(|component| {
+                matches!(
+                    component,
+                    Component::ParentDir | Component::RootDir | Component::Prefix(_)
+                )
+            })
+        {
+            return Err(PackagingError::InvalidSubpackagePattern(
+                pattern.to_string(),
+            ));
+        }
+        patterns.push(pattern.to_string());
+    }
+    Ok(Some(GlobVec::from_strings(patterns, Vec::new())?))
+}
+
+fn apply_subpackage_split(output: &Output, files: &mut Files) -> Result<(), PackagingError> {
+    let Some(split) = &output.recipe.subpackage_split else {
+        return Ok(());
+    };
+
+    let generated = split
+        .children
+        .iter()
+        .map(|child| generated_subpackage_globs(output, child))
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let mut selected_by = BTreeMap::<PathBuf, Vec<&str>>::new();
+    for file in &files.new_files {
+        let relative = file.strip_prefix(&files.prefix)?;
+        for (child, generated) in split.children.iter().zip(&generated) {
+            if child.files.is_match(relative)
+                || generated
+                    .as_ref()
+                    .is_some_and(|patterns| patterns.is_match(relative))
+            {
+                selected_by
+                    .entry(file.clone())
+                    .or_default()
+                    .push(child.name.as_normalized());
+            }
+        }
+    }
+
+    if let Some((path, packages)) = selected_by.iter().find(|(_, packages)| packages.len() > 1) {
+        return Err(PackagingError::OverlappingSubpackageSelection {
+            path: path.strip_prefix(&files.prefix)?.to_path_buf(),
+            packages: packages.join(", "),
+        });
+    }
+
+    if split.current == split.parent {
+        files
+            .new_files
+            .retain(|file| !selected_by.contains_key(file));
+    } else {
+        files.new_files.retain(|file| {
+            selected_by
+                .get(file)
+                .is_some_and(|packages| packages == &[split.current.as_normalized()])
+        });
+    }
+    Ok(())
+}
+
 impl Output {
     /// Create a conda package from any new files in the host prefix. Note: the
     /// previous stages should have been completed before calling this
@@ -1015,12 +1126,34 @@ impl Output {
         let _enter = span.enter();
 
         let host_prefix = &self.build_configuration.directories.host_prefix;
-        let package_files_list = self
+        let default_package_files_list = self
             .build_configuration
             .directories
             .package_files_list_path();
+        let cached_parent_files = self
+            .build_configuration
+            .directories
+            .work_dir
+            .join(crate::consts::SUBPACKAGE_FILES_DIR)
+            .join(crate::consts::SUBPACKAGE_PARENT_FILES);
+        let package_files_list = self
+            .recipe
+            .subpackage_split
+            .as_ref()
+            .filter(|split| split.current == split.parent && cached_parent_files.is_file())
+            .map(|_| &cached_parent_files)
+            .unwrap_or(&default_package_files_list);
 
-        let files_after = match read_package_files_list(&package_files_list)? {
+        // Split families need the complete produced-file set so overlap validation and the
+        // parent's complement are independent of the parent's own `build.files` filter.
+        let unfiltered = GlobVec::default();
+        let files_filter = if self.recipe.subpackage_split.is_some() {
+            &unfiltered
+        } else {
+            &self.recipe.build().files
+        };
+
+        let mut files_after = match read_package_files_list(package_files_list)? {
             Some(paths) => {
                 tracing::info!(
                     "Using {} explicit package file(s) from {}",
@@ -1031,17 +1164,26 @@ impl Output {
                     host_prefix,
                     paths,
                     &self.recipe.build().always_include_files,
-                    &self.recipe.build().files,
+                    files_filter,
                 )?
             }
             None => Files::from_prefix(
                 host_prefix,
                 &self.recipe.build().always_include_files,
-                &self.recipe.build().files,
+                files_filter,
                 post_install_files,
             )?,
         };
 
+        apply_subpackage_split(self, &mut files_after)?;
+        if self.recipe.subpackage_split.is_some() && !self.recipe.build().files.is_empty() {
+            files_after.new_files.retain(|file| {
+                self.recipe.build().files.is_match(
+                    file.strip_prefix(&files_after.prefix)
+                        .expect("package files live below the prefix"),
+                )
+            });
+        }
         package_conda(self, tool_configuration, &files_after)
     }
 }

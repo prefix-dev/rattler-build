@@ -463,6 +463,13 @@ noted, no variables are inherited from the shell environment in which you invoke
 
   [override-package-contents]: ./build_options.md#override-package-contents-from-the-build-script
 
+`RATTLER_BUILD_SUBPACKAGE_FILES`
+
+: Available only to a nested subpackage's `split.script`. The selector must
+  create this file and write one prefix-relative path or glob per line. These
+  entries are added to `split.files` and removed from the parent package. See
+  [Nested subpackages](reference/multi_output.md#nested-subpackages).
+
 `PKG_BUILDNUM`
 
 : Indicates the build number of the package currently being built.
