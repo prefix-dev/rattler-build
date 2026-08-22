@@ -777,8 +777,19 @@ fn discover_new_variant_keys_from_evaluation(
                 };
 
                 // Only evaluate requirements for non-skipped outputs
-                if !should_skip && let Ok(evaluated) = reqs.evaluate(&context_with_vars) {
-                    all_free_specs.extend(evaluated.free_specs());
+                if !should_skip {
+                    if let Ok(evaluated) = reqs.evaluate(&context_with_vars) {
+                        all_free_specs.extend(evaluated.free_specs());
+                    }
+                    if let stage0::Output::Package(package) = output {
+                        for subpackage in &package.subpackages {
+                            if let Some(requirements) = &subpackage.requirements
+                                && let Ok(evaluated) = requirements.evaluate(&context_with_vars)
+                            {
+                                all_free_specs.extend(evaluated.free_specs());
+                            }
+                        }
+                    }
                 }
             }
             all_free_specs
@@ -1018,7 +1029,40 @@ fn render_with_empty_combinations(
         finalize_build_string_single(&mut results[i], config)?;
     }
 
+    populate_subpackage_staging_identities(&mut results);
     Ok(results)
+}
+
+fn populate_subpackage_staging_identities(results: &mut [RenderedVariant]) {
+    let snapshot = results.to_vec();
+    for result in results {
+        let Some(split) = &result.recipe.subpackage_split else {
+            continue;
+        };
+        let matching = snapshot
+            .iter()
+            .filter(|candidate| candidate.recipe.package.name == split.parent)
+            .max_by_key(|candidate| {
+                result
+                    .full_combination
+                    .iter()
+                    .filter(|(key, value)| candidate.full_combination.get(*key) == Some(*value))
+                    .count()
+            });
+        let Some(parent) = matching else {
+            continue;
+        };
+        let build_string = parent.recipe.build.string.as_resolved().map(str::to_string);
+        let hash = parent.hash_info.as_ref().map(ToString::to_string);
+        for cache in &mut result.recipe.staging_caches {
+            if let Some(identity) = &mut cache.package_identity {
+                identity.package = parent.recipe.package.clone();
+                identity.build_number = parent.recipe.build.number.unwrap_or(0);
+                identity.build_string = build_string.clone();
+                identity.hash = hash.clone();
+            }
+        }
+    }
 }
 
 /// Helper function to finalize a single build string
@@ -1454,6 +1498,7 @@ fn render_with_variants(
         finalize_build_string_single(&mut results[i], &config)?;
     }
 
+    populate_subpackage_staging_identities(&mut results);
     Ok(results)
 }
 
@@ -1705,6 +1750,66 @@ outputs:
 
         assert!(names.contains(&"multi-pkg-lib".to_string()));
         assert!(names.contains(&"multi-pkg".to_string()));
+    }
+
+    #[test]
+    fn nested_subpackage_requirements_expand_variants_and_keep_parent_identity() {
+        let recipe_yaml = r#"
+recipe:
+  version: 1.0.0
+outputs:
+  - package:
+      name: split-parent
+    build:
+      string: py${{ python | replace(".", "") }}_0
+      script: echo build
+    subpackages:
+      - package:
+          name: split-child
+        split:
+          files: [include/**]
+        requirements:
+          host: [python]
+"#;
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config = VariantConfig::from_yaml_str(
+            r#"
+python:
+  - "3.11"
+  - "3.12"
+"#,
+        )
+        .unwrap();
+        let rendered =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, RenderConfig::new())
+                .unwrap();
+
+        let parents = rendered
+            .iter()
+            .filter(|variant| variant.recipe.package.name.as_normalized() == "split-parent")
+            .collect::<Vec<_>>();
+        let children = rendered
+            .iter()
+            .filter(|variant| variant.recipe.package.name.as_normalized() == "split-child")
+            .collect::<Vec<_>>();
+        assert_eq!(parents.len(), 2);
+        assert_eq!(children.len(), 2);
+        for child in children {
+            let python = child.variant.get(&NormalizedKey::from("python")).unwrap();
+            let parent = parents
+                .iter()
+                .find(|parent| parent.variant.get(&NormalizedKey::from("python")) == Some(python))
+                .unwrap();
+            let identity = child.recipe.staging_caches[0]
+                .package_identity
+                .as_ref()
+                .unwrap();
+            assert_eq!(identity.package.name.as_normalized(), "split-parent");
+            assert_eq!(
+                identity.build_string.as_deref(),
+                parent.recipe.build.string.as_resolved()
+            );
+        }
     }
 
     #[test]

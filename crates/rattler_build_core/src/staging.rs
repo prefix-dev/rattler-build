@@ -12,16 +12,17 @@ use std::{
 use fs_err as fs;
 use miette::{Context, IntoDiagnostic};
 use rattler_build_jinja::Variable;
-use rattler_build_recipe::stage1::{InheritsFrom, StagingCache};
+use rattler_build_recipe::stage1::{BuildPlan, InheritsFrom, StagingCache};
 use rattler_build_script::{ExecutionContext, RuntimeEnv};
 use rattler_build_types::NormalizedKey;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::{
+    consts::{RATTLER_BUILD_SUBPACKAGE_FILES, SUBPACKAGE_FILES_DIR, SUBPACKAGE_PARENT_FILES},
     env_vars,
     metadata::{Output, build_reindexed_channels},
-    packaging::Files,
+    packaging::{Files, read_package_files_list},
     post_process::package_nature::{LibraryNameMap, PrefixInfo},
     render::resolved_dependencies::{
         FinalizedDependencies, RunExportsDownload, install_environments, resolve_dependencies,
@@ -300,17 +301,39 @@ impl Output {
         // CONDA_BUILD_SYSROOT) that the staging cache's compilers depend on.
         env_vars.extend(env_vars::env_vars_from_variant(&staging.used_variant));
 
-        // A staging cache does not produce a package, so the PKG_* vars
-        // (which would otherwise carry the inheriting output's identity) are
-        // misleading here.
-        for key in [
-            "PKG_NAME",
-            "PKG_VERSION",
-            "PKG_BUILDNUM",
-            "PKG_BUILD_STRING",
-            "PKG_HASH",
-        ] {
-            env_vars.remove(key);
+        if let Some(identity) = &staging.package_identity {
+            // An implicit subpackage staging build is the parent package's one real build.
+            // Always use the finalized parent identity, even when only a child was requested.
+            env_vars.insert(
+                "PKG_NAME".to_string(),
+                Some(identity.package.name.as_normalized().to_string()),
+            );
+            env_vars.insert(
+                "PKG_VERSION".to_string(),
+                Some(identity.package.version.to_string()),
+            );
+            env_vars.insert(
+                "PKG_BUILDNUM".to_string(),
+                Some(identity.build_number.to_string()),
+            );
+            if let Some(build_string) = &identity.build_string {
+                env_vars.insert("PKG_BUILD_STRING".to_string(), Some(build_string.clone()));
+            }
+            if let Some(hash) = &identity.hash {
+                env_vars.insert("PKG_HASH".to_string(), Some(hash.clone()));
+            }
+        } else {
+            // An explicit staging cache does not produce a package, so inheritor PKG_* vars
+            // would be misleading.
+            for key in [
+                "PKG_NAME",
+                "PKG_VERSION",
+                "PKG_BUILDNUM",
+                "PKG_BUILD_STRING",
+                "PKG_HASH",
+            ] {
+                env_vars.remove(key);
+            }
         }
 
         let context = if staging.build.merge_build_and_host_envs {
@@ -334,10 +357,10 @@ impl Output {
             &staging.build.plan,
             self.recipe.context(),
             self.build_configuration.selector_config(),
-            env_vars,
+            env_vars.clone(),
             self.build_configuration.directories.work_dir.clone(),
             &self.build_configuration.directories.recipe_dir,
-            context,
+            context.clone(),
             self.build_configuration.sandbox_config().cloned(),
             self.build_configuration.env_isolation,
             self.build_configuration.experimental,
@@ -346,6 +369,81 @@ impl Output {
         rattler_build_script::run_script(exec_args)
             .await
             .into_diagnostic()?;
+
+        // Dynamic split selectors run after the common build in the same environment. Their
+        // outputs live in the work tree so they are persisted and restored with the cache.
+        let selection_dir = self
+            .build_configuration
+            .directories
+            .work_dir
+            .join(SUBPACKAGE_FILES_DIR);
+        fs::create_dir_all(&selection_dir).into_diagnostic()?;
+        let parent_files = self
+            .build_configuration
+            .directories
+            .package_files_list_path();
+        let cached_parent_files = selection_dir.join(SUBPACKAGE_PARENT_FILES);
+        if cached_parent_files.exists() {
+            fs::remove_file(&cached_parent_files).into_diagnostic()?;
+        }
+        if let Some(paths) = read_package_files_list(&parent_files).into_diagnostic()? {
+            let mut normalized = String::new();
+            for path in paths {
+                let relative = if path.is_absolute() {
+                    path.strip_prefix(self.prefix())
+                        .into_diagnostic()
+                        .context("$RATTLER_BUILD_PACKAGE_FILES entry is outside the split prefix")?
+                } else {
+                    path.as_path()
+                };
+                normalized.push_str(&relative.to_string_lossy());
+                normalized.push('\n');
+            }
+            fs::write(cached_parent_files, normalized).into_diagnostic()?;
+        }
+        for selector in &staging.subpackage_selectors {
+            if selector.script.is_default() {
+                continue;
+            }
+            let output_file = selection_dir.join(format!("{}.txt", selector.name.as_normalized()));
+            if output_file.exists() {
+                fs::remove_file(&output_file).into_diagnostic()?;
+            }
+
+            let mut script = selector.script.clone();
+            script.env.insert(
+                RATTLER_BUILD_SUBPACKAGE_FILES.to_string(),
+                output_file.to_string_lossy().into_owned(),
+            );
+            let selector_plan = BuildPlan::Script(script);
+            let exec_args = prepare_build_plan_execution_args(
+                &selector_plan,
+                self.recipe.context(),
+                self.build_configuration.selector_config(),
+                env_vars.clone(),
+                self.build_configuration.directories.work_dir.clone(),
+                &self.build_configuration.directories.recipe_dir,
+                context.clone(),
+                self.build_configuration.sandbox_config().cloned(),
+                self.build_configuration.env_isolation,
+                self.build_configuration.experimental,
+            )
+            .into_diagnostic()?;
+            rattler_build_script::run_script(exec_args)
+                .await
+                .into_diagnostic()?;
+            let output_type = fs::symlink_metadata(&output_file)
+                .map(|metadata| metadata.file_type())
+                .ok();
+            if !output_type.is_some_and(|file_type| file_type.is_file() && !file_type.is_symlink())
+            {
+                miette::bail!(
+                    "subpackage selector for '{}' did not create a regular {} file",
+                    selector.name.as_normalized(),
+                    RATTLER_BUILD_SUBPACKAGE_FILES
+                );
+            }
+        }
 
         // Find the new files in the prefix
         let new_files = Files::from_prefix(

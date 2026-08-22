@@ -133,6 +133,94 @@ outputs:
 ```
 
 
+## Nested subpackages
+
+A package output can split files into nested `subpackages` without repeating its
+source preparation or build. Rattler-build turns the parent build into a private
+staging cache, restores the complete result for each package, and treats the
+family as a partition:
+
+- each child receives files matching its `split.files` globs and generated selectors;
+- the parent receives the complement after all child selections;
+- selecting one file for two children is an error rather than silently duplicating it.
+
+```yaml
+outputs:
+  - package:
+      name: mylib
+    build:
+      script:
+        - cmake -S . -B build -DCMAKE_INSTALL_PREFIX=$PREFIX
+        - cmake --build build --target install
+    requirements:
+      build:
+        - cmake
+        - ninja
+        - ${{ compiler("c") }}
+      run:
+        - runtime-dependency
+
+    subpackages:
+      - package:
+          name: mylib-dev
+        split:
+          files:
+            - include/**
+            - lib/pkgconfig/**
+        requirements:
+          run:
+            - ${{ pin_subpackage("mylib", exact=True) }}
+        about:
+          summary: Headers and development metadata for mylib
+
+      - package:
+          name: mylib-docs
+        split:
+          files:
+            - share/doc/mylib/**
+        requirements: {} # explicitly replace inherited requirements
+```
+
+A child inherits the parent's version, build metadata, requirements, tests, and
+`about` metadata by default. An explicitly present `requirements` or `tests`
+section replaces the inherited section. `about` and non-executable `build`
+settings overlay the parent field by field. Child `build.script` and
+`build.steps` are rejected because the defining property of a split is that the
+parent build runs once. Use the `split` section for file discovery instead.
+
+### Script-generated selections
+
+Static globs are not always enough (for example, a compiler or language tool may
+produce a manifest). A `split.script` runs once, immediately after the common
+build, in the same environment and work directory. The common build receives
+the parent package's `PKG_*` identity even if only a child output was requested.
+The selector must write one
+prefix-relative path or glob per line to `RATTLER_BUILD_SUBPACKAGE_FILES`:
+
+```yaml
+subpackages:
+  - package:
+      name: mylib-dev
+    split:
+      files:
+        - include/**
+      script: |
+        find "$PREFIX/lib/cmake" -type f -printf 'lib/cmake/%P\n' \
+          >> "$RATTLER_BUILD_SUBPACKAGE_FILES"
+```
+
+Blank lines and lines beginning with `#` are ignored. Generated entries are
+unioned with `split.files`. Absolute paths and `..` components are rejected so a
+cached selection is portable between prefixes. The selector must create the
+special file, even when its result is empty.
+
+Nested subpackages are intentionally one level deep and cannot currently use a
+subpackage-specific `build.skip`. A parent containing `subpackages` cannot also
+use explicit `inherit`, because it already owns an
+automatically generated private staging cache. The parent's `build.files` is
+applied after child files are removed; the private cache itself always retains
+the complete build result so children can select any produced file.
+
 ## Staging Outputs
 
 A staging output compiles code once and caches the result. Package outputs then

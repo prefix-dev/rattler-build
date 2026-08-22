@@ -20,7 +20,8 @@ pub use extra::Extra;
 pub use match_spec::SerializableMatchSpec;
 pub use output::{
     CacheInherit, Inherit, MultiOutputRecipe, Output, PackageOutput, Recipe, RecipeMetadata,
-    SingleOutputRecipe, StagingBuild, StagingMetadata, StagingOutput,
+    SingleOutputRecipe, StagingBuild, StagingMetadata, StagingOutput, SubpackageOutput,
+    SubpackageSplit,
 };
 pub use package::{Package, PackageMetadata};
 pub use parser::{

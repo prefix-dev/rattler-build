@@ -214,11 +214,7 @@ impl Files {
 
         let mut new_files = HashSet::new();
         for path in paths {
-            let resolved = if path.is_absolute() {
-                path
-            } else {
-                prefix.join(path)
-            };
+            let resolved = crate::utils::to_lexical_absolute(&path, prefix);
 
             if resolved.strip_prefix(prefix).is_err() {
                 return Err(PackagingError::PackageFileOutsidePrefix(resolved));
@@ -501,6 +497,26 @@ mod test {
         let err = Files::from_paths(
             prefix,
             vec![outside_file],
+            &Default::default(),
+            &Default::default(),
+        )
+        .unwrap_err();
+        assert!(matches!(
+            err,
+            crate::packaging::PackagingError::PackageFileOutsidePrefix(_)
+        ));
+    }
+
+    #[test]
+    fn test_files_from_paths_relative_traversal_errors() {
+        let tempdir = tempfile::TempDir::new().unwrap();
+        let prefix = tempdir.path().join("prefix");
+        fs_err::create_dir_all(&prefix).unwrap();
+        fs_err::write(tempdir.path().join("escape.txt"), b"nope").unwrap();
+
+        let err = Files::from_paths(
+            &prefix,
+            vec![PathBuf::from("../escape.txt")],
             &Default::default(),
             &Default::default(),
         )

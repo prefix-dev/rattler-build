@@ -1,0 +1,23 @@
+schema_version: 1
+recipe:
+  version: 1.0.0
+outputs:
+  - package:
+      name: traversal-parent
+    build:
+      script:
+        - if: unix
+          then:
+            - mkdir -p "$PREFIX/share/traversal"
+            - echo data > "$PREFIX/share/traversal/data.txt"
+          else:
+            - mkdir "%PREFIX%\share\traversal"
+            - echo data> "%PREFIX%\share\traversal\data.txt"
+    subpackages:
+      - package:
+          name: traversal-child
+        split:
+          script:
+            - if: unix
+              then: echo '../outside' >> "$RATTLER_BUILD_SUBPACKAGE_FILES"
+              else: echo ..\outside>> "%RATTLER_BUILD_SUBPACKAGE_FILES%"

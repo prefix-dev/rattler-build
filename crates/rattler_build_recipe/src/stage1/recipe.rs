@@ -2,6 +2,9 @@
 
 use indexmap::IndexMap;
 use rattler_build_jinja::Variable;
+use rattler_build_script::Script;
+use rattler_build_types::GlobVec;
+use rattler_conda_types::PackageName;
 use serde::{Deserialize, Serialize};
 
 use super::{About, Build, Extra, Package, Requirements, Source, TestType};
@@ -34,6 +37,14 @@ pub struct StagingCache {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub source: Vec<Source>,
 
+    /// Selector scripts used to discover files for nested subpackages.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub subpackage_selectors: Vec<SubpackageSelection>,
+
+    /// Parent package identity exposed while running an implicit split build.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub package_identity: Option<StagingPackageIdentity>,
+
     /// Used variant - the subset of variant variables that were actually accessed
     #[serde(skip)]
     pub used_variant: std::collections::BTreeMap<rattler_build_types::NormalizedKey, Variable>,
@@ -53,9 +64,54 @@ impl StagingCache {
             build,
             requirements,
             source,
+            subpackage_selectors: Vec::new(),
+            package_identity: None,
             used_variant,
         }
     }
+}
+
+/// Package variables exposed by an implicit split staging build.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct StagingPackageIdentity {
+    /// Parent package identity.
+    pub package: Package,
+    /// Parent build number.
+    pub build_number: u64,
+    /// Final parent build string, populated after variant rendering.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub build_string: Option<String>,
+    /// Final parent package hash, populated after variant rendering.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hash: Option<String>,
+}
+
+/// One child file selection in a nested subpackage split.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SubpackageSelection {
+    /// Child package receiving the selected files.
+    pub name: PackageName,
+
+    /// Static prefix-relative include/exclude globs.
+    #[serde(default)]
+    pub files: GlobVec,
+
+    /// Optional script that writes more prefix-relative paths/globs.
+    #[serde(default, skip_serializing_if = "Script::is_default")]
+    pub script: Script,
+}
+
+/// Runtime split information attached to every package in a split family.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SubpackageSplit {
+    /// Package that owns all files not selected by a child.
+    pub parent: PackageName,
+
+    /// Current package in the split family.
+    pub current: PackageName,
+
+    /// All child selectors; needed to compute the parent's complement.
+    pub children: Vec<SubpackageSelection>,
 }
 
 /// Inheritance configuration for package outputs
@@ -150,6 +206,10 @@ pub struct Recipe {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub inherits_from: Option<InheritsFrom>,
 
+    /// File partition information for an output with nested subpackages.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subpackage_split: Option<SubpackageSplit>,
+
     /// Used variant - the subset of variant variables that were actually accessed
     /// during recipe evaluation (plus always-included variables like target_platform)
     #[serde(skip)]
@@ -182,6 +242,7 @@ impl Recipe {
             context,
             staging_caches: Vec::new(),
             inherits_from: None,
+            subpackage_split: None,
             used_variant,
         }
     }
@@ -213,6 +274,7 @@ impl Recipe {
             context,
             staging_caches,
             inherits_from,
+            subpackage_split: None,
             used_variant,
         }
     }

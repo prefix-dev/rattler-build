@@ -22,3 +22,12 @@ pub const RATTLER_BUILD_PACKAGE_FILES: &str = "RATTLER_BUILD_PACKAGE_FILES";
 /// and namespaced so that build scripts are extremely unlikely to clobber it
 /// by accident.
 pub const PACKAGE_FILES_LIST_NAME: &str = ".rattler-build-package-files";
+
+/// Selector-script output containing prefix-relative paths/globs for one nested subpackage.
+pub const RATTLER_BUILD_SUBPACKAGE_FILES: &str = "RATTLER_BUILD_SUBPACKAGE_FILES";
+
+/// Directory under the restored work tree holding generated subpackage selections.
+pub const SUBPACKAGE_FILES_DIR: &str = ".rattler-build-subpackage-files";
+
+/// Cached copy of the parent build's explicit package file list.
+pub const SUBPACKAGE_PARENT_FILES: &str = "parent-package-files.txt";
