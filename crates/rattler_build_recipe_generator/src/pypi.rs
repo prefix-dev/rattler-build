@@ -190,37 +190,29 @@ async fn extract_build_requirements(
         .bytes()
         .await
         .into_diagnostic()?;
-    let tar = flate2::read::GzDecoder::new(&tar_data[..]);
-    let mut archive = tar::Archive::new(tar);
+    let Some(contents) =
+        crate::tarball::find_file(&tar_data, |path| path.ends_with("pyproject.toml"))?
+    else {
+        return Ok(Vec::new());
+    };
 
-    // Find and read pyproject.toml
-    for entry in archive.entries().into_diagnostic()? {
-        let mut entry = entry.into_diagnostic()?;
-        if entry.path().into_diagnostic()?.ends_with("pyproject.toml") {
-            let mut contents = String::new();
-            entry.read_to_string(&mut contents).into_diagnostic()?;
+    // Parse TOML
+    let toml: toml::Table = contents.parse().into_diagnostic()?;
 
-            // Parse TOML
-            let toml: toml::Table = contents.parse().into_diagnostic()?;
-
-            // Try different build system specs
-            return Ok(match toml.get("build-system") {
-                Some(build) => build
-                    .get("requires")
-                    .and_then(|r| r.as_array())
-                    .map(|arr| {
-                        arr.iter()
-                            .filter_map(|v| v.as_str())
-                            .map(|s| s.to_string())
-                            .collect()
-                    })
-                    .unwrap_or_default(),
-                None => Vec::new(),
-            });
-        }
-    }
-
-    Ok(Vec::new())
+    // Try different build system specs
+    Ok(match toml.get("build-system") {
+        Some(build) => build
+            .get("requires")
+            .and_then(|r| r.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str())
+                    .map(|s| s.to_string())
+                    .collect()
+            })
+            .unwrap_or_default(),
+        None => Vec::new(),
+    })
 }
 
 /// Fetch and cache the conda-forge mapping from conda package names to PyPI names.

@@ -1,4 +1,3 @@
-use std::io::Read;
 #[cfg(not(target_arch = "wasm32"))]
 use std::path::PathBuf;
 use std::{collections::HashMap, collections::HashSet};
@@ -16,6 +15,7 @@ use crate::serialize::{
     self, RTest, RTestInner, Requirement, Script, ScriptStep, ScriptTest, ScriptTestFiles,
     ScriptTestRequirements, Test, UrlSourceElement,
 };
+use crate::tarball;
 #[cfg(not(target_arch = "wasm32"))]
 use crate::write_recipe;
 /// Package metadata returned by the R-universe/CRAN API.
@@ -261,8 +261,7 @@ fn format_r_package(package: &str, version: Option<&String>) -> String {
 }
 
 /// Download the package tarball at `url`.
-pub async fn fetch_package_tarball(url: &Url) -> Result<Vec<u8>, miette::Error> {
-    let client = reqwest::Client::new();
+async fn fetch_package_tarball(client: &reqwest::Client, url: &Url) -> miette::Result<Vec<u8>> {
     let response = client
         .get(url.clone())
         .send()
@@ -272,32 +271,41 @@ pub async fn fetch_package_tarball(url: &Url) -> Result<Vec<u8>, miette::Error> 
         .error_for_status()
         .into_diagnostic()?;
     let bytes = response.bytes().await.into_diagnostic()?;
-    Ok(bytes.to_vec())
+    Ok(bytes.into())
 }
 
-/// Extract the `DESCRIPTION` file (`<package>/DESCRIPTION`) from a CRAN
-/// source tarball. Deeper `DESCRIPTION` files (e.g. test fixtures under
-/// `inst/`) are ignored.
-fn extract_description(tarball: &[u8]) -> miette::Result<Option<String>> {
-    let tar = flate2::read::GzDecoder::new(tarball);
-    let mut archive = tar::Archive::new(tar);
-    for entry in archive.entries().into_diagnostic()? {
-        let mut entry = entry.into_diagnostic()?;
-        let is_top_level_description = {
-            let path = entry.path().into_diagnostic()?;
-            let depth = path
-                .components()
-                .filter(|c| matches!(c, std::path::Component::Normal(_)))
-                .count();
-            depth == 2 && path.file_name().is_some_and(|name| name == "DESCRIPTION")
-        };
-        if is_top_level_description {
-            let mut contents = String::new();
-            entry.read_to_string(&mut contents).into_diagnostic()?;
-            return Ok(Some(contents));
+/// What the CRAN source tarball tells us beyond the R-universe metadata.
+#[derive(Debug, Default)]
+struct CranTarball {
+    /// SHA256 of the tarball CRAN currently serves.
+    sha256: String,
+    /// The package's `DESCRIPTION` file (`<package>/DESCRIPTION`).
+    description: Option<String>,
+}
+
+impl CranTarball {
+    fn parse(bytes: &[u8]) -> Self {
+        let sha256 = hex::encode(compute_bytes_digest::<Sha256>(bytes));
+        let description = tarball::find_file(bytes, |path| {
+            tarball::is_in_top_level_dir(path, "DESCRIPTION")
+        })
+        .inspect_err(|e| tracing::warn!("Failed to read the DESCRIPTION file: {e}"))
+        .ok()
+        .flatten();
+        Self {
+            sha256,
+            description,
         }
     }
-    Ok(None)
+}
+
+/// A package's R-universe metadata plus what could be learned from its
+/// tarball.
+struct FetchedPackage {
+    info: PackageInfo,
+    /// `None` when the tarball could not be downloaded, e.g. in restricted
+    /// environments (WASM/browser with no CORS on cran.r-project.org).
+    tarball: Option<CranTarball>,
 }
 
 /// Append the package's DESCRIPTION file to the rendered recipe as a comment
@@ -410,25 +418,59 @@ fn format_cran_recipe_with_suggests(recipe: &serialize::Recipe) -> String {
 }
 
 /// Fetch the metadata of `package` from the R-universe API of `universe`.
-pub async fn fetch_package_info(package: &str, universe: &str) -> miette::Result<PackageInfo> {
-    reqwest::get(&format!(
-        "https://{universe}.r-universe.dev/api/packages/{package}"
-    ))
-    .await
-    .into_diagnostic()?
-    .json::<PackageInfo>()
-    .await
-    .into_diagnostic()
+async fn fetch_package_info(
+    client: &reqwest::Client,
+    package: &str,
+    universe: &str,
+) -> miette::Result<PackageInfo> {
+    client
+        .get(format!(
+            "https://{universe}.r-universe.dev/api/packages/{package}"
+        ))
+        .send()
+        .await
+        .into_diagnostic()?
+        .error_for_status()
+        .into_diagnostic()?
+        .json::<PackageInfo>()
+        .await
+        .into_diagnostic()
 }
 
-/// Turn R-universe package metadata into a recipe.
+/// Fetch the metadata of `package` and, best-effort, its tarball.
+async fn fetch_package(
+    client: &reqwest::Client,
+    package: &str,
+    universe: &str,
+) -> miette::Result<FetchedPackage> {
+    tracing::info!("Generating R recipe for {}", package);
+    let info = fetch_package_info(client, package, universe).await?;
+
+    let url = Url::parse(&format!("{CRAN_MIRROR}/src/contrib/{}", info._file))
+        .expect("Failed to parse URL");
+    let tarball = match fetch_package_tarball(client, &url).await {
+        Ok(bytes) => Some(CranTarball::parse(&bytes)),
+        Err(e) => {
+            tracing::warn!(
+                "Failed to fetch {}: {} — the recipe will not contain a checksum; add the sha256 by hand.",
+                info._file,
+                e
+            );
+            None
+        }
+    };
+
+    Ok(FetchedPackage { info, tarball })
+}
+
+/// Turn R-universe package metadata (plus what the tarball told us, when it
+/// could be downloaded) into a recipe.
 ///
-/// `sha256` is the checksum of the CRAN tarball when it could be computed.
 /// `maintainers` fills `extra.recipe-maintainers` (a placeholder is used when
 /// empty). Also returns the R packages the recipe depends on, for `--tree`.
 fn package_info_to_recipe(
     info: &PackageInfo,
-    sha256: Option<String>,
+    tarball: Option<&CranTarball>,
     maintainers: &[String],
 ) -> (serialize::Recipe, HashSet<String>) {
     let mut recipe = serialize::Recipe::default();
@@ -451,17 +493,17 @@ fn package_info_to_recipe(
 
     // CRAN moves superseded versions to `Archive/<pkg>/`, so list that as a
     // fallback mirror.
-    let tarball = format!("{}_${{{{ version }}}}.tar.gz", info.Package);
+    let file_name = format!("{}_${{{{ version }}}}.tar.gz", info.Package);
     recipe.source.push(
         UrlSourceElement {
             url: vec![
-                format!("${{{{ cran_mirror }}}}/src/contrib/{tarball}"),
+                format!("${{{{ cran_mirror }}}}/src/contrib/{file_name}"),
                 format!(
-                    "${{{{ cran_mirror }}}}/src/contrib/Archive/{}/{tarball}",
+                    "${{{{ cran_mirror }}}}/src/contrib/Archive/{}/{file_name}",
                     info.Package
                 ),
             ],
-            sha256,
+            sha256: tarball.map(|tarball| tarball.sha256.clone()),
             md5: None,
         }
         .into(),
@@ -608,69 +650,15 @@ fn package_info_to_recipe(
     (recipe, remaining_deps)
 }
 
-/// Fetch the package metadata, build the recipe and, when `with_description`
-/// is set, also return the package's DESCRIPTION file.
-async fn build_cran_recipe_and_deps(
-    package: &str,
-    universe: Option<&str>,
-    maintainers: &[String],
-    with_description: bool,
-) -> miette::Result<(serialize::Recipe, HashSet<String>, Option<String>)> {
-    let universe = universe.unwrap_or("cran");
-    tracing::info!("Generating R recipe for {}", package);
-    let package_info = fetch_package_info(package, universe).await?;
-
-    // Download the tarball CRAN currently serves to hash it (and to read its
-    // DESCRIPTION). This is best-effort: in restricted environments (e.g.
-    // WASM/browser with no CORS on cran.r-project.org) the recipe is emitted
-    // without a checksum.
-    let url = Url::parse(&format!("{CRAN_MIRROR}/src/contrib/{}", package_info._file))
-        .expect("Failed to parse URL");
-    let (sha256, description) = match fetch_package_tarball(&url).await {
-        Ok(bytes) => {
-            let sha256 = Some(hex::encode(compute_bytes_digest::<Sha256>(&bytes)));
-            let description = if with_description {
-                match extract_description(&bytes) {
-                    Ok(Some(description)) => Some(description),
-                    Ok(None) => {
-                        tracing::warn!("No DESCRIPTION file found in {}", package_info._file);
-                        None
-                    }
-                    Err(e) => {
-                        tracing::warn!(
-                            "Failed to read DESCRIPTION from {}: {}",
-                            package_info._file,
-                            e
-                        );
-                        None
-                    }
-                }
-            } else {
-                None
-            };
-            (sha256, description)
-        }
-        Err(e) => {
-            tracing::warn!(
-                "Failed to fetch {}: {} — the recipe will not contain a checksum; add the sha256 by hand.",
-                package_info._file,
-                e
-            );
-            (None, None)
-        }
-    };
-
-    let (recipe, remaining_deps) = package_info_to_recipe(&package_info, sha256, maintainers);
-    Ok((recipe, remaining_deps, description))
-}
-
 /// Generate a CRAN recipe for `package` and return the YAML as a string.
 pub async fn generate_r_recipe_string(
     package: &str,
     universe: Option<&str>,
 ) -> miette::Result<String> {
-    let (recipe, _remaining_deps, _description) =
-        build_cran_recipe_and_deps(package, universe, &[], false).await?;
+    let client = reqwest::Client::new();
+    let package = fetch_package(&client, package, universe.unwrap_or("cran")).await?;
+    let (recipe, _remaining_deps) =
+        package_info_to_recipe(&package.info, package.tarball.as_ref(), &[]);
     Ok(format_cran_recipe_with_suggests(&recipe))
 }
 
@@ -682,17 +670,24 @@ pub async fn generate_r_recipe_string(
 /// package. Otherwise, the YAML is printed to stdout. When `tree` is enabled,
 /// dependencies are recursively generated if they don't already exist locally.
 pub async fn generate_r_recipe(opts: &CranOpts) -> miette::Result<()> {
-    let (recipe, remaining_deps, description) = build_cran_recipe_and_deps(
+    let client = reqwest::Client::new();
+    let package = fetch_package(
+        &client,
         &opts.package,
-        opts.universe.as_deref(),
-        &opts.maintainers,
-        opts.staged_recipes,
+        opts.universe.as_deref().unwrap_or("cran"),
     )
     .await?;
+    let (recipe, remaining_deps) =
+        package_info_to_recipe(&package.info, package.tarball.as_ref(), &opts.maintainers);
 
     let mut final_recipe = format_cran_recipe_with_suggests(&recipe);
-    if let Some(description) = description {
-        final_recipe = append_description_comment(&final_recipe, &description);
+    if opts.staged_recipes {
+        match package.tarball.and_then(|tarball| tarball.description) {
+            Some(description) => {
+                final_recipe = append_description_comment(&final_recipe, &description);
+            }
+            None => tracing::warn!("No DESCRIPTION file available to append to the recipe"),
+        }
     }
 
     if opts.write {
@@ -737,11 +732,11 @@ mod tests {
     #[test]
     fn tinkr_noarch_with_testthat() {
         let info = fixture("tinkr");
-        let (recipe, deps) = package_info_to_recipe(
-            &info,
-            Some("425bc04af76483b8cf713ad141bdebb963cf54dd363fbdbee3a709820ec4d23e".to_string()),
-            &[],
-        );
+        let tarball = CranTarball {
+            sha256: "425bc04af76483b8cf713ad141bdebb963cf54dd363fbdbee3a709820ec4d23e".to_string(),
+            ..Default::default()
+        };
+        let (recipe, deps) = package_info_to_recipe(&info, Some(&tarball), &[]);
         assert!(deps.contains("commonmark"));
         assert!(deps.contains("R6"));
         assert!(!deps.contains("testthat"), "Suggests are not recursed into");
@@ -775,38 +770,6 @@ mod tests {
             "{yaml}"
         );
         assert!(yaml.contains("    # - r-knitr  # suggested\n"), "{yaml}");
-    }
-
-    /// Build an in-memory `.tar.gz` with the given `(path, contents)` entries.
-    fn tarball_with(files: &[(&str, &str)]) -> Vec<u8> {
-        let encoder = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
-        let mut builder = tar::Builder::new(encoder);
-        for (path, contents) in files {
-            let mut header = tar::Header::new_gnu();
-            header.set_size(contents.len() as u64);
-            header.set_mode(0o644);
-            header.set_cksum();
-            builder
-                .append_data(&mut header, path, contents.as_bytes())
-                .unwrap();
-        }
-        builder.into_inner().unwrap().finish().unwrap()
-    }
-
-    #[test]
-    fn extracts_only_the_top_level_description() {
-        let tarball = tarball_with(&[
-            ("tinkr/R/tinkr.R", "NULL\n"),
-            ("tinkr/inst/extdata/DESCRIPTION", "Package: not-this-one\n"),
-            ("tinkr/DESCRIPTION", "Package: tinkr\nVersion: 0.3.1\n"),
-        ]);
-        assert_eq!(
-            extract_description(&tarball).unwrap().as_deref(),
-            Some("Package: tinkr\nVersion: 0.3.1\n")
-        );
-
-        let without = tarball_with(&[("tinkr/R/tinkr.R", "NULL\n")]);
-        assert_eq!(extract_description(&without).unwrap(), None);
     }
 
     #[test]
