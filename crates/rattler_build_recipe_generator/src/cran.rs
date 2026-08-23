@@ -281,20 +281,22 @@ struct CranTarball {
     sha256: String,
     /// The package's `DESCRIPTION` file (`<package>/DESCRIPTION`).
     description: Option<String>,
+    /// Whether the package ships the testthat runner, `tests/testthat.R`.
+    has_testthat_runner: bool,
 }
 
 impl CranTarball {
     fn parse(bytes: &[u8]) -> Self {
-        let sha256 = hex::encode(compute_bytes_digest::<Sha256>(bytes));
-        let description = tarball::find_file(bytes, |path| {
-            tarball::is_in_top_level_dir(path, "DESCRIPTION")
-        })
-        .inspect_err(|e| tracing::warn!("Failed to read the DESCRIPTION file: {e}"))
-        .ok()
-        .flatten();
+        let file = |relative: &str| {
+            tarball::find_file(bytes, |path| tarball::is_in_top_level_dir(path, relative))
+                .inspect_err(|e| tracing::warn!("Failed to read {relative} from the tarball: {e}"))
+                .ok()
+                .flatten()
+        };
         Self {
-            sha256,
-            description,
+            sha256: hex::encode(compute_bytes_digest::<Sha256>(bytes)),
+            description: file("DESCRIPTION"),
+            has_testthat_runner: file("tests/testthat.R").is_some(),
         }
     }
 }
@@ -515,9 +517,6 @@ fn package_info_to_recipe(
     // declare `LinkingTo` dependencies also compile against those headers, so
     // they need a compiler even if `NeedsCompilation` is not set to `yes`.
     let mut needs_compilation = info.NeedsCompilation == "yes";
-    // Packages that suggest `testthat` ship their test suite in
-    // `tests/testthat.R` by convention.
-    let mut has_testthat = false;
 
     // `r-base` is always listed without a version pin; instead a minimum-R
     // constraint from `Depends: R (>= x.y.z)` is expressed as a `skip`
@@ -551,7 +550,6 @@ fn package_info_to_recipe(
             run.push(spec);
             remaining_deps.insert(dep.package.clone());
         } else if dep.role == "Suggests" {
-            has_testthat |= dep.package == "testthat";
             run.push(format!(
                 "SUGGEST {}",
                 format_r_package(&dep.package, dep.version.as_ref())
@@ -626,7 +624,9 @@ fn package_info_to_recipe(
             libraries: vec![info.Package.clone()],
         },
     }));
-    if has_testthat {
+    // Run the package's own test suite when it ships the testthat runner
+    // (suggesting testthat alone does not guarantee `tests/testthat.R` exists).
+    if tarball.is_some_and(|tarball| tarball.has_testthat_runner) {
         recipe.tests.push(Test::Script(ScriptTest {
             files: ScriptTestFiles {
                 source: vec!["tests/".to_string()],
@@ -734,6 +734,7 @@ mod tests {
         let info = fixture("tinkr");
         let tarball = CranTarball {
             sha256: "425bc04af76483b8cf713ad141bdebb963cf54dd363fbdbee3a709820ec4d23e".to_string(),
+            has_testthat_runner: true,
             ..Default::default()
         };
         let (recipe, deps) = package_info_to_recipe(&info, Some(&tarball), &[]);
@@ -755,6 +756,19 @@ mod tests {
         );
         assert!(deps.is_empty(), "gmp only depends on base R packages");
         insta::assert_snapshot!(format_cran_recipe_with_suggests(&recipe));
+    }
+
+    /// A package may suggest testthat without shipping `tests/testthat.R`
+    /// (or the tarball may not have been downloaded at all).
+    #[test]
+    fn no_testthat_test_without_the_runner() {
+        let info = fixture("tinkr");
+        let without_runner = CranTarball::default();
+        for tarball in [None, Some(&without_runner)] {
+            let (recipe, _) = package_info_to_recipe(&info, tarball, &[]);
+            assert_eq!(recipe.tests.len(), 1, "only the `r:` test is expected");
+            assert!(matches!(recipe.tests[0], Test::R(_)));
+        }
     }
 
     /// The SUGGEST marker must only be recognised as a list item, not inside

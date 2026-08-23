@@ -58,7 +58,7 @@ R packages will be prefixed with `r-` to avoid name conflicts with Python packag
 - The version lives in `context`, and the source URLs use `${{ cran_mirror }}` (also defined in `context`, so the recipe builds without a variant config) with CRAN's `Archive/` directory as a fallback for superseded versions.
 - When the package declares a minimum R version (e.g. `Depends: R (>= 4.1.0)`), the generator emits a `skip` condition using the `r_base` variant key rather than pinning `r-base` to a version.
 - Pure-R packages are `noarch: generic` and built with `${{ R }} CMD INSTALL --build .`. Packages with compiled code get compilers, `cross-r-base` for cross-compilation, `rpaths`, and a platform-conditional build script that passes `${R_ARGS}` (Unix) or `%R_ARGS%` (Windows) through to `R CMD INSTALL`.
-- Packages listed under `Suggests` are added as comments to the `run` requirements. If `testthat` is among them, a test that runs the package's `tests/testthat.R` suite is generated next to the `r:` test that loads the library.
+- Packages listed under `Suggests` are added as comments to the `run` requirements. If the package ships a testthat runner (`tests/testthat.R`), a test that runs it is generated next to the `r:` test that loads the library.
 
 The generated recipe for `dplyr` will look something like:
 
