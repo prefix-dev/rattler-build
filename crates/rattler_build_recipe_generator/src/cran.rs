@@ -540,7 +540,9 @@ fn package_info_to_recipe(
 
     // `r-base` is always listed without a version pin; instead a minimum-R
     // constraint from `Depends: R (>= x.y.z)` is expressed as a `skip`
-    // condition so variant selectors (r_base) control it at solve time.
+    // condition so variant selectors (r_base) control it at solve time. Such
+    // recipes therefore need an `r_base` variant: `match()` on an undefined
+    // variable is true, so without one the output is skipped.
     let r_base = "r-base".to_string();
     let mut host = Vec::new();
     let mut run = Vec::new();
