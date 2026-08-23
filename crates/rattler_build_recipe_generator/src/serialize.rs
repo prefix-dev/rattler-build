@@ -263,17 +263,6 @@ impl fmt::Display for Recipe {
     }
 }
 
-/// Quoting rules for a scalar, depending on where it appears in the recipe.
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum ScalarStyle {
-    /// Let `serde_yaml` decide whether the scalar needs quoting.
-    Plain,
-    /// Values under `context:`. Anything that starts with a digit (typically a
-    /// version such as `1.0` or `0.3.1`) is double-quoted so it is never
-    /// re-read as a number, matching the conda-forge convention.
-    Context,
-}
-
 /// Render a recipe as block-style YAML with sequences indented under their
 /// parent key. `serde_yaml` (libyaml) always emits *indentless* sequences,
 /// which is not the style used by recipes in the wild, so the tree is walked
@@ -282,34 +271,62 @@ fn emit_document(root: &Value) -> String {
     let mut out = String::new();
     if let Value::Mapping(map) = root {
         for (key, value) in map {
-            let style = if key.as_str() == Some("context") {
-                ScalarStyle::Context
-            } else {
-                ScalarStyle::Plain
-            };
-            emit_entry(&mut out, key, value, 0, style);
+            match value {
+                // `Recipe::context` holds versions and the like, which follow
+                // their own quoting rule (see `context_value_text`).
+                Value::Mapping(context)
+                    if key.as_str() == Some("context") && !context.is_empty() =>
+                {
+                    out.push_str("context:\n");
+                    for (name, value) in context {
+                        out.push_str("  ");
+                        out.push_str(&scalar_text(name, 2));
+                        out.push_str(": ");
+                        out.push_str(&context_value_text(value));
+                        out.push('\n');
+                    }
+                }
+                _ => emit_entry(&mut out, key, value, 0),
+            }
         }
     }
     out
 }
 
+/// Text of a value under `context:`. Anything that starts with a digit
+/// (typically a version such as `1.0` or `0.3.1`) is double-quoted so it is
+/// never re-read as a number, matching the conda-forge convention; values that
+/// `serde_yaml` would quote anyway are double-quoted as well, for consistency.
+fn context_value_text(value: &Value) -> String {
+    let rendered = scalar_text(value, 2);
+    let Value::String(string) = value else {
+        return rendered;
+    };
+    let needs_quotes = string.starts_with(|c: char| c.is_ascii_digit()) || rendered != *string;
+    if needs_quotes && !string.contains('\n') {
+        format!("\"{}\"", string.replace('\\', "\\\\").replace('"', "\\\""))
+    } else {
+        rendered
+    }
+}
+
 /// Write `key: value` (the caller has already written the indentation of the
 /// key) and descend into nested mappings and sequences.
-fn emit_entry(out: &mut String, key: &Value, value: &Value, indent: usize, style: ScalarStyle) {
-    out.push_str(&scalar_text(key, indent, ScalarStyle::Plain));
+fn emit_entry(out: &mut String, key: &Value, value: &Value, indent: usize) {
+    out.push_str(&scalar_text(key, indent));
     out.push(':');
     match value {
         Value::Mapping(map) if !map.is_empty() => {
             out.push('\n');
-            emit_mapping(out, map, indent + 2, false, style);
+            emit_mapping(out, map, indent + 2, false);
         }
         Value::Sequence(seq) if !seq.is_empty() => {
             out.push('\n');
-            emit_sequence(out, seq, indent + 2, style);
+            emit_sequence(out, seq, indent + 2);
         }
         _ => {
             out.push(' ');
-            out.push_str(&scalar_text(value, indent, style));
+            out.push_str(&scalar_text(value, indent));
             out.push('\n');
         }
     }
@@ -317,37 +334,31 @@ fn emit_entry(out: &mut String, key: &Value, value: &Value, indent: usize, style
 
 /// Write the entries of `map` at `indent`. With `inline_first` the first key
 /// continues the current line (right after a `- ` sequence marker).
-fn emit_mapping(
-    out: &mut String,
-    map: &Mapping,
-    indent: usize,
-    inline_first: bool,
-    style: ScalarStyle,
-) {
+fn emit_mapping(out: &mut String, map: &Mapping, indent: usize, inline_first: bool) {
     for (i, (key, value)) in map.iter().enumerate() {
         if !(inline_first && i == 0) {
             out.push_str(&" ".repeat(indent));
         }
-        emit_entry(out, key, value, indent, style);
+        emit_entry(out, key, value, indent);
     }
 }
 
 /// Write the items of `seq` as `- item` lines at `indent`.
-fn emit_sequence(out: &mut String, seq: &[Value], indent: usize, style: ScalarStyle) {
+fn emit_sequence(out: &mut String, seq: &[Value], indent: usize) {
     for item in seq {
         out.push_str(&" ".repeat(indent));
         match item {
             Value::Mapping(map) if !map.is_empty() => {
                 out.push_str("- ");
-                emit_mapping(out, map, indent + 2, true, style);
+                emit_mapping(out, map, indent + 2, true);
             }
             Value::Sequence(inner) if !inner.is_empty() => {
                 out.push_str("-\n");
-                emit_sequence(out, inner, indent + 2, style);
+                emit_sequence(out, inner, indent + 2);
             }
             _ => {
                 out.push_str("- ");
-                out.push_str(&scalar_text(item, indent, style));
+                out.push_str(&scalar_text(item, indent));
                 out.push('\n');
             }
         }
@@ -357,12 +368,12 @@ fn emit_sequence(out: &mut String, seq: &[Value], indent: usize, style: ScalarSt
 /// Text of a scalar (or of an empty collection), using `serde_yaml` for the
 /// quoting decision. Multi-line strings become `|-` block scalars whose body
 /// is re-indented relative to `indent`, the column of the owning key or dash.
-fn scalar_text(value: &Value, indent: usize, style: ScalarStyle) -> String {
+fn scalar_text(value: &Value, indent: usize) -> String {
     match value {
         Value::Null => "null".to_string(),
         Value::Bool(boolean) => boolean.to_string(),
         Value::Number(number) => number.to_string(),
-        Value::String(string) => string_text(string, indent, style),
+        Value::String(string) => string_text(string, indent),
         Value::Mapping(map) if map.is_empty() => "{}".to_string(),
         Value::Sequence(seq) if seq.is_empty() => "[]".to_string(),
         // Non-empty collections are always handled by `emit_entry` /
@@ -374,7 +385,7 @@ fn scalar_text(value: &Value, indent: usize, style: ScalarStyle) -> String {
     }
 }
 
-fn string_text(string: &str, indent: usize, style: ScalarStyle) -> String {
+fn string_text(string: &str, indent: usize) -> String {
     // Trailing newlines carry no meaning in a recipe, and keeping them would
     // make libyaml choose the `|+` (keep) block style, whose trailing blank
     // lines the surrounding layout does not preserve. Drop them so multi-line
@@ -384,8 +395,8 @@ fn string_text(string: &str, indent: usize, style: ScalarStyle) -> String {
     let rendered = rendered.trim_end_matches('\n');
 
     if string.contains('\n') {
-        // libyaml emits `|-` (or a variant) followed by the body indented by
-        // two spaces; shift the body so it sits two deeper than our key.
+        // libyaml emits `|-` followed by the body indented by two spaces;
+        // shift the body so it sits two deeper than our key.
         let mut lines = rendered.lines();
         let mut text = lines.next().unwrap_or("|-").to_string();
         for line in lines {
@@ -396,12 +407,6 @@ fn string_text(string: &str, indent: usize, style: ScalarStyle) -> String {
             text.push_str(line);
         }
         return text;
-    }
-
-    if style == ScalarStyle::Context
-        && (string.starts_with(|c: char| c.is_ascii_digit()) || rendered != string)
-    {
-        return format!("\"{}\"", string.replace('\\', "\\\\").replace('"', "\\\""));
     }
 
     rendered.to_string()
