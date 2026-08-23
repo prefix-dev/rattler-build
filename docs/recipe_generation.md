@@ -55,7 +55,7 @@ The `R` recipe generation supports some additional flags:
 
 R packages will be prefixed with `r-` to avoid name conflicts with Python packages. The generated recipe follows the conventions of conda-forge's R recipes:
 
-- The version lives in `context`, and the source URLs use `${{ cran_mirror }}` (also defined in `context`, so the recipe builds without a variant config) with CRAN's `Archive/` directory as a fallback for superseded versions.
+- The version lives in `context`, and the source URLs use `${{ cran_mirror }}`, which is defined in `context` to default to CRAN while honouring a `cran_mirror` variant (such as conda-forge's pinning); CRAN's `Archive/` directory is listed as a fallback for superseded versions.
 - When the package declares a minimum R version (e.g. `Depends: R (>= 4.1.0)`), the generator emits a `skip` condition using the `r_base` variant key rather than pinning `r-base` to a version.
 - Pure-R packages are `noarch: generic` and built with `${{ R }} CMD INSTALL --build .`. Packages with compiled code get compilers, `cross-r-base` for cross-compilation, `rpaths`, and a platform-conditional build script that passes `${R_ARGS}` (Unix) or `%R_ARGS%` (Windows) through to `R CMD INSTALL`.
 - Packages listed under `Suggests` are added as comments to the `run` requirements. If the package ships a testthat runner (`tests/testthat.R`), a test that runs it is generated next to the `r:` test that loads the library.

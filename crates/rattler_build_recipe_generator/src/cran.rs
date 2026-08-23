@@ -375,11 +375,16 @@ fn cross_r_base_requirement() -> Requirement {
     }
 }
 
-/// Default value of the `cran_mirror` context variable. conda-forge provides
-/// `cran_mirror` through its variant config; defining it in `context` keeps the
-/// recipe buildable without one (a `context` variable shadows a variant key of
-/// the same name).
+/// The CRAN mirror used when no `cran_mirror` variant is configured (conda-forge
+/// provides one through its pinning).
 const CRAN_MIRROR: &str = "https://cran.r-project.org";
+
+/// The `cran_mirror` context entry: the variant value when one is configured,
+/// [`CRAN_MIRROR`] otherwise. A `context` variable shadows a variant key of the
+/// same name, so the entry has to refer to the variant explicitly.
+fn cran_mirror_context() -> String {
+    format!("${{{{ cran_mirror | default(\"{CRAN_MIRROR}\") }}}}")
+}
 
 /// Placeholder maintainer when none is given on the command line (the same
 /// convention grayskull uses).
@@ -497,7 +502,7 @@ fn package_info_to_recipe(
         .insert("version".to_string(), info.Version.clone());
     recipe
         .context
-        .insert("cran_mirror".to_string(), CRAN_MIRROR.to_string());
+        .insert("cran_mirror".to_string(), cran_mirror_context());
 
     recipe.package.name = format_r_package(&info.Package, None);
     // CRAN allows `-` in versions (e.g. `0.7-5.1`), conda does not; conda-forge
