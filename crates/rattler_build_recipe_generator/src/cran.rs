@@ -609,11 +609,12 @@ fn package_info_to_recipe(
         recipe.build.script = R_CMD_INSTALL.into();
     }
 
-    if let Some(url) = &info.URL {
-        let url = url
-            .split_once(',')
-            .map_or(url.as_str(), |(first, _)| first)
-            .trim();
+    // `URL:` lists one or more URLs separated by commas and/or whitespace; the
+    // first one is the package's home page by convention.
+    if let Some(url) = info.URL.as_deref().and_then(|urls| {
+        urls.split([',', ' ', '\n', '\t'])
+            .find(|url| !url.is_empty())
+    }) {
         recipe.about.homepage = Some(url.to_string());
     }
 
@@ -777,6 +778,30 @@ mod tests {
         );
         assert!(deps.is_empty(), "gmp only depends on base R packages");
         insta::assert_snapshot!(format_cran_recipe_with_suggests(&recipe));
+    }
+
+    /// CRAN's `URL:` field may separate several URLs with commas, spaces or
+    /// newlines; the first one is the home page.
+    #[test]
+    fn homepage_is_the_first_url_of_the_url_field() {
+        let mut info = fixture("tinkr");
+        for urls in [
+            "https://a.example, https://b.example",
+            "https://a.example https://b.example",
+            "https://a.example,\nhttps://b.example",
+            "  https://a.example",
+        ] {
+            info.URL = Some(urls.to_string());
+            let (recipe, _) = package_info_to_recipe(&info, None, &[]);
+            assert_eq!(
+                recipe.about.homepage.as_deref(),
+                Some("https://a.example"),
+                "{urls:?}"
+            );
+        }
+        info.URL = None;
+        let (recipe, _) = package_info_to_recipe(&info, None, &[]);
+        assert_eq!(recipe.about.homepage, None);
     }
 
     /// Library callers (py-rattler-build, the playground) get no `extra:` block
