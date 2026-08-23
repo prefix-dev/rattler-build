@@ -406,11 +406,11 @@ fn format_cran_recipe_with_suggests(recipe: &serialize::Recipe) -> String {
                  {indent}    then: R CMD INSTALL --build . %R_ARGS%\n\
                  {indent}    else: R CMD INSTALL --build . ${{R_ARGS}}\n"
             ));
-        } else if line.contains("SUGGEST") {
-            final_recipe.push_str(&format!(
-                "{}  # suggested\n",
-                line.replace("- SUGGEST ", "# - ")
-            ));
+        } else if let Some(spec) = line.trim_start().strip_prefix("- SUGGEST ") {
+            // Suggested dependencies are kept as comments so that packagers
+            // can promote the ones their tests actually need.
+            let indent = &line[..line.len() - line.trim_start().len()];
+            final_recipe.push_str(&format!("{indent}# - {spec}  # suggested\n"));
         } else {
             final_recipe.push_str(&format!("{}\n", line));
         }
@@ -775,6 +775,21 @@ mod tests {
         );
         assert!(deps.is_empty(), "gmp only depends on base R packages");
         insta::assert_snapshot!(format_cran_recipe_with_suggests(&recipe));
+    }
+
+    /// The SUGGEST marker must only be recognised as a list item, not inside
+    /// free text such as the description.
+    #[test]
+    fn only_suggested_dependency_lines_are_commented_out() {
+        let mut info = fixture("tinkr");
+        info.Description = "Does things as SUGGESTED by the SUGGEST list.".to_string();
+        let (recipe, _) = package_info_to_recipe(&info, None, &[]);
+        let yaml = format_cran_recipe_with_suggests(&recipe);
+        assert!(
+            yaml.contains("  description: Does things as SUGGESTED by the SUGGEST list.\n"),
+            "{yaml}"
+        );
+        assert!(yaml.contains("    # - r-knitr  # suggested\n"), "{yaml}");
     }
 
     /// Build an in-memory `.tar.gz` with the given `(path, contents)` entries.
