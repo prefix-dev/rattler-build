@@ -279,7 +279,9 @@ async fn fetch_package_tarball(client: &reqwest::Client, url: &Url) -> miette::R
 struct CranTarball {
     /// SHA256 of the tarball CRAN currently serves.
     sha256: String,
-    /// The package's `DESCRIPTION` file (`<package>/DESCRIPTION`).
+    /// The package's `DESCRIPTION` file (`<package>/DESCRIPTION`); only the
+    /// command line (not built for wasm32) appends it to the recipe.
+    #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
     description: Option<String>,
     /// Whether the package ships the testthat runner, `tests/testthat.R`.
     has_testthat_runner: bool,
@@ -313,6 +315,7 @@ struct FetchedPackage {
 /// Append the package's DESCRIPTION file to the rendered recipe as a comment
 /// block, in the format `conda skeleton cran` used, so that reviewers can check
 /// the recipe against the upstream metadata without opening the tarball.
+#[cfg(not(target_arch = "wasm32"))]
 fn append_description_comment(recipe: &str, description: &str) -> String {
     let mut out = recipe.trim_end_matches('\n').to_string();
     out.push_str("\n\n# The original CRAN metadata for this package was:\n\n");
