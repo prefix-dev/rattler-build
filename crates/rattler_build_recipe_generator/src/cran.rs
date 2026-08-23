@@ -264,7 +264,14 @@ fn format_r_package(package: &str, version: Option<&String>) -> String {
 /// Download the package tarball at `url`.
 pub async fn fetch_package_tarball(url: &Url) -> Result<Vec<u8>, miette::Error> {
     let client = reqwest::Client::new();
-    let response = client.get(url.clone()).send().await.into_diagnostic()?;
+    let response = client
+        .get(url.clone())
+        .send()
+        .await
+        .into_diagnostic()?
+        // A 404 page must not end up hashed as if it were the tarball.
+        .error_for_status()
+        .into_diagnostic()?;
     let bytes = response.bytes().await.into_diagnostic()?;
     Ok(bytes.to_vec())
 }
