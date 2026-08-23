@@ -380,7 +380,19 @@ const CRAN_MIRROR: &str = "https://cran.r-project.org";
 
 /// Placeholder maintainer when none is given on the command line (the same
 /// convention grayskull uses).
+#[cfg(not(target_arch = "wasm32"))]
 const DEFAULT_MAINTAINER: &str = "AddYourGitHubIdHere";
+
+/// The maintainers to list for a recipe generated from the command line:
+/// the ones given, or a placeholder reminding the author to fill them in.
+#[cfg(not(target_arch = "wasm32"))]
+fn cli_maintainers(given: &[String]) -> Vec<String> {
+    if given.is_empty() {
+        vec![DEFAULT_MAINTAINER.to_string()]
+    } else {
+        given.to_vec()
+    }
+}
 
 /// Convert an R `Depends: R (>= x.y.z)` version string into a rattler-build
 /// `skip` expression. Only `>=` constraints are handled; returns `None` for
@@ -468,8 +480,8 @@ async fn fetch_package(
 /// Turn R-universe package metadata (plus what the tarball told us, when it
 /// could be downloaded) into a recipe.
 ///
-/// `maintainers` fills `extra.recipe-maintainers` (a placeholder is used when
-/// empty). Also returns the R packages the recipe depends on, for `--tree`.
+/// `maintainers` fills `extra.recipe-maintainers` (omitted when empty). Also
+/// returns the R packages the recipe depends on, for `--tree`.
 fn package_info_to_recipe(
     info: &PackageInfo,
     tarball: Option<&CranTarball>,
@@ -641,11 +653,7 @@ fn package_info_to_recipe(
         }));
     }
 
-    recipe.extra.recipe_maintainers = if maintainers.is_empty() {
-        vec![DEFAULT_MAINTAINER.to_string()]
-    } else {
-        maintainers.to_vec()
-    };
+    recipe.extra.recipe_maintainers = maintainers.to_vec();
 
     (recipe, remaining_deps)
 }
@@ -677,8 +685,11 @@ pub async fn generate_r_recipe(opts: &CranOpts) -> miette::Result<()> {
         opts.universe.as_deref().unwrap_or("cran"),
     )
     .await?;
-    let (recipe, remaining_deps) =
-        package_info_to_recipe(&package.info, package.tarball.as_ref(), &opts.maintainers);
+    let (recipe, remaining_deps) = package_info_to_recipe(
+        &package.info,
+        package.tarball.as_ref(),
+        &cli_maintainers(&opts.maintainers),
+    );
 
     let mut final_recipe = format_cran_recipe_with_suggests(&recipe);
     if opts.staged_recipes {
@@ -737,7 +748,7 @@ mod tests {
             has_testthat_runner: true,
             ..Default::default()
         };
-        let (recipe, deps) = package_info_to_recipe(&info, Some(&tarball), &[]);
+        let (recipe, deps) = package_info_to_recipe(&info, Some(&tarball), &cli_maintainers(&[]));
         assert!(deps.contains("commonmark"));
         assert!(deps.contains("R6"));
         assert!(!deps.contains("testthat"), "Suggests are not recursed into");
@@ -756,6 +767,22 @@ mod tests {
         );
         assert!(deps.is_empty(), "gmp only depends on base R packages");
         insta::assert_snapshot!(format_cran_recipe_with_suggests(&recipe));
+    }
+
+    /// Library callers (py-rattler-build, the playground) get no `extra:` block
+    /// unless they name maintainers; the placeholder is a CLI convenience.
+    #[test]
+    fn maintainers_are_only_defaulted_on_the_command_line() {
+        let info = fixture("tinkr");
+        let (recipe, _) = package_info_to_recipe(&info, None, &[]);
+        assert!(recipe.extra.recipe_maintainers.is_empty());
+        assert!(!format_cran_recipe_with_suggests(&recipe).contains("extra:"));
+
+        assert_eq!(cli_maintainers(&[]), vec![DEFAULT_MAINTAINER.to_string()]);
+        assert_eq!(
+            cli_maintainers(&["octocat".to_string()]),
+            vec!["octocat".to_string()]
+        );
     }
 
     /// A package may suggest testthat without shipping `tests/testthat.R`
