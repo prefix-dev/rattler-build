@@ -35,7 +35,6 @@ pub struct PackageInfo {
     pub Repository: String,
     #[serde(rename = "Date/Publication")]
     pub DatePublication: Option<String>,
-    pub MD5sum: Option<String>,
     pub _user: String,
     pub _type: String,
     pub _file: String,
@@ -424,10 +423,9 @@ pub async fn fetch_package_info(package: &str, universe: &str) -> miette::Result
 
 /// Turn R-universe package metadata into a recipe.
 ///
-/// `sha256` is the checksum of the CRAN tarball when it could be computed;
-/// otherwise the MD5 reported by R-universe is used. `maintainers` fills
-/// `extra.recipe-maintainers` (a placeholder is used when empty). Also returns
-/// the R packages the recipe depends on, for `--tree`.
+/// `sha256` is the checksum of the CRAN tarball when it could be computed.
+/// `maintainers` fills `extra.recipe-maintainers` (a placeholder is used when
+/// empty). Also returns the R packages the recipe depends on, for `--tree`.
 fn package_info_to_recipe(
     info: &PackageInfo,
     sha256: Option<String>,
@@ -463,12 +461,8 @@ fn package_info_to_recipe(
                     info.Package
                 ),
             ],
-            md5: if sha256.is_none() {
-                info.MD5sum.clone()
-            } else {
-                None
-            },
             sha256,
+            md5: None,
         }
         .into(),
     );
@@ -628,8 +622,8 @@ async fn build_cran_recipe_and_deps(
 
     // Download the tarball CRAN currently serves to hash it (and to read its
     // DESCRIPTION). This is best-effort: in restricted environments (e.g.
-    // WASM/browser with no CORS on cran.r-project.org) we fall back to the MD5
-    // the R-universe API gave us.
+    // WASM/browser with no CORS on cran.r-project.org) the recipe is emitted
+    // without a checksum.
     let url = Url::parse(&format!("{CRAN_MIRROR}/src/contrib/{}", package_info._file))
         .expect("Failed to parse URL");
     let (sha256, description) = match fetch_package_tarball(&url).await {
@@ -658,7 +652,7 @@ async fn build_cran_recipe_and_deps(
         }
         Err(e) => {
             tracing::warn!(
-                "Failed to fetch {}: {} — falling back to MD5 from R-universe.",
+                "Failed to fetch {}: {} — the recipe will not contain a checksum; add the sha256 by hand.",
                 package_info._file,
                 e
             );
