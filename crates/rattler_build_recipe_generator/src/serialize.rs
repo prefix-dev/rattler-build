@@ -375,6 +375,11 @@ fn scalar_text(value: &Value, indent: usize, style: ScalarStyle) -> String {
 }
 
 fn string_text(string: &str, indent: usize, style: ScalarStyle) -> String {
+    // Trailing newlines carry no meaning in a recipe, and keeping them would
+    // make libyaml choose the `|+` (keep) block style, whose trailing blank
+    // lines the surrounding layout does not preserve. Drop them so multi-line
+    // text always becomes a `|-` block and single lines stay plain scalars.
+    let string = string.trim_end_matches('\n');
     let rendered = serde_yaml::to_string(&Value::String(string.to_string())).unwrap_or_default();
     let rendered = rendered.trim_end_matches('\n');
 
@@ -533,6 +538,25 @@ mod tests {
         // plain scalars stay plain (YAML allows inner double quotes)
         assert!(yaml.contains("  plain: hello\n"), "{yaml}");
         assert!(yaml.contains("  inner_quotes: say \"hi\"\n"), "{yaml}");
+    }
+
+    #[test]
+    fn trailing_newlines_are_dropped_rather_than_kept_by_the_block_style() {
+        let mut recipe = Recipe::default();
+        recipe.about.summary = Some("one line\n".to_string());
+        recipe.about.description = Some("First.\nSecond.\n\n".to_string());
+        let yaml = recipe.to_string();
+        assert!(yaml.contains("  summary: one line\n"), "{yaml}");
+        assert!(
+            yaml.contains("  description: |-\n    First.\n    Second.\n"),
+            "{yaml}"
+        );
+        let reparsed: Value = serde_yaml::from_str(&yaml).unwrap();
+        assert_eq!(reparsed["about"]["summary"].as_str(), Some("one line"));
+        assert_eq!(
+            reparsed["about"]["description"].as_str(),
+            Some("First.\nSecond.")
+        );
     }
 
     #[test]
