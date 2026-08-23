@@ -12,7 +12,7 @@ use std::process::Command;
 
 #[cfg(not(target_arch = "wasm32"))]
 use super::write_recipe;
-use crate::serialize::{self, ScriptTest, Test, UrlSourceElement};
+use crate::serialize::{self, Requirement, ScriptTest, Test, UrlSourceElement};
 
 /// Options to control CPAN recipe generation.
 #[derive(Debug, Clone)]
@@ -518,21 +518,27 @@ pub async fn create_cpan_recipe(
     recipe.source.push(source.into());
 
     // Set build requirements
-    recipe.requirements.build.push("make".to_string());
+    recipe.requirements.build.push("make".into());
 
     // Host requirements
-    recipe.requirements.host.push("perl".to_string());
+    recipe.requirements.host.push("perl".into());
 
     // Runtime requirements
-    recipe.requirements.run.push("perl".to_string());
+    recipe.requirements.run.push("perl".into());
 
     // Process dependencies
     if let Some(dependencies) = &metadata.release.dependency {
         let (host_deps, run_deps) = process_dependencies(dependencies);
 
         // Add dependencies to appropriate sections
-        recipe.requirements.host.extend(host_deps);
-        recipe.requirements.run.extend(run_deps);
+        recipe
+            .requirements
+            .host
+            .extend(host_deps.into_iter().map(Requirement::from));
+        recipe
+            .requirements
+            .run
+            .extend(run_deps.into_iter().map(Requirement::from));
     }
 
     // Set build number
@@ -541,7 +547,7 @@ pub async fn create_cpan_recipe(
     recipe.build.script = r#"perl Makefile.PL INSTALLDIRS=vendor
 make
 make install"#
-        .to_string();
+        .into();
 
     // Detect if package should be noarch
     // Most Perl packages are noarch unless they contain XS (C extensions)

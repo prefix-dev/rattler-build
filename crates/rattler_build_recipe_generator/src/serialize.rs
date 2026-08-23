@@ -55,7 +55,7 @@ pub struct Build {
     pub skip: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub noarch: Option<String>,
-    pub script: String,
+    pub script: Script,
     #[serde(skip_serializing_if = "Python::is_default")]
     pub python: Python,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -68,6 +68,68 @@ fn serialize_build_number<S: Serializer>(number: &str, serializer: S) -> Result<
     match number.parse::<u64>() {
         Ok(number) => serializer.serialize_u64(number),
         Err(_) => serializer.serialize_str(number),
+    }
+}
+
+/// The `build.script` field: a single command, or a list of steps.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
+#[serde(untagged)]
+pub enum Script {
+    Command(String),
+    Steps(Vec<ScriptStep>),
+}
+
+impl Default for Script {
+    fn default() -> Self {
+        Script::Command(String::new())
+    }
+}
+
+impl From<String> for Script {
+    fn from(command: String) -> Self {
+        Script::Command(command)
+    }
+}
+
+impl From<&str> for Script {
+    fn from(command: &str) -> Self {
+        Script::Command(command.to_string())
+    }
+}
+
+/// One step of a `build.script` list: an `if`/`then`/`else` selector choosing
+/// between commands.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
+pub struct ScriptStep {
+    #[serde(rename = "if")]
+    pub condition: String,
+    pub then: String,
+    #[serde(rename = "else", skip_serializing_if = "Option::is_none")]
+    pub otherwise: Option<String>,
+}
+
+/// One entry of a requirements list: a match spec, or an `if`/`then`
+/// selector adding specs only when the condition holds.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
+#[serde(untagged)]
+pub enum Requirement {
+    Spec(String),
+    Conditional {
+        #[serde(rename = "if")]
+        condition: String,
+        then: Vec<String>,
+    },
+}
+
+impl From<String> for Requirement {
+    fn from(spec: String) -> Self {
+        Requirement::Spec(spec)
+    }
+}
+
+impl From<&str> for Requirement {
+    fn from(spec: &str) -> Self {
+        Requirement::Spec(spec.to_string())
     }
 }
 
@@ -227,11 +289,11 @@ pub struct Recipe {
 #[derive(Default, Debug, Serialize)]
 pub struct Requirements {
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub build: Vec<String>,
+    pub build: Vec<Requirement>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub host: Vec<String>,
+    pub host: Vec<Requirement>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub run: Vec<String>,
+    pub run: Vec<Requirement>,
 }
 
 impl fmt::Display for Recipe {
@@ -462,10 +524,16 @@ mod tests {
             .into(),
         );
         recipe.build.number = "${{ build_number }}".to_string();
-        recipe.build.script = "make install".to_string();
+        recipe.build.script = "make install".into();
         recipe.build.noarch = Some("generic".to_string());
-        recipe.requirements.host = vec!["r-base".to_string()];
-        recipe.requirements.build = vec!["${{ compiler('c') }}".to_string()];
+        recipe.requirements.host = vec!["r-base".into()];
+        recipe.requirements.build = vec![
+            Requirement::Conditional {
+                condition: "build_platform != target_platform".to_string(),
+                then: vec!["cross-r-base ${{ r_base }}".to_string()],
+            },
+            "${{ compiler('c') }}".into(),
+        ];
         recipe.tests.push(Test::R(RTest {
             r: RTestInner {
                 libraries: vec!["demo".to_string()],

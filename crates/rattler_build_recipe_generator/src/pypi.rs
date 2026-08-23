@@ -858,13 +858,13 @@ pub async fn create_recipe(
         recipe
             .requirements
             .host
-            .push(format!("python {}", python_req));
+            .push(format!("python {}", python_req).into());
         recipe
             .requirements
             .run
-            .push(format!("python {}", python_req));
+            .push(format!("python {}", python_req).into());
     } else {
-        recipe.requirements.host.push("python".to_string());
+        recipe.requirements.host.push("python".into());
     }
 
     let mapping = if opts.use_mapping {
@@ -878,7 +878,7 @@ pub async fn create_recipe(
         Ok(build_reqs) => {
             for req in build_reqs {
                 let mapped_req = map_requirement(&req, mapping, opts.use_mapping).await;
-                recipe.requirements.host.push(mapped_req);
+                recipe.requirements.host.push(mapped_req.into());
             }
         }
         Err(e) => {
@@ -889,7 +889,7 @@ pub async fn create_recipe(
             );
         }
     }
-    recipe.requirements.host.push("pip".to_string());
+    recipe.requirements.host.push("pip".into());
 
     // Process runtime dependencies
     if let Some(deps) = &metadata.info.requires_dist {
@@ -899,11 +899,11 @@ pub async fn create_recipe(
             recipe
                 .requirements
                 .run
-                .push(formatted_req.trim_start_matches("- ").to_string());
+                .push(formatted_req.trim_start_matches("- ").into());
         }
     }
 
-    recipe.build.script = "${{ PYTHON }} -m pip install .".to_string();
+    recipe.build.script = "${{ PYTHON }} -m pip install .".into();
 
     recipe.tests.push(Test::Python(PythonTest {
         python: PythonTestInner {

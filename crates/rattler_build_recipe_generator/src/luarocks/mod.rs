@@ -407,15 +407,15 @@ fn rockspec_to_recipe(rockspec: &LuarocksRockspec) -> miette::Result<Recipe> {
         build: Build {
             number: "${{ build_number }}".to_string(),
             skip: None,
-            script: "# Take the first `rockspec` we find (in non-deterministic places unfortunately)\nROCK=$(find . -name \"*.rockspec\" | sort -n -r | head -n 1)\nluarocks install ${ROCK} --tree=${{ PREFIX }}".to_string(),
+            script: "# Take the first `rockspec` we find (in non-deterministic places unfortunately)\nROCK=$(find . -name \"*.rockspec\" | sort -n -r | head -n 1)\nluarocks install ${ROCK} --tree=${{ PREFIX }}".into(),
             python: Python::default(),
             noarch: None,
             dynamic_linking: None,
         },
         requirements: Requirements {
-            build: vec!["luarocks".to_string()],
-            host: vec!["lua".to_string()],
-            run: vec!["lua".to_string()],
+            build: vec!["luarocks".into()],
+            host: vec!["lua".into()],
+            run: vec!["lua".into()],
         },
         tests: vec![generate_require_test(rockspec)],
         about: About {
@@ -439,7 +439,7 @@ fn rockspec_to_recipe(rockspec: &LuarocksRockspec) -> miette::Result<Recipe> {
             recipe
                 .requirements
                 .run
-                .push(dep_name.as_normalized().to_string());
+                .push(dep_name.as_normalized().into());
         }
     }
 
@@ -524,6 +524,7 @@ fn map_license(license: Option<&str>) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::serialize::Script;
 
     #[test]
     fn test_normalize_lua_name() {
@@ -689,11 +690,14 @@ dependencies = { "lua >= 5.1" }"#;
             }
         }
 
-        assert!(recipe.build.script.contains("luarocks install"),);
+        assert!(matches!(
+            &recipe.build.script,
+            Script::Command(command) if command.contains("luarocks install")
+        ));
 
-        assert!(recipe.requirements.build.contains(&"luarocks".to_string()));
-        assert!(recipe.requirements.host.contains(&"lua".to_string()));
-        assert!(recipe.requirements.run.contains(&"lua".to_string()));
+        assert!(recipe.requirements.build.contains(&"luarocks".into()));
+        assert!(recipe.requirements.host.contains(&"lua".into()));
+        assert!(recipe.requirements.run.contains(&"lua".into()));
 
         assert_eq!(
             recipe.about.summary,

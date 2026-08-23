@@ -13,8 +13,8 @@ use sha2::Sha256;
 use url::Url;
 
 use crate::serialize::{
-    self, RTest, RTestInner, ScriptTest, ScriptTestFiles, ScriptTestRequirements, Test,
-    UrlSourceElement,
+    self, RTest, RTestInner, Requirement, Script, ScriptStep, ScriptTest, ScriptTestFiles,
+    ScriptTestRequirements, Test, UrlSourceElement,
 };
 #[cfg(not(target_arch = "wasm32"))]
 use crate::write_recipe;
@@ -331,23 +331,30 @@ const R_BUILTINS: &[&str] = &[
     "utils",
 ];
 
-/// Placeholder pushed into `requirements.build` for compiled packages. It is
-/// expanded by [`format_cran_recipe_with_suggests`] into a `build_platform !=
-/// target_platform` selector that pulls in `cross-r-base` when cross-compiling.
-///
-/// A plain identifier is used so that `serde_yaml` emits it unquoted, which
-/// keeps the post-processing match simple.
-const CROSS_R_BASE_MARKER: &str = "CROSS_R_BASE_PLACEHOLDER";
-
-/// Placeholder stored in `build.script` for *compiled* packages. Expanded by
-/// [`format_cran_recipe_with_suggests`] into a platform-conditional list that
-/// uses `${R_ARGS}` on Unix and `%R_ARGS%` on Windows, so that recipe authors
-/// can inject e.g. `--configure-args`. Pure-R packages use [`R_CMD_INSTALL`].
-const CRAN_R_SCRIPT_MARKER: &str = "CRAN_R_SCRIPT_PLACEHOLDER";
-
-/// Build script for pure-R (`noarch: generic`) packages. `${{ R }}` resolves
-/// to the R binary of the host prefix at build time.
+/// The build command. `${{ R }}` resolves to the R binary of the host prefix
+/// at build time.
 const R_CMD_INSTALL: &str = "${{ R }} CMD INSTALL --build .";
+
+/// Build script for compiled packages: [`R_CMD_INSTALL`] with `R_ARGS` passed
+/// through (spelled per shell), so that recipe authors can inject e.g.
+/// `--configure-args`. Pure-R packages have no configure step and use the
+/// bare command.
+fn compiled_build_script() -> Script {
+    Script::Steps(vec![ScriptStep {
+        condition: "win".to_string(),
+        then: format!("{R_CMD_INSTALL} %R_ARGS%"),
+        otherwise: Some(format!("{R_CMD_INSTALL} ${{R_ARGS}}")),
+    }])
+}
+
+/// `cross-r-base` is required to cross-compile; `r_base` is the conda-forge
+/// variant key pinning the R version.
+fn cross_r_base_requirement() -> Requirement {
+    Requirement::Conditional {
+        condition: "build_platform != target_platform".to_string(),
+        then: vec!["cross-r-base ${{ r_base }}".to_string()],
+    }
+}
 
 /// Default value of the `cran_mirror` context variable. conda-forge provides
 /// `cran_mirror` through its variant config; defining it in `context` keeps the
@@ -378,35 +385,13 @@ fn r_dep_version_to_skip(version: &str) -> Option<String> {
     }
 }
 
+/// Render the recipe, turning the `SUGGEST <spec>` entries of `run` into
+/// comments (YAML comments cannot be expressed in the recipe model).
 fn format_cran_recipe_with_suggests(recipe: &serialize::Recipe) -> String {
     let recipe_str = format!("{}", recipe);
     let mut final_recipe = String::new();
     for line in recipe_str.lines() {
-        if let Some(indent) = line
-            .strip_suffix(CROSS_R_BASE_MARKER)
-            .and_then(|prefix| prefix.strip_suffix("- "))
-        {
-            // Expand the placeholder into a cross-compilation selector. `r_base`
-            // is the conda-forge variant key pinning the R version.
-            final_recipe.push_str(&format!(
-                "{indent}- if: build_platform != target_platform\n\
-                 {indent}  then:\n\
-                 {indent}    - cross-r-base ${{{{ r_base }}}}\n"
-            ));
-        } else if line
-            .trim_start()
-            .starts_with(&format!("script: {CRAN_R_SCRIPT_MARKER}"))
-        {
-            // Expand into a platform-conditional script list.
-            let indent_len = line.len() - line.trim_start().len();
-            let indent = &line[..indent_len];
-            final_recipe.push_str(&format!(
-                "{indent}script:\n\
-                 {indent}  - if: win\n\
-                 {indent}    then: R CMD INSTALL --build . %R_ARGS%\n\
-                 {indent}    else: R CMD INSTALL --build . ${{R_ARGS}}\n"
-            ));
-        } else if let Some(spec) = line.trim_start().strip_prefix("- SUGGEST ") {
+        if let Some(spec) = line.trim_start().strip_prefix("- SUGGEST ") {
             // Suggested dependencies are kept as comments so that packagers
             // can promote the ones their tests actually need.
             let indent = &line[..line.len() - line.trim_start().len()];
@@ -483,12 +468,6 @@ fn package_info_to_recipe(
 
     recipe.build.number = "0".to_string();
 
-    let build_tools = vec![
-        "${{ compiler('c') }}".to_string(),
-        "${{ compiler('cxx') }}".to_string(),
-        "make".to_string(),
-    ];
-
     // Whether the package contains code that has to be compiled. Packages that
     // declare `LinkingTo` dependencies also compile against those headers, so
     // they need a compiler even if `NeedsCompilation` is not set to `yes`.
@@ -540,26 +519,31 @@ fn package_info_to_recipe(
     recipe.requirements.host = std::iter::once(r_base.clone())
         .chain(host)
         .unique()
+        .map(Requirement::from)
         .collect();
-    recipe.requirements.run = std::iter::once(r_base).chain(run).unique().collect();
+    recipe.requirements.run = std::iter::once(r_base)
+        .chain(run)
+        .unique()
+        .map(Requirement::from)
+        .collect();
 
     if needs_compilation {
         // Compiled packages need a toolchain, `cross-r-base` for cross builds,
         // and rpaths so the linker can find R's shared libraries.
-        let mut build = vec![CROSS_R_BASE_MARKER.to_string()];
-        build.extend(build_tools);
-        recipe.requirements.build = build.into_iter().unique().collect();
+        recipe.requirements.build = vec![
+            cross_r_base_requirement(),
+            "${{ compiler('c') }}".into(),
+            "${{ compiler('cxx') }}".into(),
+            "make".into(),
+        ];
         recipe.build.dynamic_linking = Some(serialize::DynamicLinking {
             rpaths: vec!["lib/R/lib/".to_string(), "lib/".to_string()],
         });
-        // Expanded by `format_cran_recipe_with_suggests` into a platform-specific
-        // list (${R_ARGS} on Unix, %R_ARGS% on Windows).
-        recipe.build.script = CRAN_R_SCRIPT_MARKER.to_string();
+        recipe.build.script = compiled_build_script();
     } else {
-        // Pure-R packages are architecture independent and have no configure
-        // step, so there is nothing to pass through `R_ARGS`.
+        // Pure-R packages are architecture independent.
         recipe.build.noarch = Some("generic".to_string());
-        recipe.build.script = R_CMD_INSTALL.to_string();
+        recipe.build.script = R_CMD_INSTALL.into();
     }
 
     if let Some(url) = &info.URL {
