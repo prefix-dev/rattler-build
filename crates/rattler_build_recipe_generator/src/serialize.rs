@@ -125,6 +125,12 @@ pub struct ScriptTestFiles {
     pub source: Vec<String>,
 }
 
+impl ScriptTestFiles {
+    fn is_empty(&self) -> bool {
+        self.source.is_empty()
+    }
+}
+
 /// Additional packages to install into the test environment.
 #[derive(Default, Debug, Serialize)]
 pub struct ScriptTestRequirements {
@@ -132,12 +138,18 @@ pub struct ScriptTestRequirements {
     pub run: Vec<String>,
 }
 
+impl ScriptTestRequirements {
+    fn is_empty(&self) -> bool {
+        self.run.is_empty()
+    }
+}
+
 #[derive(Default, Debug, Serialize)]
 pub struct ScriptTest {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub files: Option<ScriptTestFiles>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub requirements: Option<ScriptTestRequirements>,
+    #[serde(skip_serializing_if = "ScriptTestFiles::is_empty")]
+    pub files: ScriptTestFiles,
+    #[serde(skip_serializing_if = "ScriptTestRequirements::is_empty")]
+    pub requirements: ScriptTestRequirements,
     pub script: Vec<String>,
 }
 
@@ -184,10 +196,21 @@ impl Extra {
     }
 }
 
-#[serde_as]
+/// The recipe format version. This crate only emits the v1 format.
 #[derive(Debug, Serialize)]
+#[serde(transparent)]
+pub struct SchemaVersion(u32);
+
+impl Default for SchemaVersion {
+    fn default() -> Self {
+        Self(1)
+    }
+}
+
+#[serde_as]
+#[derive(Default, Debug, Serialize)]
 pub struct Recipe {
-    pub schema_version: u32,
+    pub schema_version: SchemaVersion,
     pub context: IndexMap<String, String>,
     pub package: Package,
     /// A single source is emitted as a mapping, several as a list.
@@ -199,22 +222,6 @@ pub struct Recipe {
     pub about: About,
     #[serde(skip_serializing_if = "Extra::is_empty")]
     pub extra: Extra,
-}
-
-impl Default for Recipe {
-    fn default() -> Self {
-        Self {
-            schema_version: 1,
-            context: IndexMap::new(),
-            package: Package::default(),
-            source: Vec::new(),
-            build: Build::default(),
-            requirements: Requirements::default(),
-            tests: Vec::new(),
-            about: About::default(),
-            extra: Extra::default(),
-        }
-    }
 }
 
 #[derive(Default, Debug, Serialize)]
@@ -455,12 +462,12 @@ mod tests {
             },
         }));
         recipe.tests.push(Test::Script(ScriptTest {
-            files: Some(ScriptTestFiles {
+            files: ScriptTestFiles {
                 source: vec!["tests/".to_string()],
-            }),
-            requirements: Some(ScriptTestRequirements {
+            },
+            requirements: ScriptTestRequirements {
                 run: vec!["r-testthat".to_string()],
-            }),
+            },
             script: vec!["Rscript -e \"cat('hi: there')\"".to_string()],
         }));
         recipe.about.summary = Some("A demo: with a colon".to_string());

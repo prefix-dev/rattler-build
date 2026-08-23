@@ -601,12 +601,12 @@ fn package_info_to_recipe(
     }));
     if has_testthat {
         recipe.tests.push(Test::Script(ScriptTest {
-            files: Some(ScriptTestFiles {
+            files: ScriptTestFiles {
                 source: vec!["tests/".to_string()],
-            }),
-            requirements: Some(ScriptTestRequirements {
+            },
+            requirements: ScriptTestRequirements {
                 run: vec!["r-testthat".to_string()],
-            }),
+            },
             script: vec![
                 r#"Rscript -e "testthat::test_file('tests/testthat.R', stop_on_failure=TRUE)""#
                     .to_string(),
