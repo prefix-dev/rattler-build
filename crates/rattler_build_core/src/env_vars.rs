@@ -23,6 +23,11 @@ macro_rules! insert {
     };
 }
 
+/// Reduce a version such as `3.13.1` to its `major.minor` part (`3.13`).
+fn major_minor(version: &str) -> String {
+    version.split('.').take(2).collect::<Vec<_>>().join(".")
+}
+
 fn get_stdlib_dir(prefix: &Path, platform: Platform, py_ver: &str) -> PathBuf {
     if platform.is_windows() {
         prefix.join("Lib")
@@ -80,8 +85,7 @@ pub fn python_vars(output: &Output) -> HashMap<String, Option<String>> {
         });
 
     if let Some(py_ver) = python_version {
-        let py_ver: Vec<_> = py_ver.split('.').take(2).collect();
-        let py_ver_str = py_ver.join(".");
+        let py_ver_str = major_minor(&py_ver);
         let stdlib_dir = get_stdlib_dir(
             output.prefix(),
             output.host_platform().platform,
@@ -94,7 +98,11 @@ pub fn python_vars(output: &Output) -> HashMap<String, Option<String>> {
             python_record
                 .and_then(|record| record.package_record.python_site_packages_path.as_deref()),
         );
-        let py3k = if py_ver[0] == "3" { "1" } else { "0" };
+        let py3k = if py_ver_str.starts_with("3.") {
+            "1"
+        } else {
+            "0"
+        };
         insert!(result, "PY3K", py3k);
         insert!(result, "PY_VER", py_ver_str);
         insert!(result, "STDLIB_DIR", stdlib_dir.to_string_lossy());
@@ -102,10 +110,7 @@ pub fn python_vars(output: &Output) -> HashMap<String, Option<String>> {
     }
 
     if let Some(npy_version) = output.variant().get(&"numpy".into()) {
-        let npy_ver = npy_version.to_string();
-        let npy_ver: Vec<_> = npy_ver.split('.').take(2).collect();
-        let npy_ver = npy_ver.join(".");
-        insert!(result, "NPY_VER", npy_ver);
+        insert!(result, "NPY_VER", major_minor(&npy_version.to_string()));
         insert!(result, "NPY_DISTUTILS_APPEND_FLAGS", "1");
     }
 
@@ -136,9 +141,7 @@ pub fn python_vars_from_records(
         .find(|r| r.package_record.name.as_normalized() == "python");
 
     if let Some(python_record) = python_record {
-        let py_ver = python_record.package_record.version.to_string();
-        let py_ver: Vec<_> = py_ver.split('.').take(2).collect();
-        let py_ver_str = py_ver.join(".");
+        let py_ver_str = major_minor(&python_record.package_record.version.to_string());
         let stdlib_dir = get_stdlib_dir(prefix, platform, &py_ver_str);
         let site_packages_dir = get_sitepackages_dir(
             prefix,
@@ -149,7 +152,11 @@ pub fn python_vars_from_records(
                 .python_site_packages_path
                 .as_deref(),
         );
-        let py3k = if py_ver[0] == "3" { "1" } else { "0" };
+        let py3k = if py_ver_str.starts_with("3.") {
+            "1"
+        } else {
+            "0"
+        };
         insert!(result, "PY3K", py3k);
         insert!(result, "PY_VER", py_ver_str);
         insert!(result, "STDLIB_DIR", stdlib_dir.to_string_lossy());
@@ -162,9 +169,7 @@ pub fn python_vars_from_records(
         .map(|r| r.package_record.version.to_string());
 
     if let Some(npy_ver) = numpy_version {
-        let npy_ver: Vec<_> = npy_ver.split('.').take(2).collect();
-        let npy_ver = npy_ver.join(".");
-        insert!(result, "NPY_VER", npy_ver);
+        insert!(result, "NPY_VER", major_minor(&npy_ver));
         insert!(result, "NPY_DISTUTILS_APPEND_FLAGS", "1");
     }
 
@@ -208,8 +213,7 @@ fn r_vars_for(
 ) -> HashMap<String, Option<String>> {
     let mut result = HashMap::new();
 
-    let r_ver: Vec<_> = r_version.split('.').take(2).collect();
-    insert!(result, "R_VER", r_ver.join("."));
+    insert!(result, "R_VER", major_minor(r_version));
 
     let r_bin = if platform.is_windows() {
         prefix.join("Scripts/R.exe")
@@ -603,6 +607,13 @@ mod test {
                 .map(Path::new),
             Some(prefix.join("lib/python3.13t/site-packages").as_path())
         );
+    }
+
+    #[test]
+    fn major_minor_keeps_two_components() {
+        assert_eq!(major_minor("3.13.1"), "3.13");
+        assert_eq!(major_minor("4.4"), "4.4");
+        assert_eq!(major_minor("2"), "2");
     }
 
     #[test]
