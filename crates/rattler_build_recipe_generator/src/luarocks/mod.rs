@@ -663,6 +663,8 @@ dependencies = { "lua >= 5.1" }"#;
         };
 
         let recipe = rockspec_to_recipe(&rockspec).unwrap();
+        // The rendered YAML is what users get; keep it under snapshot.
+        insta::assert_snapshot!("luasocket_rendered", recipe.to_string());
 
         assert_eq!(recipe.package.name, "lua-luasocket");
         assert_eq!(recipe.package.version, "${{ version }}");

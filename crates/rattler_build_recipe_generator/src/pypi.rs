@@ -1036,6 +1036,12 @@ mod tests {
         let recipe = create_recipe(&opts, &metadata, &client).await.unwrap();
 
         assert_yaml_snapshot!(recipe);
+        // The rendered YAML is what users get (flask's description ends in a
+        // blank line, which exercises the block scalar handling).
+        insta::assert_snapshot!(
+            "flask_noarch_rendered",
+            post_process_markers(recipe.to_string())
+        );
     }
 
     /// Helper: extract just the SPDX string from `extract_license`.
