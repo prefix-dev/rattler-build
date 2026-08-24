@@ -277,8 +277,9 @@ async fn fetch_package_tarball(client: &reqwest::Client, url: &Url) -> miette::R
 /// What the CRAN source tarball tells us beyond the R-universe metadata.
 #[derive(Debug, Default)]
 struct CranTarball {
-    /// SHA256 of the tarball CRAN currently serves.
-    sha256: String,
+    /// SHA256 of the downloaded tarball; only recorded when it came from the
+    /// host the recipe's source URLs reference (the CRAN mirror).
+    sha256: Option<String>,
     /// The package's `DESCRIPTION` file (`<package>/DESCRIPTION`).
     description: Option<String>,
     /// Whether the package ships the testthat runner, `tests/testthat.R`.
@@ -294,7 +295,7 @@ impl CranTarball {
                 .flatten()
         };
         Self {
-            sha256: hex::encode(compute_bytes_digest::<Sha256>(bytes)),
+            sha256: Some(hex::encode(compute_bytes_digest::<Sha256>(bytes))),
             description: file("DESCRIPTION"),
             has_testthat_runner: file("tests/testthat.R").is_some(),
         }
@@ -464,6 +465,16 @@ async fn fetch_package_info(
         .into_diagnostic()
 }
 
+/// Where `universe` serves the tarball named `file`. CRAN hosts its own
+/// files; every other universe serves them through r-universe.dev.
+fn tarball_url(universe: &str, file: &str) -> String {
+    if universe == "cran" {
+        format!("{CRAN_MIRROR}/src/contrib/{file}")
+    } else {
+        format!("https://{universe}.r-universe.dev/src/contrib/{file}")
+    }
+}
+
 /// Fetch the metadata of `package` and, best-effort, its tarball.
 async fn fetch_package(
     client: &reqwest::Client,
@@ -473,10 +484,22 @@ async fn fetch_package(
     tracing::info!("Generating R recipe for {}", package);
     let info = fetch_package_info(client, package, universe).await?;
 
-    let url = Url::parse(&format!("{CRAN_MIRROR}/src/contrib/{}", info._file))
-        .expect("Failed to parse URL");
+    let url = Url::parse(&tarball_url(universe, &info._file)).expect("Failed to parse URL");
     let tarball = match fetch_package_tarball(client, &url).await {
-        Ok(bytes) => Some(CranTarball::parse(&bytes)),
+        Ok(bytes) => {
+            let mut tarball = CranTarball::parse(&bytes);
+            if universe != "cran" {
+                // The recipe's source URLs point at the CRAN mirror, and
+                // r-universe rebuilds tarballs, so this hash would not match
+                // what the recipe downloads.
+                tarball.sha256 = None;
+                tracing::warn!(
+                    "The package comes from the {universe} universe: the recipe's source URLs \
+                     and checksum need manual attention."
+                );
+            }
+            Some(tarball)
+        }
         Err(e) => {
             tracing::warn!(
                 "Failed to fetch {}: {} — the recipe will not contain a checksum; add the sha256 by hand.",
@@ -530,7 +553,7 @@ fn package_info_to_recipe(
                     info.Package
                 ),
             ],
-            sha256: tarball.map(|tarball| tarball.sha256.clone()),
+            sha256: tarball.and_then(|tarball| tarball.sha256.clone()),
             md5: None,
         }
         .into(),
@@ -801,7 +824,9 @@ mod tests {
     fn tinkr_noarch_with_testthat() {
         let info = fixture("tinkr");
         let tarball = CranTarball {
-            sha256: "425bc04af76483b8cf713ad141bdebb963cf54dd363fbdbee3a709820ec4d23e".to_string(),
+            sha256: Some(
+                "425bc04af76483b8cf713ad141bdebb963cf54dd363fbdbee3a709820ec4d23e".to_string(),
+            ),
             has_testthat_runner: true,
             ..Default::default()
         };
@@ -902,6 +927,18 @@ mod tests {
         let description =
             "Package: tinkr\nTitle: Cast '(R)Markdown' Files\n    to 'XML'  \n\nLicense: GPL-3\n";
         insta::assert_snapshot!(append_description_comment(recipe, description));
+    }
+
+    #[test]
+    fn tarballs_come_from_the_requested_universe() {
+        assert_eq!(
+            tarball_url("cran", "tinkr_0.3.1.tar.gz"),
+            "https://cran.r-project.org/src/contrib/tinkr_0.3.1.tar.gz"
+        );
+        assert_eq!(
+            tarball_url("bioconductor", "Biobase_2.62.0.tar.gz"),
+            "https://bioconductor.r-universe.dev/src/contrib/Biobase_2.62.0.tar.gz"
+        );
     }
 
     #[test]
