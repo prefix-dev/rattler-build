@@ -27,19 +27,37 @@ pub async fn download(
 /// a stray byte must not make the whole file unavailable.
 pub fn find_file(
     tarball: &[u8],
-    mut wanted: impl FnMut(&Path) -> bool,
+    wanted: impl FnMut(&Path) -> bool,
 ) -> miette::Result<Option<String>> {
+    Ok(find_files(tarball, wanted, 1)?
+        .pop()
+        .map(|(_, contents)| contents))
+}
+
+/// The paths and contents of the files matching `wanted`, collected in a
+/// single decompression pass that stops once `limit` files have been found.
+/// See [`find_file`] for the lossy read semantics.
+pub fn find_files(
+    tarball: &[u8],
+    mut wanted: impl FnMut(&Path) -> bool,
+    limit: usize,
+) -> miette::Result<Vec<(std::path::PathBuf, String)>> {
     let tar = flate2::read::GzDecoder::new(tarball);
     let mut archive = tar::Archive::new(tar);
+    let mut found = Vec::new();
     for entry in archive.entries().into_diagnostic()? {
+        if found.len() >= limit {
+            break;
+        }
         let mut entry = entry.into_diagnostic()?;
-        if wanted(&entry.path().into_diagnostic()?) {
+        let path = entry.path().into_diagnostic()?.into_owned();
+        if wanted(&path) {
             let mut contents = Vec::new();
             entry.read_to_end(&mut contents).into_diagnostic()?;
-            return Ok(Some(String::from_utf8_lossy(&contents).into_owned()));
+            found.push((path, String::from_utf8_lossy(&contents).into_owned()));
         }
     }
-    Ok(None)
+    Ok(found)
 }
 
 /// Whether `path` is `<top-level directory>/<relative>`. Source tarballs

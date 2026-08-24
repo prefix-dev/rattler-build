@@ -274,16 +274,27 @@ struct CranTarball {
 
 impl CranTarball {
     fn parse(bytes: &[u8]) -> Self {
-        let file = |relative: &str| {
-            tarball::find_file(bytes, |path| tarball::is_in_top_level_dir(path, relative))
-                .inspect_err(|e| tracing::warn!("Failed to read {relative} from the tarball: {e}"))
-                .ok()
-                .flatten()
+        // One decompression pass for everything the tarball can tell us.
+        let mut files = tarball::find_files(
+            bytes,
+            |path| {
+                tarball::is_in_top_level_dir(path, "DESCRIPTION")
+                    || tarball::is_in_top_level_dir(path, "tests/testthat.R")
+            },
+            2,
+        )
+        .inspect_err(|e| tracing::warn!("Failed to read the tarball: {e}"))
+        .unwrap_or_default();
+        let mut take = |relative: &str| {
+            files
+                .iter()
+                .position(|(path, _)| tarball::is_in_top_level_dir(path, relative))
+                .map(|index| files.remove(index).1)
         };
         Self {
             sha256: Some(hex::encode(compute_bytes_digest::<Sha256>(bytes))),
-            description: file("DESCRIPTION"),
-            has_testthat_runner: file("tests/testthat.R").is_some(),
+            description: take("DESCRIPTION"),
+            has_testthat_runner: take("tests/testthat.R").is_some(),
         }
     }
 }
