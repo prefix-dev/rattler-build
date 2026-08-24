@@ -497,8 +497,9 @@ noted, no variables are inherited from the shell environment in which you invoke
 
 `R`
 
-: The path to the R executable in the host prefix. Set when `r_base` is part
-  of the variant configuration or `r-base` is resolved in the host environment.
+: The path to the R executable in the host prefix, for use in the build
+  script. Set when `r_base` is part of the variant configuration or `r-base` is
+  resolved in the host environment. Test environments do not define it.
 
 `R_VER`
 
