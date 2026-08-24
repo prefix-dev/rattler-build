@@ -299,7 +299,7 @@ struct FetchedPackage {
 /// Append the package's DESCRIPTION file to the rendered recipe as a comment
 /// block, in the format `conda skeleton cran` used, so that reviewers can check
 /// the recipe against the upstream metadata without opening the tarball.
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg_attr(target_arch = "wasm32", allow(dead_code))]
 fn append_description_comment(recipe: &str, description: &str) -> String {
     let mut out = recipe.trim_end_matches('\n').to_string();
     out.push_str("\n\n# The original CRAN metadata for this package was:\n\n");
@@ -373,12 +373,12 @@ fn cran_mirror_context() -> String {
 
 /// Placeholder maintainer when none is given on the command line (the same
 /// convention grayskull uses).
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg_attr(target_arch = "wasm32", allow(dead_code))]
 const DEFAULT_MAINTAINER: &str = "AddYourGitHubIdHere";
 
 /// The maintainers to list for a recipe generated from the command line:
 /// the ones given, or a placeholder reminding the author to fill them in.
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg_attr(target_arch = "wasm32", allow(dead_code))]
 fn cli_maintainers(given: &[String]) -> Vec<String> {
     if given.is_empty() {
         vec![DEFAULT_MAINTAINER.to_string()]
