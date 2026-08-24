@@ -602,7 +602,14 @@ fn package_info_to_recipe(
     for dep in info._dependencies.iter() {
         if dep.package == "R" {
             if let Some(ver) = &dep.version {
-                recipe.build.skip = r_dep_version_to_skip(ver);
+                // Keep the first constraint that translates into a skip: a
+                // later entry (e.g. an upper bound) has none, and must not
+                // clear the minimum-R condition.
+                recipe.build.skip = recipe
+                    .build
+                    .skip
+                    .take()
+                    .or_else(|| r_dep_version_to_skip(ver));
             }
             continue;
         }
@@ -879,6 +886,23 @@ mod tests {
         );
         assert!(deps.is_empty(), "gmp only depends on base R packages");
         insta::assert_snapshot!(format_cran_recipe_with_suggests(&recipe));
+    }
+
+    /// Only the minimum-R constraint maps to a skip; a second `R` entry must
+    /// not clear it.
+    #[test]
+    fn a_later_r_constraint_does_not_clear_the_skip() {
+        let mut info = fixture("tinkr");
+        info._dependencies.push(Dependency {
+            package: "R".to_string(),
+            version: Some("<= 4.5".to_string()),
+            role: "Depends".to_string(),
+        });
+        let (recipe, _) = package_info_to_recipe(&info, None, &[]);
+        assert_eq!(
+            recipe.build.skip.as_deref(),
+            Some("match(r_base, \"<4.1\")")
+        );
     }
 
     /// R-universe reports an unusable `_devurl` for some packages; the CRAN
