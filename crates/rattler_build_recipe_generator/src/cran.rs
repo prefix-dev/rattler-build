@@ -263,8 +263,9 @@ fn format_r_package(package: &str, version: Option<&String>) -> String {
 /// What the CRAN source tarball tells us beyond the R-universe metadata.
 #[derive(Debug, Default)]
 struct CranTarball {
-    /// SHA256 of the downloaded tarball; only recorded when it came from the
-    /// host the recipe's source URLs reference (the CRAN mirror).
+    /// SHA256 of the downloaded tarball; only recorded when the archive could
+    /// be read and came from the host the recipe's source URLs reference (the
+    /// CRAN mirror).
     sha256: Option<String>,
     /// The package's `DESCRIPTION` file (`<package>/DESCRIPTION`).
     description: Option<String>,
@@ -273,8 +274,10 @@ struct CranTarball {
 }
 
 impl CranTarball {
-    fn parse(bytes: &[u8]) -> Self {
-        // One decompression pass for everything the tarball can tell us.
+    fn parse(bytes: &[u8]) -> miette::Result<Self> {
+        // One decompression pass for everything the tarball can tell us. A
+        // failure here means the bytes are not a source archive at all, so
+        // nothing about them — the checksum included — can be trusted.
         let mut files = tarball::find_files(
             bytes,
             |path| {
@@ -282,20 +285,18 @@ impl CranTarball {
                     || tarball::is_in_top_level_dir(path, "tests/testthat.R")
             },
             2,
-        )
-        .inspect_err(|e| tracing::warn!("Failed to read the tarball: {e}"))
-        .unwrap_or_default();
+        )?;
         let mut take = |relative: &str| {
             files
                 .iter()
                 .position(|(path, _)| tarball::is_in_top_level_dir(path, relative))
                 .map(|index| files.remove(index).1)
         };
-        Self {
+        Ok(Self {
             sha256: Some(hex::encode(compute_bytes_digest::<Sha256>(bytes))),
             description: take("DESCRIPTION"),
             has_testthat_runner: take("tests/testthat.R").is_some(),
-        }
+        })
     }
 }
 
@@ -483,20 +484,29 @@ async fn fetch_package(
     let info = fetch_package_info(client, package, universe).await?;
 
     let tarball = match tarball::download(client, tarball_url(universe, &info._file)).await {
-        Ok(bytes) => {
-            let mut tarball = CranTarball::parse(&bytes);
-            if universe != "cran" {
-                // The recipe's source URLs point at the CRAN mirror, and
-                // r-universe rebuilds tarballs, so this hash would not match
-                // what the recipe downloads.
-                tarball.sha256 = None;
-                tracing::warn!(
-                    "The package comes from the {universe} universe: the recipe's source URLs \
-                     and checksum need manual attention."
-                );
+        Ok(bytes) => match CranTarball::parse(&bytes) {
+            Ok(mut tarball) => {
+                if universe != "cran" {
+                    // The recipe's source URLs point at the CRAN mirror, and
+                    // r-universe rebuilds tarballs, so this hash would not
+                    // match what the recipe downloads.
+                    tarball.sha256 = None;
+                    tracing::warn!(
+                        "The package comes from the {universe} universe: the recipe's source \
+                         URLs and checksum need manual attention."
+                    );
+                }
+                Some(tarball)
             }
-            Some(tarball)
-        }
+            Err(e) => {
+                tracing::warn!(
+                    "{} is not a readable source archive: {} — the recipe will not contain a checksum; add the sha256 by hand.",
+                    info._file,
+                    e
+                );
+                None
+            }
+        },
         Err(e) => {
             tracing::warn!(
                 "Failed to fetch {}: {} — the recipe will not contain a checksum; add the sha256 by hand.",
