@@ -51,13 +51,13 @@ The `R` recipe generation supports some additional flags:
 - `-u/--universe` select an R universe to use (e.g. `bioconductor`)
 - `-t/--tree` generate multiple recipes, for every dependency as well
 - `-m/--maintainer` GitHub handle to list under `extra.recipe-maintainers`; can be given multiple times (e.g. `-m conda-forge/r -m your-handle`). A placeholder is used otherwise.
-- `--staged-recipes` append the package's `DESCRIPTION` file as a comment block at the end of the recipe; the conda-forge R team asks for this on `staged-recipes` submissions so they can review the recipe against the upstream metadata.
+- `--staged-recipes` shape the recipe for a conda-forge [staged-recipes](https://github.com/conda-forge/staged-recipes) submission: download through conda-forge's `cran_mirror` variant, and append the package's `DESCRIPTION` file as a comment block at the end of the recipe, which the conda-forge R team asks for so they can review the recipe against the upstream metadata. Such a recipe needs a variant config that defines `cran_mirror` — conda-forge's pinning does, a plain `rattler-build build` does not.
 
 R packages will be prefixed with `r-` to avoid name conflicts with Python packages. The generated recipe follows the conventions of conda-forge's R recipes:
 
-- The version lives in `context`, and the source URLs use `${{ cran_mirror }}`, which is defined in `context` to default to CRAN while honouring a `cran_mirror` variant (such as conda-forge's pinning); CRAN's `Archive/` directory is listed as a fallback for superseded versions.
+- The version lives in `context`, and the source URLs are built from it. They point at `https://cloud.r-project.org` — the mirror conda-forge pins `cran_mirror` to — with CRAN's `Archive/` directory listed as a fallback for superseded versions. `rattler-build` itself defines no `cran_mirror`, so the mirror is named in the recipe unless `--staged-recipes` is given.
 - When the package declares a minimum R version (e.g. `Depends: R (>= 4.1.0)`), the generator emits a `skip` condition using the `r_base` variant key rather than pinning `r-base` to a version. Such a recipe needs an `r_base` variant to build (conda-forge provides one); without it the `skip` condition evaluates to true and the output is skipped.
-- Pure-R packages are `noarch: generic` and built with `${{ R }} CMD INSTALL --build .`. Packages with compiled code get compilers, `cross-r-base` for cross-compilation, `rpaths`, and a platform-conditional build script that passes `${R_ARGS}` (Unix) or `%R_ARGS%` (Windows) through to `R CMD INSTALL`.
+- Pure-R packages are `noarch: generic` and built with `"${{ R }}" CMD INSTALL --build .`. Packages with compiled code get compilers, `cross-r-base` for cross-compilation, `rpaths`, and a platform-conditional build script that passes `${R_ARGS}` (Unix) or `%R_ARGS%` (Windows) through to `R CMD INSTALL`.
 - Packages listed under `Suggests` are added as comments to the `run` requirements. If the package ships a testthat runner (`tests/testthat.R`), a test that runs it is generated next to the `r:` test that loads the library.
 
 The generated recipe for `dplyr` will look something like:
