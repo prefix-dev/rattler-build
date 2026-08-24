@@ -28,6 +28,11 @@ fn major_minor(version: &str) -> String {
     version.split('.').take(2).collect::<Vec<_>>().join(".")
 }
 
+/// Whether a `major` or `major.minor` Python version is Python 3.
+fn is_python_3(major_minor: &str) -> bool {
+    major_minor == "3" || major_minor.starts_with("3.")
+}
+
 fn get_stdlib_dir(prefix: &Path, platform: Platform, py_ver: &str) -> PathBuf {
     if platform.is_windows() {
         prefix.join("Lib")
@@ -98,11 +103,7 @@ pub fn python_vars(output: &Output) -> HashMap<String, Option<String>> {
             python_record
                 .and_then(|record| record.package_record.python_site_packages_path.as_deref()),
         );
-        let py3k = if py_ver_str.starts_with("3.") {
-            "1"
-        } else {
-            "0"
-        };
+        let py3k = if is_python_3(&py_ver_str) { "1" } else { "0" };
         insert!(result, "PY3K", py3k);
         insert!(result, "PY_VER", py_ver_str);
         insert!(result, "STDLIB_DIR", stdlib_dir.to_string_lossy());
@@ -152,11 +153,7 @@ pub fn python_vars_from_records(
                 .python_site_packages_path
                 .as_deref(),
         );
-        let py3k = if py_ver_str.starts_with("3.") {
-            "1"
-        } else {
-            "0"
-        };
+        let py3k = if is_python_3(&py_ver_str) { "1" } else { "0" };
         insert!(result, "PY3K", py3k);
         insert!(result, "PY_VER", py_ver_str);
         insert!(result, "STDLIB_DIR", stdlib_dir.to_string_lossy());
@@ -614,6 +611,16 @@ mod test {
         assert_eq!(major_minor("3.13.1"), "3.13");
         assert_eq!(major_minor("4.4"), "4.4");
         assert_eq!(major_minor("2"), "2");
+    }
+
+    /// A variant may pin only the major version (`python: "3"`).
+    #[test]
+    fn python_3_is_detected_with_and_without_a_minor_version() {
+        assert!(is_python_3("3"));
+        assert!(is_python_3("3.13"));
+        assert!(!is_python_3("2"));
+        assert!(!is_python_3("2.7"));
+        assert!(!is_python_3("30"));
     }
 
     #[test]
