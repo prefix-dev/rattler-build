@@ -464,14 +464,36 @@ async fn fetch_package_info(
         .into_diagnostic()
 }
 
-/// Where `universe` serves the tarball named `file`. CRAN hosts its own
-/// files; every other universe serves them through r-universe.dev.
-fn tarball_url(universe: &str, file: &str) -> String {
+/// The URLs that may serve the tarball named `file`, in the order to try.
+/// CRAN hosts its own files and moves superseded versions into the archive —
+/// the same two locations the generated recipe lists as its sources. Every
+/// other universe serves them through r-universe.dev.
+fn tarball_urls(universe: &str, package: &str, file: &str) -> Vec<String> {
     if universe == "cran" {
-        format!("{CRAN_MIRROR}/src/contrib/{file}")
+        vec![
+            format!("{CRAN_MIRROR}/src/contrib/{file}"),
+            format!("{CRAN_MIRROR}/src/contrib/Archive/{package}/{file}"),
+        ]
     } else {
-        format!("https://{universe}.r-universe.dev/src/contrib/{file}")
+        vec![format!(
+            "https://{universe}.r-universe.dev/src/contrib/{file}"
+        )]
     }
+}
+
+/// Read the package's source tarball from the first of `urls` that serves a
+/// readable archive.
+async fn fetch_tarball(client: &reqwest::Client, urls: &[String]) -> Option<CranTarball> {
+    for url in urls {
+        match tarball::download(client, url.as_str()).await {
+            Ok(bytes) => match CranTarball::parse(&bytes) {
+                Ok(tarball) => return Some(tarball),
+                Err(e) => tracing::warn!("{url} is not a readable source archive: {e}"),
+            },
+            Err(e) => tracing::debug!("Could not download {url}: {e}"),
+        }
+    }
+    None
 }
 
 /// Fetch the metadata of `package` and, best-effort, its tarball.
@@ -483,39 +505,26 @@ async fn fetch_package(
     tracing::info!("Generating R recipe for {}", package);
     let info = fetch_package_info(client, package, universe).await?;
 
-    let tarball = match tarball::download(client, tarball_url(universe, &info._file)).await {
-        Ok(bytes) => match CranTarball::parse(&bytes) {
-            Ok(mut tarball) => {
-                if universe != "cran" {
-                    // The recipe's source URLs point at the CRAN mirror, and
-                    // r-universe rebuilds tarballs, so this hash would not
-                    // match what the recipe downloads.
-                    tarball.sha256 = None;
-                    tracing::warn!(
-                        "The package comes from the {universe} universe: the recipe's source \
-                         URLs and checksum need manual attention."
-                    );
-                }
-                Some(tarball)
-            }
-            Err(e) => {
-                tracing::warn!(
-                    "{} is not a readable source archive: {} — the recipe will not contain a checksum; add the sha256 by hand.",
-                    info._file,
-                    e
-                );
-                None
-            }
-        },
-        Err(e) => {
+    let urls = tarball_urls(universe, &info.Package, &info._file);
+    let mut tarball = fetch_tarball(client, &urls).await;
+    match tarball.as_mut() {
+        None => tracing::warn!(
+            "Could not read {} from {} — the recipe will not contain a checksum; add the sha256 by hand.",
+            info._file,
+            urls.join(" or ")
+        ),
+        // The recipe's source URLs point at the CRAN mirror, and r-universe
+        // rebuilds tarballs, so its hash would not match what the recipe
+        // downloads.
+        Some(tarball) if universe != "cran" => {
+            tarball.sha256 = None;
             tracing::warn!(
-                "Failed to fetch {}: {} — the recipe will not contain a checksum; add the sha256 by hand.",
-                info._file,
-                e
+                "The package comes from the {universe} universe: the recipe's source URLs and \
+                 checksum need manual attention."
             );
-            None
         }
-    };
+        Some(_) => {}
+    }
 
     Ok(FetchedPackage { info, tarball })
 }
@@ -949,12 +958,15 @@ mod tests {
     #[test]
     fn tarballs_come_from_the_requested_universe() {
         assert_eq!(
-            tarball_url("cran", "tinkr_0.3.1.tar.gz"),
-            "https://cran.r-project.org/src/contrib/tinkr_0.3.1.tar.gz"
+            tarball_urls("cran", "tinkr", "tinkr_0.3.1.tar.gz"),
+            [
+                "https://cran.r-project.org/src/contrib/tinkr_0.3.1.tar.gz",
+                "https://cran.r-project.org/src/contrib/Archive/tinkr/tinkr_0.3.1.tar.gz",
+            ]
         );
         assert_eq!(
-            tarball_url("bioconductor", "Biobase_2.62.0.tar.gz"),
-            "https://bioconductor.r-universe.dev/src/contrib/Biobase_2.62.0.tar.gz"
+            tarball_urls("bioconductor", "Biobase", "Biobase_2.62.0.tar.gz"),
+            ["https://bioconductor.r-universe.dev/src/contrib/Biobase_2.62.0.tar.gz"]
         );
     }
 
