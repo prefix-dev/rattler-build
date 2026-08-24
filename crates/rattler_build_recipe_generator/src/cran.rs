@@ -281,15 +281,15 @@ impl CranTarball {
         let mut files = tarball::find_files(
             bytes,
             |path| {
-                tarball::is_in_top_level_dir(path, "DESCRIPTION")
-                    || tarball::is_in_top_level_dir(path, "tests/testthat.R")
+                tarball::is_archive_file(path, "DESCRIPTION")
+                    || tarball::is_archive_file(path, "tests/testthat.R")
             },
             2,
         )?;
         let mut take = |relative: &str| {
             files
                 .iter()
-                .position(|(path, _)| tarball::is_in_top_level_dir(path, relative))
+                .position(|(path, _)| tarball::is_archive_file(path, relative))
                 .map(|index| files.remove(index).1)
         };
         Ok(Self {

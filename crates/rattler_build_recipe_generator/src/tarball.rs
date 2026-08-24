@@ -60,14 +60,20 @@ pub fn find_files(
     Ok(found)
 }
 
-/// Whether `path` is `<top-level directory>/<relative>`. Source tarballs
-/// unpack into a single directory (named after the package), and a leading
-/// `./` is ignored.
-pub fn is_in_top_level_dir(path: &Path, relative: &str) -> bool {
-    let mut components = path
+/// Whether `path` is `<relative>`, either at the archive root or directly
+/// inside the single top-level directory that source archives usually unpack
+/// into. Anything nested deeper (a vendored or test copy) does not match, and
+/// a leading `./` is ignored.
+pub fn is_archive_file(path: &Path, relative: &str) -> bool {
+    let components: Vec<_> = path
         .components()
-        .filter(|component| matches!(component, Component::Normal(_)));
-    components.next().is_some() && components.eq(Path::new(relative).components())
+        .filter(|component| matches!(component, Component::Normal(_)))
+        .collect();
+    let wanted: Vec<_> = Path::new(relative).components().collect();
+    match components.len().checked_sub(wanted.len()) {
+        Some(leading @ (0 | 1)) => components[leading..] == wanted[..],
+        _ => false,
+    }
 }
 
 #[cfg(test)]
@@ -97,11 +103,10 @@ pub(crate) mod tests {
             ("pkg/inst/extdata/DESCRIPTION", "Package: not-this-one\n"),
             ("pkg/DESCRIPTION", "Package: pkg\n"),
         ]);
-        let description =
-            find_file(&tarball, |path| is_in_top_level_dir(path, "DESCRIPTION")).unwrap();
+        let description = find_file(&tarball, |path| is_archive_file(path, "DESCRIPTION")).unwrap();
         assert_eq!(description.as_deref(), Some("Package: pkg\n"));
 
-        let missing = find_file(&tarball, |path| is_in_top_level_dir(path, "NEWS")).unwrap();
+        let missing = find_file(&tarball, |path| is_archive_file(path, "NEWS")).unwrap();
         assert_eq!(missing, None);
     }
 
@@ -120,28 +125,32 @@ pub(crate) mod tests {
             .unwrap();
         let tarball = builder.into_inner().unwrap().finish().unwrap();
 
-        let description =
-            find_file(&tarball, |path| is_in_top_level_dir(path, "DESCRIPTION")).unwrap();
+        let description = find_file(&tarball, |path| is_archive_file(path, "DESCRIPTION")).unwrap();
         assert_eq!(description.as_deref(), Some("Author: Ga\u{FFFD}l\n"));
     }
 
     #[test]
-    fn top_level_dir_matching() {
-        assert!(is_in_top_level_dir(
-            Path::new("pkg/DESCRIPTION"),
-            "DESCRIPTION"
-        ));
-        assert!(is_in_top_level_dir(
+    fn archive_file_matching() {
+        // Inside the usual top-level directory, and at the archive root.
+        assert!(is_archive_file(Path::new("pkg/DESCRIPTION"), "DESCRIPTION"));
+        assert!(is_archive_file(Path::new("DESCRIPTION"), "DESCRIPTION"));
+        assert!(is_archive_file(
             Path::new("./pkg/tests/testthat.R"),
             "tests/testthat.R"
         ));
-        assert!(!is_in_top_level_dir(
+        assert!(is_archive_file(
+            Path::new("tests/testthat.R"),
+            "tests/testthat.R"
+        ));
+        // Nested deeper: a vendored or test copy.
+        assert!(!is_archive_file(
             Path::new("pkg/inst/DESCRIPTION"),
             "DESCRIPTION"
         ));
-        assert!(!is_in_top_level_dir(
-            Path::new("DESCRIPTION"),
-            "DESCRIPTION"
+        assert!(!is_archive_file(
+            Path::new("pkg/docs/tests/testthat.R"),
+            "tests/testthat.R"
         ));
+        assert!(!is_archive_file(Path::new("pkg/NEWS"), "DESCRIPTION"));
     }
 }
