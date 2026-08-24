@@ -426,8 +426,15 @@ fn r_dep_version_to_skip(version: &str) -> Option<String> {
 fn format_cran_recipe_with_suggests(recipe: &serialize::Recipe) -> String {
     let recipe_str = format!("{}", recipe);
     let mut final_recipe = String::new();
+    // Top-level keys sit at column zero and block-scalar bodies never do, so
+    // tracking the current section tells requirement entries apart from
+    // look-alike text in e.g. the description.
+    let mut in_requirements = false;
     for line in recipe_str.lines() {
-        if let Some(spec) = line.trim_start().strip_prefix("- SUGGEST ") {
+        if line.chars().next().is_some_and(|first| first != ' ') {
+            in_requirements = line.starts_with("requirements:");
+        }
+        if in_requirements && let Some(spec) = line.trim_start().strip_prefix("- SUGGEST ") {
             // Suggested dependencies are kept as comments so that packagers
             // can promote the ones their tests actually need.
             let indent = &line[..line.len() - line.trim_start().len()];
@@ -833,17 +840,19 @@ mod tests {
         }
     }
 
-    /// The SUGGEST marker must only be recognised as a list item, not inside
-    /// free text such as the description.
+    /// The SUGGEST marker must only be recognised inside the requirements
+    /// section, not in free text such as the description — not even when a
+    /// description line has the exact shape of a suggested-dependency entry.
     #[test]
     fn only_suggested_dependency_lines_are_commented_out() {
         let mut info = fixture("tinkr");
-        info.Description = "Does things as SUGGESTED by the SUGGEST list.".to_string();
+        info.Description =
+            "Does things as SUGGESTED by:\n- SUGGEST mode for reviewers\n- other modes".to_string();
         let (recipe, _) = package_info_to_recipe(&info, None, &[]);
         let yaml = format_cran_recipe_with_suggests(&recipe);
         assert!(
-            yaml.contains("  description: Does things as SUGGESTED by the SUGGEST list.\n"),
-            "{yaml}"
+            yaml.contains("    - SUGGEST mode for reviewers\n"),
+            "description bullet must stay untouched: {yaml}"
         );
         assert!(yaml.contains("    # - r-knitr  # suggested\n"), "{yaml}");
     }
