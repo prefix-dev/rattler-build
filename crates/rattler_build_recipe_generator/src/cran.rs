@@ -685,10 +685,14 @@ fn package_info_to_recipe(
     let (license, license_files) = map_license(&info.License);
     recipe.about.license = license;
     recipe.about.license_file = license_files;
+    // `_devurl` is the development repository R-universe detected, if any;
+    // `_upstream` is the CRAN mirror on GitHub and is always usable.
     recipe.about.repository = Some(
         info._devurl
-            .clone()
-            .unwrap_or_else(|| info._upstream.clone()),
+            .as_deref()
+            .filter(|url| Url::parse(url).is_ok())
+            .unwrap_or(&info._upstream)
+            .to_string(),
     );
     if let Some(docs) = info._pkgdown.as_ref().or(info._pkgdocs.as_ref())
         && Url::parse(docs).is_ok()
@@ -875,6 +879,28 @@ mod tests {
         );
         assert!(deps.is_empty(), "gmp only depends on base R packages");
         insta::assert_snapshot!(format_cran_recipe_with_suggests(&recipe));
+    }
+
+    /// R-universe reports an unusable `_devurl` for some packages; the CRAN
+    /// mirror in `_upstream` is always there to fall back on.
+    #[test]
+    fn repository_falls_back_to_upstream_for_an_unusable_devurl() {
+        let mut info = fixture("tinkr");
+        for devurl in [None, Some(String::new()), Some("not a url".to_string())] {
+            info._devurl = devurl.clone();
+            let (recipe, _) = package_info_to_recipe(&info, None, &[]);
+            assert_eq!(
+                recipe.about.repository.as_deref(),
+                Some(info._upstream.as_str()),
+                "{devurl:?}"
+            );
+        }
+        info._devurl = Some("https://github.com/ropensci/tinkr".to_string());
+        let (recipe, _) = package_info_to_recipe(&info, None, &[]);
+        assert_eq!(
+            recipe.about.repository.as_deref(),
+            Some("https://github.com/ropensci/tinkr")
+        );
     }
 
     /// CRAN's `URL:` field may separate several URLs with commas, spaces or
