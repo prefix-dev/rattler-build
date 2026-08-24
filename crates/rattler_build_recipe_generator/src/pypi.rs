@@ -857,6 +857,7 @@ pub async fn create_recipe(
             .push(format!("python {}", python_req).into());
     } else {
         recipe.requirements.host.push("python".into());
+        recipe.requirements.run.push("python".into());
     }
 
     let mapping = if opts.use_mapping {
