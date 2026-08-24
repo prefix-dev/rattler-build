@@ -23,6 +23,8 @@ pub async fn download(
 
 /// Return the contents of the first file in the `.tar.gz` `tarball` whose
 /// archive path satisfies `wanted`, or `None` when there is no such file.
+/// Contents are read lossily: R for example allows latin1-encoded files, and
+/// a stray byte must not make the whole file unavailable.
 pub fn find_file(
     tarball: &[u8],
     mut wanted: impl FnMut(&Path) -> bool,
@@ -32,9 +34,9 @@ pub fn find_file(
     for entry in archive.entries().into_diagnostic()? {
         let mut entry = entry.into_diagnostic()?;
         if wanted(&entry.path().into_diagnostic()?) {
-            let mut contents = String::new();
-            entry.read_to_string(&mut contents).into_diagnostic()?;
-            return Ok(Some(contents));
+            let mut contents = Vec::new();
+            entry.read_to_end(&mut contents).into_diagnostic()?;
+            return Ok(Some(String::from_utf8_lossy(&contents).into_owned()));
         }
     }
     Ok(None)
@@ -83,6 +85,26 @@ pub(crate) mod tests {
 
         let missing = find_file(&tarball, |path| is_in_top_level_dir(path, "NEWS")).unwrap();
         assert_eq!(missing, None);
+    }
+
+    /// R permits e.g. `Encoding: latin1` DESCRIPTION files.
+    #[test]
+    fn non_utf8_contents_are_read_lossily() {
+        let encoder = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
+        let mut builder = tar::Builder::new(encoder);
+        let contents = b"Author: Ga\xEBl\n"; // latin1 e-diaeresis
+        let mut header = tar::Header::new_gnu();
+        header.set_size(contents.len() as u64);
+        header.set_mode(0o644);
+        header.set_cksum();
+        builder
+            .append_data(&mut header, "pkg/DESCRIPTION", &contents[..])
+            .unwrap();
+        let tarball = builder.into_inner().unwrap().finish().unwrap();
+
+        let description =
+            find_file(&tarball, |path| is_in_top_level_dir(path, "DESCRIPTION")).unwrap();
+        assert_eq!(description.as_deref(), Some("Author: Ga\u{FFFD}l\n"));
     }
 
     #[test]
