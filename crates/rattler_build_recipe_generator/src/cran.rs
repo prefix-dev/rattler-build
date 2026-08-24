@@ -406,31 +406,6 @@ fn r_dep_version_to_skip(version: &str) -> Option<String> {
     }
 }
 
-/// Render the recipe, turning the `SUGGEST <spec>` entries of `run` into
-/// comments (YAML comments cannot be expressed in the recipe model).
-fn format_cran_recipe_with_suggests(recipe: &serialize::Recipe) -> String {
-    let recipe_str = format!("{}", recipe);
-    let mut final_recipe = String::new();
-    // Top-level keys sit at column zero and block-scalar bodies never do, so
-    // tracking the current section tells requirement entries apart from
-    // look-alike text in e.g. the description.
-    let mut in_requirements = false;
-    for line in recipe_str.lines() {
-        if line.chars().next().is_some_and(|first| first != ' ') {
-            in_requirements = line.starts_with("requirements:");
-        }
-        if in_requirements && let Some(spec) = line.trim_start().strip_prefix("- SUGGEST ") {
-            // Suggested dependencies are kept as comments so that packagers
-            // can promote the ones their tests actually need.
-            let indent = &line[..line.len() - line.trim_start().len()];
-            final_recipe.push_str(&format!("{indent}# - {spec}  # suggested\n"));
-        } else {
-            final_recipe.push_str(&format!("{}\n", line));
-        }
-    }
-    final_recipe
-}
-
 /// Fetch the metadata of `package` from the R-universe API of `universe`.
 async fn fetch_package_info(
     client: &reqwest::Client,
@@ -581,6 +556,7 @@ fn package_info_to_recipe(
     let r_base = "r-base".to_string();
     let mut host = Vec::new();
     let mut run = Vec::new();
+    let mut suggested = Vec::new();
     // The testthat test dependency keeps whatever constraint upstream declares
     // in its Suggests entry.
     let mut testthat_requirement = "r-testthat".to_string();
@@ -620,10 +596,7 @@ fn package_info_to_recipe(
             if dep.package == "testthat" {
                 testthat_requirement = format_r_package(&dep.package, dep.version.as_ref());
             }
-            run.push(format!(
-                "SUGGEST {}",
-                format_r_package(&dep.package, dep.version.as_ref())
-            ));
+            suggested.push(format_r_package(&dep.package, dep.version.as_ref()));
         }
     }
 
@@ -636,6 +609,8 @@ fn package_info_to_recipe(
         .chain(run)
         .unique()
         .map(Requirement::from)
+        // Suggested dependencies follow the real ones, as comments.
+        .chain(suggested.into_iter().map(Requirement::suggested))
         .collect();
 
     if needs_compilation {
@@ -747,7 +722,7 @@ async fn fetch_and_render(
     let package = fetch_package(client, package, universe.unwrap_or("cran")).await?;
     let (recipe, remaining_deps) =
         package_info_to_recipe(&package.info, package.tarball.as_ref(), maintainers);
-    let yaml = format_cran_recipe_with_suggests(&recipe);
+    let yaml = recipe.to_string();
     let description = package.tarball.and_then(|tarball| tarball.description);
     Ok(GeneratedRecipe {
         recipe,
@@ -858,7 +833,7 @@ mod tests {
         assert!(deps.contains("commonmark"));
         assert!(deps.contains("R6"));
         assert!(!deps.contains("testthat"), "Suggests are not recursed into");
-        insta::assert_snapshot!(format_cran_recipe_with_suggests(&recipe));
+        insta::assert_snapshot!(recipe.to_string());
     }
 
     /// Compiled package with a `-` in its version: compilers, cross-r-base,
@@ -872,7 +847,7 @@ mod tests {
             &["octocat".to_string(), "conda-forge/r".to_string()],
         );
         assert!(deps.is_empty(), "gmp only depends on base R packages");
-        insta::assert_snapshot!(format_cran_recipe_with_suggests(&recipe));
+        insta::assert_snapshot!(recipe.to_string());
     }
 
     /// Only the minimum-R constraint maps to a skip; a second `R` entry must
@@ -947,7 +922,7 @@ mod tests {
         let info = fixture("tinkr");
         let (recipe, _) = package_info_to_recipe(&info, None, &[]);
         assert!(recipe.extra.recipe_maintainers.is_empty());
-        assert!(!format_cran_recipe_with_suggests(&recipe).contains("extra:"));
+        assert!(!recipe.to_string().contains("extra:"));
 
         assert_eq!(cli_maintainers(&[]), vec![DEFAULT_MAINTAINER.to_string()]);
         assert_eq!(
@@ -978,7 +953,7 @@ mod tests {
         info.Description =
             "Does things as SUGGESTED by:\n- SUGGEST mode for reviewers\n- other modes".to_string();
         let (recipe, _) = package_info_to_recipe(&info, None, &[]);
-        let yaml = format_cran_recipe_with_suggests(&recipe);
+        let yaml = recipe.to_string();
         assert!(
             yaml.contains("    - SUGGEST mode for reviewers\n"),
             "description bullet must stay untouched: {yaml}"

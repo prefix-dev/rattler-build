@@ -125,8 +125,14 @@ pub struct ScriptStep {
     pub otherwise: Option<String>,
 }
 
-/// One entry of a requirements list: a match spec, or an `if`/`then`
-/// selector adding specs only when the condition holds.
+/// The key of the marker mapping a [`Requirement::Suggested`] serializes as.
+/// YAML comments cannot be expressed in a value tree, so the emitter
+/// recognises this shape and writes a comment line for it instead.
+const SUGGESTED_KEY: &str = "__suggested__";
+
+/// One entry of a requirements list: a match spec, an `if`/`then` selector
+/// adding specs only when the condition holds, or a dependency that upstream
+/// merely suggests.
 #[derive(Debug, PartialEq, Serialize)]
 #[serde(untagged)]
 pub enum Requirement {
@@ -136,6 +142,29 @@ pub enum Requirement {
         condition: String,
         then: Vec<String>,
     },
+    /// Rendered as a comment, so that a packager can promote the suggested
+    /// dependencies their tests actually need.
+    Suggested {
+        #[serde(rename = "__suggested__")]
+        spec: String,
+    },
+}
+
+impl Requirement {
+    /// A dependency to render as a comment rather than as a real requirement.
+    pub fn suggested(spec: String) -> Self {
+        Requirement::Suggested { spec }
+    }
+}
+
+/// The spec of a serialized [`Requirement::Suggested`], if `map` is one.
+fn suggested_spec(map: &Mapping) -> Option<&str> {
+    let mut entries = map.iter();
+    let (key, value) = entries.next()?;
+    if entries.next().is_some() || key.as_str() != Some(SUGGESTED_KEY) {
+        return None;
+    }
+    value.as_str()
 }
 
 impl From<String> for Requirement {
@@ -454,6 +483,10 @@ fn emit_sequence(out: &mut String, seq: &[Value], indent: usize) {
         out.push_str(&" ".repeat(indent));
         match item {
             Value::Mapping(map) if !map.is_empty() => {
+                if let Some(spec) = suggested_spec(map) {
+                    out.push_str(&format!("# - {spec}  # suggested\n"));
+                    continue;
+                }
                 out.push_str("- ");
                 emit_mapping(out, map, indent + 2, true);
             }
