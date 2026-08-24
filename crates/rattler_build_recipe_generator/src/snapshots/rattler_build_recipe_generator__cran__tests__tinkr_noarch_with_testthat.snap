@@ -22,7 +22,7 @@ build:
   number: 0
   skip: match(r_base, "<4.1")
   noarch: generic
-  script: ${{ R }} CMD INSTALL --build .
+  script: '"${{ R }}" CMD INSTALL --build .'
   variant:
     ignore_keys:
       - cran_mirror

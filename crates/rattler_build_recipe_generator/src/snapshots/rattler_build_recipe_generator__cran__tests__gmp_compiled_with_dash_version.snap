@@ -22,8 +22,8 @@ build:
   skip: match(r_base, "<3.5")
   script:
     - if: win
-      then: ${{ R }} CMD INSTALL --build . %R_ARGS%
-      else: ${{ R }} CMD INSTALL --build . ${R_ARGS}
+      then: '"${{ R }}" CMD INSTALL --build . %R_ARGS%'
+      else: '"${{ R }}" CMD INSTALL --build . ${R_ARGS}'
   dynamic_linking:
     rpaths:
       - lib/R/lib/

@@ -347,8 +347,9 @@ const R_BUILTINS: &[&str] = &[
 ];
 
 /// The build command. `${{ R }}` resolves to the R binary of the host prefix
-/// at build time.
-const R_CMD_INSTALL: &str = "${{ R }} CMD INSTALL --build .";
+/// at build time, and is quoted because that path may contain spaces (on
+/// Windows it lives under the user's profile directory).
+const R_CMD_INSTALL: &str = "\"${{ R }}\" CMD INSTALL --build .";
 
 /// Build script for compiled packages: [`R_CMD_INSTALL`] with `R_ARGS` passed
 /// through (spelled per shell), so that recipe authors can inject e.g.
