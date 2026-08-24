@@ -1,12 +1,11 @@
 ---
 source: crates/rattler_build_recipe_generator/src/cran.rs
-expression: format_cran_recipe_with_suggests(&recipe)
+expression: recipe.to_string()
 ---
 schema_version: 1
 
 context:
   version: "0.7-5.1"
-  cran_mirror: ${{ cran_mirror | default("https://cran.r-project.org") }}
 
 package:
   name: r-gmp
@@ -14,8 +13,8 @@ package:
 
 source:
   url:
-    - ${{ cran_mirror }}/src/contrib/gmp_${{ version }}.tar.gz
-    - ${{ cran_mirror }}/src/contrib/Archive/gmp/gmp_${{ version }}.tar.gz
+    - https://cloud.r-project.org/src/contrib/gmp_${{ version }}.tar.gz
+    - https://cloud.r-project.org/src/contrib/Archive/gmp/gmp_${{ version }}.tar.gz
 
 build:
   number: 0
@@ -28,9 +27,6 @@ build:
     rpaths:
       - lib/R/lib/
       - lib/
-  variant:
-    ignore_keys:
-      - cran_mirror
 
 requirements:
   build:

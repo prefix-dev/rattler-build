@@ -1,12 +1,11 @@
 ---
 source: crates/rattler_build_recipe_generator/src/cran.rs
-expression: format_cran_recipe_with_suggests(&recipe)
+expression: recipe.to_string()
 ---
 schema_version: 1
 
 context:
   version: "0.3.1"
-  cran_mirror: ${{ cran_mirror | default("https://cran.r-project.org") }}
 
 package:
   name: r-tinkr
@@ -14,8 +13,8 @@ package:
 
 source:
   url:
-    - ${{ cran_mirror }}/src/contrib/tinkr_${{ version }}.tar.gz
-    - ${{ cran_mirror }}/src/contrib/Archive/tinkr/tinkr_${{ version }}.tar.gz
+    - https://cloud.r-project.org/src/contrib/tinkr_${{ version }}.tar.gz
+    - https://cloud.r-project.org/src/contrib/Archive/tinkr/tinkr_${{ version }}.tar.gz
   sha256: 425bc04af76483b8cf713ad141bdebb963cf54dd363fbdbee3a709820ec4d23e
 
 build:
@@ -23,9 +22,6 @@ build:
   skip: match(r_base, "<4.1")
   noarch: generic
   script: '"${{ R }}" CMD INSTALL --build .'
-  variant:
-    ignore_keys:
-      - cran_mirror
 
 requirements:
   host:

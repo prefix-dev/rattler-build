@@ -97,8 +97,9 @@ pub struct CranOpts {
     )]
     pub maintainers: Vec<String>,
 
-    /// Append the package's DESCRIPTION file as a comment block at the end of
-    /// the recipe, as conda-forge's staged-recipes reviewers ask for
+    /// Shape the recipe for a conda-forge staged-recipes submission: download
+    /// through conda-forge's `cran_mirror` variant and append the package's
+    /// DESCRIPTION file for reviewers
     #[cfg_attr(feature = "cli", arg(long))]
     pub staged_recipes: bool,
 }
@@ -360,15 +361,20 @@ fn cross_r_base_requirement() -> Requirement {
     }
 }
 
-/// The CRAN mirror used when no `cran_mirror` variant is configured (conda-forge
-/// provides one through its pinning).
-const CRAN_MIRROR: &str = "https://cran.r-project.org";
+/// The CRAN mirror the generated recipes download from: the CDN that
+/// conda-forge also pins its `cran_mirror` variant to.
+const CRAN_MIRROR: &str = "https://cloud.r-project.org";
 
-/// The `cran_mirror` context entry: the variant value when one is configured,
-/// [`CRAN_MIRROR`] otherwise. A `context` variable shadows a variant key of the
-/// same name, so the entry has to refer to the variant explicitly.
-fn cran_mirror_context() -> String {
-    format!("${{{{ cran_mirror | default(\"{CRAN_MIRROR}\") }}}}")
+/// Choices the caller makes about the shape of the generated recipe.
+#[derive(Debug, Default)]
+pub struct RecipeOptions {
+    /// GitHub handles to list under `extra.recipe-maintainers`.
+    pub maintainers: Vec<String>,
+    /// Follow the conventions of a conda-forge staged-recipes submission:
+    /// download through conda-forge's `cran_mirror` variant rather than from a
+    /// mirror named in the recipe. rattler-build itself knows no `cran_mirror`,
+    /// so such a recipe needs a variant config that defines one.
+    pub staged_recipes: bool,
 }
 
 /// Placeholder maintainer when none is given on the command line (the same
@@ -499,20 +505,13 @@ async fn fetch_package(
 fn package_info_to_recipe(
     info: &PackageInfo,
     tarball: Option<&CranTarball>,
-    maintainers: &[String],
+    options: &RecipeOptions,
 ) -> (serialize::Recipe, HashSet<String>) {
     let mut recipe = serialize::Recipe::default();
 
     recipe
         .context
         .insert("version".to_string(), info.Version.clone());
-    recipe
-        .context
-        .insert("cran_mirror".to_string(), cran_mirror_context());
-    // Reading the `cran_mirror` variant makes it part of the package's variant
-    // unless it is ignored explicitly, which would make the build string depend
-    // on the mirror a package happened to be downloaded from.
-    recipe.build.variant.ignore_keys = vec!["cran_mirror".to_string()];
 
     recipe.package.name = format_r_package(&info.Package, None);
     // CRAN allows `-` in versions (e.g. `0.7-5.1`), conda does not; conda-forge
@@ -525,15 +524,24 @@ fn package_info_to_recipe(
 
     // CRAN moves superseded versions to `Archive/<pkg>/`, so list that as a
     // fallback mirror.
+    // A staged-recipes submission downloads through conda-forge's pinned
+    // `cran_mirror`; anywhere else the recipe has to name a mirror itself,
+    // because rattler-build defines no such variable.
+    let mirror = if options.staged_recipes {
+        // Reading the variant would otherwise make it part of the package's
+        // variant, so that the mirror a package came from would change its
+        // build string.
+        recipe.build.variant.ignore_keys = vec!["cran_mirror".to_string()];
+        "${{ cran_mirror }}"
+    } else {
+        CRAN_MIRROR
+    };
     let file_name = format!("{}_${{{{ version }}}}.tar.gz", info.Package);
     recipe.source.push(
         UrlSourceElement {
             url: vec![
-                format!("${{{{ cran_mirror }}}}/src/contrib/{file_name}"),
-                format!(
-                    "${{{{ cran_mirror }}}}/src/contrib/Archive/{}/{file_name}",
-                    info.Package
-                ),
+                format!("{mirror}/src/contrib/{file_name}"),
+                format!("{mirror}/src/contrib/Archive/{}/{file_name}", info.Package),
             ],
             sha256: tarball.and_then(|tarball| tarball.sha256.clone()),
             md5: None,
@@ -691,7 +699,7 @@ fn package_info_to_recipe(
         }));
     }
 
-    recipe.extra.recipe_maintainers = maintainers.to_vec();
+    recipe.extra.recipe_maintainers = options.maintainers.clone();
 
     (recipe, remaining_deps)
 }
@@ -717,11 +725,11 @@ async fn fetch_and_render(
     client: &reqwest::Client,
     package: &str,
     universe: Option<&str>,
-    maintainers: &[String],
+    options: &RecipeOptions,
 ) -> miette::Result<GeneratedRecipe> {
     let package = fetch_package(client, package, universe.unwrap_or("cran")).await?;
     let (recipe, remaining_deps) =
-        package_info_to_recipe(&package.info, package.tarball.as_ref(), maintainers);
+        package_info_to_recipe(&package.info, package.tarball.as_ref(), options);
     let yaml = recipe.to_string();
     let description = package.tarball.and_then(|tarball| tarball.description);
     Ok(GeneratedRecipe {
@@ -738,9 +746,11 @@ pub async fn generate_r_recipe_string(
     universe: Option<&str>,
 ) -> miette::Result<String> {
     let client = reqwest::Client::new();
-    Ok(fetch_and_render(&client, package, universe, &[])
-        .await?
-        .yaml)
+    Ok(
+        fetch_and_render(&client, package, universe, &RecipeOptions::default())
+            .await?
+            .yaml,
+    )
 }
 
 /// Generate a CRAN recipe using `CranOpts` and either print it or write it to disk.
@@ -766,7 +776,10 @@ async fn generate_r_recipe_with_client(
         client,
         &opts.package,
         opts.universe.as_deref(),
-        &cli_maintainers(&opts.maintainers),
+        &RecipeOptions {
+            maintainers: cli_maintainers(&opts.maintainers),
+            staged_recipes: opts.staged_recipes,
+        },
     )
     .await?;
 
@@ -829,7 +842,11 @@ mod tests {
             has_testthat_runner: true,
             ..Default::default()
         };
-        let (recipe, deps) = package_info_to_recipe(&info, Some(&tarball), &cli_maintainers(&[]));
+        let options = RecipeOptions {
+            maintainers: cli_maintainers(&[]),
+            ..Default::default()
+        };
+        let (recipe, deps) = package_info_to_recipe(&info, Some(&tarball), &options);
         assert!(deps.contains("commonmark"));
         assert!(deps.contains("R6"));
         assert!(!deps.contains("testthat"), "Suggests are not recursed into");
@@ -841,13 +858,51 @@ mod tests {
     #[test]
     fn gmp_compiled_with_dash_version() {
         let info = fixture("gmp");
-        let (recipe, deps) = package_info_to_recipe(
-            &info,
-            None,
-            &["octocat".to_string(), "conda-forge/r".to_string()],
-        );
+        let options = RecipeOptions {
+            maintainers: vec!["octocat".to_string(), "conda-forge/r".to_string()],
+            ..Default::default()
+        };
+        let (recipe, deps) = package_info_to_recipe(&info, None, &options);
         assert!(deps.is_empty(), "gmp only depends on base R packages");
         insta::assert_snapshot!(recipe.to_string());
+    }
+
+    /// rattler-build knows no `cran_mirror`, so only a staged-recipes
+    /// submission — which conda-forge's pinning covers — may refer to it.
+    #[test]
+    fn only_staged_recipes_refer_to_the_cran_mirror_variant() {
+        let info = fixture("tinkr");
+
+        let (recipe, _) = package_info_to_recipe(&info, None, &RecipeOptions::default());
+        let yaml = recipe.to_string();
+        assert!(
+            yaml.contains(
+                "    - https://cloud.r-project.org/src/contrib/tinkr_${{ version }}.tar.gz\n"
+            ),
+            "{yaml}"
+        );
+        assert!(!yaml.contains("cran_mirror"), "{yaml}");
+
+        let staged = RecipeOptions {
+            staged_recipes: true,
+            ..Default::default()
+        };
+        let (recipe, _) = package_info_to_recipe(&info, None, &staged);
+        let yaml = recipe.to_string();
+        assert!(
+            yaml.contains("    - ${{ cran_mirror }}/src/contrib/tinkr_${{ version }}.tar.gz\n"),
+            "{yaml}"
+        );
+        assert!(
+            yaml.contains(
+                "    - ${{ cran_mirror }}/src/contrib/Archive/tinkr/tinkr_${{ version }}.tar.gz\n"
+            ),
+            "{yaml}"
+        );
+        // Referring to the variant must not put the mirror in the build hash.
+        assert!(yaml.contains("      - cran_mirror\n"), "{yaml}");
+        // The mirror comes from the variant config, not from `context`.
+        assert!(!yaml.contains("  cran_mirror:"), "{yaml}");
     }
 
     /// Only the minimum-R constraint maps to a skip; a second `R` entry must
@@ -860,7 +915,7 @@ mod tests {
             version: Some("<= 4.5".to_string()),
             role: "Depends".to_string(),
         });
-        let (recipe, _) = package_info_to_recipe(&info, None, &[]);
+        let (recipe, _) = package_info_to_recipe(&info, None, &RecipeOptions::default());
         assert_eq!(
             recipe.build.skip.as_deref(),
             Some("match(r_base, \"<4.1\")")
@@ -874,7 +929,7 @@ mod tests {
         let mut info = fixture("tinkr");
         for devurl in [None, Some(String::new()), Some("not a url".to_string())] {
             info._devurl = devurl.clone();
-            let (recipe, _) = package_info_to_recipe(&info, None, &[]);
+            let (recipe, _) = package_info_to_recipe(&info, None, &RecipeOptions::default());
             assert_eq!(
                 recipe.about.repository.as_deref(),
                 Some(info._upstream.as_str()),
@@ -882,7 +937,7 @@ mod tests {
             );
         }
         info._devurl = Some("https://github.com/ropensci/tinkr".to_string());
-        let (recipe, _) = package_info_to_recipe(&info, None, &[]);
+        let (recipe, _) = package_info_to_recipe(&info, None, &RecipeOptions::default());
         assert_eq!(
             recipe.about.repository.as_deref(),
             Some("https://github.com/ropensci/tinkr")
@@ -903,7 +958,7 @@ mod tests {
             "  https://a.example",
         ] {
             info.URL = Some(urls.to_string());
-            let (recipe, _) = package_info_to_recipe(&info, None, &[]);
+            let (recipe, _) = package_info_to_recipe(&info, None, &RecipeOptions::default());
             assert_eq!(
                 recipe.about.homepage.as_deref(),
                 Some("https://a.example"),
@@ -911,7 +966,7 @@ mod tests {
             );
         }
         info.URL = None;
-        let (recipe, _) = package_info_to_recipe(&info, None, &[]);
+        let (recipe, _) = package_info_to_recipe(&info, None, &RecipeOptions::default());
         assert_eq!(recipe.about.homepage, None);
     }
 
@@ -920,7 +975,7 @@ mod tests {
     #[test]
     fn maintainers_are_only_defaulted_on_the_command_line() {
         let info = fixture("tinkr");
-        let (recipe, _) = package_info_to_recipe(&info, None, &[]);
+        let (recipe, _) = package_info_to_recipe(&info, None, &RecipeOptions::default());
         assert!(recipe.extra.recipe_maintainers.is_empty());
         assert!(!recipe.to_string().contains("extra:"));
 
@@ -938,7 +993,7 @@ mod tests {
         let info = fixture("tinkr");
         let without_runner = CranTarball::default();
         for tarball in [None, Some(&without_runner)] {
-            let (recipe, _) = package_info_to_recipe(&info, tarball, &[]);
+            let (recipe, _) = package_info_to_recipe(&info, tarball, &RecipeOptions::default());
             assert_eq!(recipe.tests.len(), 1, "only the `r:` test is expected");
             assert!(matches!(recipe.tests[0], Test::R(_)));
         }
@@ -952,7 +1007,7 @@ mod tests {
         let mut info = fixture("tinkr");
         info.Description =
             "Does things as SUGGESTED by:\n- SUGGEST mode for reviewers\n- other modes".to_string();
-        let (recipe, _) = package_info_to_recipe(&info, None, &[]);
+        let (recipe, _) = package_info_to_recipe(&info, None, &RecipeOptions::default());
         let yaml = recipe.to_string();
         assert!(
             yaml.contains("    - SUGGEST mode for reviewers\n"),
@@ -974,8 +1029,8 @@ mod tests {
         assert_eq!(
             tarball_urls("cran", "tinkr", "tinkr_0.3.1.tar.gz"),
             [
-                "https://cran.r-project.org/src/contrib/tinkr_0.3.1.tar.gz",
-                "https://cran.r-project.org/src/contrib/Archive/tinkr/tinkr_0.3.1.tar.gz",
+                "https://cloud.r-project.org/src/contrib/tinkr_0.3.1.tar.gz",
+                "https://cloud.r-project.org/src/contrib/Archive/tinkr/tinkr_0.3.1.tar.gz",
             ]
         );
         assert_eq!(
