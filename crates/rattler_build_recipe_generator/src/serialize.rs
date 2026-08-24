@@ -471,16 +471,21 @@ fn emit_entry(out: &mut String, key: &Value, value: &Value, indent: usize) {
 fn emit_mapping(out: &mut String, map: &Mapping, indent: usize, inline_first: bool) {
     for (i, (key, value)) in map.iter().enumerate() {
         if !(inline_first && i == 0) {
-            out.push_str(&" ".repeat(indent));
+            push_indent(out, indent);
         }
         emit_entry(out, key, value, indent);
     }
 }
 
+/// Write `indent` spaces.
+fn push_indent(out: &mut String, indent: usize) {
+    out.extend(std::iter::repeat_n(' ', indent));
+}
+
 /// Write the items of `seq` as `- item` lines at `indent`.
 fn emit_sequence(out: &mut String, seq: &[Value], indent: usize) {
     for item in seq {
-        out.push_str(&" ".repeat(indent));
+        push_indent(out, indent);
         match item {
             Value::Mapping(map) if !map.is_empty() => {
                 if let Some(spec) = suggested_spec(map) {
@@ -521,12 +526,31 @@ fn scalar_text(value: &Value, indent: usize) -> String {
     }
 }
 
+/// Whether `string` can be written as a plain YAML scalar without asking
+/// `serde_yaml`. Deliberately conservative: an ASCII word of letters, digits
+/// and `-_./` starting with a letter has no indicator character, cannot be
+/// read back as a number or timestamp, and only needs quoting when it spells
+/// a boolean or null keyword.
+fn is_plainly_safe(string: &str) -> bool {
+    string.starts_with(|c: char| c.is_ascii_alphabetic())
+        && string
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '/'))
+        && !matches!(
+            string.to_ascii_lowercase().as_str(),
+            "y" | "n" | "yes" | "no" | "true" | "false" | "on" | "off" | "null"
+        )
+}
+
 fn string_text(string: &str, indent: usize) -> String {
     // Trailing newlines carry no meaning in a recipe, and keeping them would
     // make libyaml choose the `|+` (keep) block style, whose trailing blank
     // lines the surrounding layout does not preserve. Drop them so multi-line
     // text always becomes a `|-` block and single lines stay plain scalars.
     let string = string.trim_end_matches('\n');
+    if is_plainly_safe(string) {
+        return string.to_string();
+    }
     let rendered = serde_yaml::to_string(&Value::String(string.to_string())).unwrap_or_default();
     let rendered = rendered.trim_end_matches('\n');
 
@@ -685,6 +709,53 @@ mod tests {
         // plain scalars stay plain (YAML allows inner double quotes)
         assert!(yaml.contains("  plain: hello\n"), "{yaml}");
         assert!(yaml.contains("  inner_quotes: say \"hi\"\n"), "{yaml}");
+    }
+
+    /// The plain-scalar fast path must agree with `serde_yaml` on every input.
+    #[test]
+    fn plainly_safe_scalars_render_like_serde_yaml() {
+        for string in [
+            "r-base",
+            "generic",
+            "make",
+            "GPL-3.0-only",
+            "lib/R/lib/",
+            "tests/testthat.R",
+            "https://example.com",
+            "r-cli >=3.6.2",
+            "${{ version }}",
+            "yes",
+            "No",
+            "TRUE",
+            "null",
+            "on",
+            "n",
+            "1.0",
+            "0.3.1",
+            "4",
+            ".inf",
+            "-dash",
+            "a: b",
+            "a #b",
+            " leading",
+            "trailing ",
+            "",
+            "*star",
+            "&anchor",
+            "!tag",
+            "%directive",
+            "@at",
+            "`tick",
+            "[bracket",
+            "{brace",
+            "2026-08-24",
+        ] {
+            let expected = serde_yaml::to_string(&Value::String(string.to_string()))
+                .unwrap()
+                .trim_end_matches('\n')
+                .to_string();
+            assert_eq!(string_text(string, 0), expected, "{string:?}");
+        }
     }
 
     /// Context values lose trailing newlines like every other scalar.
