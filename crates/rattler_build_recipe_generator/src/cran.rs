@@ -666,7 +666,7 @@ fn package_info_to_recipe(
     // `URL:` lists one or more URLs separated by commas and/or whitespace; the
     // first one is the package's home page by convention.
     if let Some(url) = info.URL.as_deref().and_then(|urls| {
-        urls.split([',', ' ', '\n', '\t'])
+        urls.split(|c: char| c == ',' || c.is_whitespace())
             .find(|url| !url.is_empty())
     }) {
         recipe.about.homepage = Some(url.to_string());
@@ -885,6 +885,8 @@ mod tests {
         for urls in [
             "https://a.example, https://b.example",
             "https://a.example https://b.example",
+            "https://a.example,\r\nhttps://b.example",
+            "https://a.example\r\nhttps://b.example",
             "https://a.example,\nhttps://b.example",
             "  https://a.example",
         ] {
