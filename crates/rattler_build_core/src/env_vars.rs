@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use rattler_build_jinja::Variable;
 use rattler_build_script::{EnvironmentIsolation, RuntimeEnv};
 use rattler_build_types::NormalizedKey;
-use rattler_conda_types::{Platform, RepoDataRecord};
+use rattler_conda_types::{Platform, RepoDataRecord, Version};
 use std::collections::BTreeMap;
 
 use crate::android;
@@ -26,6 +26,16 @@ macro_rules! insert {
 /// Reduce a version such as `3.13.1` to its `major.minor` part (`3.13`).
 fn major_minor(version: &str) -> String {
     version.split('.').take(2).collect::<Vec<_>>().join(".")
+}
+
+/// `major.minor` of a structured version (epochs and non-numeric segments are
+/// handled by [`Version`]), falling back to the lexical reduction when there is
+/// no plain major/minor pair.
+fn version_major_minor(version: &Version) -> String {
+    version.as_major_minor().map_or_else(
+        || major_minor(&version.to_string()),
+        |(major, minor)| format!("{major}.{minor}"),
+    )
 }
 
 /// Whether a `major` or `major.minor` Python version is Python 3.
@@ -82,15 +92,14 @@ pub fn python_vars(output: &Output) -> HashMap<String, Option<String>> {
     let python_version = output
         .variant()
         .get(&"python".into())
-        .map(|s| s.to_string())
+        .map(|version| major_minor(&version.to_string()))
         .or_else(|| {
             // Use the resolved python version even if it's a transitive dependency
             // (e.g. pulled in by pip in noarch python packages)
-            python_record.map(|record| record.package_record.version.to_string())
+            python_record.map(|record| version_major_minor(&record.package_record.version))
         });
 
-    if let Some(py_ver) = python_version {
-        let py_ver_str = major_minor(&py_ver);
+    if let Some(py_ver_str) = python_version {
         let stdlib_dir = get_stdlib_dir(
             output.prefix(),
             output.host_platform().platform,
@@ -142,7 +151,7 @@ pub fn python_vars_from_records(
         .find(|r| r.package_record.name.as_normalized() == "python");
 
     if let Some(python_record) = python_record {
-        let py_ver_str = major_minor(&python_record.package_record.version.to_string());
+        let py_ver_str = version_major_minor(&python_record.package_record.version);
         let stdlib_dir = get_stdlib_dir(prefix, platform, &py_ver_str);
         let site_packages_dir = get_sitepackages_dir(
             prefix,
@@ -163,10 +172,10 @@ pub fn python_vars_from_records(
     let numpy_version = records
         .iter()
         .find(|r| r.package_record.name.as_normalized() == "numpy")
-        .map(|r| r.package_record.version.to_string());
+        .map(|r| version_major_minor(&r.package_record.version));
 
     if let Some(npy_ver) = numpy_version {
-        insert!(result, "NPY_VER", major_minor(&npy_ver));
+        insert!(result, "NPY_VER", npy_ver);
         insert!(result, "NPY_DISTUTILS_APPEND_FLAGS", "1");
     }
 
@@ -192,7 +201,7 @@ pub fn r_vars(output: &Output) -> HashMap<String, Option<String>> {
         .or_else(|| {
             output
                 .find_resolved_package("r-base")
-                .map(|(record, _)| record.package_record.version.to_string())
+                .map(|(record, _)| version_major_minor(&record.package_record.version))
         });
 
     match r_version {
@@ -611,6 +620,17 @@ mod test {
         assert_eq!(major_minor("3.13.1"), "3.13");
         assert_eq!(major_minor("4.4"), "4.4");
         assert_eq!(major_minor("2"), "2");
+    }
+
+    #[test]
+    fn structured_versions_reduce_to_major_minor() {
+        use std::str::FromStr;
+        let version = |v: &str| Version::from_str(v).unwrap();
+        assert_eq!(version_major_minor(&version("3.13.1")), "3.13");
+        // The epoch is not a segment.
+        assert_eq!(version_major_minor(&version("1!2.3.4")), "2.3");
+        // No minor segment: fall back to the lexical reduction.
+        assert_eq!(version_major_minor(&version("3")), "3");
     }
 
     /// A variant may pin only the major version (`python: "3"`).
