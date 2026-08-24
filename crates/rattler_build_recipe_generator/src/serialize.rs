@@ -365,11 +365,35 @@ fn context_value_text(value: &Value) -> String {
         return rendered;
     };
     let needs_quotes = string.starts_with(|c: char| c.is_ascii_digit()) || rendered != *string;
-    if needs_quotes && !string.contains('\n') {
-        format!("\"{}\"", string.replace('\\', "\\\\").replace('"', "\\\""))
+    if needs_quotes {
+        double_quoted(string)
     } else {
         rendered
     }
+}
+
+/// A YAML double-quoted scalar for `string`, escaping everything the style
+/// requires (quotes, backslashes, and non-printable characters).
+fn double_quoted(string: &str) -> String {
+    let mut out = String::with_capacity(string.len() + 2);
+    out.push('"');
+    for character in string.chars() {
+        match character {
+            '\\' => out.push_str("\\\\"),
+            '"' => out.push_str("\\\""),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            character
+                if (character as u32) < 0x20 || (0x7f..=0x9f).contains(&(character as u32)) =>
+            {
+                out.push_str(&format!("\\x{:02X}", character as u32));
+            }
+            character => out.push(character),
+        }
+    }
+    out.push('"');
+    out
 }
 
 /// Write `key: value` (the caller has already written the indentation of the
@@ -611,6 +635,25 @@ mod tests {
         // plain scalars stay plain (YAML allows inner double quotes)
         assert!(yaml.contains("  plain: hello\n"), "{yaml}");
         assert!(yaml.contains("  inner_quotes: say \"hi\"\n"), "{yaml}");
+    }
+
+    /// A broken (or malicious) registry version must not change meaning or
+    /// break the document when it is quoted.
+    #[test]
+    fn quoted_context_values_escape_control_characters() {
+        let mut recipe = Recipe::default();
+        recipe
+            .context
+            .insert("cr".to_string(), "1.0\rbeta".to_string());
+        recipe
+            .context
+            .insert("bell".to_string(), "1.0\u{7}x".to_string());
+        let yaml = recipe.to_string();
+        assert!(yaml.contains("  cr: \"1.0\\rbeta\"\n"), "{yaml}");
+        assert!(yaml.contains("  bell: \"1.0\\x07x\"\n"), "{yaml}");
+        let reparsed: Value = serde_yaml::from_str(&yaml).expect("document must stay parseable");
+        assert_eq!(reparsed["context"]["cr"].as_str(), Some("1.0\rbeta"));
+        assert_eq!(reparsed["context"]["bell"].as_str(), Some("1.0\u{7}x"));
     }
 
     #[test]
