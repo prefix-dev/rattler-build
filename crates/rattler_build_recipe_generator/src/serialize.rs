@@ -72,7 +72,7 @@ fn serialize_build_number<S: Serializer>(number: &str, serializer: S) -> Result<
 }
 
 /// The `build.script` field: a single command, or a list of steps.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
+#[derive(Debug, Serialize)]
 #[serde(untagged)]
 pub enum Script {
     Command(String),
@@ -99,7 +99,7 @@ impl From<&str> for Script {
 
 /// One step of a `build.script` list: an `if`/`then`/`else` selector choosing
 /// between commands.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
+#[derive(Debug, Serialize)]
 pub struct ScriptStep {
     #[serde(rename = "if")]
     pub condition: String,
@@ -110,7 +110,7 @@ pub struct ScriptStep {
 
 /// One entry of a requirements list: a match spec, or an `if`/`then`
 /// selector adding specs only when the condition holds.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
+#[derive(Debug, PartialEq, Serialize)]
 #[serde(untagged)]
 pub enum Requirement {
     Spec(String),
