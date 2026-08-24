@@ -559,6 +559,9 @@ fn package_info_to_recipe(
     let r_base = "r-base".to_string();
     let mut host = Vec::new();
     let mut run = Vec::new();
+    // The testthat test dependency keeps whatever constraint upstream declares
+    // in its Suggests entry.
+    let mut testthat_requirement = "r-testthat".to_string();
 
     let mut remaining_deps = HashSet::new();
     for dep in info._dependencies.iter() {
@@ -585,6 +588,9 @@ fn package_info_to_recipe(
             run.push(spec);
             remaining_deps.insert(dep.package.clone());
         } else if dep.role == "Suggests" {
+            if dep.package == "testthat" {
+                testthat_requirement = format_r_package(&dep.package, dep.version.as_ref());
+            }
             run.push(format!(
                 "SUGGEST {}",
                 format_r_package(&dep.package, dep.version.as_ref())
@@ -668,7 +674,7 @@ fn package_info_to_recipe(
                 source: vec!["tests/".to_string()],
             },
             requirements: ScriptTestRequirements {
-                run: vec!["r-testthat".to_string()],
+                run: vec![testthat_requirement],
             },
             script: vec![
                 r#"Rscript -e "testthat::test_file('tests/testthat.R', stop_on_failure=TRUE)""#

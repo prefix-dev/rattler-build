@@ -62,7 +62,7 @@ tests:
         - tests/
     requirements:
       run:
-        - r-testthat
+        - r-testthat >=3.0.0
     script:
       - Rscript -e "testthat::test_file('tests/testthat.R', stop_on_failure=TRUE)"
 
