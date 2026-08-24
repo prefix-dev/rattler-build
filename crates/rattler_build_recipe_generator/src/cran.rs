@@ -279,9 +279,7 @@ async fn fetch_package_tarball(client: &reqwest::Client, url: &Url) -> miette::R
 struct CranTarball {
     /// SHA256 of the tarball CRAN currently serves.
     sha256: String,
-    /// The package's `DESCRIPTION` file (`<package>/DESCRIPTION`); only the
-    /// command line (not built for wasm32) appends it to the recipe.
-    #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
+    /// The package's `DESCRIPTION` file (`<package>/DESCRIPTION`).
     description: Option<String>,
     /// Whether the package ships the testthat runner, `tests/testthat.R`.
     has_testthat_runner: bool,
@@ -676,57 +674,98 @@ fn package_info_to_recipe(
     (recipe, remaining_deps)
 }
 
+/// A rendered recipe plus what the recursive `--tree` mode and the command
+/// line need alongside it.
+struct GeneratedRecipe {
+    /// Only `yaml` is read on wasm32, where the command-line front end that
+    /// consumes the other fields is not built.
+    #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
+    recipe: serialize::Recipe,
+    yaml: String,
+    #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
+    remaining_deps: HashSet<String>,
+    /// The tarball's DESCRIPTION file, appended to the recipe by
+    /// `--staged-recipes`.
+    #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
+    description: Option<String>,
+}
+
+/// Fetch `package` from `universe` (CRAN when `None`) and render its recipe.
+async fn fetch_and_render(
+    client: &reqwest::Client,
+    package: &str,
+    universe: Option<&str>,
+    maintainers: &[String],
+) -> miette::Result<GeneratedRecipe> {
+    let package = fetch_package(client, package, universe.unwrap_or("cran")).await?;
+    let (recipe, remaining_deps) =
+        package_info_to_recipe(&package.info, package.tarball.as_ref(), maintainers);
+    let yaml = format_cran_recipe_with_suggests(&recipe);
+    let description = package.tarball.and_then(|tarball| tarball.description);
+    Ok(GeneratedRecipe {
+        recipe,
+        yaml,
+        remaining_deps,
+        description,
+    })
+}
+
 /// Generate a CRAN recipe for `package` and return the YAML as a string.
 pub async fn generate_r_recipe_string(
     package: &str,
     universe: Option<&str>,
 ) -> miette::Result<String> {
     let client = reqwest::Client::new();
-    let package = fetch_package(&client, package, universe.unwrap_or("cran")).await?;
-    let (recipe, _remaining_deps) =
-        package_info_to_recipe(&package.info, package.tarball.as_ref(), &[]);
-    Ok(format_cran_recipe_with_suggests(&recipe))
+    Ok(fetch_and_render(&client, package, universe, &[])
+        .await?
+        .yaml)
 }
 
-#[cfg(not(target_arch = "wasm32"))]
-#[async_recursion::async_recursion]
 /// Generate a CRAN recipe using `CranOpts` and either print it or write it to disk.
 ///
 /// If `opts.write` is true, the recipe is written to a folder named after the
 /// package. Otherwise, the YAML is printed to stdout. When `tree` is enabled,
 /// dependencies are recursively generated if they don't already exist locally.
+#[cfg(not(target_arch = "wasm32"))]
 pub async fn generate_r_recipe(opts: &CranOpts) -> miette::Result<()> {
+    // One client for the whole (possibly recursive) run, so that `--tree`
+    // reuses its connections.
     let client = reqwest::Client::new();
-    let package = fetch_package(
-        &client,
+    generate_r_recipe_with_client(&client, opts).await
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[async_recursion::async_recursion]
+async fn generate_r_recipe_with_client(
+    client: &reqwest::Client,
+    opts: &CranOpts,
+) -> miette::Result<()> {
+    let generated = fetch_and_render(
+        client,
         &opts.package,
-        opts.universe.as_deref().unwrap_or("cran"),
+        opts.universe.as_deref(),
+        &cli_maintainers(&opts.maintainers),
     )
     .await?;
-    let (recipe, remaining_deps) = package_info_to_recipe(
-        &package.info,
-        package.tarball.as_ref(),
-        &cli_maintainers(&opts.maintainers),
-    );
 
-    let mut final_recipe = format_cran_recipe_with_suggests(&recipe);
+    let mut final_recipe = generated.yaml;
     if opts.staged_recipes {
-        match package.tarball.and_then(|tarball| tarball.description) {
+        match &generated.description {
             Some(description) => {
-                final_recipe = append_description_comment(&final_recipe, &description);
+                final_recipe = append_description_comment(&final_recipe, description);
             }
             None => tracing::warn!("No DESCRIPTION file available to append to the recipe"),
         }
     }
 
     if opts.write {
-        write_recipe(&recipe.package.name, &final_recipe).into_diagnostic()?;
+        write_recipe(&generated.recipe.package.name, &final_recipe).into_diagnostic()?;
     } else {
         print!("{}", final_recipe);
     }
 
     if opts.tree {
-        for dep in remaining_deps {
+        for dep in generated.remaining_deps {
             let r_package = format_r_package(&dep, None);
 
             if !PathBuf::from(r_package).exists() {
@@ -734,7 +773,7 @@ pub async fn generate_r_recipe(opts: &CranOpts) -> miette::Result<()> {
                     package: dep,
                     ..opts.clone()
                 };
-                generate_r_recipe(&opts).await?;
+                generate_r_recipe_with_client(client, &opts).await?;
             }
         }
     }
