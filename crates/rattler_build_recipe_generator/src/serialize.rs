@@ -378,7 +378,12 @@ fn context_value_text(value: &Value) -> String {
     let Value::String(string) = value else {
         return rendered;
     };
-    let needs_quotes = string.starts_with(|c: char| c.is_ascii_digit()) || rendered != *string;
+    // `string_text` renders without trailing newlines; compare and quote the
+    // same text, so that a quoted context value cannot keep what every other
+    // scalar in the document drops.
+    let string = string.trim_end_matches('\n');
+    let needs_quotes =
+        string.starts_with(|c: char| c.is_ascii_digit()) || rendered.as_str() != string;
     if needs_quotes {
         double_quoted(string)
     } else {
@@ -647,6 +652,24 @@ mod tests {
         // plain scalars stay plain (YAML allows inner double quotes)
         assert!(yaml.contains("  plain: hello\n"), "{yaml}");
         assert!(yaml.contains("  inner_quotes: say \"hi\"\n"), "{yaml}");
+    }
+
+    /// Context values lose trailing newlines like every other scalar.
+    #[test]
+    fn quoted_context_values_drop_trailing_newlines() {
+        let mut recipe = Recipe::default();
+        recipe
+            .context
+            .insert("version".to_string(), "1.0\n".to_string());
+        recipe
+            .context
+            .insert("name".to_string(), "demo\n".to_string());
+        let yaml = recipe.to_string();
+        assert!(yaml.contains("  version: \"1.0\"\n"), "{yaml}");
+        assert!(yaml.contains("  name: demo\n"), "{yaml}");
+        let reparsed: Value = serde_yaml::from_str(&yaml).unwrap();
+        assert_eq!(reparsed["context"]["version"].as_str(), Some("1.0"));
+        assert_eq!(reparsed["context"]["name"].as_str(), Some("demo"));
     }
 
     /// A broken (or malicious) registry version must not change meaning or
