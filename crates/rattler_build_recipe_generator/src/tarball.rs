@@ -1,5 +1,6 @@
 //! Helpers to look inside gzip-compressed source tarballs.
 
+use std::collections::HashMap;
 use std::io::Read as _;
 use std::path::{Component, Path};
 
@@ -21,41 +22,38 @@ pub async fn download(
     Ok(response.bytes().await.into_diagnostic()?.into())
 }
 
-/// Return the contents of the first file in the `.tar.gz` `tarball` whose
-/// archive path satisfies `wanted`, or `None` when there is no such file.
-/// Contents are read lossily: R for example allows latin1-encoded files, and
-/// a stray byte must not make the whole file unavailable.
-pub fn find_file(
+/// The contents of the archive files named by `relatives`, keyed by the entry
+/// of `relatives` that matched (see [`is_archive_file`]), read in a single
+/// decompression pass. Missing files are simply absent from the result.
+///
+/// Contents are read lossily: R for example allows latin1-encoded files, and a
+/// stray byte must not make the whole file unavailable.
+pub fn find_archive_files<'a>(
     tarball: &[u8],
-    wanted: impl FnMut(&Path) -> bool,
-) -> miette::Result<Option<String>> {
-    Ok(find_files(tarball, wanted, 1)?
-        .pop()
-        .map(|(_, contents)| contents))
-}
-
-/// The paths and contents of the files matching `wanted`, collected in a
-/// single decompression pass that stops once `limit` files have been found.
-/// See [`find_file`] for the lossy read semantics.
-pub fn find_files(
-    tarball: &[u8],
-    mut wanted: impl FnMut(&Path) -> bool,
-    limit: usize,
-) -> miette::Result<Vec<(std::path::PathBuf, String)>> {
+    relatives: &[&'a str],
+) -> miette::Result<HashMap<&'a str, String>> {
     let tar = flate2::read::GzDecoder::new(tarball);
     let mut archive = tar::Archive::new(tar);
-    let mut found = Vec::new();
+    let mut found = HashMap::new();
     for entry in archive.entries().into_diagnostic()? {
-        if found.len() >= limit {
+        if found.len() == relatives.len() {
             break;
         }
         let mut entry = entry.into_diagnostic()?;
         let path = entry.path().into_diagnostic()?.into_owned();
-        if wanted(&path) {
-            let mut contents = Vec::new();
-            entry.read_to_end(&mut contents).into_diagnostic()?;
-            found.push((path, String::from_utf8_lossy(&contents).into_owned()));
+        let Some(relative) = relatives
+            .iter()
+            .copied()
+            .find(|relative| is_archive_file(&path, relative))
+        else {
+            continue;
+        };
+        if found.contains_key(relative) {
+            continue;
         }
+        let mut contents = Vec::new();
+        entry.read_to_end(&mut contents).into_diagnostic()?;
+        found.insert(relative, String::from_utf8_lossy(&contents).into_owned());
     }
     Ok(found)
 }
@@ -97,17 +95,18 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn finds_the_first_matching_file() {
+    fn finds_the_requested_files() {
         let tarball = tarball_with(&[
             ("pkg/R/pkg.R", "NULL\n"),
             ("pkg/inst/extdata/DESCRIPTION", "Package: not-this-one\n"),
             ("pkg/DESCRIPTION", "Package: pkg\n"),
         ]);
-        let description = find_file(&tarball, |path| is_archive_file(path, "DESCRIPTION")).unwrap();
-        assert_eq!(description.as_deref(), Some("Package: pkg\n"));
-
-        let missing = find_file(&tarball, |path| is_archive_file(path, "NEWS")).unwrap();
-        assert_eq!(missing, None);
+        let found = find_archive_files(&tarball, &["DESCRIPTION", "NEWS"]).unwrap();
+        assert_eq!(
+            found.get("DESCRIPTION").map(String::as_str),
+            Some("Package: pkg\n")
+        );
+        assert_eq!(found.get("NEWS"), None);
     }
 
     /// R permits e.g. `Encoding: latin1` DESCRIPTION files.
@@ -125,8 +124,11 @@ pub(crate) mod tests {
             .unwrap();
         let tarball = builder.into_inner().unwrap().finish().unwrap();
 
-        let description = find_file(&tarball, |path| is_archive_file(path, "DESCRIPTION")).unwrap();
-        assert_eq!(description.as_deref(), Some("Author: Ga\u{FFFD}l\n"));
+        let found = find_archive_files(&tarball, &["DESCRIPTION"]).unwrap();
+        assert_eq!(
+            found.get("DESCRIPTION").map(String::as_str),
+            Some("Author: Ga\u{FFFD}l\n")
+        );
     }
 
     #[test]

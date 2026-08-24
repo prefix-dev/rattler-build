@@ -185,9 +185,8 @@ async fn extract_build_requirements(
     let tar_data = crate::tarball::download(client, url).await?;
     // Only the sdist's own pyproject.toml counts; vendored or documentation
     // copies deeper in the archive must not win.
-    let Some(contents) = crate::tarball::find_file(&tar_data, |path| {
-        crate::tarball::is_archive_file(path, "pyproject.toml")
-    })?
+    let Some(contents) = crate::tarball::find_archive_files(&tar_data, &["pyproject.toml"])?
+        .remove("pyproject.toml")
     else {
         return Ok(Vec::new());
     };

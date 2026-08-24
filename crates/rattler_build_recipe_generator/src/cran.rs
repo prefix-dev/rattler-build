@@ -278,24 +278,11 @@ impl CranTarball {
         // One decompression pass for everything the tarball can tell us. A
         // failure here means the bytes are not a source archive at all, so
         // nothing about them — the checksum included — can be trusted.
-        let mut files = tarball::find_files(
-            bytes,
-            |path| {
-                tarball::is_archive_file(path, "DESCRIPTION")
-                    || tarball::is_archive_file(path, "tests/testthat.R")
-            },
-            2,
-        )?;
-        let mut take = |relative: &str| {
-            files
-                .iter()
-                .position(|(path, _)| tarball::is_archive_file(path, relative))
-                .map(|index| files.remove(index).1)
-        };
+        let mut files = tarball::find_archive_files(bytes, &["DESCRIPTION", "tests/testthat.R"])?;
         Ok(Self {
             sha256: Some(hex::encode(compute_bytes_digest::<Sha256>(bytes))),
-            description: take("DESCRIPTION"),
-            has_testthat_runner: take("tests/testthat.R").is_some(),
+            description: files.remove("DESCRIPTION"),
+            has_testthat_runner: files.contains_key("tests/testthat.R"),
         })
     }
 }
