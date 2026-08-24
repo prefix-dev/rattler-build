@@ -300,21 +300,13 @@ impl fmt::Display for Recipe {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let value = serde_yaml::to_value(self).map_err(|_| fmt::Error)?;
         let string = emit_document(&value);
-        // add a newline before every top-level key
-        let lines = string
-            .trim_end_matches('\n')
-            .split('\n')
-            .collect::<Vec<&str>>();
-        let mut first_line = true;
-        for line in lines {
-            if line.chars().next().map(|c| c.is_alphabetic()) == Some(true) && !first_line {
-                writeln!(f)?;
-            }
-            first_line = false;
-            // Inject a warning comment above the license field if present
-            if line.starts_with("  license:")
-                && let Some(warning) = &self.about.license_warning
-            {
+        // Inject the warning comment above the license field if present; the
+        // field is #[serde(skip)], so it cannot travel through the Value tree.
+        let Some(warning) = &self.about.license_warning else {
+            return f.write_str(&string);
+        };
+        for line in string.lines() {
+            if line.starts_with("  license:") {
                 for comment_line in warning.lines() {
                     writeln!(f, "  # {comment_line}")?;
                 }
@@ -333,6 +325,11 @@ fn emit_document(root: &Value) -> String {
     let mut out = String::new();
     if let Value::Mapping(map) = root {
         for (key, value) in map {
+            if !out.is_empty() {
+                // A blank line between top-level sections keeps recipes
+                // readable.
+                out.push('\n');
+            }
             match value {
                 // `Recipe::context` holds versions and the like, which follow
                 // their own quoting rule (see `context_value_text`).
