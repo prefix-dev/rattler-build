@@ -5,6 +5,22 @@ use std::path::{Component, Path};
 
 use miette::IntoDiagnostic;
 
+/// Download the archive at `url`, failing on HTTP error statuses so that an
+/// error page is never mistaken for the archive itself.
+pub async fn download(
+    client: &reqwest::Client,
+    url: impl reqwest::IntoUrl,
+) -> miette::Result<Vec<u8>> {
+    let response = client
+        .get(url)
+        .send()
+        .await
+        .into_diagnostic()?
+        .error_for_status()
+        .into_diagnostic()?;
+    Ok(response.bytes().await.into_diagnostic()?.into())
+}
+
 /// Return the contents of the first file in the `.tar.gz` `tarball` whose
 /// archive path satisfies `wanted`, or `None` when there is no such file.
 pub fn find_file(

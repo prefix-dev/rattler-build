@@ -260,20 +260,6 @@ fn format_r_package(package: &str, version: Option<&String>) -> String {
     res
 }
 
-/// Download the package tarball at `url`.
-async fn fetch_package_tarball(client: &reqwest::Client, url: &Url) -> miette::Result<Vec<u8>> {
-    let response = client
-        .get(url.clone())
-        .send()
-        .await
-        .into_diagnostic()?
-        // A 404 page must not end up hashed as if it were the tarball.
-        .error_for_status()
-        .into_diagnostic()?;
-    let bytes = response.bytes().await.into_diagnostic()?;
-    Ok(bytes.into())
-}
-
 /// What the CRAN source tarball tells us beyond the R-universe metadata.
 #[derive(Debug, Default)]
 struct CranTarball {
@@ -484,8 +470,7 @@ async fn fetch_package(
     tracing::info!("Generating R recipe for {}", package);
     let info = fetch_package_info(client, package, universe).await?;
 
-    let url = Url::parse(&tarball_url(universe, &info._file)).expect("Failed to parse URL");
-    let tarball = match fetch_package_tarball(client, &url).await {
+    let tarball = match tarball::download(client, tarball_url(universe, &info._file)).await {
         Ok(bytes) => {
             let mut tarball = CranTarball::parse(&bytes);
             if universe != "cran" {

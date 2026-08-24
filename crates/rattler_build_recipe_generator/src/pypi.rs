@@ -182,16 +182,12 @@ async fn extract_build_requirements(
     url: &str,
     client: &reqwest::Client,
 ) -> miette::Result<Vec<String>> {
-    let tar_data = client
-        .get(url)
-        .send()
-        .await
-        .into_diagnostic()?
-        .bytes()
-        .await
-        .into_diagnostic()?;
-    let Some(contents) =
-        crate::tarball::find_file(&tar_data, |path| path.ends_with("pyproject.toml"))?
+    let tar_data = crate::tarball::download(client, url).await?;
+    // Only the sdist's own pyproject.toml counts; vendored or documentation
+    // copies deeper in the archive must not win.
+    let Some(contents) = crate::tarball::find_file(&tar_data, |path| {
+        crate::tarball::is_in_top_level_dir(path, "pyproject.toml")
+    })?
     else {
         return Ok(Vec::new());
     };
