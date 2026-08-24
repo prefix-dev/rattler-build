@@ -2,7 +2,6 @@ schema_version: 1
 
 context:
   version: "1.2.1"
-  cran_mirror: ${{ cran_mirror | default("https://cran.r-project.org") }}
 
 package:
   name: r-dplyr
@@ -10,8 +9,8 @@ package:
 
 source:
   url:
-    - ${{ cran_mirror }}/src/contrib/dplyr_${{ version }}.tar.gz
-    - ${{ cran_mirror }}/src/contrib/Archive/dplyr/dplyr_${{ version }}.tar.gz
+    - https://cloud.r-project.org/src/contrib/dplyr_${{ version }}.tar.gz
+    - https://cloud.r-project.org/src/contrib/Archive/dplyr/dplyr_${{ version }}.tar.gz
   sha256: 18d66fe2f24cda8b619c177326d39dd015229ab99695fa67d3fa31e4569390e0
 
 build:
@@ -25,9 +24,6 @@ build:
     rpaths:
       - lib/R/lib/
       - lib/
-  variant:
-    ignore_keys:
-      - cran_mirror
 
 requirements:
   build:
