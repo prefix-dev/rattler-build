@@ -527,6 +527,10 @@ fn package_info_to_recipe(
     recipe
         .context
         .insert("cran_mirror".to_string(), cran_mirror_context());
+    // Reading the `cran_mirror` variant makes it part of the package's variant
+    // unless it is ignored explicitly, which would make the build string depend
+    // on the mirror a package happened to be downloaded from.
+    recipe.build.variant.ignore_keys = vec!["cran_mirror".to_string()];
 
     recipe.package.name = format_r_package(&info.Package, None);
     // CRAN allows `-` in versions (e.g. `0.7-5.1`), conda does not; conda-forge

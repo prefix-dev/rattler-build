@@ -28,6 +28,9 @@ build:
     rpaths:
       - lib/R/lib/
       - lib/
+  variant:
+    ignore_keys:
+      - cran_mirror
 
 requirements:
   build:
