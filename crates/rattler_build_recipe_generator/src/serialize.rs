@@ -463,11 +463,9 @@ fn scalar_text(value: &Value, indent: usize) -> String {
         Value::Mapping(map) if map.is_empty() => "{}".to_string(),
         Value::Sequence(seq) if seq.is_empty() => "[]".to_string(),
         // Non-empty collections are always handled by `emit_entry` /
-        // `emit_sequence`; keep a valid fallback rather than panicking.
-        other => serde_yaml::to_string(other)
-            .unwrap_or_default()
-            .trim_end()
-            .to_string(),
+        // `emit_sequence`; splicing YAML here would corrupt the document
+        // silently, so fail loudly instead.
+        other => unreachable!("collections are emitted structurally: {other:?}"),
     }
 }
 
