@@ -34,7 +34,10 @@ nav = [
     { "Variants" = "variants.md" },
     { "Configuration" = "config.md" },
     { "Compilers and cross compilation" = "compilers.md" },
-    { "Experimental features" = "experimental_features.md" },
+    { "Experimental" = [
+      { "Overview" = "experimental_features.md" },
+      { "Build steps" = "experimental_build_steps.md" },
+    ] },
     { "V3 packages (beta)" = "v3.md" },
     { "Multiple output cache" = "multiple_output_cache.md" },
     { "Sandbox" = "sandbox.md" },

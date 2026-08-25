@@ -2200,6 +2200,20 @@ impl Evaluate for Stage0Build {
         // empty or all steps filter out, so outputs don't accidentally inherit a
         // top-level script.
         let plan = evaluate_build_plan(&self.plan, context)?;
+        let metadata = if let Some(step) = &self.metadata {
+            if !context.jinja_config().experimental {
+                return Err(ParseError::invalid_value(
+                    "build.metadata",
+                    "`build.metadata` is an experimental feature: provide the `--experimental` flag to enable it",
+                    Span::new_blank(),
+                ));
+            }
+            evaluate_steps(std::slice::from_ref(step), context)?
+                .into_iter()
+                .next()
+        } else {
+            None
+        };
 
         // Evaluate noarch
         //
@@ -2305,6 +2319,7 @@ impl Evaluate for Stage0Build {
             number,
             string,
             plan,
+            metadata,
             noarch,
             flags,
             python,
@@ -3173,6 +3188,7 @@ fn merge_stage1_build(
 
     stage1::Build {
         plan,
+        metadata: output.metadata.or(toplevel.metadata),
         number,
         string,
         noarch,
@@ -6371,6 +6387,38 @@ package:
 
         let err = build.evaluate(&ctx).unwrap_err();
         assert!(err.to_string().contains("experimental"));
+    }
+
+    #[test]
+    fn test_build_metadata_requires_experimental() {
+        let build = Stage0Build {
+            metadata: Some(run_step("echo metadata")),
+            ..Default::default()
+        };
+        let err = build.evaluate(&EvaluationContext::new()).unwrap_err();
+        assert!(err.to_string().contains("experimental"));
+    }
+
+    #[test]
+    fn test_build_evaluate_uses_metadata_step() {
+        let build = Stage0Build {
+            metadata: Some(run_step("echo metadata")),
+            ..Default::default()
+        };
+        let ctx = EvaluationContext::with_variables_and_config(
+            IndexMap::new(),
+            JinjaConfig {
+                experimental: true,
+                ..Default::default()
+            },
+        );
+
+        let stage1 = build.evaluate(&ctx).unwrap();
+
+        assert_eq!(
+            stage1.metadata.unwrap().run,
+            Stage1StepRun::Commands(vec!["echo metadata".to_string()])
+        );
     }
 
     #[test]

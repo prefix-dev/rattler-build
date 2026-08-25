@@ -1,0 +1,28 @@
+steps:
+  - name: build-wheel
+    interpreter: python
+    run: |
+      from build import ProjectBuilder
+      from pathlib import Path
+      import os
+
+      output = Path(os.environ["BUILD_DIR"]) / "python-wheels"
+      output.mkdir(parents=True, exist_ok=True)
+      ProjectBuilder(os.environ["SRC_DIR"]).build("wheel", str(output))
+
+  - name: install-wheel
+    depends_on: [build-wheel]
+    interpreter: python
+    run: |
+      from pathlib import Path
+      import os
+      import subprocess
+      import sys
+
+      wheels = list((Path(os.environ["BUILD_DIR"]) / "python-wheels").glob("*.whl"))
+      if len(wheels) != 1:
+          raise RuntimeError(f"expected one wheel, found {wheels}")
+      subprocess.check_call([
+          sys.executable, "-m", "pip", "install", str(wheels[0]),
+          "--no-deps", "--no-build-isolation",
+      ])
