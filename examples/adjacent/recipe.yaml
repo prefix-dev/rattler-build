@@ -1,0 +1,64 @@
+context:
+  version: "0.1.0"
+
+package:
+  name: adjacent
+  version: ${{ version }}
+
+source:
+  git: https://github.com/Evil-Spirit/Adjacent.git
+  rev: 5e159261bc183004f38116eb3402af8e01636a5d
+
+build:
+  steps:
+    - name: configure
+      run: >-
+        cmake -S "$SRC_DIR" -B "$SRC_DIR/build" -G Ninja
+        -DBUILD_PYTHON_BINDINGS=OFF
+        -DCMAKE_BUILD_TYPE=Release
+        -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+        -DCMAKE_INSTALL_PREFIX="$PREFIX"
+
+    - name: build
+      depends_on: [configure]
+      run: cmake --build "$SRC_DIR/build"
+
+    # This has no edge to build/configure, so `rattler-build run lint` does not
+    # populate or touch the CMake build tree.
+    - name: lint
+      requirements:
+        inherit: false
+        build:
+          - clang-format
+      uses: ./steps/lint.yaml
+
+    # Normal package builds skip this local-only step. Selecting it pulls in
+    # configure + build and adds valgrind to the existing host prefix.
+    - name: test
+      optional: true
+      depends_on: [build]
+      requirements:
+        host:
+          - if: linux
+            then: valgrind
+      run:
+        - '"$SRC_DIR/build/adjacent_test"'
+        - if: linux
+          then: 'valgrind --quiet --error-exitcode=0 "$SRC_DIR/build/adjacent_test"'
+
+requirements:
+  build:
+    - ${{ compiler('cxx') }}
+    - python
+    - cmake
+    - ninja
+  host:
+    - python
+    - xtensor <0.25
+    - pybind11
+
+about:
+  homepage: https://github.com/Evil-Spirit/Adjacent
+  license: MIT
+  license_file: LICENSE
+  summary: Geometric constraint solver

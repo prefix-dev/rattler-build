@@ -52,7 +52,17 @@ build:
 Each step is a scoped section of the generated build wrapper, so step-local
 `env` values and `cwd` changes do not leak into later steps. A step supports:
 
-- **`run`** - Required inline command, multiline string, or list of commands.
+- **`name`** - Optional unique name. Named steps can be selected from the CLI.
+  A `uses` reference becomes the default name when this is omitted.
+- **`optional`** - Exclude the step from normal package builds (default: `false`).
+- **`depends_on`** - Names of prerequisite steps, forming a DAG.
+- **`requirements.build` / `requirements.host`** - Extra dependencies added
+  to the selected step's build or host solve group.
+- **`requirements.inherit`** - Whether the solve group includes the parent
+  recipe environments. Use `false` to disable both, or a `{build, host}`
+  mapping to control them separately.
+- **`run` / `uses`** - Exactly one is required. `run` is an inline command,
+  multiline string, or command list. `uses` references a reusable step.
 - **`if`** - Optional Jinja selector expression, such as `unix` or
   `target_platform == "linux-64"`. Do not wrap expressions in `${{ }}`.
 - **`interpreter`** - Optional interpreter override for this step.
@@ -72,10 +82,90 @@ build:
     - if: win
       run: copy %RECIPE_DIR%\my_script_with_recipe.bat %LIBRARY_BIN%\super-cool-script.bat
 
-    - run: python -m pip install . --no-deps
+    - name: build
+      run: python -m pip install . --no-deps
       env:
         SETUPTOOLS_SCM_PRETEND_VERSION: ${{ version }}
+
+    - name: test
+      optional: true
+      depends_on: [build]
+      requirements:
+        host: [pytest]
+      run: pytest
 ```
+
+Run a named step and its transitive prerequisites with:
+
+```console
+rattler-build run test --recipe . --source-dir . --experimental
+```
+
+`run` uses a deterministic build directory and updates its prefixes in place.
+With `--source-dir .`, commands execute directly in the project checkout,
+`SRC_DIR` points there, and tools such as CMake reuse the project's cache.
+This intentionally bypasses recipe source fetching and patch application; the
+checkout is treated as already prepared.
+Set `requirements.inherit: false` to create a standalone tool environment,
+such as for a Python `ruff` lint step, while retaining the step requirements.
+Use `inherit: {build: false, host: true}` (or the expanded YAML mapping) to
+control the parent environments independently. Isolated solves use their own
+deterministic prefixes, preventing packages from an earlier parent-based run
+from leaking into the tool environment. See
+the [`examples/adjacent`](https://github.com/prefix-dev/rattler-build/tree/main/examples/adjacent)
+recipe for an independent lint step and an optional C++ test step.
+
+### Reusable steps
+
+A step can load its executable fields from a small YAML file:
+
+```yaml title="recipe.yaml"
+build:
+  steps:
+    - name: lint
+      uses: ./steps/lint.yaml
+      requirements:
+        inherit: false
+        build: [ruff]
+```
+
+```yaml title="steps/lint.yaml"
+steps:
+  - name: check
+    run: ruff check .
+    env:
+      RUFF_NO_CACHE: "1"
+  - name: format
+    depends_on: [check]
+    run: ruff format --check .
+```
+
+Local paths are relative to the recipe directory. A reusable file may contain
+either one step or a complete `steps:` pipeline. Pipeline DAG ordering and
+optional steps are supported. The referencing step may override the interpreter
+and working directory and extend/override the environment for every nested
+step. Requirements stay on the referencing recipe step because dependency
+solving happens before the reusable file is loaded.
+
+Package references use `provider:step` syntax:
+
+```yaml
+- uses: cargo:build
+```
+
+With no explicit `name`, this step is named `cargo:build`, so it can be run as
+`rattler-build run cargo:build`. The reference automatically adds
+`cargo-rattler-build-steps` to the build solve. After
+environment installation, rattler-build looks for the first existing file at:
+
+```text
+$BUILD_PREFIX/etc/rattler-build/steps/cargo/build.yaml
+$HOST_PREFIX/etc/rattler-build/steps/cargo/build.yaml
+```
+
+An extensionless `build` file is accepted as a fallback. Provider packages
+should express tool dependencies such as `cargo` in their package metadata;
+reusable step files deliberately cannot add late requirements.
 
 !!! warning "Windows multiline steps"
     On Windows, a multiline `run: |` block is emitted as one command-list item.
