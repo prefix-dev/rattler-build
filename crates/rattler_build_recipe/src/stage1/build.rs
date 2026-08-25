@@ -620,6 +620,10 @@ impl VariantKeyUsage {
     }
 }
 
+fn default_prefix_detection_ignore() -> AllOrGlobVec {
+    AllOrGlobVec::All(false)
+}
+
 /// Prefix detection configuration
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PrefixDetection {
@@ -627,7 +631,10 @@ pub struct PrefixDetection {
     #[serde(default, skip_serializing_if = "ForceFileType::is_default")]
     pub force_file_type: ForceFileType,
     /// Files to ignore for prefix replacement
-    #[serde(default, skip_serializing_if = "AllOrGlobVec::is_none")]
+    #[serde(
+        default = "default_prefix_detection_ignore",
+        skip_serializing_if = "AllOrGlobVec::is_none"
+    )]
     pub ignore: AllOrGlobVec,
     /// Ignore binary files for prefix replacement (Unix only)
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
@@ -638,7 +645,7 @@ impl Default for PrefixDetection {
     fn default() -> Self {
         Self {
             force_file_type: ForceFileType::default(),
-            ignore: AllOrGlobVec::All(false),
+            ignore: default_prefix_detection_ignore(),
             ignore_binary_files: false,
         }
     }
@@ -1071,6 +1078,13 @@ mod tests {
         let build = Build::with_number(5);
         assert_eq!(build.number, Some(5));
         assert!(!build.is_default());
+    }
+
+    #[test]
+    fn prefix_detection_does_not_ignore_files_when_ignore_is_omitted() {
+        let build: Build = serde_yaml::from_str("prefix_detection: {}\n").unwrap();
+        assert_eq!(build.prefix_detection.ignore, AllOrGlobVec::All(false));
+        assert!(build.prefix_detection.is_default());
     }
 
     #[test]

@@ -152,18 +152,23 @@ fn matching_paths(root: &Path, pattern: &str) -> Result<Vec<PathBuf>, std::io::E
     Ok(paths)
 }
 
+fn write_framed(writer: &mut impl std::io::Write, bytes: &[u8]) -> Result<(), std::io::Error> {
+    writer.write_all(&(bytes.len() as u64).to_le_bytes())?;
+    writer.write_all(bytes)
+}
+
 fn fingerprint(root: &Path, declaration: &Declaration) -> Result<(String, usize), std::io::Error> {
     let paths = matching_paths(root, &declaration.glob)?;
     let count = paths.len();
     let mut hasher = HashingWriter::<_, Sha256>::new(std::io::sink());
     for path in paths {
         let relative = path.strip_prefix(root).unwrap_or(&path);
-        std::io::Write::write_all(
-            &mut hasher,
-            relative.to_string_lossy().replace('\\', "/").as_bytes(),
-        )?;
+        let relative = relative.to_string_lossy().replace('\\', "/");
+        write_framed(&mut hasher, relative.as_bytes())?;
         match declaration.method {
             Method::Hash => {
+                let metadata = fs_err::metadata(&path)?;
+                std::io::Write::write_all(&mut hasher, &metadata.len().to_le_bytes())?;
                 let mut file = File::open(&path)?;
                 let mut buffer = [0_u8; 64 * 1024];
                 loop {
@@ -304,5 +309,23 @@ mod tests {
         assert!(parse_declarations("input-hash: ../secret\n").is_err());
         assert!(parse_declarations("wat: src/**\n").is_err());
         assert!(parse_declarations("# only a comment\n").is_err());
+    }
+
+    #[test]
+    fn hash_fingerprint_frames_paths_and_contents() {
+        let first = tempfile::tempdir().unwrap();
+        fs_err::write(first.path().join("a"), "bc").unwrap();
+        let second = tempfile::tempdir().unwrap();
+        fs_err::write(second.path().join("ab"), "c").unwrap();
+        let declaration = Declaration {
+            side: Side::Input,
+            method: Method::Hash,
+            glob: "*".to_string(),
+        };
+
+        assert_ne!(
+            fingerprint(first.path(), &declaration).unwrap(),
+            fingerprint(second.path(), &declaration).unwrap()
+        );
     }
 }
