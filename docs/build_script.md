@@ -115,6 +115,49 @@ from leaking into the tool environment. See
 the [`examples/adjacent`](https://github.com/prefix-dev/rattler-build/tree/main/examples/adjacent)
 recipe for an independent lint step and an optional C++ test step.
 
+### Caching build steps
+
+Each build step receives `RATTLER_BUILD_STEP_CACHE`, pointing to a persistent
+file under the build directory. A successful step can write cache conditions to
+this file. On later invocations, rattler-build skips the step when all matching
+inputs and outputs are unchanged:
+
+```yaml
+- name: compile
+  run: |
+    cmake --build "$SRC_DIR/build"
+    cat > "$RATTLER_BUILD_STEP_CACHE" <<'EOF'
+    input-hash: CMakeLists.txt
+    input-hash: src/**
+    output-mtime: build/**
+    EOF
+```
+
+On Windows, write the same lines to `%RATTLER_BUILD_STEP_CACHE%`. The format is
+one `KEY: GLOB` declaration per line (blank lines and `#` comments are ignored):
+
+- `input-hash` / `output-hash` compare matching paths and file contents.
+- `input-mtime` / `output-mtime` compare matching paths, sizes, and modification
+  times.
+
+Globs use `/` separators, are relative to the step working directory, and may
+not be absolute or contain `..`. Every condition must match at least one file;
+a missing input or deleted output is a cache miss. Changes to the step's script,
+interpreter, environment, or working directory also invalidate its cache.
+Rattler-build stores the fingerprints next to the declaration file after the
+step succeeds. It removes the old declaration before a cache-miss execution, so
+a step must write the file again to remain cacheable. Failed steps never update
+cache state.
+
+The declaration file is intentionally simple to generate from shell scripts;
+the adjacent executor-owned `.state.json` file is an implementation detail and
+should not be edited by the step.
+
+See [`examples/step-cache`](https://github.com/prefix-dev/rattler-build/tree/main/examples/step-cache)
+for a small cross-platform, two-step example using both hash and mtime checks.
+The [`examples/adjacent`](https://github.com/prefix-dev/rattler-build/tree/main/examples/adjacent)
+recipe shows the same feature around a real CMake configure/build pipeline.
+
 ### Reusable steps
 
 A step can load its executable fields from a small YAML file:
@@ -206,10 +249,11 @@ participate in normal used-variable tracking. Reusable files use the same valid-
 blocks are not supported.
 
 Every build-step section receives a unique `OUTPUT_FILE` environment variable.
-A step can write an [RFC 6902 JSON Patch](https://datatracker.ietf.org/doc/html/rfc6902)
-to this file to update packaging metadata after all steps finish and before the
-package is created. For example, a reusable step can register generated license
-files:
+A step can write line-oriented metadata to this file after generating files or
+inspecting build-system output. Each line contains a dotted field, an optional
+`.append` operation, whitespace, and a value. Plain values are strings; lists
+and objects use JSON syntax so they remain unambiguous and easy to generate with
+`cat`:
 
 ```yaml
 requirements:
@@ -217,17 +261,34 @@ requirements:
 run: |
   go-licenses save ./... --save_path "$BUILD_DIR/go-dependencies"
   dollar='$'
-  printf '%s\n' '[{"op":"add","path":"/about/license_file/include/-","value":"'"$dollar"'{{ BUILD_DIR }}/go-dependencies/**"}]' > "$OUTPUT_FILE"
+  cat > "$OUTPUT_FILE" <<EOF
+  about.repository https://github.com/example/project
+  about.license_file.include.append ["$dollar{{ BUILD_DIR }}/go-dependencies/**"]
+  requirements.run.append ["libgcc >=14", "zlib"]
+  requirements.run_exports.strong.append ["project-abi >=1,<2"]
+  EOF
 ```
 
-Output patches are applied in step execution order. Commonly extended arrays,
-including `about.license_file` and the dynamic-linking allowlists, are
-materialized even when omitted from the recipe, so standard JSON Patch `/-`
-array appends work. Post-build patches may update `about.*` and packaging-time
-fields under `build.dynamic_linking`, `build.prefix_detection`, `build.files`,
+Outputs are applied in step execution order after all build steps finish and
+before packaging. Supported requirement collections are `requirements.run`,
+`requirements.run_constraints`, and the `noarch`, `strong`, `weak`,
+`strong_constraints`, and `weak_constraints` collections below
+`requirements.run_exports`. These update `index.json` and `run_exports.json` in
+the resulting package. Requirement fields are append-only because replacing an
+already finalized dependency set would be ambiguous.
+
+`requirements.build` and `requirements.host` cannot be emitted at runtime: the
+step is already running by then, so those environments have necessarily been
+solved and installed. Reusable steps must declare build and host requirements
+in their YAML metadata; rattler-build collects those requirements before the
+recipe solve.
+
+Post-build output may also update `about.*` and packaging-time fields under
+`build.dynamic_linking`, `build.prefix_detection`, `build.files`,
 `build.always_copy_files`, `build.always_include_files`, and
-`build.post_process`. Fields already consumed by rendering, solving, or script
-execution are rejected as too late to modify.
+`build.post_process`. Append targets are materialized even when omitted from the
+recipe. This line format replaces the prototype's RFC 6902 JSON Patch format so
+step output remains straightforward to inspect and generate.
 
 !!! warning "Windows multiline steps"
     On Windows, a multiline `run: |` block is emitted as one command-list item.
