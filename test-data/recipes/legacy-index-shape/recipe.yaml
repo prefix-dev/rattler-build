@@ -4,6 +4,11 @@ package:
   name: legacy-index-shape
   version: 1.0.0
 
+requirements:
+  extras:
+    test:
+      - pytest >=8
+
 build:
   script:
     - if: win

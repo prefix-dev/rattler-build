@@ -35,7 +35,7 @@ tokio = { version = "1.53.1", features = [
   "rt-multi-thread",
   "process",
 ] }
-rattler_conda_types = "0.51"
+rattler_conda_types = "0.52"
 rattler_config = "0.7"
 rattler_networking = { version = "0.30.3" }
 rattler_solve = "9.0"
