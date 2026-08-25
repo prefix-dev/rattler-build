@@ -470,7 +470,68 @@ pub async fn get_build_output(
 
     let timestamp = jiff::Timestamp::now();
 
-    for discovered_output in outputs_and_variants {
+    for mut discovered_output in outputs_and_variants {
+        let mut inherit_parent_build = true;
+        let mut inherit_parent_host = true;
+        // Resolve the step DAG before solving so step-local host requirements
+        // participate in environment creation. A normal build selects all
+        // non-optional roots; `run` supplies explicit roots.
+        if discovered_output.recipe.build.plan.steps().is_some() {
+            let selected = discovered_output
+                .recipe
+                .build
+                .plan
+                .select_steps(build_data.selected_steps.as_deref())
+                .map_err(|error| miette::miette!("invalid build steps: {error}"))?;
+            if let Some(requested_steps) = build_data.selected_steps.as_deref() {
+                // The explicitly requested roots define the solve group. DAG
+                // prerequisites execute in that same environment; their own
+                // inheritance setting applies only when selected directly.
+                let mut root_inheritance = requested_steps.iter().map(|requested| {
+                    selected
+                        .iter()
+                        .find(|step| step.name.as_deref() == Some(requested.as_str()))
+                        .expect("selected root must be present after DAG resolution")
+                        .requirements
+                        .inherit
+                        .clone()
+                });
+                if let Some(first) = root_inheritance.next() {
+                    if root_inheritance.any(|inherit| inherit != first) {
+                        return Err(miette::miette!(
+                            "selected build steps use incompatible parent environment inheritance; run them separately"
+                        ));
+                    }
+                    inherit_parent_build = first.build;
+                    inherit_parent_host = first.host;
+                }
+                if !inherit_parent_build {
+                    discovered_output.recipe.requirements.build.clear();
+                }
+                if !inherit_parent_host {
+                    discovered_output.recipe.requirements.host.clear();
+                }
+            }
+            for step in &selected {
+                discovered_output
+                    .recipe
+                    .requirements
+                    .build
+                    .extend(step.requirements.build.clone());
+                discovered_output
+                    .recipe
+                    .requirements
+                    .host
+                    .extend(step.requirements.host.clone());
+            }
+            discovered_output.recipe.build.plan =
+                rattler_build_recipe::stage1::build::BuildPlan::Steps(selected);
+        } else if build_data.selected_steps.is_some() {
+            return Err(miette::miette!(
+                "named steps were requested, but this recipe uses build.script"
+            ));
+        }
+
         let recipe = &discovered_output.recipe;
 
         // Check if this build should be skipped based on skip conditions
@@ -495,11 +556,39 @@ pub async fn get_build_output(
         // Use the global build name for outputs that inherit from staging caches
         // This ensures staging caches and their dependent packages share the same build directory
         // Otherwise, use the output's own name for the build directory
-        let build_name = if recipe.inherits_from.is_some() {
+        let mut build_name = if recipe.inherits_from.is_some() {
             global_build_name.clone()
         } else {
             recipe.package().name().as_normalized().to_string()
         };
+        // An isolated local solve gets its own deterministic prefixes. This
+        // prevents packages left by a previous parent-based solve from leaking
+        // into a standalone lint/tool environment.
+        if build_data.selected_steps.is_some() && (!inherit_parent_build || !inherit_parent_host) {
+            let step_group = build_data
+                .selected_steps
+                .as_deref()
+                .unwrap_or_default()
+                .join("-")
+                .chars()
+                .map(|character| {
+                    if character.is_ascii_alphanumeric() || matches!(character, '-' | '_') {
+                        character
+                    } else {
+                        '_'
+                    }
+                })
+                .collect::<String>();
+            build_name.push_str(&format!(
+                "-steps-{step_group}{}{}",
+                if !inherit_parent_build {
+                    "-no-build"
+                } else {
+                    ""
+                },
+                if !inherit_parent_host { "-no-host" } else { "" },
+            ));
+        }
 
         let variant_channels = if let Some(channel_sources) = discovered_output
             .used_vars
@@ -1582,6 +1671,86 @@ pub async fn publish_packages(
     Ok(())
 }
 
+/// Execute selected named build steps without packaging.
+///
+/// The build directory is deterministic (`--no-build-id` semantics), and the
+/// work directory and prefixes are retained and updated in place between runs.
+pub async fn run_steps(
+    recipe_path: PathBuf,
+    mut build_data: BuildData,
+    source_dir: Option<PathBuf>,
+    log_handler: &Option<LoggingOutputHandler>,
+) -> miette::Result<()> {
+    build_data.no_build_id = true;
+    build_data.keep_build = true;
+    build_data.test = TestStrategy::Skip;
+    let recipe_path = get_recipe_path(&recipe_path)?;
+    let tool_config = get_tool_config(&build_data, log_handler)?;
+    let outputs = get_build_output(&build_data, &recipe_path, &tool_config).await?;
+    if outputs.len() != 1 {
+        return Err(miette::miette!(
+            "`rattler-build run` currently requires a recipe with exactly one output (found {})",
+            outputs.len()
+        ));
+    }
+
+    let mut output = outputs.into_iter().next().expect("one output");
+    if let Some(source_dir) = source_dir {
+        let source_dir = canonicalize(&source_dir)
+            .into_diagnostic()
+            .wrap_err_with(|| {
+                format!(
+                    "failed to resolve source directory {}",
+                    source_dir.display()
+                )
+            })?;
+        if !source_dir.is_dir() {
+            return Err(miette::miette!(
+                "source directory is not a directory: {}",
+                source_dir.display()
+            ));
+        }
+        tracing::info!("Executing steps in source tree {}", source_dir.display());
+        output.build_configuration.directories.source_dir = Some(source_dir);
+    }
+    output
+        .build_configuration
+        .directories
+        .create_build_dir(false)
+        .into_diagnostic()?;
+    let source_info = output
+        .build_configuration
+        .directories
+        .work_dir
+        .join(".source_info.json");
+    if let Some(source_dir) = &output.build_configuration.directories.source_dir {
+        tracing::info!("Using project source tree in {}", source_dir.display());
+    } else if source_info.exists() {
+        tracing::info!(
+            "Reusing source tree in {}",
+            output.build_configuration.directories.work_dir.display()
+        );
+    } else {
+        output = output
+            .fetch_sources(&tool_config, source::patch::apply_patch_custom)
+            .await
+            .into_diagnostic()?;
+    }
+    output = output
+        .resolve_dependencies(
+            &tool_config,
+            render::resolved_dependencies::RunExportsDownload::DownloadMissing,
+        )
+        .await
+        .into_diagnostic()?;
+    output
+        .install_environments(&tool_config)
+        .await
+        .into_diagnostic()?;
+    output.run_build_script().await.into_diagnostic()?;
+    Ok(())
+}
+
 /// Debug a recipe by setting up the environment without running the build script
 pub async fn debug_recipe(
     debug_data: DebugData,
@@ -1626,6 +1795,7 @@ pub async fn debug_recipe(
         build_num_override: None,
         build_string_prefix: None,
         markdown_summary: None,
+        selected_steps: None,
     };
 
     let tool_config = get_tool_config(&build_data, log_handler)?;

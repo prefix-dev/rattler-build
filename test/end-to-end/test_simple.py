@@ -398,11 +398,7 @@ def host_subdir():
 
 def variant_hash(variant):
     hash_length = 7
-    # Mirrors conda's variant hash, which is defined by the ecosystem to be
-    # SHA1. This is a build-identity fingerprint used to assert that a built
-    # package is named correctly -- not a security control -- so it is marked
-    # usedforsecurity=False. That also keeps it working under FIPS.
-    m = hashlib.sha1(usedforsecurity=False)
+    m = hashlib.sha1()
     m.update(json.dumps(variant, sort_keys=True).encode())
     return f"h{m.hexdigest()[:hash_length]}"
 

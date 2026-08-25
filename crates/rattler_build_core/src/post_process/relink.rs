@@ -155,7 +155,6 @@ pub fn relink(temp_files: &TempFiles, output: &Output) -> Result<(), RelinkError
     if target_platform == Platform::NoArch
         // skip linking checks for wasm
         || target_platform.arch() == Some(Arch::Wasm32)
-        || target_platform.arch() == Some(Arch::Wasm64)
         || relocation_config.is_none()
     {
         return Ok(());

@@ -5,41 +5,6 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.74.0] - 2026-08-17
-### ✨ Highlights
-
-This release adds shared configuration discovery across rattler-based tools, configurable build execution runners, and initial `emscripten-wasm64` support. It also preserves namespaced prefix.dev channel paths and tolerates non-UTF-8 build output. Updated Rattler dependencies improve solver candidate selection, virtual-package defaults, package-cache filtering, OCI registry interoperability, repodata caching, and shell environment escaping.
-
-### Added
-
-- Read the shared config layer instead of pixi's config files by @Hofer-Julian in [#2724](https://github.com/prefix-dev/rattler-build/pull/2724)
-- Add runner to build configuration by @baszalmstra in [#2702](https://github.com/prefix-dev/rattler-build/pull/2702)
-- Wasm64 - skip link checks for wasm64 by @DerThorsten in [#2745](https://github.com/prefix-dev/rattler-build/pull/2745)
-
-
-### Changed
-
-- Update the cargo dependency group by @dependabot[bot] in [#2732](https://github.com/prefix-dev/rattler-build/pull/2732)
-
-### Rattler dependency updates
-
-The dependency update includes the following user-visible changes inherited from [conda/rattler](https://github.com/conda/rattler):
-
-- Add `emscripten-wasm64` to the platform model ([rattler#2680](https://github.com/conda/rattler/pull/2680)).
-- Introduce default versions for virtual packages and speed up CUDA virtual-package detection ([rattler#2646](https://github.com/conda/rattler/pull/2646), [rattler#2568](https://github.com/conda/rattler/pull/2568)).
-- Prefer candidates using their most restrictive requirement during solving ([rattler#2649](https://github.com/conda/rattler/pull/2649)).
-- Add package-cache layer filtering ([rattler#2652](https://github.com/conda/rattler/pull/2652)).
-- Follow OCI registry authentication challenges, report missing manifests as 404s, and retry digest-addressed blob misses through the manifest ([rattler#2628](https://github.com/conda/rattler/pull/2628), [rattler#2651](https://github.com/conda/rattler/pull/2651), [rattler#2653](https://github.com/conda/rattler/pull/2653)).
-- Honor HTTP `max-age` for repodata without requiring a public-cache directive ([rattler#2664](https://github.com/conda/rattler/pull/2664)).
-- Correctly escape environment-variable values in generated activation scripts ([rattler#2621](https://github.com/conda/rattler/pull/2621)).
-
-### Fixed
-
-- Preserve namespaced Prefix channel paths by @wolfv in [#2743](https://github.com/prefix-dev/rattler-build/pull/2743)
-- Decode build output lossily instead of failing on non-UTF-8 by @wolfv in [#2737](https://github.com/prefix-dev/rattler-build/pull/2737)
-
-
-
 ## [0.73.0] - 2026-08-13
 ### ✨ Highlights
 

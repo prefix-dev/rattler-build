@@ -607,37 +607,6 @@ async fn upload_to_artifactory(
     Ok(())
 }
 
-/// Split a Prefix channel URL into the server URL and channel identifier.
-///
-/// Prefix channels can be namespaced (for example,
-/// `https://beta.prefix.dev/wolfv/rattler-build-steps`), so the complete path
-/// identifies the channel rather than only its final segment.
-fn prefix_server_and_channel(url: &url::Url) -> miette::Result<(url::Url, String)> {
-    let channel = url
-        .path_segments()
-        .map(|segments| {
-            segments
-                .filter(|segment| !segment.is_empty())
-                .collect::<Vec<_>>()
-                .join("/")
-        })
-        .filter(|channel| !channel.is_empty())
-        .ok_or_else(|| miette::miette!("Invalid Prefix URL: missing channel name"))?;
-
-    let mut server_url = if url.scheme() == "prefix" {
-        url::Url::parse(&url.as_str().replacen("prefix:", "https:", 1))
-            .into_diagnostic()
-            .wrap_err("Failed to convert prefix:// URL to https://")?
-    } else {
-        url.clone()
-    };
-    server_url.set_path("");
-    server_url.set_query(None);
-    server_url.set_fragment(None);
-
-    Ok((server_url, channel))
-}
-
 /// Upload packages to Prefix.dev server
 async fn upload_to_prefix(
     url: &url::Url,
@@ -655,7 +624,24 @@ async fn upload_to_prefix(
     let auth_storage = tool_configuration::get_auth_store(publish_config.auth_file.clone())
         .map_err(|e| miette::miette!("Failed to get authentication storage: {}", e))?;
 
-    let (server_url, channel) = prefix_server_and_channel(url)?;
+    // Extract channel name from URL path
+    let channel = url
+        .path_segments()
+        .and_then(|mut segments| segments.next_back())
+        .ok_or_else(|| miette::miette!("Invalid Prefix URL: missing channel name"))?
+        .to_string();
+
+    // Convert prefix:// to https:// if needed, and strip the channel path from the URL
+    // The server_url should only contain the base URL (e.g., https://prefix.dev/)
+    // without the channel path, since the channel is passed separately to PrefixData
+    let mut server_url = url.clone();
+    if server_url.scheme() == "prefix" {
+        server_url
+            .set_scheme("https")
+            .map_err(|_| miette::miette!("Failed to convert prefix:// URL to https://"))?;
+    }
+    // Remove the channel path from the URL to get just the base server URL
+    server_url.set_path("");
 
     // Determine attestation source
     let attestation = if publish_config.generate_attestation {
@@ -828,39 +814,6 @@ mod tests {
 
     fn resolve(raw: &str) -> NamedChannelOrUrl {
         resolve_channel_for_repodata(&NamedChannelOrUrl::from_str(raw).unwrap())
-    }
-
-    #[test]
-    fn prefix_channel_url_preserves_namespaces() {
-        for (raw, expected_server, expected_channel) in [
-            (
-                "https://prefix.dev/my-channel",
-                "https://prefix.dev/",
-                "my-channel",
-            ),
-            (
-                "https://beta.prefix.dev/wolfv/rattler-build-steps",
-                "https://beta.prefix.dev/",
-                "wolfv/rattler-build-steps",
-            ),
-            (
-                "prefix://beta.prefix.dev/wolfv/rattler-build-steps/?ignored=yes#fragment",
-                "https://beta.prefix.dev/",
-                "wolfv/rattler-build-steps",
-            ),
-        ] {
-            let (server, channel) =
-                prefix_server_and_channel(&url::Url::parse(raw).unwrap()).unwrap();
-            assert_eq!(server.as_str(), expected_server);
-            assert_eq!(channel, expected_channel);
-        }
-    }
-
-    #[test]
-    fn prefix_channel_url_requires_a_channel_path() {
-        let error = prefix_server_and_channel(&url::Url::parse("https://prefix.dev/").unwrap())
-            .unwrap_err();
-        assert!(error.to_string().contains("missing channel name"));
     }
 
     #[test]

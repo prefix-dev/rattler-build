@@ -7,28 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.1.13](https://github.com/prefix-dev/rattler-build/compare/rattler_build_recipe-v0.1.12...rattler_build_recipe-v0.1.13) - 2026-08-21
-
-### Other
-
-- update Cargo.toml dependencies
-
-## [0.1.12](https://github.com/prefix-dev/rattler-build/compare/rattler_build_recipe-v0.1.11...rattler_build_recipe-v0.1.12) - 2026-08-17
-
-### Added
-
-- *(build-steps)* support steps in staging outputs ([#2647](https://github.com/prefix-dev/rattler-build/pull/2647))
-- Allow $schema top-level field in recipe.yaml ([#2645](https://github.com/prefix-dev/rattler-build/pull/2645))
-- add experimental build steps ([#2646](https://github.com/prefix-dev/rattler-build/pull/2646))
-
-### Fixed
-
-- inherit all top-level build settings for cache outputs ([#2641](https://github.com/prefix-dev/rattler-build/pull/2641))
-
-### Other
-
-- update the cargo dependency group ([#2732](https://github.com/prefix-dev/rattler-build/pull/2732))
-
 ## [0.1.11](https://github.com/prefix-dev/rattler-build/compare/rattler_build_recipe-v0.1.10...rattler_build_recipe-v0.1.11) - 2026-07-25
 
 ### Other
