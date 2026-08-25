@@ -154,7 +154,7 @@ pub async fn run_build(
     // Resolve dependencies for this output
     // If we inherited from a staging cache, finalized_cache_dependencies will be merged
     // into the final dependencies during the resolve_dependencies call
-    let output = output
+    let mut output = output
         .resolve_dependencies(tool_configuration, RunExportsDownload::DownloadMissing)
         .await
         .into_diagnostic()?;
@@ -230,6 +230,11 @@ pub async fn run_build(
             );
         }
     }
+
+    crate::recipe_patch::apply_outputs(
+        &mut output.recipe,
+        &output.build_configuration.directories.work_dir,
+    )?;
 
     // Package all the new files
     let (result, paths_json) = output

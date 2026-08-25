@@ -281,7 +281,8 @@ impl<'de> Deserialize<'de> for StepRequirementsInheritance {
 }
 
 impl StepRequirementsInheritance {
-    fn is_default(&self) -> bool {
+    /// Returns true when both parent environments are inherited.
+    pub fn is_default(&self) -> bool {
         self.build && self.host
     }
 }
@@ -293,26 +294,89 @@ impl StepRequirements {
     }
 }
 
-/// Parse a package step reference (`provider:step`). Paths return `Ok(None)`.
-pub fn parse_step_package_reference(reference: &str) -> Result<Option<(&str, &str)>, String> {
+/// Parsed packaged reusable-step reference.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct StepPackageReference<'a> {
+    /// Provider name.
+    pub provider: &'a str,
+    /// Step name inside the provider package.
+    pub step: &'a str,
+    /// Optional conda version constraint following `@`.
+    pub version: Option<&'a str>,
+}
+
+/// Parse `provider:step` or `provider:step@version`. Paths return `Ok(None)`.
+pub fn parse_step_package_reference_detailed(
+    reference: &str,
+) -> Result<Option<StepPackageReference<'_>>, String> {
     if reference.contains('/') || reference.contains('\\') || !reference.contains(':') {
         return Ok(None);
     }
-    let (provider, step) = reference
+    let (provider, step_and_version) = reference
         .split_once(':')
         .expect("contains(':') checked above");
+    let (step, version) = step_and_version
+        .split_once('@')
+        .map_or((step_and_version, None), |(step, version)| {
+            (step, Some(version))
+        });
     let valid = |value: &str| {
         !value.is_empty()
             && value.chars().all(|character| {
                 character.is_ascii_alphanumeric() || matches!(character, '-' | '_')
             })
     };
-    if !valid(provider) || !valid(step) || step.contains(':') {
+    if !valid(provider) || !valid(step) || step.contains(':') || version.is_some_and(str::is_empty)
+    {
         return Err(format!(
-            "invalid reusable step reference `{reference}`; expected `provider:step`"
+            "invalid reusable step reference `{reference}`; expected `provider:step[@version]`"
         ));
     }
-    Ok(Some((provider, step)))
+    Ok(Some(StepPackageReference {
+        provider,
+        step,
+        version,
+    }))
+}
+
+/// Parse a package step reference while ignoring its optional version.
+pub fn parse_step_package_reference(reference: &str) -> Result<Option<(&str, &str)>, String> {
+    Ok(parse_step_package_reference_detailed(reference)?
+        .map(|reference| (reference.provider, reference.step)))
+}
+
+/// Exact provenance for a packaged reusable-step provider.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ResolvedProvider {
+    /// Provider package name.
+    pub name: String,
+    /// Resolved package version.
+    pub version: String,
+    /// Resolved package build string.
+    pub build: String,
+    /// Resolved package subdirectory.
+    pub subdir: String,
+    /// Canonical channel recorded by repodata.
+    pub channel: String,
+    /// SHA-256 of the provider artifact when available.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sha256: Option<String>,
+}
+
+/// Provenance and fully rendered contents of a reusable step.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ResolvedStep {
+    /// Original portable `uses` reference.
+    pub reference: String,
+    /// Exact provider package, absent for recipe-local reusable files.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider: Option<ResolvedProvider>,
+    /// SHA-256 of the reusable YAML contents.
+    pub content_sha256: String,
+    /// SHA-256 of the rendered step payload, including resolved inputs.
+    pub rendered_sha256: String,
+    /// Steps loaded from the reusable file after provider resolution.
+    pub steps: Vec<Step>,
 }
 
 /// A stage1 build step with evaluated metadata and script content.
@@ -325,6 +389,12 @@ pub struct Step {
     /// Reusable step reference, either a recipe-relative path or `provider:step`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub uses: Option<String>,
+    /// Evaluated typed arguments passed to the reusable step.
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
+    pub with: IndexMap<String, rattler_build_jinja::Variable>,
+    /// Preprocessed reusable contents and exact source provenance.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resolved: Option<Box<ResolvedStep>>,
     /// Optional unique name used by the step DAG and CLI.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
@@ -356,6 +426,8 @@ impl Step {
     pub fn new(script: Script) -> Self {
         Self {
             uses: None,
+            with: IndexMap::new(),
+            resolved: None,
             name: None,
             optional: false,
             depends_on: Vec::new(),
@@ -418,6 +490,14 @@ impl BuildPlan {
         match self {
             Self::Script(_) => None,
             Self::Steps(steps) => Some(steps.as_slice()),
+        }
+    }
+
+    /// Mutably access explicit build steps.
+    pub fn steps_mut(&mut self) -> Option<&mut Vec<Step>> {
+        match self {
+            Self::Script(_) => None,
+            Self::Steps(steps) => Some(steps),
         }
     }
 
@@ -1128,6 +1208,22 @@ steps:
                 "expected null script/steps to be rejected: {yaml:?}"
             );
         }
+    }
+
+    #[test]
+    fn test_parse_versioned_step_package_reference() {
+        let parsed = parse_step_package_reference_detailed("cmake:build@>=0.3,<0.4")
+            .unwrap()
+            .unwrap();
+        assert_eq!(parsed.provider, "cmake");
+        assert_eq!(parsed.step, "build");
+        assert_eq!(parsed.version, Some(">=0.3,<0.4"));
+        assert!(
+            parse_step_package_reference_detailed("./steps/build.yaml")
+                .unwrap()
+                .is_none()
+        );
+        assert!(parse_step_package_reference_detailed("cmake:build@").is_err());
     }
 
     #[test]

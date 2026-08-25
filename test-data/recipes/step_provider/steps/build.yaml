@@ -1,0 +1,12 @@
+inputs:
+  message:
+    type: string
+    default: provider-worked
+steps:
+  - if: win
+    then:
+      - run: |
+          if not exist "%PREFIX%\share\step-provider" mkdir "%PREFIX%\share\step-provider"
+          echo ${{ inputs.message }}> "%PREFIX%\share\step-provider\marker.txt"
+    else:
+      - run: mkdir -p "$PREFIX/share/step-provider" && echo "${{ inputs.message }}" > "$PREFIX/share/step-provider/marker.txt"

@@ -1,0 +1,32 @@
+schema_version: 1
+
+package:
+  name: provider-example-meson
+  version: 0.1.0
+
+source:
+  path: .
+
+build:
+  skip: win
+  steps:
+    - uses: meson:build@0.3.*
+      with:
+        build_type: debugoptimized
+        extra_args:
+          - -Dwarning_level=3
+        compile_args:
+          - --verbose
+
+requirements:
+  build:
+    - ${{ compiler('c') }}
+
+tests:
+  - script:
+      - hello-meson
+
+about:
+  license: MIT
+  license_file: LICENSE
+  summary: Minimal recipe using the Meson reusable build-step provider

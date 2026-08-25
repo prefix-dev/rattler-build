@@ -120,6 +120,9 @@ pub struct Configuration {
     /// Concurrency limit for I/O operations
     pub io_concurrency_limit: Option<usize>,
 
+    /// Root directory used for package, repodata, and standalone tool caches.
+    pub cache_dir: PathBuf,
+
     /// The package cache to use to store packages in.
     pub package_cache: PackageCache,
 
@@ -489,6 +492,7 @@ impl ConfigurationBuilder {
             channel_config,
             compression_threads: self.compression_threads,
             io_concurrency_limit: self.io_concurrency_limit,
+            cache_dir,
             package_cache,
             repodata_gateway,
             channel_priority: self.channel_priority,

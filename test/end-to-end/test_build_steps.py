@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from helpers import RattlerBuild, get_extracted_package
+from helpers import RattlerBuild, get_extracted_package, get_package
 
 
 def test_build_steps(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
@@ -28,6 +28,45 @@ def test_build_steps(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path)
         "step-local env did not reach the section"
     )
     assert "unset" in step3.read_text(), "step-local env leaked to a later section"
+
+
+def test_reusable_steps_inputs_and_generated_licenses(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Reusable inputs render before solving and generated licenses are metadata-only."""
+    rattler_build.build(
+        recipes / "reusable_steps", tmp_path, extra_args=["--experimental"]
+    )
+    pkg = get_extracted_package(tmp_path, "reusable_steps_test")
+
+    assert (pkg / "share" / "reusable-steps" / "marker.txt").exists()
+    license_file = pkg / "info" / "licenses" / "dependency.txt"
+    assert license_file.read_text().strip() == "dependency-license"
+    assert not (pkg / "generated-licenses").exists()
+
+
+def test_packaged_step_provider_uses_standalone_environment(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """A versioned provider resolves from a local channel without entering the package."""
+    provider_output = tmp_path / "provider-output"
+    channel = tmp_path / "channel"
+    consumer_output = tmp_path / "consumer-output"
+    rattler_build.build(recipes / "step_provider", provider_output)
+    provider_package = get_package(provider_output, "test-rattler-build-steps")
+    rattler_build("publish", str(provider_package), "--to", str(channel))
+
+    rattler_build.build(
+        recipes / "step_provider_consumer",
+        consumer_output,
+        custom_channels=[channel.as_uri(), "conda-forge"],
+        extra_args=["--experimental"],
+    )
+    pkg = get_extracted_package(consumer_output, "step-provider-consumer")
+    assert (
+        pkg / "share" / "step-provider" / "marker.txt"
+    ).read_text().strip() == "exact-provider-worked"
+    assert not any(pkg.rglob("test-rattler-build-steps*"))
 
 
 def test_default_build_script_still_runs(

@@ -1,0 +1,10 @@
+schema_version: 1
+package:
+  name: test-rattler-build-steps
+  version: 1.0.0
+build:
+  noarch: generic
+  script: >-
+    python -c "import os,pathlib,shutil; p=pathlib.Path(os.environ['PREFIX'])/'etc/rattler-build/steps/test'; p.mkdir(parents=True,exist_ok=True); shutil.copy(pathlib.Path(os.environ['RECIPE_DIR'])/'steps/build.yaml',p/'build.yaml')"
+requirements:
+  build: [python]
