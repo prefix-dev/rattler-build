@@ -545,24 +545,6 @@ pub fn env_vars_from_variant(
         .collect()
 }
 
-/// Convert the variant keys that only have a single possible value into
-/// environment variables, excluding language-specific keys that are handled
-/// separately. `all_variants` is expected to hold every key and all of its
-/// possible values from the variant configuration, not just the ones a
-/// recipe uses.
-pub fn env_vars_from_single_value_variants(
-    all_variants: &BTreeMap<NormalizedKey, Vec<Variable>>,
-) -> HashMap<String, Option<String>> {
-    let single_value_variants: BTreeMap<NormalizedKey, Variable> = all_variants
-        .iter()
-        .filter_map(|(k, values)| match values.as_slice() {
-            [value] => Some((k.clone(), value.clone())),
-            _ => None,
-        })
-        .collect();
-    env_vars_from_variant(&single_value_variants)
-}
-
 #[cfg(test)]
 mod test {
     use super::*;

@@ -299,8 +299,8 @@ impl Output {
         // inheriting output may not directly reference variant keys (like
         // CONDA_BUILD_SYSROOT) that the staging cache's compilers depend on.
         env_vars.extend(env_vars::env_vars_from_variant(&staging.used_variant));
-        env_vars.extend(env_vars::env_vars_from_single_value_variants(
-            &self.build_configuration.all_variants,
+        env_vars.extend(env_vars::env_vars_from_variant(
+            &self.build_configuration.single_value_variants(),
         ));
 
         // A staging cache does not produce a package, so the PKG_* vars

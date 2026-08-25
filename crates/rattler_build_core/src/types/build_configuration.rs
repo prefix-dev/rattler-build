@@ -107,4 +107,29 @@ impl BuildConfiguration {
             recipe_path: None,
         }
     }
+
+    /// Variant keys from `all_variants` that only have a single possible
+    /// value (empty unless `--pass-all-variants-as-env` was passed).
+    pub fn single_value_variants(&self) -> BTreeMap<NormalizedKey, Variable> {
+        self.all_variants
+            .iter()
+            .filter_map(|(key, values)| match values.as_slice() {
+                [value] => Some((key.clone(), value.clone())),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// The variant keys the recipe actually uses, plus (only when
+    /// `--pass-all-variants-as-env` was passed) any additional variant keys
+    /// that only have a single possible value. Used for provenance data
+    /// (e.g. the `variant_config.yaml` stored in the package) rather than
+    /// hashing or build-string computation.
+    pub fn variant_with_single_value_extras(&self) -> BTreeMap<NormalizedKey, Variable> {
+        let mut variant = self.variant.clone();
+        for (key, value) in self.single_value_variants() {
+            variant.entry(key).or_insert(value);
+        }
+        variant
+    }
 }
