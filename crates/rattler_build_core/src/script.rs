@@ -185,6 +185,9 @@ impl Output {
             context.runtime(),
         ));
         env_vars.extend(env_vars::env_vars_from_variant(self.variant()));
+        env_vars.extend(env_vars::env_vars_from_single_value_variants(
+            &self.build_configuration.all_variants,
+        ));
         prepare_build_plan_execution_args(
             &build.plan,
             &self.recipe.context,

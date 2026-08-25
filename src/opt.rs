@@ -621,6 +621,12 @@ pub struct BuildOpts {
     #[arg(long)]
     pub ignore_recipe_variants: bool,
 
+    /// Expose every variant key that only has a single possible value as an
+    /// environment variable to the build script, even if the recipe does not
+    /// otherwise reference it.
+    #[arg(long)]
+    pub pass_all_variants_as_env: bool,
+
     /// Render the recipe files without executing the build.
     #[arg(long)]
     pub render_only: bool,
@@ -901,6 +907,7 @@ pub struct BuildData {
     pub variant_config: Vec<PathBuf>,
     pub variant_overrides: HashMap<String, Vec<String>>,
     pub ignore_recipe_variants: bool,
+    pub pass_all_variants_as_env: bool,
     pub render_only: bool,
     pub with_solve: bool,
     pub keep_build: bool,
@@ -939,6 +946,7 @@ impl BuildData {
         variant_config: Option<Vec<PathBuf>>,
         variant_overrides: HashMap<String, Vec<String>>,
         ignore_recipe_variants: bool,
+        pass_all_variants_as_env: bool,
         render_only: bool,
         with_solve: bool,
         keep_build: bool,
@@ -977,6 +985,7 @@ impl BuildData {
             variant_config: variant_config.unwrap_or_default(),
             variant_overrides,
             ignore_recipe_variants,
+            pass_all_variants_as_env,
             render_only,
             with_solve,
             keep_build,
@@ -1026,6 +1035,7 @@ impl BuildData {
             opts.variant_config,
             opts.variant_overrides.into_iter().collect(),
             opts.ignore_recipe_variants,
+            opts.pass_all_variants_as_env,
             opts.render_only,
             opts.with_solve,
             opts.keep_build,

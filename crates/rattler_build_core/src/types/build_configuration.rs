@@ -73,6 +73,15 @@ pub struct BuildConfiguration {
     /// Repodata revision to target when writing package metadata.
     #[serde(skip_serializing, default)]
     pub repodata_revision: RepodataRevision,
+
+    /// All variant keys and their possible values from the variant
+    /// configuration (not just the ones the recipe actually uses). When
+    /// `--pass-all-variants-as-env` is passed, the keys among these
+    /// that only have a single possible value are exported as environment
+    /// variables to the build script in addition to the variant keys the
+    /// recipe actually uses. Empty unless that flag is set.
+    #[serde(skip_serializing, default)]
+    pub all_variants: BTreeMap<NormalizedKey, Vec<Variable>>,
 }
 
 impl BuildConfiguration {

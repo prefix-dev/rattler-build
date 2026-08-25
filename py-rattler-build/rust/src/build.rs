@@ -229,6 +229,7 @@ pub(crate) fn output_from_rendered_variant(
             sandbox_config: None,
             exclude_newer,
             repodata_revision: repodata_revision.into(),
+            all_variants: Default::default(),
         },
         finalized_dependencies: None,
         finalized_sources: None,
