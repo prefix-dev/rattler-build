@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.75.0] - 2026-08-26
+### ✨ Highlights
+
+This release features CEP-6 channel notices and various bug fixes.
+
+
+### Added
+
+- Display CEP-6 channel notices by @wolfv in [#2749](https://github.com/prefix-dev/rattler-build/pull/2749)
+
+
+### Fixed
+
+- Select platform-appropriate legacy test scripts by @jezdez in [#2751](https://github.com/prefix-dev/rattler-build/pull/2751)
+- Allow legacy-compatible optional dependencies by @baszalmstra in [#2768](https://github.com/prefix-dev/rattler-build/pull/2768)
+
+
+### New Contributors
+* @jezdez made their first contribution in [#2751](https://github.com/prefix-dev/rattler-build/pull/2751)
+
 ## [0.74.0] - 2026-08-17
 ### ✨ Highlights
 
