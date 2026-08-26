@@ -2084,10 +2084,11 @@ dependencies = [
 
 [[package]]
 name = "flickzeug"
-version = "0.5.4"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fb44f8d38184df06a8bd1bd6bf594a2b8a8a1a7a59768f8ce102d0510462355f"
+checksum = "193f9e0d733b59a9db196a6443d654c0ced3986faf000da429538998f2eecb7a"
 dependencies = [
+ "memchr",
  "nu-ansi-term",
  "strsim",
  "thiserror 2.0.19",
