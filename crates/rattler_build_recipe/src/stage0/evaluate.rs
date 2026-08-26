@@ -1804,15 +1804,6 @@ impl Evaluate for Stage0Requirements {
     type Output = Stage1Requirements;
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
-        if !self.extras.is_empty() && context.repodata_revision() != RepodataRevision::V3 {
-            return Err(ParseError::invalid_value(
-                "requirements.extras",
-                "optional dependency groups require the --v3 flag",
-                Span::new_blank(),
-            )
-            .with_suggestion("Enable --v3 to use requirements.extras."));
-        }
-
         let extras = self
             .extras
             .iter()

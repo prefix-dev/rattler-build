@@ -1158,18 +1158,13 @@ This is the version bound consistent with CentOS 6. Software built against glibc
 `mamba`, `conda` or `pixi` tell the user that a given package can't be installed if their system
 glibc version is too old.
 
-### Optional dependencies / extras (V3, beta)
+### Optional dependencies / extras
 
-!!! warning "Beta — opt in with `--v3`"
-    `requirements.extras` is part of the V3 repodata revision and is only
-    accepted when Rattler-Build is invoked with `--v3`. Without the flag,
-    recipes that declare an `extras` mapping fail to evaluate. See
-    [V3 packages](../v3.md) for background.
-
-`extras` is a mapping from a group name to a list of dependencies that are
-*not* installed by default. Consumers opt in via the V3 `extras=[…]`
-`MatchSpec` key. This mirrors the optional-dependencies idea from
-`pyproject.toml`.
+`requirements.extras` is supported in both legacy and V3 packages. `extras`
+is a mapping from a group name to a list of dependencies that are *not*
+installed by default. Consumers opt in via the V3-only `extras=[…]`
+`MatchSpec` key, which requires `--v3`. This mirrors the
+optional-dependencies idea from `pyproject.toml`.
 
 ```yaml
 requirements:

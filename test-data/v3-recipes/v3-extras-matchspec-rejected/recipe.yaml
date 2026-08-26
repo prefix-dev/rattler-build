@@ -1,0 +1,9 @@
+schema_version: 1
+
+package:
+  name: v3-extras-matchspec-rejected
+  version: 1.0.0
+
+requirements:
+  run:
+    - foo [extras=["bla"]]

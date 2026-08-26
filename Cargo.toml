@@ -134,7 +134,7 @@ tracing-subscriber = { version = "0.3", features = [
 tracing-test = "0.2.6"
 
 # Rattler crates
-rattler_conda_types = { version = "0.51", default-features = false }
+rattler_conda_types = { version = "0.52", default-features = false }
 rattler_digest = { version = "1.3.2", default-features = false, features = [
   "serde",
 ] }
