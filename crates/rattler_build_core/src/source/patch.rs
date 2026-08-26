@@ -12,8 +12,8 @@ use std::{
 };
 
 use flickzeug::{
-    ApplyConfig, ApplyError, ApplyOutcome, Diff, FuzzyConfig, HunkRangeStrategy, ParsePatchError,
-    ParserConfig, Patch, apply_bytes_reporting, apply_bytes_with_config,
+    ApplyConfig, ApplyError, ApplyOutcome, Diff, FuzzyConfig, HunkRangeStrategy, LineEndHandling,
+    ParsePatchError, ParserConfig, Patch, apply_bytes_reporting, apply_bytes_with_config,
     patch_from_bytes_with_config,
 };
 use fs_err::File;
@@ -171,12 +171,13 @@ fn patch_from_bytes_raw(input: &[u8]) -> Result<Patch<'_, [u8]>, ParsePatchError
 /// `apply` and the already-applied detection so both agree on what "applies".
 fn apply_config() -> ApplyConfig {
     ApplyConfig {
+        line_end_strategy: LineEndHandling::KeepOriginal,
         fuzzy_config: FuzzyConfig {
             max_fuzz: 2,
             ignore_whitespace: true,
             ignore_case: false,
+            similarity_threshold: 0.8,
         },
-        ..Default::default()
     }
 }
 
@@ -651,6 +652,83 @@ mod tests {
             after_first, after_second,
             "already-applied patch must not modify the file again"
         );
+    }
+
+    #[test]
+    fn test_trailing_newline_only_patch_is_applied() {
+        let tempdir = TempDir::new().unwrap();
+        let target = tempdir.path().join("file.txt");
+        let patch = tempdir.path().join("newline.patch");
+        fs_err::write(&target, b"gamma").unwrap();
+        fs_err::write(
+            &patch,
+            b"--- file.txt\n+++ file.txt\n@@ -1 +1 @@\n-gamma\n\\ No newline at end of file\n+gamma\n",
+        )
+        .unwrap();
+
+        apply_patch_custom(tempdir.path(), &patch).unwrap();
+        assert_eq!(fs_err::read(&target).unwrap(), b"gamma\n");
+
+        apply_patch_custom(tempdir.path(), &patch).unwrap();
+        assert_eq!(fs_err::read(&target).unwrap(), b"gamma\n");
+    }
+
+    #[test]
+    fn test_patch_preserves_mixed_line_endings() {
+        let tempdir = TempDir::new().unwrap();
+        let target = tempdir.path().join("file.txt");
+        let patch = tempdir.path().join("mixed-endings.patch");
+        fs_err::write(&target, b"keep\r\nold\r\nplain\nmore\r\n").unwrap();
+        fs_err::write(
+            &patch,
+            b"--- file.txt\n+++ file.txt\n@@ -2 +2 @@\n-old\n+new\n",
+        )
+        .unwrap();
+
+        apply_patch_custom(tempdir.path(), &patch).unwrap();
+        assert_eq!(
+            fs_err::read(&target).unwrap(),
+            b"keep\r\nnew\r\nplain\nmore\r\n"
+        );
+    }
+
+    #[test]
+    fn test_fuzzy_patch_does_not_delete_similar_line() {
+        let tempdir = TempDir::new().unwrap();
+        let target = tempdir.path().join("file.txt");
+        let patch = tempdir.path().join("similar-deletion.patch");
+        let content = b"context 1\nthe quick brown fox jumps\ncontext 2\n";
+        fs_err::write(&target, content).unwrap();
+        fs_err::write(
+            &patch,
+            b"--- file.txt\n+++ file.txt\n@@ -1,3 +1,2 @@\n context 1\n-the quick brown fox jumped\n context 2\n",
+        )
+        .unwrap();
+
+        assert!(matches!(
+            apply_patch_custom(tempdir.path(), &patch),
+            Err(SourceError::PatchApplyError(_))
+        ));
+        assert_eq!(fs_err::read(&target).unwrap(), content);
+    }
+
+    #[test]
+    fn test_malformed_later_hunk_does_not_partially_apply() {
+        let tempdir = TempDir::new().unwrap();
+        let target = tempdir.path().join("file.txt");
+        let patch = tempdir.path().join("malformed.patch");
+        fs_err::write(&target, b"old\n").unwrap();
+        fs_err::write(
+            &patch,
+            b"--- file.txt\n+++ file.txt\n@@ -1 +1 @@\n-old\n+new\n@@ -10,2 +10,2 XX broken header\n context\n-old\n+new\n",
+        )
+        .unwrap();
+
+        assert!(matches!(
+            apply_patch_custom(tempdir.path(), &patch),
+            Err(SourceError::PatchParseFailed(_))
+        ));
+        assert_eq!(fs_err::read(&target).unwrap(), b"old\n");
     }
 
     #[test]
