@@ -2736,10 +2736,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#optional-dependencies-extras-v3-beta" class="md-nav__link">
+  <a href="#optional-dependencies-extras" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Optional dependencies / extras (V3, beta)
+        Optional dependencies / extras
       </span>
     </span>
   </a>
@@ -4697,10 +4697,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#optional-dependencies-extras-v3-beta" class="md-nav__link">
+  <a href="#optional-dependencies-extras" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Optional dependencies / extras (V3, beta)
+        Optional dependencies / extras
       </span>
     </span>
   </a>
@@ -5956,18 +5956,12 @@ This is the version bound consistent with CentOS 6. Software built against glibc
 2.12 will be compatible with CentOS 6. This <code>run_constraints</code> dependency helps
 <code>mamba</code>, <code>conda</code> or <code>pixi</code> tell the user that a given package can't be installed if their system
 glibc version is too old.</p>
-<h3 id="optional-dependencies-extras-v3-beta">Optional dependencies / extras (V3, beta)<a class="headerlink" href="#optional-dependencies-extras-v3-beta" title="Permanent link">#</a></h3>
-<div class="admonition warning">
-<p class="admonition-title">Beta — opt in with <code>--v3</code></p>
-<p><code>requirements.extras</code> is part of the V3 repodata revision and is only
-accepted when Rattler-Build is invoked with <code>--v3</code>. Without the flag,
-recipes that declare an <code>extras</code> mapping fail to evaluate. See
-<a href="../../v3/">V3 packages</a> for background.</p>
-</div>
-<p><code>extras</code> is a mapping from a group name to a list of dependencies that are
-<em>not</em> installed by default. Consumers opt in via the V3 <code>extras=[…]</code>
-<code>MatchSpec</code> key. This mirrors the optional-dependencies idea from
-<code>pyproject.toml</code>.</p>
+<h3 id="optional-dependencies-extras">Optional dependencies / extras<a class="headerlink" href="#optional-dependencies-extras" title="Permanent link">#</a></h3>
+<p><code>requirements.extras</code> is supported in both legacy and V3 packages. <code>extras</code>
+is a mapping from a group name to a list of dependencies that are <em>not</em>
+installed by default. Consumers opt in via the V3-only <code>extras=[…]</code>
+<code>MatchSpec</code> key, which requires <code>--v3</code>. This mirrors the
+optional-dependencies idea from <code>pyproject.toml</code>.</p>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-54-1"><a id="__codelineno-54-1" name="__codelineno-54-1" href="#__codelineno-54-1"></a><span class="nt">requirements</span><span class="p">:</span>
 </span><span id="__span-54-2"><a id="__codelineno-54-2" name="__codelineno-54-2" href="#__codelineno-54-2"></a><span class="w">  </span><span class="nt">run</span><span class="p">:</span>
 </span><span id="__span-54-3"><a id="__codelineno-54-3" name="__codelineno-54-3" href="#__codelineno-54-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python &gt;=3.10</span>

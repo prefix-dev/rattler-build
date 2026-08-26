@@ -1049,10 +1049,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#requirementsextras-optional-dependency-groups" class="md-nav__link">
+  <a href="#optional-dependency-groups" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        <code>requirements.extras</code> — optional dependency groups
+        Optional dependency groups
       </span>
     </span>
   </a>
@@ -3978,10 +3978,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#requirementsextras-optional-dependency-groups" class="md-nav__link">
+  <a href="#optional-dependency-groups" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        <code>requirements.extras</code> — optional dependency groups
+        Optional dependency groups
       </span>
     </span>
   </a>
@@ -4054,8 +4054,8 @@
 <p class="admonition-title">Beta — not for production use</p>
 <p>V3 is an <strong>opt-in preview</strong> of the next conda repodata revision and is
 still under active development. The on-disk repodata format, the
-<code>index.json</code> layout, recipe fields (<code>build.flags</code>, <code>requirements.extras</code>,
-…) and the <code>MatchSpec</code> bracket syntax described on this page <strong>can and
+<code>index.json</code> layout, V3-only recipe fields such as <code>build.flags</code>, and the
+<code>MatchSpec</code> bracket syntax described on this page <strong>can and
 will change in backwards-incompatible ways</strong> before V3 is finalized.
 Concretely, this means:</p>
 <ul>
@@ -4073,11 +4073,10 @@ stabilizes. Track the discussion in the relevant CEPs and the
 <a href="https://github.com/prefix-dev/rattler-build/issues">rattler-build issue tracker</a>
 before depending on it.</p>
 </div>
-<p>V3 is a new revision of the conda repodata format. It extends the existing
-package record with two new fields and adds a richer <code>MatchSpec</code> bracket
-syntax that lets you express conditional, optional and variant-tagged
-dependencies. Rattler-Build can produce V3 packages and parse V3 recipes,
-but only when the feature is explicitly enabled.</p>
+<p>V3 is a new revision of the conda repodata format. It adds package flags and
+a richer <code>MatchSpec</code> bracket syntax that lets you express conditional, optional
+and variant-tagged dependencies. Rattler-Build can produce V3 packages and
+parse V3 recipes, but only when the feature is explicitly enabled.</p>
 <h2 id="opting-in">Opting in<a class="headerlink" href="#opting-in" title="Permanent link">#</a></h2>
 <p>V3 is gated behind a single flag. There are two ways to turn it on:</p>
 <ul>
@@ -4095,8 +4094,8 @@ but only when the feature is explicitly enabled.</p>
 <p>When the flag is <strong>off</strong> (the default), Rattler-Build behaves exactly like
 before:</p>
 <ul>
-<li>Recipes that use V3-only fields (<code>build.flags</code>, <code>requirements.extras</code>) fail
-  to evaluate with an error pointing at <code>--v3</code>.</li>
+<li>Recipes that use V3-only fields (<code>build.flags</code>) fail to evaluate with an
+  error pointing at <code>--v3</code>.</li>
 <li><code>MatchSpec</code> strings that use V3-only bracket keys (<code>flags=[…]</code>,
   <code>extras=[…]</code>, <code>when="…"</code>) fail to parse with the same error.</li>
 <li>Built packages get the legacy <code>index.json</code> shape — there is no
@@ -4104,13 +4103,13 @@ before:</p>
 </ul>
 <p>When the flag is <strong>on</strong>:</p>
 <ul>
-<li>The new recipe fields are accepted and round-tripped through Stage 0/Stage 1
+<li>V3-only recipe fields are accepted and round-tripped through Stage 0/Stage 1
   evaluation.</li>
 <li>V3 <code>MatchSpec</code> syntax is parsed everywhere a dependency string is allowed
   (<code>requirements.{build,host,run,run_constraints,extras}</code>, <code>run_exports</code>).</li>
 <li>Built packages are tagged with <code>repodata_revision: 3</code> in <code>index.json</code> and
-  carry their declared variant flags in a top-level <code>flags</code> array. Optional
-  dependency groups are written into the <code>extra_depends</code> mapping.</li>
+  carry their declared variant flags in a top-level <code>flags</code> array. Declared
+  optional dependency groups are written into the <code>extra_depends</code> mapping.</li>
 </ul>
 <h2 id="what-v3-adds">What V3 adds<a class="headerlink" href="#what-v3-adds" title="Permanent link">#</a></h2>
 <h3 id="buildflags-package-variant-flags"><code>build.flags</code> — package variant flags<a class="headerlink" href="#buildflags-package-variant-flags" title="Permanent link">#</a></h3>
@@ -4134,9 +4133,10 @@ valid:</p>
 </span></code></pre></div>
 <p>Flags that depend on a Jinja variable participate in variant hashing, so
 each flag combination produces its own build hash.</p>
-<h3 id="requirementsextras-optional-dependency-groups"><code>requirements.extras</code> — optional dependency groups<a class="headerlink" href="#requirementsextras-optional-dependency-groups" title="Permanent link">#</a></h3>
-<p><code>extras</code> is a mapping from a group name to a list of dependencies. The group
-is <em>not</em> installed by default — consumers opt in via the <code>extras=[…]</code>
+<h3 id="optional-dependency-groups">Optional dependency groups<a class="headerlink" href="#optional-dependency-groups" title="Permanent link">#</a></h3>
+<p><code>requirements.extras</code> is supported in both legacy and V3 packages. <code>extras</code>
+is a mapping from a group name to a list of dependencies. The group is <em>not</em>
+installed by default — consumers opt in via the V3-only <code>extras=[…]</code>
 <code>MatchSpec</code> bracket key. This mirrors the "optional dependencies" idea from
 <code>pyproject.toml</code>.</p>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">requirements</span><span class="p">:</span>
