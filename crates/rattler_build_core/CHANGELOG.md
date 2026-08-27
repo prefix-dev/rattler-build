@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.13](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.12...rattler_build_core-v0.2.13) - 2026-08-27
+
+### Other
+
+- update flickzeug to 0.6.0 ([#2772](https://github.com/prefix-dev/rattler-build/pull/2772))
+
 ## [0.2.12](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.11...rattler_build_core-v0.2.12) - 2026-08-21
 
 ### Added
