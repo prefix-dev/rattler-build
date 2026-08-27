@@ -39,7 +39,7 @@ rattler_conda_types = "0.52"
 rattler_config = "0.7"
 rattler_networking = { version = "0.30.3" }
 rattler_solve = "9.0"
-rattler_virtual_packages = "5.1.0"
+rattler_virtual_packages = "6.0.0"
 clap = "4.6.4"
 url = "2.5.8"
 jiff = "0.2.35"
