@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.12](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.11...rattler_build_core-v0.2.12) - 2026-08-21
+
+### Added
+
+- display CEP-6 channel notices ([#2749](https://github.com/prefix-dev/rattler-build/pull/2749))
+
+### Fixed
+
+- select platform-appropriate legacy test scripts ([#2751](https://github.com/prefix-dev/rattler-build/pull/2751))
+
+## [0.2.11](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.10...rattler_build_core-v0.2.11) - 2026-08-17
+
+### Added
+
+- wasm64 - skip link checks for wasm64 ([#2745](https://github.com/prefix-dev/rattler-build/pull/2745))
+- add runner to build configuration ([#2702](https://github.com/prefix-dev/rattler-build/pull/2702))
+- read the shared config layer instead of pixi's config files ([#2724](https://github.com/prefix-dev/rattler-build/pull/2724))
+- *(build-steps)* support steps in staging outputs ([#2647](https://github.com/prefix-dev/rattler-build/pull/2647))
+- add experimental build steps ([#2646](https://github.com/prefix-dev/rattler-build/pull/2646))
+
+### Fixed
+
+- preserve namespaced Prefix channel paths ([#2743](https://github.com/prefix-dev/rattler-build/pull/2743))
+- use `remove_dir_all_force` helper in `run_test.rs` ([#2729](https://github.com/prefix-dev/rattler-build/pull/2729))
+- select compatible Python for downstream tests ([#2725](https://github.com/prefix-dev/rattler-build/pull/2725))
+- preserve executable-relative macOS rpaths ([#2718](https://github.com/prefix-dev/rattler-build/pull/2718))
+- Handle copy_metadata errors for reflinked files ([#2703](https://github.com/prefix-dev/rattler-build/pull/2703))
+- use DT_RUNPATH instead of DT_RPATH on Android ([#2699](https://github.com/prefix-dev/rattler-build/pull/2699))
+- use CEP-17 path for SP_DIR ([#2700](https://github.com/prefix-dev/rattler-build/pull/2700))
+- deletion-only patches misdetected as already applied ([#2695](https://github.com/prefix-dev/rattler-build/pull/2695))
+- stop wrapping solver errors ([#2687](https://github.com/prefix-dev/rattler-build/pull/2687))
+
+### Other
+
+- update the cargo dependency group ([#2732](https://github.com/prefix-dev/rattler-build/pull/2732))
+- inject RuntimeEnv into script environment generation ([#2691](https://github.com/prefix-dev/rattler-build/pull/2691))
+- add an execution view for Directories ([#2694](https://github.com/prefix-dev/rattler-build/pull/2694))
+
 ## [0.2.10](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.9...rattler_build_core-v0.2.10) - 2026-07-25
 
 ### Added

@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.9](https://github.com/prefix-dev/rattler-build/compare/rattler_build_script-v0.2.8...rattler_build_script-v0.2.9) - 2026-08-21
+
+### Other
+
+- update Cargo.toml dependencies
+
+## [0.2.8](https://github.com/prefix-dev/rattler-build/compare/rattler_build_script-v0.2.7...rattler_build_script-v0.2.8) - 2026-08-17
+
+### Added
+
+- add Runner and Session execution interfaces ([#2696](https://github.com/prefix-dev/rattler-build/pull/2696))
+- add experimental build steps ([#2646](https://github.com/prefix-dev/rattler-build/pull/2646))
+
+### Fixed
+
+- decode build output lossily instead of failing on non-UTF-8 ([#2737](https://github.com/prefix-dev/rattler-build/pull/2737))
+- ignore case when querying variables from `RuntimeEnv` on Windows ([#2676](https://github.com/prefix-dev/rattler-build/pull/2676))
+
+### Other
+
+- inject RuntimeEnv into script environment generation ([#2691](https://github.com/prefix-dev/rattler-build/pull/2691))
+- rename `NativeShellRunner` to `ShellDialect` ([#2692](https://github.com/prefix-dev/rattler-build/pull/2692))
+- split process spawn from output handling ([#2690](https://github.com/prefix-dev/rattler-build/pull/2690))
+- extract pure resolve_process_env ([#2677](https://github.com/prefix-dev/rattler-build/pull/2677))
+
 ## [0.2.7](https://github.com/prefix-dev/rattler-build/compare/rattler_build_script-v0.2.6...rattler_build_script-v0.2.7) - 2026-07-25
 
 ### Added

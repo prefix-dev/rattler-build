@@ -157,7 +157,6 @@ def assert_v3_index_json(index_json: dict[str, Any]) -> None:
 def assert_legacy_index_json(index_json: dict[str, Any]) -> None:
     assert "repodata_revision" not in index_json
     assert "flags" not in index_json
-    assert "extra_depends" not in index_json
 
 
 def test_v3_build_writes_v3_index_json(rattler_build: RattlerBuild, tmp_path: Path):
@@ -208,7 +207,10 @@ def test_v3_local_publish_writes_v3_repodata_and_shards(
 
     record = repodata["v3"][v3_submap][package_record_name]
     assert record["flags"] == ["cuda", "blas:openblas"]
-    assert record["extra_depends"] == index_json["extra_depends"]
+    assert record["extra_depends"] == {
+        "full": ['pandas[version=">=2"]', "rich[extras=[jupyter]]"],
+        "plot": ['matplotlib[version=">=3.8"]'],
+    }
     assert 'scipy[when="python>=3.10"]' in record["depends"]
 
     shard_index_path = channel_dir / subdir / "repodata_shards.msgpack.zst"
@@ -238,6 +240,7 @@ def test_legacy_build_keeps_legacy_index_json(
     extracted = get_extracted_package(output_dir, "legacy-index-shape")
     index_json = json.loads((extracted / "info/index.json").read_text())
     assert_legacy_index_json(index_json)
+    assert index_json["extra_depends"] == {"test": ["pytest >=8"]}
 
 
 @pytest.mark.parametrize(
@@ -249,9 +252,9 @@ def test_legacy_build_keeps_legacy_index_json(
             "Enable --v3 to use build.flags.",
         ),
         (
-            "v3-extras-rejected",
-            "requirements.extras",
-            "Enable --v3 to use requirements.extras.",
+            "v3-extra-matchspec-rejected",
+            "invalid bracket key: when",
+            "Enable --v3 to use V3 MatchSpec keys",
         ),
         (
             "v3-conditional-matchspec-rejected",
@@ -261,6 +264,11 @@ def test_legacy_build_keeps_legacy_index_json(
         (
             "v3-flags-matchspec-rejected",
             "invalid bracket key: flags",
+            "Enable --v3 to use V3 MatchSpec keys",
+        ),
+        (
+            "v3-extras-matchspec-rejected",
+            "invalid bracket key: extras",
             "Enable --v3 to use V3 MatchSpec keys",
         ),
     ],

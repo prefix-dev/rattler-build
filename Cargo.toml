@@ -1,6 +1,6 @@
 [package]
 name = "rattler-build"
-version = "0.73.0"
+version = "0.75.0"
 authors = ["rattler-build contributors <hi@prefix.dev>"]
 repository = "https://github.com/prefix-dev/rattler-build"
 edition = "2024"
@@ -114,7 +114,7 @@ unicode-normalization = "0.1.25"
 # Dependencies used in subcrates (workspace-level)
 clap-verbosity-flag = "3.0.4"
 comfy-table = "8.0.0"
-flickzeug = "0.5.4"
+flickzeug = "0.6.0"
 goblin = "0.10.7"
 ignore = "0.4.31"
 num_cpus = "1.17.0"
@@ -134,7 +134,7 @@ tracing-subscriber = { version = "0.3", features = [
 tracing-test = "0.2.6"
 
 # Rattler crates
-rattler_conda_types = { version = "0.49", default-features = false }
+rattler_conda_types = { version = "0.52", default-features = false }
 rattler_digest = { version = "1.3.2", default-features = false, features = [
   "serde",
 ] }
@@ -155,30 +155,30 @@ rattler_cache = { version = "0.10", default-features = false }
 rattler_index = { version = "0.31", default-features = false }
 rattler_upload = { version = "0.10", default-features = false }
 rattler_s3 = { version = "0.2.9" }
-rattler_redaction = { version = "0.2.2", default-features = false }
-rattler_repodata_gateway = { version = "0.32", default-features = false, features = [
+rattler_redaction = { version = "0.2.3", default-features = false }
+rattler_repodata_gateway = { version = "0.33", default-features = false, features = [
   "gateway",
 ] }
 rattler_solve = { version = "9.0", default-features = false, features = [
   "resolvo",
   "serde",
 ] }
-rattler_virtual_packages = { version = "5.0", default-features = false }
+rattler_virtual_packages = { version = "5.1", default-features = false }
 rattler_menuinst = "0.2"
 
 
 # Internal rattler-build crates
 rattler_build_allocator = { path = "crates/rattler_build_allocator", version = "=0.1.2" }
-rattler_build_core = { path = "crates/rattler_build_core", version = "=0.2.10", default-features = false }
-rattler_build_jinja = { path = "crates/rattler_build_jinja", version = "=0.1.11" }
-rattler_build_networking = { path = "crates/rattler_build_networking", version = "=0.1.10" }
-rattler_build_recipe = { path = "crates/rattler_build_recipe", version = "=0.1.11" }
-rattler_build_recipe_generator = { path = "crates/rattler_build_recipe_generator", version = "=0.1.9", default-features = false }
-rattler_build_script = { path = "crates/rattler_build_script", version = "=0.2.7", default-features = false }
-rattler_build_source_cache = { path = "crates/rattler_build_source_cache", version = "=0.1.10", default-features = false }
-rattler_build_types = { path = "crates/rattler_build_types", version = "=0.1.10" }
-rattler_build_variant_config = { path = "crates/rattler_build_variant_config", version = "=0.1.11" }
-rattler_build_yaml_parser = { path = "crates/rattler_build_yaml_parser", version = "=0.1.11" }
+rattler_build_core = { path = "crates/rattler_build_core", version = "=0.2.12", default-features = false }
+rattler_build_jinja = { path = "crates/rattler_build_jinja", version = "=0.1.13" }
+rattler_build_networking = { path = "crates/rattler_build_networking", version = "=0.1.11" }
+rattler_build_recipe = { path = "crates/rattler_build_recipe", version = "=0.1.13" }
+rattler_build_recipe_generator = { path = "crates/rattler_build_recipe_generator", version = "=0.1.11", default-features = false }
+rattler_build_script = { path = "crates/rattler_build_script", version = "=0.2.9", default-features = false }
+rattler_build_source_cache = { path = "crates/rattler_build_source_cache", version = "=0.1.11", default-features = false }
+rattler_build_types = { path = "crates/rattler_build_types", version = "=0.1.12" }
+rattler_build_variant_config = { path = "crates/rattler_build_variant_config", version = "=0.1.13" }
+rattler_build_yaml_parser = { path = "crates/rattler_build_yaml_parser", version = "=0.1.13" }
 
 [features]
 default = ['rustls', 'recipe-generation', 's3', 'sigstore']
