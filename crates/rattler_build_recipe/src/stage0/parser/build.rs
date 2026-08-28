@@ -763,6 +763,9 @@ fn parse_build_from_mapping(mapping: &MarkedMappingNode) -> Result<Build, ParseE
             "string" => {
                 build.string = Some(parse_field!("build.string", value_node));
             }
+            "metadata" => {
+                build.metadata = Some(parse_step(value_node)?);
+            }
             "script" | "steps" => {
                 parse_build_plan_key(
                     &mut build.plan,
@@ -814,7 +817,7 @@ fn parse_build_from_mapping(mapping: &MarkedMappingNode) -> Result<Build, ParseE
             _ => {
                 return Err(
                     ParseError::invalid_value("build", format!("unknown field '{}'", key), *key_node.span())
-                        .with_suggestion("Valid fields are: number, string, script, steps, noarch, flags, python, skip, always_copy_files, always_include_files, merge_build_and_host_envs, files, dynamic_linking, variant, prefix_detection, post_process")
+                        .with_suggestion("Valid fields are: number, string, metadata, script, steps, noarch, flags, python, skip, always_copy_files, always_include_files, merge_build_and_host_envs, files, dynamic_linking, variant, prefix_detection, post_process")
                 );
             }
         }

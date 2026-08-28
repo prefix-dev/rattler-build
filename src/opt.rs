@@ -947,6 +947,8 @@ pub struct BuildData {
     pub markdown_summary: Option<PathBuf>,
     /// Named build steps selected by the local `run` command.
     pub selected_steps: Option<Vec<String>>,
+    /// Canonical external source tree used by the local `run` command.
+    pub local_source_dir: Option<PathBuf>,
 }
 
 impl BuildData {
@@ -1027,6 +1029,7 @@ impl BuildData {
             build_string_prefix,
             markdown_summary,
             selected_steps: None,
+            local_source_dir: None,
         }
     }
 }

@@ -9,6 +9,10 @@ Currently only the `build` and `rebuild` commands support the following experime
 To enable them, use the `--experimental` flag with the command.
 Or, use the environment variable, `RATTLER_BUILD_EXPERIMENTAL=true`.
 
+Named and reusable build steps, pre-solve metadata steps, step caching, and
+post-build metadata outputs have a dedicated
+[Experimental build steps](experimental_build_steps.md) section.
+
 ## Sigstore source attestation
 
 The `attestation` field on URL sources allows verifying that downloaded source archives were produced by a trusted publisher using [Sigstore](https://sigstore.dev) attestations. This is supported for PyPI packages (where the bundle URL is automatically derived) and GitHub releases (where you specify the `bundle_url` manually).

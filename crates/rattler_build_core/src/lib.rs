@@ -8,6 +8,7 @@ pub mod bump_recipe;
 pub mod console_utils;
 pub mod debug;
 pub mod metadata;
+pub mod metadata_step;
 pub mod migrate_recipe;
 pub mod package_test;
 pub mod packaging;

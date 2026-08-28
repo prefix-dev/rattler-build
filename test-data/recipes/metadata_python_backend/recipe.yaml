@@ -1,0 +1,29 @@
+schema_version: 1
+
+context:
+  version: "14.2.0"
+
+package:
+  name: rich
+  version: ${{ version }}
+
+source:
+  url: https://pypi.io/packages/source/r/rich/rich-${{ version }}.tar.gz
+  sha256: 73ff50c7c0c1c77c8243079283f4edb376f0f6442433aecb8ce7e6d0b92d1fe4
+
+build:
+  noarch: python
+  metadata:
+    uses: python:metadata@0.1.*
+    with:
+      backend_args: [--config-setting, rich-build=true]
+    env:
+      # Resolved provider identity must override consumer-supplied values.
+      RATTLER_BUILD_PROVIDER_PREFIX: should-not-be-used
+      RATTLER_BUILD_PROVIDER_VERSION: "9.9.9"
+
+tests:
+  - python:
+      imports: [rich]
+  - script:
+      - python -c "from rich.console import Console; Console().print('[bold green]external Rich package works![/]')"
