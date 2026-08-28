@@ -1,0 +1,21 @@
+inputs:
+  message:
+    type: string
+    required: true
+steps:
+  - if: win
+    then:
+      - run: |
+          if not exist "%BUILD_DIR%\generated-licenses" mkdir "%BUILD_DIR%\generated-licenses"
+          echo ${{ inputs.message }}> "%BUILD_DIR%\generated-licenses\dependency.txt"
+          if not exist "%PREFIX%\share\reusable-steps" mkdir "%PREFIX%\share\reusable-steps"
+          echo done> "%PREFIX%\share\reusable-steps\marker.txt"
+          set "DOLLAR=$"
+          echo [{"op":"add","path":"/about/license_file/include/-","value":"%DOLLAR%{{ BUILD_DIR }}/generated-licenses/**"}]> "%OUTPUT_FILE%"
+    else:
+      - run: |
+          mkdir -p "$BUILD_DIR/generated-licenses" "$PREFIX/share/reusable-steps"
+          echo "${{ inputs.message }}" > "$BUILD_DIR/generated-licenses/dependency.txt"
+          echo done > "$PREFIX/share/reusable-steps/marker.txt"
+          dollar='$'
+          printf '%s\n' '[{"op":"add","path":"/about/license_file/include/-","value":"'"$dollar"'{{ BUILD_DIR }}/generated-licenses/**"}]' > "$OUTPUT_FILE"

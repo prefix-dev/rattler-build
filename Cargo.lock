@@ -4873,6 +4873,7 @@ dependencies = [
  "insta",
  "itertools 0.15.0",
  "jiff",
+ "json-patch",
  "line-ending",
  "memchr",
  "memmap2",

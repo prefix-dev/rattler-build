@@ -253,6 +253,44 @@ pub async fn install_packages(
     target_prefix: &Path,
     tool_configuration: &tool_configuration::Configuration,
 ) -> miette::Result<()> {
+    install_packages_with_link_scripts(
+        name,
+        required_packages,
+        target_platform,
+        target_prefix,
+        tool_configuration,
+        true,
+    )
+    .await
+}
+
+/// Install a data-only environment without running package link scripts.
+pub async fn install_packages_without_link_scripts(
+    name: &str,
+    required_packages: &[RepoDataRecord],
+    target_platform: Platform,
+    target_prefix: &Path,
+    tool_configuration: &tool_configuration::Configuration,
+) -> miette::Result<()> {
+    install_packages_with_link_scripts(
+        name,
+        required_packages,
+        target_platform,
+        target_prefix,
+        tool_configuration,
+        false,
+    )
+    .await
+}
+
+async fn install_packages_with_link_scripts(
+    name: &str,
+    required_packages: &[RepoDataRecord],
+    target_platform: Platform,
+    target_prefix: &Path,
+    tool_configuration: &tool_configuration::Configuration,
+    execute_link_scripts: bool,
+) -> miette::Result<()> {
     let span_msg = format!("Installing {name} environment");
     let span = tracing::info_span!("", message = %span_msg);
     let _enter = span.enter();
@@ -304,7 +342,7 @@ pub async fn install_packages(
     Installer::new()
         .with_download_client(tool_configuration.client.get_client().clone())
         .with_target_platform(target_platform)
-        .with_execute_link_scripts(true)
+        .with_execute_link_scripts(execute_link_scripts)
         .with_package_cache(tool_configuration.package_cache.clone())
         .with_installed_packages(installed_packages)
         .with_io_concurrency_limit(tool_configuration.io_concurrency_limit.unwrap_or_default())

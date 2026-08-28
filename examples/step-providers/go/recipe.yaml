@@ -1,0 +1,34 @@
+schema_version: 1
+
+package:
+  name: provider-example-go
+  version: 0.1.0
+
+source:
+  path: .
+
+build:
+  skip: win
+  steps:
+    - uses: go:build@0.4.*
+      with:
+        packages: ./...
+        collect_licenses: true
+        # The package's own LICENSE is already declared below; collect licenses
+        # for its dependency graph without asking go-licenses to classify it.
+        license_args:
+          - --ignore
+          - example.com/hello-go
+
+requirements:
+  build:
+    - ${{ compiler('c') }}
+
+tests:
+  - script:
+      - hello-go
+
+about:
+  license: MIT
+  license_file: LICENSE
+  summary: Minimal recipe using the Go reusable build-step provider

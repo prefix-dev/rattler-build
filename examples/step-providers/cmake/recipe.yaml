@@ -1,0 +1,32 @@
+schema_version: 1
+
+package:
+  name: provider-example-cmake
+  version: 0.1.0
+
+source:
+  path: .
+
+build:
+  skip: win
+  steps:
+    - uses: cmake:build@0.3.*
+      with:
+        build_type: RelWithDebInfo
+        extra_args:
+          - -DBUILD_TESTING=OFF
+        build_args:
+          - --verbose
+
+requirements:
+  build:
+    - ${{ compiler('c') }}
+
+tests:
+  - script:
+      - hello-cmake
+
+about:
+  license: MIT
+  license_file: LICENSE
+  summary: Minimal recipe using the CMake reusable build-step provider
