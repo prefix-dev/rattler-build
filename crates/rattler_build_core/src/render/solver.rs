@@ -8,7 +8,10 @@ use indicatif::HumanBytes;
 use itertools::Itertools;
 use miette::{IntoDiagnostic, WrapErr};
 use rattler::install::{DefaultProgressFormatter, IndicatifReporter, Installer};
-use rattler_conda_types::{Channel, ChannelUrl, MatchSpec, Platform, PrefixRecord, RepoDataRecord};
+use rattler_conda_types::{
+    Channel, ChannelNoticeLevel, ChannelUrl, MatchSpec, Platform, PrefixRecord, RepoDataRecord,
+};
+use rattler_repodata_gateway::ChannelNoticeResult;
 use rattler_solve::{ChannelPriority, SolveStrategy, SolverImpl, SolverTask, resolvo::Solver};
 
 use super::reporters::GatewayReporter;
@@ -158,6 +161,30 @@ pub async fn create_environment(
     Ok(required_packages)
 }
 
+fn display_channel_notices(
+    notices: &[ChannelNoticeResult],
+    tool_configuration: &tool_configuration::Configuration,
+) {
+    let mut displayed = tool_configuration.displayed_channel_notices.lock().unwrap();
+
+    for result in notices {
+        let channel_url = result.channel.url().as_str().to_owned();
+        if !displayed.insert((channel_url, result.notice.id.clone())) {
+            continue;
+        }
+
+        let channel = tool_configuration
+            .channel_config
+            .canonical_name(result.channel.url());
+        let message = format!("Channel notice from {channel}:\n{}", result.notice.message);
+        match result.notice.level {
+            ChannelNoticeLevel::Info => tracing::info!("{message}"),
+            ChannelNoticeLevel::Warning => tracing::warn!("{message}"),
+            ChannelNoticeLevel::Critical => tracing::error!("{message}"),
+        }
+    }
+}
+
 /// Load repodata from channels. Only includes necessary records for platform &
 /// specs.
 pub async fn load_repodatas(
@@ -178,6 +205,7 @@ pub async fn load_repodatas(
             [target_platform, Platform::NoArch],
             specs.to_vec(),
         )
+        .channel_notices(true)
         .with_reporter(
             GatewayReporter::builder()
                 .with_multi_progress(
@@ -213,6 +241,7 @@ pub async fn load_repodatas(
     for warning in &result.warnings {
         tracing::warn!("{warning}");
     }
+    display_channel_notices(&result.notices, tool_configuration);
 
     Ok(result.repodata)
 }
@@ -303,4 +332,109 @@ pub async fn install_packages(
     );
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use rattler_conda_types::ChannelNotice;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn loads_channel_notices_with_repodata() {
+        let channel_dir = tempfile::tempdir().unwrap();
+        for subdir in ["linux-64", "noarch"] {
+            let subdir = channel_dir.path().join(subdir);
+            fs_err::create_dir(&subdir).unwrap();
+            fs_err::write(
+                subdir.join("repodata.json"),
+                r#"{
+                    "info": {},
+                    "packages": {},
+                    "packages.conda": {
+                        "demo-1.0-0.conda": {
+                            "build": "0",
+                            "build_number": 0,
+                            "depends": [],
+                            "name": "demo",
+                            "version": "1.0"
+                        }
+                    },
+                    "repodata_version": 1
+                }"#,
+            )
+            .unwrap();
+        }
+        fs_err::write(
+            channel_dir.path().join("notices.json"),
+            r#"{"notices":[{"id":"test","message":"Test channel notice","level":"warning"}]}"#,
+        )
+        .unwrap();
+
+        let cache_dir = tempfile::tempdir().unwrap();
+        let configuration = tool_configuration::Configuration::builder()
+            .with_cache_dir(cache_dir.path().to_path_buf())
+            .finish();
+        let channel = Channel::try_from_directory(channel_dir.path()).unwrap();
+
+        let spec = MatchSpec {
+            name: rattler_conda_types::PackageNameMatcher::Exact("demo".parse().unwrap()),
+            ..Default::default()
+        };
+        load_repodatas(
+            &[channel.base_url],
+            Platform::Linux64,
+            &[spec],
+            &configuration,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(
+            configuration
+                .displayed_channel_notices
+                .lock()
+                .unwrap()
+                .len(),
+            1
+        );
+    }
+
+    #[test]
+    fn displays_channel_notices_only_once_per_channel_and_id() {
+        let cache_dir = tempfile::tempdir().unwrap();
+        let configuration = tool_configuration::Configuration::builder()
+            .with_cache_dir(cache_dir.path().to_path_buf())
+            .finish();
+        let channel = ChannelUrl::from(url::Url::parse("https://example.com/channel").unwrap());
+
+        let notice = |id: &str, message: &str, level| ChannelNoticeResult {
+            channel: channel.clone(),
+            notice: ChannelNotice {
+                id: id.to_owned(),
+                message: message.to_owned(),
+                level,
+                created_at: None,
+                expires_at: None,
+                interval: None,
+            },
+        };
+        let notices = [
+            notice("info", "Informational message", ChannelNoticeLevel::Info),
+            notice("warning", "Warning message", ChannelNoticeLevel::Warning),
+            notice("critical", "Critical message", ChannelNoticeLevel::Critical),
+        ];
+
+        display_channel_notices(&notices, &configuration);
+        display_channel_notices(&notices, &configuration);
+
+        assert_eq!(
+            configuration
+                .displayed_channel_notices
+                .lock()
+                .unwrap()
+                .len(),
+            notices.len()
+        );
+    }
 }
