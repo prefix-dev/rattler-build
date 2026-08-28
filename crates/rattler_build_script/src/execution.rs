@@ -74,7 +74,7 @@ impl std::str::FromStr for EnvironmentIsolation {
 }
 
 /// Arguments for executing a script in a given interpreter.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ExecutionArgs {
     /// The ordered sections the build wrapper is composed of. Each section runs
     /// in its own scope with its own interpreter and step-local `env`.
@@ -133,7 +133,7 @@ impl ExecutionArgs {
 }
 
 /// The resolved contents of a script.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum ResolvedScriptContents {
     /// The script contents as loaded from a file (path, contents)
     Path(PathBuf, String),
@@ -582,7 +582,7 @@ impl Decoder for CrLfNormalizer {
 /// One per build step (or one for a plain `build.script`), with its resolved
 /// content, explicit interpreter, step-local `env`, optional `cwd`, and label.
 /// It is borrowed into a [`ScriptSection`] during wrapper generation.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct BuildScriptSection {
     /// Explicit interpreter for this section, or `None` to fall back to the
     /// wrapper shell.

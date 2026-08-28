@@ -3,7 +3,7 @@
 use std::{path::PathBuf, vec};
 
 use miette::{Context, IntoDiagnostic};
-use rattler_build_recipe::stage1::TestType;
+use rattler_build_recipe::stage1::{Dependency, TestType};
 use rattler_build_script::InterpreterError;
 use rattler_conda_types::{Channel, MatchSpec, Platform, package::PathsJson};
 
@@ -11,9 +11,67 @@ use crate::{
     metadata::{Output, build_reindexed_channels},
     package_test::PackageContentsTestExt as _,
     packaging::record_files,
-    render::{resolved_dependencies::RunExportsDownload, solver::load_repodatas},
+    render::{
+        resolved_dependencies::{DependencyInfo, RunExportsDownload, SourceDependency},
+        solver::load_repodatas,
+    },
     tool_configuration,
 };
+
+fn output_dependency(dependency: Dependency) -> miette::Result<MatchSpec> {
+    match dependency {
+        Dependency::Spec(spec) => Ok(*spec),
+        Dependency::PinSubpackage(_) | Dependency::PinCompatible(_) => Err(miette::miette!(
+            "build-step outputs must use concrete dependency strings; pin expressions are resolved before build execution"
+        )),
+    }
+}
+
+fn apply_post_build_requirements(
+    output: &mut Output,
+    changes: crate::recipe_patch::PostBuildRequirements,
+) -> miette::Result<()> {
+    let finalized = output
+        .finalized_dependencies
+        .as_mut()
+        .ok_or_else(|| miette::miette!("dependencies were not finalized before build execution"))?;
+    for dependency in changes.run {
+        finalized
+            .run
+            .depends
+            .push(DependencyInfo::Source(SourceDependency {
+                spec: output_dependency(dependency)?,
+            }));
+    }
+    for dependency in changes.run_constraints {
+        finalized
+            .run
+            .constraints
+            .push(DependencyInfo::Source(SourceDependency {
+                spec: output_dependency(dependency)?,
+            }));
+    }
+
+    let run_exports = &mut finalized.run.run_exports;
+    let append = |target: &mut Vec<String>, dependencies: Vec<Dependency>| {
+        for dependency in dependencies {
+            target.push(output_dependency(dependency)?.to_string());
+        }
+        Ok::<_, miette::Report>(())
+    };
+    append(&mut run_exports.noarch, changes.run_exports.noarch)?;
+    append(&mut run_exports.strong, changes.run_exports.strong)?;
+    append(&mut run_exports.weak, changes.run_exports.weak)?;
+    append(
+        &mut run_exports.strong_constrains,
+        changes.run_exports.strong_constraints,
+    )?;
+    append(
+        &mut run_exports.weak_constrains,
+        changes.run_exports.weak_constraints,
+    )?;
+    Ok(())
+}
 
 /// Behavior for handling the working directory during the build process
 #[derive(Debug, Clone, Copy)]
@@ -231,10 +289,11 @@ pub async fn run_build(
         }
     }
 
-    crate::recipe_patch::apply_outputs(
+    let post_build_requirements = crate::recipe_patch::apply_outputs(
         &mut output.recipe,
         &output.build_configuration.directories.work_dir,
     )?;
+    apply_post_build_requirements(&mut output, post_build_requirements)?;
 
     // Package all the new files
     let (result, paths_json) = output

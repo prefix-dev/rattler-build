@@ -54,7 +54,6 @@ anyhow = { workspace = true }
 walkdir = { workspace = true }
 hex = { workspace = true }
 serde_json = { workspace = true }
-json-patch = { workspace = true }
 reqwest = { workspace = true, features = ["multipart"] }
 tokio = { workspace = true, features = [
   "rt",
