@@ -13,7 +13,7 @@ rattler-build [OPTIONS] [COMMAND]
 | Command | Description |
 |---------|-------------|
 | [`build`](build.md) | Build a package from a recipe |
-| [`run`](run.md) | Execute one or more named build steps in a persistent local environment |
+| [`run`](run.md) | Execute experimental named build steps in a persistent local environment. Requires `--experimental` |
 | [`publish`](publish.md) | Publish packages to a channel. This command builds packages from recipes (or uses already built packages), uploads them to a channel, and runs indexing |
 | [`test`](test.md) | Run a test for a single package |
 | [`rebuild`](rebuild.md) | Rebuild a package from a package file instead of a recipe |

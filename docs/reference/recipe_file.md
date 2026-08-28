@@ -670,9 +670,12 @@ requirements:
 
 #### Build steps (experimental)
 
-`build.steps` is an experimental alternative to `build.script` and requires
-`--experimental`. `script` and `steps` are mutually exclusive, including
-`steps: []`.
+!!! warning "Experimental"
+    `build.steps`, reusable `uses` files, and `rattler-build run` may change or
+    be removed. They require `--experimental`.
+
+`build.steps` is an experimental alternative to `build.script`. `script` and
+`steps` are mutually exclusive, including `steps: []`.
 
 Each step is a scoped build-wrapper section. Step-local `env` values and `cwd`
 changes apply only to that step. A step supports:

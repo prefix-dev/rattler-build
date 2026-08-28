@@ -44,8 +44,12 @@ build:
 
 ## Experimental build steps
 
-`build.steps` is an experimental alternative to `build.script`. Enable it with
-`--experimental`. `script` and `steps` are mutually exclusive; even
+!!! warning "Experimental"
+    Named and reusable build steps may change or be removed. They require
+    `--experimental`.
+
+`build.steps` is an experimental alternative to `build.script`. `script` and
+`steps` are mutually exclusive; even
 `steps: []` explicitly selects steps mode and prevents default `build.sh` /
 `build.bat` discovery.
 
