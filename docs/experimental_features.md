@@ -4,10 +4,15 @@
     These are experimental features of Rattler-Build and may change or go away completely.
 
 
-Currently only the `build` and `rebuild` commands support the following experimental features.
+The `build`, `rebuild`, and `run` commands support experimental features.
+Enable them with `--experimental` or the
+`RATTLER_BUILD_EXPERIMENTAL=true` environment variable.
 
-To enable them, use the `--experimental` flag with the command.
-Or, use the environment variable, `RATTLER_BUILD_EXPERIMENTAL=true`.
+## Named and reusable build steps
+
+`build.steps`, named step DAGs, reusable `uses` files, and `rattler-build run`
+are experimental. Their syntax and behavior may change or be removed. See
+[Build scripts](build_script.md#experimental-build-steps) for details.
 
 ## Sigstore source attestation
 

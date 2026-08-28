@@ -37,6 +37,58 @@ def test_completion_stderr_is_clean(rattler_build: RattlerBuild):
     assert result.stderr == ""
 
 
+def test_run_named_reusable_step(rattler_build: RattlerBuild, tmp_path: Path):
+    recipe = tmp_path / "recipe"
+    source = tmp_path / "source"
+    output = tmp_path / "output"
+    recipe.mkdir()
+    source.mkdir()
+    (recipe / "recipe.yaml").write_text(
+        """package:
+  name: named-steps-test
+  version: "1.0"
+build:
+  steps:
+    - name: prepare
+      run: echo prepared > prepared.txt
+    - name: check
+      optional: true
+      depends_on: [prepare]
+      uses: ./check.yaml
+"""
+    )
+    (recipe / "check.yaml").write_text("run: echo checked > checked.txt\n")
+
+    without_experimental = rattler_build(
+        "run",
+        "check",
+        "--recipe",
+        recipe,
+        "--source-dir",
+        source,
+        "--output-dir",
+        output,
+        capture_output=True,
+    )
+    assert without_experimental.returncode != 0
+    assert "experimental" in without_experimental.stderr
+
+    rattler_build(
+        "run",
+        "check",
+        "--recipe",
+        recipe,
+        "--source-dir",
+        source,
+        "--output-dir",
+        output,
+        "--experimental",
+        stderr=STDOUT,
+    )
+    assert (source / "prepared.txt").read_text().strip() == "prepared"
+    assert (source / "checked.txt").read_text().strip() == "checked"
+
+
 def test_license_glob(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     rattler_build.build(recipes / "globtest", tmp_path)
     pkg = get_extracted_package(tmp_path, "globtest")

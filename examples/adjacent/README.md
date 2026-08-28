@@ -1,5 +1,9 @@
 # Named build-step prototype
 
+> [!WARNING]
+> Named and reusable build steps are experimental. Their syntax and behavior may
+> change or be removed, and they require `--experimental`.
+
 Clone Adjacent, then execute the recipe directly in that checkout (replace the
 recipe path with the path to this repository):
 

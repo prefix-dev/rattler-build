@@ -51,7 +51,8 @@ pub enum SubCommands {
     /// Build a package from a recipe
     Build(BuildOnlyOpts),
 
-    /// Execute one or more named build steps in a persistent local environment.
+    /// Execute experimental named build steps in a persistent local environment.
+    /// Requires `--experimental`.
     Run(RunOpts),
 
     /// Publish packages to a channel.
@@ -571,7 +572,9 @@ impl FromStr for ChannelPriorityWrapper {
     }
 }
 
-/// Options for executing named build steps locally.
+/// Options for executing experimental named build steps locally.
+///
+/// This command requires `--experimental`; its interface may change or be removed.
 #[derive(Parser, Clone)]
 pub struct RunOpts {
     /// Step names to execute. Their transitive `depends_on` steps are included.
