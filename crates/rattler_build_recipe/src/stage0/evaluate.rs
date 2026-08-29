@@ -825,7 +825,7 @@ pub fn evaluate_skip_list(
     list: &ConditionalList<String>,
     context: &EvaluationContext,
 ) -> Result<bool, ParseError> {
-    let conditions: Vec<String> =
+    let conditions: Vec<(String, Option<Span>)> =
         evaluate_conditional_list(list.as_slice(), context, |value, ctx| {
             // Skip expressions are Jinja boolean expressions, not templates
             // We need to render them through Jinja to track accessed variables,
@@ -833,11 +833,15 @@ pub fn evaluate_skip_list(
             if let Some(expr_str) = value.as_concrete() {
                 // Wrap in ${{ }} to render as Jinja expression (for variable tracking)
                 let template = format!("${{{{ {} }}}}", expr_str);
-                // Ignore the result - we just want to trigger variable tracking
+                // Ignore the result - we just want to trigger variable tracking.
+                // A render failure is not fatal here: skip conditions may reference
+                // variant keys that are not part of this combination, which strict
+                // template rendering rejects but expression evaluation tolerates.
+                // Malformed expressions are reported by the evaluation below instead.
                 let _ = render_template(&template, ctx, value.span());
 
                 // Always return the original expression string
-                Ok(Some(expr_str.clone()))
+                Ok(Some((expr_str.clone(), value.span().copied())))
             } else if let Some(template) = value.as_template() {
                 // Already a template, render it
                 let rendered = render_template(template.source(), ctx, value.span())?;
@@ -845,37 +849,55 @@ pub fn evaluate_skip_list(
                 if rendered.is_empty() {
                     Ok(None)
                 } else {
-                    Ok(Some(rendered))
+                    Ok(Some((rendered, value.span().copied())))
                 }
             } else {
                 unreachable!("Value must be either concrete or template")
             }
         })?;
-    Ok(is_skipped(&conditions, context))
+    eval_skip_conditions(&conditions, context)
 }
 
 /// Check if any skip condition in the list evaluates to true
 ///
 /// Skip conditions are Jinja boolean expressions (e.g., "win", "unix", "platform == 'osx-64'").
 /// Returns true if ANY condition evaluates to true (OR logic).
-pub fn is_skipped(skip_conditions: &[String], context: &EvaluationContext) -> bool {
-    for condition in skip_conditions {
+///
+/// An expression that cannot be evaluated (for example one with unbalanced brackets)
+/// is a hard error: silently treating it as "not skipped" builds outputs the recipe
+/// author meant to exclude.
+pub fn is_skipped(
+    skip_conditions: &[String],
+    context: &EvaluationContext,
+) -> Result<bool, ParseError> {
+    let conditions: Vec<(String, Option<Span>)> = skip_conditions
+        .iter()
+        .map(|condition| (condition.clone(), None))
+        .collect();
+    eval_skip_conditions(&conditions, context)
+}
+
+/// Evaluate skip conditions, reporting failures against the span of the entry they came from.
+fn eval_skip_conditions(
+    skip_conditions: &[(String, Option<Span>)],
+    context: &EvaluationContext,
+) -> Result<bool, ParseError> {
+    for (condition, span) in skip_conditions {
         let jinja = context.to_jinja();
 
         // Evaluate the skip condition as a boolean expression
-        match jinja.eval(condition) {
-            Ok(value) => {
-                if value.is_true() {
-                    return true;
-                }
-            }
-            Err(_) => {
-                // If evaluation fails, we can't determine if it's skipped
-                // Continue to check other conditions
-            }
+        let value = jinja.eval(condition).map_err(|err| {
+            ParseError::jinja_error(
+                format!("failed to evaluate skip condition '{}': {}", condition, err),
+                span.unwrap_or_else(Span::new_blank),
+            )
+        })?;
+
+        if value.is_true() {
+            return Ok(true);
         }
     }
-    false
+    Ok(false)
 }
 
 /// Evaluate a string list, preserving templates with undefined variables
@@ -5903,6 +5925,54 @@ build:
     }
 
     #[test]
+    fn test_is_skipped_errors_on_malformed_expression() {
+        // Regression test for #2780: an expression that cannot be evaluated must not be
+        // silently treated as "not skipped".
+        let ctx = EvaluationContext::new();
+
+        let skip_conditions = vec![
+            "target_platform == \"win-arm64\") and target_platform != cross_target_platform"
+                .to_string(),
+        ];
+        let err = is_skipped(&skip_conditions, &ctx)
+            .expect_err("malformed skip condition should be an error");
+        assert!(
+            err.to_string().contains("skip condition"),
+            "unexpected error: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn test_skip_template_rendering_to_malformed_expression_errors() {
+        use crate::stage0::parser::parse_recipe_from_source;
+
+        // A template can only be checked once rendered, so this one gets caught during
+        // evaluation rather than at parse time.
+        let recipe_yaml = r#"
+schema_version: 1
+context:
+  condition: 'unix and (osx'
+package:
+  name: test
+  version: 1.0.0
+build:
+  skip: ${{ condition }}
+"#;
+
+        let parsed = parse_recipe_from_source(recipe_yaml).unwrap();
+        let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
+        let err = parsed
+            .evaluate(&ctx)
+            .expect_err("malformed rendered skip condition should be an error");
+        assert!(
+            err.to_string().contains("skip condition"),
+            "unexpected error: {}",
+            err
+        );
+    }
+
+    #[test]
     fn test_is_skipped_with_literal_true() {
         // Direct test of is_skipped function with the string "true"
         let ctx = EvaluationContext::new();
@@ -5910,14 +5980,14 @@ build:
         // The string "true" should evaluate to boolean true in Jinja
         let skip_conditions = vec!["true".to_string()];
         assert!(
-            is_skipped(&skip_conditions, &ctx),
+            is_skipped(&skip_conditions, &ctx).unwrap(),
             "is_skipped should return true for skip condition 'true'"
         );
 
         // Also test "false" - should NOT skip
         let skip_conditions_false = vec!["false".to_string()];
         assert!(
-            !is_skipped(&skip_conditions_false, &ctx),
+            !is_skipped(&skip_conditions_false, &ctx).unwrap(),
             "is_skipped should return false for skip condition 'false'"
         );
     }
