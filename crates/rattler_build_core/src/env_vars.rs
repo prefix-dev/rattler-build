@@ -585,7 +585,8 @@ mod test {
         let record_linux = make_record("lib/python3.13t/site-packages");
         let vars_linux = python_vars_from_records(&[record_linux], prefix, Platform::Linux64);
         assert_eq!(
-            vars_linux.get("SP_DIR")
+            vars_linux
+                .get("SP_DIR")
                 .and_then(|value| value.as_deref())
                 .map(Path::new),
             Some(prefix.join("lib/python3.13t/site-packages").as_path())
@@ -594,8 +595,7 @@ mod test {
         let record_win = make_record("Lib/site-packages");
         let vars_win = python_vars_from_records(&[record_win], prefix, Platform::Win64);
         assert_eq!(
-            vars_win.get("SP_DIR")
-                .and_then(|value| value.as_deref()),
+            vars_win.get("SP_DIR").and_then(|value| value.as_deref()),
             Some(format!("{}\\Lib\\site-packages", prefix.to_string_lossy()).as_str())
         );
     }
