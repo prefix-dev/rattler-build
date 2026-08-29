@@ -835,9 +835,9 @@ pub fn evaluate_skip_list(
                 let template = format!("${{{{ {} }}}}", expr_str);
                 // Ignore the result - we just want to trigger variable tracking.
                 // A render failure is not fatal here: skip conditions may reference
-                // variant keys that are not part of this combination, which strict
-                // template rendering rejects but expression evaluation tolerates.
-                // Malformed expressions are reported by the evaluation below instead.
+                // variant keys that are not part of this combination. Broken
+                // expressions are reported by `eval_skip_conditions` below, and by
+                // the syntax check the parser runs over every concrete skip entry.
                 let _ = render_template(&template, ctx, value.span());
 
                 // Always return the original expression string
@@ -863,9 +863,10 @@ pub fn evaluate_skip_list(
 /// Skip conditions are Jinja boolean expressions (e.g., "win", "unix", "platform == 'osx-64'").
 /// Returns true if ANY condition evaluates to true (OR logic).
 ///
-/// An expression that cannot be evaluated (for example one with unbalanced brackets)
-/// is a hard error: silently treating it as "not skipped" builds outputs the recipe
-/// author meant to exclude.
+/// A condition that does not *parse* (for example one with unbalanced brackets) is a
+/// hard error: silently treating it as "not skipped" builds outputs the recipe author
+/// meant to exclude. Conditions that parse but fail to evaluate are tolerated, see
+/// [`eval_skip_conditions`].
 pub fn is_skipped(
     skip_conditions: &[String],
     context: &EvaluationContext,
@@ -878,6 +879,13 @@ pub fn is_skipped(
 }
 
 /// Evaluate skip conditions, reporting failures against the span of the entry they came from.
+///
+/// Only syntax errors are fatal. Under [`minijinja::UndefinedBehavior::Strict`] an
+/// undefined variable makes most operators fail (`python == "3.12"` errors outright when
+/// `python` is not part of the variant), and skip conditions are legitimately evaluated
+/// against incomplete variant combinations during variant discovery, so a condition that
+/// parses but cannot be evaluated keeps counting as "not skipped". A syntax error can
+/// never be caused by a missing variable, so it always indicates a broken recipe.
 fn eval_skip_conditions(
     skip_conditions: &[(String, Option<Span>)],
     context: &EvaluationContext,
@@ -886,15 +894,23 @@ fn eval_skip_conditions(
         let jinja = context.to_jinja();
 
         // Evaluate the skip condition as a boolean expression
-        let value = jinja.eval(condition).map_err(|err| {
-            ParseError::jinja_error(
-                format!("failed to evaluate skip condition '{}': {}", condition, err),
-                span.unwrap_or_else(Span::new_blank),
-            )
-        })?;
-
-        if value.is_true() {
-            return Ok(true);
+        match jinja.eval(condition) {
+            Ok(value) => {
+                if value.is_true() {
+                    return Ok(true);
+                }
+            }
+            Err(err) if err.kind() == minijinja::ErrorKind::SyntaxError => {
+                return Err(ParseError::jinja_error(
+                    format!("invalid skip condition '{}': {}", condition, err),
+                    span.unwrap_or_else(Span::new_blank),
+                ));
+            }
+            Err(_) => {
+                // Evaluation failed for a reason that a missing variant value can explain
+                // (undefined variables, operations on them). Keep the previous behaviour
+                // and continue to check the other conditions.
+            }
         }
     }
     Ok(false)
@@ -5970,6 +5986,32 @@ build:
             "unexpected error: {}",
             err
         );
+    }
+
+    #[test]
+    fn test_is_skipped_tolerates_undefined_variables() {
+        // Undefined variables must not become build failures: under strict undefined
+        // behaviour most operators error out when a variant key is missing, and skip
+        // conditions are evaluated against incomplete combinations during variant
+        // discovery. Only genuinely broken expressions are errors.
+        let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
+
+        for condition in [
+            "is_abi3",
+            "not is_abi3",
+            "python == \"3.12\"",
+            "unix and py < 310",
+            "undefined_thing | length",
+            "undefined_thing()",
+        ] {
+            let conditions = vec![condition.to_string()];
+            assert_eq!(
+                is_skipped(&conditions, &ctx).ok(),
+                Some(false),
+                "skip condition '{}' with undefined variables should not skip and should not error",
+                condition
+            );
+        }
     }
 
     #[test]
