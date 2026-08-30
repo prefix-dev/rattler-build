@@ -210,9 +210,8 @@ pub struct Build {
 
     /// Files to include/exclude in the package (glob patterns or include/exclude mapping)
     ///
-    /// `None` means the `files` key was absent from the recipe, which packages every
-    /// new file in the prefix. `Some` means it was given, and the globs decide - an
-    /// explicitly empty list therefore packages nothing.
+    /// `None` means the key was absent (packages everything); `Some` lets the globs
+    /// decide, so an empty list packages nothing.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub files: Option<IncludeExclude>,
 

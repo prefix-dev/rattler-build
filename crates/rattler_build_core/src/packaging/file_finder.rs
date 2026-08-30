@@ -205,9 +205,8 @@ impl Files {
     /// `files` glob filters the explicit list down, and `always_include`
     /// scans the prefix to force-include matching files.
     ///
-    /// `files` is `None` when the recipe has no `files` key, in which case no
-    /// filtering happens. `Some` filters by the globs, so an empty [`GlobVec`]
-    /// selects nothing.
+    /// `files` is `None` when the recipe has no `files` key (no filtering); an
+    /// empty [`GlobVec`] selects nothing.
     pub fn from_paths(
         prefix: &Path,
         paths: impl IntoIterator<Item = PathBuf>,
@@ -263,9 +262,8 @@ impl Files {
     /// of the conda environment). If always_include is Some, then all files matching the glob pattern will be included
     /// in the new_files set.
     ///
-    /// `files` is `None` when the recipe has no `files` key, in which case every new
-    /// file is packaged. `Some` filters by the globs, so an empty [`GlobVec`] packages
-    /// nothing.
+    /// `files` is `None` when the recipe has no `files` key (no filtering); an
+    /// empty [`GlobVec`] packages nothing.
     pub fn from_prefix(
         prefix: &Path,
         always_include: &GlobVec,

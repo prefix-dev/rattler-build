@@ -2213,9 +2213,8 @@ impl Evaluate for Stage0Build {
         let always_copy_files = evaluate_glob_vec_simple(&self.always_copy_files, context)?;
         let always_include_files = evaluate_glob_vec_simple(&self.always_include_files, context)?;
 
-        // Evaluate files (handle both list and include/exclude variants).
-        // Keep `None` (key absent) distinct from `Some(empty)` (`files: []`): the
-        // former packages everything, the latter packages nothing.
+        // Keep `None` (key absent, packages everything) distinct from `Some(empty)`
+        // (`files: []`, packages nothing).
         let files = self
             .files
             .as_ref()
@@ -3112,9 +3111,8 @@ fn merge_stage1_build(
     let merge_build_and_host_envs =
         output.merge_build_and_host_envs || toplevel.merge_build_and_host_envs;
 
-    // Files: use output if the key was given, otherwise inherit from top-level.
-    // An explicit `files: []` on the output is an override, not an absence, so it
-    // must not fall back to the top-level globs.
+    // Files: an explicit `files: []` is an override, not an absence, so only a
+    // missing key falls back to the top-level globs.
     let files = output.files.or(toplevel.files);
 
     // Dynamic linking: use output if not default, otherwise inherit from top-level
@@ -5077,8 +5075,7 @@ outputs:
         use crate::stage0::parser::parse_recipe_or_multi_from_source;
 
         // Regression test for https://github.com/prefix-dev/rattler-build/issues/2753
-        // `files: []` means "package nothing" and must not be confused with an absent
-        // `files` key, which packages everything and inherits the top-level globs.
+        // `files: []` means "package nothing"; an absent key inherits the top-level globs.
         let recipe_yaml = r#"
 schema_version: 1
 
@@ -5119,8 +5116,7 @@ outputs:
         let recipes = multi.evaluate(&ctx).unwrap();
         assert_eq!(recipes.len(), 3);
 
-        // `files: []` is an override, not an absence: it must stay `Some(empty)` so
-        // packaging selects nothing, instead of inheriting the top-level `lib/**`.
+        // An override, not an absence: must stay `Some(empty)`, not inherit `lib/**`.
         let cleared = recipes[0].build.files.as_ref();
         assert!(
             cleared.is_some_and(|files| files.is_empty()),
@@ -5136,8 +5132,7 @@ outputs:
             .expect("`files` should be inherited from top-level");
         assert!(!inherited.is_empty());
 
-        // A conditional list where no branch matches is still an explicit `files` key,
-        // so it selects nothing rather than falling back to packaging everything.
+        // No branch matches, but the key is still present, so it selects nothing.
         let conditional = recipes[2].build.files.as_ref();
         assert!(
             conditional.is_some_and(|files| files.is_empty()),

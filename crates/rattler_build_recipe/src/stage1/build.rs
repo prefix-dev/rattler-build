@@ -473,9 +473,8 @@ pub struct Build {
 
     /// Files to include in the package (validated glob patterns)
     ///
-    /// `None` means the recipe had no `files` key, in which case every new file in
-    /// the prefix is packaged. `Some` means the key was given and the globs select
-    /// what to package, so `files: []` packages nothing.
+    /// `None` means the key was absent (packages every new file); `Some` lets the
+    /// globs decide, so `files: []` packages nothing.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub files: Option<GlobVec>,
 

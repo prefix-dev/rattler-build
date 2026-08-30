@@ -798,17 +798,17 @@ build:
       - include/**/private.h
 ```
 
-Leaving the `files` key out entirely packages every new file. Giving the key
-hands the selection to the globs, so an empty list packages nothing:
+Omitting `files` packages every new file; giving it hands the selection to the
+globs, so an empty list packages nothing:
 
 ```yaml title="recipe.yaml"
 build:
-  # a metapackage: no files, whatever the build produced
+  # a metapackage, whatever the build produced
   files: []
 ```
 
-The same applies when a conditional list has no matching branch - the key is
-still present, so nothing is selected on the platforms that match no branch:
+A conditional list with no matching branch is still an explicit key, so it too
+packages nothing:
 
 ```yaml title="recipe.yaml"
 build:
@@ -820,8 +820,8 @@ build:
     # on Windows no branch matches, so the package is empty
 ```
 
-This matters most for outputs that `inherit` from a staging output, where the
-files restored from the staging cache all count as new.
+This matters most for outputs that `inherit` from a staging output, where every
+file restored from the cache counts as new.
 
 ### Python specific options
 

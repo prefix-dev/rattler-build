@@ -346,11 +346,7 @@ def test_multiple_staging_caches(
 def test_staging_empty_files_selection(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
-    """Issue #2753: an inheriting output must respect its `files` selection.
-
-    `files: []` and a conditional `files` list with no matching branch both mean
-    "package nothing", rather than falling through to the whole staging cache.
-    """
+    """Issue #2753: `files: []` and an unmatched conditional list package nothing."""
     rattler_build.build(
         recipes / "staging/staging-empty-files.yaml",
         tmp_path,
