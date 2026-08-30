@@ -1,0 +1,24 @@
+schema_version: 1
+recipe:
+  version: 1.0.0
+outputs:
+  - package:
+      name: overlapping-parent
+    build:
+      script:
+        - if: unix
+          then:
+            - mkdir -p "$PREFIX/include"
+            - echo header > "$PREFIX/include/shared.h"
+          else:
+            - mkdir "%PREFIX%\include"
+            - echo header> "%PREFIX%\include\shared.h"
+    subpackages:
+      - package:
+          name: overlapping-a
+        split:
+          files: [include/**]
+      - package:
+          name: overlapping-b
+        split:
+          files: [include/**]

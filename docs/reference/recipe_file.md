@@ -1645,6 +1645,37 @@ Due to the variant config file, this will build two versions of `libtest`. We
 will also build two versions of `test`, one that depends on `libtest (openssl
 1)` and one that depends on `libtest (openssl 3)`.
 
+### Nested subpackages
+
+A package output may contain `subpackages:` whose files are split from the
+parent build. Each entry has `package` metadata and a required `split` mapping:
+
+```yaml
+outputs:
+  - package:
+      name: libtest
+    build:
+      script: install-everything
+    subpackages:
+      - package:
+          name: libtest-dev
+        split:
+          files:
+            - include/**
+        requirements:
+          run:
+            - ${{ pin_subpackage("libtest", exact=True) }}
+```
+
+The parent build executes once. Child selections are removed from the parent,
+and overlapping child selections are rejected. `split.files` accepts the same
+list or `include`/`exclude` mapping as `build.files`. An optional
+`split.script` can write additional prefix-relative paths or globs, one per
+line, to `$RATTLER_BUILD_SUBPACKAGE_FILES`.
+
+See [Nested subpackages](multi_output.md#nested-subpackages) for inheritance,
+overrides, dynamic selection, and current scope.
+
 ### Staging outputs
 
 !!!note

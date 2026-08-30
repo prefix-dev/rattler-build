@@ -559,7 +559,7 @@ pub(crate) fn reject_script_and_steps(
     Ok(())
 }
 
-fn parse_build_files(node: &Node) -> Result<IncludeExclude, ParseError> {
+pub(crate) fn parse_build_files(node: &Node) -> Result<IncludeExclude, ParseError> {
     // Try parsing as a mapping with include/exclude first
     if let Some(mapping) = node.as_mapping() {
         let mut include = None;

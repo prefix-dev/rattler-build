@@ -11,7 +11,7 @@ use crate::{
         ConditionalList, Requirements, Value,
         output::{
             CacheInherit, Inherit, MultiOutputRecipe, Output, PackageOutput, RecipeMetadata,
-            StagingBuild, StagingMetadata, StagingOutput,
+            StagingBuild, StagingMetadata, StagingOutput, SubpackageOutput, SubpackageSplit,
         },
         parser::{
             ParseConfig, get_span, parse_about, parse_build, parse_extra, parse_source, parse_tests,
@@ -440,6 +440,102 @@ fn parse_package_metadata(yaml: &MarkedNode) -> ParseResult<crate::stage0::Packa
     Ok(crate::stage0::PackageMetadata { name, version })
 }
 
+fn parse_subpackages(yaml: &MarkedNode, config: ParseConfig) -> ParseResult<Vec<SubpackageOutput>> {
+    let sequence = yaml.as_sequence().ok_or_else(|| {
+        ParseError::expected_type("sequence", "non-sequence", get_span(yaml))
+            .with_message("subpackages must be a list")
+    })?;
+
+    sequence
+        .iter()
+        .map(|item| {
+            let mapping = item.as_mapping().ok_or_else(|| {
+                ParseError::expected_type("mapping", "non-mapping", get_span(item))
+                    .with_message("each subpackage must be a mapping")
+            })?;
+
+            let package = parse_package_metadata(mapping.get("package").ok_or_else(|| {
+                ParseError::missing_field("package", get_span(item))
+            })?)?;
+
+            let split_node = mapping.get("split").ok_or_else(|| {
+                ParseError::missing_field("split", get_span(item)).with_suggestion(
+                    "add `split: {files: [...]}` or a `split.script` selector",
+                )
+            })?;
+            let split_mapping = split_node.as_mapping().ok_or_else(|| {
+                ParseError::expected_type("mapping", "non-mapping", get_span(split_node))
+                    .with_message("split must be a mapping")
+            })?;
+            split_node.validate_keys("subpackage split", &["files", "script"])?;
+            let files = split_mapping
+                .get("files")
+                .map(super::build::parse_build_files)
+                .transpose()?
+                .unwrap_or_default();
+            let script = split_mapping
+                .get("script")
+                .map(super::build::parse_script)
+                .transpose()?
+                .unwrap_or_default();
+            if files == Default::default() && script.is_default() {
+                return Err(ParseError::invalid_value(
+                    "split",
+                    "a subpackage split needs static files or a selector script",
+                    get_span(split_node),
+                ));
+            }
+
+            let requirements = mapping
+                .get("requirements")
+                .map(|node| super::requirements::parse_requirements_with_config(node, config))
+                .transpose()?;
+            let build = mapping.get("build").map(parse_build).transpose()?;
+            if let Some(build) = &build {
+                let build_span = get_span(mapping.get("build").expect("checked above"));
+                if !build.plan.is_default() {
+                    return Err(ParseError::invalid_value(
+                        "subpackage build",
+                        "subpackage build sections cannot contain script or steps",
+                        build_span,
+                    )
+                    .with_suggestion("put file-discovery commands under `split.script`; the parent build runs only once"));
+                }
+                if build.files != Default::default() {
+                    return Err(ParseError::invalid_value(
+                        "subpackage build.files",
+                        "use split.files to select subpackage contents",
+                        build_span,
+                    ));
+                }
+                if !build.skip.is_empty() {
+                    return Err(ParseError::invalid_value(
+                        "subpackage build.skip",
+                        "conditional nested subpackages are not supported yet",
+                        build_span,
+                    ));
+                }
+            }
+            let about = mapping.get("about").map(parse_about).transpose()?;
+            let tests = mapping.get("tests").map(parse_tests).transpose()?;
+
+            item.validate_keys(
+                "subpackage",
+                &["package", "split", "requirements", "build", "about", "tests"],
+            )?;
+
+            Ok(SubpackageOutput {
+                package,
+                split: SubpackageSplit { files, script },
+                requirements,
+                build,
+                about,
+                tests,
+            })
+        })
+        .collect()
+}
+
 /// Parse a package output
 fn parse_package_output(
     mapping: &marked_yaml::types::MarkedMappingNode,
@@ -493,6 +589,20 @@ fn parse_package_output(
         ConditionalList::default()
     };
 
+    let subpackages = mapping
+        .get("subpackages")
+        .map(|node| parse_subpackages(node, config))
+        .transpose()?
+        .unwrap_or_default();
+
+    if !subpackages.is_empty() && !matches!(inherit, Inherit::TopLevel) {
+        return Err(ParseError::invalid_value(
+            "subpackages",
+            "a package with subpackages cannot itself inherit from a staging output",
+            get_span(mapping.get("subpackages").expect("checked above")),
+        ));
+    }
+
     // Validate field names
     let node = MarkedNode::Mapping(mapping.clone());
     node.validate_keys(
@@ -505,6 +615,7 @@ fn parse_package_output(
             "build",
             "about",
             "tests",
+            "subpackages",
         ],
     )?;
 
@@ -516,6 +627,7 @@ fn parse_package_output(
         build,
         about,
         tests,
+        subpackages,
     })
 }
 

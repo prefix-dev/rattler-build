@@ -1,0 +1,71 @@
+schema_version: 1
+
+recipe:
+  name: split-demo
+  version: 1.0.0
+
+about:
+  license: BSD-3-Clause
+  summary: Parent summary
+
+outputs:
+  - package:
+      name: split-demo
+    build:
+      script:
+        - if: unix
+          then:
+            - mkdir -p "$PREFIX/include/split-demo" "$PREFIX/lib/cmake/split-demo" "$PREFIX/share/split-demo/doc"
+            - echo header > "$PREFIX/include/split-demo/demo.h"
+            - echo cmake > "$PREFIX/lib/cmake/split-demo/SplitDemoConfig.cmake"
+            - echo "$PKG_NAME $PKG_VERSION $PKG_BUILDNUM $PKG_BUILD_STRING $PKG_HASH" > "$PREFIX/share/split-demo/runtime.txt"
+            - echo "$PKG_NAME $PKG_VERSION $PKG_BUILDNUM $PKG_BUILD_STRING $PKG_HASH" > "$PREFIX/share/split-demo/doc/readme.txt"
+          else:
+            - mkdir "%PREFIX%\include\split-demo" "%PREFIX%\lib\cmake\split-demo" "%PREFIX%\share\split-demo\doc"
+            - echo header> "%PREFIX%\include\split-demo\demo.h"
+            - echo cmake> "%PREFIX%\lib\cmake\split-demo\SplitDemoConfig.cmake"
+            - echo %PKG_NAME% %PKG_VERSION% %PKG_BUILDNUM% %PKG_BUILD_STRING% %PKG_HASH%> "%PREFIX%\share\split-demo\runtime.txt"
+            - echo %PKG_NAME% %PKG_VERSION% %PKG_BUILDNUM% %PKG_BUILD_STRING% %PKG_HASH%> "%PREFIX%\share\split-demo\doc\readme.txt"
+    tests:
+      - package_contents:
+          files:
+            - share/split-demo/runtime.txt
+          strict: true
+
+    subpackages:
+      - package:
+          name: split-demo-dev
+        split:
+          files:
+            - include/**
+          script:
+            - if: unix
+              then: echo 'lib/cmake/**' >> "$RATTLER_BUILD_SUBPACKAGE_FILES"
+              else: echo lib/cmake/**>> "%RATTLER_BUILD_SUBPACKAGE_FILES%"
+        requirements:
+          run:
+            - ${{ pin_subpackage("split-demo", exact=True) }}
+        build:
+          number: 7
+        about:
+          summary: Development files split from split-demo
+        tests:
+          - package_contents:
+              files:
+                - include/split-demo/demo.h
+                - lib/cmake/split-demo/SplitDemoConfig.cmake
+              strict: true
+
+      - package:
+          name: split-demo-docs
+        split:
+          files:
+            - share/split-demo/doc/**
+        requirements: {}
+        about:
+          summary: Documentation split from split-demo
+        tests:
+          - package_contents:
+              files:
+                - share/split-demo/doc/readme.txt
+              strict: true
