@@ -83,6 +83,34 @@ if %ERRORLEVEL% neq 0 exit 1
 
 To find more examples of this pattern, [try this Github search query](https://github.com/search?q=org%3Aconda-forge+bash+language%3ABatchfile+&type=code).
 
+### Using `brush` on Windows
+
+[`brush`](https://github.com/reubeno/brush) runs Bash-compatible scripts on
+Windows, macOS and Linux. It avoids a separate `build.bat` wrapper when the
+same shell script can build on every platform. Select it explicitly and add it
+to the build requirements:
+
+```yaml title="recipe.yaml"
+build:
+  script:
+    interpreter: brush
+    content:
+      - cmake -S . -B build ${CMAKE_ARGS}
+      - cmake --build build --config Release
+      - cmake --install build --config Release
+
+requirements:
+  build:
+    - brush
+    - cmake
+```
+
+Rattler-Build only resolves `brush` from the build environment, not the system
+or host environment. See [Using `brush`](build_script.md#using-brush) for the
+full interpreter behavior and
+[conda-forge recipes using it](https://github.com/search?q=org%3Aconda-forge+%22interpreter%3A+brush%22&type=code)
+for more examples.
+
 ## Installing the correct MSVC compilers
 
 In order to install the correct MSVC compilers, you should get the Community [Visual Studio Installer](https://visualstudio.microsoft.com/downloads/).
