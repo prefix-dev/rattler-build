@@ -88,14 +88,22 @@ To find more examples of this pattern, [try this Github search query](https://gi
 [`brush`](https://github.com/reubeno/brush) runs Bash-compatible scripts on
 Windows, macOS and Linux. It avoids a separate `build.bat` wrapper when the
 same shell script can build on every platform. Select it explicitly and add it
-to the build requirements:
+to the build requirements.
+
+`brush` uses Unix-style variable expansion on every platform, including
+Windows. `$PREFIX` is the root of the host environment. `$LIBRARY_PREFIX` is
+set for Windows targets and points to `$PREFIX/Library`, where non-Python
+libraries and executables usually belong. Use `$PREFIX` for Python and other
+root-level contents. For a script that installs a Unix-style layout on every
+platform, `${LIBRARY_PREFIX:-$PREFIX}` selects `$LIBRARY_PREFIX` when it exists
+and falls back to `$PREFIX` elsewhere:
 
 ```yaml title="recipe.yaml"
 build:
   script:
     interpreter: brush
     content:
-      - cmake -S . -B build ${CMAKE_ARGS}
+      - cmake -S . -B build ${CMAKE_ARGS} -DCMAKE_INSTALL_PREFIX="${LIBRARY_PREFIX:-$PREFIX}"
       - cmake --build build --config Release
       - cmake --install build --config Release
 
