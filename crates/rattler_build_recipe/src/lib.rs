@@ -15,7 +15,7 @@ pub use stage1::{Evaluate, EvaluationContext, Recipe as Stage1Recipe};
 
 #[cfg(feature = "variant-config")]
 pub use variant_render::{
-    RenderConfig, RenderError, RenderedVariant, TopologicalSortError,
+    BuildStringPrefix, RenderConfig, RenderError, RenderedVariant, TopologicalSortError,
     render_recipe_with_variant_config, topological_sort_by_dependencies,
 };
 
