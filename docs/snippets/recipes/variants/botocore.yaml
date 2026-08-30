@@ -1,0 +1,3 @@
+python_geq_310:
+  - true
+  - false
