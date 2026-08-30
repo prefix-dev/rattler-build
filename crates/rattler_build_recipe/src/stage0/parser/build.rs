@@ -666,7 +666,7 @@ fn parse_build_from_mapping(mapping: &MarkedMappingNode) -> Result<Build, ParseE
                     parse_bool_value(value_node, "merge_build_and_host_envs")?;
             }
             "files" => {
-                build.files = parse_build_files(value_node)?;
+                build.files = Some(parse_build_files(value_node)?);
             }
             "dynamic_linking" => {
                 build.dynamic_linking = parse_dynamic_linking(value_node)?;

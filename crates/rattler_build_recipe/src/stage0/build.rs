@@ -209,8 +209,12 @@ pub struct Build {
     pub merge_build_and_host_envs: Value<bool>,
 
     /// Files to include/exclude in the package (glob patterns or include/exclude mapping)
-    #[serde(default)]
-    pub files: IncludeExclude,
+    ///
+    /// `None` means the `files` key was absent from the recipe, which packages every
+    /// new file in the prefix. `Some` means it was given, and the globs decide - an
+    /// explicitly empty list therefore packages nothing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub files: Option<IncludeExclude>,
 
     /// Dynamic linking configuration
     #[serde(default)]
@@ -242,7 +246,7 @@ impl Default for Build {
             always_copy_files: ConditionalList::default(),
             always_include_files: ConditionalList::default(),
             merge_build_and_host_envs: Value::new_concrete(false, None),
-            files: IncludeExclude::default(),
+            files: None,
             dynamic_linking: DynamicLinking::default(),
             variant: VariantKeyUsage::default(),
             prefix_detection: PrefixDetection::default(),
@@ -491,7 +495,9 @@ impl Build {
         vars.extend(always_copy_files.used_variables());
         vars.extend(always_include_files.used_variables());
         vars.extend(merge_build_and_host_envs.used_variables());
-        vars.extend(files.used_variables());
+        if let Some(files) = files {
+            vars.extend(files.used_variables());
+        }
 
         // Dynamic linking
         let DynamicLinking {

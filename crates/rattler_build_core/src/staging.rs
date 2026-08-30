@@ -351,7 +351,7 @@ impl Output {
         let new_files = Files::from_prefix(
             self.prefix(),
             &staging.build.always_include_files,
-            &staging.build.files,
+            staging.build.files.as_ref(),
             None,
         )
         .into_diagnostic()?;

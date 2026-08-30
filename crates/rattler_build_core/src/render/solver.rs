@@ -281,13 +281,8 @@ pub async fn install_packages(
 
     if !installed_packages.is_empty() && name.starts_with("host") {
         // we have to clean up extra files in the prefix
-        let extra_files = Files::from_prefix(
-            target_prefix,
-            &Default::default(),
-            &Default::default(),
-            None,
-        )
-        .into_diagnostic()?;
+        let extra_files =
+            Files::from_prefix(target_prefix, &Default::default(), None, None).into_diagnostic()?;
 
         tracing::info!(
             "Cleaning up {} files in the prefix from a previous build.",

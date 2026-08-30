@@ -204,11 +204,15 @@ impl Files {
     /// explicit list, mirroring the behaviour of [`Files::from_prefix`]: the
     /// `files` glob filters the explicit list down, and `always_include`
     /// scans the prefix to force-include matching files.
+    ///
+    /// `files` is `None` when the recipe has no `files` key, in which case no
+    /// filtering happens. `Some` filters by the globs, so an empty [`GlobVec`]
+    /// selects nothing.
     pub fn from_paths(
         prefix: &Path,
         paths: impl IntoIterator<Item = PathBuf>,
         always_include: &GlobVec,
-        files: &GlobVec,
+        files: Option<&GlobVec>,
     ) -> Result<Self, PackagingError> {
         let old_files = collect_previous_files(prefix)?;
 
@@ -231,7 +235,7 @@ impl Files {
             new_files.insert(resolved);
         }
 
-        if !files.is_empty() {
+        if let Some(files) = files {
             new_files.retain(|f| {
                 files.is_match(f.strip_prefix(prefix).expect("File should be in prefix"))
             });
@@ -258,10 +262,14 @@ impl Files {
     /// Find all files in the given (host) prefix and remove all previously installed files (based on the PrefixRecord
     /// of the conda environment). If always_include is Some, then all files matching the glob pattern will be included
     /// in the new_files set.
+    ///
+    /// `files` is `None` when the recipe has no `files` key, in which case every new
+    /// file is packaged. `Some` filters by the globs, so an empty [`GlobVec`] packages
+    /// nothing.
     pub fn from_prefix(
         prefix: &Path,
         always_include: &GlobVec,
-        files: &GlobVec,
+        files: Option<&GlobVec>,
         post_install_files: Option<&HashSet<PathBuf>>,
     ) -> Result<Self, io::Error> {
         if !prefix.exists() {
@@ -293,8 +301,8 @@ impl Files {
             fs_is_case_sensitive,
         );
 
-        // Filter by files glob if specified
-        if !files.is_empty() {
+        // Filter by files glob if the recipe specified one
+        if let Some(files) = files {
             difference.retain(|f| {
                 files.is_match(f.strip_prefix(prefix).expect("File should be in prefix"))
             });
@@ -479,8 +487,7 @@ mod test {
 
         let inputs = vec![PathBuf::from("bin/foo"), prefix.join("bin/bar")];
 
-        let files =
-            Files::from_paths(prefix, inputs, &Default::default(), &Default::default()).unwrap();
+        let files = Files::from_paths(prefix, inputs, &Default::default(), None).unwrap();
         let new_files: HashSet<PathBuf> = files.new_files.iter().cloned().collect();
 
         assert_eq!(new_files.len(), 2);
@@ -498,13 +505,8 @@ mod test {
         let outside_file = outside.path().join("escape.txt");
         fs_err::write(&outside_file, b"nope").unwrap();
 
-        let err = Files::from_paths(
-            prefix,
-            vec![outside_file],
-            &Default::default(),
-            &Default::default(),
-        )
-        .unwrap_err();
+        let err =
+            Files::from_paths(prefix, vec![outside_file], &Default::default(), None).unwrap_err();
         assert!(matches!(
             err,
             crate::packaging::PackagingError::PackageFileOutsidePrefix(_)
@@ -520,7 +522,7 @@ mod test {
             prefix,
             vec![PathBuf::from("bin/missing")],
             &Default::default(),
-            &Default::default(),
+            None,
         )
         .unwrap_err();
         assert!(matches!(
@@ -545,12 +547,68 @@ mod test {
             prefix,
             vec![PathBuf::from("bin/foo"), PathBuf::from("bin/bar")],
             &Default::default(),
-            &only_foo,
+            Some(&only_foo),
         )
         .unwrap();
 
         assert_eq!(files.new_files.len(), 1);
         assert!(files.new_files.contains(&prefix.join("bin/foo")));
+    }
+
+    #[test]
+    fn test_files_from_paths_empty_files_glob_selects_nothing() {
+        use rattler_build_recipe::stage1::GlobVec;
+
+        // Issue #2753: `files: []` means "package nothing", not "no filter".
+        let tempdir = tempfile::TempDir::new().unwrap();
+        let prefix = tempdir.path();
+        fs_err::create_dir_all(prefix.join("bin")).unwrap();
+        fs_err::write(prefix.join("bin/foo"), b"foo").unwrap();
+
+        let empty = GlobVec::default();
+        let files = Files::from_paths(
+            prefix,
+            vec![PathBuf::from("bin/foo")],
+            &Default::default(),
+            Some(&empty),
+        )
+        .unwrap();
+        assert!(
+            files.new_files.is_empty(),
+            "an explicit empty `files` glob should select no files, got {:?}",
+            files.new_files
+        );
+
+        // Whereas an absent `files` key keeps everything.
+        let files = Files::from_paths(
+            prefix,
+            vec![PathBuf::from("bin/foo")],
+            &Default::default(),
+            None,
+        )
+        .unwrap();
+        assert_eq!(files.new_files.len(), 1);
+    }
+
+    #[test]
+    fn test_files_from_prefix_empty_files_glob_selects_nothing() {
+        use rattler_build_recipe::stage1::GlobVec;
+
+        let tempdir = tempfile::TempDir::new().unwrap();
+        let prefix = tempdir.path();
+        fs_err::create_dir_all(prefix.join("bin")).unwrap();
+        fs_err::write(prefix.join("bin/foo"), b"foo").unwrap();
+
+        let empty = GlobVec::default();
+        let files = Files::from_prefix(prefix, &Default::default(), Some(&empty), None).unwrap();
+        assert!(
+            files.new_files.is_empty(),
+            "an explicit empty `files` glob should select no files, got {:?}",
+            files.new_files
+        );
+
+        let files = Files::from_prefix(prefix, &Default::default(), None, None).unwrap();
+        assert!(!files.new_files.is_empty());
     }
 
     #[test]
@@ -565,13 +623,8 @@ mod test {
 
         let always: GlobVec = serde_yaml::from_str("- bin/extra").unwrap();
 
-        let files = Files::from_paths(
-            prefix,
-            vec![PathBuf::from("bin/foo")],
-            &always,
-            &Default::default(),
-        )
-        .unwrap();
+        let files =
+            Files::from_paths(prefix, vec![PathBuf::from("bin/foo")], &always, None).unwrap();
 
         assert_eq!(files.new_files.len(), 2);
         assert!(files.new_files.contains(&prefix.join("bin/foo")));

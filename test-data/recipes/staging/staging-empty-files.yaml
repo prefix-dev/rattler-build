@@ -1,0 +1,60 @@
+# Regression test for https://github.com/prefix-dev/rattler-build/issues/2753
+# An output that inherits from a staging cache must respect its `files` selection.
+# `files: []`, and a conditional `files` list where no branch matches, both mean
+# "package nothing" - not "package everything from the staging cache".
+
+schema_version: 1
+
+recipe:
+  name: staging-empty-files
+  version: 1.0.0
+
+outputs:
+  - staging:
+      name: stage
+    build:
+      script:
+        - if: unix
+          then: |
+            mkdir -p $PREFIX/lib $PREFIX/include
+            echo "libcore" > $PREFIX/lib/libcore.so
+            echo "core.h"  > $PREFIX/include/core.h
+        - if: win
+          then: |
+            if not exist "%PREFIX%\lib" mkdir "%PREFIX%\lib"
+            if not exist "%PREFIX%\include" mkdir "%PREFIX%\include"
+            echo libcore > "%PREFIX%\lib\libcore.dll"
+            echo core.h > "%PREFIX%\include\core.h"
+
+  # A pure metapackage: `files: []` selects nothing.
+  - package:
+      name: empty-files-metapackage
+      version: 1.0.0
+    inherit: stage
+    build:
+      files: []
+    about:
+      summary: Metapackage with no files
+      license: MIT
+
+  # No branch matches on any platform, so this also selects nothing.
+  - package:
+      name: unmatched-conditional-files
+      version: 1.0.0
+    inherit: stage
+    build:
+      files:
+        - if: target_platform == "some-unknown-platform"
+          then: lib/never-matches
+    about:
+      summary: Conditional file list that matches nothing
+      license: MIT
+
+  # Control: an output with no `files` key still gets the whole staging cache.
+  - package:
+      name: inherits-all-files
+      version: 1.0.0
+    inherit: stage
+    about:
+      summary: Inherits every staged file
+      license: MIT
