@@ -3170,7 +3170,10 @@ def test_overlinking_check(rattler_build: RattlerBuild, recipes: Path, tmp_path:
     reason="Link checking fixture supports Linux and Windows",
 )
 def test_overlinking_check_without_binary_relocation(
-    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+    rattler_build: RattlerBuild,
+    recipes: Path,
+    tmp_path: Path,
+    clean_path_on_win32,
 ):
     target_platform = "win-64" if platform.system() == "Windows" else "linux-64"
     args = rattler_build.build_args(
