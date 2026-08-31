@@ -459,13 +459,37 @@ source:
 
 Specifies build information.
 
-Each field that expects a path can also handle a glob pattern. The matching is
-performed from the top of the build environment, so to match files inside your
-project you can use a pattern similar to the following one:
-`"**/myproject/**/*.txt"`. This pattern will match any `.txt` file found in your
-project. Quotation marks (`""`) are required for patterns that start with a `*`.
+Each field that expects a path can also handle a glob pattern. Patterns are
+matched from the top of the build environment.
 
-Recursive globbing using `**` is also supported.
+??? info "Glob syntax"
+
+    Rattler-Build uses [globset's Unix-style glob syntax](https://docs.rs/globset/latest/globset/#syntax).
+
+    | Pattern | Matches |
+    |---------|---------|
+    | `?` | Any single character |
+    | `*` | Zero or more characters |
+    | `**` | Directories recursively |
+    | `{a,b}` | Either `a` or `b` (alternatives cannot be nested) |
+    | `[ab]` | Either `a` or `b` |
+    | `[a-z]` | Any character in the range `a` through `z` |
+    | `[!ab]` | Any character except `a` or `b` |
+    | `[*]` | A literal `*` |
+
+    Alternatives can replace platform selectors when only a file extension
+    differs. This example matches both `lib/libclang-cpp.dylib` and
+    `lib/libclang-cpp.so`:
+
+    ```yaml
+    build:
+      files:
+        - lib/libclang-cpp.{dylib,so}
+    ```
+
+    To match every `.txt` file in a project directory, use
+    `"**/myproject/**/*.txt"`. YAML quotes are required for patterns that start
+    with `*`.
 
 #### Build number and string
 
