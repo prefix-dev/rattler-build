@@ -1031,13 +1031,13 @@ impl Output {
                     host_prefix,
                     paths,
                     &self.recipe.build().always_include_files,
-                    &self.recipe.build().files,
+                    self.recipe.build().files.as_ref(),
                 )?
             }
             None => Files::from_prefix(
                 host_prefix,
                 &self.recipe.build().always_include_files,
-                &self.recipe.build().files,
+                self.recipe.build().files.as_ref(),
                 post_install_files,
             )?,
         };

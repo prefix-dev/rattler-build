@@ -343,6 +343,32 @@ def test_multiple_staging_caches(
     assert about["license"] == "MIT"
 
 
+def test_staging_empty_files_selection(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Issue #2753: `files: []` and an unmatched conditional list package nothing."""
+    rattler_build.build(
+        recipes / "staging/staging-empty-files.yaml",
+        tmp_path,
+        extra_args=["--experimental"],
+    )
+
+    lib_name = "lib/libcore.dll" if platform.system() == "Windows" else "lib/libcore.so"
+
+    def packaged_files(package: str) -> list[str]:
+        pkg = get_extracted_package(tmp_path, package)
+        paths = json.loads((pkg / "info/paths.json").read_text())
+        return [p["_path"] for p in paths["paths"]]
+
+    assert packaged_files("empty-files-metapackage") == []
+    assert packaged_files("unmatched-conditional-files") == []
+
+    # An output without a `files` key keeps packaging the whole staging cache.
+    inherits_all = packaged_files("inherits-all-files")
+    assert any(lib_name in f for f in inherits_all)
+    assert any("include/core.h" in f for f in inherits_all)
+
+
 def test_staging_with_top_level_inherit(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, clean_path_on_win32
 ):

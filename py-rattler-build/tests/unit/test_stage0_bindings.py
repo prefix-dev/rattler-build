@@ -97,7 +97,6 @@ def test_recipe_to_dict_snapshot() -> None:
                 "always_copy_files": [],
                 "always_include_files": [],
                 "merge_build_and_host_envs": False,
-                "files": [],
                 "dynamic_linking": {
                     "rpaths": [],
                     "binary_relocation": True,
@@ -158,7 +157,6 @@ def test_single_output_recipe_to_dict_snapshot() -> None:
                 "always_copy_files": [],
                 "always_include_files": [],
                 "merge_build_and_host_envs": False,
-                "files": [],
                 "dynamic_linking": {
                     "rpaths": [],
                     "binary_relocation": True,
@@ -220,7 +218,6 @@ def test_multi_output_recipe_to_dict_snapshot() -> None:
                 "always_copy_files": [],
                 "always_include_files": [],
                 "merge_build_and_host_envs": False,
-                "files": [],
                 "dynamic_linking": {
                     "rpaths": [],
                     "binary_relocation": True,
@@ -249,7 +246,6 @@ def test_multi_output_recipe_to_dict_snapshot() -> None:
                         "always_copy_files": [],
                         "always_include_files": [],
                         "merge_build_and_host_envs": False,
-                        "files": [],
                         "dynamic_linking": {
                             "rpaths": [],
                             "binary_relocation": True,
@@ -277,7 +273,6 @@ def test_multi_output_recipe_to_dict_snapshot() -> None:
                         "always_copy_files": [],
                         "always_include_files": [],
                         "merge_build_and_host_envs": False,
-                        "files": [],
                         "dynamic_linking": {
                             "rpaths": [],
                             "binary_relocation": True,
@@ -338,7 +333,6 @@ def test_build_to_dict_snapshot() -> None:
             "always_copy_files": [],
             "always_include_files": [],
             "merge_build_and_host_envs": False,
-            "files": [],
             "dynamic_linking": {
                 "rpaths": [],
                 "binary_relocation": True,
@@ -442,7 +436,6 @@ def test_multi_output_outputs_snapshot() -> None:
                     "always_copy_files": [],
                     "always_include_files": [],
                     "merge_build_and_host_envs": False,
-                    "files": [],
                     "dynamic_linking": {
                         "rpaths": [],
                         "binary_relocation": True,
@@ -470,7 +463,6 @@ def test_multi_output_outputs_snapshot() -> None:
                     "always_copy_files": [],
                     "always_include_files": [],
                     "merge_build_and_host_envs": False,
-                    "files": [],
                     "dynamic_linking": {
                         "rpaths": [],
                         "binary_relocation": True,

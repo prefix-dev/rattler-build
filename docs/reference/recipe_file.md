@@ -822,6 +822,30 @@ build:
       - include/**/private.h
 ```
 
+Omitting `files` packages every new file; giving it hands the selection to the
+globs, so an empty list packages nothing:
+
+```yaml title="recipe.yaml"
+build:
+  # a metapackage, whatever the build produced
+  files: []
+```
+
+A conditional list with no matching branch is still an explicit key, so it too
+packages nothing:
+
+```yaml title="recipe.yaml"
+build:
+  files:
+    - if: linux
+      then: lib/libfoo.so
+    - if: osx
+      then: lib/libfoo.dylib
+    # on Windows no branch matches, so the package is empty
+```
+
+This matters most for outputs that `inherit` from a staging output, where every
+file restored from the cache counts as new.
 
 ### Python specific options
 

@@ -2213,8 +2213,13 @@ impl Evaluate for Stage0Build {
         let always_copy_files = evaluate_glob_vec_simple(&self.always_copy_files, context)?;
         let always_include_files = evaluate_glob_vec_simple(&self.always_include_files, context)?;
 
-        // Evaluate files (handle both list and include/exclude variants)
-        let files = evaluate_glob_vec(&self.files, context)?;
+        // Keep `None` (key absent, packages everything) distinct from `Some(empty)`
+        // (`files: []`, packages nothing).
+        let files = self
+            .files
+            .as_ref()
+            .map(|files| evaluate_glob_vec(files, context))
+            .transpose()?;
 
         // Evaluate dynamic linking
         let dynamic_linking = self.dynamic_linking.evaluate(context)?;
@@ -3106,12 +3111,9 @@ fn merge_stage1_build(
     let merge_build_and_host_envs =
         output.merge_build_and_host_envs || toplevel.merge_build_and_host_envs;
 
-    // Files: use output if not empty, otherwise inherit from top-level
-    let files = if output.files.is_empty() {
-        toplevel.files
-    } else {
-        output.files
-    };
+    // Files: an explicit `files: []` is an override, not an absence, so only a
+    // missing key falls back to the top-level globs.
+    let files = output.files.or(toplevel.files);
 
     // Dynamic linking: use output if not default, otherwise inherit from top-level
     let dynamic_linking = if output.dynamic_linking.is_default() {
@@ -5066,6 +5068,77 @@ outputs:
             }
             _ => panic!("Expected MultiOutputRecipe"),
         }
+    }
+
+    #[test]
+    fn test_output_can_override_files_with_empty_list() {
+        use crate::stage0::parser::parse_recipe_or_multi_from_source;
+
+        // Regression test for https://github.com/prefix-dev/rattler-build/issues/2753
+        // `files: []` means "package nothing"; an absent key inherits the top-level globs.
+        let recipe_yaml = r#"
+schema_version: 1
+
+recipe:
+  name: myproject
+  version: 1.0.0
+
+build:
+  files:
+    - lib/**
+
+outputs:
+  - package:
+      name: output-packages-nothing
+      version: 1.0.0
+    build:
+      files: []
+
+  - package:
+      name: output-inherits-files
+      version: 1.0.0
+
+  - package:
+      name: output-conditional-misses
+      version: 1.0.0
+    build:
+      files:
+        - if: win
+          then: lib/only-on-windows.dll
+"#;
+
+        let parsed = parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let stage0::Recipe::MultiOutput(multi) = parsed else {
+            panic!("Expected MultiOutputRecipe");
+        };
+
+        let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
+        let recipes = multi.evaluate(&ctx).unwrap();
+        assert_eq!(recipes.len(), 3);
+
+        // An override, not an absence: must stay `Some(empty)`, not inherit `lib/**`.
+        let cleared = recipes[0].build.files.as_ref();
+        assert!(
+            cleared.is_some_and(|files| files.is_empty()),
+            "explicit empty `files` should be preserved as Some(empty), got {:?}",
+            cleared
+        );
+
+        // No `files` key at all: inherit the top-level globs.
+        let inherited = recipes[1]
+            .build
+            .files
+            .as_ref()
+            .expect("`files` should be inherited from top-level");
+        assert!(!inherited.is_empty());
+
+        // No branch matches, but the key is still present, so it selects nothing.
+        let conditional = recipes[2].build.files.as_ref();
+        assert!(
+            conditional.is_some_and(|files| files.is_empty()),
+            "`files` with no matching branch should be Some(empty), got {:?}",
+            conditional
+        );
     }
 
     #[test]

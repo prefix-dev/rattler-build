@@ -1808,7 +1808,11 @@ outputs:
         );
         // Other top-level build settings (e.g. `files`) must be inherited too.
         assert!(
-            !output.build.files.is_empty(),
+            output
+                .build
+                .files
+                .as_ref()
+                .is_some_and(|files| !files.is_empty()),
             "cache-inherited output should inherit the top-level build.files glob"
         );
     }
