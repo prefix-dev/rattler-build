@@ -1286,6 +1286,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#using-brush-on-windows" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Using <code>brush</code> on Windows
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4110,6 +4121,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#using-brush-on-windows" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Using <code>brush</code> on Windows
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4324,16 +4346,46 @@ command and you have to check <code>$?</code> or <code>$LASTEXITCODE</code> manu
 </span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>...
 </span></code></pre></div>
 <p>To find more examples of this pattern, <a href="https://github.com/search?q=org%3Aconda-forge+bash+language%3ABatchfile+&amp;type=code">try this Github search query</a>.</p>
+<h3 id="using-brush-on-windows">Using <code>brush</code> on Windows<a class="headerlink" href="#using-brush-on-windows" title="Permanent link">#</a></h3>
+<p><a href="https://github.com/reubeno/brush"><code>brush</code></a> runs Bash-compatible scripts on
+Windows, macOS and Linux. It avoids a separate <code>build.bat</code> wrapper when the
+same shell script can build on every platform. Select it explicitly and add it
+to the build requirements.</p>
+<p><code>brush</code> uses Unix-style variable expansion on every platform, including
+Windows. <code>$PREFIX</code> is the root of the host environment. <code>$LIBRARY_PREFIX</code> is
+set for Windows targets and points to <code>$PREFIX/Library</code>, where non-Python
+libraries and executables usually belong. Use <code>$PREFIX</code> for Python and other
+root-level contents. For a script that installs a Unix-style layout on every
+platform, <code>${LIBRARY_PREFIX:-$PREFIX}</code> selects <code>$LIBRARY_PREFIX</code> when it exists
+and falls back to <code>$PREFIX</code> elsewhere:</p>
+<div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="nt">script</span><span class="p">:</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">    </span><span class="nt">interpreter</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">brush</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">    </span><span class="nt">content</span><span class="p">:</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cmake -S . -B build ${CMAKE_ARGS} -DCMAKE_INSTALL_PREFIX=&quot;${LIBRARY_PREFIX:-$PREFIX}&quot;</span>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cmake --build build --config Release</span>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cmake --install build --config Release</span>
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="nt">requirements</span><span class="p">:</span>
+</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="w">  </span><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">brush</span>
+</span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cmake</span>
+</span></code></pre></div>
+<p>Rattler-Build only resolves <code>brush</code> from the build environment, not the system
+or host environment. See <a href="../build_script/#using-brush">Using <code>brush</code></a> for the
+full interpreter behavior and
+<a href="https://github.com/search?q=org%3Aconda-forge+%22interpreter%3A+brush%22&amp;type=code">conda-forge recipes using it</a>
+for more examples.</p>
 <h2 id="installing-the-correct-msvc-compilers">Installing the correct MSVC compilers<a class="headerlink" href="#installing-the-correct-msvc-compilers" title="Permanent link">#</a></h2>
 <p>In order to install the correct MSVC compilers, you should get the Community <a href="https://visualstudio.microsoft.com/downloads/">Visual Studio Installer</a>.</p>
 <p>The <code>C</code> / <code>C++</code> compiler that is installed on the host system needs to match the requirements of the recipe. For example, if the recipe uses <code>vs2022</code>, then you will need <code>Visual Studio Compilers 2022</code> installed on the host system. The same goes for <code>vs2026</code>, <code>vs2017</code>, etc. The installer also allows you to have multiple versions installed simultaneously. The "activation scripts" of the package will automatically <em>select</em> the correct version by setting the environment variables properly.</p>
 <p>You can use the GUI to install the right version of Visual Studio Compilers, or you can use the following commands in Powershell:</p>
-<div class="language-powershell highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c"># Install C/C++ build tools with Winget (through community installer)</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="n">winget</span> <span class="n">install</span> <span class="n">Microsoft</span><span class="p">.</span><span class="n">VisualStudio</span><span class="p">.</span><span class="n">BuildTools</span> <span class="p">-</span><span class="n">-silent</span> <span class="p">-</span><span class="n">-accept-source-agreements</span> <span class="p">-</span><span class="n">-accept-package-agreements</span> <span class="p">`</span>
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    <span class="p">-</span><span class="n">-override</span> <span class="s2">&quot;--passive --wait --norestart --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended&quot;</span>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="c"># For VS2019, use --add Microsoft.VisualStudio.ComponentGroup.VC.Tools.142.x86.x64</span>
-</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="c"># For Windows 11 SDK, --add Microsoft.VisualStudio.Component.Windows11SDK.22621</span>
+<div class="language-powershell highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c"># Install C/C++ build tools with Winget (through community installer)</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="n">winget</span> <span class="n">install</span> <span class="n">Microsoft</span><span class="p">.</span><span class="n">VisualStudio</span><span class="p">.</span><span class="n">BuildTools</span> <span class="p">-</span><span class="n">-silent</span> <span class="p">-</span><span class="n">-accept-source-agreements</span> <span class="p">-</span><span class="n">-accept-package-agreements</span> <span class="p">`</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>    <span class="p">-</span><span class="n">-override</span> <span class="s2">&quot;--passive --wait --norestart --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended&quot;</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="c"># For VS2019, use --add Microsoft.VisualStudio.ComponentGroup.VC.Tools.142.x86.x64</span>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="c"># For Windows 11 SDK, --add Microsoft.VisualStudio.Component.Windows11SDK.22621</span>
 </span></code></pre></div>
 <p>You can find more <a href="https://learn.microsoft.com/en-us/visualstudio/install/command-line-parameter-examples?view=visualstudio#using-winget">documentation</a> and <a href="https://learn.microsoft.com/en-us/visualstudio/install/workload-component-id-vs-build-tools?view=visualstudio#desktop-development-with-c">more identifiers</a> on the Microsoft Visual Studio documentation.</p>
 <h2 id="mingw64-compiler-stack">MinGW64 compiler stack<a class="headerlink" href="#mingw64-compiler-stack" title="Permanent link">#</a></h2>
@@ -4344,12 +4396,12 @@ command and you have to check <code>$?</code> or <code>$LASTEXITCODE</code> manu
 <p>As an alternative to MSVC, conda-forge provides a MinGW-based compiler stack for Windows. This can be useful when porting Unix software that relies on GCC-specific features or when you want to avoid MSVC licensing requirements.</p>
 <h3 id="using-mingw-compilers-in-recipes">Using MinGW compilers in recipes<a class="headerlink" href="#using-mingw-compilers-in-recipes" title="Permanent link">#</a></h3>
 <p>To use the MinGW compiler stack, use the following compiler macros in your recipe:</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nt">requirements</span><span class="p">:</span>
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="nt">build</span><span class="p">:</span>
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ compiler(&#39;m2w64_c&#39;) }}</span><span class="w">      </span><span class="c1"># C compiler (gcc)</span>
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ compiler(&#39;m2w64_cxx&#39;) }}</span><span class="w">    </span><span class="c1"># C++ compiler (g++)</span>
-</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ compiler(&#39;m2w64_fortran&#39;) }}</span><span class="w"> </span><span class="c1"># Fortran compiler (gfortran)</span>
-</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ stdlib(&#39;m2w64_c&#39;) }}</span><span class="w">        </span><span class="c1"># MinGW C standard library</span>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nt">requirements</span><span class="p">:</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ compiler(&#39;m2w64_c&#39;) }}</span><span class="w">      </span><span class="c1"># C compiler (gcc)</span>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ compiler(&#39;m2w64_cxx&#39;) }}</span><span class="w">    </span><span class="c1"># C++ compiler (g++)</span>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ compiler(&#39;m2w64_fortran&#39;) }}</span><span class="w"> </span><span class="c1"># Fortran compiler (gfortran)</span>
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ stdlib(&#39;m2w64_c&#39;) }}</span><span class="w">        </span><span class="c1"># MinGW C standard library</span>
 </span></code></pre></div>
 <p>These compilers correspond to the <code>gcc</code>, <code>gxx</code>, and <code>gfortran</code> packages from the MSYS2/MinGW-w64 ecosystem.</p>
 <h3 id="abi-compatibility-warning">ABI compatibility warning<a class="headerlink" href="#abi-compatibility-warning" title="Permanent link">#</a></h3>
@@ -4419,25 +4471,25 @@ command and you have to check <code>$?</code> or <code>$LASTEXITCODE</code> manu
 </table>
 <h3 id="using-clang-in-recipes">Using Clang in recipes<a class="headerlink" href="#using-clang-in-recipes" title="Permanent link">#</a></h3>
 <p>To use Clang on Windows (with <code>clang-cl</code> frontend) and other platforms (with standard <code>clang</code> frontend), use:</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nt">requirements</span><span class="p">:</span>
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="nt">build</span><span class="p">:</span>
-</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ compiler(&#39;clang&#39;) }}</span><span class="w">    </span><span class="c1"># C compiler</span>
-</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ compiler(&#39;clangxx&#39;) }}</span><span class="w">  </span><span class="c1"># C++ compiler</span>
-</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ stdlib(&#39;c&#39;) }}</span>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nt">requirements</span><span class="p">:</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ compiler(&#39;clang&#39;) }}</span><span class="w">    </span><span class="c1"># C compiler</span>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ compiler(&#39;clangxx&#39;) }}</span><span class="w">  </span><span class="c1"># C++ compiler</span>
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ stdlib(&#39;c&#39;) }}</span>
 </span></code></pre></div>
 <h3 id="selecting-a-specific-frontend-on-windows">Selecting a specific frontend on Windows<a class="headerlink" href="#selecting-a-specific-frontend-on-windows" title="Permanent link">#</a></h3>
 <p>To explicitly select a frontend on Windows, configure your <code>variant_config.yaml</code>:</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># Use clang with GCC argument syntax</span>
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="nt">c_compiler</span><span class="p">:</span>
-</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">clang</span>
-</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="nt">cxx_compiler</span><span class="p">:</span>
-</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">clangxx</span>
-</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>
-</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="c1"># Or use clang-cl with MSVC argument syntax</span>
-</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="nt">c_compiler</span><span class="p">:</span>
-</span><span id="__span-8-9"><a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">clang-cl</span>
-</span><span id="__span-8-10"><a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="nt">cxx_compiler</span><span class="p">:</span>
-</span><span id="__span-8-11"><a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">clang-cl</span>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c1"># Use clang with GCC argument syntax</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="nt">c_compiler</span><span class="p">:</span>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">clang</span>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="nt">cxx_compiler</span><span class="p">:</span>
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">clangxx</span>
+</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>
+</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="c1"># Or use clang-cl with MSVC argument syntax</span>
+</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="nt">c_compiler</span><span class="p">:</span>
+</span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">clang-cl</span>
+</span><span id="__span-9-10"><a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a><span class="nt">cxx_compiler</span><span class="p">:</span>
+</span><span id="__span-9-11"><a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">clang-cl</span>
 </span></code></pre></div>
 <p>The <code>clang-cl</code> frontend is particularly useful when:</p>
 <ul>
