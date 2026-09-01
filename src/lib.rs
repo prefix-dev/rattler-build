@@ -709,6 +709,18 @@ fn can_test(output: &Output, all_output_names: &[&PackageName], done_outputs: &[
     true
 }
 
+fn check_outputs(
+    built_outputs: &[Output],
+    all_outputs: &[Output],
+    configuration: &Configuration,
+) -> miette::Result<()> {
+    output_checks::check_overlapping_files(built_outputs, configuration.error_overlapping_files)
+        .and(output_checks::check_unused_staging_files(
+            all_outputs,
+            configuration.error_unused_staging_files,
+        ))
+}
+
 /// Runs build.
 pub async fn run_build_from_args(
     build_output: Vec<Output>,
@@ -717,8 +729,7 @@ pub async fn run_build_from_args(
 ) -> miette::Result<()> {
     let mut outputs = Vec::new();
     let mut test_queue = Vec::new();
-    // Keep the unfiltered list: the staging check below must see skipped outputs to
-    // know when a cache's usage cannot be judged.
+    // Missing consumers suppress the unused-cache check.
     let all_outputs = build_output.clone();
     let outputs_to_build = skip_existing(build_output, &tool_configuration).await?;
 
@@ -876,17 +887,7 @@ pub async fn run_build_from_args(
         }
     }
 
-    // Cross-output consistency checks: overlapping files between outputs, and
-    // staging cache files that no inheriting output packaged. Warnings by default;
-    // recorded first so they show up in the summaries below even in error mode.
-    let checks_result = output_checks::check_overlapping_files(
-        &outputs,
-        tool_configuration.error_overlapping_files,
-    )
-    .and(output_checks::check_unused_staging_files(
-        &all_outputs,
-        tool_configuration.error_unused_staging_files,
-    ));
+    let checks_result = check_outputs(&outputs, &all_outputs, &tool_configuration);
 
     let span = tracing::info_span!("Build summary");
     let _enter = span.enter();
@@ -1359,10 +1360,13 @@ async fn build_and_collect_packages(
     tool_configuration: &Configuration,
 ) -> miette::Result<Vec<PathBuf>> {
     let mut package_paths = Vec::new();
+    let mut built_outputs = Vec::new();
+    // Missing consumers suppress the unused-cache check.
+    let all_outputs = build_output.clone();
     let outputs_to_build = skip_existing(build_output, tool_configuration).await?;
 
     for output in outputs_to_build.iter() {
-        let (_output, archive) = match run_build(
+        let (output, archive) = match run_build(
             output.clone(),
             tool_configuration,
             WorkingDirectoryBehavior::Cleanup,
@@ -1385,7 +1389,10 @@ async fn build_and_collect_packages(
         };
 
         package_paths.push(archive);
+        built_outputs.push(output);
     }
+
+    check_outputs(&built_outputs, &all_outputs, tool_configuration)?;
 
     Ok(package_paths)
 }
