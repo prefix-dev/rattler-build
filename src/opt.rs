@@ -722,6 +722,15 @@ pub struct BuildOpts {
     #[arg(long, help_heading = "Modifying result")]
     pub allow_symlinks_on_windows: bool,
 
+    /// Error instead of warn when outputs of one recipe package the same file
+    #[arg(long, help_heading = "Modifying result")]
+    pub error_overlapping_files: bool,
+
+    /// Error instead of warn when files from a staging cache are not included in any
+    /// output that inherits from it
+    #[arg(long, help_heading = "Modifying result")]
+    pub error_unused_staging_files: bool,
+
     /// Allow absolute paths in license_file entries (defaults to false)
     #[arg(long, hide = true, help_heading = "Modifying result")]
     pub allow_absolute_license_paths: bool,
@@ -920,6 +929,8 @@ pub struct BuildData {
     pub continue_on_failure: ContinueOnFailure,
     pub error_prefix_in_binary: bool,
     pub allow_symlinks_on_windows: bool,
+    pub error_overlapping_files: bool,
+    pub error_unused_staging_files: bool,
     pub allow_absolute_license_paths: bool,
     pub exclude_newer: Option<jiff::Timestamp>,
     pub build_num_override: Option<u64>,
@@ -957,6 +968,8 @@ impl BuildData {
         continue_on_failure: ContinueOnFailure,
         error_prefix_in_binary: bool,
         allow_symlinks_on_windows: bool,
+        error_overlapping_files: bool,
+        error_unused_staging_files: bool,
         allow_absolute_license_paths: bool,
         exclude_newer: Option<jiff::Timestamp>,
         build_num_override: Option<u64>,
@@ -999,6 +1012,8 @@ impl BuildData {
             continue_on_failure,
             error_prefix_in_binary,
             allow_symlinks_on_windows,
+            error_overlapping_files,
+            error_unused_staging_files,
             allow_absolute_license_paths,
             exclude_newer,
             build_num_override,
@@ -1052,6 +1067,8 @@ impl BuildData {
             opts.continue_on_failure.into(),
             opts.error_prefix_in_binary,
             opts.allow_symlinks_on_windows,
+            opts.error_overlapping_files,
+            opts.error_unused_staging_files,
             opts.allow_absolute_license_paths,
             opts.exclude_newer,
             None, // build_num_override — set by caller (BuildOnlyOpts or PublishOpts)
