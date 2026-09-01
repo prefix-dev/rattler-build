@@ -1,4 +1,4 @@
-//! Cross-output consistency checks that run after all outputs of a build are packaged.
+//! Checks that compare packaged outputs.
 
 use std::{
     collections::{BTreeSet, HashMap, HashSet},
@@ -9,14 +9,13 @@ use fs_err as fs;
 
 use crate::{packaging::file_mapper::filter_file, staging::StagingCacheMetadata, types::Output};
 
-/// How many offending files to list per finding before truncating.
 const MAX_LISTED_FILES: usize = 10;
 
 fn format_file_list(files: &BTreeSet<PathBuf>) -> String {
     let listed = files
         .iter()
         .take(MAX_LISTED_FILES)
-        .map(|p| format!("  - {}", p.display()))
+        .map(|p| format!("  - {}", p.to_string_lossy().replace('\\', "/")))
         .collect::<Vec<_>>()
         .join("\n");
     if files.len() > MAX_LISTED_FILES {
@@ -45,13 +44,7 @@ fn report(findings: Vec<String>, error: bool, flag: &str) -> miette::Result<()> 
     }
 }
 
-/// Warn (or error) when two outputs of the same recipe package the same file.
-///
-/// Installing both packages into one environment would clobber the file, and with
-/// staging caches this usually means an output forgot to narrow its `files` selection.
-/// Compared on prefix-relative paths as selected for packaging (before noarch path
-/// remapping), so a noarch and an arch output that ship the same file are caught too.
-/// Outputs with the same package name are never compared: they cannot be co-installed.
+/// Report files packaged by two co-installable outputs of the same recipe.
 pub fn check_overlapping_files(outputs: &[Output], error: bool) -> miette::Result<()> {
     let mut by_recipe: HashMap<&std::path::Path, Vec<&Output>> = HashMap::new();
     for output in outputs {
@@ -63,14 +56,20 @@ pub fn check_overlapping_files(outputs: &[Output], error: bool) -> miette::Resul
 
     let mut findings = Vec::new();
     for outputs in by_recipe.values() {
-        // Variants of the same pair would repeat the same finding, so keep one per name pair.
+        // Report each package pair once across variants.
         let mut seen_pairs = HashSet::new();
         for (i, a) in outputs.iter().enumerate() {
             let Some(files_a) = a.packaged_prefix_files() else {
                 continue;
             };
             for b in &outputs[i + 1..] {
-                if a.name() == b.name() {
+                let a_platform = a.build_configuration.target_platform;
+                let b_platform = b.build_configuration.target_platform;
+                if a.name() == b.name()
+                    || (a_platform != rattler_conda_types::Platform::NoArch
+                        && b_platform != rattler_conda_types::Platform::NoArch
+                        && a_platform != b_platform)
+                {
                     continue;
                 }
                 let Some(files_b) = b.packaged_prefix_files() else {
@@ -99,15 +98,8 @@ pub fn check_overlapping_files(outputs: &[Output], error: bool) -> miette::Resul
     report(findings, error, "--error-overlapping-files")
 }
 
-/// Warn (or error) when files in a staging cache were not packaged by any output
-/// that inherits from it.
-///
-/// Caches are compared per cache directory (one per staging output and variant
-/// selection). Pass every output of the run, before any skipping: a cache is only
-/// judged when all of its inheriting outputs were packaged, since a skipped or
-/// failed consumer leaves usage unknown.
+/// Report staged files unused by any inheriting output.
 pub fn check_unused_staging_files(outputs: &[Output], error: bool) -> miette::Result<()> {
-    // cache dir -> outputs expected to consume it
     let mut consumers: HashMap<PathBuf, Vec<&Output>> = HashMap::new();
     for output in outputs {
         let Some(cache_dir) = inherited_cache_dir(output) else {
@@ -118,7 +110,7 @@ pub fn check_unused_staging_files(outputs: &[Output], error: bool) -> miette::Re
 
     let mut findings = Vec::new();
     for (cache_dir, consumers) in consumers {
-        // Judge only caches whose consumers were all packaged in this run.
+        // None means a consumer did not finish packaging.
         let files: Option<Vec<BTreeSet<PathBuf>>> = consumers
             .iter()
             .map(|o| o.packaged_prefix_files())
@@ -138,7 +130,7 @@ pub fn check_unused_staging_files(outputs: &[Output], error: bool) -> miette::Re
         let unused: BTreeSet<PathBuf> = metadata
             .prefix_files
             .iter()
-            // files like CACHEDIR.TAG or .pyo are never packaged
+            // Ignore files packaging always drops.
             .filter(|f| !filter_file(f) && !used.contains(f))
             .cloned()
             .collect();
@@ -169,7 +161,6 @@ pub fn check_unused_staging_files(outputs: &[Output], error: bool) -> miette::Re
     report(findings, error, "--error-unused-staging-files")
 }
 
-/// The cache directory of the staging cache this output inherits from, if any.
 fn inherited_cache_dir(output: &Output) -> Option<PathBuf> {
     let inherits = output.recipe.inherits_from.as_ref()?;
     let staging = output

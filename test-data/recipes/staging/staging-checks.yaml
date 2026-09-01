@@ -1,6 +1,4 @@
-# Fixtures for the cross-output consistency checks (issues #2730 / #2753):
-# `liba` and `libb` both package lib/libcore.so, and include/unused.h is not
-# packaged by any output.
+# Both outputs package libcore.so; neither packages unused.h.
 
 schema_version: 1
 

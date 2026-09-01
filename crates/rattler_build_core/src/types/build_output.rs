@@ -116,13 +116,12 @@ impl BuildOutput {
         summary.paths = Some(paths.clone());
     }
 
-    /// Record the prefix-relative files that were selected for packaging
+    /// Record the prefix-relative files selected for packaging.
     pub fn record_packaged_prefix_files(&self, files: BTreeSet<PathBuf>) {
         self.build_summary.lock().unwrap().packaged_prefix_files = Some(files);
     }
 
-    /// The prefix-relative files that were selected for packaging, if this
-    /// output has been packaged
+    /// Return the selected prefix-relative files after packaging.
     pub fn packaged_prefix_files(&self) -> Option<BTreeSet<PathBuf>> {
         self.build_summary
             .lock()
