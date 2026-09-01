@@ -4,7 +4,7 @@ import json
 import os
 import platform
 from pathlib import Path
-from subprocess import CalledProcessError
+from subprocess import STDOUT, CalledProcessError
 
 import pytest
 import yaml
@@ -367,6 +367,48 @@ def test_staging_empty_files_selection(
     inherits_all = packaged_files("inherits-all-files")
     assert any(lib_name in f for f in inherits_all)
     assert any("include/core.h" in f for f in inherits_all)
+
+
+def test_staging_consistency_checks(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Issues #2730/#2753: warn on overlapping output files and unused staging files."""
+    args = rattler_build.build_args(
+        recipes / "staging/staging-checks.yaml",
+        tmp_path / "warn",
+        extra_args=["--experimental"],
+    )
+    output = rattler_build(*args, stderr=STDOUT)
+    assert "Outputs 'liba' and 'libb' both package 1 file(s)" in output
+    assert "lib/libcore.so" in output
+    assert "1 file(s) from staging cache 'stage' were not included" in output
+    assert "include/unused.h" in output
+
+    # With the flags, the warnings become hard errors.
+    for flag in ["--error-overlapping-files", "--error-unused-staging-files"]:
+        args = rattler_build.build_args(
+            recipes / "staging/staging-checks.yaml",
+            tmp_path / flag.strip("-"),
+            extra_args=["--experimental", flag],
+        )
+        with pytest.raises(CalledProcessError):
+            rattler_build(*args, stderr=STDOUT)
+
+
+def test_staging_checks_quiet_when_all_files_used(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Outputs that together use every staged file and share nothing raise no errors."""
+    args = rattler_build.build_args(
+        recipes / "staging/staging-empty-files.yaml",
+        tmp_path,
+        extra_args=[
+            "--experimental",
+            "--error-overlapping-files",
+            "--error-unused-staging-files",
+        ],
+    )
+    rattler_build(*args, stderr=STDOUT)
 
 
 def test_staging_with_top_level_inherit(

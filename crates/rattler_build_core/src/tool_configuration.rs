@@ -149,6 +149,13 @@ pub struct Configuration {
     /// Whether to error if the host prefix is detected in binary files
     pub error_prefix_in_binary: bool,
 
+    /// Whether outputs of one recipe packaging the same file is an error (defaults to a warning)
+    pub error_overlapping_files: bool,
+
+    /// Whether staging cache files not packaged by any inheriting output are an error
+    /// (defaults to a warning)
+    pub error_unused_staging_files: bool,
+
     /// Whether to allow symlinks in packages on Windows (defaults to false)
     pub allow_symlinks_on_windows: bool,
 
@@ -216,6 +223,8 @@ pub struct ConfigurationBuilder {
     allow_insecure_host: Option<Vec<String>>,
     continue_on_failure: ContinueOnFailure,
     error_prefix_in_binary: bool,
+    error_overlapping_files: bool,
+    error_unused_staging_files: bool,
     allow_symlinks_on_windows: bool,
     allow_absolute_license_paths: bool,
     environments_externally_managed: bool,
@@ -251,6 +260,8 @@ impl ConfigurationBuilder {
             allow_insecure_host: None,
             continue_on_failure: ContinueOnFailure::No,
             error_prefix_in_binary: false,
+            error_overlapping_files: false,
+            error_unused_staging_files: false,
             allow_symlinks_on_windows: false,
             allow_absolute_license_paths: false,
             environments_externally_managed: false,
@@ -278,6 +289,22 @@ impl ConfigurationBuilder {
     pub fn with_error_prefix_in_binary(self, error_prefix_in_binary: bool) -> Self {
         Self {
             error_prefix_in_binary,
+            ..self
+        }
+    }
+
+    /// Whether outputs of one recipe packaging the same file is an error
+    pub fn with_error_overlapping_files(self, error_overlapping_files: bool) -> Self {
+        Self {
+            error_overlapping_files,
+            ..self
+        }
+    }
+
+    /// Whether staging cache files not packaged by any inheriting output are an error
+    pub fn with_error_unused_staging_files(self, error_unused_staging_files: bool) -> Self {
+        Self {
+            error_unused_staging_files,
             ..self
         }
     }
@@ -507,6 +534,8 @@ impl ConfigurationBuilder {
             allow_insecure_host: self.allow_insecure_host,
             continue_on_failure: self.continue_on_failure,
             error_prefix_in_binary: self.error_prefix_in_binary,
+            error_overlapping_files: self.error_overlapping_files,
+            error_unused_staging_files: self.error_unused_staging_files,
             allow_symlinks_on_windows: self.allow_symlinks_on_windows,
             allow_absolute_license_paths: self.allow_absolute_license_paths,
             environments_externally_managed: self.environments_externally_managed,

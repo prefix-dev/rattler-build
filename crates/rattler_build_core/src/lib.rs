@@ -9,6 +9,7 @@ pub mod console_utils;
 pub mod debug;
 pub mod metadata;
 pub mod migrate_recipe;
+pub mod output_checks;
 pub mod package_test;
 pub mod packaging;
 pub mod render;

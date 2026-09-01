@@ -1,0 +1,42 @@
+# Fixtures for the cross-output consistency checks (issues #2730 / #2753):
+# `liba` and `libb` both package lib/libcore.so, and include/unused.h is not
+# packaged by any output.
+
+schema_version: 1
+
+recipe:
+  name: staging-checks
+  version: 1.0.0
+
+outputs:
+  - staging:
+      name: stage
+    build:
+      script:
+        - if: unix
+          then: |
+            mkdir -p $PREFIX/lib $PREFIX/include
+            echo "libcore" > $PREFIX/lib/libcore.so
+            echo "unused"  > $PREFIX/include/unused.h
+        - if: win
+          then: |
+            if not exist "%PREFIX%\lib" mkdir "%PREFIX%\lib"
+            if not exist "%PREFIX%\include" mkdir "%PREFIX%\include"
+            echo libcore > "%PREFIX%\lib\libcore.so"
+            echo unused > "%PREFIX%\include\unused.h"
+
+  - package:
+      name: liba
+      version: 1.0.0
+    inherit: stage
+    build:
+      files:
+        - lib/**
+
+  - package:
+      name: libb
+      version: 1.0.0
+    inherit: stage
+    build:
+      files:
+        - lib/libcore.so
