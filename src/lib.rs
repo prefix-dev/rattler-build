@@ -23,6 +23,7 @@ pub use rattler_build_core::tool_configuration;
 pub use rattler_build_core::types;
 pub use rattler_build_core::utils;
 
+mod build_queue;
 pub mod config;
 pub mod opt;
 
@@ -44,6 +45,7 @@ use std::{
 };
 
 use build::{WorkingDirectoryBehavior, run_build, skip_existing};
+use build_queue::{BlockedOutputPolicy, OutputBuildQueue};
 use console_utils::LoggingOutputHandler;
 use dunce::canonicalize;
 use fs_err as fs;
@@ -52,11 +54,11 @@ use miette::{Context, IntoDiagnostic};
 use opt::*;
 use package_test::TestConfiguration;
 use rattler_build_core::consts;
-use rattler_build_recipe::{stage0, stage1::TestType};
+use rattler_build_recipe::stage0;
 use rattler_build_variant_config::VariantConfig;
 use rattler_conda_types::{
-    MatchSpec, NamedChannelOrUrl, NoArchType, PackageName, Platform, RepodataRevision,
-    compression_level::CompressionLevel, package::CondaArchiveType,
+    NamedChannelOrUrl, NoArchType, Platform, RepodataRevision, compression_level::CompressionLevel,
+    package::CondaArchiveType,
 };
 use rattler_config::config::build::PackageFormatAndCompression;
 use rattler_index::ensure_channel_initialized_fs;
@@ -615,95 +617,77 @@ pub async fn get_build_output(
     Ok(outputs)
 }
 
-fn can_test(output: &Output, all_output_names: &[&PackageName], done_outputs: &[Output]) -> bool {
-    fn check_if_matches(spec: &MatchSpec, output: &Output) -> bool {
-        spec.name.as_exact() == Some(output.name())
-            && spec
-                .version
-                .as_ref()
-                .is_none_or(|version| version.matches(output.recipe.package().version()))
-            && spec
-                .build
-                .as_ref()
-                .is_none_or(|build| build.matches(&output.build_string()))
-    }
+/// Runs package tests that were released from the deferred test queue.
+async fn run_queued_tests(
+    tests: &[(Output, PathBuf)],
+    tool_configuration: &Configuration,
+) -> miette::Result<()> {
+    for (output, archive) in tests {
+        match package_test::run_test(
+            archive,
+            &TestConfiguration {
+                test_prefix: output
+                    .build_configuration
+                    .directories
+                    .output_dir
+                    .join("test"),
+                target_platform: Some(output.build_configuration.target_platform),
+                host_platform: Some(output.build_configuration.host_platform.clone()),
+                current_platform: output.build_configuration.build_platform.clone(),
+                keep_test_prefix: tool_configuration.no_clean,
+                channels: build_reindexed_channels(&output.build_configuration, tool_configuration)
+                    .await
+                    .into_diagnostic()
+                    .context("failed to reindex output channel")?,
+                channel_priority: tool_configuration.channel_priority,
+                solve_strategy: SolveStrategy::Highest,
+                tool_configuration: tool_configuration.clone(),
+                test_index: None,
+                output_dir: output.build_configuration.directories.output_dir.clone(),
+                exclude_newer: output.build_configuration.exclude_newer,
+                env_isolation: output.build_configuration.env_isolation,
+            },
+            None,
+        )
+        .await
+        {
+            Ok(_) => {}
+            Err(error) => {
+                let failed_directory = output
+                    .build_configuration
+                    .directories
+                    .output_dir
+                    .join("broken");
+                fs::create_dir_all(&failed_directory).into_diagnostic()?;
+                let archive_name = archive.file_name().ok_or_else(|| {
+                    miette::miette!("package archive has no file name: {}", archive.display())
+                })?;
+                fs::rename(archive, failed_directory.join(archive_name)).into_diagnostic()?;
 
-    fn run_dependencies_are_built(
-        output: &Output,
-        all_output_names: &[&PackageName],
-        done_outputs: &[Output],
-        visiting: &mut Vec<String>,
-    ) -> bool {
-        let identifier = output.identifier();
-        if visiting.contains(&identifier) {
-            return true;
-        }
-        visiting.push(identifier);
+                // Reindex the output directory so that the broken package is no longer
+                // listed in the repodata. This is important for --skip-existing to work
+                // correctly on subsequent builds.
+                if let Err(error) =
+                    build_reindexed_channels(&output.build_configuration, tool_configuration).await
+                {
+                    tracing::warn!(
+                        "Failed to reindex output directory after moving package to broken folder: {}",
+                        error
+                    );
+                }
 
-        let ready = output.finalized_dependencies.as_ref().is_none_or(|deps| {
-            deps.run.depends.iter().all(|dep| {
-                !all_output_names
-                    .iter()
-                    .any(|name| dep.spec().name.as_exact() == Some(*name))
-                    || done_outputs.iter().any(|candidate| {
-                        check_if_matches(dep.spec(), candidate)
-                            && run_dependencies_are_built(
-                                candidate,
-                                all_output_names,
-                                done_outputs,
-                                visiting,
-                            )
-                    })
-            })
-        });
-
-        visiting.pop();
-        ready
-    }
-
-    let mut visiting = Vec::new();
-    if !run_dependencies_are_built(output, all_output_names, done_outputs, &mut visiting) {
-        return false;
-    }
-
-    // Also check that for all script tests
-    for test in output.recipe.tests() {
-        if let TestType::Commands(command) = test {
-            for dep in command
-                .requirements
-                .build
-                .iter()
-                .chain(command.requirements.run.iter())
-            {
-                let dep_name = dep.name();
-                if all_output_names.iter().any(|o| Some(*o) == dep_name) {
-                    // this dependency might not be built yet
-                    // For pin_subpackage/pin_compatible, we only check name match
-                    // For regular specs, we also check version/build if specified
-                    let is_built = done_outputs.iter().any(|output| {
-                        let matches = match dep {
-                            rattler_build_recipe::stage1::Dependency::Spec(spec) => {
-                                check_if_matches(spec, output)
-                            }
-                            _ => Some(output.name()) == dep_name,
-                        };
-                        matches
-                            && run_dependencies_are_built(
-                                output,
-                                all_output_names,
-                                done_outputs,
-                                &mut visiting,
-                            )
-                    });
-                    if !is_built {
-                        return false;
-                    }
+                let report = error.into_report();
+                if tool_configuration.continue_on_failure == ContinueOnFailure::Yes {
+                    tracing::error!("Test failed for {}: {:?}", output.identifier(), report);
+                    output.record_warning(&format!("Test failed: {report:?}"));
+                } else {
+                    return Err(report).context("Test failed");
                 }
             }
         }
     }
 
-    true
+    Ok(())
 }
 
 /// Runs build.
@@ -715,15 +699,19 @@ pub async fn run_build_from_args(
     let mut outputs = Vec::new();
     let mut test_queue = Vec::new();
     let outputs_to_build = skip_existing(build_output, &tool_configuration).await?;
+    let mut build_queue = OutputBuildQueue::new(outputs_to_build);
+    let blocked_output_policy = match tool_configuration.continue_on_failure {
+        ContinueOnFailure::Yes => BlockedOutputPolicy::AttemptFirst,
+        ContinueOnFailure::No => BlockedOutputPolicy::Error,
+    };
 
-    let all_output_names = outputs_to_build
-        .iter()
-        .map(|o| o.name())
-        .collect::<Vec<_>>();
-    tracing::info!("Starting build of {} outputs", outputs_to_build.len());
-    for (index, output) in outputs_to_build.iter().enumerate() {
+    tracing::info!("Starting build of {} outputs", build_queue.len());
+    while let Some(output_to_build) = build_queue
+        .next_ready(blocked_output_policy)
+        .into_diagnostic()?
+    {
         let (output, archive) = match run_build(
-            output.clone(),
+            output_to_build.clone(),
             &tool_configuration,
             WorkingDirectoryBehavior::Cleanup,
         )
@@ -736,14 +724,16 @@ pub async fn run_build_from_args(
             }
             Err(e) => {
                 if tool_configuration.continue_on_failure == ContinueOnFailure::Yes {
-                    tracing::error!("Build failed for {}: {}", output.identifier(), e);
-                    output.record_warning(&format!("Build failed: {}", e));
+                    tracing::error!("Build failed for {}: {}", output_to_build.identifier(), e);
+                    output_to_build.record_warning(&format!("Build failed: {}", e));
+                    build_queue.record_processed(output_to_build);
                     continue;
                 }
                 return Err(e);
             }
         };
 
+        build_queue.record_processed(output.clone());
         outputs.push(output.clone());
 
         // We can now run the tests for the output. However, we need to check if
@@ -781,94 +771,24 @@ pub async fn run_build_from_args(
         } else {
             test_queue.push((output, archive));
 
-            let is_last_iteration = index == outputs_to_build.len() - 1;
-            let to_test = if is_last_iteration {
-                // On last iteration, test everything in the queue
-                std::mem::take(&mut test_queue)
-            } else {
-                // Update the test queue with the tests that we can't run yet
-                let (to_test, new_test_queue) = test_queue
-                    .into_iter()
-                    .partition(|(output, _)| can_test(output, &all_output_names, &outputs));
-                test_queue = new_test_queue;
-                to_test
-            };
-
-            for (output, archive) in &to_test {
-                match package_test::run_test(
-                    archive,
-                    &TestConfiguration {
-                        test_prefix: output
-                            .build_configuration
-                            .directories
-                            .output_dir
-                            .join("test"),
-                        target_platform: Some(output.build_configuration.target_platform),
-                        host_platform: Some(output.build_configuration.host_platform.clone()),
-                        current_platform: output.build_configuration.build_platform.clone(),
-                        keep_test_prefix: tool_configuration.no_clean,
-                        channels: build_reindexed_channels(
-                            &output.build_configuration,
-                            &tool_configuration,
-                        )
-                        .await
-                        .into_diagnostic()
-                        .context("failed to reindex output channel")?,
-                        channel_priority: tool_configuration.channel_priority,
-                        solve_strategy: SolveStrategy::Highest,
-                        tool_configuration: tool_configuration.clone(),
-                        test_index: None,
-                        output_dir: output.build_configuration.directories.output_dir.clone(),
-                        exclude_newer: output.build_configuration.exclude_newer,
-                        env_isolation: output.build_configuration.env_isolation,
-                    },
-                    None,
-                )
-                .await
-                {
-                    Ok(_) => {}
-                    Err(e) => {
-                        // move the package file to the failed directory
-                        let failed_dir = output
-                            .build_configuration
-                            .directories
-                            .output_dir
-                            .join("broken");
-                        fs::create_dir_all(&failed_dir).into_diagnostic()?;
-                        fs::rename(archive, failed_dir.join(archive.file_name().unwrap()))
-                            .into_diagnostic()?;
-
-                        // Reindex the output directory so that the broken package is no longer
-                        // listed in the repodata. This is important for --skip-existing to work
-                        // correctly on subsequent builds.
-                        if let Err(e) = build_reindexed_channels(
-                            &output.build_configuration,
-                            &tool_configuration,
-                        )
-                        .await
-                        {
-                            tracing::warn!(
-                                "Failed to reindex output directory after moving package to broken folder: {}",
-                                e
-                            );
-                        }
-
-                        let report = e.into_report();
-                        if tool_configuration.continue_on_failure == ContinueOnFailure::Yes {
-                            tracing::error!(
-                                "Test failed for {}: {:?}",
-                                output.identifier(),
-                                report
-                            );
-                            output.record_warning(&format!("Test failed: {report:?}"));
-                        } else {
-                            return Err(report).context("Test failed");
-                        }
-                    }
+            let mut to_test = Vec::new();
+            let mut deferred_tests = Vec::new();
+            for queued_test in test_queue {
+                if build_queue.can_test(&queued_test.0).into_diagnostic()? {
+                    to_test.push(queued_test);
+                } else {
+                    deferred_tests.push(queued_test);
                 }
             }
+            test_queue = deferred_tests;
+            run_queued_tests(&to_test, &tool_configuration).await?;
         }
     }
+
+    // A failed or test-skipped final build can leave earlier tests deferred.
+    // At this point no additional sibling can become available, so run them and
+    // let the package solver report any dependency that is still unavailable.
+    run_queued_tests(&test_queue, &tool_configuration).await?;
 
     let span = tracing::info_span!("Build summary");
     let _enter = span.enter();
@@ -1342,10 +1262,18 @@ async fn build_and_collect_packages(
 ) -> miette::Result<Vec<PathBuf>> {
     let mut package_paths = Vec::new();
     let outputs_to_build = skip_existing(build_output, tool_configuration).await?;
+    let mut build_queue = OutputBuildQueue::new(outputs_to_build);
+    let blocked_output_policy = match tool_configuration.continue_on_failure {
+        ContinueOnFailure::Yes => BlockedOutputPolicy::AttemptFirst,
+        ContinueOnFailure::No => BlockedOutputPolicy::Error,
+    };
 
-    for output in outputs_to_build.iter() {
-        let (_output, archive) = match run_build(
-            output.clone(),
+    while let Some(output_to_build) = build_queue
+        .next_ready(blocked_output_policy)
+        .into_diagnostic()?
+    {
+        let (output, archive) = match run_build(
+            output_to_build.clone(),
             tool_configuration,
             WorkingDirectoryBehavior::Cleanup,
         )
@@ -1358,14 +1286,15 @@ async fn build_and_collect_packages(
             }
             Err(e) => {
                 if tool_configuration.continue_on_failure == ContinueOnFailure::Yes {
-                    tracing::error!("Build failed for {}: {}", output.identifier(), e);
+                    tracing::error!("Build failed for {}: {}", output_to_build.identifier(), e);
+                    build_queue.record_processed(output_to_build);
                     continue;
-                } else {
-                    return Err(e);
                 }
+                return Err(e);
             }
         };
 
+        build_queue.record_processed(output);
         package_paths.push(archive);
     }
 

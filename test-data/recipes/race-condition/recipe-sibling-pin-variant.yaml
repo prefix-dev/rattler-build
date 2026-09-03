@@ -1,0 +1,48 @@
+context:
+  version: "1.0.0"
+
+recipe:
+  name: repro-variant-pin
+  version: ${{ version }}
+
+build:
+  number: 0
+
+outputs:
+  - package:
+      name: repro-variant-extra
+    build:
+      script: echo "extra built"
+    requirements:
+      run:
+        - repro-variant-runtime ==${{ version }}
+
+  - package:
+      name: repro-variant-provider
+    build:
+      script: echo "provider built for ${{ flavor }}"
+    requirements:
+      host:
+        - if: flavor == "b"
+          then: repro-variant-extra ==${{ version }}
+
+  - package:
+      name: repro-variant-consumer
+    build:
+      script: echo "consumer built for ${{ flavor }}"
+    requirements:
+      host:
+        - ${{ pin_subpackage('repro-variant-provider', exact=True) }}
+
+  - package:
+      name: repro-variant-late
+    build:
+      script: echo "late built for ${{ flavor }}"
+
+  - package:
+      name: repro-variant-runtime
+    build:
+      script: echo "runtime built"
+    requirements:
+      host:
+        - repro-variant-late

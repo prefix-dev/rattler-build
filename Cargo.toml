@@ -231,6 +231,7 @@ clap = { workspace = true, features = ["env", "cargo", "suggestions"] }
 minijinja = { workspace = true }
 tracing-subscriber = { workspace = true }
 miette = { workspace = true, features = ["fancy"] }
+thiserror = { workspace = true }
 num_cpus = { workspace = true }
 comfy-table = { workspace = true }
 futures = { workspace = true }

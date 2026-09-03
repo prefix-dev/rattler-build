@@ -1,0 +1,63 @@
+context:
+  version: "1.0.0"
+
+recipe:
+  name: ignored-run-export-order
+  version: ${{ version }}
+
+outputs:
+  - package:
+      name: repro-ignored-exporter
+    build:
+      script: echo "exporter built"
+    requirements:
+      run_exports:
+        strong:
+          - repro-ignored-runtime ==${{ version }}
+
+  - package:
+      name: repro-ignored-consumer
+    build:
+      script: echo "consumer built"
+    requirements:
+      build:
+        - repro-ignored-exporter ==${{ version }}
+      ignore_run_exports:
+        from_package:
+          - repro-ignored-exporter
+
+  - package:
+      name: repro-ignored-runtime
+    build:
+      script: echo "runtime built"
+    requirements:
+      host:
+        - repro-ignored-consumer ==${{ version }}
+
+  - package:
+      name: repro-name-ignored-exporter
+    build:
+      script: echo "name-ignored exporter built"
+    requirements:
+      run_exports:
+        strong:
+          - repro-name-ignored-runtime ==${{ version }}
+
+  - package:
+      name: repro-name-ignored-consumer
+    build:
+      script: echo "name-ignored consumer built"
+    requirements:
+      build:
+        - repro-name-ignored-exporter ==${{ version }}
+      ignore_run_exports:
+        by_name:
+          - repro-name-ignored-runtime
+
+  - package:
+      name: repro-name-ignored-runtime
+    build:
+      script: echo "name-ignored runtime built"
+    requirements:
+      host:
+        - repro-name-ignored-consumer ==${{ version }}
