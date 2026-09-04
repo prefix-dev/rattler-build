@@ -33,9 +33,29 @@ requirements:
   host:
     - r-base
     - r-ggplot2
+    # TODO(2026-08-24): drop once conda-forge's 2026-08-21 mingw runtime
+    # rebuild (*_3) is fixed; executables crash at startup with
+    # "stack smashing detected" / 0xC0000409 under it, taking Rscript down
+    # with them. See conda-forge/m2w64-sysroot-feedstock issue 23.
+    # The *_2 builds are the last good ones.
+    - if: win
+      then:
+        - libgcc ==16.1.0 h110b43a_2
+        - libgomp ==16.1.0 h8ee18e1_2
+        - libgfortran5 ==16.1.0 h94075d5_2
   run:
     - r-base
     - r-ggplot2
+    # TODO(2026-08-24): drop once conda-forge's 2026-08-21 mingw runtime
+    # rebuild (*_3) is fixed; executables crash at startup with
+    # "stack smashing detected" / 0xC0000409 under it, taking Rscript down
+    # with them. See conda-forge/m2w64-sysroot-feedstock issue 23.
+    # The *_2 builds are the last good ones.
+    - if: win
+      then:
+        - libgcc ==16.1.0 h110b43a_2
+        - libgomp ==16.1.0 h8ee18e1_2
+        - libgfortran5 ==16.1.0 h94075d5_2
 
 tests:
   - r:

@@ -2,6 +2,7 @@
 source: crates/rattler_build_recipe_generator/src/pypi.rs
 expression: recipe
 ---
+schema_version: 1
 context:
   version: 3.1.0
   build_number: "0"
@@ -9,15 +10,15 @@ package:
   name: flask
   version: "${{ version }}"
 source:
-  - url: "https://files.pythonhosted.org/packages/source/f/flask/flask-${{ version }}.tar.gz"
-    sha256: 5f873c5184c897c8d9d1b05df1e3d01b14910ce69607a117bd3277098a5836ac
+  url: "https://files.pythonhosted.org/packages/source/f/flask/flask-${{ version }}.tar.gz"
+  sha256: 5f873c5184c897c8d9d1b05df1e3d01b14910ce69607a117bd3277098a5836ac
 build:
   number: "${{ build_number }}"
+  noarch: python
   script: "${{ PYTHON }} -m pip install ."
   python:
     entry_points:
       - "flask = flask.cli:main"
-  noarch: python
 requirements:
   host:
     - python >=3.9

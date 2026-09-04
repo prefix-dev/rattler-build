@@ -1,0 +1,44 @@
+---
+source: crates/rattler_build_recipe_generator/src/luarocks/mod.rs
+expression: recipe.to_string()
+---
+schema_version: 1
+
+context:
+  version: "3.0rc1"
+  name: lua-luasocket
+  build_number: "0"
+
+package:
+  name: lua-luasocket
+  version: ${{ version }}
+
+source:
+  url: https://github.com/diegonehab/luasocket/archive/v3.0-rc1.tar.gz
+  sha256: def456
+  md5: abc123
+
+build:
+  number: ${{ build_number }}
+  script: |-
+    # Take the first `rockspec` we find (in non-deterministic places unfortunately)
+    ROCK=$(find . -name "*.rockspec" | sort -n -r | head -n 1)
+    luarocks install ${ROCK} --tree=${{ PREFIX }}
+
+requirements:
+  build:
+    - luarocks
+  host:
+    - lua
+  run:
+    - lua
+
+tests:
+  - script:
+      - lua -e "require('luasocket')"
+
+about:
+  homepage: http://w3.impa.br/~diego/software/luasocket/
+  summary: Network support for the Lua language
+  description: Detailed description
+  license: MIT

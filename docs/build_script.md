@@ -497,18 +497,20 @@ noted, no variables are inherited from the shell environment in which you invoke
 
 `R`
 
-: The path to the R executable in the build prefix. R is installed in the
-  build prefix only when it is listed as a build requirement.
+: The path to the R executable in the host prefix, for use in the build
+  script. Set when `r_base` is part of the variant configuration or `r-base` is
+  resolved in the host environment. Test environments do not define it.
 
 `R_VER`
 
-: The R version (`major.minor`, e.g. `4.3`). Only set when R is part of the
-  variant configuration.
+: The R version reduced to `major.minor` (e.g. `4.3`), taken from the
+  `r_base` variant when configured and from the resolved `r-base` host package
+  otherwise. Set under the same conditions as `R`.
 
 `R_USER`
 
-: The path to the R user library directory inside the host prefix. Only set
-  when R is part of the variant configuration.
+: The path to the R user library directory inside the host prefix. Set under
+  the same conditions as `R`.
 
 `NPY_VER`
 
