@@ -64,6 +64,44 @@ fn reusable_step_path(
         })
 }
 
+#[derive(serde::Deserialize)]
+#[serde(untagged)]
+enum ReusableFile {
+    Pipeline { steps: Vec<Step> },
+    Step(Box<Step>),
+}
+
+pub(crate) fn parse_reusable_steps(
+    contents: &str,
+    source: &str,
+) -> Result<Vec<Step>, std::io::Error> {
+    let reusable: ReusableFile = serde_yaml::from_str(contents).map_err(|error| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            format!("failed to parse reusable step {source}: {error}"),
+        )
+    })?;
+    Ok(match reusable {
+        ReusableFile::Pipeline { steps } => steps,
+        ReusableFile::Step(step) => vec![*step],
+    })
+}
+
+pub(crate) fn read_reusable_steps(path: &Path) -> Result<Vec<Step>, std::io::Error> {
+    parse_reusable_steps(&fs_err::read_to_string(path)?, &path.display().to_string())
+}
+
+fn load_reusable_steps(path: &Path) -> Result<Vec<Step>, std::io::Error> {
+    BuildPlan::Steps(read_reusable_steps(path)?)
+        .select_steps(None)
+        .map_err(|error| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("invalid reusable pipeline {}: {error}", path.display()),
+            )
+        })
+}
+
 fn resolve_reusable_step(
     step: &Step,
     step_index: usize,
@@ -77,66 +115,51 @@ fn resolve_reusable_step(
             .unwrap_or_else(|| format!("step {step_index}"));
         return Ok(vec![(step.to_script(), Some(label))]);
     };
-    let path = reusable_step_path(reference, recipe_dir, context)?;
-    let contents = fs_err::read_to_string(&path)?;
-    #[derive(serde::Deserialize)]
-    #[serde(untagged)]
-    enum ReusableFile {
-        Pipeline { steps: Vec<Step> },
-        Step(Box<Step>),
-    }
-    let reusable: ReusableFile = serde_yaml::from_str(&contents).map_err(|error| {
-        std::io::Error::new(
-            std::io::ErrorKind::InvalidData,
-            format!("failed to parse reusable step {}: {error}", path.display()),
-        )
-    })?;
-    let reusable_steps =
-        match reusable {
-            ReusableFile::Pipeline { steps } => BuildPlan::Steps(steps)
+    let (source, reusable_steps) = if let Some(resolved) = &step.resolved {
+        let source = resolved.provider.as_ref().map_or_else(
+            || resolved.reference.clone(),
+            |provider| {
+                format!(
+                    "{} ({}-{}-{})",
+                    resolved.reference, provider.name, provider.version, provider.build
+                )
+            },
+        );
+        (
+            source.clone(),
+            BuildPlan::Steps(resolved.steps.clone())
                 .select_steps(None)
                 .map_err(|error| {
                     std::io::Error::new(
                         std::io::ErrorKind::InvalidData,
-                        format!("invalid reusable pipeline {}: {error}", path.display()),
+                        format!("invalid resolved reusable pipeline {source}: {error}"),
                     )
                 })?,
-            ReusableFile::Step(step) => {
-                BuildPlan::Steps(vec![*step])
-                    .select_steps(None)
-                    .map_err(|error| {
-                        std::io::Error::new(
-                            std::io::ErrorKind::InvalidData,
-                            format!("invalid reusable step {}: {error}", path.display()),
-                        )
-                    })?
-            }
-        };
+        )
+    } else {
+        let path = reusable_step_path(reference, recipe_dir, context)?;
+        let steps = load_reusable_steps(&path)?;
+        (path.display().to_string(), steps)
+    };
     if reusable_steps.is_empty() {
         return Err(std::io::Error::new(
             std::io::ErrorKind::InvalidData,
-            format!(
-                "reusable pipeline {} contains no required steps",
-                path.display()
-            ),
+            format!("reusable pipeline {source} contains no required steps"),
         ));
     }
 
     let mut scripts = Vec::with_capacity(reusable_steps.len());
     for (index, reusable) in reusable_steps.into_iter().enumerate() {
-        if reusable.uses.is_some() || !reusable.requirements.is_empty() {
+        if reusable.uses.is_some() {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
-                format!(
-                    "reusable pipeline {} may not contain nested uses or requirements",
-                    path.display()
-                ),
+                format!("reusable pipeline {source} may not contain nested uses"),
             ));
         }
         if reusable.run.is_empty() {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
-                format!("reusable step {} must define run", path.display()),
+                format!("reusable step {source} must define run"),
             ));
         }
         let nested_name = reusable
@@ -220,7 +243,18 @@ pub(crate) fn prepare_build_plan_execution_args(
 
     let mut secrets = IndexMap::new();
     let mut sections = Vec::with_capacity(scripts.len());
-    for (script, step_label) in scripts {
+    for (index, (mut script, step_label)) in scripts.into_iter().enumerate() {
+        if matches!(plan, BuildPlan::Steps(_)) {
+            let output_file = crate::recipe_patch::output_file(&work_dir, index)
+                .to_string_lossy()
+                .into_owned();
+            script
+                .env
+                .insert("OUTPUT_FILE".to_string(), output_file.clone());
+            script
+                .env
+                .insert("RATTLER_BUILD_OUTPUT_FILE".to_string(), output_file);
+        }
         let mut section_jinja = Jinja::new(selector_config.clone()).with_context(recipe_context);
         for (key, value) in env_vars.iter().chain(script.env()) {
             section_jinja
@@ -373,6 +407,11 @@ impl Output {
             Err(err) => return Err(err.into()),
         }
 
+        if self.recipe.build().plan.steps().is_some() {
+            crate::recipe_patch::prepare_output_directory(
+                &self.build_configuration.directories.work_dir,
+            )?;
+        }
         let exec_args = self.prepare_build_script().await?;
         rattler_build_script::run_script(exec_args).await?;
 
@@ -398,6 +437,11 @@ impl Output {
         let span = tracing::info_span!("Creating build script");
         let _enter = span.enter();
 
+        if self.recipe.build().plan.steps().is_some() {
+            crate::recipe_patch::prepare_output_directory(
+                &self.build_configuration.directories.work_dir,
+            )?;
+        }
         let exec_args = self.prepare_build_script().await?;
         rattler_build_script::create_build_script(exec_args).await
     }
@@ -446,5 +490,31 @@ mod tests {
         assert_eq!(scripts.len(), 2);
         assert_eq!(scripts[0].1.as_deref(), Some("step 0/check"));
         assert_eq!(scripts[1].1.as_deref(), Some("step 0/report"));
+
+        // Preprocessed provider contents execute without the provider being
+        // present in either the build or host prefix.
+        let resolved: Step = serde_yaml::from_str(
+            r#"
+uses: cargo:build
+resolved:
+  reference: cargo:build
+  provider:
+    name: cargo-rattler-build-steps
+    version: '1.0'
+    build: h0
+    subdir: noarch
+    channel: test
+    sha256: aabbcc
+  content_sha256: ddee
+  rendered_sha256: eeff
+  steps:
+    - name: build
+      run: cargo build
+"#,
+        )
+        .unwrap();
+        let scripts = resolve_reusable_step(&resolved, 0, &recipe, &context).unwrap();
+        assert_eq!(scripts.len(), 1);
+        assert_eq!(scripts[0].1.as_deref(), Some("step 0/build"));
     }
 }

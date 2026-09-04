@@ -470,6 +470,7 @@ fn parse_step(node: &Node) -> Result<Step, ParseError> {
 
     let mut run = None;
     let mut uses = None;
+    let mut with = indexmap::IndexMap::new();
     let mut name = None;
     let mut optional = false;
     let mut depends_on = Vec::new();
@@ -486,6 +487,9 @@ fn parse_step(node: &Node) -> Result<Step, ParseError> {
         match key {
             "uses" => {
                 uses = Some(parse_field!("steps.uses", value_node));
+            }
+            "with" => {
+                with = super::parse_context(value_node)?;
             }
             "name" => {
                 name = Some(
@@ -555,7 +559,7 @@ fn parse_step(node: &Node) -> Result<Step, ParseError> {
                     format!("unknown field '{}' in step", key),
                     *key_node.span(),
                 )
-                .with_suggestion("Valid fields are: name, optional, depends_on, requirements, uses, run, if, interpreter, cwd, env"));
+                .with_suggestion("Valid fields are: name, optional, depends_on, requirements, uses, with, run, if, interpreter, cwd, env"));
             }
         }
     }
@@ -571,6 +575,7 @@ fn parse_step(node: &Node) -> Result<Step, ParseError> {
 
     Ok(Step::Run(RunStep {
         uses,
+        with,
         name,
         optional,
         depends_on,
@@ -1285,6 +1290,11 @@ steps:
 steps:
   - name: build
     uses: cargo:build
+    with:
+      locked: true
+      extra_args:
+        - --features
+        - cli
 "#;
         let node = marked_yaml::parse_yaml(0, yaml).unwrap();
         let build = parse_build(&node).unwrap();
@@ -1294,6 +1304,17 @@ steps:
             Some(&"cargo:build".to_string())
         );
         assert!(step.run.is_empty());
+        assert_eq!(
+            step.with["locked"]
+                .as_concrete()
+                .and_then(|value| value.as_bool()),
+            Some(true)
+        );
+        assert!(
+            step.with["extra_args"]
+                .as_concrete()
+                .is_some_and(rattler_build_jinja::Variable::is_sequence)
+        );
     }
 
     #[test]

@@ -133,6 +133,10 @@ pub struct RunStep {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub uses: Option<Value<String>>,
 
+    /// Typed arguments passed to a reusable step provider.
+    #[serde(default, skip_serializing_if = "indexmap::IndexMap::is_empty")]
+    pub with: indexmap::IndexMap<String, Value<rattler_build_jinja::Variable>>,
+
     /// Optional unique name used by `rattler-build run` and dependency edges.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
@@ -189,6 +193,7 @@ impl RunStep {
     pub fn used_variables(&self) -> Vec<String> {
         let RunStep {
             uses,
+            with,
             name: _,
             optional: _,
             depends_on: _,
@@ -204,6 +209,9 @@ impl RunStep {
         let mut vars = run.used_variables();
         if let Some(uses) = uses {
             vars.extend(uses.used_variables());
+        }
+        for value in with.values() {
+            vars.extend(value.used_variables());
         }
         vars.extend(requirements.used_variables());
 

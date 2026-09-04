@@ -1,0 +1,9 @@
+schema_version: 1
+package:
+  name: step-provider-consumer
+  version: 1.0.0
+build:
+  steps:
+    - uses: test:build@=1.0.0
+      with:
+        message: exact-provider-worked

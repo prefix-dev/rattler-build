@@ -148,28 +148,90 @@ Local paths are relative to the recipe directory. A reusable file may contain
 either one step or a complete `steps:` pipeline. Pipeline DAG ordering and
 optional steps are supported. The referencing step may override the interpreter
 and working directory and extend/override the environment for every nested
-step. Requirements stay on the referencing recipe step because dependency
-solving happens before the reusable file is loaded.
+step. Reusable step requirements are preprocessed and included in the recipe's
+build or host solve.
 
-Package references use `provider:step` syntax:
+Package references use `provider:step` syntax and may include a conda version
+constraint after `@`:
 
 ```yaml
-- uses: cargo:build
+- uses: cargo:build@>=0.3,<0.4
 ```
 
 With no explicit `name`, this step is named `cargo:build`, so it can be run as
-`rattler-build run cargo:build`. The reference automatically adds
-`cargo-rattler-build-steps` to the build solve. After
-environment installation, rattler-build looks for the first existing file at:
+`rattler-build run cargo:build`. Before solving the recipe environments,
+rattler-build resolves `cargo-rattler-build-steps` for the build platform and
+installs it into a content-addressed provider prefix under the global cache.
+The cache identity includes the platform and complete solved records, channels,
+and artifact hashes. Provider packages never enter the recipe build or host
+prefix.
 
-```text
-$BUILD_PREFIX/etc/rattler-build/steps/cargo/build.yaml
-$HOST_PREFIX/etc/rattler-build/steps/cargo/build.yaml
+Rattler-build loads `etc/rattler-build/steps/cargo/build.yaml` from that
+standalone prefix and stores the rendered steps, portable reference, content
+SHA-256, and exact provider package version, build, subdir, channel, and SHA-256
+in the rendered recipe. Provider installation is data-only: package link scripts
+are not executed during preprocessing. Requirements declared by those steps are
+added to the recipe solve. An extensionless `build` file is accepted as a
+fallback. Provider packages should therefore contain step definitions only;
+tools such as `cargo` belong in the reusable step's `requirements.build`.
+Complete CMake, Meson, Rust, and Go recipes are available in
+[`examples/step-providers`](https://github.com/prefix-dev/rattler-build/tree/main/examples/step-providers).
+
+Reusable pipelines can declare typed inputs and use them in Jinja templates:
+
+```yaml title="provider build.yaml"
+inputs:
+  extra_args:
+    type: list
+    default: []
+  install:
+    type: boolean
+    default: true
+steps:
+  - run: cmake -S "$SRC_DIR" -B "$BUILD_DIR/cmake" ${{ inputs.extra_args | join(' ') }}
+  - if: inputs.install
+    then:
+      - run: cmake --install "$BUILD_DIR/cmake"
 ```
 
-An extensionless `build` file is accepted as a fallback. Provider packages
-should express tool dependencies such as `cargo` in their package metadata;
-reusable step files deliberately cannot add late requirements.
+```yaml title="recipe.yaml"
+build:
+  steps:
+    - uses: cmake:build
+      with:
+        extra_args: [-DBUILD_TESTING=ON]
+        install: false
+```
+
+Unknown inputs, missing required inputs, and values of the wrong declared type
+are rejected during preprocessing. Inputs may use recipe templates and therefore
+participate in normal used-variable tracking. Reusable files use the same valid-YAML
+`if` / `then` / `else` preprocessing selectors as recipes; `{% if %}` template
+blocks are not supported.
+
+Every build-step section receives a unique `OUTPUT_FILE` environment variable.
+A step can write an [RFC 6902 JSON Patch](https://datatracker.ietf.org/doc/html/rfc6902)
+to this file to update packaging metadata after all steps finish and before the
+package is created. For example, a reusable step can register generated license
+files:
+
+```yaml
+requirements:
+  build: [go, go-licenses]
+run: |
+  go-licenses save ./... --save_path "$BUILD_DIR/go-dependencies"
+  dollar='$'
+  printf '%s\n' '[{"op":"add","path":"/about/license_file/include/-","value":"'"$dollar"'{{ BUILD_DIR }}/go-dependencies/**"}]' > "$OUTPUT_FILE"
+```
+
+Output patches are applied in step execution order. Commonly extended arrays,
+including `about.license_file` and the dynamic-linking allowlists, are
+materialized even when omitted from the recipe, so standard JSON Patch `/-`
+array appends work. Post-build patches may update `about.*` and packaging-time
+fields under `build.dynamic_linking`, `build.prefix_detection`, `build.files`,
+`build.always_copy_files`, `build.always_include_files`, and
+`build.post_process`. Fields already consumed by rendering, solving, or script
+execution are rejected as too late to modify.
 
 !!! warning "Windows multiline steps"
     On Windows, a multiline `run: |` block is emitted as one command-list item.
