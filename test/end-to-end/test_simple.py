@@ -1771,6 +1771,20 @@ def test_missing_pin_subpackage(
     assert "missing output: test1" in stdout
 
 
+def test_unbalanced_bracket_in_skip(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    # Issue #2780: a mismatched bracket in a `skip` expression used to be ignored,
+    # silently building an output the recipe meant to skip.
+    with pytest.raises(CalledProcessError) as e:
+        rattler_build.render(
+            recipes / "test-parsing" / "recipe_unbalanced_skip.yaml",
+            tmp_path,
+            stderr=STDOUT,
+        )
+    assert "skip" in e.value.output
+
+
 def test_cycle_detection(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     # make sure that tests are ran in the right order and that the packages are built correctly
     with pytest.raises(CalledProcessError) as e:

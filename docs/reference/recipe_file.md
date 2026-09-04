@@ -742,6 +742,11 @@ build:
     ...
 ```
 
+Each entry is a Jinja expression (without the surrounding `${{ ... }}`). Entries
+that are not valid Jinja - an unbalanced bracket, for example - are reported as an
+error instead of being silently treated as "do not skip". An entry that references a
+variable which is not part of the variant still counts as "do not skip".
+
 ### Architecture-independent packages
 
 Allows you to specify "no architecture" when building a package, thus making it
