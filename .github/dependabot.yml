@@ -8,7 +8,7 @@ updates:
     labels:
       - "dependencies"
     commit-message:
-      prefix: "bump"
+      prefix: "build"
     open-pull-requests-limit: 10
     ignore:
       - dependency-name: "rattler*"
