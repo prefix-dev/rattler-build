@@ -25,7 +25,7 @@ rattler-build publish [OPTIONS] --to <TO> [PACKAGE_OR_RECIPE]...
 - <a id="arg---recipe-dir" href="#arg---recipe-dir">`--recipe-dir <RECIPE_DIR>`</a>
 :  The directory that contains recipes
 - <a id="arg---up-to" href="#arg---up-to">`--up-to <UP_TO>`</a>
-:  Build recipes up to the specified package
+:  Build only the specified package and outputs needed to build it. Runtime and explicit test dependencies are also included unless tests are skipped
 - <a id="arg---build-platform" href="#arg---build-platform">`--build-platform <BUILD_PLATFORM>`</a>
 :  The build platform to use for the build (e.g. for building with emulation, or rendering)
 - <a id="arg---target-platform" href="#arg---target-platform">`--target-platform <TARGET_PLATFORM>`</a>

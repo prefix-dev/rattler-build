@@ -2020,6 +2020,10 @@ def test_channel_package_can_satisfy_sibling_runtime_dependency(
     )
 
 
+@pytest.mark.skipif(
+    os.name == "nt",
+    reason="Unix CI covers this platform-independent scheduler performance regression",
+)
 def test_variant_closure_failure_is_memoized(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
