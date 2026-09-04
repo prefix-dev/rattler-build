@@ -376,3 +376,39 @@ outputs:
     for variant in rendered:
         result = variant.run_build(output_dir=tmp_path)
         assert result.name in ("my-pkg-base", "my-pkg")
+
+
+def test_render_prefers_plain_run_dependency_order() -> None:
+    """Render sibling runtime providers before consumers when possible."""
+    recipe = Stage0Recipe.from_yaml(
+        """
+schema_version: 1
+
+recipe:
+  version: "1.0.0"
+
+outputs:
+  - package:
+      name: runtime-wrapper
+    requirements:
+      run:
+        - runtime-provider
+
+  - package:
+      name: runtime-consumer
+    requirements:
+      host:
+        - runtime-wrapper
+
+  - package:
+      name: runtime-provider
+"""
+    )
+
+    rendered = recipe.render(VariantConfig())
+
+    assert [variant.recipe.package.name for variant in rendered] == [
+        "runtime-provider",
+        "runtime-wrapper",
+        "runtime-consumer",
+    ]

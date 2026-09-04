@@ -1801,15 +1801,272 @@ def test_non_exact_run_constraint_no_cycle(
 def test_sibling_run_dep_ordering(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
-    """Test that outputs with plain run deps on sibling outputs are built in the right order.
+    """Prefer a sibling runtime dependency before consumers that install it."""
+    recipe = recipes / "race-condition" / "recipe-sibling-run-dep.yaml"
+    rendered = rattler_build.render(recipe, tmp_path)
+    assert [output["recipe"]["package"]["name"] for output in rendered] == [
+        "repro-runtime",
+        "repro-wrapper",
+        "repro-consumer",
+    ]
+    rattler_build.build(recipe, tmp_path)
 
-    repro-wrapper has a run dep on repro-runtime but is listed first in the recipe.
-    The build should succeed because repro-runtime must be built before repro-wrapper's
-    test environment is solved.
-    """
-    rattler_build.build(
-        recipes / "race-condition" / "recipe-sibling-run-dep.yaml", tmp_path
+
+def test_sibling_run_dep_up_to_skips_target_runtime_when_tests_are_skipped(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Do not build a target's runtime dependencies when its tests are skipped."""
+    rendered = rattler_build.render(
+        recipes / "race-condition" / "recipe-sibling-run-dep.yaml",
+        tmp_path,
+        extra_args=["--test=skip", "--up-to", "repro-wrapper"],
     )
+    assert [output["recipe"]["package"]["name"] for output in rendered] == [
+        "repro-wrapper"
+    ]
+
+
+def test_up_to_includes_explicit_test_requirements(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Select sibling requirements needed by tests of the requested output."""
+    recipe = recipes / "race-condition" / "recipe.yaml"
+    rendered = rattler_build.render(
+        recipe,
+        tmp_path,
+        extra_args=["--up-to", "my-package-a"],
+    )
+    assert [output["recipe"]["package"]["name"] for output in rendered] == [
+        "my-package-a",
+        "my-package",
+    ]
+
+    rendered_without_tests = rattler_build.render(
+        recipe,
+        tmp_path,
+        extra_args=["--test=skip", "--up-to", "my-package-a"],
+    )
+    assert [
+        output["recipe"]["package"]["name"] for output in rendered_without_tests
+    ] == ["my-package-a"]
+
+
+def test_sibling_run_dep_with_skipped_local_output(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Treat a skipped local sibling as an external dependency."""
+    recipe = recipes / "race-condition" / "recipe-sibling-run-dep.yaml"
+    rattler_build.build(
+        recipe,
+        tmp_path,
+        extra_args=["--test=skip", "--up-to", "repro-runtime"],
+    )
+    rattler_build.build(
+        recipe,
+        tmp_path,
+        extra_args=["--test=skip", "--skip-existing", "local"],
+    )
+
+
+def test_sibling_strong_run_export_up_to(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Include sibling targets exported by a selected build dependency."""
+    rattler_build.build(
+        recipes / "race-condition" / "recipe-sibling-run-export.yaml",
+        tmp_path,
+        extra_args=["--test=skip", "--up-to", "repro-export-consumer"],
+    )
+
+
+def test_up_to_does_not_select_target_run_exports(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Do not select run exports emitted by the target itself."""
+    rendered = rattler_build.render(
+        recipes / "race-condition" / "recipe-sibling-run-export.yaml",
+        tmp_path,
+        extra_args=["--up-to", "repro-exporter"],
+    )
+    assert [output["recipe"]["package"]["name"] for output in rendered] == [
+        "repro-exporter"
+    ]
+
+
+def test_sibling_strong_run_export_ordering(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Delay a consumer until a build dependency's strong run export exists."""
+    rattler_build.build(
+        recipes / "race-condition" / "recipe-sibling-run-export.yaml",
+        tmp_path,
+        extra_args=["--test=skip"],
+    )
+
+
+def test_ignored_sibling_strong_run_export(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Exports ignored by provider or target name do not block consumers."""
+    recipe = recipes / "race-condition" / "recipe-sibling-run-export-ignored.yaml"
+    rendered = rattler_build.render(
+        recipe,
+        tmp_path,
+        extra_args=["--up-to", "repro-name-ignored-consumer"],
+    )
+    assert [output["recipe"]["package"]["name"] for output in rendered] == [
+        "repro-name-ignored-exporter",
+        "repro-name-ignored-consumer",
+    ]
+    rattler_build.build(recipe, tmp_path, extra_args=["--test=skip"])
+
+
+def test_merged_environment_ignores_build_run_exports(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Merged build dependencies do not contribute strong run exports."""
+    recipe = recipes / "race-condition" / "recipe-sibling-run-export-merged.yaml"
+    rendered = rattler_build.render(
+        recipe,
+        tmp_path,
+        extra_args=["--up-to", "repro-merged-consumer"],
+    )
+    assert [output["recipe"]["package"]["name"] for output in rendered] == [
+        "repro-merged-exporter",
+        "repro-merged-consumer",
+    ]
+    rattler_build.build(recipe, tmp_path, extra_args=["--test=skip"])
+
+
+def test_transitive_sibling_strong_run_export(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Only direct build dependencies contribute strong run exports."""
+    rattler_build.build(
+        recipes / "race-condition" / "recipe-transitive-run-export.yaml",
+        tmp_path,
+        extra_args=["--test=skip"],
+    )
+
+
+def test_sibling_run_dependency_cycle(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Runtime cycles do not impose an order on package builds."""
+    rattler_build.build(
+        recipes / "race-condition" / "recipe-sibling-run-cycle.yaml",
+        tmp_path,
+        extra_args=["--test=skip"],
+    )
+
+
+def test_sibling_exact_pin_uses_matching_variant(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Resolve each exact sibling pin against the matching provider variant."""
+    rendered = rattler_build.render(
+        recipes / "race-condition" / "recipe-sibling-pin-variant.yaml",
+        tmp_path,
+        variant_config=recipes / "race-condition" / "variant-sibling-pin.yaml",
+        extra_args=["--test=skip"],
+    )
+    core_builds = {
+        output["build_configuration"]["variant"]["flavor"]: output["recipe"]["build"][
+            "string"
+        ]
+        for output in rendered
+        if output["recipe"]["package"]["name"] == "repro-variant-core"
+    }
+    assert set(core_builds) == {"a", "b"}
+
+    consumers = [
+        output
+        for output in rendered
+        if output["recipe"]["package"]["name"] == "repro-variant-consumer"
+    ]
+    assert len(consumers) == 2
+    for consumer in consumers:
+        flavor = consumer["build_configuration"]["variant"]["flavor"]
+        pinned_core = consumer["build_configuration"]["subpackages"][
+            "repro-variant-core"
+        ]
+        assert pinned_core["build_string"] == core_builds[flavor]
+
+
+def test_later_sibling_pin_in_test_requirements_is_deferred(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Defer a test pin until its later sibling has been built."""
+    rattler_build.build(
+        recipes / "race-condition" / "recipe-sibling-test-pin-late.yaml",
+        tmp_path,
+    )
+
+
+def test_channel_package_can_satisfy_sibling_runtime_dependency(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Let the solver use an older channel package instead of blocking locally."""
+    recipe_directory = recipes / "race-condition"
+    rattler_build.build(
+        recipe_directory / "recipe-sibling-channel-fallback-seed.yaml",
+        tmp_path,
+        extra_args=["--test=skip"],
+    )
+    rattler_build.build(
+        recipe_directory / "recipe-sibling-channel-fallback.yaml",
+        tmp_path,
+        extra_args=["--test=skip"],
+    )
+
+
+@pytest.mark.skipif(
+    os.name == "nt",
+    reason="Unix CI covers this platform-independent scheduler performance regression",
+)
+def test_variant_closure_failure_is_memoized(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Report an unsatisfied deep variant closure without exponential traversal."""
+    args = rattler_build.build_args(
+        recipes / "race-condition" / "recipe-sibling-variant-closure.yaml",
+        tmp_path,
+        variant_config=recipes / "race-condition" / "variant-sibling-closure.yaml",
+        extra_args=["--test=skip"],
+    )
+    with pytest.raises(CalledProcessError) as error:
+        rattler_build(*args, stderr=STDOUT, timeout=30)
+    assert "Cannot solve the request because of" in error.value.output
+
+
+def test_sibling_deferred_tests_run_after_final_failure(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Deferred tests are drained after the final build attempt fails."""
+    rattler_build.build(
+        recipes / "race-condition" / "recipe-deferred-test-after-failure.yaml",
+        tmp_path,
+        extra_args=["--continue-on-failure"],
+    )
+    assert list((tmp_path / "broken").glob("repro-deferred-test-*"))
+
+
+def test_sibling_blocked_cycle_reports_solver_error(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Let the solver identify the dependency edge that cannot be satisfied."""
+    args = rattler_build.build_args(
+        recipes / "race-condition" / "recipe-sibling-blocked-cycle.yaml",
+        tmp_path,
+        extra_args=["--test=skip"],
+    )
+    with pytest.raises(CalledProcessError) as error:
+        rattler_build(*args, stderr=STDOUT)
+    assert (
+        "Cannot solve the request because of: repro-blocked-provider"
+        in error.value.output
+    )
+    assert "repro-blocked-consumer ==1.0.0" in error.value.output
 
 
 def test_python_min_render(
