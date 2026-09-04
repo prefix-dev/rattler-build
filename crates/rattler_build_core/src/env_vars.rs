@@ -495,15 +495,21 @@ pub fn vars(output: &Output, build_state: &str) -> HashMap<String, Option<String
 /// Return environment variables that should be set during the test process.
 ///
 /// This is a minimal subset of [`vars`] appropriate for test scripts — it does
-/// not include build-time paths (`RECIPE_DIR`, `SRC_DIR`, …) or pip settings.
+/// not include build-time paths (`RECIPE_DIR`, …) or pip settings. `SRC_DIR`
+/// points at the test working directory, matching conda-build's behavior of
+/// setting it to the directory the test runs in (conda-forge's compiler
+/// activation scripts interpolate `${SRC_DIR}` into compiler flags whenever
+/// `CONDA_BUILD` is set).
 pub fn test_vars(
     target_platform: Platform,
     build_platform: Platform,
     host_platform: Platform,
+    work_dir: &Path,
 ) -> HashMap<String, Option<String>> {
     let mut vars = HashMap::new();
 
     insert!(vars, "CONDA_BUILD_STATE", "TEST");
+    insert!(vars, "SRC_DIR", work_dir.to_string_lossy());
     insert!(vars, "SUBDIR", target_platform.to_string());
     insert!(vars, "target_platform", target_platform.to_string());
     insert!(vars, "build_platform", build_platform.to_string());
@@ -577,6 +583,30 @@ mod test {
                 .and_then(|value| value.as_deref())
                 .map(Path::new),
             Some(prefix.join("lib/python3.13t/site-packages").as_path())
+        );
+    }
+
+    /// `SRC_DIR` points at the test working directory during tests, matching
+    /// conda-build (issue #2793).
+    #[test]
+    fn test_vars_set_src_dir_to_the_test_work_dir() {
+        let work_dir = Path::new("/some/test/work");
+
+        let vars = test_vars(
+            Platform::Linux64,
+            Platform::Linux64,
+            Platform::Linux64,
+            work_dir,
+        );
+
+        assert_eq!(
+            vars.get("SRC_DIR").and_then(|value| value.as_deref()),
+            Some("/some/test/work")
+        );
+        assert_eq!(
+            vars.get("CONDA_BUILD_STATE")
+                .and_then(|value| value.as_deref()),
+            Some("TEST")
         );
     }
 

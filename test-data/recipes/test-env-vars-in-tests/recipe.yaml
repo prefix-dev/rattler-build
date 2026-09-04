@@ -31,6 +31,9 @@ tests:
           # CONDA_BUILD
           test "$CONDA_BUILD" = "1"
           test "$CONDA_BUILD_STATE" = "TEST"
+          # SRC_DIR points at the test working directory (issue #2793)
+          test -n "${SRC_DIR:-}"
+          test -d "$SRC_DIR"
           # Jinja expressions
           test "${{ version }}" = "1.2.3"
           test "${{ my_custom_variant }}" = "hello_from_variant"
@@ -40,6 +43,8 @@ tests:
           if not "%my_custom_variant%"=="hello_from_variant" exit 1
           if "%target_platform%"=="" exit 1
           if "%CONDA_BUILD%"=="" exit 1
+          if "%SRC_DIR%"=="" exit 1
+          if not exist "%SRC_DIR%" exit 1
           if not "${{ version }}"=="1.2.3" exit 1
           if not "${{ my_custom_variant }}"=="hello_from_variant" exit 1
           if "${{ target_platform }}"=="" exit 1
