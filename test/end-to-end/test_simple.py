@@ -3165,6 +3165,46 @@ def test_overlinking_check(rattler_build: RattlerBuild, recipes: Path, tmp_path:
         assert "linking check error: Overlinking against" in e.output
 
 
+@pytest.mark.skipif(
+    platform.system() not in ("Linux", "Windows"),
+    reason="Link checking fixture supports Linux and Windows",
+)
+def test_overlinking_check_without_binary_relocation(
+    rattler_build: RattlerBuild,
+    recipes: Path,
+    tmp_path: Path,
+    clean_path_on_win32,
+):
+    target_platform = "win-64" if platform.system() == "Windows" else "linux-64"
+    args = rattler_build.build_args(
+        recipes / "link-check-no-relocation-undeclared",
+        tmp_path,
+        extra_args=["--target-platform", target_platform],
+    )
+    with pytest.raises(CalledProcessError) as exc_info:
+        rattler_build(*args, stderr=STDOUT)
+
+    assert "linking check error: Overlinking against" in exc_info.value.output
+
+
+@pytest.mark.skipif(platform.system() != "Linux", reason="Linux-only hash fixture")
+def test_declared_link_without_binary_relocation_is_not_modified(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    rattler_build.build(
+        recipes / "link-check-no-relocation-declared",
+        tmp_path,
+        extra_args=["--target-platform", "linux-64"],
+    )
+    package = get_extracted_package(tmp_path, "link-check-no-relocation-declared")
+    binary = package / "bin/zlink"
+    expected_hash = (
+        (package / "share/link-check-no-relocation/zlink.sha256").read_text().strip()
+    )
+
+    assert hashlib.sha256(binary.read_bytes()).hexdigest() == expected_hash
+
+
 @pytest.mark.skipif(platform.system() != "Linux", reason="Linux-only test")
 def test_overdepending_check(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
