@@ -1,50 +1,10 @@
-# The recipe spec
+# Recipe file reference
 
-Rattler-Build implements a new recipe spec, different from the traditional
-"`meta.yaml`" file used in `conda-build`. A recipe has to be stored as a
-`recipe.yaml` file.
+A Rattler-Build recipe is a `recipe.yaml` file. This page documents its fields
+and their accepted values. To migrate a `meta.yaml` recipe, see
+[Converting from conda-build](../converting_from_conda_build.md).
 
-## History
-
-A discussion was started on what a new recipe spec could or should look like.
-The fragments of this discussion can be found [here](https://github.com/mamba-org/conda-specs/blob/master/proposed_specs/recipe.md).
-
-The reason for a new spec are:
-
-- make it easier to parse (i.e. "pure YAML"); `conda-build` uses a mix of comments
-  and Jinja to achieve a great deal of flexibility, but it's hard to parse the
-  recipe with a computer
-- iron out some inconsistencies around multiple outputs (`build` vs. `build/script`
-  and more)
-- remove any need for recursive parsing & solving
-- finally, the initial implementation in `boa` relied on `conda-build`;
-  Rattler-Build removes any dependency on Python or `conda-build` and
-  reimplements everything in Rust
-
-## Major differences from `conda-build`
-
-- recipe filename is `recipe.yaml`, not `meta.yaml`
-- outputs have less complicated behavior, keys are same as top-level recipe
-  (e.g. `build/script`, not just `script` and `package/name`, not just `name`)
-- no implicit meta-packages in outputs
-- no full Jinja2 support: no conditional or `{% set ...` support, only string
-  interpolation; variables can be set in the toplevel "context" which is valid
-  YAML
-- Jinja string interpolation needs to be preceded by a dollar sign at the
-  beginning of a string, e.g. `- ${{ version }}` in order for it to be valid
-  YAML
-- selectors use a YAML dictionary style (vs. comments in conda-build). Instead
-  of `- somepkg  #[osx]` we use:
-  ```yaml
-  if: osx
-  then:
-    - somepkg
-  ```
-
-- `skip` instruction uses a list of skip conditions and not the selector syntax
-  from `conda-build` (e.g. `skip: ["osx", "win and py37"]`)
-
-## Spec
+## Top-level structure
 
 The recipe spec has the following parts:
 
@@ -64,33 +24,20 @@ The recipe spec has the following parts:
 - [x] `about`: package metadata such as homepage, license and description
 - [x] `extra`: free-form metadata that rattler-build does not interpret
 
-## Spec reference
+## Schema
 
-The spec is also made available through a JSON Schema (which is used for
-validation).<br/>
-The schema (and `pydantic` source file) can be found in this repository:
-[`recipe-format`](https://github.com/prefix-dev/recipe-format)
+The recipe [JSON Schema](https://github.com/prefix-dev/recipe-format) is used
+for validation and editor integration. See [Automatic recipe
+linting](../automatic_linting.md) for setup instructions.
 
-
-See more in the [automatic linting](../automatic_linting.md) chapter.
-
-<!--
-Quick start (from conda-build)
-------------------------------
-
-You can use `boa convert meta.yaml` to convert an existing recipe from conda-build syntax to boa. The command will output the new recipe to stdout. To quickly save the result, you can use `boa convert meta.yaml > recipe.yaml` and run `boa build .`. Please note that the conversion process is working fine only for "simple" recipes and there will be some needed manual work to convert complex recipes.
-
--->
-
-Examples
---------
+## Example
 
 ```yaml title="recipe.yaml"
 --8<-- "docs/snippets/recipes/imagesize.yaml"
 ```
 
 
-### Package section
+## Package section
 
 Specifies package information.
 
@@ -108,14 +55,13 @@ package:
   version number in quotes so that it is interpreted as a string.
 
 
-### Source section
+## Source section
 
-Specifies where the source code of the package is coming from. The source may
-come from a tarball file, `git`, `hg`, or `svn`. It may be a local path and it may
-contain patches.
+Specifies where the package source comes from. A source can be a URL archive,
+a Git repository, or a local path, and can include patches.
 
 
-#### Source from tarball or `zip` archive
+### Source from tarball or `zip` archive
 
 ```yaml
 source:
@@ -191,7 +137,7 @@ source:
       # file_name is not set — the archive is extracted into the work directory
     ```
 
-#### Source from `git`
+### Source from `git`
 
 ```yaml
 source:
@@ -283,7 +229,7 @@ source:
 
 If the actual commit does not match the expected commit, the build will fail with an error message indicating the mismatch. This feature is inspired by [Wolfi/Melange](https://github.com/wolfi-dev/wolfi-os) and provides an additional layer of security for your builds.
 
-#### Source from a local path
+### Source from a local path
 
 If the path is relative, it is taken relative to the recipe directory. The
 source is copied to the work directory before building.
@@ -298,7 +244,7 @@ By default, all files in the local path that are ignored by `git` are also ignor
 by Rattler-Build. You can disable this behavior by setting `use_gitignore` to
 `false`.
 
-#### Patches
+### Patches
 
 Patches may optionally be applied to the source.
 
@@ -337,7 +283,7 @@ source:
 Only the variables listed above are allowed in `patches`; any other variable
 is treated as undefined and produces an error.
 
-#### Destination path
+### Destination path
 
 Within Rattler-Build's work directory, you may specify a particular folder to
 place the source into. Rattler-Build will always drop you into the same folder
@@ -351,7 +297,7 @@ source:
   target_directory: my-destination/folder
 ```
 
-#### Attestation verification (experimental)
+### Attestation verification (experimental)
 
 !!! note
     This feature requires the `--experimental` flag.
@@ -379,7 +325,7 @@ The attestation config has the following fields:
 See the [Sigstore source attestation documentation](../sigstore.md#source-attestation-verification)
 for more details and examples.
 
-#### Source from multiple sources
+### Source from multiple sources
 
 Some software is most easily built by aggregating several pieces.
 
@@ -414,8 +360,8 @@ source:
     - globs
 ```
 
-Glob patterns throughout the recipe file can also use a flexible `include` /
-`exclude` pair, such as:
+Glob patterns throughout the recipe file can also use an `include` / `exclude`
+pair:
 
 ```yaml title="recipe.yaml"
 source:
@@ -426,6 +372,9 @@ source:
     exclude:
       - include/**/private.h
 ```
+
+See the [glob syntax reference](glob_syntax.md) for supported patterns and
+matching behavior.
 
 The `filter` field is available for `path`, `url`, and `git` sources. It is
 applied to the files that are copied into the work directory — the copied tree
@@ -459,39 +408,11 @@ source:
 
 Specifies build information.
 
-Each field that expects a path can also handle a glob pattern. Patterns are
-matched from the top of the build environment.
+Fields that select paths accept the patterns described in the
+[glob syntax reference](glob_syntax.md). Build file patterns are relative to
+the package prefix.
 
-??? info "Glob syntax"
-
-    Rattler-Build uses [globset's Unix-style glob syntax](https://docs.rs/globset/latest/globset/#syntax).
-
-    | Pattern | Matches |
-    |---------|---------|
-    | `?` | Any single character |
-    | `*` | Zero or more characters |
-    | `**` | Directories recursively |
-    | `{a,b}` | Either `a` or `b` (alternatives cannot be nested) |
-    | `[ab]` | Either `a` or `b` |
-    | `[a-z]` | Any character in the range `a` through `z` |
-    | `[!ab]` | Any character except `a` or `b` |
-    | `[*]` | A literal `*` |
-
-    Alternatives can replace platform selectors when only a file extension
-    differs. This example matches both `lib/libclang-cpp.dylib` and
-    `lib/libclang-cpp.so`:
-
-    ```yaml
-    build:
-      files:
-        - lib/libclang-cpp.{dylib,so}
-    ```
-
-    To match every `.txt` file in a project directory, use
-    `"**/myproject/**/*.txt"`. YAML quotes are required for patterns that start
-    with `*`.
-
-#### Build number and string
+### Build number and string
 
 The build number should be incremented for new builds of the same version. The
 number defaults to `0`. The build string cannot contain "`-`". The string defaults
@@ -503,7 +424,7 @@ build:
   string: abc
 ```
 
-#### Dynamic linking
+### Dynamic linking
 
 This section contains settings for the shared libraries and executables on
 Linux and macOS.
@@ -539,7 +460,7 @@ Fields (all optional):
 - **`overlinking_behavior`** - What to do when a binary links against a
   library that is not a declared dependency. One of `ignore` or `error`.
 
-#### Package variant flags (V3, beta)
+### Package variant flags (V3, beta)
 
 !!! warning "Beta — opt in with `--v3`"
     This field is part of the V3 repodata revision and is only accepted when
@@ -810,8 +731,7 @@ build:
     - globs
 ```
 
-Glob patterns throughout the recipe file can also use a flexible `include` /
-`exclude` pair, such as:
+The [`include` / `exclude` glob form](glob_syntax.md) is also supported:
 
 ```yaml title="recipe.yaml"
 build:
@@ -1522,6 +1442,8 @@ require 'rspec'
 
 Checks if the built package contains the mentioned items. These checks are executed directly at
 the end of the build process to make sure that all expected files are present in the package.
+File checks use the [standard glob syntax](glob_syntax.md) relative to the
+installed test prefix.
 
 ```yaml
 tests:
@@ -1901,196 +1823,26 @@ form.
 
 ## Templating with Jinja
 
-Rattler-Build supports limited Jinja templating in the `recipe.yaml` file.
-
-You can set up Jinja variables in the `context` section:
+Rattler-Build supports a limited Jinja syntax for expressions and string
+interpolation. Variables can be declared in `context` and referenced later:
 
 ```yaml
 context:
-  name: "test"
-  version: "5.1.2"
-  # later keys can reference previous keys
-  # and use jinja functions to compute new values
-  major_version: ${{ (version | split('.'))[0] }}
-  tests_to_skip:
-    # fails for one reason
-    - test_foo
-    # fails for another reason
-    - test_bar
-```
+  name: test
+  version: 5.1.2
 
-Later in your `recipe.yaml` you can use these values in string interpolation
-with Jinja:
-
-```yaml
-source:
-  url: https://github.com/mamba-org/${{ name }}/v${{ version }}.tar.gz
-
-tests:
-  - script:
-    - pytest -k "not (${{ tests_to_skip | join(" or ")" }})"
-```
-
-Jinja has built-in support for some common string manipulations.
-
-In Rattler-Build, complex Jinja is completely disallowed as we try to produce
-YAML that is valid at all times. So you should not use any `{% if ... %}` or
-similar Jinja constructs that produce invalid YAML. Furthermore, instead of
-plain double curly brackets Jinja statements need to be prefixed by `$`, e.g.
-`${{ ... }}`:
-
-```yaml
 package:
-  name: {{ name }}   # WRONG: invalid yaml
-  name: ${{ name }} # correct
+  name: ${{ name }}
+  version: ${{ version }}
 ```
 
-For more information, see the [Jinja template
-documentation](https://jinja.palletsprojects.com/en/3.1.x/) and the list of
-available environment variables [`env-vars`]().
+Expressions use `${{ ... }}`. Jinja control statements such as `{% if ... %}`
+and `{% set ... %}` are not supported; use recipe selectors and the `context`
+section instead.
 
-Jinja templates are evaluated during the build process.
-<!-- TODO: implement the command to do below
-To retrieve a fully rendered `recipe.yaml`, use the `` command.
--->
-
-#### Additional Jinja2 functionality in Rattler-Build
-
-Besides the default Jinja2 functionality, additional Jinja functions are
-available during the Rattler-Build process: `pin_compatible`, `pin_subpackage`,
-`compiler` and `stdlib`.
-
-The `compiler` function takes `c`, `cxx`, `fortran` and other values as argument
-and automatically selects the right (cross-)compiler for the target platform.
-Similarly, `stdlib` function selects the right standard library dependencies.
-
-```
-build:
-  - ${{ compiler('c') }}
-  - ${{ stdlib('c') }}
-```
-
-The `pin_subpackage` function pins another package produced by the recipe with
-the supplied parameters.
-
-Similarly, the `pin_compatible` function will pin a package according to the
-specified rules.
-
-#### Pin expressions
-
-Rattler-Build knows pin expressions. A pin expression can have a `lower_bound`,
-`upper_bound` and `exact` value. A `upper_bound` and `lower_bound` are specified with a
-string containing only `x` and `.`, e.g. `upper_bound="x.x.x"` would signify to pin
-the given package to `<1.2.3` (if the package version is `1.2.2`, for example).
-
-A pin with `lower_bound="x.x",upper_bound="x.x"` for a package of version `1.2.2` would
-evaluate to `>=1.2,<1.3.0a0`.
-
-If `exact=true`, then the `hash` is included, and the package is pinned exactly,
-e.g. `==1.2.2 h1234`. This is a unique package variant that cannot exist more
-than once, and thus is "exactly" pinned.
-
-You can also hard-code version strings into `lower_bound` and `upper_bound`.
-See the [Jinja Reference](./jinja.md) for more information.
-
-#### Pin subpackage
-
-Pin subpackage refers to another package from the same recipe file. It is
-commonly used in the `requirements/run_exports` section to export a run export from the
-package, or with multiple outputs to refer to a previous build.
-
-It looks something like:
-
-```yaml
-package:
-  name: mypkg
-  version: "1.2.3"
-
-requirements:
-  run_exports:
-    # this will evaluate to `mypkg <1.3`
-    - ${{ pin_subpackage(name, upper_bound='x.x') }}
-```
-
-#### Pin compatible
-
-Pin compatible lets you pin a package based on the version retrieved from the
-variant file (if the pinning from the variant file needs customization).
-
-For example, if the variant specifies a pin for `numpy: 1.11`, one can use
-`pin_compatible` to relax it:
-
-```yaml
-requirements:
-  host:
-    # this will select numpy 1.11
-    - numpy
-  run:
-    # this will export `numpy >=1.11,<2`, instead of the stricter `1.11` pin
-    - ${{ pin_compatible('numpy', lower_bound='x.x', upper_bound='x') }}
-```
-
-#### The env Jinja functions
-
-You can access the environment variables set outside the build script using the
-`env` object in Jinja.
-
-There are three functions:
-
-- `env.get("ENV_VAR")` will insert the value of "ENV_VAR" into the recipe.
-- `env.get("ENV_VAR", default="undefined")` will insert the value of `ENV_VAR`
-  into the recipe or, if `ENV_VAR` is not defined, the specified default value
-  (in this case "undefined")
-- `env.exists("ENV_VAR")` returns a boolean true of false if the env var is set
-  to any value
-
-This can be used for some light templating, for example:
-
-```yaml
-build:
-  string: ${{ env.get("GIT_BUILD_STRING") }}_${{ hash }}
-```
-
-#### `match` function
-
-This function matches the first argument (the package version) against the second
-argument (the version spec) and returns the resulting boolean. This only works for packages
-defined in the "variant_config.yaml" file.
-
-```yaml title="recipe.yaml"
-match(python, '>=3.4')
-```
-
-For example, you could require a certain dependency only for builds against python 3.4 and above:
-
-```yaml title="recipe.yaml"
-requirements:
-  build:
-    - if: match(python, '>=3.4')
-      then:
-        - some-dep
-```
-
-With a corresponding variant config that looks like the following:
-
-```yaml title="variant_config.yaml"
-python: ["3.2", "3.4", "3.6"]
-```
-
-Example: [`match` usage example](https://github.com/prefix-dev/rattler-build/tree/main/examples/match_and_cdt/recipe.yaml)
-
-#### `cdt` function
-
-This function helps add Core Dependency Tree packages as dependencies by converting packages as required according to hard-coded logic.
-
-```yaml
-# on x86_64 system
-cdt('package-name') # outputs: package-name-cos6-x86_64
-# on aarch64 system
-cdt('package-name') # outputs: package-name-cos6-aarch64
-```
-
-Example: [`cdt` usage example](https://github.com/prefix-dev/rattler-build/tree/main/examples/match_and_cdt/recipe.yaml)
+See the [Jinja reference](jinja.md) for the supported functions, filters,
+inline conditionals, and access to outer environment variables through the
+`env` object.
 
 ## Preprocessing selectors
 
