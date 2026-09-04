@@ -29,8 +29,12 @@ use super::{PackagingError, TempFiles};
 use crate::metadata::Output;
 use rattler_build_recipe::stage1::HashInput;
 
-/// Returns whether package dependency MatchSpecs must use CEP 48's canonical
-/// representation for the serialized index record.
+/// Returns whether dependency MatchSpecs are written in the canonical
+/// `name[key="value"]` form.
+///
+/// CEP 48 mandates that form for `depends`, `constrains` and `extra_depends`
+/// in repodata records of revision 3 and up. Writing it into `index.json` too
+/// keeps the package metadata identical to the record indexed from it.
 fn uses_canonical_matchspec_format(revision: Option<RepodataRevision>) -> bool {
     revision.is_some_and(|revision| revision.as_u64() >= RepodataRevision::V3.as_u64())
 }
