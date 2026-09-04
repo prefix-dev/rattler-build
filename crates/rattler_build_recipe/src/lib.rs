@@ -2,6 +2,7 @@
 //! and variant rendering.
 
 pub mod error;
+pub mod script_variables;
 pub mod source_code;
 pub mod stage0;
 pub mod stage1;

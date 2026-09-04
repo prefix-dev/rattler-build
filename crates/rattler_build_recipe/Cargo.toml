@@ -47,6 +47,7 @@ petgraph = { workspace = true, optional = true, default-features = false }
 insta = { workspace = true, features = ["yaml"] }
 walkdir = { workspace = true }
 clap = { workspace = true }
+tempfile = { workspace = true }
 
 # Enable fancy miette for tests to demonstrate error messages
 [dev-dependencies.miette]
