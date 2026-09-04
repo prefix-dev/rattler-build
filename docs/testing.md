@@ -80,6 +80,12 @@ tests:
         - bin/myapp
       lib:
         - mylib
+
+  # check that the shared libraries in the package are ABI compatible with the
+  # lowest previously published version that matches the pin (`x.x` == same
+  # major.minor version)
+  - abi_check:
+      pin: x.x
 ```
 
 ### Testing package contents
@@ -107,6 +113,30 @@ It has multiple sub-keys that help when building cross-platform packages:
 - **`bin`**: matches files under the `bin` directory in the package. You can specify executable names like `foo` which will match `foo.exe` on Windows and `foo` on Linux and macOS.
 - **`site_packages`**: matches files under the `site-packages` directory in the package. You can specify the import path like `foobar.api` which will match `foobar/api.py` and `foobar/api/__init__.py`.
 - **`strict`**: when set to `true`, enables strict mode. In strict mode, the test will fail if there are any files in the package that don't match any of the specified globs. (default: `false`).
+
+### Checking ABI compatibility
+
+The `abi_check` test verifies that the shared libraries shipped in the package stay ABI
+compatible with previously published versions of the same package. It downloads the
+lowest published version matching the pin expression (using the same `x.x` syntax as
+pinnings) from the test channels and compares the exported symbols, sonames and library
+names of the shared libraries in both packages.
+
+```yaml title="recipe.yaml"
+tests:
+  - abi_check:
+      pin: x.x               # default: lowest version with the same major.minor
+      libraries:             # optional: restrict the check to certain libraries
+        - lib/libfoo*
+      ignore_symbols:        # optional: ignore certain exported symbols
+        - _private_*
+```
+
+The test fails if a shared library was removed, a soname / install name / DLL name
+changed, or exported symbols were removed within the pinned version range. If no
+previously published version matches the pin (e.g. for the first release of a new
+major/minor series) the check is skipped with a warning. See the
+[recipe reference](reference/recipe_file.md#abi-check-test) for details.
 
 ## Testing existing packages
 
