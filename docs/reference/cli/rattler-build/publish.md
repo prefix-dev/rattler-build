@@ -122,6 +122,8 @@ e.g. `tar-bz2:<number>` (from 1 to 9) or `conda:<number>` (from -7 to
 ## Sandbox arguments
 - <a id="arg---sandbox" href="#arg---sandbox">`--sandbox`</a>
 :  Enable the sandbox
+- <a id="arg---sandbox-config" href="#arg---sandbox-config">`--sandbox-config <PATH>`</a>
+:  Path to a sandbox config file. Implies `--sandbox`
 - <a id="arg---allow-network" href="#arg---allow-network">`--allow-network`</a>
 :  Allow network access during build (default: false if sandbox is enabled)
 - <a id="arg---allow-read" href="#arg---allow-read">`--allow-read <ALLOW_READ>`</a>

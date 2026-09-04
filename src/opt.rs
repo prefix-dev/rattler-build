@@ -800,7 +800,7 @@ pub struct PublishData {
 
 impl PublishData {
     /// Generate a new PublishData struct from PublishOpts and an optional config.
-    pub fn from_opts_and_config(opts: PublishOpts, config: Option<Config>) -> Self {
+    pub fn from_opts_and_config(opts: PublishOpts, config: Option<Config>) -> miette::Result<Self> {
         // Separate package files from recipe paths based on file extension
         let mut package_files = Vec::new();
         let mut recipe_paths = Vec::new();
@@ -870,10 +870,10 @@ impl PublishData {
 
         build_opts.channels = channels;
 
-        let mut build_data = BuildData::from_opts_and_config(build_opts, config);
+        let mut build_data = BuildData::from_opts_and_config(build_opts, config)?;
         build_data.build_string_prefix = opts.build_string_prefix;
 
-        Self {
+        Ok(Self {
             to: opts.to,
             build_number: opts.build_number,
             force: opts.force,
@@ -881,7 +881,7 @@ impl PublishData {
             package_files,
             recipe_paths,
             build: build_data,
-        }
+        })
     }
 }
 
@@ -1011,8 +1011,13 @@ impl BuildData {
 impl BuildData {
     /// Generate a new BuildData struct from BuildOpts and an optional pixi config.
     /// BuildOpts have higher priority than the pixi config.
-    pub fn from_opts_and_config(opts: BuildOpts, config: Option<Config>) -> Self {
+    pub fn from_opts_and_config(opts: BuildOpts, config: Option<Config>) -> miette::Result<Self> {
         let explicit_channels = opts.channels.is_some();
+        let sandbox_configuration = opts
+            .sandbox_arguments
+            .try_into_configuration()
+            .map_err(|e| miette::miette!("failed to load sandbox config: {e}"))?;
+
         let mut build_data = Self::new(
             opts.up_to,
             opts.build_platform,
@@ -1047,7 +1052,7 @@ impl BuildData {
             opts.skip_existing,
             opts.noarch_build_platform,
             opts.extra_meta,
-            opts.sandbox_arguments.into(),
+            sandbox_configuration,
             opts.env_isolation,
             opts.continue_on_failure.into(),
             opts.error_prefix_in_binary,
@@ -1059,7 +1064,7 @@ impl BuildData {
             opts.markdown_summary,
         );
         build_data.channels_from_config = !explicit_channels && build_data.channels.is_some();
-        build_data
+        Ok(build_data)
     }
 }
 

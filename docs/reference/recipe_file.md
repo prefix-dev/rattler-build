@@ -623,6 +623,9 @@ with the following fields (all optional):
 - **`cwd`** - Working directory for the script. Relative paths are resolved
   against the host prefix (`$PREFIX` / `%PREFIX%`). Defaults to the build work
   directory.
+- **`sandbox`** - Set to `true` to run this script in the built-in sandbox, or
+  use a mapping to declare required `network`, `read`, `read_execute`, and
+  `read_write` permissions. See [Script sandboxing](#script-sandboxing).
 
 !!! note "Where interpreters come from"
 
@@ -677,6 +680,61 @@ requirements:
     # `python` is the interpreter, so it must be available in the build env
     - python
 ```
+
+#### Script sandboxing
+
+A recipe can opt into the built-in sandbox without requiring a command-line
+flag:
+
+```yaml title="recipe.yaml"
+build:
+  script:
+    sandbox: true
+    content: curl https://example.com  # blocked: network is disabled by default
+```
+
+The mapping form declares permissions required by the script:
+
+```yaml title="recipe.yaml"
+build:
+  script:
+    sandbox:
+      network: true
+      read_write:
+        - $SRC_DIR/.cargo
+      reason: Download Rust dependencies and update the Cargo cache
+    content: cargo build
+```
+
+Recipe metadata is not allowed to weaken the user's sandbox policy. Network
+access therefore also requires `--allow-network` (or `network: true` in the
+file passed with `--sandbox-config`). Requested paths must be contained by an
+appropriate `--allow-read`, `--allow-read-execute`, or `--allow-read-write`
+path, or by the built-in paths such as the build work directory. Otherwise the
+build fails before executing the script.
+
+Sandbox paths may be absolute, relative to the build work directory, or use
+build environment variables in `$NAME`/`${NAME}` form. Unknown variables are
+reported as errors. `sandbox: false` explicitly disables recipe opt-in; a
+command-line `--sandbox` still applies the host policy to all scripts.
+
+A reusable host policy can be supplied with `--sandbox-config PATH`. Version 1
+uses platform-specific blocks; each block extends the built-in policy unless
+`replace: true` is set:
+
+```yaml title="sandbox.yaml"
+version: 1
+linux:
+  network: true
+  read_write:
+    - /home/builder/.cache
+osx:
+  read_write:
+    - /Users/builder/Library/Caches
+```
+
+Unknown fields and unsupported schema versions are rejected. Configuration
+errors never silently disable the sandbox.
 
 Selecting `nushell` with the required build dependency:
 
