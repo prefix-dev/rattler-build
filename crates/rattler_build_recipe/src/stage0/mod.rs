@@ -1,6 +1,8 @@
 //! The stage0 recipe that contains the un-evaluated recipe information.
 //! This means, it still contains Jinja templates and if-else statements.
 
+use rattler_conda_types::RepodataRevision;
+
 mod about;
 mod build;
 pub mod evaluate;
@@ -40,6 +42,12 @@ pub use types::{
 /// Backwards compatibility alias for Stage0Recipe
 /// This is now the same as SingleOutputRecipe
 pub type Stage0Recipe = SingleOutputRecipe;
+
+/// Returns whether a repodata revision supports the CEP 48 v3 MatchSpec and
+/// recipe-field additions.
+pub(crate) fn supports_v3_repodata_features(revision: RepodataRevision) -> bool {
+    revision.as_u64() >= RepodataRevision::V3.as_u64()
+}
 
 #[cfg(test)]
 mod test {

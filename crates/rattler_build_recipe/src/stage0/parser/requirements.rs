@@ -13,6 +13,7 @@ use crate::{
         parser::ParseConfig,
         parser::helpers::get_span,
         requirements::{IgnoreRunExports, Requirements, RunExports},
+        supports_v3_repodata_features,
     },
 };
 
@@ -38,7 +39,7 @@ impl NodeConverter<SerializableMatchSpec> for MatchSpecConverter {
         .map_err(|e| {
             let reason = e.to_string();
             let err = ParseError::invalid_value(field_name, &reason, *scalar.span());
-            if self.repodata_revision != RepodataRevision::V3
+            if !supports_v3_repodata_features(self.repodata_revision)
                 && reason.contains("invalid bracket key")
             {
                 err.with_suggestion(

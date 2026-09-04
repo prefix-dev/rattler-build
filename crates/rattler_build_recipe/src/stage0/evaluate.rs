@@ -795,7 +795,7 @@ fn evaluate_flag_list(
         }
     })?;
 
-    if !flags.is_empty() && context.repodata_revision() != RepodataRevision::V3 {
+    if !flags.is_empty() && !stage0::supports_v3_repodata_features(context.repodata_revision()) {
         return Err(ParseError::invalid_value(
             "build.flags",
             "package flags require the --v3 flag",
@@ -1198,7 +1198,7 @@ fn ensure_matchspec_v3_allowed(
     context: &EvaluationContext,
     span: Option<&Span>,
 ) -> Result<(), ParseError> {
-    if context.repodata_revision() != RepodataRevision::V3
+    if !stage0::supports_v3_repodata_features(context.repodata_revision())
         && spec.required_repodata_revision() == RepodataRevision::V3
     {
         return Err(ParseError::invalid_value(

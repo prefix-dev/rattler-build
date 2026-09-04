@@ -18,11 +18,16 @@ build:
 requirements:
   run:
     - python >=3.10
+    - python >=3.10
     - scipy[when="python >=3.10"]
     - blas-provider[flags=[blas:*]]
+  run_constraints:
+    - python <4
+    - python <4
   extras:
     plot:
       - matplotlib >=3.8
     full:
+      - pandas >=2
       - pandas >=2
       - rich[extras=[jupyter]]
