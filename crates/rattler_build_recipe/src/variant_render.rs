@@ -18,7 +18,7 @@ use miette::Diagnostic;
 use petgraph::graph::{DiGraph, NodeIndex};
 use rattler_build_variant_config::VariantExpandError;
 use rattler_build_yaml_parser::ParseError;
-use rattler_conda_types::{NoArchType, RepodataRevision};
+use rattler_conda_types::{NoArchType, PackageName, RepodataRevision};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -27,7 +27,7 @@ use rattler_build_types::NormalizedKey;
 use rattler_build_variant_config::VariantConfig;
 
 use crate::stage0::evaluate::ALWAYS_INCLUDED_VARS;
-use crate::stage1::{Dependency, HashInfo, build::BuildString};
+use crate::stage1::{Dependency, HashInfo, TestType, build::BuildString};
 use crate::{
     stage0::{self, MultiOutputRecipe, Recipe as Stage0Recipe, SingleOutputRecipe},
     stage1::{Evaluate, EvaluationContext, Recipe as Stage1Recipe},
@@ -376,15 +376,17 @@ pub fn topological_sort_variants(
 /// Sort items with [`Stage1Recipe`]s topologically by their dependencies.
 ///
 /// Takes a list of items, a function to extract the [`Stage1Recipe`] from each item,
-/// and an optional `up_to` package name to filter the results.
+/// an optional `up_to` package name, and whether tests will run.
 ///
 /// When `up_to` is `None`, returns all items in topological order (dependencies first).
-/// When `up_to` is `Some(name)`, returns only the named package, its build-order
-/// dependencies, and sibling runtime or run-export packages needed to test it.
+/// When `up_to` is `Some(name)`, returns only the named package and outputs needed to
+/// build it. Runtime and explicit test dependencies of the named package are included
+/// only when `include_test_dependencies` is `true`.
 pub fn topological_sort_by_dependencies<T>(
     items: Vec<T>,
     get_recipe: impl Fn(&T) -> &Stage1Recipe,
     up_to: Option<&str>,
+    include_test_dependencies: bool,
 ) -> Result<Vec<T>, TopologicalSortError> {
     if items.is_empty() {
         return Ok(items);
@@ -403,6 +405,7 @@ pub fn topological_sort_by_dependencies<T>(
             &recipes,
             &toposorted,
             up_to,
+            include_test_dependencies,
         )?
     } else {
         toposorted
@@ -459,8 +462,8 @@ fn build_recipe_graph(
 /// Performs a stable topological sort on the hard dependency graph.
 ///
 /// Among hard-ready items, plain sibling runtime dependencies are preferred.
-/// If every hard-ready item is soft-blocked, the first one is selected so runtime
-/// cycles retain recipe order. Hard cycles still produce an error.
+/// If every hard-ready item is soft-blocked, the first one is selected as a
+/// deterministic fallback. Hard cycles still produce an error.
 fn stable_toposort(
     graph: &DiGraph<usize, ()>,
     idx_to_node: &[NodeIndex],
@@ -562,11 +565,38 @@ fn build_recipe_name_index(
     name_to_indices
 }
 
-/// Filters to the outputs needed to build and test `up_to`.
+/// Selects the sibling variant sharing the most rendered variant values.
+fn best_matching_recipe_index(
+    current_index: usize,
+    dependency_name: &PackageName,
+    recipes: &[&Stage1Recipe],
+    name_to_indices: &BTreeMap<PackageName, Vec<usize>>,
+) -> Option<usize> {
+    let dependency_indices = name_to_indices.get(dependency_name)?;
+    if dependency_indices.len() <= 1 {
+        return dependency_indices.first().copied();
+    }
+
+    let current_variant = &recipes[current_index].used_variant;
+    dependency_indices
+        .iter()
+        .max_by_key(|&&dependency_index| {
+            current_variant
+                .iter()
+                .filter(|(key, value)| {
+                    recipes[dependency_index].used_variant.get(*key) == Some(*value)
+                })
+                .count()
+        })
+        .copied()
+}
+
+/// Filters to the outputs needed to build and optionally test `up_to`.
 ///
-/// Build-order dependencies come from `graph`. Sibling runtime dependencies and
-/// relevant run exports from direct build or host dependencies are followed for
-/// selection only, so they do not create ordering cycles.
+/// Build-order dependencies come from `graph`. Their sibling runtime closures
+/// and relevant run exports are followed because the dependencies must be
+/// installable. The target's runtime and explicit test dependencies are included
+/// only when tests will run. These selection edges do not create ordering cycles.
 fn filter_up_to(
     graph: &DiGraph<usize, ()>,
     idx_to_node: &[NodeIndex],
@@ -574,6 +604,7 @@ fn filter_up_to(
     recipes: &[&Stage1Recipe],
     toposorted: &[usize],
     up_to: &str,
+    include_test_dependencies: bool,
 ) -> Result<Vec<usize>, TopologicalSortError> {
     use std::str::FromStr;
 
@@ -590,6 +621,7 @@ fn filter_up_to(
                 package: up_to.to_string(),
             })?;
 
+    let requested_indices: HashSet<_> = up_to_indices.iter().copied().collect();
     let mut pending = up_to_indices.clone();
     let mut selected = HashSet::new();
     while let Some(index) = pending.pop() {
@@ -617,9 +649,10 @@ fn filter_up_to(
                 for dependency in dependencies {
                     if let Some(name) = dependency.name()
                         && !requirements.ignore_run_exports.by_name.contains(name)
-                        && let Some(indices) = name_to_indices.get(name)
+                        && let Some(dependency_index) =
+                            best_matching_recipe_index(index, name, recipes, name_to_indices)
                     {
-                        pending.extend(indices);
+                        pending.push(dependency_index);
                     }
                 }
             };
@@ -646,11 +679,34 @@ fn filter_up_to(
             }
         }
 
-        for dependency in &requirements.run {
-            if let Some(name) = dependency.name()
-                && let Some(indices) = name_to_indices.get(name)
-            {
-                pending.extend(indices);
+        if include_test_dependencies || !requested_indices.contains(&index) {
+            for dependency in &requirements.run {
+                if let Some(name) = dependency.name()
+                    && let Some(dependency_index) =
+                        best_matching_recipe_index(index, name, recipes, name_to_indices)
+                {
+                    pending.push(dependency_index);
+                }
+            }
+        }
+
+        if include_test_dependencies {
+            for test in recipes[index].tests() {
+                if let TestType::Commands(command) = test {
+                    for dependency in command
+                        .requirements
+                        .build
+                        .iter()
+                        .chain(command.requirements.run.iter())
+                    {
+                        if let Some(name) = dependency.name()
+                            && let Some(dependency_index) =
+                                best_matching_recipe_index(index, name, recipes, name_to_indices)
+                        {
+                            pending.push(dependency_index);
+                        }
+                    }
+                }
             }
         }
     }
@@ -2358,7 +2414,7 @@ outputs:
     }
 
     #[test]
-    fn test_plain_run_cycle_preserves_recipe_order() {
+    fn test_plain_run_cycle_has_stable_fallback_order() {
         let recipe_yaml = r#"
 schema_version: 1
 
@@ -2381,6 +2437,14 @@ outputs:
       noarch: generic
     requirements:
       run:
+        - package-c
+
+  - package:
+      name: package-c
+    build:
+      noarch: generic
+    requirements:
+      run:
         - package-a
 "#;
 
@@ -2395,7 +2459,7 @@ outputs:
             .iter()
             .map(|variant| variant.recipe.package.name.as_normalized())
             .collect();
-        assert_eq!(names, vec!["package-a", "package-b"]);
+        assert_eq!(names, vec!["package-a", "package-c", "package-b"]);
     }
 
     #[test]
@@ -2602,7 +2666,7 @@ outputs:
 
         // --up-to=pkg-b should include pkg-a (dependency) and pkg-b itself, but not pkg-c
         let sorted =
-            topological_sort_by_dependencies(rendered.clone(), |v| &v.recipe, Some("pkg-b"))
+            topological_sort_by_dependencies(rendered.clone(), |v| &v.recipe, Some("pkg-b"), true)
                 .unwrap();
 
         let names: Vec<_> = sorted
@@ -2613,7 +2677,7 @@ outputs:
 
         // --up-to=pkg-a should return only pkg-a (no deps)
         let sorted =
-            topological_sort_by_dependencies(rendered.clone(), |v| &v.recipe, Some("pkg-a"))
+            topological_sort_by_dependencies(rendered.clone(), |v| &v.recipe, Some("pkg-a"), true)
                 .unwrap();
 
         let names: Vec<_> = sorted
@@ -2624,7 +2688,7 @@ outputs:
 
         // --up-to=pkg-c should return all three in dependency order
         let sorted =
-            topological_sort_by_dependencies(rendered.clone(), |v| &v.recipe, Some("pkg-c"))
+            topological_sort_by_dependencies(rendered.clone(), |v| &v.recipe, Some("pkg-c"), true)
                 .unwrap();
 
         let names: Vec<_> = sorted
@@ -2637,7 +2701,8 @@ outputs:
         assert_eq!(names.len(), 3);
 
         // --up-to with nonexistent package should error
-        let result = topological_sort_by_dependencies(rendered, |v| &v.recipe, Some("nonexistent"));
+        let result =
+            topological_sort_by_dependencies(rendered, |v| &v.recipe, Some("nonexistent"), true);
         assert!(matches!(
             result,
             Err(TopologicalSortError::PackageNotFound { .. })
@@ -2688,9 +2753,13 @@ variant:
 
         // --up-to=my-package should include the my-package variants plus
         // the my-package-a and my-package-b variants they depend on via pin_subpackage
-        let sorted =
-            topological_sort_by_dependencies(rendered.clone(), |v| &v.recipe, Some("my-package"))
-                .unwrap();
+        let sorted = topological_sort_by_dependencies(
+            rendered.clone(),
+            |v| &v.recipe,
+            Some("my-package"),
+            true,
+        )
+        .unwrap();
 
         let names: Vec<_> = sorted
             .iter()
@@ -2704,7 +2773,7 @@ variant:
 
         // --up-to=my-package-a should return only my-package-a (no deps)
         let sorted =
-            topological_sort_by_dependencies(rendered, |v| &v.recipe, Some("my-package-a"))
+            topological_sort_by_dependencies(rendered, |v| &v.recipe, Some("my-package-a"), true)
                 .unwrap();
 
         let names: Vec<_> = sorted

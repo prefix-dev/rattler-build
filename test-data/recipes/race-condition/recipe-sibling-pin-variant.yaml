@@ -10,21 +10,9 @@ build:
 
 outputs:
   - package:
-      name: repro-variant-extra
+      name: repro-variant-core
     build:
-      script: echo "extra built"
-    requirements:
-      run:
-        - repro-variant-runtime ==${{ version }}
-
-  - package:
-      name: repro-variant-provider
-    build:
-      script: echo "provider built for ${{ flavor }}"
-    requirements:
-      host:
-        - if: flavor == "b"
-          then: repro-variant-extra ==${{ version }}
+      script: echo "core built for ${{ flavor }}"
 
   - package:
       name: repro-variant-consumer
@@ -32,17 +20,12 @@ outputs:
       script: echo "consumer built for ${{ flavor }}"
     requirements:
       host:
-        - ${{ pin_subpackage('repro-variant-provider', exact=True) }}
+        - ${{ pin_subpackage('repro-variant-core', exact=True) }}
+      run:
+        - repro-variant-data
 
   - package:
-      name: repro-variant-late
+      name: repro-variant-data
     build:
-      script: echo "late built for ${{ flavor }}"
-
-  - package:
-      name: repro-variant-runtime
-    build:
-      script: echo "runtime built"
-    requirements:
-      host:
-        - repro-variant-late
+      noarch: generic
+      script: echo "data built"

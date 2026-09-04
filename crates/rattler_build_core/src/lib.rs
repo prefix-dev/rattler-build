@@ -45,7 +45,7 @@ pub use rattler_build_recipe::variant_render::RenderConfig;
 
 use std::collections::BTreeMap;
 
-use rattler_build_recipe::stage1::HashInfo;
+use rattler_build_recipe::{stage1::HashInfo, variant_render::PinSubpackageInfo};
 use rattler_build_types::NormalizedKey;
 use rattler_conda_types::{NoArchType, Platform};
 
@@ -61,6 +61,7 @@ pub struct DiscoveredOutput {
     pub used_vars: BTreeMap<NormalizedKey, Variable>,
     pub recipe: Recipe,
     pub hash: HashInfo,
+    pub pin_subpackages: BTreeMap<NormalizedKey, PinSubpackageInfo>,
 }
 
 impl Eq for DiscoveredOutput {}

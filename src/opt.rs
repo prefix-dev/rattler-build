@@ -586,7 +586,8 @@ pub struct BuildOpts {
     #[arg(long, value_parser = is_dir, conflicts_with = "recipes")]
     pub recipe_dir: Option<PathBuf>,
 
-    /// Build recipes up to the specified package.
+    /// Build only the specified package and outputs needed to build it. Runtime
+    /// and explicit test dependencies are also included unless tests are skipped.
     #[arg(long)]
     pub up_to: Option<String>,
 

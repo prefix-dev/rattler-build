@@ -1,0 +1,111 @@
+context:
+  version: "1.0.0"
+
+recipe:
+  name: repro-closure
+  version: ${{ version }}
+
+outputs:
+  - package:
+      name: repro-closure-consumer
+    build:
+      script: echo "consumer ${{ flavor }}"
+    requirements:
+      host:
+        - repro-closure-00 ==${{ version }}
+
+  - package:
+      name: repro-closure-00
+    build:
+      script: echo "level 00 ${{ flavor }}"
+    requirements:
+      run:
+        - repro-closure-01 ==${{ version }}
+
+  - package:
+      name: repro-closure-01
+    build:
+      script: echo "level 01 ${{ flavor }}"
+    requirements:
+      run:
+        - repro-closure-02 ==${{ version }}
+
+  - package:
+      name: repro-closure-02
+    build:
+      script: echo "level 02 ${{ flavor }}"
+    requirements:
+      run:
+        - repro-closure-03 ==${{ version }}
+
+  - package:
+      name: repro-closure-03
+    build:
+      script: echo "level 03 ${{ flavor }}"
+    requirements:
+      run:
+        - repro-closure-04 ==${{ version }}
+
+  - package:
+      name: repro-closure-04
+    build:
+      script: echo "level 04 ${{ flavor }}"
+    requirements:
+      run:
+        - repro-closure-05 ==${{ version }}
+
+  - package:
+      name: repro-closure-05
+    build:
+      script: echo "level 05 ${{ flavor }}"
+    requirements:
+      run:
+        - repro-closure-06 ==${{ version }}
+
+  - package:
+      name: repro-closure-06
+    build:
+      script: echo "level 06 ${{ flavor }}"
+    requirements:
+      run:
+        - repro-closure-07 ==${{ version }}
+
+  - package:
+      name: repro-closure-07
+    build:
+      script: echo "level 07 ${{ flavor }}"
+    requirements:
+      run:
+        - repro-closure-08 ==${{ version }}
+
+  - package:
+      name: repro-closure-08
+    build:
+      script: echo "level 08 ${{ flavor }}"
+    requirements:
+      run:
+        - repro-closure-09 ==${{ version }}
+
+  - package:
+      name: repro-closure-09
+    build:
+      script: echo "level 09 ${{ flavor }}"
+    requirements:
+      run:
+        - repro-closure-10 ==${{ version }}
+
+  - package:
+      name: repro-closure-10
+    build:
+      script: echo "level 10 ${{ flavor }}"
+    requirements:
+      run:
+        - repro-closure-11 ==${{ version }}
+
+  - package:
+      name: repro-closure-11
+    build:
+      script: echo "level 11 ${{ flavor }}"
+    requirements:
+      run:
+        - repro-closure-consumer ==${{ version }}

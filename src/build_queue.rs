@@ -3,7 +3,7 @@
 //! [`BuildQueue`] owns stable rotation only. [`OutputBuildQueue`] supplies the
 //! rendered-output dependency policy used by the build and publish loops.
 
-use std::collections::{HashSet, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 use rattler_build_recipe::stage1::{Dependency, TestType};
 use rattler_build_types::PinError;
@@ -39,22 +39,6 @@ pub(crate) enum BuildQueueError {
         /// Pin rendering failure.
         #[source]
         source: PinError,
-    },
-
-    /// A sibling referenced by a pin is missing from the consumer's rendered metadata.
-    #[error("sibling `{subpackage}` pinned by `{consumer}` is missing from the build plan")]
-    MissingPinnedSubpackage {
-        /// Referenced sibling package.
-        subpackage: String,
-        /// Output containing the pin.
-        consumer: String,
-    },
-
-    /// Every pending output depends on another unavailable output in the same plan.
-    #[error("could not determine a buildable output; blocked outputs: {blocked_outputs}")]
-    NoBuildableOutput {
-        /// Comma-separated identifiers retained in queue order.
-        blocked_outputs: String,
     },
 }
 
@@ -118,14 +102,9 @@ impl<'a> BuildReadiness<'a> {
             Dependency::Spec(spec) => Ok(Some((**spec).clone())),
             Dependency::PinSubpackage(pin) => {
                 let name = &pin.pin_subpackage.name;
-                let subpackage = consumer
-                    .build_configuration
-                    .subpackages
-                    .get(name)
-                    .ok_or_else(|| BuildQueueError::MissingPinnedSubpackage {
-                        subpackage: name.as_normalized().to_string(),
-                        consumer: consumer.identifier(),
-                    })?;
+                let Some(subpackage) = consumer.build_configuration.subpackages.get(name) else {
+                    return Ok(None);
+                };
                 let spec = pin
                     .pin_subpackage
                     .apply(&subpackage.version, &subpackage.build_string)
@@ -155,24 +134,31 @@ impl<'a> BuildReadiness<'a> {
         &self,
         output_index: usize,
         visited: &mut HashSet<usize>,
+        availability: &mut HashMap<usize, bool>,
         closure: &mut Vec<usize>,
     ) -> bool {
-        let Some(finalized_dependencies) = &self.done_outputs[output_index].finalized_dependencies
-        else {
-            return false;
-        };
         if !visited.insert(output_index) {
             return true;
         }
-        closure.push(output_index);
-
-        for dependency in &finalized_dependencies.run.depends {
-            if !self.collect_spec_install_closure(dependency.spec(), visited, closure) {
-                return false;
+        if let Some(&available) = availability.get(&output_index) {
+            if available {
+                closure.push(output_index);
             }
+            return available;
         }
 
-        true
+        let Some(finalized_dependencies) = &self.done_outputs[output_index].finalized_dependencies
+        else {
+            availability.insert(output_index, false);
+            return false;
+        };
+        closure.push(output_index);
+
+        let available = finalized_dependencies.run.depends.iter().all(|dependency| {
+            self.collect_spec_install_closure(dependency.spec(), visited, availability, closure)
+        });
+        availability.insert(output_index, available);
+        available
     }
 
     /// Collects the installable sibling closure for a match specification.
@@ -183,6 +169,7 @@ impl<'a> BuildReadiness<'a> {
         &self,
         spec: &MatchSpec,
         visited: &mut HashSet<usize>,
+        availability: &mut HashMap<usize, bool>,
         closure: &mut Vec<usize>,
     ) -> bool {
         if !self
@@ -203,6 +190,7 @@ impl<'a> BuildReadiness<'a> {
             if self.collect_install_closure(
                 output_index,
                 &mut candidate_visited,
+                availability,
                 &mut candidate_closure,
             ) {
                 *visited = candidate_visited;
@@ -223,6 +211,7 @@ impl<'a> BuildReadiness<'a> {
         dependency: &Dependency,
         consumer: &Output,
         visited: &mut HashSet<usize>,
+        availability: &mut HashMap<usize, bool>,
         closure: &mut Vec<usize>,
     ) -> Result<bool, BuildQueueError> {
         let match_spec = Self::dependency_match_spec(dependency, consumer)?;
@@ -248,6 +237,7 @@ impl<'a> BuildReadiness<'a> {
             if self.collect_install_closure(
                 output_index,
                 &mut candidate_visited,
+                availability,
                 &mut candidate_closure,
             ) {
                 *visited = candidate_visited;
@@ -267,6 +257,7 @@ impl<'a> BuildReadiness<'a> {
         &self,
         build_environment_outputs: &[usize],
         consumer: &Output,
+        availability: &mut HashMap<usize, bool>,
     ) -> Result<bool, BuildQueueError> {
         let ignore_run_exports = &consumer.recipe.requirements().ignore_run_exports;
 
@@ -299,7 +290,12 @@ impl<'a> BuildReadiness<'a> {
                     continue;
                 }
 
-                if !self.collect_spec_install_closure(&spec, &mut HashSet::new(), &mut Vec::new()) {
+                if !self.collect_spec_install_closure(
+                    &spec,
+                    &mut HashSet::new(),
+                    availability,
+                    &mut Vec::new(),
+                ) {
                     return Ok(false);
                 }
             }
@@ -311,6 +307,7 @@ impl<'a> BuildReadiness<'a> {
     /// Checks whether all locally planned inputs needed to build an output are available.
     fn can_build(&self, output: &Output) -> Result<bool, BuildQueueError> {
         let requirements = output.recipe.requirements();
+        let mut availability = HashMap::new();
         let mut direct_build_outputs = Vec::new();
 
         for dependency in &requirements.build {
@@ -319,6 +316,7 @@ impl<'a> BuildReadiness<'a> {
                 dependency,
                 output,
                 &mut HashSet::new(),
+                &mut availability,
                 &mut closure,
             )? {
                 return Ok(false);
@@ -333,6 +331,7 @@ impl<'a> BuildReadiness<'a> {
                 dependency,
                 output,
                 &mut HashSet::new(),
+                &mut availability,
                 &mut Vec::new(),
             )? {
                 return Ok(false);
@@ -340,7 +339,11 @@ impl<'a> BuildReadiness<'a> {
         }
 
         if !output.recipe.build().merge_build_and_host_envs
-            && !self.strong_build_run_exports_are_built(&direct_build_outputs, output)?
+            && !self.strong_build_run_exports_are_built(
+                &direct_build_outputs,
+                output,
+                &mut availability,
+            )?
         {
             return Ok(false);
         }
@@ -358,7 +361,13 @@ impl<'a> BuildReadiness<'a> {
             return Ok(false);
         };
 
-        if !self.collect_install_closure(output_index, &mut HashSet::new(), &mut Vec::new()) {
+        let mut availability = HashMap::new();
+        if !self.collect_install_closure(
+            output_index,
+            &mut HashSet::new(),
+            &mut availability,
+            &mut Vec::new(),
+        ) {
             return Ok(false);
         }
 
@@ -374,6 +383,7 @@ impl<'a> BuildReadiness<'a> {
                         dependency,
                         output,
                         &mut HashSet::new(),
+                        &mut availability,
                         &mut Vec::new(),
                     )? {
                         return Ok(false);
@@ -453,20 +463,6 @@ impl<T> BuildQueue<T> {
     fn pop_front(&mut self) -> Option<T> {
         self.pending.pop_front()
     }
-
-    /// Iterates over queued items in their current stable order.
-    fn iter(&self) -> impl Iterator<Item = &T> {
-        self.pending.iter()
-    }
-}
-
-/// Policy applied when no output is currently ready.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum BlockedOutputPolicy {
-    /// Return a typed scheduling error.
-    Error,
-    /// Attempt the first blocked output so failure-tolerant builds can continue.
-    AttemptFirst,
 }
 
 /// Applies rendered-output readiness rules to a generic [`BuildQueue`].
@@ -514,11 +510,8 @@ impl OutputBuildQueue {
         BuildReadiness::new(&self.planned_outputs, &self.processed_outputs).can_test(output)
     }
 
-    /// Removes the next buildable output or applies the blocked-output policy.
-    pub(crate) fn next_ready(
-        &mut self,
-        blocked_policy: BlockedOutputPolicy,
-    ) -> Result<Option<Output>, BuildQueueError> {
+    /// Removes the next buildable output, or the first blocked output as a fallback.
+    pub(crate) fn next_ready(&mut self) -> Result<Option<Output>, BuildQueueError> {
         let readiness = BuildReadiness::new(&self.planned_outputs, &self.processed_outputs);
         match self
             .queue
@@ -526,27 +519,16 @@ impl OutputBuildQueue {
         {
             NextReady::Ready(output) => Ok(Some(output)),
             NextReady::Empty => Ok(None),
-            NextReady::Blocked => match blocked_policy {
-                BlockedOutputPolicy::AttemptFirst => {
-                    let output = self.queue.pop_front();
-                    if let Some(output) = &output {
-                        tracing::warn!(
-                            "No output is currently buildable; attempting {} because failures may continue",
-                            output.identifier()
-                        );
-                    }
-                    Ok(output)
+            NextReady::Blocked => {
+                let output = self.queue.pop_front();
+                if let Some(output) = &output {
+                    tracing::warn!(
+                        "No output is currently known to be buildable; attempting {} so the solver can check configured channels",
+                        output.identifier()
+                    );
                 }
-                BlockedOutputPolicy::Error => {
-                    let blocked_outputs = self
-                        .queue
-                        .iter()
-                        .map(Output::identifier)
-                        .collect::<Vec<_>>()
-                        .join(", ");
-                    Err(BuildQueueError::NoBuildableOutput { blocked_outputs })
-                }
-            },
+                Ok(output)
+            }
         }
     }
 }

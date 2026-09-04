@@ -1,0 +1,25 @@
+context:
+  version: "2.0.0"
+
+recipe:
+  name: repro-fallback
+  version: ${{ version }}
+
+outputs:
+  - package:
+      name: repro-fallback-consumer
+    build:
+      noarch: generic
+      script: echo "consumer built"
+    requirements:
+      host:
+        - repro-fallback-provider ==${{ version }}
+
+  - package:
+      name: repro-fallback-provider
+    build:
+      noarch: generic
+      script: echo "provider built"
+    requirements:
+      run:
+        - repro-fallback-consumer >=1.0.0

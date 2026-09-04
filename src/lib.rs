@@ -45,7 +45,7 @@ use std::{
 };
 
 use build::{WorkingDirectoryBehavior, run_build, skip_existing};
-use build_queue::{BlockedOutputPolicy, OutputBuildQueue};
+use build_queue::OutputBuildQueue;
 use console_utils::LoggingOutputHandler;
 use dunce::canonicalize;
 use fs_err as fs;
@@ -143,7 +143,7 @@ fn find_variants(
     for rendered in rendered_variants {
         let recipe = rendered.recipe;
         let variant = rendered.variant;
-
+        let pin_subpackages = rendered.pin_subpackages;
         let effective_target_platform = if recipe.build().noarch.is_none() {
             target_platform
         } else {
@@ -168,6 +168,7 @@ fn find_variants(
             used_vars: variant,
             recipe,
             hash: rendered.hash_info.expect("Should be set after evaluation"),
+            pin_subpackages,
         });
     }
 
@@ -494,6 +495,20 @@ pub async fn get_build_output(
             },
         );
 
+        let mut output_subpackages = subpackages.clone();
+        for pin in discovered_output.pin_subpackages.values() {
+            if let Some(build_string) = &pin.build_string {
+                output_subpackages.insert(
+                    pin.name.clone(),
+                    PackageIdentifier {
+                        name: pin.name.clone(),
+                        version: pin.version.clone(),
+                        build_string: build_string.clone(),
+                    },
+                );
+            }
+        }
+
         // Use the global build name for outputs that inherit from staging caches
         // This ensures staging caches and their dependent packages share the same build directory
         // Otherwise, use the output's own name for the build directory
@@ -581,7 +596,7 @@ pub async fn get_build_output(
                 channel_priority: tool_config.channel_priority,
                 solve_strategy: SolveStrategy::Highest,
                 timestamp,
-                subpackages: subpackages.clone(),
+                subpackages: output_subpackages,
                 packaging_settings: PackagingSettings::from_args(
                     build_data.package_format.archive_type,
                     build_data.package_format.compression_level,
@@ -700,16 +715,9 @@ pub async fn run_build_from_args(
     let mut test_queue = Vec::new();
     let outputs_to_build = skip_existing(build_output, &tool_configuration).await?;
     let mut build_queue = OutputBuildQueue::new(outputs_to_build);
-    let blocked_output_policy = match tool_configuration.continue_on_failure {
-        ContinueOnFailure::Yes => BlockedOutputPolicy::AttemptFirst,
-        ContinueOnFailure::No => BlockedOutputPolicy::Error,
-    };
 
     tracing::info!("Starting build of {} outputs", build_queue.len());
-    while let Some(output_to_build) = build_queue
-        .next_ready(blocked_output_policy)
-        .into_diagnostic()?
-    {
+    while let Some(output_to_build) = build_queue.next_ready().into_diagnostic()? {
         let (output, archive) = match run_build(
             output_to_build.clone(),
             &tool_configuration,
@@ -1180,15 +1188,29 @@ pub async fn rebuild(
     Ok(())
 }
 
+fn include_test_dependencies(test_strategy: TestStrategy) -> bool {
+    match test_strategy {
+        TestStrategy::Skip => false,
+        TestStrategy::Native | TestStrategy::NativeAndEmulated => true,
+    }
+}
+
 /// Sort the build outputs (recipes) topologically based on their dependencies.
 ///
-/// When `up_to` is specified, only outputs needed to build the named package are kept.
+/// When `up_to` is specified, only outputs needed to build and optionally test
+/// the named package are kept.
 fn sort_build_outputs_topologically(
     outputs: &mut Vec<Output>,
     up_to: Option<&str>,
+    include_test_dependencies: bool,
 ) -> miette::Result<()> {
-    let sorted = topological_sort_by_dependencies(std::mem::take(outputs), |o| &o.recipe, up_to)
-        .into_diagnostic()?;
+    let sorted = topological_sort_by_dependencies(
+        std::mem::take(outputs),
+        |output| &output.recipe,
+        up_to,
+        include_test_dependencies,
+    )
+    .into_diagnostic()?;
 
     for output in &sorted {
         tracing::debug!("Ordered output: {:?}", output.name().as_normalized());
@@ -1220,9 +1242,15 @@ pub async fn build_recipes(
         outputs.extend(output);
     }
 
+    let include_test_dependencies = include_test_dependencies(build_data.test);
+
     if build_data.render_only {
         // Sort outputs topologically even in render-only mode to show expected build order
-        sort_build_outputs_topologically(&mut outputs, build_data.up_to.as_deref())?;
+        sort_build_outputs_topologically(
+            &mut outputs,
+            build_data.up_to.as_deref(),
+            include_test_dependencies,
+        )?;
 
         let outputs = if build_data.with_solve {
             let mut updated_outputs = Vec::new();
@@ -1249,7 +1277,11 @@ pub async fn build_recipes(
     // Skip noarch builds before the topological sort
     outputs = skip_noarch(outputs, &tool_config).await?;
 
-    sort_build_outputs_topologically(&mut outputs, build_data.up_to.as_deref())?;
+    sort_build_outputs_topologically(
+        &mut outputs,
+        build_data.up_to.as_deref(),
+        include_test_dependencies,
+    )?;
     run_build_from_args(outputs, tool_config, build_data.markdown_summary.as_deref()).await?;
 
     Ok(())
@@ -1263,15 +1295,8 @@ async fn build_and_collect_packages(
     let mut package_paths = Vec::new();
     let outputs_to_build = skip_existing(build_output, tool_configuration).await?;
     let mut build_queue = OutputBuildQueue::new(outputs_to_build);
-    let blocked_output_policy = match tool_configuration.continue_on_failure {
-        ContinueOnFailure::Yes => BlockedOutputPolicy::AttemptFirst,
-        ContinueOnFailure::No => BlockedOutputPolicy::Error,
-    };
 
-    while let Some(output_to_build) = build_queue
-        .next_ready(blocked_output_policy)
-        .into_diagnostic()?
-    {
+    while let Some(output_to_build) = build_queue.next_ready().into_diagnostic()? {
         let (output, archive) = match run_build(
             output_to_build.clone(),
             tool_configuration,
@@ -1479,7 +1504,11 @@ pub async fn publish_packages(
         // Skip noarch builds before the topological sort
         outputs = skip_noarch(outputs, &tool_config).await?;
 
-        sort_build_outputs_topologically(&mut outputs, publish_data.build.up_to.as_deref())?;
+        sort_build_outputs_topologically(
+            &mut outputs,
+            publish_data.build.up_to.as_deref(),
+            include_test_dependencies(publish_data.build.test),
+        )?;
 
         // Build all packages and collect the paths
         let built_packages = build_and_collect_packages(outputs, &tool_config).await?;
