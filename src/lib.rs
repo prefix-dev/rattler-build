@@ -418,6 +418,18 @@ pub async fn get_build_output(
         ..RenderConfig::default()
     };
 
+    // All variant keys and their possible values, kept around so that when
+    // opted in via `--pass-all-variants-as-env` the keys among them
+    // that only have a single possible value can be exported as environment
+    // variables to the build script, even if the recipe doesn't otherwise
+    // reference them.
+    let all_variants: BTreeMap<NormalizedKey, Vec<Variable>> =
+        if build_data.pass_all_variants_as_env {
+            variant_config.variants.clone()
+        } else {
+            BTreeMap::new()
+        };
+
     let FoundVariants {
         outputs: outputs_and_variants,
         recipe_name,
@@ -591,6 +603,7 @@ pub async fn get_build_output(
                 sandbox_config: build_data.sandbox_configuration.clone(),
                 exclude_newer: build_data.exclude_newer,
                 repodata_revision: repodata_revision_from_v3_flag(build_data.common.v3),
+                all_variants: all_variants.clone(),
             },
             finalized_dependencies: None,
             finalized_sources: None,
@@ -1602,6 +1615,7 @@ pub async fn debug_recipe(
         variant_config: debug_data.variant_config,
         variant_overrides: debug_data.variant_overrides,
         ignore_recipe_variants: debug_data.ignore_recipe_variants,
+        pass_all_variants_as_env: false,
         render_only: false,
         with_solve: true,
         no_build_id: false,

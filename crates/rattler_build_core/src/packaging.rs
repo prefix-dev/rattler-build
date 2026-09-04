@@ -402,8 +402,10 @@ fn write_recipe_folder(
     // write the variant config to the appropriate file
     let variant_config_file = recipe_folder.join("variant_config.yaml");
     let mut variant_config = File::create(&variant_config_file)?;
-    variant_config
-        .write_all(serde_yaml::to_string(&output.build_configuration.variant)?.as_bytes())?;
+    variant_config.write_all(
+        serde_yaml::to_string(&output.build_configuration.variant_with_single_value_extras())?
+            .as_bytes(),
+    )?;
     files.push(variant_config_file);
 
     let mut output_clean = output.clone();
