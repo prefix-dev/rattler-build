@@ -11,6 +11,7 @@ mod package;
 mod parser;
 mod requirements;
 pub mod source;
+mod system_requirements;
 mod tests;
 mod types;
 
@@ -31,6 +32,7 @@ pub use parser::{
 };
 pub use requirements::Requirements;
 pub use source::Source;
+pub use system_requirements::SystemRequirements;
 pub use tests::{PythonVersion, TestType};
 pub use types::{
     Conditional, ConditionalList, ConditionalListOrItem, IncludeExclude, Item, JinjaExpression,

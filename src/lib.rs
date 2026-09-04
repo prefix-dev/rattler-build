@@ -55,8 +55,8 @@ use rattler_build_core::consts;
 use rattler_build_recipe::{stage0, stage1::TestType};
 use rattler_build_variant_config::VariantConfig;
 use rattler_conda_types::{
-    MatchSpec, NamedChannelOrUrl, NoArchType, PackageName, Platform, RepodataRevision,
-    compression_level::CompressionLevel, package::CondaArchiveType,
+    MatchSpec, NamedChannelOrUrl, NoArchType, PackageName, ParseStrictness, Platform,
+    RepodataRevision, Version, compression_level::CompressionLevel, package::CondaArchiveType,
 };
 use rattler_config::config::build::PackageFormatAndCompression;
 use rattler_index::ensure_channel_initialized_fs;
@@ -261,6 +261,104 @@ pub fn get_tool_config(
     Ok(configuration_builder.finish())
 }
 
+/// Load a package-provided variant configuration from an installed prefix.
+pub fn load_variant_config_from_prefix(
+    prefix: &Path,
+    target_platform: Platform,
+) -> miette::Result<VariantConfig> {
+    let candidates = [
+        prefix.join(consts::CONDA_BUILD_CONFIG_FILE),
+        prefix
+            .join("share/rattler-build/variants")
+            .join(consts::CONDA_BUILD_CONFIG_FILE),
+    ];
+    let path = candidates.iter().find(|path| path.is_file()).ok_or_else(|| {
+        miette::miette!(
+            "variant configuration prefix does not contain `{}` at the prefix root or under `share/rattler-build/variants`",
+            consts::CONDA_BUILD_CONFIG_FILE
+        )
+    })?;
+    tracing::info!("Loading variant configuration from {}", path.display());
+    VariantConfig::from_files(&[path], target_platform).map_err(miette::Report::new)
+}
+
+/// Install a package and load the variant configuration it provides.
+///
+/// Provider packages should place `conda_build_config.yaml` at the prefix root
+/// (as `conda-forge-pinning` does) or under
+/// `share/rattler-build/variants/conda_build_config.yaml`.
+pub async fn load_variant_config_from_package(
+    package: &str,
+    channels: &[rattler_conda_types::ChannelUrl],
+    platform: &PlatformWithVirtualPackages,
+    tool_configuration: &Configuration,
+) -> miette::Result<VariantConfig> {
+    let spec = MatchSpec::from_str(package, ParseStrictness::Strict)
+        .into_diagnostic()
+        .wrap_err_with(|| format!("invalid variant configuration package `{package}`"))?;
+    let prefix = tempfile::tempdir().into_diagnostic()?;
+    render::solver::create_environment(
+        "variant configuration",
+        &[spec],
+        platform,
+        prefix.path(),
+        channels,
+        tool_configuration,
+        tool_configuration.channel_priority,
+        SolveStrategy::Highest,
+        None,
+    )
+    .await?;
+
+    load_variant_config_from_prefix(prefix.path(), platform.platform)
+        .wrap_err_with(|| format!("failed to load variant configuration from package `{package}`"))
+}
+
+fn apply_system_requirements_to_host(
+    platform: &mut PlatformWithVirtualPackages,
+    requirements: &rattler_build_recipe::stage1::SystemRequirements,
+) -> miette::Result<()> {
+    let mut replace = |name: &str, version: &str, build_string: String| -> miette::Result<()> {
+        let version = Version::from_str(version)
+            .into_diagnostic()
+            .wrap_err_with(|| format!("invalid system requirement version `{version}`"))?;
+        platform
+            .virtual_packages
+            .retain(|package| package.name.as_normalized() != name);
+        platform
+            .virtual_packages
+            .push(rattler_conda_types::GenericVirtualPackage {
+                name: PackageName::try_from(name).expect("static virtual package name is valid"),
+                version,
+                build_string,
+            });
+        Ok(())
+    };
+
+    if platform.platform.is_linux() {
+        if let Some(version) = &requirements.linux {
+            replace("__linux", version, "0".to_string())?;
+        }
+        if let Some(version) = requirements.glibc.as_ref().or(requirements.libc.as_ref()) {
+            replace("__glibc", version, "0".to_string())?;
+        }
+    }
+    if platform.platform.is_osx()
+        && let Some(version) = &requirements.macos
+    {
+        replace("__osx", version, "0".to_string())?;
+    }
+    if !platform.platform.is_osx()
+        && let Some(version) = &requirements.cuda
+    {
+        replace("__cuda", version, "0".to_string())?;
+    }
+    platform
+        .virtual_packages
+        .sort_by(|left, right| left.name.cmp(&right.name));
+    Ok(())
+}
+
 /// Returns the output for the build.
 pub async fn get_build_output(
     build_data: &BuildData,
@@ -336,7 +434,30 @@ pub async fn get_build_output(
     let mut variant_configs = detected_variant_config.unwrap_or_default();
     variant_configs.extend(build_data.variant_config.clone());
 
-    let mut variant_config =
+    let mut packaged_variant_config = VariantConfig::default();
+    if !build_data.variant_config_packages.is_empty() {
+        let channels = build_data
+            .channels
+            .clone()
+            .unwrap_or_else(|| vec![NamedChannelOrUrl::Name("conda-forge".to_string())])
+            .into_iter()
+            .map(|channel| channel.into_base_url(&tool_config.channel_config))
+            .collect::<Result<Vec<_>, _>>()
+            .into_diagnostic()?;
+        let platform = PlatformWithVirtualPackages::detect_for_platform(
+            build_data.build_platform,
+            &VirtualPackageOverrides::from_env(),
+        )
+        .into_diagnostic()?;
+        for package in &build_data.variant_config_packages {
+            packaged_variant_config.merge(
+                load_variant_config_from_package(package, &channels, &platform, tool_config)
+                    .await?,
+            );
+        }
+    }
+
+    let local_variant_config =
         VariantConfig::from_files(&variant_configs, build_data.target_platform).map_err(|e| {
             // Check if this is a ParseError with a file path
             if let rattler_build_variant_config::VariantConfigError::ParseError { path, source } =
@@ -358,6 +479,9 @@ pub async fn get_build_output(
             // Fallback to original error if we can't provide source context
             miette::Report::new(e)
         })?;
+    // Local and CLI variant files override package-provided baseline pinnings.
+    packaged_variant_config.merge(local_variant_config);
+    let mut variant_config = packaged_variant_config;
 
     // Warn if target_platform is set in variant config - it's not supported and will be ignored
     let target_platform_variants = variant_config
@@ -547,15 +671,20 @@ pub async fn get_build_output(
             .into_diagnostic()?;
 
         let virtual_package_override = VirtualPackageOverrides::from_env();
+        let mut host_platform = PlatformWithVirtualPackages::detect_for_platform(
+            build_data.host_platform,
+            &virtual_package_override,
+        )
+        .into_diagnostic()?;
+        apply_system_requirements_to_host(
+            &mut host_platform,
+            &discovered_output.recipe.system_requirements,
+        )?;
         let output = Output {
             recipe: discovered_output.recipe.clone(),
             build_configuration: BuildConfiguration {
                 target_platform: discovered_output.target_platform,
-                host_platform: PlatformWithVirtualPackages::detect_for_platform(
-                    build_data.host_platform,
-                    &virtual_package_override,
-                )
-                .into_diagnostic()?,
+                host_platform,
                 build_platform: PlatformWithVirtualPackages::detect_for_platform(
                     build_data.build_platform,
                     &virtual_package_override,
@@ -1600,6 +1729,7 @@ pub async fn debug_recipe(
         test: TestStrategy::Skip,
         up_to: None,
         variant_config: debug_data.variant_config,
+        variant_config_packages: Vec::new(),
         variant_overrides: debug_data.variant_overrides,
         ignore_recipe_variants: debug_data.ignore_recipe_variants,
         render_only: false,
@@ -1710,4 +1840,48 @@ pub fn show_package_info(args: InspectOpts) -> miette::Result<()> {
 /// Extract a conda package to a directory
 pub async fn extract_package(args: opt::ExtractOpts) -> miette::Result<()> {
     rattler_build_core::package_info::extract_package(args.into()).await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn system_requirements_override_host_virtual_packages() {
+        let mut platform = PlatformWithVirtualPackages {
+            platform: Platform::Linux64,
+            virtual_packages: vec![rattler_conda_types::GenericVirtualPackage {
+                name: PackageName::try_from("__glibc").unwrap(),
+                version: Version::from_str("2.17").unwrap(),
+                build_string: "0".to_string(),
+            }],
+        };
+        apply_system_requirements_to_host(
+            &mut platform,
+            &rattler_build_recipe::stage1::SystemRequirements {
+                glibc: Some("2.37".to_string()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let glibc = platform
+            .virtual_packages
+            .iter()
+            .find(|package| package.name.as_normalized() == "__glibc")
+            .unwrap();
+        assert_eq!(glibc.version.to_string(), "2.37");
+    }
+
+    #[test]
+    fn loads_variant_configuration_from_provider_prefix() {
+        let prefix = tempfile::tempdir().unwrap();
+        fs_err::write(
+            prefix.path().join(consts::CONDA_BUILD_CONFIG_FILE),
+            "python:\n  - '3.12'\n",
+        )
+        .unwrap();
+
+        let config = load_variant_config_from_prefix(prefix.path(), Platform::Linux64).unwrap();
+        assert!(config.get(&NormalizedKey::from("python")).is_some());
+    }
 }

@@ -38,6 +38,9 @@ rattler-build publish [OPTIONS] --to <TO> [PACKAGE_OR_RECIPE]...
 - <a id="arg---variant-config" href="#arg---variant-config">`--variant-config (-m) <VARIANT_CONFIG>`</a>
 :  Variant configuration files for the build
 <br>May be provided more than once.
+- <a id="arg---variant-config-package" href="#arg---variant-config-package">`--variant-config-package <VARIANT_CONFIG_PACKAGES>`</a>
+:  Load a `conda_build_config.yaml` from an installed package. May be specified multiple times; for example `conda-forge-pinning`
+<br>May be provided more than once.
 - <a id="arg---variant" href="#arg---variant">`--variant <VARIANT_OVERRIDES>`</a>
 :  Override specific variant values (e.g. --variant python=3.12 or --variant python=3.12,3.11). Multiple values separated by commas will create multiple build variants
 <br>May be provided more than once.
