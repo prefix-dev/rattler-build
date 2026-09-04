@@ -24,6 +24,11 @@ class RattlerBuild:
                 kwds_copy["capture_output"] = True
             if "text" not in kwds_copy:
                 kwds_copy["text"] = True
+            if kwds_copy.get("text") and "encoding" not in kwds_copy:
+                # Windows otherwise uses the active ANSI code page, while
+                # rattler-build emits UTF-8 progress characters.
+                kwds_copy["encoding"] = "utf-8"
+                kwds_copy.setdefault("errors", "replace")
 
             result = run([str(self.path), *args], **kwds_copy)
             return result

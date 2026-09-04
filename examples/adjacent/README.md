@@ -17,10 +17,17 @@ rattler-build run test  --recipe /path/to/rattler-build/examples/adjacent --sour
 
 `test` executes `configure -> build -> test`; `lint` executes only `lint`.
 `SRC_DIR` and each step's default working directory are the Adjacent checkout,
-so its `build/` CMake cache is reused. Build and host prefixes remain under
-deterministic `output/bld/rattler-build_*` directories; the isolated lint solve
-gets a separate prefix from the parent-based build/test solve. Dependencies listed under a step's `requirements.build` and
-`requirements.host` extend the corresponding solve group. The lint task sets
+so its `build/` CMake cache is reused. The `configure` and `build` steps also
+write input/output declarations to `RATTLER_BUILD_STEP_CACHE`. Running `build`
+a second time skips both processes entirely. Editing a file under `src/` or
+`include/` reruns `build`, changing `CMakeLists.txt` reruns both steps, and
+deleting `build/adjacent_test` reruns its producing step.
+
+Build and host prefixes remain under deterministic
+`output/bld/rattler-build_*` directories; the isolated lint solve gets a
+separate prefix from the parent-based build/test solve. Dependencies listed
+under a step's `requirements.build` and `requirements.host` extend the
+corresponding solve group. The lint task sets
 `requirements.inherit: false`, so only its `clang-format` requirement is
 solved. Its command is loaded from the recipe-local reusable step file
 `steps/lint.yaml`.
