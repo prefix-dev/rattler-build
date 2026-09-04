@@ -145,6 +145,8 @@ pub fn build_recipes_py(
         ContinueOnFailure::from(continue_on_failure),
         error_prefix_in_binary,
         allow_symlinks_on_windows,
+        false, // error_overlapping_files
+        false, // error_unused_staging_files
         allow_absolute_license_paths,
         exclude_newer,
         build_num,

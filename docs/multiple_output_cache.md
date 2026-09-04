@@ -243,6 +243,18 @@ package that additionally depends on `python` expands the matrix further (one
 package per `libfoo` × `python` combination), but the staging cache is reused
 across `python` variants.
 
+### Consistency checks
+
+After all outputs are built, rattler-build warns when
+
+- two outputs of the same recipe package the same file (installing both would
+  clobber it), or
+- files from a staging cache were not included in any output that inherits
+  from it.
+
+`--error-overlapping-files` and `--error-unused-staging-files` turn these
+warnings into hard errors.
+
 ### How caching works
 
 The staging cache is keyed by a SHA256 hash over:

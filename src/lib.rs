@@ -10,6 +10,7 @@ pub use rattler_build_core::debug;
 pub use rattler_build_core::env_vars;
 pub use rattler_build_core::metadata;
 pub use rattler_build_core::migrate_recipe;
+pub use rattler_build_core::output_checks;
 pub use rattler_build_core::package_test;
 pub use rattler_build_core::packaging;
 pub use rattler_build_core::publish;
@@ -246,6 +247,8 @@ pub fn get_tool_config(
         .with_allow_insecure_host(build_data.common.allow_insecure_host.clone())
         .with_error_prefix_in_binary(build_data.error_prefix_in_binary)
         .with_allow_symlinks_on_windows(build_data.allow_symlinks_on_windows)
+        .with_error_overlapping_files(build_data.error_overlapping_files)
+        .with_error_unused_staging_files(build_data.error_unused_staging_files)
         .with_allow_absolute_license_paths(build_data.allow_absolute_license_paths)
         .with_io_concurrency_limit(Some(build_data.io_concurrency_limit))
         .with_zstd_repodata_enabled(build_data.common.use_zstd)
@@ -706,6 +709,18 @@ fn can_test(output: &Output, all_output_names: &[&PackageName], done_outputs: &[
     true
 }
 
+fn check_outputs(
+    built_outputs: &[Output],
+    all_outputs: &[Output],
+    configuration: &Configuration,
+) -> miette::Result<()> {
+    output_checks::check_overlapping_files(built_outputs, configuration.error_overlapping_files)
+        .and(output_checks::check_unused_staging_files(
+            all_outputs,
+            configuration.error_unused_staging_files,
+        ))
+}
+
 /// Runs build.
 pub async fn run_build_from_args(
     build_output: Vec<Output>,
@@ -714,6 +729,8 @@ pub async fn run_build_from_args(
 ) -> miette::Result<()> {
     let mut outputs = Vec::new();
     let mut test_queue = Vec::new();
+    // Missing consumers suppress the unused-cache check.
+    let all_outputs = build_output.clone();
     let outputs_to_build = skip_existing(build_output, &tool_configuration).await?;
 
     let all_output_names = outputs_to_build
@@ -870,9 +887,11 @@ pub async fn run_build_from_args(
         }
     }
 
+    let checks_result = check_outputs(&outputs, &all_outputs, &tool_configuration);
+
     let span = tracing::info_span!("Build summary");
     let _enter = span.enter();
-    for output in outputs {
+    for output in &outputs {
         // print summaries for each output
         let _ = output.log_build_summary().map_err(|e| {
             tracing::error!("Error writing build summary: {}", e);
@@ -888,7 +907,7 @@ pub async fn run_build_from_args(
         }
     }
 
-    Ok(())
+    checks_result
 }
 
 /// Check if the noarch builds should be skipped because the noarch platform has
@@ -1341,10 +1360,13 @@ async fn build_and_collect_packages(
     tool_configuration: &Configuration,
 ) -> miette::Result<Vec<PathBuf>> {
     let mut package_paths = Vec::new();
+    let mut built_outputs = Vec::new();
+    // Missing consumers suppress the unused-cache check.
+    let all_outputs = build_output.clone();
     let outputs_to_build = skip_existing(build_output, tool_configuration).await?;
 
     for output in outputs_to_build.iter() {
-        let (_output, archive) = match run_build(
+        let (output, archive) = match run_build(
             output.clone(),
             tool_configuration,
             WorkingDirectoryBehavior::Cleanup,
@@ -1367,7 +1389,10 @@ async fn build_and_collect_packages(
         };
 
         package_paths.push(archive);
+        built_outputs.push(output);
     }
+
+    check_outputs(&built_outputs, &all_outputs, tool_configuration)?;
 
     Ok(package_paths)
 }
@@ -1621,6 +1646,8 @@ pub async fn debug_recipe(
         continue_on_failure: ContinueOnFailure::No,
         error_prefix_in_binary: false,
         allow_symlinks_on_windows: false,
+        error_overlapping_files: false,
+        error_unused_staging_files: false,
         allow_absolute_license_paths: false,
         exclude_newer: None,
         build_num_override: None,

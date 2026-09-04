@@ -11,10 +11,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{
     borrow::Cow,
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     fmt::{self, Display, Formatter},
     io::Write,
-    path::Path,
+    path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
 
@@ -114,6 +114,20 @@ impl BuildOutput {
         let mut summary = self.build_summary.lock().unwrap();
         summary.artifact = Some(artifact.to_path_buf());
         summary.paths = Some(paths.clone());
+    }
+
+    /// Record the prefix-relative files selected for packaging.
+    pub fn record_packaged_prefix_files(&self, files: BTreeSet<PathBuf>) {
+        self.build_summary.lock().unwrap().packaged_prefix_files = Some(files);
+    }
+
+    /// Return the selected prefix-relative files after packaging.
+    pub fn packaged_prefix_files(&self) -> Option<BTreeSet<PathBuf>> {
+        self.build_summary
+            .lock()
+            .unwrap()
+            .packaged_prefix_files
+            .clone()
     }
 
     /// Record the end of the build

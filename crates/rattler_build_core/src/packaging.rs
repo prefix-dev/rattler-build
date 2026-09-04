@@ -1,7 +1,7 @@
 //! This module contains the functions to package a conda package from a given
 //! output.
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeSet, HashMap, HashSet},
     io::Write,
     path::{Component, Path, PathBuf},
 };
@@ -20,7 +20,7 @@ use rattler_package_streaming::write::{write_conda_package, write_tar_bz2_packag
 use unicode_normalization::UnicodeNormalization;
 
 mod file_finder;
-mod file_mapper;
+pub(crate) mod file_mapper;
 mod metadata;
 pub use file_finder::{Files, TempFiles, content_type, read_package_files_list, record_files};
 pub use metadata::{contains_prefix_binary, contains_prefix_text, create_prefix_placeholder};
@@ -1041,6 +1041,13 @@ impl Output {
                 post_install_files,
             )?,
         };
+
+        let relative_new_files: BTreeSet<PathBuf> = files_after
+            .new_files
+            .iter()
+            .filter_map(|f| f.strip_prefix(host_prefix).ok().map(Path::to_path_buf))
+            .collect();
+        self.record_packaged_prefix_files(relative_new_files);
 
         package_conda(self, tool_configuration, &files_after)
     }
