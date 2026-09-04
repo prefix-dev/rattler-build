@@ -51,6 +51,10 @@ pub enum SubCommands {
     /// Build a package from a recipe
     Build(BuildOnlyOpts),
 
+    /// Execute experimental named build steps in a persistent local environment.
+    /// Requires `--experimental`.
+    Run(RunOpts),
+
     /// Publish packages to a channel.
     /// This command builds packages from recipes (or uses already built packages),
     /// uploads them to a channel, and runs indexing.
@@ -568,6 +572,25 @@ impl FromStr for ChannelPriorityWrapper {
     }
 }
 
+/// Options for executing experimental named build steps locally.
+///
+/// This command requires `--experimental`; its interface may change or be removed.
+#[derive(Parser, Clone)]
+pub struct RunOpts {
+    /// Step names to execute. Their transitive `depends_on` steps are included.
+    #[arg(required = true)]
+    pub steps: Vec<String>,
+
+    /// Execute directly in this source tree instead of copying recipe sources.
+    /// `SRC_DIR` and the default working directory point to this path.
+    #[arg(long)]
+    pub source_dir: Option<PathBuf>,
+
+    /// Recipe and environment options.
+    #[clap(flatten)]
+    pub build: BuildOpts,
+}
+
 /// Build options.
 #[derive(Parser, Clone, Default)]
 pub struct BuildOpts {
@@ -925,6 +948,8 @@ pub struct BuildData {
     pub build_num_override: Option<u64>,
     pub build_string_prefix: Option<String>,
     pub markdown_summary: Option<PathBuf>,
+    /// Named build steps selected by the local `run` command.
+    pub selected_steps: Option<Vec<String>>,
 }
 
 impl BuildData {
@@ -1004,6 +1029,7 @@ impl BuildData {
             build_num_override,
             build_string_prefix,
             markdown_summary,
+            selected_steps: None,
         }
     }
 }
