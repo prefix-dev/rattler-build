@@ -49,6 +49,7 @@ conda-package-handling = ">=2.6.0,<3"
 requests = ">=2.34.2,<3"
 syrupy = ">=6.0.0,<7"
 boto3 = ">=1.43.88,<2"
+zstandard = ">=0.25.0,<0.26"
 
 [target.unix.dependencies]
 make = ">=4.4.1,<5"
