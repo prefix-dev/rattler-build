@@ -5,3 +5,8 @@ rules:
       - docs.yml
       # tag-release job needs git credentials to push tags
       - release-artifacts.yml
+  self-repository:
+    ignore:
+      # GitHub and actionlint require the ./ syntax for local reusable workflows.
+      - python-release.yml
+      - release-artifacts.yml

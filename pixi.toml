@@ -175,7 +175,7 @@ nbstripout = ">=0.9.1,<0.10"
 [environments.lint.tasks]
 actionlint = { cmd = "actionlint", env = { SHELLCHECK_OPTS = "-e SC2086" } }
 cargo-clippy = "cargo clippy --all-targets --all-features --workspace -- -D warnings -Dclippy::dbg_macro"
-cargo-deny = "cargo deny --workspace check license --deny warnings"
+cargo-deny = "cargo deny --workspace check licenses --deny warnings"
 cargo-fmt = "cargo fmt"
 cargo-fmt-check = "cargo fmt -- --check"
 prettier-check = { cmd = "prettier --check", description = "Check YAML formatting with prettier" }
