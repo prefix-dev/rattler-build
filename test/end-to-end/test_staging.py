@@ -395,6 +395,49 @@ def test_staging_consistency_checks(
             rattler_build(*args, stderr=STDOUT)
 
 
+def test_staging_filtered_files_do_not_overlap(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    recipe = yaml.safe_load((recipes / "staging/staging-checks.yaml").read_text())
+    recipe["outputs"][2]["build"]["files"] = ["lib/libcore.la"]
+    recipe_path = tmp_path / "recipe.yaml"
+    recipe_path.write_text(yaml.safe_dump(recipe))
+    args = rattler_build.build_args(
+        recipe_path,
+        tmp_path / "output",
+        extra_args=["--experimental", "--error-overlapping-files"],
+    )
+    output = rattler_build(*args, stderr=STDOUT)
+    assert "both package" not in output
+    pkg = get_extracted_package(tmp_path / "output", "libb")
+    assert json.loads((pkg / "info/paths.json").read_text())["paths"] == []
+
+
+def test_staging_checks_skip_failed_packaging_consumer(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    recipe = yaml.safe_load((recipes / "staging/staging-checks.yaml").read_text())
+    # Fail inside package_conda, after files have been selected and copied.
+    recipe["outputs"][2]["about"] = {"license_file": "missing-license.txt"}
+    recipe_path = tmp_path / "recipe.yaml"
+    recipe_path.write_text(yaml.safe_dump(recipe))
+    args = rattler_build.build_args(
+        recipe_path,
+        tmp_path / "output",
+        extra_args=[
+            "--experimental",
+            "--continue-on-failure",
+            "--error-unused-staging-files",
+        ],
+    )
+    output = rattler_build(*args, stderr=STDOUT)
+    assert "Build failed for libb" in output
+    assert "No license files were copied" in output
+    assert "were not included" not in output
+    assert list((tmp_path / "output").glob("*/liba-*.tar.bz2"))
+    assert not list((tmp_path / "output").glob("*/libb-*.tar.bz2"))
+
+
 def test_staging_checks_quiet_when_all_files_used(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):

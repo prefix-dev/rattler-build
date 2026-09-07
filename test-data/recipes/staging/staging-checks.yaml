@@ -1,4 +1,4 @@
-# Both outputs package libcore.so; neither packages unused.h.
+# Both outputs select libcore.so and a filtered .la file; neither packages unused.h.
 
 schema_version: 1
 
@@ -15,12 +15,14 @@ outputs:
           then: |
             mkdir -p $PREFIX/lib $PREFIX/include
             echo "libcore" > $PREFIX/lib/libcore.so
+            echo "filtered" > $PREFIX/lib/libcore.la
             echo "unused"  > $PREFIX/include/unused.h
         - if: win
           then: |
             if not exist "%PREFIX%\lib" mkdir "%PREFIX%\lib"
             if not exist "%PREFIX%\include" mkdir "%PREFIX%\include"
             echo libcore > "%PREFIX%\lib\libcore.so"
+            echo filtered > "%PREFIX%\lib\libcore.la"
             echo unused > "%PREFIX%\include\unused.h"
 
   - package:
@@ -38,3 +40,4 @@ outputs:
     build:
       files:
         - lib/libcore.so
+        - lib/libcore.la

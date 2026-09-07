@@ -1,7 +1,7 @@
 //! This module contains the functions to package a conda package from a given
 //! output.
 use std::{
-    collections::{BTreeSet, HashMap, HashSet},
+    collections::{HashMap, HashSet},
     io::Write,
     path::{Component, Path, PathBuf},
 };
@@ -989,6 +989,8 @@ pub fn package_conda(
     tracing::info!("Archive written to '{}'", final_name.display());
 
     let paths_json = PathsJson::from_path(info_folder.join("paths.json"))?;
+    // Only successful packaging marks a consumer's file usage as known.
+    output.record_packaged_prefix_files(tmp.packaged_prefix_files);
     Ok((final_name, paths_json))
 }
 
@@ -1049,13 +1051,6 @@ impl Output {
                 post_install_files,
             )?,
         };
-
-        let relative_new_files: BTreeSet<PathBuf> = files_after
-            .new_files
-            .iter()
-            .filter_map(|f| f.strip_prefix(host_prefix).ok().map(Path::to_path_buf))
-            .collect();
-        self.record_packaged_prefix_files(relative_new_files);
 
         package_conda(self, tool_configuration, &files_after)
     }
