@@ -56,7 +56,7 @@ def test_conditional_script_empty(
 def test_env_vars_in_test_scripts(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
-    """Test that variant env vars, platform vars, and CONDA_BUILD are set in test scripts (issue #1317)."""
+    """Test that variant env vars, platform vars, CONDA_BUILD, and SRC_DIR are set in test scripts (issues #1317, #2793)."""
     rattler_build.build(recipes / "test-env-vars-in-tests", tmp_path)
 
 

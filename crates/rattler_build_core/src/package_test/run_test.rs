@@ -244,6 +244,7 @@ impl Tests {
             target_platform,
             build_platform,
             host_platform,
+            tmp_dir.path(),
         ));
         env_vars.extend(env_vars::python_vars_from_records(
             resolved_records,
@@ -1116,6 +1117,7 @@ async fn run_commands_test(
         target_platform,
         build_platform,
         host_platform,
+        &test_dir,
     ));
     env_vars.extend(env_vars::python_vars_from_records(
         &resolved_records,
