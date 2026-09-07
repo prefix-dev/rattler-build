@@ -3605,8 +3605,18 @@ impl Evaluate for crate::stage0::MultiOutputRecipe {
                     evaluate_string_value(&staging_output.staging.name, &context_with_vars)?;
 
                 // Evaluate staging output components
-                let build = staging_output.build.evaluate(&context_with_vars)?;
-                let requirements = staging_output.requirements.evaluate(&context_with_vars)?;
+                let mut build = staging_output.build.evaluate(&context_with_vars)?;
+                let mut requirements = staging_output.requirements.evaluate(&context_with_vars)?;
+                if build.plan.steps().is_some() {
+                    let selected = build.plan.select_steps(None).map_err(|error| {
+                        ParseError::invalid_value("staging build.steps", error, Span::new_blank())
+                    })?;
+                    for step in &selected {
+                        requirements.build.extend(step.requirements.build.clone());
+                        requirements.host.extend(step.requirements.host.clone());
+                    }
+                    build.plan = Stage1BuildPlan::Steps(selected);
+                }
 
                 // Staging outputs inherit top-level sources (prepend), then add their own
                 // (conditionals expand to multiple sources)
@@ -4584,6 +4594,83 @@ outputs:
                 );
             }
             _ => panic!("Expected MultiOutputRecipe"),
+        }
+    }
+
+    #[test]
+    fn staging_steps_select_dependencies_and_collect_only_selected_requirements() {
+        let yaml = r#"
+recipe:
+  version: 1.0
+outputs:
+  - staging:
+      name: common
+    build:
+      steps:
+        - name: install
+          depends_on: [compile]
+          run: install
+          requirements:
+            host: [zlib]
+        - name: unused
+          optional: true
+          run: unused
+          requirements:
+            build: [unused-tool]
+        - name: compile
+          optional: true
+          run: compile
+          requirements:
+            build: [cmake]
+  - package:
+      name: result
+    inherit: common
+"#;
+        let ctx = EvaluationContext::with_variables_and_config(
+            IndexMap::new(),
+            JinjaConfig {
+                experimental: true,
+                ..Default::default()
+            },
+        );
+        let stage0::Recipe::MultiOutput(recipe) = parse_recipe_or_multi_from_source(yaml).unwrap()
+        else {
+            panic!("expected multi-output recipe");
+        };
+        let outputs = recipe.evaluate(&ctx).unwrap();
+        let cache = &outputs[0].staging_caches[0];
+        let names = cache
+            .build
+            .plan
+            .steps()
+            .unwrap()
+            .iter()
+            .map(|step| step.name.as_deref().unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(names, ["compile", "install"]);
+        assert_eq!(cache.requirements.build.len(), 1);
+        assert_eq!(
+            cache.requirements.build[0].name().unwrap().as_normalized(),
+            "cmake"
+        );
+        assert_eq!(
+            cache.requirements.host[0].name().unwrap().as_normalized(),
+            "zlib"
+        );
+
+        for invalid in [
+            yaml.replace("[compile]", "[missing]"),
+            yaml.replace(
+                "run: compile",
+                "depends_on: [install]\n          run: compile",
+            ),
+        ] {
+            let stage0::Recipe::MultiOutput(recipe) =
+                parse_recipe_or_multi_from_source(&invalid).unwrap()
+            else {
+                unreachable!();
+            };
+            assert!(recipe.evaluate(&ctx).is_err());
         }
     }
 
