@@ -40,7 +40,7 @@ fn get_sitepackages_dir(
 ) -> PathBuf {
     python_site_packages_path.map_or_else(
         || get_stdlib_dir(prefix, platform, py_ver).join("site-packages"),
-        |path| prefix.join(path),
+        |path| prefix.join(path.replace('/', std::path::MAIN_SEPARATOR_STR)),
     )
 }
 
@@ -561,28 +561,39 @@ mod test {
         use std::str::FromStr;
         use url::Url;
 
-        let mut package_record = PackageRecord::new(
-            PackageName::from_str("python").unwrap(),
-            "3.13.1".parse::<VersionWithSource>().unwrap(),
-            "cp313t".to_string(),
-        );
-        package_record.python_site_packages_path =
-            Some("lib/python3.13t/site-packages".to_string());
-        let record = RepoDataRecord {
-            package_record,
-            identifier: "python-3.13.1-cp313t.conda".parse().unwrap(),
-            url: Url::parse("https://example.com/python-3.13.1-cp313t.conda").unwrap(),
-            channel: None,
-        };
+        fn make_record(site_packages_path: &str) -> RepoDataRecord {
+            let mut package_record = PackageRecord::new(
+                PackageName::from_str("python").unwrap(),
+                "3.13.1".parse::<VersionWithSource>().unwrap(),
+                "cp313t".to_string(),
+            );
+            package_record.python_site_packages_path = Some(site_packages_path.to_string());
+            RepoDataRecord {
+                package_record,
+                identifier: "python-3.13.1-cp313t.conda".parse().unwrap(),
+                url: Url::parse("https://example.com/python-3.13.1-cp313t.conda").unwrap(),
+                channel: None,
+            }
+        }
 
         let prefix = Path::new("prefix");
-        let vars = python_vars_from_records(&[record], prefix, Platform::Linux64);
 
+        let record_linux = make_record("lib/python3.13t/site-packages");
+        let vars_linux = python_vars_from_records(&[record_linux], prefix, Platform::Linux64);
         assert_eq!(
-            vars.get("SP_DIR")
+            vars_linux
+                .get("SP_DIR")
                 .and_then(|value| value.as_deref())
                 .map(Path::new),
             Some(prefix.join("lib/python3.13t/site-packages").as_path())
+        );
+
+        let record_win = make_record("Lib/site-packages");
+        let vars_win = python_vars_from_records(&[record_win], prefix, Platform::Win64);
+        let expected_win = prefix.join("Lib").join("site-packages");
+        assert_eq!(
+            vars_win.get("SP_DIR").and_then(|value| value.as_deref()),
+            Some(expected_win.to_string_lossy().as_ref())
         );
     }
 
