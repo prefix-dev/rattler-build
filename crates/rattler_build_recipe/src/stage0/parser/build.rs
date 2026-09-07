@@ -607,6 +607,47 @@ fn parse_build_files(node: &Node) -> Result<IncludeExclude, ParseError> {
     ))
 }
 
+/// Validate that every concrete `skip` entry is a syntactically valid Jinja expression.
+///
+/// Unlike most recipe fields, `skip` entries are bare Jinja expressions
+/// (e.g. `win and python == "3.12"`) rather than `${{ ... }}` templates, so nothing
+/// parses them until they are evaluated against a variant. A typo such as an
+/// unbalanced bracket would otherwise pass unnoticed and silently evaluate to
+/// "not skipped", building outputs the recipe author meant to exclude.
+fn validate_skip_expressions(list: &ConditionalList<String>) -> Result<(), ParseError> {
+    fn validate_items(items: &[Item<String>]) -> Result<(), ParseError> {
+        for item in items {
+            match item {
+                Item::Value(value) => {
+                    // `${{ ... }}` templates are already validated when parsed, and their
+                    // expression is only known once rendered, so only check plain strings.
+                    let Some(expr) = value.as_concrete() else {
+                        continue;
+                    };
+                    if let Err(err) = JinjaExpression::new(expr.clone()) {
+                        return Err(ParseError::jinja_error(
+                            format!("invalid `skip` expression: {}", err),
+                            value
+                                .span()
+                                .copied()
+                                .unwrap_or_else(marked_yaml::Span::new_blank),
+                        ));
+                    }
+                }
+                Item::Conditional(conditional) => {
+                    validate_items(conditional.then.as_slice())?;
+                    if let Some(else_value) = &conditional.else_value {
+                        validate_items(else_value.as_slice())?;
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    validate_items(list.as_slice())
+}
+
 /// Parse a Build section from YAML
 pub fn parse_build(node: &Node) -> Result<Build, ParseError> {
     let mapping = node.as_mapping().ok_or_else(|| {
@@ -653,7 +694,10 @@ fn parse_build_from_mapping(mapping: &MarkedMappingNode) -> Result<Build, ParseE
             }
             "skip" => {
                 // Skip accepts both a single value (e.g., "win") or a list
-                build.skip = parse_conditional_list_or_item(value_node)?.into();
+                let skip: ConditionalList<String> =
+                    parse_conditional_list_or_item(value_node)?.into();
+                validate_skip_expressions(&skip)?;
+                build.skip = skip;
             }
             "always_copy_files" => {
                 build.always_copy_files = parse_conditional_list(value_node)?;
@@ -1082,6 +1126,63 @@ mod tests {
         } else {
             panic!("Expected Some(number)");
         }
+    }
+
+    #[test]
+    fn test_parse_build_skip_with_unbalanced_bracket_errors() {
+        // Regression test for #2780: a mismatched bracket in a `skip` expression used to
+        // be silently ignored, so the output got built despite the intended skip.
+        let yaml = r#"
+skip: target_platform == "win-arm64" or cross_target_platform == "win-arm64") and target_platform != cross_target_platform
+"#;
+        let node = marked_yaml::parse_yaml(0, yaml).unwrap();
+        let err = parse_build(&node).expect_err("unbalanced bracket should be rejected");
+        assert!(
+            err.to_string().contains("skip"),
+            "unexpected error: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn test_parse_build_skip_list_and_conditional_are_validated() {
+        // Inside a list
+        let yaml = r#"
+skip:
+  - win
+  - unix and (osx
+"#;
+        let node = marked_yaml::parse_yaml(0, yaml).unwrap();
+        assert!(
+            parse_build(&node).is_err(),
+            "unbalanced bracket in a skip list entry should be rejected"
+        );
+
+        // Inside the branch of an `if`/`then`/`else` entry
+        let yaml = r#"
+skip:
+  - if: unix
+    then: "python == \"3.12\""
+    else: "win and (arm64"
+"#;
+        let node = marked_yaml::parse_yaml(0, yaml).unwrap();
+        assert!(
+            parse_build(&node).is_err(),
+            "unbalanced bracket in a conditional skip branch should be rejected"
+        );
+    }
+
+    #[test]
+    fn test_parse_build_skip_accepts_valid_expressions() {
+        let yaml = r#"
+skip:
+  - (target_platform == "win-arm64" or cross_target_platform == "win-arm64") and target_platform != cross_target_platform
+  - match(python, ">=3.12")
+  - ${{ true }}
+"#;
+        let node = marked_yaml::parse_yaml(0, yaml).unwrap();
+        let build = parse_build(&node).expect("valid skip expressions should parse");
+        assert_eq!(build.skip.len(), 3);
     }
 
     #[test]
