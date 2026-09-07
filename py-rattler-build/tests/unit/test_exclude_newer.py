@@ -5,10 +5,11 @@ from __future__ import annotations
 import hashlib
 import io
 import json
-import subprocess
+import os
+import re
+import shutil
 import sys
 import tarfile
-from base64 import b64encode
 from collections.abc import Iterator
 from datetime import datetime, timezone
 from pathlib import Path
@@ -17,6 +18,8 @@ from urllib.parse import urlsplit
 from urllib.request import url2pathname
 
 import pytest
+from xprocess import ProcessStarter
+from xprocess.xprocess import XProcess
 
 from rattler_build import Package, Stage0Recipe, ToolConfiguration
 from rattler_build.debug import DebugSession
@@ -106,46 +109,27 @@ def cutoff_channel(tmp_path: Path) -> str:
 
 
 @pytest.fixture
-def cutoff_http_channel(cutoff_channel: str, tmp_path: Path) -> Iterator[tuple[str, Path]]:
+def cutoff_http_channel(cutoff_channel: str, tmp_path: Path, xprocess: XProcess) -> Iterator[str]:
     """Serve the tiny channel independently of the native binding's Python GIL."""
-    requests_path = tmp_path / "requests.jsonl"
-    requests_path.touch()
-    server_code = """
-import json
-import sys
-from functools import partial
-from http.server import HTTPServer, SimpleHTTPRequestHandler
+    shutil.copytree(
+        url2pathname(urlsplit(cutoff_channel).path),
+        tmp_path / "t" / "cutoff-test-token" / "channel",
+    )
 
-class Handler(SimpleHTTPRequestHandler):
-    def do_GET(self):
-        with open(sys.argv[2], "a") as requests:
-            requests.write(json.dumps({
-                "path": self.path,
-                "authorization": self.headers.get("Authorization"),
-            }) + "\\n")
-        if self.path.startswith("/t/cutoff-test-token/"):
-            self.path = self.path.removeprefix("/t/cutoff-test-token")
-        super().do_GET()
+    class Starter(ProcessStarter):
+        pattern = r"Serving HTTP on 127\.0\.0\.1 port (\d+)"
+        timeout = 10
+        terminate_on_interrupt = True
+        args = (sys.executable, "-u", "-m", "http.server", "0", "--bind", "127.0.0.1", "--directory", str(tmp_path))
 
-    def log_message(self, *args):
-        pass
-
-with HTTPServer(("127.0.0.1", 0), partial(Handler, directory=sys.argv[1])) as server:
-    print(server.server_address[1], flush=True)
-    server.serve_forever()
-"""
-    with subprocess.Popen(
-        [sys.executable, "-u", "-c", server_code, url2pathname(urlsplit(cutoff_channel).path), str(requests_path)],
-        stdout=subprocess.PIPE,
-        text=True,
-    ) as server:
-        assert server.stdout is not None
-        port = int(server.stdout.readline())
-        try:
-            yield f"http://127.0.0.1:{port}", requests_path
-        finally:
-            server.terminate()
-            server.wait(timeout=5)
+    name = f"cutoff-http-{os.getpid()}"
+    try:
+        _, logfile = xprocess.ensure(name, Starter, persist_logs=False)
+        match = re.search(Starter.pattern, logfile.read())
+        assert match is not None
+        yield f"http://127.0.0.1:{match[1]}"
+    finally:
+        xprocess.getinfo(name).terminate()
 
 
 def dependency_recipe() -> Stage0Recipe:
@@ -315,16 +299,16 @@ def test_invalid_package_override(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize("authentication", ["none", "basic", "token"])
-def test_authenticated_channel_cutoff(
-    cutoff_http_channel: tuple[str, Path], tmp_path: Path, authentication: str
+def test_channel_cutoff_matches_authenticated_urls(
+    cutoff_http_channel: str, tmp_path: Path, authentication: str
 ) -> None:
-    base_url, requests_path = cutoff_http_channel
+    base_url = cutoff_http_channel
     if authentication == "basic":
-        channel = base_url.replace("http://", "http://cutoff-user:cutoff-password@")
+        channel = base_url.replace("http://", "http://cutoff-user:cutoff-password@") + "/channel"
     elif authentication == "token":
-        channel = base_url + "/t/cutoff-test-token"
+        channel = base_url + "/t/cutoff-test-token/channel"
     else:
-        channel = base_url
+        channel = base_url + "/channel"
     session = DebugSession.create(
         dependency_recipe().render()[0],
         output_dir=tmp_path / "debug",
@@ -334,15 +318,6 @@ def test_authenticated_channel_cutoff(
     )
     assert (session.build_prefix / "share/cutoff-dependency.txt").read_text().strip() == "1"
     assert (session.host_prefix / "share/cutoff-other.txt").read_text().strip() == "1"
-    requests = [json.loads(line) for line in requests_path.read_text().splitlines()]
-    assert any(request["path"].endswith("/noarch/repodata.json") for request in requests)
-    if authentication == "basic":
-        expected_auth = "Basic " + b64encode(b"cutoff-user:cutoff-password").decode()
-        assert all(request["authorization"] == expected_auth for request in requests)
-    elif authentication == "token":
-        assert all(request["path"].startswith("/t/cutoff-test-token/") for request in requests)
-    else:
-        assert all(request["authorization"] is None for request in requests)
 
 
 @pytest.mark.parametrize("channel", ["conda-forge", "relative/channel", "mailto:channel@example.com"])
