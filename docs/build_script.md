@@ -485,6 +485,18 @@ noted, no variables are inherited from the shell environment in which you invoke
 : Represents the hash of the package being built, excluding the
   leading 'h' (e.g. 21422ab).
 
+`PATHS_JSON`
+
+: Only set during the test phase. The path to `info/paths.json` in the
+  extracted package under test. This describes paths in the package archive,
+  which can differ from installed paths (for example, for noarch Python
+  packages).
+
+`INDEX_JSON`
+
+: Only set during the test phase. The path to `info/index.json` in the
+  extracted package under test.
+
 `PYTHON`
 
 : The path to the Python executable in the host prefix. Python is
