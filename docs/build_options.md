@@ -48,22 +48,9 @@ build:
 
 ### Glob evaluation
 
-Glob patterns are used throughout the build options to specify files. The
-patterns are matched against the relative path of the file in the build
-directory. Patterns can contain `*` to match any number of characters, `?` to
-match a single character, and `**` to match any number of directories.
-
-For example:
-
-- `*.txt` matches all files ending in `.txt`
-- `**/*.txt` matches all files ending in `.txt` in any directory
-- `**/test_*.txt` matches all files starting with `test_` and ending in `.txt`
-  in any directory
-- `foo/` matches all files under the `foo` directory
-
-The globs are always evaluated relative to the prefix directory. If you have no
-`include` globs, but an `exclude` glob, then all files are included except those
-that match the `exclude` glob. This is equivalent to `include: ['**']`.
+Build file patterns are evaluated relative to the package prefix. See the
+[glob syntax reference](reference/glob_syntax.md) for the supported syntax,
+directory matching, and `include` / `exclude` behavior.
 
 ## Always include and always copy files
 
