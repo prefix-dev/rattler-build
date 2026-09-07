@@ -356,6 +356,10 @@ class RenderedVariant:
         no_include_recipe: bool = False,
         exclude_newer: datetime | None = None,
         env_isolation: EnvironmentIsolation = EnvironmentIsolation.STRICT,
+        *,
+        exclude_newer_package: dict[str, datetime | None] | None = None,
+        exclude_newer_channel: dict[str, datetime | None] | None = None,
+        exclude_newer_include_unknown_timestamp: bool = False,
     ) -> BuildResult:
         """Build this rendered variant.
 
@@ -378,6 +382,9 @@ class RenderedVariant:
             no_include_recipe: Don't include recipe in the output package.
             exclude_newer: Exclude packages newer than this timestamp.
             env_isolation: Environment isolation mode. Defaults to ``EnvironmentIsolation.STRICT``.
+            exclude_newer_package: Package-specific cutoffs. ``None`` values exempt a package.
+            exclude_newer_channel: Cutoffs keyed by exact channel URL. ``None`` values exempt a channel.
+            exclude_newer_include_unknown_timestamp: Include packages without a timestamp when filtering.
 
         Returns:
             BuildResult: Information about the built package including paths, metadata, and timing.
@@ -424,6 +431,9 @@ class RenderedVariant:
             env_isolation=env_isolation,
             sibling_variants=rust_siblings,
             repodata_revision=self._repodata_revision,
+            exclude_newer_package=exclude_newer_package,
+            exclude_newer_channel=exclude_newer_channel,
+            exclude_newer_include_unknown_timestamp=exclude_newer_include_unknown_timestamp,
         )
 
         # Convert Rust BuildResult to Python BuildResult
@@ -445,6 +455,9 @@ def build_rendered_variants(
     no_include_recipe: bool = False,
     exclude_newer: datetime | None = None,
     env_isolation: EnvironmentIsolation = EnvironmentIsolation.STRICT,
+    exclude_newer_package: dict[str, datetime | None] | None = None,
+    exclude_newer_channel: dict[str, datetime | None] | None = None,
+    exclude_newer_include_unknown_timestamp: bool = False,
 ) -> list[BuildResult]:
     """Build multiple rendered variants.
 
@@ -465,6 +478,9 @@ def build_rendered_variants(
         no_include_recipe: Don't include recipe in the output package.
         exclude_newer: Exclude packages newer than this timestamp.
         env_isolation: Environment isolation mode. Defaults to ``EnvironmentIsolation.STRICT``.
+        exclude_newer_package: Package-specific cutoffs. ``None`` values exempt a package.
+        exclude_newer_channel: Cutoffs keyed by exact channel URL. ``None`` values exempt a channel.
+        exclude_newer_include_unknown_timestamp: Include packages without a timestamp when filtering.
 
     Returns:
         list[BuildResult]: List of build results, one per variant built.
@@ -505,6 +521,9 @@ def build_rendered_variants(
             no_include_recipe=no_include_recipe,
             exclude_newer=exclude_newer,
             env_isolation=env_isolation,
+            exclude_newer_package=exclude_newer_package,
+            exclude_newer_channel=exclude_newer_channel,
+            exclude_newer_include_unknown_timestamp=exclude_newer_include_unknown_timestamp,
         )
         results.append(result)
 

@@ -232,6 +232,10 @@ class Package:
         use_zstd: bool = True,
         use_sharded: bool = True,
         progress_callback: "ProgressCallback | None" = None,
+        exclude_newer: datetime | None = None,
+        exclude_newer_package: dict[str, datetime | None] | None = None,
+        exclude_newer_channel: dict[str, datetime | None] | None = None,
+        exclude_newer_include_unknown_timestamp: bool = False,
     ) -> "TestResult":
         """Run a specific test by index.
 
@@ -246,6 +250,10 @@ class Package:
             use_zstd: Enable zstd repodata
             use_sharded: Enable sharded repodata
             progress_callback: Optional callback for streaming log output in real-time
+            exclude_newer: Exclude packages newer than this timestamp.
+            exclude_newer_package: Package-specific cutoffs. ``None`` values exempt a package.
+            exclude_newer_channel: Cutoffs keyed by exact channel URL. ``None`` values exempt a channel.
+            exclude_newer_include_unknown_timestamp: Include packages without a timestamp when filtering.
 
         Returns:
             TestResult with success status and output
@@ -272,6 +280,10 @@ class Package:
                 use_zstd=use_zstd,
                 use_sharded=use_sharded,
                 progress_callback=progress_callback,
+                exclude_newer=exclude_newer,
+                exclude_newer_package=exclude_newer_package,
+                exclude_newer_channel=exclude_newer_channel,
+                exclude_newer_include_unknown_timestamp=exclude_newer_include_unknown_timestamp,
             )
         )
 
@@ -287,6 +299,10 @@ class Package:
         use_zstd: bool = True,
         use_sharded: bool = True,
         progress_callback: "ProgressCallback | None" = None,
+        exclude_newer: datetime | None = None,
+        exclude_newer_package: dict[str, datetime | None] | None = None,
+        exclude_newer_channel: dict[str, datetime | None] | None = None,
+        exclude_newer_include_unknown_timestamp: bool = False,
     ) -> list["TestResult"]:
         """Run all tests in the package.
 
@@ -300,6 +316,10 @@ class Package:
             use_zstd: Enable zstd repodata
             use_sharded: Enable sharded repodata
             progress_callback: Optional callback for streaming log output in real-time
+            exclude_newer: Exclude packages newer than this timestamp.
+            exclude_newer_package: Package-specific cutoffs. ``None`` values exempt a package.
+            exclude_newer_channel: Cutoffs keyed by exact channel URL. ``None`` values exempt a channel.
+            exclude_newer_include_unknown_timestamp: Include packages without a timestamp when filtering.
 
         Returns:
             List of TestResult objects, one per test
@@ -331,6 +351,10 @@ class Package:
                 use_zstd=use_zstd,
                 use_sharded=use_sharded,
                 progress_callback=progress_callback,
+                exclude_newer=exclude_newer,
+                exclude_newer_package=exclude_newer_package,
+                exclude_newer_channel=exclude_newer_channel,
+                exclude_newer_include_unknown_timestamp=exclude_newer_include_unknown_timestamp,
             )
         ]
 

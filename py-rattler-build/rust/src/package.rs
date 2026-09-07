@@ -1,6 +1,7 @@
 // Python bindings for package inspection and testing
 
 use std::{
+    collections::HashMap,
     future::Future,
     path::PathBuf,
     str::FromStr,
@@ -267,7 +268,7 @@ impl PyPackage {
     }
 
     /// Run a specific test by index
-    #[pyo3(signature = (index, channel=None, channel_priority=None, auth_file=None, allow_insecure_host=None, compression_threads=None, use_bz2=true, use_zstd=true, use_sharded=true, progress_callback=None))]
+    #[pyo3(signature = (index, channel=None, channel_priority=None, auth_file=None, allow_insecure_host=None, compression_threads=None, use_bz2=true, use_zstd=true, use_sharded=true, progress_callback=None, *, exclude_newer=None, exclude_newer_package=None, exclude_newer_channel=None, exclude_newer_include_unknown_timestamp=false))]
     #[allow(clippy::too_many_arguments)]
     fn run_test(
         &self,
@@ -281,6 +282,10 @@ impl PyPackage {
         use_zstd: bool,
         use_sharded: bool,
         progress_callback: Option<Py<PyAny>>,
+        exclude_newer: Option<jiff::Timestamp>,
+        exclude_newer_package: Option<HashMap<String, Option<jiff::Timestamp>>>,
+        exclude_newer_channel: Option<HashMap<String, Option<jiff::Timestamp>>>,
+        exclude_newer_include_unknown_timestamp: bool,
     ) -> PyResult<PyTestResult> {
         self.run_test_internal(
             Some(index),
@@ -293,12 +298,18 @@ impl PyPackage {
             use_zstd,
             use_sharded,
             progress_callback,
+            crate::exclude_newer::exclude_newer_policy(
+                exclude_newer,
+                exclude_newer_package,
+                exclude_newer_channel,
+                exclude_newer_include_unknown_timestamp,
+            )?,
         )
         .map(|results| results.into_iter().next().unwrap())
     }
 
     /// Run all tests in the package
-    #[pyo3(signature = (channel=None, channel_priority=None, auth_file=None, allow_insecure_host=None, compression_threads=None, use_bz2=true, use_zstd=true, use_sharded=true, progress_callback=None))]
+    #[pyo3(signature = (channel=None, channel_priority=None, auth_file=None, allow_insecure_host=None, compression_threads=None, use_bz2=true, use_zstd=true, use_sharded=true, progress_callback=None, *, exclude_newer=None, exclude_newer_package=None, exclude_newer_channel=None, exclude_newer_include_unknown_timestamp=false))]
     #[allow(clippy::too_many_arguments)]
     fn run_tests(
         &self,
@@ -311,6 +322,10 @@ impl PyPackage {
         use_zstd: bool,
         use_sharded: bool,
         progress_callback: Option<Py<PyAny>>,
+        exclude_newer: Option<jiff::Timestamp>,
+        exclude_newer_package: Option<HashMap<String, Option<jiff::Timestamp>>>,
+        exclude_newer_channel: Option<HashMap<String, Option<jiff::Timestamp>>>,
+        exclude_newer_include_unknown_timestamp: bool,
     ) -> PyResult<Vec<PyTestResult>> {
         self.run_test_internal(
             None,
@@ -323,6 +338,12 @@ impl PyPackage {
             use_zstd,
             use_sharded,
             progress_callback,
+            crate::exclude_newer::exclude_newer_policy(
+                exclude_newer,
+                exclude_newer_package,
+                exclude_newer_channel,
+                exclude_newer_include_unknown_timestamp,
+            )?,
         )
     }
 
@@ -492,6 +513,7 @@ impl PyPackage {
         use_zstd: bool,
         use_sharded: bool,
         progress_callback: Option<Py<PyAny>>,
+        exclude_newer: Option<rattler_solve::ExcludeNewer>,
     ) -> PyResult<Vec<PyTestResult>> {
         use ::rattler_build::{
             config::Config,
@@ -547,13 +569,14 @@ impl PyPackage {
             .into());
         }
 
-        let test_data = TestData::new(
+        let mut test_data = TestData::new(
             self.path.clone(),
             channel,
             compression_threads,
             test_index,
             common,
         );
+        test_data.exclude_newer = exclude_newer;
 
         // Run the test(s) with log capture and optional streaming callback
         let (result, log_buffer) = tracing_subscriber::with_log_capture(progress_callback, || {

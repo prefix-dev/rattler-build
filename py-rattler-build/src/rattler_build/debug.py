@@ -9,6 +9,7 @@ re-run the build script, inspecting output each time.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -98,6 +99,10 @@ class DebugSession:
         channels: list[str] | None = None,
         no_build_id: bool = True,
         progress_callback: ProgressCallback | None = None,
+        exclude_newer: datetime | None = None,
+        exclude_newer_package: dict[str, datetime | None] | None = None,
+        exclude_newer_channel: dict[str, datetime | None] | None = None,
+        exclude_newer_include_unknown_timestamp: bool = False,
     ) -> DebugSession:
         """Create a debug session from a rendered variant.
 
@@ -120,6 +125,14 @@ class DebugSession:
             giving stable paths across iterations.
         progress_callback:
             Optional callback for progress events during setup.
+        exclude_newer:
+            Exclude packages newer than this timestamp.
+        exclude_newer_package:
+            Package-specific cutoffs. ``None`` values exempt a package.
+        exclude_newer_channel:
+            Cutoffs keyed by exact channel URL. ``None`` values exempt a channel.
+        exclude_newer_include_unknown_timestamp:
+            Include packages without a timestamp when filtering.
 
         Returns
         -------
@@ -137,6 +150,10 @@ class DebugSession:
             progress_callback=progress_callback,
             recipe_path=variant._recipe_path,
             repodata_revision=variant._repodata_revision,
+            exclude_newer=exclude_newer,
+            exclude_newer_package=exclude_newer_package,
+            exclude_newer_channel=exclude_newer_channel,
+            exclude_newer_include_unknown_timestamp=exclude_newer_include_unknown_timestamp,
         )
         return cls(inner)
 

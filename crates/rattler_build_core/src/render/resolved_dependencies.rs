@@ -865,7 +865,9 @@ pub(crate) async fn resolve_dependencies(
             tool_configuration,
             output.build_configuration.channel_priority,
             output.build_configuration.solve_strategy,
-            output.build_configuration.exclude_newer,
+            output
+                .build_configuration
+                .exclude_newer_with_build_outputs(),
         )
         .await
         .map_err(|e| ResolveError::DependencyResolutionError(e.into()))?;
@@ -954,7 +956,9 @@ pub(crate) async fn resolve_dependencies(
             tool_configuration,
             output.build_configuration.channel_priority,
             output.build_configuration.solve_strategy,
-            output.build_configuration.exclude_newer,
+            output
+                .build_configuration
+                .exclude_newer_with_build_outputs(),
         )
         .await
         .map_err(|e| ResolveError::DependencyResolutionError(e.into()))?;

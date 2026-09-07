@@ -169,6 +169,9 @@ impl PyDebugSession {
                 &specs,
                 &channels,
                 &self.tool_config,
+                self.output
+                    .build_configuration
+                    .exclude_newer_with_build_outputs(),
             )
             .await
         })?;
@@ -242,7 +245,7 @@ impl PyDebugSession {
 /// installs environments, creates build script) without running the build.
 #[pyfunction]
 #[allow(clippy::too_many_arguments)]
-#[pyo3(signature = (rendered_variant, tool_config=None, output_dir=None, channels=None, no_build_id=true, progress_callback=None, recipe_path=None, repodata_revision=None))]
+#[pyo3(signature = (rendered_variant, tool_config=None, output_dir=None, channels=None, no_build_id=true, progress_callback=None, recipe_path=None, repodata_revision=None, *, exclude_newer=None, exclude_newer_package=None, exclude_newer_channel=None, exclude_newer_include_unknown_timestamp=false))]
 pub fn create_debug_session_py(
     py: Python<'_>,
     rendered_variant: PyRenderedVariant,
@@ -253,7 +256,17 @@ pub fn create_debug_session_py(
     progress_callback: Option<Py<PyAny>>,
     recipe_path: Option<PathBuf>,
     repodata_revision: Option<PyRepodataRevision>,
+    exclude_newer: Option<jiff::Timestamp>,
+    exclude_newer_package: Option<std::collections::HashMap<String, Option<jiff::Timestamp>>>,
+    exclude_newer_channel: Option<std::collections::HashMap<String, Option<jiff::Timestamp>>>,
+    exclude_newer_include_unknown_timestamp: bool,
 ) -> PyResult<PyDebugSession> {
+    let exclude_newer = crate::exclude_newer::exclude_newer_policy(
+        exclude_newer,
+        exclude_newer_package,
+        exclude_newer_channel,
+        exclude_newer_include_unknown_timestamp,
+    )?;
     let tool_config = tool_config
         .map(|tc| tc.inner)
         .unwrap_or_else(|| Configuration::builder().finish());
@@ -290,7 +303,7 @@ pub fn create_debug_session_py(
         None,
         true, // no_include_recipe
         recipe_path.as_deref(),
-        None, // exclude_newer
+        exclude_newer,
         EnvironmentIsolation::default(),
         repodata_revision.unwrap_or_default(),
         BTreeMap::new(), // extra_subpackages

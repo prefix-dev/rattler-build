@@ -7,6 +7,7 @@ mod build;
 mod cli_api;
 mod debug;
 mod error;
+mod exclude_newer;
 mod jinja_config;
 mod package;
 mod package_assembler;
