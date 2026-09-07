@@ -1108,6 +1108,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#consistency-checks" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Consistency checks
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#how-caching-works" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -4066,6 +4077,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#consistency-checks" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Consistency checks
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#how-caching-works" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -4341,6 +4363,16 @@ output's requirements. This means:</p>
 package that additionally depends on <code>python</code> expands the matrix further (one
 package per <code>libfoo</code> × <code>python</code> combination), but the staging cache is reused
 across <code>python</code> variants.</p>
+<h3 id="consistency-checks">Consistency checks<a class="headerlink" href="#consistency-checks" title="Permanent link">#</a></h3>
+<p>After all outputs are built, rattler-build warns when</p>
+<ul>
+<li>two outputs of the same recipe package the same file (installing both would
+  clobber it), or</li>
+<li>files from a staging cache were not included in any output that inherits
+  from it.</li>
+</ul>
+<p><code>--error-overlapping-files</code> and <code>--error-unused-staging-files</code> turn these
+warnings into hard errors.</p>
 <h3 id="how-caching-works">How caching works<a class="headerlink" href="#how-caching-works" title="Permanent link">#</a></h3>
 <p>The staging cache is keyed by a SHA256 hash over:</p>
 <ul>

@@ -4242,6 +4242,18 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 </li>
 <li>
 <dl>
+<dt><a id="arg---error-overlapping-files" href="#arg---error-overlapping-files"><code>--error-overlapping-files</code></a></dt>
+<dd>Error instead of warn when outputs of one recipe package the same file</dd>
+</dl>
+</li>
+<li>
+<dl>
+<dt><a id="arg---error-unused-staging-files" href="#arg---error-unused-staging-files"><code>--error-unused-staging-files</code></a></dt>
+<dd>Error instead of warn when files from a staging cache are not included in any output that inherits from it</dd>
+</dl>
+</li>
+<li>
+<dl>
 <dt><a id="arg---exclude-newer" href="#arg---exclude-newer"><code>--exclude-newer &lt;EXCLUDE_NEWER&gt;</code></a></dt>
 <dd>Exclude packages newer than this date from the solver, in RFC3339 format (e.g. 2024-03-15T12:00:00Z)</dd>
 </dl>

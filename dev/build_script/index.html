@@ -4649,6 +4649,18 @@ noted, no variables are inherited from the shell environment in which you invoke
 <p>Represents the hash of the package being built, excluding the
   leading 'h' (e.g. 21422ab).</p>
 </dd>
+<dt><code>PATHS_JSON</code></dt>
+<dd>
+<p>Only set during the test phase. The path to <code>info/paths.json</code> in the
+  extracted package under test. This describes paths in the package archive,
+  which can differ from installed paths (for example, for noarch Python
+  packages).</p>
+</dd>
+<dt><code>INDEX_JSON</code></dt>
+<dd>
+<p>Only set during the test phase. The path to <code>info/index.json</code> in the
+  extracted package under test.</p>
+</dd>
 <dt><code>PYTHON</code></dt>
 <dd>
 <p>The path to the Python executable in the host prefix. Python is
