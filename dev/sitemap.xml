@@ -178,6 +178,9 @@
         <loc>https://rattler-build.prefix.dev/latest/reference/recipe_file/</loc>
       </url>
       <url>
+        <loc>https://rattler-build.prefix.dev/latest/reference/glob_syntax/</loc>
+      </url>
+      <url>
         <loc>https://rattler-build.prefix.dev/latest/reference/multi_output/</loc>
       </url>
       <url>

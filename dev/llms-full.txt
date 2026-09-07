@@ -138,8 +138,7 @@ self-contained.
   libraries and executables to make it relative
 * `patchelf` is required on Linux to rewrite the `rpath` and `runpath` of shared
   libraries and executables
-* `git` to checkout Git repositories (not implemented yet, but will require `git`
-  in the future)
+* `git` to check out Git sources and evaluate experimental Git Jinja functions
 * `msvc` on Windows because we cannot ship the MSVC compiler on conda-forge
   (needs to be installed on the host machine)
 
@@ -1983,22 +1982,9 @@ build:
 
 ### Glob evaluation
 
-Glob patterns are used throughout the build options to specify files. The
-patterns are matched against the relative path of the file in the build
-directory. Patterns can contain `*` to match any number of characters, `?` to
-match a single character, and `**` to match any number of directories.
-
-For example:
-
-- `*.txt` matches all files ending in `.txt`
-- `**/*.txt` matches all files ending in `.txt` in any directory
-- `**/test_*.txt` matches all files starting with `test_` and ending in `.txt`
-  in any directory
-- `foo/` matches all files under the `foo` directory
-
-The globs are always evaluated relative to the prefix directory. If you have no
-`include` globs, but an `exclude` glob, then all files are included except those
-that match the `exclude` glob. This is equivalent to `include: ['**']`.
+Build file patterns are evaluated relative to the package prefix. See the
+[glob syntax reference](reference/glob_syntax.md) for the supported syntax,
+directory matching, and `include` / `exclude` behavior.
 
 ## Always include and always copy files
 
@@ -8318,7 +8304,7 @@ session = DebugSession.create(
 print(f"Work directory:  {session.work_dir}")
 ```
 
-    Work directory:  /tmp/rattler_build_f6369e75d3692aec/output/bld/rattler-build_debug-demo/work
+    Work directory:  /tmp/rattler_build_3c76813ffbae46b7/output/bld/rattler-build_debug-demo/work
 
 
 ## Read the Build Script
@@ -8340,7 +8326,7 @@ for p in sorted(session.work_dir.iterdir()):
     set -e
     ## Start of bash preamble
     if [ -z ${CONDA_BUILD+x} ]; then
-        source "/tmp/rattler_build_f6369e75d3692aec/output/bld/rattler-build_debug-demo/work/build_env.sh"
+        source "/tmp/rattler_build_3c76813ffbae46b7/output/bld/rattler-build_debug-demo/work/build_env.sh"
     fi
     ## End of preamble
     # Trace each command as it runs so a failing line is visible (see #2264).
@@ -8385,7 +8371,7 @@ if result.stderr:
     + '[' -z x ']'
     + set -x
     + echo 'Hello from the build script!'
-    + mkdir -p /tmp/rattler_build_f6369e75d3692aec/output/bld/rattler-build_debug-demo/host_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_plac/bin
+    + mkdir -p /tmp/rattler_build_3c76813ffbae46b7/output/bld/rattler-build_debug-demo/host_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_plac/bin
     + echo 'hello from debug-demo'
     
 
@@ -8558,7 +8544,7 @@ print(f"Built: {built_package_path}")
     Version: 1.0.0
     
     Building package...
-    Built: /tmp/rattler_build_exn4stoo/output/noarch/test-demo-package-1.0.0-pyh4616a5c_0.conda
+    Built: /tmp/rattler_build_953s8jaj/output/noarch/test-demo-package-1.0.0-pyh4616a5c_0.conda
 
 
 ## Step 2: Loading a Package
@@ -8579,7 +8565,7 @@ print(f"\nString representation: {repr(pkg)}")
 
     Package Loaded Successfully!
     ============================================================
-    Path: /tmp/rattler_build_exn4stoo/output/noarch/test-demo-package-1.0.0-pyh4616a5c_0.conda
+    Path: /tmp/rattler_build_953s8jaj/output/noarch/test-demo-package-1.0.0-pyh4616a5c_0.conda
     Type: Package
     
     String representation: Package(test-demo-package-1.0.0-pyh4616a5c_0)
@@ -8634,7 +8620,7 @@ else:
     License:        MIT
     Arch:           None
     Platform:       None
-    Timestamp:      2026-09-07 13:05:46.141000+00:00
+    Timestamp:      2026-09-07 13:22:35.641000+00:00
     
     Archive Information
     ----------------------------------------
@@ -8676,10 +8662,10 @@ print(json.dumps(metadata_dict, indent=2, default=str))
       "constrains": [],
       "license": "MIT",
       "license_family": null,
-      "timestamp": "2026-09-07 13:05:46.141000+00:00",
+      "timestamp": "2026-09-07 13:22:35.641000+00:00",
       "arch": null,
       "platform": null,
-      "path": "/tmp/rattler_build_exn4stoo/output/noarch/test-demo-package-1.0.0-pyh4616a5c_0.conda",
+      "path": "/tmp/rattler_build_953s8jaj/output/noarch/test-demo-package-1.0.0-pyh4616a5c_0.conda",
       "archive_type": "conda",
       "filename": "test-demo-package-1.0.0-pyh4616a5c_0.conda"
     }
@@ -8861,7 +8847,7 @@ for i in range(pkg.test_count):
          Adding 1 packages to subdir noarch.
          Successfully added 1 packages to subdir noarch.
          Writing repodata to noarch/repodata.json
-         Collecting tests from '/tmp/.tmpLOwFZu/test-demo-package-1.0.0-pyh4616a5c_0'
+         Collecting tests from '/tmp/.tmpVnjv6O/test-demo-package-1.0.0-pyh4616a5c_0'
          ... and 17 more lines
 
 
@@ -9044,11 +9030,11 @@ print(f"Identical (reproducible): {rebuild_result.is_identical}")
 
     Rebuilding Package
     ============================================================
-    Original package: /tmp/rattler_build_exn4stoo/output/noarch/test-demo-package-1.0.0-pyh4616a5c_0.conda
-    Rebuilt package:  output/test-demo-package-1.0.0-pyh4616a5c_0-rebuilt-20260907-130551.conda
+    Original package: /tmp/rattler_build_953s8jaj/output/noarch/test-demo-package-1.0.0-pyh4616a5c_0.conda
+    Rebuilt package:  output/test-demo-package-1.0.0-pyh4616a5c_0-rebuilt-20260907-132242.conda
     
-    Original SHA256:  d0edbb0ac2338ed0105bfb6b5eae8ade2f3b36c0202b53e0e308d3297ca0e5fa
-    Rebuilt SHA256:   d0edbb0ac2338ed0105bfb6b5eae8ade2f3b36c0202b53e0e308d3297ca0e5fa
+    Original SHA256:  8b19ff8c86ae620b25ec106447b63db6fd586167ac0495d15ec33dbfc5ef8f01
+    Rebuilt SHA256:   8b19ff8c86ae620b25ec106447b63db6fd586167ac0495d15ec33dbfc5ef8f01
     
     Identical (reproducible): True
 
@@ -9074,7 +9060,7 @@ print(f"Files:        {len(rebuilt_pkg.files)} files")
     Name:         test-demo-package
     Version:      1.0.0
     Build string: pyh4616a5c_0
-    Path:         output/test-demo-package-1.0.0-pyh4616a5c_0-rebuilt-20260907-130551.conda
+    Path:         output/test-demo-package-1.0.0-pyh4616a5c_0-rebuilt-20260907-132242.conda
     Files:        1 files
 
 
@@ -9270,14 +9256,14 @@ print(f"\nBuilt packages are available in: {result.output_dir}")
 
     Building Example 1 packages...
     ============================================================
-    Recipe path: /tmp/rattler_build_5hfia94z/recipe.yaml
+    Recipe path: /tmp/rattler_build_0wr4upgu/recipe.yaml
     
     Building variant 1/2
       Package: myproject-lib
       Version: 2.0.0
       Build string: hb0f4dca_0
-      Build complete in 1.51s!
-      Package: /tmp/rattler_build_5hfia94z/output/linux-64/myproject-lib-2.0.0-hb0f4dca_0.conda
+      Build complete in 1.28s!
+      Package: /tmp/rattler_build_0wr4upgu/output/linux-64/myproject-lib-2.0.0-hb0f4dca_0.conda
       Variant: {'target_platform': 'linux-64'}
       Build log: 55 messages captured
     
@@ -9285,15 +9271,17 @@ print(f"\nBuilt packages are available in: {result.output_dir}")
       Package: myproject-tools
       Version: 2.0.0
       Build string: hb0f4dca_0
-      Build complete in 0.69s!
-      Package: /tmp/rattler_build_5hfia94z/output/linux-64/myproject-tools-2.0.0-hb0f4dca_0.conda
+
+
+      Build complete in 0.35s!
+      Package: /tmp/rattler_build_0wr4upgu/output/linux-64/myproject-tools-2.0.0-hb0f4dca_0.conda
       Variant: {'target_platform': 'linux-64'}
       Build log: 60 messages captured
     
     ============================================================
     Example 1 builds completed successfully!
     
-    Built packages are available in: /tmp/rattler_build_5hfia94z/output
+    Built packages are available in: /tmp/rattler_build_0wr4upgu/output
 
 
 ## Example 2: Staging Outputs - Shared Build Artifacts
@@ -9480,19 +9468,15 @@ print(f"\nBuilt packages are available in: {result.output_dir}")
 
     Building Example 2 packages (with staging)...
     ============================================================
-    Recipe path: /tmp/rattler_build_zbeoxyjp/recipe.yaml
+    Recipe path: /tmp/rattler_build_5y5jyzes/recipe.yaml
     
     Building variant 1/2
       Package: compiled-project-python
       Version: 1.5.0
       Build string: hb0f4dca_0
       Staging caches: ['shared-build']
-
-
-      Build complete in 0.83s!
-
-    
-      Package: /tmp/rattler_build_zbeoxyjp/output/linux-64/compiled-project-python-1.5.0-hb0f4dca_0.conda
+      Build complete in 0.45s!
+      Package: /tmp/rattler_build_5y5jyzes/output/linux-64/compiled-project-python-1.5.0-hb0f4dca_0.conda
       Variant: {'target_platform': 'linux-64'}
       Build log: 72 messages captured
     
@@ -9501,15 +9485,17 @@ print(f"\nBuilt packages are available in: {result.output_dir}")
       Version: 1.5.0
       Build string: hb0f4dca_0
       Staging caches: ['shared-build']
-      Build complete in 0.54s!
-      Package: /tmp/rattler_build_zbeoxyjp/output/linux-64/compiled-project-cli-1.5.0-hb0f4dca_0.conda
+
+
+      Build complete in 0.46s!
+      Package: /tmp/rattler_build_5y5jyzes/output/linux-64/compiled-project-cli-1.5.0-hb0f4dca_0.conda
       Variant: {'target_platform': 'linux-64'}
       Build log: 75 messages captured
     
     ============================================================
     Example 2 builds completed successfully!
     
-    Built packages are available in: /tmp/rattler_build_zbeoxyjp/output
+    Built packages are available in: /tmp/rattler_build_5y5jyzes/output
 
 
 ## Summary
@@ -10250,15 +10236,17 @@ print(f"\nBuilt packages are available in: {result.output_dir}")
 
     Building packages...
     ============================================================
-    Recipe path: /tmp/rattler_build_tkbnwj5_/recipe.yaml
+    Recipe path: /tmp/rattler_build_5kc61rvd/recipe.yaml
     
     Building variant 1/3
       Package: my-simple-package
       Version: 1.0.0
       Build string: np121py39h13fef27_0
-      Build complete in 1.58s!
-      Package: /tmp/rattler_build_tkbnwj5_/output/linux-64/my-simple-package-1.0.0-np121py39h13fef27_0.conda
-      Variant: {'target_platform': 'linux-64', 'numpy': '1.21', 'python': '3.9'}
+
+
+      Build complete in 1.61s!
+      Package: /tmp/rattler_build_5kc61rvd/output/linux-64/my-simple-package-1.0.0-np121py39h13fef27_0.conda
+      Variant: {'numpy': '1.21', 'python': '3.9', 'target_platform': 'linux-64'}
       Build log: 53 messages captured
     
       Build log details:
@@ -10268,9 +10256,9 @@ print(f"\nBuilt packages are available in: {result.output_dir}")
         Adding 0 packages to subdir noarch.
         Successfully added 0 packages to subdir noarch.
         Writing repodata to noarch/repodata.json
-          Platform: linux-64 [2m[__unix=0=0, __linux=6.17.0=0, __glibc=2.39=0, __archspec=1=sapphirerapids][0m
+          Platform: linux-64 [2m[__unix=0=0, __linux=6.17.0=0, __glibc=2.39=0, __archspec=1=zen2][0m
           Channels: 
-           - file:///tmp/rattler_build_tkbnwj5_/output/
+           - file:///tmp/rattler_build_5kc61rvd/output/
            - conda-forge
         ... and 43 more messages
     
@@ -10278,9 +10266,9 @@ print(f"\nBuilt packages are available in: {result.output_dir}")
       Package: my-simple-package
       Version: 1.0.0
       Build string: np122py310h27bf20f_0
-      Build complete in 1.55s!
-      Package: /tmp/rattler_build_tkbnwj5_/output/linux-64/my-simple-package-1.0.0-np122py310h27bf20f_0.conda
-      Variant: {'python': '3.10', 'numpy': '1.22', 'target_platform': 'linux-64'}
+      Build complete in 1.54s!
+      Package: /tmp/rattler_build_5kc61rvd/output/linux-64/my-simple-package-1.0.0-np122py310h27bf20f_0.conda
+      Variant: {'python': '3.10', 'target_platform': 'linux-64', 'numpy': '1.22'}
       Build log: 53 messages captured
     
       Build log details:
@@ -10292,7 +10280,7 @@ print(f"\nBuilt packages are available in: {result.output_dir}")
         Adding 0 packages to subdir noarch.
         Successfully added 0 packages to subdir noarch.
         Writing repodata to noarch/repodata.json
-          Platform: linux-64 [2m[__unix=0=0, __linux=6.17.0=0, __glibc=2.39=0, __archspec=1=sapphirerapids][0m
+          Platform: linux-64 [2m[__unix=0=0, __linux=6.17.0=0, __glibc=2.39=0, __archspec=1=zen2][0m
           Channels: 
         ... and 43 more messages
     
@@ -10300,28 +10288,28 @@ print(f"\nBuilt packages are available in: {result.output_dir}")
       Package: my-simple-package
       Version: 1.0.0
       Build string: np123py311hadc6f11_0
-      Build complete in 1.10s!
-      Package: /tmp/rattler_build_tkbnwj5_/output/linux-64/my-simple-package-1.0.0-np123py311hadc6f11_0.conda
+      Build complete in 1.15s!
+      Package: /tmp/rattler_build_5kc61rvd/output/linux-64/my-simple-package-1.0.0-np123py311hadc6f11_0.conda
       Variant: {'target_platform': 'linux-64', 'python': '3.11', 'numpy': '1.23'}
       Build log: 53 messages captured
     
       Build log details:
         Starting build of 1 outputs
         No sources to fetch
-        Adding 0 packages to subdir linux-64.
-        Successfully added 0 packages to subdir linux-64.
-        Writing repodata to linux-64/repodata.json
         Adding 0 packages to subdir noarch.
         Successfully added 0 packages to subdir noarch.
         Writing repodata to noarch/repodata.json
-          Platform: linux-64 [2m[__unix=0=0, __linux=6.17.0=0, __glibc=2.39=0, __archspec=1=sapphirerapids][0m
+        Adding 0 packages to subdir linux-64.
+        Successfully added 0 packages to subdir linux-64.
+        Writing repodata to linux-64/repodata.json
+          Platform: linux-64 [2m[__unix=0=0, __linux=6.17.0=0, __glibc=2.39=0, __archspec=1=zen2][0m
           Channels: 
         ... and 43 more messages
     
     ============================================================
     All builds completed successfully!
     
-    Built packages are available in: /tmp/rattler_build_tkbnwj5_/output
+    Built packages are available in: /tmp/rattler_build_5kc61rvd/output
 
 
 ## Summary
@@ -10345,6 +10333,60 @@ title: CLI Reference
 <meta http-equiv="refresh" content="0; url=cli/rattler-build/">
 
 The CLI reference has moved to [cli/rattler-build/](cli/rattler-build/index.md).
+
+
+# Glob syntax
+
+Recipe fields that select paths use the Rust
+[`globset`](https://docs.rs/globset/latest/globset/#syntax) syntax.
+
+| Pattern | Matches |
+|---------|---------|
+| `?` | Any single character |
+| `*` | Zero or more characters, including path separators |
+| `**` | Directories recursively |
+| `{a,b}` | Either `a` or `b`; alternatives cannot be nested |
+| `[ab]` | Either `a` or `b` |
+| `[a-z]` | Any character in the range `a` through `z` |
+| `[!ab]` | Any character except `a` or `b` |
+| `[*]` | A literal `*` |
+
+A pattern that names a directory also matches its contents. For example, both
+`share/` and `share` match files below that directory. `.` and `./` match
+everything.
+
+Alternatives can replace platform selectors when only a file extension differs:
+
+```yaml
+build:
+  files:
+    - lib/libclang-cpp.{dylib,so}
+```
+
+This matches `lib/libclang-cpp.dylib` and `lib/libclang-cpp.so`.
+
+Patterns can also use an `include`/`exclude` mapping. If `include` is empty,
+every path is included before the exclusions are applied:
+
+```yaml
+build:
+  files:
+    include:
+      - include/**/*.h
+    exclude:
+      - include/**/private.h
+```
+
+The matching root depends on the field:
+
+- `source.filter` patterns are relative to the copied or extracted source tree.
+- `build.files`, `always_include_files`, and other build file patterns are
+  relative to the package prefix.
+- `tests.package_contents` patterns are relative to the installed test prefix.
+
+YAML quotes are required when a pattern starts with `*`, because an unquoted
+asterisk denotes a YAML alias. For example, write `"**/*.txt"`, not
+`**/*.txt`.
 
 
 # Jinja
@@ -11017,53 +11059,13 @@ For more advanced selection with include/exclude patterns, see the
 [build options documentation](../build_options.md#include-only-certain-files-in-the-package).
 
 
-# The recipe spec
+# Recipe file reference
 
-Rattler-Build implements a new recipe spec, different from the traditional
-"`meta.yaml`" file used in `conda-build`. A recipe has to be stored as a
-`recipe.yaml` file.
+A Rattler-Build recipe is a `recipe.yaml` file. This page documents its fields
+and their accepted values. To migrate a `meta.yaml` recipe, see
+[Converting from conda-build](../converting_from_conda_build.md).
 
-## History
-
-A discussion was started on what a new recipe spec could or should look like.
-The fragments of this discussion can be found [here](https://github.com/mamba-org/conda-specs/blob/master/proposed_specs/recipe.md).
-
-The reason for a new spec are:
-
-- make it easier to parse (i.e. "pure YAML"); `conda-build` uses a mix of comments
-  and Jinja to achieve a great deal of flexibility, but it's hard to parse the
-  recipe with a computer
-- iron out some inconsistencies around multiple outputs (`build` vs. `build/script`
-  and more)
-- remove any need for recursive parsing & solving
-- finally, the initial implementation in `boa` relied on `conda-build`;
-  Rattler-Build removes any dependency on Python or `conda-build` and
-  reimplements everything in Rust
-
-## Major differences from `conda-build`
-
-- recipe filename is `recipe.yaml`, not `meta.yaml`
-- outputs have less complicated behavior, keys are same as top-level recipe
-  (e.g. `build/script`, not just `script` and `package/name`, not just `name`)
-- no implicit meta-packages in outputs
-- no full Jinja2 support: no conditional or `{% set ...` support, only string
-  interpolation; variables can be set in the toplevel "context" which is valid
-  YAML
-- Jinja string interpolation needs to be preceded by a dollar sign at the
-  beginning of a string, e.g. `- ${{ version }}` in order for it to be valid
-  YAML
-- selectors use a YAML dictionary style (vs. comments in conda-build). Instead
-  of `- somepkg  #[osx]` we use:
-  ```yaml
-  if: osx
-  then:
-    - somepkg
-  ```
-
-- `skip` instruction uses a list of skip conditions and not the selector syntax
-  from `conda-build` (e.g. `skip: ["osx", "win and py37"]`)
-
-## Spec
+## Top-level structure
 
 The recipe spec has the following parts:
 
@@ -11083,33 +11085,20 @@ The recipe spec has the following parts:
 - [x] `about`: package metadata such as homepage, license and description
 - [x] `extra`: free-form metadata that rattler-build does not interpret
 
-## Spec reference
+## Schema
 
-The spec is also made available through a JSON Schema (which is used for
-validation).<br/>
-The schema (and `pydantic` source file) can be found in this repository:
-[`recipe-format`](https://github.com/prefix-dev/recipe-format)
+The recipe [JSON Schema](https://github.com/prefix-dev/recipe-format) is used
+for validation and editor integration. See [Automatic recipe
+linting](../automatic_linting.md) for setup instructions.
 
-
-See more in the [automatic linting](../automatic_linting.md) chapter.
-
-<!--
-Quick start (from conda-build)
-------------------------------
-
-You can use `boa convert meta.yaml` to convert an existing recipe from conda-build syntax to boa. The command will output the new recipe to stdout. To quickly save the result, you can use `boa convert meta.yaml > recipe.yaml` and run `boa build .`. Please note that the conversion process is working fine only for "simple" recipes and there will be some needed manual work to convert complex recipes.
-
--->
-
-Examples
---------
+## Example
 
 ```yaml title="recipe.yaml"
 --8<-- "docs/snippets/recipes/imagesize.yaml"
 ```
 
 
-### Package section
+## Package section
 
 Specifies package information.
 
@@ -11127,14 +11116,13 @@ package:
   version number in quotes so that it is interpreted as a string.
 
 
-### Source section
+## Source section
 
-Specifies where the source code of the package is coming from. The source may
-come from a tarball file, `git`, `hg`, or `svn`. It may be a local path and it may
-contain patches.
+Specifies where the package source comes from. A source can be a URL archive,
+a Git repository, or a local path, and can include patches.
 
 
-#### Source from tarball or `zip` archive
+### Source from tarball or `zip` archive
 
 ```yaml
 source:
@@ -11210,7 +11198,7 @@ source:
       # file_name is not set — the archive is extracted into the work directory
     ```
 
-#### Source from `git`
+### Source from `git`
 
 ```yaml
 source:
@@ -11302,7 +11290,7 @@ source:
 
 If the actual commit does not match the expected commit, the build will fail with an error message indicating the mismatch. This feature is inspired by [Wolfi/Melange](https://github.com/wolfi-dev/wolfi-os) and provides an additional layer of security for your builds.
 
-#### Source from a local path
+### Source from a local path
 
 If the path is relative, it is taken relative to the recipe directory. The
 source is copied to the work directory before building.
@@ -11317,7 +11305,7 @@ By default, all files in the local path that are ignored by `git` are also ignor
 by Rattler-Build. You can disable this behavior by setting `use_gitignore` to
 `false`.
 
-#### Patches
+### Patches
 
 Patches may optionally be applied to the source.
 
@@ -11356,7 +11344,7 @@ source:
 Only the variables listed above are allowed in `patches`; any other variable
 is treated as undefined and produces an error.
 
-#### Destination path
+### Destination path
 
 Within Rattler-Build's work directory, you may specify a particular folder to
 place the source into. Rattler-Build will always drop you into the same folder
@@ -11370,7 +11358,7 @@ source:
   target_directory: my-destination/folder
 ```
 
-#### Attestation verification (experimental)
+### Attestation verification (experimental)
 
 !!! note
     This feature requires the `--experimental` flag.
@@ -11398,7 +11386,7 @@ The attestation config has the following fields:
 See the [Sigstore source attestation documentation](../sigstore.md#source-attestation-verification)
 for more details and examples.
 
-#### Source from multiple sources
+### Source from multiple sources
 
 Some software is most easily built by aggregating several pieces.
 
@@ -11433,8 +11421,8 @@ source:
     - globs
 ```
 
-Glob patterns throughout the recipe file can also use a flexible `include` /
-`exclude` pair, such as:
+Glob patterns throughout the recipe file can also use an `include` / `exclude`
+pair:
 
 ```yaml title="recipe.yaml"
 source:
@@ -11445,6 +11433,9 @@ source:
     exclude:
       - include/**/private.h
 ```
+
+See the [glob syntax reference](glob_syntax.md) for supported patterns and
+matching behavior.
 
 The `filter` field is available for `path`, `url`, and `git` sources. It is
 applied to the files that are copied into the work directory — the copied tree
@@ -11478,39 +11469,11 @@ source:
 
 Specifies build information.
 
-Each field that expects a path can also handle a glob pattern. Patterns are
-matched from the top of the build environment.
+Fields that select paths accept the patterns described in the
+[glob syntax reference](glob_syntax.md). Build file patterns are relative to
+the package prefix.
 
-??? info "Glob syntax"
-
-    Rattler-Build uses [globset's Unix-style glob syntax](https://docs.rs/globset/latest/globset/#syntax).
-
-    | Pattern | Matches |
-    |---------|---------|
-    | `?` | Any single character |
-    | `*` | Zero or more characters |
-    | `**` | Directories recursively |
-    | `{a,b}` | Either `a` or `b` (alternatives cannot be nested) |
-    | `[ab]` | Either `a` or `b` |
-    | `[a-z]` | Any character in the range `a` through `z` |
-    | `[!ab]` | Any character except `a` or `b` |
-    | `[*]` | A literal `*` |
-
-    Alternatives can replace platform selectors when only a file extension
-    differs. This example matches both `lib/libclang-cpp.dylib` and
-    `lib/libclang-cpp.so`:
-
-    ```yaml
-    build:
-      files:
-        - lib/libclang-cpp.{dylib,so}
-    ```
-
-    To match every `.txt` file in a project directory, use
-    `"**/myproject/**/*.txt"`. YAML quotes are required for patterns that start
-    with `*`.
-
-#### Build number and string
+### Build number and string
 
 The build number should be incremented for new builds of the same version. The
 number defaults to `0`. The build string cannot contain "`-`". The string defaults
@@ -11522,7 +11485,7 @@ build:
   string: abc
 ```
 
-#### Dynamic linking
+### Dynamic linking
 
 This section contains settings for the shared libraries and executables on
 Linux and macOS.
@@ -11558,7 +11521,7 @@ Fields (all optional):
 - **`overlinking_behavior`** - What to do when a binary links against a
   library that is not a declared dependency. One of `ignore` or `error`.
 
-#### Package variant flags (V3, beta)
+### Package variant flags (V3, beta)
 
 !!! warning "Beta — opt in with `--v3`"
     This field is part of the V3 repodata revision and is only accepted when
@@ -11829,8 +11792,7 @@ build:
     - globs
 ```
 
-Glob patterns throughout the recipe file can also use a flexible `include` /
-`exclude` pair, such as:
+The [`include` / `exclude` glob form](glob_syntax.md) is also supported:
 
 ```yaml title="recipe.yaml"
 build:
@@ -12541,6 +12503,8 @@ require 'rspec'
 
 Checks if the built package contains the mentioned items. These checks are executed directly at
 the end of the build process to make sure that all expected files are present in the package.
+File checks use the [standard glob syntax](glob_syntax.md) relative to the
+installed test prefix.
 
 ```yaml
 tests:
@@ -12920,196 +12884,26 @@ form.
 
 ## Templating with Jinja
 
-Rattler-Build supports limited Jinja templating in the `recipe.yaml` file.
-
-You can set up Jinja variables in the `context` section:
+Rattler-Build supports a limited Jinja syntax for expressions and string
+interpolation. Variables can be declared in `context` and referenced later:
 
 ```yaml
 context:
-  name: "test"
-  version: "5.1.2"
-  # later keys can reference previous keys
-  # and use jinja functions to compute new values
-  major_version: ${{ (version | split('.'))[0] }}
-  tests_to_skip:
-    # fails for one reason
-    - test_foo
-    # fails for another reason
-    - test_bar
-```
+  name: test
+  version: 5.1.2
 
-Later in your `recipe.yaml` you can use these values in string interpolation
-with Jinja:
-
-```yaml
-source:
-  url: https://github.com/mamba-org/${{ name }}/v${{ version }}.tar.gz
-
-tests:
-  - script:
-    - pytest -k "not (${{ tests_to_skip | join(" or ")" }})"
-```
-
-Jinja has built-in support for some common string manipulations.
-
-In Rattler-Build, complex Jinja is completely disallowed as we try to produce
-YAML that is valid at all times. So you should not use any `{% if ... %}` or
-similar Jinja constructs that produce invalid YAML. Furthermore, instead of
-plain double curly brackets Jinja statements need to be prefixed by `$`, e.g.
-`${{ ... }}`:
-
-```yaml
 package:
-  name: {{ name }}   # WRONG: invalid yaml
-  name: ${{ name }} # correct
+  name: ${{ name }}
+  version: ${{ version }}
 ```
 
-For more information, see the [Jinja template
-documentation](https://jinja.palletsprojects.com/en/3.1.x/) and the list of
-available environment variables [`env-vars`]().
+Expressions use `${{ ... }}`. Jinja control statements such as `{% if ... %}`
+and `{% set ... %}` are not supported; use recipe selectors and the `context`
+section instead.
 
-Jinja templates are evaluated during the build process.
-<!-- TODO: implement the command to do below
-To retrieve a fully rendered `recipe.yaml`, use the `` command.
--->
-
-#### Additional Jinja2 functionality in Rattler-Build
-
-Besides the default Jinja2 functionality, additional Jinja functions are
-available during the Rattler-Build process: `pin_compatible`, `pin_subpackage`,
-`compiler` and `stdlib`.
-
-The `compiler` function takes `c`, `cxx`, `fortran` and other values as argument
-and automatically selects the right (cross-)compiler for the target platform.
-Similarly, `stdlib` function selects the right standard library dependencies.
-
-```
-build:
-  - ${{ compiler('c') }}
-  - ${{ stdlib('c') }}
-```
-
-The `pin_subpackage` function pins another package produced by the recipe with
-the supplied parameters.
-
-Similarly, the `pin_compatible` function will pin a package according to the
-specified rules.
-
-#### Pin expressions
-
-Rattler-Build knows pin expressions. A pin expression can have a `lower_bound`,
-`upper_bound` and `exact` value. A `upper_bound` and `lower_bound` are specified with a
-string containing only `x` and `.`, e.g. `upper_bound="x.x.x"` would signify to pin
-the given package to `<1.2.3` (if the package version is `1.2.2`, for example).
-
-A pin with `lower_bound="x.x",upper_bound="x.x"` for a package of version `1.2.2` would
-evaluate to `>=1.2,<1.3.0a0`.
-
-If `exact=true`, then the `hash` is included, and the package is pinned exactly,
-e.g. `==1.2.2 h1234`. This is a unique package variant that cannot exist more
-than once, and thus is "exactly" pinned.
-
-You can also hard-code version strings into `lower_bound` and `upper_bound`.
-See the [Jinja Reference](./jinja.md) for more information.
-
-#### Pin subpackage
-
-Pin subpackage refers to another package from the same recipe file. It is
-commonly used in the `requirements/run_exports` section to export a run export from the
-package, or with multiple outputs to refer to a previous build.
-
-It looks something like:
-
-```yaml
-package:
-  name: mypkg
-  version: "1.2.3"
-
-requirements:
-  run_exports:
-    # this will evaluate to `mypkg <1.3`
-    - ${{ pin_subpackage(name, upper_bound='x.x') }}
-```
-
-#### Pin compatible
-
-Pin compatible lets you pin a package based on the version retrieved from the
-variant file (if the pinning from the variant file needs customization).
-
-For example, if the variant specifies a pin for `numpy: 1.11`, one can use
-`pin_compatible` to relax it:
-
-```yaml
-requirements:
-  host:
-    # this will select numpy 1.11
-    - numpy
-  run:
-    # this will export `numpy >=1.11,<2`, instead of the stricter `1.11` pin
-    - ${{ pin_compatible('numpy', lower_bound='x.x', upper_bound='x') }}
-```
-
-#### The env Jinja functions
-
-You can access the environment variables set outside the build script using the
-`env` object in Jinja.
-
-There are three functions:
-
-- `env.get("ENV_VAR")` will insert the value of "ENV_VAR" into the recipe.
-- `env.get("ENV_VAR", default="undefined")` will insert the value of `ENV_VAR`
-  into the recipe or, if `ENV_VAR` is not defined, the specified default value
-  (in this case "undefined")
-- `env.exists("ENV_VAR")` returns a boolean true of false if the env var is set
-  to any value
-
-This can be used for some light templating, for example:
-
-```yaml
-build:
-  string: ${{ env.get("GIT_BUILD_STRING") }}_${{ hash }}
-```
-
-#### `match` function
-
-This function matches the first argument (the package version) against the second
-argument (the version spec) and returns the resulting boolean. This only works for packages
-defined in the "variant_config.yaml" file.
-
-```yaml title="recipe.yaml"
-match(python, '>=3.4')
-```
-
-For example, you could require a certain dependency only for builds against python 3.4 and above:
-
-```yaml title="recipe.yaml"
-requirements:
-  build:
-    - if: match(python, '>=3.4')
-      then:
-        - some-dep
-```
-
-With a corresponding variant config that looks like the following:
-
-```yaml title="variant_config.yaml"
-python: ["3.2", "3.4", "3.6"]
-```
-
-Example: [`match` usage example](https://github.com/prefix-dev/rattler-build/tree/main/examples/match_and_cdt/recipe.yaml)
-
-#### `cdt` function
-
-This function helps add Core Dependency Tree packages as dependencies by converting packages as required according to hard-coded logic.
-
-```yaml
-# on x86_64 system
-cdt('package-name') # outputs: package-name-cos6-x86_64
-# on aarch64 system
-cdt('package-name') # outputs: package-name-cos6-aarch64
-```
-
-Example: [`cdt` usage example](https://github.com/prefix-dev/rattler-build/tree/main/examples/match_and_cdt/recipe.yaml)
+See the [Jinja reference](jinja.md) for the supported functions, filters,
+inline conditionals, and access to outer environment variables through the
+`env` object.
 
 ## Preprocessing selectors
 

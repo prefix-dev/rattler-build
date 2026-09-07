@@ -98,7 +98,8 @@ software.
 ## Reference documentation
 
 - [CLI Reference](https://rattler-build.prefix.dev/latest/reference/cli/)
+- [Glob syntax](https://rattler-build.prefix.dev/latest/reference/glob_syntax/)
 - [Jinja](https://rattler-build.prefix.dev/latest/reference/jinja/)
 - [Multi-Output Recipes](https://rattler-build.prefix.dev/latest/reference/multi_output/)
-- [The recipe spec](https://rattler-build.prefix.dev/latest/reference/recipe_file/)
+- [Recipe file reference](https://rattler-build.prefix.dev/latest/reference/recipe_file/)
 - [Rattler Index](https://rattler-build.prefix.dev/latest/rattler_index/)

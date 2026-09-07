@@ -10,36 +10,36 @@
       
       
       
-        <link rel="canonical" href="https://rattler-build.prefix.dev/latest/selectors/">
+        <link rel="canonical" href="https://rattler-build.prefix.dev/latest/reference/glob_syntax/">
       
       
-        <link rel="prev" href="../build_options/">
+        <link rel="prev" href="../recipe_file/">
       
       
-        <link rel="next" href="../build_script/">
+        <link rel="next" href="../multi_output/">
       
       
         
       
       
-      <link rel="icon" href="../assets/favicon.png">
+      <link rel="icon" href="../../assets/favicon.png">
       <meta name="generator" content="zensical-0.0.52">
     
     
       
-        <title>Selectors in recipes - Rattler-Build</title>
+        <title>Glob syntax - Rattler-Build</title>
       
     
     
       
         
       
-      <link rel="stylesheet" href="../assets/stylesheets/classic/main.4c04d108.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/classic/main.4c04d108.min.css">
       
         
           
         
-        <link rel="stylesheet" href="../assets/stylesheets/classic/palette.7dc9a0ad.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/classic/palette.7dc9a0ad.min.css">
       
       
 
@@ -58,9 +58,9 @@
       
     
     
-      <link rel="stylesheet" href="../stylesheets/extra.css">
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
     
-    <script>__md_scope=new URL("..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+    <script>__md_scope=new URL("../..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
     
       
 
@@ -85,7 +85,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#selectors-in-recipes" class="md-skip">
+        <a href="#glob-syntax" class="md-skip">
           Skip to content
         </a>
       
@@ -107,7 +107,7 @@
   <nav class="md-header__inner md-grid" aria-label="Header">
     <a href="https://rattler-build.prefix.dev" title="Rattler-Build" class="md-header__button md-logo" aria-label="Rattler-Build" data-md-component="logo">
       
-  <img src="../assets/rattler-build-logo-no-padding.svg" alt="Rattler-Build">
+  <img src="../../assets/rattler-build-logo-no-padding.svg" alt="Rattler-Build">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer" aria-label="Navigation">
@@ -124,7 +124,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Selectors in recipes
+              Glob syntax
             
           </span>
         </div>
@@ -225,7 +225,7 @@
   <label class="md-nav__title" for="__drawer">
     <a href="https://rattler-build.prefix.dev" title="Rattler-Build" class="md-nav__button md-logo" aria-label="Rattler-Build" data-md-component="logo">
       
-  <img src="../assets/rattler-build-logo-no-padding.svg" alt="Rattler-Build">
+  <img src="../../assets/rattler-build-logo-no-padding.svg" alt="Rattler-Build">
 
     </a>
     Rattler-Build
@@ -252,7 +252,7 @@
   
   
     <li class="md-nav__item">
-      <a href="./.." class="md-nav__link">
+      <a href="../.." class="md-nav__link">
         
   
   
@@ -278,7 +278,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../getting_started/" class="md-nav__link">
+      <a href="../../getting_started/" class="md-nav__link">
         
   
   
@@ -304,7 +304,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../highlevel/" class="md-nav__link">
+      <a href="../../highlevel/" class="md-nav__link">
         
   
   
@@ -330,7 +330,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../understanding_terminal_output/" class="md-nav__link">
+      <a href="../../understanding_terminal_output/" class="md-nav__link">
         
   
   
@@ -392,7 +392,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../tutorials/" class="md-nav__link ">
+            <a href="../../tutorials/" class="md-nav__link ">
               
   
   
@@ -434,7 +434,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../tutorials/python/" class="md-nav__link">
+      <a href="../../tutorials/python/" class="md-nav__link">
         
   
   
@@ -461,7 +461,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../tutorials/cpp/" class="md-nav__link">
+      <a href="../../tutorials/cpp/" class="md-nav__link">
         
   
   
@@ -488,7 +488,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../tutorials/javascript/" class="md-nav__link">
+      <a href="../../tutorials/javascript/" class="md-nav__link">
         
   
   
@@ -515,7 +515,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../tutorials/rust/" class="md-nav__link">
+      <a href="../../tutorials/rust/" class="md-nav__link">
         
   
   
@@ -542,7 +542,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../tutorials/go/" class="md-nav__link">
+      <a href="../../tutorials/go/" class="md-nav__link">
         
   
   
@@ -569,7 +569,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../tutorials/perl/" class="md-nav__link">
+      <a href="../../tutorials/perl/" class="md-nav__link">
         
   
   
@@ -596,7 +596,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../tutorials/r/" class="md-nav__link">
+      <a href="../../tutorials/r/" class="md-nav__link">
         
   
   
@@ -623,7 +623,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../tutorials/repackaging/" class="md-nav__link">
+      <a href="../../tutorials/repackaging/" class="md-nav__link">
         
   
   
@@ -650,7 +650,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../converting_from_conda_build/" class="md-nav__link">
+      <a href="../../converting_from_conda_build/" class="md-nav__link">
         
   
   
@@ -681,10 +681,8 @@
       
   
   
-    
   
   
-  
     
     
       
@@ -724,11 +722,11 @@
     
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
         
           
           <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
@@ -748,7 +746,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_6">
             <span class="md-nav__icon md-icon"></span>
             
@@ -765,7 +763,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../build_options/" class="md-nav__link">
+      <a href="../../build_options/" class="md-nav__link">
         
   
   
@@ -789,38 +787,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      
-        <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-  Selector syntax (if/then)
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="././" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../selectors/" class="md-nav__link">
         
   
   
@@ -835,82 +805,6 @@
   
 
       </a>
-      
-        
-
-
-<nav class="md-nav md-nav--secondary" aria-label="On this page">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      On this page
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#available-variables" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Available variables
-      </span>
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#variant-selectors" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Variant selectors
-      </span>
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#the-match-function" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        The <code>match</code> function
-      </span>
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#selector-evaluation" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Selector evaluation
-      </span>
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#alternatives-for-scalar-fields" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Alternatives for scalar fields
-      </span>
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -923,7 +817,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../build_script/" class="md-nav__link">
+      <a href="../../build_script/" class="md-nav__link">
         
   
   
@@ -950,7 +844,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../variants/" class="md-nav__link">
+      <a href="../../variants/" class="md-nav__link">
         
   
   
@@ -977,7 +871,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../config/" class="md-nav__link">
+      <a href="../../config/" class="md-nav__link">
         
   
   
@@ -1004,7 +898,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../compilers/" class="md-nav__link">
+      <a href="../../compilers/" class="md-nav__link">
         
   
   
@@ -1031,7 +925,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../experimental_features/" class="md-nav__link">
+      <a href="../../experimental_features/" class="md-nav__link">
         
   
   
@@ -1058,7 +952,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../v3/" class="md-nav__link">
+      <a href="../../v3/" class="md-nav__link">
         
   
   
@@ -1085,7 +979,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../multiple_output_cache/" class="md-nav__link">
+      <a href="../../multiple_output_cache/" class="md-nav__link">
         
   
   
@@ -1112,7 +1006,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../sandbox/" class="md-nav__link">
+      <a href="../../sandbox/" class="md-nav__link">
         
   
   
@@ -1139,7 +1033,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../recipe_generation/" class="md-nav__link">
+      <a href="../../recipe_generation/" class="md-nav__link">
         
   
   
@@ -1166,7 +1060,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../bump_recipe/" class="md-nav__link">
+      <a href="../../bump_recipe/" class="md-nav__link">
         
   
   
@@ -1193,7 +1087,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../create_patch/" class="md-nav__link">
+      <a href="../../create_patch/" class="md-nav__link">
         
   
   
@@ -1220,7 +1114,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../debugging_builds/" class="md-nav__link">
+      <a href="../../debugging_builds/" class="md-nav__link">
         
   
   
@@ -1247,7 +1141,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../tips_and_tricks/" class="md-nav__link">
+      <a href="../../tips_and_tricks/" class="md-nav__link">
         
   
   
@@ -1274,7 +1168,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../windows_quirks/" class="md-nav__link">
+      <a href="../../windows_quirks/" class="md-nav__link">
         
   
   
@@ -1359,7 +1253,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../testing/" class="md-nav__link">
+      <a href="../../testing/" class="md-nav__link">
         
   
   
@@ -1386,7 +1280,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../rebuild/" class="md-nav__link">
+      <a href="../../rebuild/" class="md-nav__link">
         
   
   
@@ -1477,7 +1371,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../authentication_and_upload/" class="md-nav__link">
+      <a href="../../authentication_and_upload/" class="md-nav__link">
         
   
   
@@ -1504,7 +1398,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../publish/" class="md-nav__link">
+      <a href="../../publish/" class="md-nav__link">
         
   
   
@@ -1531,7 +1425,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../sigstore/" class="md-nav__link">
+      <a href="../../sigstore/" class="md-nav__link">
         
   
   
@@ -1558,7 +1452,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../conda_forge/" class="md-nav__link">
+      <a href="../../conda_forge/" class="md-nav__link">
         
   
   
@@ -1585,7 +1479,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../automatic_linting/" class="md-nav__link">
+      <a href="../../automatic_linting/" class="md-nav__link">
         
   
   
@@ -1674,7 +1568,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../package_spec/" class="md-nav__link">
+      <a href="../../package_spec/" class="md-nav__link">
         
   
   
@@ -1701,7 +1595,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../special_files/" class="md-nav__link">
+      <a href="../../special_files/" class="md-nav__link">
         
   
   
@@ -1728,7 +1622,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../internals/" class="md-nav__link">
+      <a href="../../internals/" class="md-nav__link">
         
   
   
@@ -1755,7 +1649,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../system_integration/" class="md-nav__link">
+      <a href="../../system_integration/" class="md-nav__link">
         
   
   
@@ -1880,7 +1774,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../py-rattler-build/reference/" class="md-nav__link ">
+            <a href="../../py-rattler-build/reference/" class="md-nav__link ">
               
   
   
@@ -1922,7 +1816,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../py-rattler-build/reference/recipe/" class="md-nav__link">
+      <a href="../../py-rattler-build/reference/recipe/" class="md-nav__link">
         
   
   
@@ -1949,7 +1843,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../py-rattler-build/reference/rendering/" class="md-nav__link">
+      <a href="../../py-rattler-build/reference/rendering/" class="md-nav__link">
         
   
   
@@ -1976,7 +1870,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../py-rattler-build/reference/configuration/" class="md-nav__link">
+      <a href="../../py-rattler-build/reference/configuration/" class="md-nav__link">
         
   
   
@@ -2003,7 +1897,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../py-rattler-build/reference/package/" class="md-nav__link">
+      <a href="../../py-rattler-build/reference/package/" class="md-nav__link">
         
   
   
@@ -2030,7 +1924,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../py-rattler-build/reference/build_result/" class="md-nav__link">
+      <a href="../../py-rattler-build/reference/build_result/" class="md-nav__link">
         
   
   
@@ -2057,7 +1951,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../py-rattler-build/reference/upload/" class="md-nav__link">
+      <a href="../../py-rattler-build/reference/upload/" class="md-nav__link">
         
   
   
@@ -2084,7 +1978,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../py-rattler-build/reference/exceptions/" class="md-nav__link">
+      <a href="../../py-rattler-build/reference/exceptions/" class="md-nav__link">
         
   
   
@@ -2111,7 +2005,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../py-rattler-build/reference/recipe_generation/" class="md-nav__link">
+      <a href="../../py-rattler-build/reference/recipe_generation/" class="md-nav__link">
         
   
   
@@ -2138,7 +2032,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../py-rattler-build/reference/progress/" class="md-nav__link">
+      <a href="../../py-rattler-build/reference/progress/" class="md-nav__link">
         
   
   
@@ -2165,7 +2059,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../py-rattler-build/reference/package_assembler/" class="md-nav__link">
+      <a href="../../py-rattler-build/reference/package_assembler/" class="md-nav__link">
         
   
   
@@ -2192,7 +2086,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../py-rattler-build/reference/debug/" class="md-nav__link">
+      <a href="../../py-rattler-build/reference/debug/" class="md-nav__link">
         
   
   
@@ -2284,7 +2178,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../py-rattler-build/tutorials/recipe_rendering_basics/" class="md-nav__link">
+      <a href="../../py-rattler-build/tutorials/recipe_rendering_basics/" class="md-nav__link">
         
   
   
@@ -2311,7 +2205,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../py-rattler-build/tutorials/multi_output_and_staging/" class="md-nav__link">
+      <a href="../../py-rattler-build/tutorials/multi_output_and_staging/" class="md-nav__link">
         
   
   
@@ -2338,7 +2232,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../py-rattler-build/tutorials/inspecting_built_packages/" class="md-nav__link">
+      <a href="../../py-rattler-build/tutorials/inspecting_built_packages/" class="md-nav__link">
         
   
   
@@ -2365,7 +2259,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../py-rattler-build/tutorials/package_assembly/" class="md-nav__link">
+      <a href="../../py-rattler-build/tutorials/package_assembly/" class="md-nav__link">
         
   
   
@@ -2392,7 +2286,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../py-rattler-build/tutorials/debug_session/" class="md-nav__link">
+      <a href="../../py-rattler-build/tutorials/debug_session/" class="md-nav__link">
         
   
   
@@ -2431,8 +2325,10 @@
       
   
   
+    
   
   
+  
     
     
       
@@ -2452,11 +2348,11 @@
     
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_11" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_11" checked>
         
           
           <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="0">
@@ -2476,7 +2372,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_11">
             <span class="md-nav__icon md-icon"></span>
             
@@ -2493,7 +2389,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../reference/recipe_file/" class="md-nav__link">
+      <a href="../recipe_file/" class="md-nav__link">
         
   
   
@@ -2517,10 +2413,21 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../reference/glob_syntax/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      
+        <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+      
+        
+      
+      
+      <a href="././" class="md-nav__link md-nav__link--active">
         
   
   
@@ -2535,6 +2442,7 @@
   
 
       </a>
+      
     </li>
   
 
@@ -2547,7 +2455,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../reference/multi_output/" class="md-nav__link">
+      <a href="../multi_output/" class="md-nav__link">
         
   
   
@@ -2616,7 +2524,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../reference/cli/rattler-build/" class="md-nav__link ">
+            <a href="../cli/rattler-build/" class="md-nav__link ">
               
   
   
@@ -2658,7 +2566,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../reference/cli/rattler-build/build/" class="md-nav__link">
+      <a href="../cli/rattler-build/build/" class="md-nav__link">
         
   
   
@@ -2685,7 +2593,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../reference/cli/rattler-build/publish/" class="md-nav__link">
+      <a href="../cli/rattler-build/publish/" class="md-nav__link">
         
   
   
@@ -2712,7 +2620,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../reference/cli/rattler-build/test/" class="md-nav__link">
+      <a href="../cli/rattler-build/test/" class="md-nav__link">
         
   
   
@@ -2739,7 +2647,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../reference/cli/rattler-build/rebuild/" class="md-nav__link">
+      <a href="../cli/rattler-build/rebuild/" class="md-nav__link">
         
   
   
@@ -2796,7 +2704,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../reference/cli/rattler-build/upload/" class="md-nav__link ">
+            <a href="../cli/rattler-build/upload/" class="md-nav__link ">
               
   
   
@@ -2838,7 +2746,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../reference/cli/rattler-build/upload/quetz/" class="md-nav__link">
+      <a href="../cli/rattler-build/upload/quetz/" class="md-nav__link">
         
   
   
@@ -2865,7 +2773,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../reference/cli/rattler-build/upload/artifactory/" class="md-nav__link">
+      <a href="../cli/rattler-build/upload/artifactory/" class="md-nav__link">
         
   
   
@@ -2892,7 +2800,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../reference/cli/rattler-build/upload/prefix/" class="md-nav__link">
+      <a href="../cli/rattler-build/upload/prefix/" class="md-nav__link">
         
   
   
@@ -2919,7 +2827,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../reference/cli/rattler-build/upload/anaconda/" class="md-nav__link">
+      <a href="../cli/rattler-build/upload/anaconda/" class="md-nav__link">
         
   
   
@@ -2946,7 +2854,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../reference/cli/rattler-build/upload/cloudsmith/" class="md-nav__link">
+      <a href="../cli/rattler-build/upload/cloudsmith/" class="md-nav__link">
         
   
   
@@ -2973,7 +2881,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../reference/cli/rattler-build/upload/s3/" class="md-nav__link">
+      <a href="../cli/rattler-build/upload/s3/" class="md-nav__link">
         
   
   
@@ -3008,7 +2916,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../reference/cli/rattler-build/completion/" class="md-nav__link">
+      <a href="../cli/rattler-build/completion/" class="md-nav__link">
         
   
   
@@ -3061,7 +2969,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../reference/cli/rattler-build/generate-recipe/" class="md-nav__link ">
+            <a href="../cli/rattler-build/generate-recipe/" class="md-nav__link ">
               
   
   
@@ -3103,7 +3011,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../reference/cli/rattler-build/generate-recipe/pypi/" class="md-nav__link">
+      <a href="../cli/rattler-build/generate-recipe/pypi/" class="md-nav__link">
         
   
   
@@ -3130,7 +3038,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../reference/cli/rattler-build/generate-recipe/cran/" class="md-nav__link">
+      <a href="../cli/rattler-build/generate-recipe/cran/" class="md-nav__link">
         
   
   
@@ -3157,7 +3065,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../reference/cli/rattler-build/generate-recipe/cpan/" class="md-nav__link">
+      <a href="../cli/rattler-build/generate-recipe/cpan/" class="md-nav__link">
         
   
   
@@ -3184,7 +3092,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../reference/cli/rattler-build/generate-recipe/luarocks/" class="md-nav__link">
+      <a href="../cli/rattler-build/generate-recipe/luarocks/" class="md-nav__link">
         
   
   
@@ -3245,7 +3153,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../reference/cli/rattler-build/auth/" class="md-nav__link ">
+            <a href="../cli/rattler-build/auth/" class="md-nav__link ">
               
   
   
@@ -3287,7 +3195,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../reference/cli/rattler-build/auth/login/" class="md-nav__link">
+      <a href="../cli/rattler-build/auth/login/" class="md-nav__link">
         
   
   
@@ -3314,7 +3222,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../reference/cli/rattler-build/auth/logout/" class="md-nav__link">
+      <a href="../cli/rattler-build/auth/logout/" class="md-nav__link">
         
   
   
@@ -3341,7 +3249,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../reference/cli/rattler-build/auth/token/" class="md-nav__link">
+      <a href="../cli/rattler-build/auth/token/" class="md-nav__link">
         
   
   
@@ -3368,7 +3276,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../reference/cli/rattler-build/auth/status/" class="md-nav__link">
+      <a href="../cli/rattler-build/auth/status/" class="md-nav__link">
         
   
   
@@ -3435,7 +3343,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../reference/cli/rattler-build/debug/" class="md-nav__link ">
+            <a href="../cli/rattler-build/debug/" class="md-nav__link ">
               
   
   
@@ -3477,7 +3385,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../reference/cli/rattler-build/debug/setup/" class="md-nav__link">
+      <a href="../cli/rattler-build/debug/setup/" class="md-nav__link">
         
   
   
@@ -3504,7 +3412,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../reference/cli/rattler-build/debug/shell/" class="md-nav__link">
+      <a href="../cli/rattler-build/debug/shell/" class="md-nav__link">
         
   
   
@@ -3531,7 +3439,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../reference/cli/rattler-build/debug/host-add/" class="md-nav__link">
+      <a href="../cli/rattler-build/debug/host-add/" class="md-nav__link">
         
   
   
@@ -3558,7 +3466,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../reference/cli/rattler-build/debug/build-add/" class="md-nav__link">
+      <a href="../cli/rattler-build/debug/build-add/" class="md-nav__link">
         
   
   
@@ -3585,7 +3493,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../reference/cli/rattler-build/debug/workdir/" class="md-nav__link">
+      <a href="../cli/rattler-build/debug/workdir/" class="md-nav__link">
         
   
   
@@ -3612,7 +3520,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../reference/cli/rattler-build/debug/run/" class="md-nav__link">
+      <a href="../cli/rattler-build/debug/run/" class="md-nav__link">
         
   
   
@@ -3639,7 +3547,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../reference/cli/rattler-build/debug/create-patch/" class="md-nav__link">
+      <a href="../cli/rattler-build/debug/create-patch/" class="md-nav__link">
         
   
   
@@ -3696,7 +3604,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../reference/cli/rattler-build/package/" class="md-nav__link ">
+            <a href="../cli/rattler-build/package/" class="md-nav__link ">
               
   
   
@@ -3738,7 +3646,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../reference/cli/rattler-build/package/inspect/" class="md-nav__link">
+      <a href="../cli/rattler-build/package/inspect/" class="md-nav__link">
         
   
   
@@ -3765,7 +3673,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../reference/cli/rattler-build/package/extract/" class="md-nav__link">
+      <a href="../cli/rattler-build/package/extract/" class="md-nav__link">
         
   
   
@@ -3800,7 +3708,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../reference/cli/rattler-build/bump-recipe/" class="md-nav__link">
+      <a href="../cli/rattler-build/bump-recipe/" class="md-nav__link">
         
   
   
@@ -3827,7 +3735,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../reference/cli/rattler-build/migrate-recipe/" class="md-nav__link">
+      <a href="../cli/rattler-build/migrate-recipe/" class="md-nav__link">
         
   
   
@@ -3862,7 +3770,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../reference/jinja/" class="md-nav__link">
+      <a href="../jinja/" class="md-nav__link">
         
   
   
@@ -3889,7 +3797,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../rattler_index/" class="md-nav__link">
+      <a href="../../rattler_index/" class="md-nav__link">
         
   
   
@@ -3938,69 +3846,6 @@
     
   
   
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      On this page
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#available-variables" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Available variables
-      </span>
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#variant-selectors" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Variant selectors
-      </span>
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#the-match-function" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        The <code>match</code> function
-      </span>
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#selector-evaluation" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Selector evaluation
-      </span>
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#alternatives-for-scalar-fields" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Alternatives for scalar fields
-      </span>
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
 </nav>
                   </div>
                 </div>
@@ -4014,7 +3859,7 @@
                 
                   
   
-    <a href="https://github.com/prefix-dev/rattler-build/edit/main/docs/selectors.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+    <a href="https://github.com/prefix-dev/rattler-build/edit/main/docs/reference/glob_syntax.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.71 7.04c.39-.39.39-1.04 0-1.41l-2.34-2.34c-.37-.39-1.02-.39-1.41 0l-1.84 1.83 3.75 3.75M3 17.25V21h3.75L17.81 9.93l-3.75-3.75z"/></svg>
     </a>
@@ -4022,214 +3867,79 @@
   
 
 
-<h1 id="selectors-in-recipes">Selectors in recipes<a class="headerlink" href="#selectors-in-recipes" title="Permanent link">#</a></h1>
-<p>Recipe and variant configuration files can utilize selectors to conditionally
-add, remove, or modify dependencies, configuration options, or even skip recipe
-execution based on specific conditions.</p>
-<p>Selectors are implemented using an <code>if / then / else</code> map, which is a
-valid YAML dictionary. The condition is evaluated using <a href="https://github.com/mitsuhiko/minijinja"><code>minijinja</code></a> and
-follows
-the same syntax as a Python expression.</p>
-<p>During rendering, several variables are set based on the platform and variant
-being built. For example, the <code>unix</code> variable is true when the host platform is macOS or Linux, while
-<code>win</code> is true when the host platform is Windows. Consider the following recipe executed on Linux:</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">requirements</span><span class="p">:</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">host</span><span class="p">:</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">unix</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">      </span><span class="nt">then</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">unix-tool</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">win</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">      </span><span class="nt">then</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">win-tool</span>
-</span></code></pre></div>
-<p>This will be evaluated as:</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">requirements</span><span class="p">:</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">host</span><span class="p">:</span>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">unix-tool</span>
-</span></code></pre></div>
-<p>The line containing the Windows-specific configuration is removed. Multiple
-items can also be selected, such as:</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">host</span><span class="p">:</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">linux</span>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">    </span><span class="nt">then</span><span class="p">:</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">linux-tool-1</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">linux-tool-2</span>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">linux-tool-3</span>
-</span></code></pre></div>
-<p>For Linux, this will result in:</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">host</span><span class="p">:</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">linux-tool-1</span>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">linux-tool-2</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">linux-tool-3</span>
-</span></code></pre></div>
-<p>Other examples often found in the wild:</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">build_platform != target_platform ...</span><span class="w"> </span><span class="c1"># true if cross-platform build</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">osx and arm64 ...</span><span class="w"> </span><span class="c1"># true for apple silicon (osx-arm64)</span>
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">linux and (aarch64 or ppc64le)) ...</span><span class="w"> </span><span class="c1"># true for linux ppc64le or linux-aarch64</span>
-</span></code></pre></div>
-<h3 id="available-variables">Available variables<a class="headerlink" href="#available-variables" title="Permanent link">#</a></h3>
-<p>The following variables are available during rendering of the recipe:</p>
+<h1 id="glob-syntax">Glob syntax<a class="headerlink" href="#glob-syntax" title="Permanent link">#</a></h1>
+<p>Recipe fields that select paths use the Rust
+<a href="https://docs.rs/globset/latest/globset/#syntax"><code>globset</code></a> syntax.</p>
 <table>
 <thead>
 <tr>
-<th>Variable</th>
-<th>Description</th>
+<th>Pattern</th>
+<th>Matches</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>target_platform</code></td>
-<td>the configured <code>target_platform</code> for the build</td>
+<td><code>?</code></td>
+<td>Any single character</td>
 </tr>
 <tr>
-<td><code>build_platform</code></td>
-<td>the configured <code>build_platform</code> for the build</td>
+<td><code>*</code></td>
+<td>Zero or more characters, including path separators</td>
 </tr>
 <tr>
-<td><code>host_platform</code></td>
-<td>the configured <code>host_platform</code> for the build</td>
+<td><code>**</code></td>
+<td>Directories recursively</td>
 </tr>
 <tr>
-<td><code>linux</code></td>
-<td>"true" if <code>host_platform</code> is Linux</td>
+<td><code>{a,b}</code></td>
+<td>Either <code>a</code> or <code>b</code>; alternatives cannot be nested</td>
 </tr>
 <tr>
-<td><code>osx</code></td>
-<td>"true" if <code>host_platform</code> is OSX / macOS</td>
+<td><code>[ab]</code></td>
+<td>Either <code>a</code> or <code>b</code></td>
 </tr>
 <tr>
-<td><code>win</code></td>
-<td>"true" if <code>host_platform</code> is Windows</td>
+<td><code>[a-z]</code></td>
+<td>Any character in the range <code>a</code> through <code>z</code></td>
 </tr>
 <tr>
-<td><code>ios</code></td>
-<td>"true" if <code>host_platform</code> is iOS (device or simulator)</td>
+<td><code>[!ab]</code></td>
+<td>Any character except <code>a</code> or <code>b</code></td>
 </tr>
 <tr>
-<td><code>iossimulator</code></td>
-<td>"true" if <code>host_platform</code> is an iOS simulator</td>
-</tr>
-<tr>
-<td><code>android</code></td>
-<td>"true" if <code>host_platform</code> is Android</td>
-</tr>
-<tr>
-<td><code>unix</code></td>
-<td>"true" if <code>host_platform</code> is a Unix (macOS, Linux, iOS or Android)</td>
-</tr>
-<tr>
-<td><code>x86</code>, <code>x86_64</code></td>
-<td>x86 32/64-bit Architecture (based on <code>host_platform</code>)</td>
-</tr>
-<tr>
-<td><code>aarch64</code></td>
-<td>64-bit Arm (if <code>host_platform</code> is <code>linux-aarch64</code> or <code>android-aarch64</code>)</td>
-</tr>
-<tr>
-<td><code>arm64</code></td>
-<td>64-bit Arm (if <code>host_platform</code> is <code>osx-arm64</code>, <code>win-arm64</code> or <code>ios-*</code>)</td>
-</tr>
-<tr>
-<td><code>armV6l</code>, <code>armV7l</code></td>
-<td>32-bit Arm</td>
-</tr>
-<tr>
-<td><code>armv7a</code></td>
-<td>32-bit Arm using Android's <code>armeabi-v7a</code> ABI</td>
-</tr>
-<tr>
-<td><code>ppc64</code>, <code>s390x</code>,</td>
-<td>Big endian</td>
-</tr>
-<tr>
-<td><code>ppc64le</code></td>
-<td>Little endian</td>
-</tr>
-<tr>
-<td><code>riscv32</code>, <code>riscv64</code></td>
-<td>The <a href="https://wikipedia.org/wiki/RISC-V">RISC-V</a> Architecture</td>
-</tr>
-<tr>
-<td><code>wasm32</code></td>
-<td>The <a href="https://wikipedia.org/wiki/WebAssembly">WebAssembly</a> Architecture</td>
+<td><code>[*]</code></td>
+<td>A literal <code>*</code></td>
 </tr>
 </tbody>
 </table>
-<div class="admonition note">
-<p class="admonition-title">iOS and Android are not <code>osx</code> / <code>linux</code></p>
-<p>Although iOS is Mach-O based like macOS, and Android is ELF based like Linux, they
-are <em>distinct</em> platform families: <code>osx</code> is false on iOS and <code>linux</code> is false on
-Android. Both are <code>unix</code>. Use <code>ios</code> / <code>android</code> to select them, and note that
-<code>ios</code> also covers the simulator targets (use <code>iossimulator</code> for the narrower case).</p>
-</div>
-<h3 id="variant-selectors">Variant selectors<a class="headerlink" href="#variant-selectors" title="Permanent link">#</a></h3>
-<p>To select based on <a href="../variants/">variant configuration</a> you can use the names in the selectors as well.
-For example, if the build uses <code>python: 3.8</code> as a variant, we can use <code>if: python == "3.8"</code> to enable a dependency for
-only
-when the Python version is 3.8.</p>
-<div class="admonition note">
-<p class="admonition-title">String comparison</p>
-</div>
-<p>The comparison is a string comparison done by <a href="https://github.com/mitsuhiko/minijinja"><code>minijinja</code></a>, so it is important to use the correct string
-representation of the variant.
-Use the <code>match</code> function to compare versions.</p>
-<div class="language-yaml highlight"><span class="filename">variants.yaml</span><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nt">python</span><span class="p">:</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3.8</span>
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3.9</span>
+<p>A pattern that names a directory also matches its contents. For example, both
+<code>share/</code> and <code>share</code> match files below that directory. <code>.</code> and <code>./</code> match
+everything.</p>
+<p>Alternatives can replace platform selectors when only a file extension differs:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">files</span><span class="p">:</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">lib/libclang-cpp.{dylib,so}</span>
 </span></code></pre></div>
-<div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nt">requirements</span><span class="p">:</span>
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="nt">host</span><span class="p">:</span>
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python == &quot;3.8&quot;</span><span class="w"> </span><span class="c1"># (1)!</span>
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">      </span><span class="nt">then</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mydep</span>
-</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">      </span><span class="nt">else</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">otherdep</span>
+<p>This matches <code>lib/libclang-cpp.dylib</code> and <code>lib/libclang-cpp.so</code>.</p>
+<p>Patterns can also use an <code>include</code>/<code>exclude</code> mapping. If <code>include</code> is empty,
+every path is included before the exclusions are applied:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">files</span><span class="p">:</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span><span class="nt">include</span><span class="p">:</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">include/**/*.h</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">    </span><span class="nt">exclude</span><span class="p">:</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">include/**/private.h</span>
 </span></code></pre></div>
-<ol>
-<li>This will only add <code>mydep</code> when the Python version is 3.8. This comparison is a string comparison, so it is important
-   to
-   use the correct string representation of the variant.</li>
-</ol>
-<h3 id="the-match-function">The <code>match</code> function<a class="headerlink" href="#the-match-function" title="Permanent link">#</a></h3>
-<p>!!!  note "Rename from <code>cmp</code> to <code>match</code>"
-    The <code>cmp</code> function has been renamed to <code>match</code> to better reflect its purpose.</p>
-<p>Inside selectors, one can use a special <code>match</code> function to test if the selected variant version has a matching version.
-For example, having the following variants file, we could use the these tests:</p>
-<div class="language-yaml highlight"><span class="filename">variants.yaml</span><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nt">python</span><span class="p">:</span>
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3.8</span>
-</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3.9</span>
-</span></code></pre></div>
-<div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">match(python, &quot;3.8&quot;)</span><span class="w">    </span><span class="c1"># true, false</span>
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span><span class="nt">then</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mydep</span>
-</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">match(python, &quot;&gt;=3.8&quot;)</span><span class="w">  </span><span class="c1"># true, true</span>
-</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">  </span><span class="nt">then</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mydep</span>
-</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">match(python, &quot;&lt;3.8&quot;)</span><span class="w">   </span><span class="c1"># false, false (1)</span>
-</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">  </span><span class="nt">then</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mydep</span>
-</span></code></pre></div>
-<ol>
-<li><code>else:</code> would also have worked here.</li>
-</ol>
-<p>This function eliminates the need to implement any Python-specific <code>conda-build</code>
-selectors (such as <code>py3k</code>, <code>py38</code>, etc.) or the <code>py</code> and <code>npy</code> integers.</p>
-<p>Please note that during the <em>initial</em> phase of rendering we do not know the
-variant, and thus the <code>match</code> condition always evaluates to <code>true</code>.</p>
-<h3 id="selector-evaluation">Selector evaluation<a class="headerlink" href="#selector-evaluation" title="Permanent link">#</a></h3>
-<p>Except for the Rattler-Build specific selectors, the selectors are evaluated using the <code>minijinja</code> engine. This means
-that the selectors are evaluated by <a href="https://github.com/mitsuhiko/minijinja"><code>minijinja</code></a> thus Python like expressions.
-Some notable options are:</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python == &quot;3.8&quot;</span><span class="w"> </span><span class="c1"># equal</span>
-</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python != &quot;3.8&quot;</span><span class="w"> </span><span class="c1"># not equal</span>
-</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python and linux</span><span class="w"> </span><span class="c1"># true if python variant is set and the host_platform is linux</span>
-</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python and not linux</span><span class="w"> </span><span class="c1"># true if python variant is set and the host_platform is not linux</span>
-</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python and (linux or osx)</span><span class="w"> </span><span class="c1"># true if python variant is set and the host_platform is linux or osx</span>
-</span></code></pre></div>
-<h3 id="alternatives-for-scalar-fields">Alternatives for scalar fields<a class="headerlink" href="#alternatives-for-scalar-fields" title="Permanent link">#</a></h3>
-<p>Some fields accept scalars rather than lists, and selectors cannot be used. Alternatives include:</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nt">string</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ &quot;foobar&quot; if USE_OPENMP else &quot;bla&quot; }}</span>
-</span></code></pre></div>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="nt">string</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
-</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="w">  </span><span class="no">{% if USE_OPENMP %}</span>
-</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="w">     </span><span class="no">blablabla</span>
-</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="w">  </span><span class="no">{% else %}</span>
-</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="w">     </span><span class="no">blabla</span>
-</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="w">  </span><span class="no">{% endif %}</span>
-</span></code></pre></div>
+<p>The matching root depends on the field:</p>
+<ul>
+<li><code>source.filter</code> patterns are relative to the copied or extracted source tree.</li>
+<li><code>build.files</code>, <code>always_include_files</code>, and other build file patterns are
+  relative to the package prefix.</li>
+<li><code>tests.package_contents</code> patterns are relative to the installed test prefix.</li>
+</ul>
+<p>YAML quotes are required when a pattern starts with <code>*</code>, because an unquoted
+asterisk denotes a YAML alias. For example, write <code>"**/*.txt"</code>, not
+<code>**/*.txt</code>.</p>
 
 
 
@@ -4300,9 +4010,9 @@ Some notable options are:</p>
           
             
             <a
-              href="../build_options/"
+              href="../recipe_file/"
               class="md-footer__link md-footer__link--prev"
-              aria-label="Previous: Advanced options"
+              aria-label="Previous: Recipe file"
             >
               <div class="md-footer__button md-icon">
                 
@@ -4313,7 +4023,7 @@ Some notable options are:</p>
                   Previous
                 </span>
                 <div class="md-ellipsis">
-                  Advanced options
+                  Recipe file
                 </div>
               </div>
             </a>
@@ -4323,16 +4033,16 @@ Some notable options are:</p>
           
             
             <a
-              href="../build_script/"
+              href="../multi_output/"
               class="md-footer__link md-footer__link--next"
-              aria-label="Next: Build script"
+              aria-label="Next: Multi-Output Recipes"
             >
               <div class="md-footer__title">
                 <span class="md-footer__direction">
                   Next
                 </span>
                 <div class="md-ellipsis">
-                  Build script
+                  Multi-Output Recipes
                 </div>
               </div>
               <div class="md-footer__button md-icon">
@@ -4358,8 +4068,8 @@ Some notable options are:</p>
         <!-- prefix logo -->
         <div class="md-footer-meta__item md-footer-meta__item--prefix-logo">
             <a href="https://prefix.dev" target="_blank">
-                <img class="prefix-logo prefix-logo__dark" src="../assets/logo_dark.svg" alt="">
-                <img class="prefix-logo prefix-logo__light" src="../assets/logo_light.svg" alt="">
+                <img class="prefix-logo prefix-logo__dark" src="../../assets/logo_dark.svg" alt="">
+                <img class="prefix-logo prefix-logo__light" src="../../assets/logo_light.svg" alt="">
             </a>
         </div>
 
@@ -4431,10 +4141,10 @@ Some notable options are:</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate":null,"base":"..","features":["content.tabs.link","content.code.copy","content.action.edit","content.code.annotate","content.tooltips","navigation.instant","navigation.instant.progress","navigation.tracking","navigation.indexes","navigation.top","navigation.footer"],"search":"../assets/javascripts/workers/search.7d14d953.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":{"provider":"mike"}}</script>
+      <script id="__config" type="application/json">{"annotate":null,"base":"../..","features":["content.tabs.link","content.code.copy","content.action.edit","content.code.annotate","content.tooltips","navigation.instant","navigation.instant.progress","navigation.tracking","navigation.indexes","navigation.top","navigation.footer"],"search":"../../assets/javascripts/workers/search.7d14d953.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":{"provider":"mike"}}</script>
     
     
-      <script src="../assets/javascripts/bundle.ed145cee.min.js"></script>
+      <script src="../../assets/javascripts/bundle.ed145cee.min.js"></script>
       
     
   </body>
