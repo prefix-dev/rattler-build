@@ -2,7 +2,7 @@ use content_inspector::ContentType;
 use fs_err as fs;
 use rattler_conda_types::PrefixRecord;
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeSet, HashMap, HashSet},
     io::{self, Read},
     path::{Path, PathBuf},
 };
@@ -95,6 +95,8 @@ pub struct Files {
 pub struct TempFiles {
     /// The files that are copied to the temporary directory
     pub files: HashSet<PathBuf>,
+    /// Accepted source paths relative to the prefix, before noarch remapping.
+    pub packaged_prefix_files: BTreeSet<PathBuf>,
     /// The temporary directory where the files are copied to
     pub temp_dir: tempfile::TempDir,
     /// The prefix which is encoded in the files (the long placeholder for the actual prefix, e.g. /home/user/bld_placeholder...)
@@ -329,6 +331,7 @@ impl Files {
     pub fn to_temp_folder(&self, output: &Output) -> Result<TempFiles, PackagingError> {
         let temp_dir = TempDir::with_prefix(output.name().as_normalized())?;
         let mut files = HashSet::new();
+        let mut packaged_prefix_files = BTreeSet::new();
         let mut content_type_map = HashMap::new();
         for f in &self.new_files {
             // temporary measure to remove pyc files that are not supposed to be there
@@ -339,11 +342,13 @@ impl Files {
             if let Some(dest_file) = output.write_to_dest(f, &self.prefix, temp_dir.path())? {
                 content_type_map.insert(dest_file.clone(), content_type(f)?);
                 files.insert(dest_file);
+                packaged_prefix_files.insert(f.strip_prefix(&self.prefix)?.to_path_buf());
             }
         }
 
         Ok(TempFiles {
             files,
+            packaged_prefix_files,
             temp_dir,
             encoded_prefix: self.prefix.clone(),
             content_type_map,

@@ -1,6 +1,6 @@
 //! Common types used throughout Rattler-Build
 //! All the metadata that makes up a recipe file
-use std::{iter, path::PathBuf, str::FromStr};
+use std::{collections::BTreeSet, iter, path::PathBuf, str::FromStr};
 
 use jiff::Timestamp;
 use rattler_conda_types::{
@@ -139,6 +139,9 @@ pub struct BuildSummary {
     pub warnings: Vec<String>,
     /// The paths that are packaged in the artifact
     pub paths: Option<PathsJson>,
+    /// The prefix-relative files that were selected for packaging (before any
+    /// noarch path remapping)
+    pub packaged_prefix_files: Option<BTreeSet<PathBuf>>,
     ///  Whether the build was successful or not
     pub failed: bool,
 }

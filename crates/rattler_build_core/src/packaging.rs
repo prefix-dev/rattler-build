@@ -20,7 +20,7 @@ use rattler_package_streaming::write::{write_conda_package, write_tar_bz2_packag
 use unicode_normalization::UnicodeNormalization;
 
 mod file_finder;
-mod file_mapper;
+pub(crate) mod file_mapper;
 mod metadata;
 pub use file_finder::{Files, TempFiles, content_type, read_package_files_list, record_files};
 pub use metadata::{contains_prefix_binary, contains_prefix_text, create_prefix_placeholder};
@@ -989,6 +989,8 @@ pub fn package_conda(
     tracing::info!("Archive written to '{}'", final_name.display());
 
     let paths_json = PathsJson::from_path(info_folder.join("paths.json"))?;
+    // Only successful packaging marks a consumer's file usage as known.
+    output.record_packaged_prefix_files(tmp.packaged_prefix_files);
     Ok((final_name, paths_json))
 }
 

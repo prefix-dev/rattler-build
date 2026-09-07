@@ -101,6 +101,10 @@ e.g. `tar-bz2:<number>` (from 1 to 9) or `conda:<number>` (from -7 to
 :  Error if the host prefix is detected in any binary files
 - <a id="arg---allow-symlinks-on-windows" href="#arg---allow-symlinks-on-windows">`--allow-symlinks-on-windows`</a>
 :  Allow symlinks in packages on Windows (defaults to false - symlinks are forbidden on Windows)
+- <a id="arg---error-overlapping-files" href="#arg---error-overlapping-files">`--error-overlapping-files`</a>
+:  Error instead of warn when outputs of one recipe package the same file
+- <a id="arg---error-unused-staging-files" href="#arg---error-unused-staging-files">`--error-unused-staging-files`</a>
+:  Error instead of warn when files from a staging cache are not included in any output that inherits from it
 - <a id="arg---exclude-newer" href="#arg---exclude-newer">`--exclude-newer <EXCLUDE_NEWER>`</a>
 :  Exclude packages newer than this date from the solver, in RFC3339 format (e.g. 2024-03-15T12:00:00Z)
 

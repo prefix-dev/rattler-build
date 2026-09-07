@@ -37,6 +37,8 @@ def build_recipes(
     allow_insecure_host: list[str] | None = None,
     continue_on_failure: bool = False,
     error_prefix_in_binary: bool = False,
+    error_overlapping_files: bool = False,
+    error_unused_staging_files: bool = False,
     allow_symlinks_on_windows: bool = False,
     allow_absolute_license_paths: bool = False,
     exclude_newer: datetime | None = None,
@@ -80,6 +82,8 @@ def build_recipes(
         allow_insecure_host: Allow insecure hosts for the build.
         continue_on_failure: Continue building other recipes even if one fails. (default: False)
         error_prefix_in_binary: Do not allow the $PREFIX to appear in binary files. (default: False)
+        error_overlapping_files: Error if outputs package overlapping files. (default: False)
+        error_unused_staging_files: Error if staged files are not packaged by any inheriting output. (default: False)
         allow_symlinks_on_windows: Allow symlinks on Windows and `noarch` packages. (default: False)
         allow_absolute_license_paths: Allow absolute paths in license files. (default: False)
         exclude_newer: Exclude any packages that were released after the specified date when solving the build, host and test environments. (default: None)
@@ -135,6 +139,8 @@ def build_recipes(
         use_zstd,
         use_sharded,
         repodata_revision,
+        error_overlapping_files,
+        error_unused_staging_files,
     )
 
 
