@@ -14,7 +14,8 @@ def clean_path_on_win32():
     if sys.platform == "win32":
         original_path = os.environ.get("PATH", "")
         try:
-            os.environ["PATH"] = ""
+            system_root = os.environ.get("SystemRoot", r"C:\Windows")
+            os.environ["PATH"] = str(Path(system_root) / "System32")
             yield
         finally:
             os.environ["PATH"] = original_path

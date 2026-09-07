@@ -156,7 +156,6 @@ pub fn relink(temp_files: &TempFiles, output: &Output) -> Result<(), RelinkError
         // skip linking checks for wasm
         || target_platform.arch() == Some(Arch::Wasm32)
         || target_platform.arch() == Some(Arch::Wasm64)
-        || relocation_config.is_none()
     {
         return Ok(());
     }
@@ -187,13 +186,10 @@ pub fn relink(temp_files: &TempFiles, output: &Output) -> Result<(), RelinkError
             }
 
             let rel_path = p.strip_prefix(tmp_prefix)?;
-            if !relocation_config.is_match(rel_path) {
-                return Ok(None);
-            }
 
             match get_relinker(target_platform, p) {
                 Ok(relinker) => {
-                    if !target_platform.is_windows() {
+                    if !target_platform.is_windows() && relocation_config.is_match(rel_path) {
                         relinker.relink(
                             tmp_prefix,
                             encoded_prefix,
