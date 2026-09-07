@@ -148,6 +148,12 @@ lists with their own entries rather than replacing them. If a key appears in bot
 lists, `ignore_keys` takes precedence. Included keys are available to build scripts
 as environment variables.
 
+Ignored keys remain available to recipe expressions during rendering. Combinations
+that produce the same package identity are deduplicated before building; do not
+rely on an ignored key to distinguish package contents. The top-level
+`down_prioritize_variant` is inherited independently of these lists; an output
+can override it explicitly, including with `0`.
+
 ### Zip keys
 
 Zip keys modify how variants are combined. Usually, each variant key that has multiple

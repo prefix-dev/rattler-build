@@ -1699,6 +1699,7 @@ recipe:
 
 build:
   variant:
+    down_prioritize_variant: 3
     use_keys:
       - parent_key
       - ignored_key
@@ -1728,13 +1729,14 @@ outputs:
     build:
       script: echo $parent_key ${{ ignored_key }}
       variant:
+        down_prioritize_variant: 0
         use_keys:
           - output_key
           - ignored_key
 "#;
 
         let variant_config = VariantConfig::from_yaml_str(
-            "parent_key: [parent]\noutput_key: [output]\nignored_key: [ignored]\noutput_ignored_key: [ignored]\n",
+            "parent_key: [parent]\noutput_key: [output]\nignored_key: [ignored_a, ignored_b]\noutput_ignored_key: [ignored_a, ignored_b]\n",
         )
         .unwrap();
         let recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
@@ -1742,7 +1744,19 @@ outputs:
             render_recipe_with_variant_config(&recipe, &variant_config, RenderConfig::new())
                 .unwrap();
 
-        assert_eq!(rendered.len(), 2);
+        // Rendering retains combinations for expression evaluation and sibling
+        // pin matching. The CLI deduplicates the resulting package identities.
+        assert_eq!(rendered.len(), 8);
+        let identities: HashSet<_> = rendered
+            .iter()
+            .map(|output| {
+                (
+                    output.recipe.package.name.clone(),
+                    output.recipe.build.string.as_resolved().unwrap(),
+                )
+            })
+            .collect();
+        assert_eq!(identities.len(), 2);
         for output in &rendered {
             assert_eq!(
                 output.variant.get(&"parent_key".into()),
@@ -1768,6 +1782,7 @@ outputs:
                 .contains_key(&"ignored_key".into())
         );
         assert!(!staged.variant.contains_key(&"output_ignored_key".into()));
+        assert_eq!(staged.recipe.build.variant.down_prioritize_variant, Some(3));
         assert_eq!(
             staged.recipe.build.variant.ignore_keys,
             ["output_ignored_key", "ignored_key"]
@@ -1777,6 +1792,7 @@ outputs:
             .iter()
             .find(|output| output.recipe.package.name.as_normalized() == "direct")
             .unwrap();
+        assert_eq!(direct.recipe.build.variant.down_prioritize_variant, Some(0));
         assert_eq!(
             direct.variant.get(&"output_key".into()),
             Some(&Variable::from_string("output"))

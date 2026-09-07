@@ -3165,6 +3165,9 @@ fn merge_stage1_build(
         toplevel.variant
     } else {
         let mut variant = output.variant;
+        variant.down_prioritize_variant = variant
+            .down_prioritize_variant
+            .or(toplevel.variant.down_prioritize_variant);
         for key in toplevel.variant.use_keys {
             if !variant.use_keys.contains(&key) {
                 variant.use_keys.push(key);

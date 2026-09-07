@@ -88,7 +88,7 @@ impl Output {
     ///
     /// The cache key is based on:
     /// - The staging cache configuration (requirements, sources)
-    /// - The relevant variant variables (those used in the requirements)
+    /// - The staging build's used variants, including top-level use_keys
     /// - The build and host platforms
     pub fn staging_cache_key(&self, staging: &StagingCache) -> Result<String, StagingError> {
         // Collect variant variable names that are used in the staging requirements
@@ -134,8 +134,15 @@ impl Output {
                 .into(),
         );
 
-        // Create the cache key from staging config + selected variant + prefix
-        let cache_key = (&staging, &selected_variant, self.prefix());
+        // used_variant is skipped by StagingCache serialization, so include it
+        // explicitly: forced keys can affect script environment without changing
+        // the rendered script or requirements.
+        let cache_key = (
+            &staging,
+            &staging.used_variant,
+            &selected_variant,
+            self.prefix(),
+        );
 
         // Serialize to JSON and hash
         let json = serde_json::to_vec(&cache_key)?;
@@ -582,6 +589,26 @@ mod tests {
     };
     use rattler_build_script::EnvironmentIsolation;
     use rattler_conda_types::Platform;
+
+    #[test]
+    fn staging_cache_key_tracks_forced_variant_values() {
+        let output: Output = serde_yaml::from_str(include_str!(
+            "../../../test-data/rendered_recipes/rich_recipe.yaml"
+        ))
+        .unwrap();
+        let mut staging = StagingCache::new(
+            "compile".to_string(),
+            Build::default(),
+            Requirements::default(),
+            Vec::new(),
+            [("forced_key".into(), "first".into())].into(),
+        );
+        let first = output.staging_cache_key(&staging).unwrap();
+        staging
+            .used_variant
+            .insert("forced_key".into(), "second".into());
+        assert_ne!(first, output.staging_cache_key(&staging).unwrap());
+    }
 
     #[test]
     fn staging_build_steps_prepare_as_sections() {
