@@ -4344,6 +4344,11 @@ the variant configuration file. In multi-output recipes, top-level <code>use_key
 lists with their own entries rather than replacing them. If a key appears in both
 lists, <code>ignore_keys</code> takes precedence. Included keys are available to build scripts
 as environment variables.</p>
+<p>Ignored keys remain available to recipe expressions during rendering. Combinations
+that produce the same package identity are deduplicated before building; do not
+rely on an ignored key to distinguish package contents. The top-level
+<code>down_prioritize_variant</code> is inherited independently of these lists; an output
+can override it explicitly, including with <code>0</code>.</p>
 <h3 id="zip-keys">Zip keys<a class="headerlink" href="#zip-keys" title="Permanent link">#</a></h3>
 <p>Zip keys modify how variants are combined. Usually, each variant key that has multiple
 entries is expanded to a build matrix. For example, if we have:</p>

@@ -4293,6 +4293,12 @@ top-level build instead, use <code>inherit: null</code>:</p>
 </span><span id="__span-3-31"><a id="__codelineno-3-31" name="__codelineno-3-31" href="#__codelineno-3-31"></a><span class="w">      </span><span class="nt">files</span><span class="p">:</span>
 </span><span id="__span-3-32"><a id="__codelineno-3-32" name="__codelineno-3-32" href="#__codelineno-3-32"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">share/**</span>
 </span></code></pre></div>
+<p>Package outputs always inherit top-level build settings and <code>about</code> metadata,
+even with <code>inherit: cache-name</code>. The exceptions are the top-level build plan and
+tests: these are inherited only with <code>inherit: null</code> (or an omitted <code>inherit</code>).
+Staging builds themselves inherit top-level sources, context, and variant key
+lists, not the other top-level build settings. Staging inheritance passes build
+artifacts and dependency information, not an arbitrary recipe configuration.</p>
 <h3 id="multiple-staging-caches">Multiple staging caches<a class="headerlink" href="#multiple-staging-caches" title="Permanent link">#</a></h3>
 <p>A recipe can define multiple independent staging outputs. Each staging output is
 built and cached separately, and different package outputs can inherit from
@@ -4350,8 +4356,11 @@ different staging caches:</p>
 </span></code></pre></div>
 <h3 id="variants-and-staging">Variants and staging<a class="headerlink" href="#variants-and-staging" title="Permanent link">#</a></h3>
 <p>Staging caches interact with <a href="../variants/">variant configuration</a>. The cache
-key includes only the variant variables that are referenced in the staging
-output's requirements. This means:</p>
+key includes the staging build's used variant values, including variables used
+in expressions, unconstrained dependencies, and top-level <code>build.variant.use_keys</code>.
+Top-level <code>build.variant.ignore_keys</code> removes keys from that used-variant map;
+ignored values can still change the cache key if they change the rendered build
+plan, sources, or requirements. This means:</p>
 <ul>
 <li>Different variants produce different staging caches</li>
 <li>The staging build is only rerun when its relevant variant keys change</li>
@@ -4376,9 +4385,11 @@ warnings into hard errors.</p>
 <h3 id="how-caching-works">How caching works<a class="headerlink" href="#how-caching-works" title="Permanent link">#</a></h3>
 <p>The staging cache is keyed by a SHA256 hash over:</p>
 <ul>
-<li>The staging output's resolved requirements (build and host dependencies)</li>
-<li>Relevant variant variables (only those referenced in the staging requirements)</li>
+<li>The staging output's rendered configuration (build plan, sources, and requirements)</li>
+<li>The staging build's used variant values, including top-level <code>use_keys</code></li>
+<li>Unconstrained staging dependency variant values from the package output</li>
 <li><code>host_platform</code> and <code>build_platform</code> (always included)</li>
+<li>The destination prefix</li>
 </ul>
 <p>Staging caches are stored under <code>output/build_cache/staging_&lt;hash&gt;/</code>. Each
 cache directory contains:</p>
