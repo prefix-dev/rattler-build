@@ -1,6 +1,5 @@
-from pathlib import Path
 import json
-
+from pathlib import Path
 
 from helpers import RattlerBuild, setup_patch_test_environment, write_simple_text_patch
 
@@ -615,6 +614,7 @@ def test_create_patch_real_world_xtensor(rattler_build: RattlerBuild, tmp_path: 
             capture_output=True,
             text=True,
             timeout=30,
+            check=False,
         )
         # Rendering might fail due to missing dependencies, that's okay
     except subprocess.TimeoutExpired:
@@ -650,6 +650,7 @@ def test_create_patch_real_world_xtensor(rattler_build: RattlerBuild, tmp_path: 
                 capture_output=True,
                 text=True,
                 timeout=60,  # Give it time to download
+                check=False,
             )
         except (subprocess.TimeoutExpired, subprocess.CalledProcessError):
             pass  # We expect this might fail, that's okay

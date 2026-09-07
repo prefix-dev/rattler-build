@@ -6,10 +6,10 @@ import re
 import shutil
 import subprocess
 import uuid
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
 from subprocess import DEVNULL, STDOUT, CalledProcessError, check_output
-from typing import Iterator
 
 import boto3
 import pytest
@@ -452,6 +452,7 @@ def test_strict_mode_many_files(
         text=True,
         encoding="utf-8",
         errors="replace",
+        check=False,
     )
     assert result.returncode != 0
 
@@ -869,9 +870,10 @@ def test_prefix_detection(rattler_build: RattlerBuild, recipes: Path, tmp_path: 
                 check_path(p, None)
         elif path == "is_text/file_with_prefix":
             check_path(p, "text")
-        elif path == "is_binary/file_without_prefix":
-            check_path(p, None)
-        elif path == "is_text/file_without_prefix":
+        elif (
+            path == "is_binary/file_without_prefix"
+            or path == "is_text/file_without_prefix"
+        ):
             check_path(p, None)
         elif path == "force_text/file_with_prefix":
             if not win:
@@ -890,11 +892,11 @@ def test_prefix_detection(rattler_build: RattlerBuild, recipes: Path, tmp_path: 
                 # and we also don't do any prefix replacement
                 check_path(p, None)
 
-        elif path == "force_binary/file_without_prefix":
-            check_path(p, None)
-        elif path == "ignore/file_with_prefix":
-            check_path(p, None)
-        elif path == "ignore/text_with_prefix":
+        elif (
+            path == "force_binary/file_without_prefix"
+            or path == "ignore/file_with_prefix"
+            or path == "ignore/text_with_prefix"
+        ):
             check_path(p, None)
         elif path == "is_text/file_with_forwardslash_prefix":
             assert "\\" not in p["prefix_placeholder"]
@@ -1238,7 +1240,7 @@ def test_regex_post_process(rattler_build: RattlerBuild, recipes: Path, tmp_path
 
     text_cmake = (pkg / "test.cmake").read_text()
     assert text_cmake.startswith(
-        'target_compile_definitions(test PRIVATE "some_path;$ENV{CONDA_BUILD_SYSROOT}/and/more;some_other_path;$ENV{CONDA_BUILD_SYSROOT}/and/more")'  # noqa: E501
+        'target_compile_definitions(test PRIVATE "some_path;$ENV{CONDA_BUILD_SYSROOT}/and/more;some_other_path;$ENV{CONDA_BUILD_SYSROOT}/and/more")'
     )
 
 
@@ -1379,7 +1381,7 @@ def test_channel_specific(rattler_build: RattlerBuild, recipes: Path, tmp_path: 
     rattler_build.build(
         recipes / "channel_specific/recipe.yaml",
         tmp_path,
-        extra_args="-c conda-forge -c quantstack".split(),
+        extra_args=["-c", "conda-forge", "-c", "quantstack"],
     )
     pkg = get_extracted_package(tmp_path, "channel_specific")
 
@@ -3106,6 +3108,7 @@ about:
         cwd=cached_repo,
         capture_output=True,
         env={**os.environ, "GIT_CEILING_DIRECTORIES": str(cached_repo.parent)},
+        check=False,
     )
     assert result.returncode != 0, "Git command should fail on corrupted cache"
 
@@ -3149,6 +3152,7 @@ about:
             ["git", "rev-parse", "--git-dir"],
             cwd=repo,
             capture_output=True,
+            check=False,
         )
         if result.returncode == 0:
             # Found a valid repo, test passed
@@ -3182,6 +3186,7 @@ def test_topological_sort_with_variants(
         capture_output=True,
         text=True,
         encoding="utf-8",
+        check=False,
     )
 
     # The JSON is on stdout, debug messages are on stderr

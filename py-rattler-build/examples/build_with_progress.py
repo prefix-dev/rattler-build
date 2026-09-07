@@ -96,7 +96,7 @@ def main() -> None:
     try:
         build_recipe_with_rich_progress(recipe_path)
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - example reports all build failures
         print(f"❌ Error: {e}")
         import traceback
 

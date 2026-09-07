@@ -15,7 +15,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from rattler_build._rattler_build import EnvironmentIsolation, RepodataRevision, render as _render
+from rattler_build._rattler_build import EnvironmentIsolation, RepodataRevision
+from rattler_build._rattler_build import render as _render
 from rattler_build._rattler_build import stage0 as _stage0
 from rattler_build.render import RenderConfig, RenderedVariant
 from rattler_build.tool_config import ToolConfiguration

@@ -74,6 +74,7 @@ def sync_py_cargo_lock(git_token: str, repo_url: str, branch: str) -> None:
     diff = subprocess.run(
         ["git", "diff", "--exit-code", str(PY_CARGO_LOCK)],
         cwd=ROOT,
+        check=False,
     )
     if diff.returncode == 0:
         print("py-rattler-build/rust/Cargo.lock is already up to date.")

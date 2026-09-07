@@ -4,7 +4,6 @@ from pathlib import Path
 
 from helpers import RattlerBuild
 
-
 SIMPLE_RECIPE = """\
 package:
   name: test-override
