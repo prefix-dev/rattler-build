@@ -24,9 +24,8 @@ def test_version_match_local_cargo() -> None:
 @pytest.mark.parametrize("strict", [False, True])
 def test_build_recipes_output_check_flags(strict: bool) -> None:
     options = {"error_overlapping_files": True, "error_unused_staging_files": True} if strict else {}
-    with patch("rattler_build.cli_api.build_recipes_py") as build:
-        with pytest.warns(DeprecationWarning):
-            rattler_build.build_recipes([], **options)
+    with patch("rattler_build.cli_api.build_recipes_py") as build, pytest.warns(DeprecationWarning):
+        rattler_build.build_recipes([], **options)
     assert build.call_args.args[-2:] == (strict, strict)
 
 
