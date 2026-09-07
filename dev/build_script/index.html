@@ -4668,7 +4668,9 @@ noted, no variables are inherited from the shell environment in which you invoke
 <dd>
 <p>The path to where the source code is unpacked or cloned. If the
   source file is not a recognized archive format, this directory contains a copy
-  of the source file.</p>
+  of the source file. During the test phase (<code>CONDA_BUILD_STATE=TEST</code>), it
+  points at the test working directory instead, matching conda-build's
+  behavior.</p>
 </dd>
 <dt><code>STDLIB_DIR</code></dt>
 <dd>

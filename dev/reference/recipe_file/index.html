@@ -6048,7 +6048,7 @@ optional-dependencies idea from <code>pyproject.toml</code>.</p>
 </span><span id="__span-58-3"><a id="__codelineno-58-3" name="__codelineno-58-3" href="#__codelineno-58-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mypkg[extras=[plot]]</span>
 </span></code></pre></div>
 <p>In the built package, optional groups are written into
-<code>index.json::extra_depends</code>.</p>
+<code>index.json#/extra_depends</code>.</p>
 <h3 id="run-exports">Run exports<a class="headerlink" href="#run-exports" title="Permanent link">#</a></h3>
 <p>Packages may have runtime requirements such as shared libraries (e.g. <code>zlib</code>), which are required for linking at build time, and for resolving the link at run time.
 With <code>run_exports</code> packages runtime requirements can be implicitly added.
