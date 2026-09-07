@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../../assets/favicon.png">
-      <meta name="generator" content="zensical-0.0.52">
+      <meta name="generator" content="zensical-0.0.59">
     
     
       
@@ -34,12 +34,12 @@
       
         
       
-      <link rel="stylesheet" href="../../../assets/stylesheets/classic/main.4c04d108.min.css">
+      <link rel="stylesheet" href="../../../assets/stylesheets/classic/main.38807bfb.min.css">
       
         
           
         
-        <link rel="stylesheet" href="../../../assets/stylesheets/classic/palette.7dc9a0ad.min.css">
+        <link rel="stylesheet" href="../../../assets/stylesheets/classic/palette.c7ab7c71.min.css">
       
       
 
@@ -4140,14 +4140,14 @@ Package: myproject-tools 2.0.0
 </span></code></pre></div>
 <div class="language-text highlight"><pre><span></span><code>Building Example 1 packages...
 ============================================================
-Recipe path: /tmp/rattler_build_bp1xzex5/recipe.yaml
+Recipe path: /tmp/rattler_build_91glld7a/recipe.yaml
 
 Building variant 1/2
   Package: myproject-lib
   Version: 2.0.0
   Build string: hb0f4dca_0
-  Build complete in 1.25s!
-  Package: /tmp/rattler_build_bp1xzex5/output/linux-64/myproject-lib-2.0.0-hb0f4dca_0.conda
+  Build complete in 0.89s!
+  Package: /tmp/rattler_build_91glld7a/output/linux-64/myproject-lib-2.0.0-hb0f4dca_0.conda
   Variant: {&#39;target_platform&#39;: &#39;linux-64&#39;}
   Build log: 55 messages captured
 
@@ -4155,15 +4155,17 @@ Building variant 2/2
   Package: myproject-tools
   Version: 2.0.0
   Build string: hb0f4dca_0
-  Build complete in 0.42s!
-  Package: /tmp/rattler_build_bp1xzex5/output/linux-64/myproject-tools-2.0.0-hb0f4dca_0.conda
+
+
+  Build complete in 0.41s!
+  Package: /tmp/rattler_build_91glld7a/output/linux-64/myproject-tools-2.0.0-hb0f4dca_0.conda
   Variant: {&#39;target_platform&#39;: &#39;linux-64&#39;}
   Build log: 60 messages captured
 
 ============================================================
 Example 1 builds completed successfully!
 
-Built packages are available in: /tmp/rattler_build_bp1xzex5/output
+Built packages are available in: /tmp/rattler_build_91glld7a/output
 </code></pre></div>
 <h2 id="example-2-staging-outputs-shared-build-artifacts">Example 2: Staging Outputs - Shared Build Artifacts<a class="headerlink" href="#example-2-staging-outputs-shared-build-artifacts" title="Permanent link">#</a></h2>
 <p>Staging is different from regular dependencies (Example 1). A staging output runs its build script once, then <strong>copies its files directly into each inheriting package's prefix</strong>. Since these are "new" files in the prefix, they will be included in the final package.</p>
@@ -4338,17 +4340,15 @@ compiled-project-cli 1.5.0
 </span></code></pre></div>
 <div class="language-text highlight"><pre><span></span><code>Building Example 2 packages (with staging)...
 ============================================================
-Recipe path: /tmp/rattler_build_mxbrh6h5/recipe.yaml
+Recipe path: /tmp/rattler_build_g3ly2y6q/recipe.yaml
 
 Building variant 1/2
   Package: compiled-project-python
   Version: 1.5.0
   Build string: hb0f4dca_0
   Staging caches: [&#39;shared-build&#39;]
-
-
-  Build complete in 0.48s!
-  Package: /tmp/rattler_build_mxbrh6h5/output/linux-64/compiled-project-python-1.5.0-hb0f4dca_0.conda
+  Build complete in 0.50s!
+  Package: /tmp/rattler_build_g3ly2y6q/output/linux-64/compiled-project-python-1.5.0-hb0f4dca_0.conda
   Variant: {&#39;target_platform&#39;: &#39;linux-64&#39;}
   Build log: 72 messages captured
 
@@ -4359,15 +4359,17 @@ Building variant 2/2
   Staging caches: [&#39;shared-build&#39;]
 
 
-  Build complete in 0.50s!
-  Package: /tmp/rattler_build_mxbrh6h5/output/linux-64/compiled-project-cli-1.5.0-hb0f4dca_0.conda
+  Build complete in 0.49s!
+
+
+  Package: /tmp/rattler_build_g3ly2y6q/output/linux-64/compiled-project-cli-1.5.0-hb0f4dca_0.conda
   Variant: {&#39;target_platform&#39;: &#39;linux-64&#39;}
   Build log: 75 messages captured
 
 ============================================================
 Example 2 builds completed successfully!
 
-Built packages are available in: /tmp/rattler_build_mxbrh6h5/output
+Built packages are available in: /tmp/rattler_build_g3ly2y6q/output
 </code></pre></div>
 <h2 id="summary">Summary<a class="headerlink" href="#summary" title="Permanent link">#</a></h2>
 <p>In this tutorial, you learned about multi-output recipes and staging:</p>
@@ -4579,7 +4581,7 @@ Built packages are available in: /tmp/rattler_build_mxbrh6h5/output
       <script id="__config" type="application/json">{"annotate":null,"base":"../../..","features":["content.tabs.link","content.code.copy","content.action.edit","content.code.annotate","content.tooltips","navigation.instant","navigation.instant.progress","navigation.tracking","navigation.indexes","navigation.top","navigation.footer"],"search":"../../../assets/javascripts/workers/search.7d14d953.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":{"provider":"mike"}}</script>
     
     
-      <script src="../../../assets/javascripts/bundle.ed145cee.min.js"></script>
+      <script src="../../../assets/javascripts/bundle.6970bfe9.min.js"></script>
       
     
   </body>
