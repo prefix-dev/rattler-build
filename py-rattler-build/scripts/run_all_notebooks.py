@@ -29,6 +29,7 @@ def main() -> int:
         result = subprocess.run(
             ["python", str(notebook)],
             cwd=notebooks_dir.parent,
+            check=False,
         )
 
         if result.returncode != 0:

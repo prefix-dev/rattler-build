@@ -43,15 +43,15 @@ async-once-cell = "0.5.4"
 async-recursion = "1.1.1"
 async-trait = "0.1"
 bzip2 = "0.6.1"
-clap = { version = "4.6.4", features = ["derive"] }
+clap = { version = "4.6.6", features = ["derive"] }
 dashmap = "6.2"
 dunce = "1.0.5"
 console = { version = "0.16.4", features = ["windows-console-colors"] }
-flate2 = "1.1.9"
+flate2 = "1.1.10"
 fs-err = "3.3.1"
-futures = "0.3.33"
-globset = "0.4.19"
-indexmap = "2.14.0"
+futures = "0.3.34"
+globset = "0.4.20"
+indexmap = "2.14.2"
 indicatif = "0.18.6"
 insta = "1.48.0"
 itertools = "0.15.0"
@@ -61,7 +61,7 @@ libc = "0.2"
 md-5 = "0.11"
 lazy_static = "1.5.0"
 miette = "7.6.0"
-minijinja = { version = "2.21.0", features = [
+minijinja = { version = "2.24.0", features = [
   "unstable_machinery",
   "custom_syntax",
 ] }
@@ -74,7 +74,7 @@ reqwest-retry = { package = "astral-reqwest-retry", version = "0.9.1" }
 retry-policies = "0.5.2"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
-serde_with = "3.21.0"
+serde_with = "3.22.0"
 serde_yaml = "0.9.34"
 serde-value = "0.7.0"
 sevenz-rust2 = "0.20.2"
@@ -83,22 +83,22 @@ strsim = "0.11.1"
 strum = "0.28.0"
 tar = "0.4.46"
 tempfile = "3.27.0"
-thiserror = "2.0.19"
+thiserror = "2.0.20"
 tokio = { version = "1.53.1", features = ["rt", "macros"] }
 tokio-util = { version = "0.7.19", features = ["codec", "compat"] }
-toml = "1.1.4"
+toml = "1.1.5"
 tracing = "0.1.44"
 url = "2.5.8"
 urlencoding = "2.1"
 walkdir = "2.5.0"
-which = "8.0.5"
+which = "8.0.6"
 windows-sys = "0.61"
 zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
-zstd = "0.13.3"
-spdx = "0.13.4"
+zstd = "0.14.0"
+spdx = "0.13.5"
 pathdiff = "0.2.3"
 marked-yaml = "0.8.0"
-rstest = "0.26.1"
+rstest = "0.27.0"
 petgraph = { version = "0.8.3", default-features = false }
 sha1 = { version = "0.11.0" }
 lzma-rust2 = { version = "0.20", features = ["xz"] }
@@ -116,7 +116,7 @@ clap-verbosity-flag = "3.0.4"
 comfy-table = "8.0.0"
 flickzeug = "0.6.0"
 goblin = "0.10.7"
-ignore = "0.4.31"
+ignore = "0.4.33"
 num_cpus = "1.17.0"
 pretty_assertions = "1.4.1"
 reflink-copy = "0.1.30"
@@ -154,8 +154,8 @@ rattler = { version = "0.48", default-features = false, features = [
 rattler_cache = { version = "0.10", default-features = false }
 rattler_index = { version = "0.31", default-features = false }
 rattler_upload = { version = "0.10", default-features = false }
-rattler_s3 = { version = "0.2.9" }
-rattler_redaction = { version = "0.2.3", default-features = false }
+rattler_s3 = { version = "0.2" }
+rattler_redaction = { version = "0.2", default-features = false }
 rattler_repodata_gateway = { version = "0.33", default-features = false, features = [
   "gateway",
 ] }
@@ -211,13 +211,13 @@ serde_json = { workspace = true }
 anyhow = { workspace = true }
 reqwest = { workspace = true, features = ["multipart"] }
 reqwest-middleware = { workspace = true }
-async_http_range_reader = { package = "astral_async_http_range_reader", version = "0.11.0" }
-async_zip = { package = "astral_async_zip", version = "0.0.20", features = [
+async_http_range_reader = { package = "astral_async_http_range_reader", version = "0.12.0" }
+async_zip = { package = "astral_async_zip", version = "0.0.21", features = [
   "tokio",
   "zstd",
 ] }
 async-compression = { version = "0.4", features = ["tokio", "zstd"] }
-tokio_tar = { package = "astral-tokio-tar", version = "0.6", default-features = false }
+tokio_tar = { package = "astral-tokio-tar", version = "0.7", default-features = false }
 http = "1"
 tokio = { workspace = true, features = [
   "rt",
@@ -243,8 +243,8 @@ clap-verbosity-flag = { workspace = true }
 indexmap = { workspace = true }
 dunce = { workspace = true }
 fs-err = { workspace = true }
-clap_complete = "4.6.8"
-clap_complete_nushell = "4.6.1"
+clap_complete = "4.6.9"
+clap_complete_nushell = "4.6.2"
 tokio-util = { workspace = true }
 memmap2 = { workspace = true }
 dialoguer = "0.12.0"

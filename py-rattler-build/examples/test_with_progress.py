@@ -69,7 +69,7 @@ def main() -> None:
 
     try:
         test_package_with_progress(package_path)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - example reports all test failures
         print(f"Error: {e}")
         import traceback
 

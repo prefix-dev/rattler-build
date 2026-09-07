@@ -104,7 +104,7 @@ class TestAssemblePackageMetadata:
 
         with zipfile.ZipFile(output.path, "r") as zf:
             # Find the info archive
-            info_name = [n for n in zf.namelist() if n.startswith("info-")][0]
+            info_name = next(n for n in zf.namelist() if n.startswith("info-"))
             with zf.open(info_name) as info_zst:
                 dctx = zstandard.ZstdDecompressor()
                 with tempfile.NamedTemporaryFile() as tmp:

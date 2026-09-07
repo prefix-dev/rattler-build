@@ -3,8 +3,12 @@
 import pytest
 from inline_snapshot import snapshot
 
-from rattler_build import MultiOutputRecipe, SingleOutputRecipe, Stage0Recipe
-
+from rattler_build import (
+    MultiOutputRecipe,
+    RattlerBuildError,
+    SingleOutputRecipe,
+    Stage0Recipe,
+)
 
 # Sample YAML recipes for testing
 SIMPLE_RECIPE_YAML = """
@@ -399,7 +403,7 @@ def test_invalid_yaml() -> None:
     this is not: [valid yaml
     """
 
-    with pytest.raises(Exception):  # Should raise some parsing error
+    with pytest.raises(RattlerBuildError):
         Stage0Recipe.from_yaml(invalid_yaml)
 
 

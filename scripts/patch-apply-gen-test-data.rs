@@ -185,12 +185,12 @@ async fn fetch_recipe_files_sparse(
         };
 
         if rel == recipe_filename {
-            let size = entry.header().size().into_diagnostic()?;
+            let size = entry.effective_size();
             let mut buf = Vec::with_capacity(size as usize);
             entry.read_to_end(&mut buf).await.into_diagnostic()?;
             recipe = Some(buf);
         } else if rel.extension().and_then(|s| s.to_str()) == Some("patch") {
-            let size = entry.header().size().into_diagnostic()?;
+            let size = entry.effective_size();
             let mut buf = Vec::with_capacity(size as usize);
             entry.read_to_end(&mut buf).await.into_diagnostic()?;
             patches.push((rel.to_path_buf(), buf));

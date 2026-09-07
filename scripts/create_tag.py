@@ -23,6 +23,7 @@ def rev_parse(ref: str) -> str | None:
         ["git", "rev-parse", f"{ref}^{{commit}}"],
         capture_output=True,
         text=True,
+        check=False,
     )
     if result.returncode == 0:
         return result.stdout.strip()

@@ -1,5 +1,7 @@
-import pytest
 from pathlib import Path
+from subprocess import CalledProcessError
+
+import pytest
 from helpers import RattlerBuild
 
 
@@ -10,7 +12,7 @@ def test_insecure_ssl_failure(
     output_path = tmp_path / "output"
 
     # build should fail because of ssl certificate verification failure
-    with pytest.raises(Exception):
+    with pytest.raises(CalledProcessError):
         rattler_build.build(recipe_path, output_path)
 
     captured = capfd.readouterr()
@@ -51,7 +53,7 @@ def test_specific_insecure_host(
     extra_args = ["--allow-insecure-host", "untrusted-root.badssl.com"]
 
     # should still fail because self-signed.badssl.com is not in the allowed list
-    with pytest.raises(Exception):
+    with pytest.raises(CalledProcessError):
         rattler_build.build(recipe_path, output_path, extra_args=extra_args)
 
     captured = capfd.readouterr()

@@ -5,13 +5,12 @@ import os
 import struct
 from io import BytesIO
 from pathlib import Path
-from subprocess import CalledProcessError, STDOUT
+from subprocess import STDOUT, CalledProcessError
 from typing import Any
 
 import pytest
 import zstandard
 from helpers import RattlerBuild, get_extracted_package, get_package
-
 
 V3_RECIPES = Path(__file__).parent.parent.parent / "test-data" / "v3-recipes"
 

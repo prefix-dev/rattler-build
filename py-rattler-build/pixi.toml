@@ -11,8 +11,8 @@ build-variants = { python = ["3.10"] }
 
 [dependencies]
 requests = ">=2.34.2,<3"
-sccache = ">=0.16.0,<0.17"
-types-requests = ">=2.33.0.20260518,<3"
+sccache = ">=0.17.0,<0.18"
+types-requests = ">=2.33.0.20260712,<3"
 
 [activation.env]
 RUSTC_WRAPPER = "sccache"
@@ -22,21 +22,21 @@ py-rattler-build = { path = "." }
 lua = ">=5.5.0,<6"
 
 # Python 3.10 is the minimum supported version, so we use that for testing
-python = ">=3.10.20,<3.11"
+python = ">=3.10.21,<4"
 
-ty = ">=0.0.51,<0.0.52"
+ty = ">=0.0.78,<0.0.79"
 
 pytest = ">=9.1.1,<10"
 pytest-asyncio = ">=1.4.0,<2"
 pytest-xprocess = ">=1.0.2,<2"
-inline-snapshot = ">=0.34.2,<0.35"
+inline-snapshot = ">=0.35.4,<0.36"
 # used in examples
-typer = ">=0.26.7,<0.27"
+typer = ">=0.27.2,<0.28"
 rich = ">=15.0.0,<16"
 zstandard = ">=0.25.0,<0.26"
 
 [feature.test.pypi-dependencies]
-types-networkx = ">=3.6.1.20260612, <4"
+types-networkx = ">=3.6.1.20260903, <4"
 
 [feature.test.tasks]
 check-cargo-lock = "cargo check --locked --manifest-path rust/Cargo.toml"
@@ -56,8 +56,8 @@ solve-group = "default"
 
 [environments.lint.dependencies]
 # we need rust for cargo-fmt and clippy
-rust = ">=1.97.1,<1.98"
-ruff = ">=0.15.18,<0.16"
+rust = ">=1.98.0,<2"
+ruff = ">=0.16.6,<0.17"
 
 [environments.lint.tasks]
 
