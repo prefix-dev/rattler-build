@@ -142,9 +142,11 @@ build:
 
 An ignored key does not contribute to the package's variant or hash, so its configured
 values do not produce distinct packages. These options belong in `recipe.yaml`, not in
-the variant configuration file. In multi-output recipes, top-level `use_keys` apply to
-package and staging outputs, and are available to their build scripts as environment
-variables.
+the variant configuration file. In multi-output recipes, top-level `use_keys` and
+`ignore_keys` apply to both package and staging outputs. Package outputs extend these
+lists with their own entries rather than replacing them. If a key appears in both
+lists, `ignore_keys` takes precedence. Included keys are available to build scripts
+as environment variables.
 
 ### Zip keys
 

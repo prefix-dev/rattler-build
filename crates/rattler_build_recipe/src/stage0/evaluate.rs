@@ -3129,7 +3129,7 @@ fn merge_stage1_build(
         output.dynamic_linking
     };
 
-    // Variant: use output if not default, but always inherit top-level use_keys.
+    // Variant: use output if not default, but always inherit top-level use_keys and ignore_keys.
     let variant = if output.variant.is_default() {
         toplevel.variant
     } else {
@@ -3137,6 +3137,11 @@ fn merge_stage1_build(
         for key in toplevel.variant.use_keys {
             if !variant.use_keys.contains(&key) {
                 variant.use_keys.push(key);
+            }
+        }
+        for key in toplevel.variant.ignore_keys {
+            if !variant.ignore_keys.contains(&key) {
+                variant.ignore_keys.push(key);
             }
         }
         variant
@@ -3504,8 +3509,8 @@ impl Evaluate for crate::stage0::MultiOutputRecipe {
             .cloned()
             .collect();
 
-        // Top-level use_keys apply to every build unit, including staging builds.
-        let top_level_use_keys = self.build.variant.evaluate(&context_with_vars)?.use_keys;
+        // Top-level use_keys and ignore_keys apply to every build unit, including staging builds.
+        let top_level_variant = self.build.variant.evaluate(&context_with_vars)?;
 
         // First pass: Evaluate all staging outputs and collect them
         let mut staging_caches = IndexMap::new();
@@ -3563,11 +3568,16 @@ impl Evaluate for crate::stage0::MultiOutputRecipe {
                     .map(|(k, v)| (NormalizedKey::from(k.as_str()), v.clone()))
                     .collect();
 
-                for key in &top_level_use_keys {
+                for key in &top_level_variant.use_keys {
                     let key = NormalizedKey::from(key.as_str());
                     if let Some(value) = context_with_vars.variables().get(&key.0) {
                         actual_variant.insert(key, value.clone());
                     }
+                }
+
+                // Ignore wins over both detected and explicitly included keys.
+                for key in &top_level_variant.ignore_keys {
+                    actual_variant.remove(&NormalizedKey::from(key.as_str()));
                 }
 
                 let staging_cache = StagingCache::new(
