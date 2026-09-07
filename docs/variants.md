@@ -123,6 +123,31 @@ This JSON string is then hashed with the MD5 hash algorithm, and produces the ha
 For certain packages (such as Python packages) special rules exists, and the `py<Major.Minor>` version is prepended to the hash, so that the final hash
 would look something like `py38h123123`.
 
+### Including and ignoring variant keys
+
+Rattler-Build normally includes variant keys that are used by the recipe, such as
+unconstrained dependencies and variables used in expressions. A recipe can override
+this detection with `build.variant.use_keys` and `build.variant.ignore_keys`:
+
+```yaml title="recipe.yaml"
+build:
+  variant:
+    # Include this key even when the recipe does not otherwise use it.
+    use_keys:
+      - cuda
+    # Exclude this key even when the recipe uses it.
+    ignore_keys:
+      - python
+```
+
+An ignored key does not contribute to the package's variant or hash, so its configured
+values do not produce distinct packages. These options belong in `recipe.yaml`, not in
+the variant configuration file. In multi-output recipes, top-level `use_keys` and
+`ignore_keys` apply to both package and staging outputs. Package outputs extend these
+lists with their own entries rather than replacing them. If a key appears in both
+lists, `ignore_keys` takes precedence. Included keys are available to build scripts
+as environment variables.
+
 ### Zip keys
 
 Zip keys modify how variants are combined. Usually, each variant key that has multiple

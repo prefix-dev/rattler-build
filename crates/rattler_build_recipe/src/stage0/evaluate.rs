@@ -3160,11 +3160,22 @@ fn merge_stage1_build(
         output.dynamic_linking
     };
 
-    // Variant: use output if not default, otherwise inherit from top-level
+    // Variant: use output if not default, but always inherit top-level use_keys and ignore_keys.
     let variant = if output.variant.is_default() {
         toplevel.variant
     } else {
-        output.variant
+        let mut variant = output.variant;
+        for key in toplevel.variant.use_keys {
+            if !variant.use_keys.contains(&key) {
+                variant.use_keys.push(key);
+            }
+        }
+        for key in toplevel.variant.ignore_keys {
+            if !variant.ignore_keys.contains(&key) {
+                variant.ignore_keys.push(key);
+            }
+        }
+        variant
     };
 
     // Prefix detection: use output if not default, otherwise inherit from top-level
@@ -3529,6 +3540,9 @@ impl Evaluate for crate::stage0::MultiOutputRecipe {
             .cloned()
             .collect();
 
+        // Top-level use_keys and ignore_keys apply to every build unit, including staging builds.
+        let top_level_variant = self.build.variant.evaluate(&context_with_vars)?;
+
         // First pass: Evaluate all staging outputs and collect them
         let mut staging_caches = IndexMap::new();
         for output in &self.outputs {
@@ -3564,7 +3578,7 @@ impl Evaluate for crate::stage0::MultiOutputRecipe {
                     &["target_platform", "channel_targets", "channel_sources"];
 
                 let os_env_var_keys = context_with_vars.os_env_var_keys();
-                let actual_variant: BTreeMap<NormalizedKey, Variable> = context_with_vars
+                let mut actual_variant: BTreeMap<NormalizedKey, Variable> = context_with_vars
                     .variables()
                     .iter()
                     .filter(|(k, _)| {
@@ -3584,6 +3598,18 @@ impl Evaluate for crate::stage0::MultiOutputRecipe {
                     })
                     .map(|(k, v)| (NormalizedKey::from(k.as_str()), v.clone()))
                     .collect();
+
+                for key in &top_level_variant.use_keys {
+                    let key = NormalizedKey::from(key.as_str());
+                    if let Some(value) = context_with_vars.variables().get(&key.0) {
+                        actual_variant.insert(key, value.clone());
+                    }
+                }
+
+                // Ignore wins over both detected and explicitly included keys.
+                for key in &top_level_variant.ignore_keys {
+                    actual_variant.remove(&NormalizedKey::from(key.as_str()));
+                }
 
                 let staging_cache = StagingCache::new(
                     staging_name.clone(),
