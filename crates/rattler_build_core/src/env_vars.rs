@@ -40,17 +40,7 @@ fn get_sitepackages_dir(
 ) -> PathBuf {
     python_site_packages_path.map_or_else(
         || get_stdlib_dir(prefix, platform, py_ver).join("site-packages"),
-        |path| {
-            if platform.is_windows() {
-                PathBuf::from(format!(
-                    "{}\\{}",
-                    prefix.to_string_lossy(),
-                    path.replace('/', "\\")
-                ))
-            } else {
-                prefix.join(path)
-            }
-        },
+        |path| prefix.join(path.replace('/', std::path::MAIN_SEPARATOR_STR)),
     )
 }
 
@@ -594,9 +584,10 @@ mod test {
 
         let record_win = make_record("Lib/site-packages");
         let vars_win = python_vars_from_records(&[record_win], prefix, Platform::Win64);
+        let expected_win = prefix.join("Lib").join("site-packages");
         assert_eq!(
             vars_win.get("SP_DIR").and_then(|value| value.as_deref()),
-            Some(format!("{}\\Lib\\site-packages", prefix.to_string_lossy()).as_str())
+            Some(expected_win.to_string_lossy().as_ref())
         );
     }
 
