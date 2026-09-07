@@ -1504,6 +1504,82 @@ python:
     }
 
     #[test]
+    fn test_top_level_use_keys_apply_to_package_and_staging_outputs() {
+        let recipe_yaml = r#"
+schema_version: 1
+
+recipe:
+  name: test-project
+  version: "1.0.0"
+
+build:
+  variant:
+    use_keys:
+      - parent_key
+
+outputs:
+  - staging:
+      name: build-cache
+    build:
+      script: echo $parent_key
+
+  - package:
+      name: staged
+    inherit: build-cache
+    build:
+      variant:
+        ignore_keys:
+          - ignored_key
+
+  - package:
+      name: direct
+    inherit: null
+    build:
+      script: echo $parent_key
+      variant:
+        use_keys:
+          - output_key
+"#;
+
+        let variant_config = VariantConfig::from_yaml_str(
+            "parent_key: [parent]\noutput_key: [output]\nignored_key: [ignored]\n",
+        )
+        .unwrap();
+        let recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let rendered =
+            render_recipe_with_variant_config(&recipe, &variant_config, RenderConfig::new())
+                .unwrap();
+
+        assert_eq!(rendered.len(), 2);
+        for output in &rendered {
+            assert_eq!(
+                output.variant.get(&"parent_key".into()),
+                Some(&Variable::from_string("parent"))
+            );
+        }
+
+        let staged = rendered
+            .iter()
+            .find(|output| output.recipe.package.name.as_normalized() == "staged")
+            .unwrap();
+        assert_eq!(
+            staged.recipe.staging_caches[0]
+                .used_variant
+                .get(&"parent_key".into()),
+            Some(&Variable::from_string("parent"))
+        );
+
+        let direct = rendered
+            .iter()
+            .find(|output| output.recipe.package.name.as_normalized() == "direct")
+            .unwrap();
+        assert_eq!(
+            direct.variant.get(&"output_key".into()),
+            Some(&Variable::from_string("output"))
+        );
+    }
+
+    #[test]
     fn test_build_steps_if_participates_in_variant_matrix() {
         let recipe_yaml = r#"
 package:
