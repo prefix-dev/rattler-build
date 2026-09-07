@@ -242,6 +242,7 @@ pub(crate) fn parse_script(node: &Node) -> Result<crate::stage0::types::Script, 
         let mut content = None;
         let mut file = None;
         let mut cwd = None;
+        let mut sandbox = None;
         let mut content_explicit = false;
 
         for (key_node, value_node) in mapping.iter() {
@@ -317,6 +318,9 @@ pub(crate) fn parse_script(node: &Node) -> Result<crate::stage0::types::Script, 
                 "cwd" => {
                     cwd = Some(parse_field!("script.cwd", value_node));
                 }
+                "sandbox" => {
+                    sandbox = parse_sandbox(value_node)?;
+                }
                 _ => {
                     return Err(ParseError::invalid_value(
                         "script",
@@ -324,7 +328,7 @@ pub(crate) fn parse_script(node: &Node) -> Result<crate::stage0::types::Script, 
                         *key_node.span(),
                     )
                     .with_suggestion(
-                        "Valid fields are: interpreter, env, secrets, content, file, cwd",
+                        "Valid fields are: interpreter, env, secrets, content, file, cwd, sandbox",
                     ));
                 }
             }
@@ -337,6 +341,7 @@ pub(crate) fn parse_script(node: &Node) -> Result<crate::stage0::types::Script, 
             content,
             file,
             cwd,
+            sandbox,
             content_explicit,
         });
     }
@@ -349,6 +354,63 @@ pub(crate) fn parse_script(node: &Node) -> Result<crate::stage0::types::Script, 
     .with_message(
         "script must be either a list of commands, a multiline string, or a script object",
     ))
+}
+
+/// Parse the `sandbox:` block of a script object.
+fn parse_sandbox(node: &Node) -> Result<Option<crate::stage0::types::Sandbox>, ParseError> {
+    use crate::stage0::types::{ConditionalList, Sandbox};
+
+    if node.as_scalar().is_some() {
+        let enabled = parse_bool_value(node, "script.sandbox")?;
+        return match enabled.as_concrete() {
+            Some(true) => Ok(Some(Sandbox::default())),
+            Some(false) => Ok(None),
+            None => Err(ParseError::invalid_value(
+                "script.sandbox",
+                "templated sandbox enablement is not supported; use a conditional mapping instead",
+                get_span(node),
+            )),
+        };
+    }
+
+    let mapping = node.as_mapping().ok_or_else(|| {
+        ParseError::expected_type("boolean or mapping", "other", get_span(node))
+            .with_message("Expected 'sandbox' to be true, false, or a mapping")
+    })?;
+
+    let mut network: Option<Value<bool>> = None;
+    let mut read: ConditionalList<String> = ConditionalList::default();
+    let mut read_execute: ConditionalList<String> = ConditionalList::default();
+    let mut read_write: ConditionalList<String> = ConditionalList::default();
+    let mut reason: Option<Value<String>> = None;
+
+    for (key_node, value_node) in mapping.iter() {
+        match key_node.as_str() {
+            "network" => network = Some(parse_bool_value(value_node, "script.sandbox.network")?),
+            "read" => read = parse_conditional_list(value_node)?,
+            "read_execute" => read_execute = parse_conditional_list(value_node)?,
+            "read_write" => read_write = parse_conditional_list(value_node)?,
+            "reason" => reason = Some(parse_field!("script.sandbox.reason", value_node)),
+            other => {
+                return Err(ParseError::invalid_value(
+                    "script.sandbox",
+                    format!("unknown field '{}' in sandbox object", other),
+                    *key_node.span(),
+                )
+                .with_suggestion(
+                    "Valid fields are: network, read, read_execute, read_write, reason",
+                ));
+            }
+        }
+    }
+
+    Ok(Some(Sandbox {
+        network,
+        read,
+        read_execute,
+        read_write,
+        reason,
+    }))
 }
 
 fn parse_env_key(field_name: &str, key_node: &MarkedScalarNode) -> Result<String, ParseError> {

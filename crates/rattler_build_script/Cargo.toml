@@ -23,6 +23,7 @@ execution = [
   "fs-err",
   "which",
   "minijinja",
+  "serde_yaml",
   "strsim",
 ]
 
@@ -52,6 +53,7 @@ rattler_shell = { workspace = true, optional = true }
 fs-err = { workspace = true, optional = true }
 which = { workspace = true, optional = true }
 minijinja = { workspace = true, optional = true }
+serde_yaml = { workspace = true, optional = true }
 strsim = { workspace = true, optional = true }
 
 [target.'cfg(windows)'.dependencies]

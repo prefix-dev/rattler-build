@@ -1080,6 +1080,7 @@ mod tests {
             env: IndexMap::new(),
             secrets: Vec::new(),
             cwd: None,
+            sandbox: None,
             content_explicit: false,
         };
 

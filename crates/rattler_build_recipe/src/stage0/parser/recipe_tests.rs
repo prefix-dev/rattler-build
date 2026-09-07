@@ -215,3 +215,83 @@ requirements:
     assert!(vars.contains(&"linux".to_string()));
     assert!(vars.contains(&"osx".to_string()));
 }
+
+#[test]
+fn test_parse_script_with_sandbox_block() {
+    let yaml_str = r#"
+package:
+  name: cargo-thing
+  version: 1.0.0
+
+build:
+  script:
+    interpreter: bash
+    sandbox:
+      network: true
+      read_write:
+        - $SRC_DIR/.cargo
+      reason: "cargo fetch during build"
+    content: cargo build --release
+"#;
+    let recipe = parse_recipe_from_source(yaml_str).unwrap();
+
+    let sandbox = recipe
+        .build
+        .plan
+        .script()
+        .and_then(|script| script.sandbox.as_ref())
+        .expect("sandbox block should be parsed");
+
+    assert_eq!(
+        sandbox.network.as_ref().and_then(|v| v.as_concrete()),
+        Some(&true)
+    );
+    assert_eq!(sandbox.read_write.as_slice().len(), 1);
+    assert!(sandbox.read.is_empty());
+    assert!(sandbox.read_execute.is_empty());
+    assert!(sandbox.reason.is_some());
+}
+
+#[test]
+fn test_parse_script_sandbox_boolean() {
+    for (enabled, expected) in [("true", true), ("false", false)] {
+        let yaml = format!(
+            r#"
+package:
+  name: sandbox-boolean
+  version: 1
+build:
+  script:
+    sandbox: {enabled}
+    content: echo hi
+"#
+        );
+        let recipe = parse_recipe_from_source(&yaml).unwrap();
+        let has_sandbox = recipe
+            .build
+            .plan
+            .script()
+            .is_some_and(|script| script.sandbox.is_some());
+        assert_eq!(has_sandbox, expected);
+    }
+}
+
+#[test]
+fn test_parse_script_sandbox_rejects_unknown_field() {
+    let yaml_str = r#"
+package:
+  name: bad
+  version: 1.0.0
+build:
+  script:
+    sandbox:
+      bogus: true
+    content: echo hi
+"#;
+    let err = parse_recipe_from_source(yaml_str).unwrap_err();
+    let msg = format!("{:?}", err);
+    assert!(
+        msg.contains("bogus"),
+        "expected error to mention unknown field, got: {msg}"
+    );
+}
