@@ -5755,6 +5755,10 @@ a build is never skipped.</p>
 </span><span id="__span-34-3"><a id="__codelineno-34-3" name="__codelineno-34-3" href="#__codelineno-34-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">win</span>
 </span><span id="__span-34-4"><a id="__codelineno-34-4" name="__codelineno-34-4" href="#__codelineno-34-4"></a><span class="w">    </span><span class="l l-Scalar l-Scalar-Plain">...</span>
 </span></code></pre></div>
+<p>Each entry is a Jinja expression (without the surrounding <code>${{ ... }}</code>). Entries
+that are not valid Jinja - an unbalanced bracket, for example - are reported as an
+error instead of being silently treated as "do not skip". An entry that references a
+variable which is not part of the variant still counts as "do not skip".</p>
 <h3 id="architecture-independent-packages">Architecture-independent packages<a class="headerlink" href="#architecture-independent-packages" title="Permanent link">#</a></h3>
 <p>Allows you to specify "no architecture" when building a package, thus making it
 compatible with all platforms and architectures. Architecture-independent packages
