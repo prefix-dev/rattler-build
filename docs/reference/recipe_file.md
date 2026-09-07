@@ -1235,7 +1235,7 @@ requirements:
 ```
 
 In the built package, optional groups are written into
-`index.json::extra_depends`.
+`index.json#/extra_depends`.
 
 ### Run exports
 
