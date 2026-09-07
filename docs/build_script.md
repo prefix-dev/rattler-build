@@ -487,16 +487,15 @@ noted, no variables are inherited from the shell environment in which you invoke
 
 `PATHS_JSON`
 
-: Only set during the test phase. The path to the `info/paths.json` file of
-  the package under test, resolved from its `conda-meta` `PrefixRecord` once
-  the package has been linked into the test prefix. Lets test scripts inspect
-  the exact list of files the package installed without having to locate and
-  parse the `PrefixRecord` themselves.
+: Only set during the test phase. The path to `info/paths.json` in the
+  extracted package under test. This describes paths in the package archive,
+  which can differ from installed paths (for example, for noarch Python
+  packages).
 
 `INDEX_JSON`
 
-: Only set during the test phase. The path to the `info/index.json` file of
-  the package under test, resolved the same way as `PATHS_JSON`.
+: Only set during the test phase. The path to `info/index.json` in the
+  extracted package under test.
 
 `PYTHON`
 

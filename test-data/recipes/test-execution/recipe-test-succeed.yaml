@@ -57,6 +57,9 @@ tests:
           - test -f "$PATHS_JSON"
           - test -f "$INDEX_JSON"
           - grep -q "test-execution" "$INDEX_JSON"
+          - grep -Fq "test-execution.txt" "$PATHS_JSON"
         else:
           - if not exist "%PATHS_JSON%" (exit 1)
           - if not exist "%INDEX_JSON%" (exit 1)
+          - findstr /L /C:"test-execution" "%INDEX_JSON%" || exit /b 1
+          - findstr /L /C:"test-execution.txt" "%PATHS_JSON%" || exit /b 1

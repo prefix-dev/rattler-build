@@ -19,7 +19,7 @@ use rattler_build_script::{
 use rattler_build_types::NormalizedKey;
 use rattler_conda_types::{
     Channel, ChannelUrl, MatchSpec, PackageName, PackageNameMatcher, ParseStrictness, Platform,
-    PrefixRecord, StringMatcher, Version, VersionSpec,
+    RepoDataRecord, StringMatcher, Version, VersionSpec,
     compression_level::CompressionLevel,
     package::{ArchiveIdentifier, CondaArchiveIdentifier, IndexJson, PackageFile},
     version_spec::EqualityOperator,
@@ -203,19 +203,13 @@ impl Tests {
         &self,
         environment: &Path,
         cwd: &Path,
-        pkg_vars: &HashMap<String, String>,
-        resolved_records: &[rattler_conda_types::RepoDataRecord],
+        package_folder: &Path,
+        resolved_records: &[RepoDataRecord],
         config: &TestConfiguration,
     ) -> Result<(), TestError> {
         tracing::info!("Testing commands:");
 
-        let target_platform = config.target_platform.unwrap_or(Platform::current());
-        let build_platform = config.current_platform.platform;
-        let host_platform = config
-            .host_platform
-            .as_ref()
-            .map(|p| p.platform)
-            .unwrap_or(target_platform);
+        let (_, _, host_platform) = configured_test_platforms(config);
 
         let tmp_dir = tempfile::tempdir()?;
 
@@ -228,34 +222,13 @@ impl Tests {
             )))
         })?;
 
-        let mut env_vars = env_vars::os_vars(
+        let env_vars = test_env_vars(
             environment,
-            &target_platform,
-            &host_platform,
-            &build_platform,
-            config.env_isolation,
             tmp_dir.path(),
-            &RuntimeEnv::current(),
-        );
-        if config.env_isolation == EnvironmentIsolation::None {
-            env_vars.retain(|key, _| key != ShellEnum::default().path_var(&build_platform));
-        }
-        env_vars.extend(env_vars::test_vars(
-            target_platform,
-            build_platform,
-            host_platform,
-            tmp_dir.path(),
-        ));
-        env_vars.extend(env_vars::python_vars_from_records(
+            package_folder,
             resolved_records,
-            environment,
-            host_platform,
-        ));
-        env_vars.extend(pkg_vars.iter().map(|(k, v)| (k.clone(), Some(v.clone()))));
-        env_vars.insert(
-            "PREFIX".to_string(),
-            Some(environment.to_string_lossy().to_string()),
-        );
+            config,
+        )?;
 
         let context = shared_test_context(environment, host_platform);
 
@@ -415,54 +388,64 @@ fn env_vars_from_package(index_json: &IndexJson) -> HashMap<String, String> {
     res
 }
 
-/// Once the tested package has been linked into `prefix`, locate its
-/// `conda-meta/<name>-<version>-<build>.json` (the `PrefixRecord`) and derive
-/// the `PATHS_JSON` and `INDEX_JSON` env vars from its `extracted_package_dir`.
-///
-/// This spares test scripts from having to load the `PrefixRecord` themselves
-/// to find these files (see <https://github.com/prefix-dev/rattler-build/issues/1263>).
-fn env_vars_from_prefix_record(
+/// Assemble the environment shared by legacy, script, and language tests.
+fn test_env_vars(
     prefix: &Path,
-    pkg: &CondaArchiveIdentifier,
-) -> HashMap<String, String> {
-    let mut res = HashMap::new();
-
-    let conda_meta_file = prefix.join("conda-meta").join(format!(
-        "{}-{}-{}.json",
-        pkg.identifier.name, pkg.identifier.version, pkg.identifier.build_string
+    cwd: &Path,
+    package_folder: &Path,
+    resolved_records: &[RepoDataRecord],
+    config: &TestConfiguration,
+) -> Result<HashMap<String, Option<String>>, TestError> {
+    let (target_platform, build_platform, host_platform) = configured_test_platforms(config);
+    let mut vars = env_vars::os_vars(
+        prefix,
+        &target_platform,
+        &host_platform,
+        &build_platform,
+        config.env_isolation,
+        cwd,
+        &RuntimeEnv::current(),
+    );
+    if config.env_isolation == EnvironmentIsolation::None {
+        vars.retain(|key, _| key != ShellEnum::default().path_var(&build_platform));
+    }
+    vars.extend(env_vars::test_vars(
+        target_platform,
+        build_platform,
+        host_platform,
+        cwd,
     ));
-
-    let prefix_record = match PrefixRecord::from_path(&conda_meta_file) {
-        Ok(record) => record,
-        Err(e) => {
-            tracing::debug!(
-                "could not read prefix record at '{}': {e}",
-                conda_meta_file.display()
-            );
-            return res;
-        }
-    };
-
-    let Some(extracted_package_dir) = &prefix_record.extracted_package_dir else {
-        return res;
-    };
-
-    res.insert(
-        "PATHS_JSON".to_string(),
-        extracted_package_dir
-            .join("info/paths.json")
-            .to_string_lossy()
-            .to_string(),
+    vars.extend(env_vars::python_vars_from_records(
+        resolved_records,
+        prefix,
+        host_platform,
+    ));
+    let index_json = IndexJson::from_package_directory(package_folder)?;
+    vars.extend(
+        env_vars_from_package(&index_json)
+            .into_iter()
+            .map(|(k, v)| (k, Some(v))),
     );
-    res.insert(
-        "INDEX_JSON".to_string(),
-        extracted_package_dir
-            .join("info/index.json")
-            .to_string_lossy()
-            .to_string(),
+    vars.extend(env_vars_from_hash_input(package_folder));
+    vars.insert(
+        "PREFIX".to_string(),
+        Some(prefix.to_string_lossy().into_owned()),
     );
 
-    res
+    // The package is already extracted for reading its tests; reuse that metadata.
+    for (key, file) in [("PATHS_JSON", "paths.json"), ("INDEX_JSON", "index.json")] {
+        vars.insert(
+            key.to_string(),
+            Some(
+                package_folder
+                    .join("info")
+                    .join(file)
+                    .to_string_lossy()
+                    .into_owned(),
+            ),
+        );
+    }
+    Ok(vars)
 }
 
 /// Read variant environment variables from `info/hash_input.json` in the
@@ -644,14 +627,6 @@ pub async fn run_test(
 
     tracing::info!("Collecting tests from '{}'", package_folder.display());
 
-    let index_json = IndexJson::from_package_directory(&package_folder)?;
-    let mut env = env_vars_from_package(&index_json);
-    env.extend(
-        env_vars_from_hash_input(&package_folder)
-            .into_iter()
-            .filter_map(|(k, v)| v.map(|v| (k, v))),
-    );
-
     let has_legacy_tests = package_folder.join("info/test").exists();
     let has_modern_tests = package_folder.join("info/tests/tests.yaml").exists();
 
@@ -697,14 +672,11 @@ pub async fn run_test(
         let (test_folder, tests) =
             legacy_tests_from_folder(&package_folder, config.current_platform.platform).await?;
 
-        let mut legacy_env = env.clone();
-        legacy_env.extend(env_vars_from_prefix_record(&prefix, &pkg));
-
         for test in tests {
             test.run(
                 &prefix,
                 &test_folder,
-                &legacy_env,
+                &package_folder,
                 &resolved_records,
                 &config,
             )
@@ -749,8 +721,7 @@ pub async fn run_test(
             .keep();
             match test {
                 TestType::Commands(c) => {
-                    run_commands_test(&c, &pkg, &package_folder, &test_prefix, &config, &env)
-                        .await?
+                    run_commands_test(&c, &pkg, &package_folder, &test_prefix, &config).await?
                 }
                 TestType::Python { python } => {
                     // A downstream package's Python test matrix describes the Python
@@ -871,7 +842,6 @@ async fn run_python_test(
     for (python_version, dependencies) in dependencies_map {
         run_python_test_inner(
             python_test,
-            pkg,
             python_version,
             dependencies,
             path,
@@ -886,7 +856,6 @@ async fn run_python_test(
 
 async fn run_python_test_inner(
     python_test: &PythonTest,
-    pkg: &CondaArchiveIdentifier,
     python_version: String,
     dependencies: Vec<MatchSpec>,
     path: &Path,
@@ -901,7 +870,7 @@ async fn run_python_test_inner(
     let _guard = span.enter();
 
     let test_prefix = prefix.join("test_env");
-    create_environment(
+    let resolved_records = create_environment(
         "test",
         &dependencies,
         config
@@ -930,23 +899,10 @@ async fn run_python_test_inner(
         ..Script::default()
     };
 
-    let (target_platform, build_platform, host_platform) = configured_test_platforms(config);
+    let (_, _, host_platform) = configured_test_platforms(config);
     let test_dir = prefix.join("test");
     fs::create_dir_all(&test_dir)?;
-    let mut test_env_vars = env_vars::os_vars(
-        &test_prefix,
-        &target_platform,
-        &host_platform,
-        &build_platform,
-        config.env_isolation,
-        &test_dir,
-        &RuntimeEnv::current(),
-    );
-    test_env_vars.extend(
-        env_vars_from_prefix_record(&test_prefix, pkg)
-            .into_iter()
-            .map(|(k, v)| (k, Some(v))),
-    );
+    let test_env_vars = test_env_vars(&test_prefix, &test_dir, path, &resolved_records, config)?;
 
     let context = shared_test_context(&test_prefix, host_platform);
 
@@ -1014,7 +970,7 @@ async fn run_perl_test(
     let dependencies = vec!["perl".parse().unwrap(), match_spec];
 
     let test_prefix = prefix.join("test_env");
-    create_environment(
+    let resolved_records = create_environment(
         "test",
         &dependencies,
         config
@@ -1050,21 +1006,8 @@ async fn run_perl_test(
     let test_folder = prefix.join("test_files");
     fs::create_dir_all(&test_folder)?;
 
-    let (target_platform, build_platform, host_platform) = configured_test_platforms(config);
-    let mut test_env_vars = env_vars::os_vars(
-        &test_prefix,
-        &target_platform,
-        &host_platform,
-        &build_platform,
-        config.env_isolation,
-        &test_folder,
-        &RuntimeEnv::current(),
-    );
-    test_env_vars.extend(
-        env_vars_from_prefix_record(&test_prefix, pkg)
-            .into_iter()
-            .map(|(k, v)| (k, Some(v))),
-    );
+    let (_, _, host_platform) = configured_test_platforms(config);
+    let test_env_vars = test_env_vars(&test_prefix, &test_folder, path, &resolved_records, config)?;
     let context = shared_test_context(&test_prefix, host_platform);
 
     script
@@ -1090,7 +1033,6 @@ async fn run_commands_test(
     path: &Path,
     test_directory: &Path,
     config: &TestConfiguration,
-    pkg_vars: &HashMap<String, String>,
 ) -> Result<(), TestError> {
     let deps = commands_test.requirements.clone();
 
@@ -1154,13 +1096,7 @@ async fn run_commands_test(
     .wrap_err("failed to setup test environment")
     .map_err(TestError::TestEnvironmentSetup)?;
 
-    let target_platform = config.target_platform.unwrap_or(Platform::current());
-    let build_platform = config.current_platform.platform;
-    let host_platform = config
-        .host_platform
-        .as_ref()
-        .map(|p| p.platform)
-        .unwrap_or(target_platform);
+    let (_, build_platform, host_platform) = configured_test_platforms(config);
 
     // copy all test files to a temporary directory and set it as the working
     // directory
@@ -1172,39 +1108,7 @@ async fn run_commands_test(
         )))
     })?;
 
-    let mut env_vars = env_vars::os_vars(
-        &run_prefix,
-        &target_platform,
-        &host_platform,
-        &build_platform,
-        config.env_isolation,
-        &test_dir,
-        &RuntimeEnv::current(),
-    );
-    if config.env_isolation == EnvironmentIsolation::None {
-        env_vars.retain(|key, _| key != ShellEnum::default().path_var(&build_platform));
-    }
-    env_vars.extend(env_vars::test_vars(
-        target_platform,
-        build_platform,
-        host_platform,
-        &test_dir,
-    ));
-    env_vars.extend(env_vars::python_vars_from_records(
-        &resolved_records,
-        &run_prefix,
-        host_platform,
-    ));
-    env_vars.extend(pkg_vars.iter().map(|(k, v)| (k.clone(), Some(v.clone()))));
-    env_vars.extend(
-        env_vars_from_prefix_record(&run_prefix, pkg)
-            .into_iter()
-            .map(|(k, v)| (k, Some(v))),
-    );
-    env_vars.insert(
-        "PREFIX".to_string(),
-        Some(run_prefix.to_string_lossy().to_string()),
-    );
+    let env_vars = test_env_vars(&run_prefix, &test_dir, path, &resolved_records, config)?;
 
     let context = if let Some(build_prefix) = build_prefix {
         ExecutionContext::separate(
@@ -1355,7 +1259,7 @@ async fn run_r_test(
 
     let dependencies = vec!["r-base".parse().unwrap(), match_spec];
     let test_prefix = prefix.join("test_env");
-    create_environment(
+    let resolved_records = create_environment(
         "test",
         &dependencies,
         config
@@ -1391,21 +1295,8 @@ async fn run_r_test(
     let test_folder = prefix.join("test_files");
     fs::create_dir_all(&test_folder)?;
 
-    let (target_platform, build_platform, host_platform) = configured_test_platforms(config);
-    let mut test_env_vars = env_vars::os_vars(
-        &test_prefix,
-        &target_platform,
-        &host_platform,
-        &build_platform,
-        config.env_isolation,
-        &test_folder,
-        &RuntimeEnv::current(),
-    );
-    test_env_vars.extend(
-        env_vars_from_prefix_record(&test_prefix, pkg)
-            .into_iter()
-            .map(|(k, v)| (k, Some(v))),
-    );
+    let (_, _, host_platform) = configured_test_platforms(config);
+    let test_env_vars = test_env_vars(&test_prefix, &test_folder, path, &resolved_records, config)?;
     let context = shared_test_context(&test_prefix, host_platform);
 
     script
@@ -1444,7 +1335,7 @@ async fn run_ruby_test(
     let dependencies = vec!["ruby".parse().unwrap(), match_spec];
 
     let test_prefix = prefix.join("test_env");
-    create_environment(
+    let resolved_records = create_environment(
         "test",
         &dependencies,
         config
@@ -1480,21 +1371,8 @@ async fn run_ruby_test(
     let test_folder = prefix.join("test_files");
     fs::create_dir_all(&test_folder)?;
 
-    let (target_platform, build_platform, host_platform) = configured_test_platforms(config);
-    let mut test_env_vars = env_vars::os_vars(
-        &test_prefix,
-        &target_platform,
-        &host_platform,
-        &build_platform,
-        config.env_isolation,
-        &test_folder,
-        &RuntimeEnv::current(),
-    );
-    test_env_vars.extend(
-        env_vars_from_prefix_record(&test_prefix, pkg)
-            .into_iter()
-            .map(|(k, v)| (k, Some(v))),
-    );
+    let (_, _, host_platform) = configured_test_platforms(config);
+    let test_env_vars = test_env_vars(&test_prefix, &test_folder, path, &resolved_records, config)?;
     let context = shared_test_context(&test_prefix, host_platform);
 
     script
