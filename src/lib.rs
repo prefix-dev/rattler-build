@@ -1668,6 +1668,9 @@ pub async fn run_steps(
     build_data.keep_build = true;
     build_data.test = TestStrategy::Skip;
     let recipe_path = get_recipe_path(&recipe_path)?;
+    if build_data.render_only {
+        return build_recipes(vec![recipe_path], build_data, log_handler).await;
+    }
     let tool_config = get_tool_config(&build_data, log_handler)?;
     let outputs = get_build_output(&build_data, &recipe_path, &tool_config).await?;
     if outputs.len() != 1 {
@@ -1701,6 +1704,13 @@ pub async fn run_steps(
         .directories
         .create_build_dir(false)
         .into_diagnostic()?;
+    if let Some((dependencies, sources, library_name_map)) =
+        output.process_staging_caches(&tool_config).await?
+    {
+        output.finalized_cache_dependencies = Some(dependencies);
+        output.finalized_cache_sources = Some(sources);
+        output.staging_library_name_map = Some(library_name_map);
+    }
     let source_info = output
         .build_configuration
         .directories

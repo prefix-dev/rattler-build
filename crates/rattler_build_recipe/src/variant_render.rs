@@ -238,6 +238,13 @@ fn extract_pin_subpackages(recipe: &Stage1Recipe) -> BTreeMap<NormalizedKey, Pin
     recipe
         .requirements
         .exact_pin_subpackages()
+        .chain(
+            recipe.build.plan.step_dependencies()
+                .filter_map(|dependency| match dependency {
+                    Dependency::PinSubpackage(pin) if pin.pin_subpackage.args.exact => Some(pin),
+                    Dependency::Spec(_) | Dependency::PinCompatible(_) | Dependency::PinSubpackage(_) => None,
+                }),
+        )
         .map(|pin| {
             let key = NormalizedKey::from(pin.pin_subpackage.name.as_normalized());
             // Note: version and build_string are placeholders here.
@@ -888,6 +895,21 @@ fn collect_used_variables(
         .collect()
 }
 
+fn evaluated_step_free_specs(
+    plan: &stage0::build::BuildPlan,
+    context: &EvaluationContext,
+) -> Result<Vec<rattler_conda_types::PackageName>, ParseError> {
+    let Some(steps) = plan.steps() else {
+        return Ok(Vec::new());
+    };
+    let evaluated = stage0::evaluate::evaluate_steps(steps, context)?;
+    Ok(crate::stage1::Requirements::free_specs_from_dependencies(
+        evaluated.iter().flat_map(|step| {
+            step.requirements.build.iter().chain(&step.requirements.host)
+        }),
+    ))
+}
+
 /// Evaluate requirements with a variant combination and extract free specs
 /// that are also variant keys (not yet in the combination)
 fn discover_new_variant_keys_from_evaluation(
@@ -911,7 +933,9 @@ fn discover_new_variant_keys_from_evaluation(
                 (context.clone(), IndexMap::new())
             };
             let evaluated = recipe.requirements.evaluate(&context_with_vars)?;
-            evaluated.free_specs()
+            let mut free_specs = evaluated.free_specs();
+            free_specs.extend(evaluated_step_free_specs(&recipe.build.plan, &context_with_vars)?);
+            free_specs
         }
         Stage0Recipe::MultiOutput(recipe) => {
             // Merge recipe context variables into evaluation context
@@ -931,10 +955,10 @@ fn discover_new_variant_keys_from_evaluation(
                 // For package outputs, check if the output should be skipped before
                 // evaluating requirements. This prevents errors from platform-specific
                 // functions like stdlib('c') when the output is skipped for that platform.
-                let (reqs, should_skip) = match output {
+                let (reqs, plan, should_skip) = match output {
                     stage0::Output::Staging(staging) => {
                         // Staging outputs don't have skip conditions
-                        (&staging.requirements, toplevel_skipped)
+                        (&staging.requirements, &staging.build.plan, toplevel_skipped)
                     }
                     stage0::Output::Package(pkg) => {
                         // Evaluate skip conditions: combine top-level and output skip (OR logic)
@@ -944,13 +968,16 @@ fn discover_new_variant_keys_from_evaluation(
                                 &context_with_vars,
                             )
                             .unwrap_or_default();
-                        (&pkg.requirements, is_skipped)
+                        (&pkg.requirements, &pkg.build.plan, is_skipped)
                     }
                 };
 
                 // Only evaluate requirements for non-skipped outputs
                 if !should_skip && let Ok(evaluated) = reqs.evaluate(&context_with_vars) {
                     all_free_specs.extend(evaluated.free_specs());
+                    if let Ok(specs) = evaluated_step_free_specs(plan, &context_with_vars) {
+                        all_free_specs.extend(specs);
+                    }
                 }
             }
             all_free_specs
@@ -1283,6 +1310,7 @@ fn extract_dependency_names(recipe: &Stage1Recipe) -> Vec<rattler_conda_types::P
     // Collect names from build/host dependencies (needed at build time)
     let build_host = requirements
         .build_host()
+        .chain(recipe.build.plan.step_dependencies())
         .filter_map(|dep| dep.name().cloned());
 
     // pin_subpackage refs in run/run_exports must be built first to resolve the
@@ -1797,6 +1825,124 @@ outputs:
             direct.variant.get(&"output_key".into()),
             Some(&Variable::from_string("output"))
         );
+    }
+
+    #[test]
+    fn test_build_steps_free_requirements_create_variants() {
+        let recipe_yaml = r#"
+context:
+  host_package: python
+package:
+  name: test-pkg
+  version: "1.0.0"
+build:
+  steps:
+    - run: echo build
+      requirements:
+        build:
+          - cmake
+        host:
+          - if: unix
+            then: ${{ host_package }}
+    - if: win
+      run: echo windows
+      requirements:
+        host:
+          - ${{ 'numpy' }}
+"#;
+        let variant_yaml = r#"
+cmake: ["3.28.*", "3.29.*"]
+python: ["3.11.*", "3.12.*"]
+numpy: ["1.26.*", "2.0.*"]
+"#;
+        let recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml)
+            .expect("valid steps recipe");
+        let variants = VariantConfig::from_yaml_str(variant_yaml).expect("valid variants");
+        let rendered = render_recipe_with_variant_config(
+            &recipe,
+            &variants,
+            RenderConfig::new()
+                .with_target_platform(rattler_conda_types::Platform::Linux64)
+                .with_experimental(true),
+        )
+        .expect("steps requirements render");
+
+        let combinations = rendered
+            .iter()
+            .map(|output| {
+                assert!(!output.variant.contains_key(&"numpy".into()));
+                assert!(output.recipe.requirements.build.is_empty());
+                assert!(output.recipe.requirements.host.is_empty());
+                (
+                    output.variant.get(&"cmake".into()).expect("build variant").to_string(),
+                    output.variant.get(&"python".into()).expect("host variant").to_string(),
+                )
+            })
+            .collect::<std::collections::BTreeSet<_>>();
+        assert_eq!(
+            combinations,
+            [
+                ("3.28.*".to_string(), "3.11.*".to_string()),
+                ("3.28.*".to_string(), "3.12.*".to_string()),
+                ("3.29.*".to_string(), "3.11.*".to_string()),
+                ("3.29.*".to_string(), "3.12.*".to_string()),
+            ].into_iter().collect(),
+        );
+        assert_eq!(rendered.len(), 4);
+    }
+
+    #[test]
+    fn test_build_steps_exact_pin_orders_outputs() {
+        let recipe_yaml = r#"
+recipe:
+  name: steps
+  version: "1.0"
+outputs:
+  - package:
+      name: consumer
+    build:
+      steps:
+        - run: echo consumer
+          requirements:
+            host:
+              - ${{ pin_subpackage('producer', exact=True) }}
+  - package:
+      name: producer
+    build:
+      steps:
+        - run: echo producer
+          requirements:
+            build:
+              - cmake
+"#;
+        let recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml)
+            .expect("valid multi-output steps recipe");
+        let variants = VariantConfig::from_yaml_str("cmake: ['3.28.*', '3.29.*']")
+            .expect("valid variants");
+        let rendered = render_recipe_with_variant_config(
+            &recipe,
+            &variants,
+            RenderConfig::new().with_experimental(true),
+        )
+        .expect("step pins render");
+        assert_eq!(rendered.len(), 4);
+        for (index, consumer) in rendered.iter().enumerate().filter(|(_, output)| {
+            output.recipe.package.name().as_normalized() == "consumer"
+        }) {
+            let pin = consumer.pin_subpackages.get(&"producer".into()).expect("exact step pin");
+            let producer = rendered[..index].iter().find(|output| {
+                output.recipe.package.name().as_normalized() == "producer"
+                    && output.full_combination == consumer.full_combination
+            }).expect("matching producer precedes consumer");
+            assert_eq!(
+                pin.build_string.as_deref(),
+                producer.recipe.build.string.as_resolved(),
+            );
+            assert_eq!(
+                consumer.variant.get(&"producer".into()).expect("pin in variant").to_string(),
+                format!("{} {}", pin.version, pin.build_string.as_deref().expect("resolved build string")),
+            );
+        }
     }
 
     #[test]

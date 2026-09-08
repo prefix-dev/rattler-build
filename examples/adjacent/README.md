@@ -1,7 +1,7 @@
 # Named build-step prototype
 
 > [!WARNING]
-> Named and reusable build steps are experimental. Their syntax and behavior may
+> Named inline build steps are experimental. Their syntax and behavior may
 > change or be removed, and they require `--experimental`.
 
 Clone Adjacent, then execute the recipe directly in that checkout (replace the
@@ -22,8 +22,8 @@ deterministic `output/bld/rattler-build_*` directories; the isolated lint solve
 gets a separate prefix from the parent-based build/test solve. Dependencies listed under a step's `requirements.build` and
 `requirements.host` extend the corresponding solve group. The lint task sets
 `requirements.inherit: false`, so only its `clang-format` requirement is
-solved. Its command is loaded from the recipe-local reusable step file
-`steps/lint.yaml`.
+solved. Its inline commands check the tool version and the checkout's
+`.clang-format` file.
 
 Without `--source-dir`, `run` uses the recipe's fetched source in the persistent
 rattler-build work directory instead.

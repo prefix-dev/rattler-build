@@ -37,7 +37,7 @@ def test_completion_stderr_is_clean(rattler_build: RattlerBuild):
     assert result.stderr == ""
 
 
-def test_run_named_reusable_step(rattler_build: RattlerBuild, tmp_path: Path):
+def test_run_named_inline_step(rattler_build: RattlerBuild, tmp_path: Path):
     recipe = tmp_path / "recipe"
     source = tmp_path / "source"
     output = tmp_path / "output"
@@ -54,10 +54,9 @@ build:
     - name: check
       optional: true
       depends_on: [prepare]
-      uses: ./check.yaml
+      run: echo checked > checked.txt
 """
     )
-    (recipe / "check.yaml").write_text("run: echo checked > checked.txt\n")
 
     without_experimental = rattler_build(
         "run",
@@ -87,6 +86,74 @@ build:
     )
     assert (source / "prepared.txt").read_text().strip() == "prepared"
     assert (source / "checked.txt").read_text().strip() == "checked"
+
+
+def test_build_steps_reject_uses(
+    rattler_build: RattlerBuild, tmp_path: Path
+):
+    recipe = tmp_path / "recipe.yaml"
+    recipe.write_text(
+        """package:
+  name: inline-steps-only
+  version: "1.0"
+build:
+  steps:
+    - name: check
+      uses: ./check.yaml
+"""
+    )
+
+    result = rattler_build(
+        "build",
+        "--recipe",
+        recipe,
+        "--render-only",
+        "--experimental",
+        capture_output=True,
+    )
+
+    assert result.returncode != 0
+    assert "uses" in result.stderr
+
+
+def test_run_render_only_is_read_only(
+    rattler_build: RattlerBuild, tmp_path: Path
+):
+    recipe = tmp_path / "recipe.yaml"
+    output = tmp_path / "output"
+    recipe.write_text(
+        """package:
+  name: read-only-steps
+  version: "1.0"
+source:
+  path: missing-source
+requirements:
+  host:
+    - rattler-build-nonexistent-render-only-dependency ==0
+build:
+  steps:
+    - name: check
+      run: exit 1
+"""
+    )
+
+    result = rattler_build(
+        "run",
+        "check",
+        "--recipe",
+        recipe,
+        "--output-dir",
+        output,
+        "--render-only",
+        "--experimental",
+        capture_output=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    outputs = json.loads(result.stdout)
+    assert outputs[0]["recipe"]["package"]["name"] == "read-only-steps"
+    assert not outputs[0].get("finalized_dependencies")
+    assert not output.exists()
 
 
 def test_license_glob(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
@@ -208,15 +275,30 @@ def test_python_noarch(rattler_build: RattlerBuild, recipes: Path, tmp_path: Pat
     assert "python >=3.11" in index_json["depends"]
 
 
+@pytest.mark.parametrize("command", [["build"], ["run", "check"]])
 def test_render_only_with_solve_does_not_install_packages(
-    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, command: list[str]
 ):
-    result = rattler_build.render(
-        recipes / "toml",
+    recipe = recipes / "toml"
+    if command[0] == "run":
+        recipe_data = yaml.safe_load((recipe / "recipe.yaml").read_text())
+        script = recipe_data["build"].pop("script")
+        recipe_data["build"]["steps"] = [{"name": "check", "run": script}]
+        recipe = tmp_path / "recipe.yaml"
+        recipe.write_text(yaml.safe_dump(recipe_data))
+
+    result = rattler_build(
+        *command,
+        "--recipe",
+        recipe,
+        "--output-dir",
         tmp_path,
-        with_solve=True,
-        custom_channels=["conda-forge"],
-        raw=True,
+        "--render-only",
+        "--with-solve",
+        "--channel",
+        "conda-forge",
+        "--experimental",
+        capture_output=True,
     )
 
     assert result.returncode == 0

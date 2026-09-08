@@ -293,28 +293,6 @@ impl StepRequirements {
     }
 }
 
-/// Parse a package step reference (`provider:step`). Paths return `Ok(None)`.
-pub fn parse_step_package_reference(reference: &str) -> Result<Option<(&str, &str)>, String> {
-    if reference.contains('/') || reference.contains('\\') || !reference.contains(':') {
-        return Ok(None);
-    }
-    let (provider, step) = reference
-        .split_once(':')
-        .expect("contains(':') checked above");
-    let valid = |value: &str| {
-        !value.is_empty()
-            && value.chars().all(|character| {
-                character.is_ascii_alphanumeric() || matches!(character, '-' | '_')
-            })
-    };
-    if !valid(provider) || !valid(step) || step.contains(':') {
-        return Err(format!(
-            "invalid reusable step reference `{reference}`; expected `provider:step`"
-        ));
-    }
-    Ok(Some((provider, step)))
-}
-
 /// A stage1 build step with evaluated metadata and script content.
 ///
 /// This is deliberately separate from [`Script`]: rendered recipes use
@@ -322,9 +300,6 @@ pub fn parse_step_package_reference(reference: &str) -> Result<Option<(&str, &st
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Step {
-    /// Reusable step reference, either a recipe-relative path or `provider:step`.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub uses: Option<String>,
     /// Optional unique name used by the step DAG and CLI.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
@@ -355,7 +330,6 @@ impl Step {
     /// Create a step from an evaluated script payload.
     pub fn new(script: Script) -> Self {
         Self {
-            uses: None,
             name: None,
             optional: false,
             depends_on: Vec::new(),
@@ -419,6 +393,15 @@ impl BuildPlan {
             Self::Script(_) => None,
             Self::Steps(steps) => Some(steps.as_slice()),
         }
+    }
+
+    /// Iterate over build and host dependencies from all evaluated steps.
+    pub(crate) fn step_dependencies(
+        &self,
+    ) -> impl Iterator<Item = &super::requirements::Dependency> {
+        self.steps().into_iter().flatten().flat_map(|step| {
+            step.requirements.build.iter().chain(&step.requirements.host)
+        })
     }
 
     /// Select named steps (or all non-optional steps when `names` is `None`),
