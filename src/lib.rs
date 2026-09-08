@@ -100,6 +100,7 @@ struct FoundVariants {
     outputs: IndexSet<DiscoveredOutput>,
     /// Top-level recipe name from multi-output recipes (if set and concrete)
     recipe_name: Option<String>,
+    is_multi_output_recipe: bool,
 }
 
 /// Find all variants from the recipe and variant config
@@ -242,7 +243,103 @@ async fn find_variants(
     Ok(FoundVariants {
         outputs: recipes,
         recipe_name,
+        is_multi_output_recipe: matches!(stage0_recipe, stage0::Recipe::MultiOutput(_)),
     })
+}
+
+/// Render generated source with the same compiler and variant machinery as authored recipes.
+struct MetadataRenderer<'a> {
+    variant_config: &'a VariantConfig,
+    recipe_path: &'a Path,
+    recipe_content: &'a str,
+    render_config: &'a RenderConfig,
+    build_data: &'a BuildData,
+    tool_config: &'a Configuration,
+}
+
+impl MetadataRenderer<'_> {
+    async fn expand(
+        &self,
+        output: Output,
+        provider_resolver: &mut rattler_build_core::step_provider::StepProviderResolver,
+    ) -> miette::Result<Vec<Output>> {
+        let Some(metadata) =
+            rattler_build_core::metadata_step::run_metadata_step(&output, self.tool_config).await?
+        else {
+            return Ok(vec![output]);
+        };
+        let source: serde_json::Value =
+            serde_yaml::from_str(self.recipe_content).into_diagnostic()?;
+        let source = metadata.apply_to_source(&source)?;
+        let generated_source = serde_yaml::to_string(&source).into_diagnostic()?;
+        let mut final_variants = self.variant_config.clone();
+        final_variants.insert(
+            "rattler_build_metadata",
+            vec![Variable::from(metadata.fingerprint.as_str())],
+        );
+        let mut final_config = self.render_config.clone();
+        final_config.variant_constraints = output
+            .build_configuration
+            .variant
+            .iter()
+            .filter(|(key, _)| self.variant_config.get(key).is_some())
+            .map(|(key, value)| (key.clone(), value.clone()))
+            .collect();
+        let found = find_variants(
+            &final_variants,
+            self.recipe_path,
+            &generated_source,
+            final_config,
+            self.build_data,
+            self.tool_config,
+            provider_resolver,
+        )
+        .await?;
+        let mut expanded = Vec::with_capacity(found.outputs.len());
+        for discovered in found.outputs {
+            if discovered.recipe.build.skip {
+                continue;
+            }
+            let mut candidate = output.clone();
+            candidate.recipe = discovered.recipe;
+            candidate.recipe.build.metadata = output.recipe.build.metadata.clone();
+            candidate.build_configuration.hash = discovered.hash;
+            candidate.build_configuration.variant = discovered.used_vars;
+            candidate.build_configuration.target_platform = discovered.target_platform;
+            tracing::info!(
+                "Generated metadata for {}:\n{}",
+                candidate.identifier(),
+                metadata.contents.trim_end(),
+            );
+            expanded.push(candidate);
+        }
+        Ok(expanded)
+    }
+}
+
+fn show_effective_build_steps(output: &Output) {
+    let Some(steps) = output.recipe.build.plan.steps() else {
+        return;
+    };
+    let mut table = comfy_table::Table::new();
+    table
+        .load_style(comfy_table::presets::UTF8_FULL_CONDENSED.with_rounded_corners())
+        .set_header(["Step", "Depends on"]);
+    for (index, step) in steps.iter().enumerate() {
+        table.add_row([
+            step.name.clone().unwrap_or_else(|| format!("step {index}")),
+            if step.depends_on.is_empty() {
+                "-".to_string()
+            } else {
+                step.depends_on.join(", ")
+            },
+        ]);
+    }
+    tracing::info!(
+        "\nEffective build steps for {}:\n{}\n",
+        output.identifier(),
+        table
+    );
 }
 
 /// Returns the recipe path.
@@ -495,17 +592,27 @@ pub async fn get_build_output(
     let FoundVariants {
         outputs: outputs_and_variants,
         recipe_name,
+        is_multi_output_recipe,
     } = find_variants(
         &variant_config,
         recipe_path,
         &recipe_content,
-        render_config,
+        render_config.clone(),
         build_data,
         tool_config,
         &mut step_provider_resolver,
     )
     .await?;
 
+    if is_multi_output_recipe
+        && outputs_and_variants
+            .iter()
+            .any(|output| output.recipe.build.metadata.is_some())
+    {
+        return Err(miette::miette!(
+            "build.metadata in multi-output recipes is not yet supported: metadata changes package identities, so exact subpackage pins and dependent output hashes must be recomputed afterward"
+        ));
+    }
     tracing::info!("Found {} variants\n", outputs_and_variants.len());
     for discovered_output in &outputs_and_variants {
         let skipped = if discovered_output.recipe.build().skip {
@@ -543,6 +650,14 @@ pub async fn get_build_output(
 
     let mut subpackages = BTreeMap::new();
     let mut outputs = Vec::new();
+    let metadata_renderer = MetadataRenderer {
+        variant_config: &variant_config,
+        recipe_path,
+        recipe_content: &recipe_content,
+        render_config: &render_config,
+        build_data,
+        tool_config,
+    };
 
     // For multi-output recipes, all outputs (including staging caches) need to use the same
     // build directory so that paths are consistent across outputs.
@@ -691,7 +806,7 @@ pub async fn get_build_output(
             .into_diagnostic()?;
 
         let virtual_package_override = VirtualPackageOverrides::from_env();
-        let output = Output {
+        let mut output = Output {
             recipe: discovered_output.recipe.clone(),
             build_configuration: BuildConfiguration {
                 target_platform: discovered_output.target_platform,
@@ -753,7 +868,53 @@ pub async fn get_build_output(
             ),
         };
 
-        outputs.push(output);
+        output.build_configuration.directories.source_dir = build_data.local_source_dir.clone();
+
+        if output.recipe.build.metadata.is_some()
+            && output.build_configuration.directories.source_dir.is_none()
+            && !(build_data.selected_steps.is_some()
+                && output
+                    .build_configuration
+                    .directories
+                    .work_dir
+                    .join(".source_info.json")
+                    .exists())
+        {
+            // Metadata may inspect the fetched project (for example,
+            // pyproject.toml) before producing the final solve requirements.
+            // The normal build recreates this work directory and restores the
+            // source from cache after output selection. `rattler-build run
+            // --source-dir` instead points metadata directly at that tree. A
+            // repeated `run` reuses its prepared source tree and build artifacts.
+            output
+                .build_configuration
+                .directories
+                .create_build_dir(build_data.selected_steps.is_none())
+                .into_diagnostic()?;
+            output = output
+                .fetch_sources(
+                    tool_config,
+                    rattler_build_core::source::patch::apply_patch_custom,
+                )
+                .await
+                .into_diagnostic()?;
+        }
+        let expanded = metadata_renderer
+            .expand(output, &mut step_provider_resolver)
+            .await?;
+        for mut output in expanded {
+            show_effective_build_steps(&output);
+            subpackages.insert(
+                output.name().clone(),
+                PackageIdentifier {
+                    name: output.name().clone(),
+                    version: output.recipe.package().version().clone(),
+                    build_string: output.build_string().into_owned(),
+                },
+            );
+            output.build_configuration.subpackages = subpackages.clone();
+            outputs.push(output);
+        }
     }
 
     Ok(outputs)
@@ -1702,6 +1863,25 @@ pub async fn run_steps(
     build_data.no_build_id = true;
     build_data.keep_build = true;
     build_data.test = TestStrategy::Skip;
+    build_data.local_source_dir = source_dir
+        .map(|source_dir| {
+            let source_dir = canonicalize(&source_dir)
+                .into_diagnostic()
+                .wrap_err_with(|| {
+                    format!(
+                        "failed to resolve source directory {}",
+                        source_dir.display()
+                    )
+                })?;
+            if !source_dir.is_dir() {
+                return Err(miette::miette!(
+                    "source directory is not a directory: {}",
+                    source_dir.display()
+                ));
+            }
+            Ok(source_dir)
+        })
+        .transpose()?;
     let recipe_path = get_recipe_path(&recipe_path)?;
     if build_data.render_only {
         return build_recipes(vec![recipe_path], build_data, log_handler).await;
@@ -1716,23 +1896,8 @@ pub async fn run_steps(
     }
 
     let mut output = outputs.into_iter().next().expect("one output");
-    if let Some(source_dir) = source_dir {
-        let source_dir = canonicalize(&source_dir)
-            .into_diagnostic()
-            .wrap_err_with(|| {
-                format!(
-                    "failed to resolve source directory {}",
-                    source_dir.display()
-                )
-            })?;
-        if !source_dir.is_dir() {
-            return Err(miette::miette!(
-                "source directory is not a directory: {}",
-                source_dir.display()
-            ));
-        }
+    if let Some(source_dir) = &output.build_configuration.directories.source_dir {
         tracing::info!("Executing steps in source tree {}", source_dir.display());
-        output.build_configuration.directories.source_dir = Some(source_dir);
     }
     output
         .build_configuration
@@ -1821,6 +1986,7 @@ pub async fn debug_recipe(
         build_string_prefix: None,
         markdown_summary: None,
         selected_steps: None,
+        local_source_dir: None,
     };
 
     let tool_config = get_tool_config(&build_data, log_handler)?;

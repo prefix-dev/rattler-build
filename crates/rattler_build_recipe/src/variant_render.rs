@@ -966,6 +966,10 @@ fn discover_new_variant_keys_from_evaluation(
             let build = recipe.build.evaluate(&context_with_vars)?;
             evaluated.build.extend(build.action_requirements.build);
             evaluated.host.extend(build.action_requirements.host);
+            if let Some(metadata) = build.metadata {
+                evaluated.build.extend(metadata.requirements.build);
+                evaluated.host.extend(metadata.requirements.host);
+            }
             evaluated.free_specs()
         }
         Stage0Recipe::MultiOutput(recipe) => {
@@ -1029,6 +1033,10 @@ fn discover_new_variant_keys_from_evaluation(
                     let mut action_requirements = crate::stage1::Requirements::default();
                     action_requirements.build = build.action_requirements.build;
                     action_requirements.host = build.action_requirements.host;
+                    if let Some(metadata) = build.metadata {
+                        action_requirements.build.extend(metadata.requirements.build);
+                        action_requirements.host.extend(metadata.requirements.host);
+                    }
                     all_free_specs.extend(action_requirements.free_specs());
                 }
             }

@@ -1,6 +1,7 @@
 import json
 import shutil
 from pathlib import Path
+from subprocess import STDOUT
 
 import pytest
 import yaml
@@ -34,6 +35,292 @@ def test_build_steps(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path)
     assert "unset" in step3.read_text(), "step-local env leaked to a later section"
 
 
+def test_metadata_step_runs_before_solving_and_defines_build_plan(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Metadata bootstrap output participates in solving and build execution."""
+    rattler_build.build(
+        recipes / "metadata_step", tmp_path, extra_args=["--experimental"]
+    )
+    pkg = get_extracted_package(tmp_path, "metadata-step-example")
+
+    assert (
+        pkg / "share" / "metadata-step-example" / "generated.txt"
+    ).read_text() == "overridden by recipe\n"
+    rendered = yaml.safe_load(
+        (pkg / "info" / "recipe" / "rendered_recipe.yaml").read_text()
+    )["recipe"]
+    assert rendered["requirements"]["build"] == ["python"]
+    assert rendered["requirements"]["host"] == ["zlib"]
+    assert rendered["build"]["steps"][0]["name"] == "install"
+    assert "overridden by recipe" in "\n".join(rendered["build"]["steps"][0]["run"])
+
+
+def test_metadata_dependencies_expand_variants_after_generation(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """A dependency introduced by metadata participates in the final matrix."""
+    variant_config = tmp_path / "variants.yaml"
+    variant_config.write_text("zlib:\n  - 1.2\n  - 1.3\n")
+
+    rendered = rattler_build.render(
+        recipes / "metadata_step",
+        tmp_path / "output",
+        variant_config=variant_config,
+        extra_args=["--experimental"],
+    )
+
+    assert len(rendered) == 2
+    assert {
+        output["build_configuration"]["variant"]["zlib"] for output in rendered
+    } == {"1.2", "1.3"}
+    assert all(
+        output["recipe"]["build"]["steps"][0]["name"] == "install"
+        for output in rendered
+    )
+
+
+def test_generated_provider_requirements_expand_metadata_variants(
+    rattler_build: RattlerBuild, tmp_path: Path
+):
+    """Requirements hidden in a generated provider are included in the matrix."""
+    recipe_dir = tmp_path / "generated-provider-variant"
+    recipe_dir.mkdir()
+    (recipe_dir / "provider.yaml").write_text(
+        """requirements:
+  build: [zlib]
+steps:
+  - name: compile
+    run: echo compiled
+"""
+    )
+    (recipe_dir / "recipe.yaml").write_text(
+        """schema_version: 1
+package:
+  name: generated-provider-variant
+  version: 1.0.0
+build:
+  metadata:
+    requirements:
+      build: [python]
+    interpreter: python
+    run: |
+      import json
+      import os
+      with open(os.environ["OUTPUT_FILE"], "w") as output:
+          output.write("build.steps " + json.dumps([{"name": "compile", "uses": "./provider.yaml"}]) + "\\n")
+          output.write('build.variant.use_keys.append ["libpng"]\\n')
+"""
+    )
+    variant_config = tmp_path / "provider-variants.yaml"
+    variant_config.write_text(
+        """zlib:
+  - 1.2
+  - 1.3
+libpng:
+  - 1.6.42
+  - 1.6.43
+zip_keys:
+  - [zlib, libpng]
+"""
+    )
+
+    rendered = rattler_build.render(
+        recipe_dir,
+        tmp_path / "output",
+        variant_config=variant_config,
+        extra_args=["--experimental"],
+    )
+
+    assert len(rendered) == 2
+    assert {
+        (
+            output["build_configuration"]["variant"]["zlib"],
+            output["build_configuration"]["variant"]["libpng"],
+        )
+        for output in rendered
+    } == {("1.2", "1.6.42"), ("1.3", "1.6.43")}
+
+
+@pytest.mark.parametrize("recipe_name", ["", "  name: metadata-multi-output\n"])
+def test_metadata_rejects_multi_output_graphs_before_execution(
+    rattler_build: RattlerBuild, tmp_path: Path, recipe_name: str
+):
+    """Even metadata without new variants would invalidate downstream exact-pin hashes."""
+    recipe_dir = tmp_path / "metadata-multi-output"
+    recipe_dir.mkdir()
+    (recipe_dir / "recipe.yaml").write_text(
+        "schema_version: 1\nrecipe:\n"
+        + recipe_name
+        + """  version: 1.0.0
+outputs:
+  - package:
+      name: upstream
+    build:
+      metadata:
+        interpreter: python
+        run: |
+          raise AssertionError("metadata must not execute")
+  - package:
+      name: downstream
+    requirements:
+      run:
+        - ${{ pin_subpackage("upstream", exact=True) }}
+"""
+    )
+
+    result = rattler_build(
+        "build",
+        "--recipe",
+        str(recipe_dir),
+        "--output-dir",
+        str(tmp_path / "output"),
+        "--render-only",
+        "--experimental",
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert (
+        "build.metadata in multi-output recipes is not yet supported" in result.stderr
+    )
+    assert "hashes must be recomputed afterward" in result.stderr
+    assert "Running pre-solve metadata step" not in result.stderr
+
+
+def test_metadata_requires_output_file(rattler_build: RattlerBuild, tmp_path: Path):
+    """A successful command that forgets the metadata protocol is an error."""
+    recipe = tmp_path / "missing-output" / "recipe.yaml"
+    recipe.parent.mkdir()
+    recipe.write_text(
+        """schema_version: 1
+package:
+  name: missing-metadata-output
+  version: 1.0.0
+build:
+  metadata:
+    run: echo metadata command ran
+"""
+    )
+    result = rattler_build(
+        "build",
+        "--recipe",
+        str(recipe),
+        "--output-dir",
+        str(tmp_path / "output"),
+        "--render-only",
+        "--experimental",
+        capture_output=True,
+    )
+
+    assert result.returncode != 0
+    assert "completed without creating OUTPUT_FILE" in result.stderr
+
+
+def test_metadata_generated_steps_require_names(
+    rattler_build: RattlerBuild, tmp_path: Path
+):
+    """Generated defaults are always addressable for recipe overrides."""
+    recipe = tmp_path / "unnamed-step" / "recipe.yaml"
+    recipe.parent.mkdir()
+    recipe.write_text(
+        """schema_version: 1
+package:
+  name: unnamed-generated-step
+  version: 1.0.0
+build:
+  metadata:
+    requirements:
+      build: [python]
+    interpreter: python
+    run: |
+      import os
+      with open(os.environ["OUTPUT_FILE"], "w") as output:
+          output.write('build.steps [{"run":"echo generated"}]\\n')
+"""
+    )
+    result = rattler_build(
+        "build",
+        "--recipe",
+        str(recipe),
+        "--output-dir",
+        str(tmp_path / "output"),
+        "--render-only",
+        "--experimental",
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert "generated an unnamed build step" in result.stderr
+
+
+def test_run_metadata_uses_external_source_tree(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """`run --source-dir` is visible to metadata, not only generated steps."""
+    source = tmp_path / "external-source"
+    source.mkdir()
+    (source / "pyproject.toml").write_text(
+        '[tool.rattler-build]\nbuild = ["python"]\nhost = []\n'
+    )
+    output = rattler_build(
+        "run",
+        "install",
+        "--recipe",
+        str(recipes / "metadata_step"),
+        "--source-dir",
+        str(source),
+        "--output-dir",
+        str(tmp_path / "output"),
+        "--experimental",
+        stderr=STDOUT,
+    )
+
+    assert str(source) in output
+    assert "- zlib" not in output
+
+
+def test_python_metadata_backend_builds_external_rich_source(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """One provider package supplies both pyproject metadata and wheel steps."""
+    provider_output = tmp_path / "provider-output"
+    channel = tmp_path / "channel"
+    consumer_output = tmp_path / "consumer-output"
+    variant_config = tmp_path / "rich-variants.yaml"
+    variant_config.write_text("python:\n  - 3.11\n  - 3.12\n")
+    rattler_build.build(recipes / "metadata_python_provider", provider_output)
+    provider = get_package(provider_output, "python-rattler-build-steps")
+    rattler_build("publish", str(provider), "--to", str(channel))
+    build_args = rattler_build.build_args(
+        recipes / "metadata_python_backend",
+        consumer_output,
+        variant_config=variant_config,
+        custom_channels=[channel.as_uri(), "conda-forge"],
+        extra_args=["--experimental"],
+    )
+    rattler_build(*build_args, stderr=STDOUT)
+    pkg = get_extracted_package(consumer_output, "rich")
+
+    index = json.loads((pkg / "info" / "index.json").read_text())
+    assert index["noarch"] == "python"
+    assert "python >=3.8.0" in index["depends"]
+    assert "markdown-it-py >=2.2.0" in index["depends"]
+    assert "pygments >=2.13.0,<3" in index["depends"]
+    about = json.loads((pkg / "info" / "about.json").read_text())
+    assert about["license"] == "MIT"
+    assert about["summary"].startswith("Render rich text")
+    rendered = yaml.safe_load(
+        (pkg / "info" / "recipe" / "rendered_recipe.yaml").read_text()
+    )["recipe"]
+    assert {"python", "pip", "python-build", "poetry-core >=1.0.0"} <= set(
+        rendered["requirements"]["host"]
+    )
+    assert (pkg / "site-packages" / "rich" / "__init__.py").exists()
+    assert (pkg / "info" / "licenses" / "LICENSE").exists()
+
 def test_reusable_steps_inputs_and_generated_licenses(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
@@ -54,6 +341,7 @@ def test_reusable_steps_inputs_and_generated_licenses(
     assert run_exports["strong"] == ["reusable-abi"]
     about = json.loads((pkg / "info" / "about.json").read_text())
     assert about["dev_url"] == "https://example.com/reusable-step"
+
 
 
 def test_step_cache_skips_and_invalidates(
@@ -324,3 +612,35 @@ def test_rebuild_applies_post_build_outputs_once(
             get_extracted_package(output, "rebuild-outputs") / "marker.txt"
         ).read_text() == "built!!"
         package = get_package(output, "rebuild-outputs")
+def test_metadata_run_preserves_prepared_sources_and_cached_outputs(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    project = tmp_path / "project"
+    shutil.copytree(recipes / "step_cache", project)
+    recipe_path = project / "recipe.yaml"
+    recipe = yaml.safe_load(recipe_path.read_text())
+    recipe["source"] = {"path": "input.txt"}
+    recipe["build"]["metadata"] = {
+        "requirements": {"build": ["python"]},
+        "interpreter": "python",
+        "run": 'import os\nfrom pathlib import Path\nPath(os.environ["OUTPUT_FILE"]).write_text("about.summary generated metadata\\n")',
+    }
+    recipe_path.write_text(yaml.safe_dump(recipe))
+    output = tmp_path / "output"
+    args = (
+        "run",
+        "cached",
+        "--recipe",
+        str(project),
+        "--output-dir",
+        str(output),
+        "--experimental",
+    )
+    rattler_build(*args)
+    (work,) = output.glob("bld/*/work")
+    (work / "retained-artifact.txt").write_text("keep me")
+    rattler_build(*args)
+    assert (work / "run-count.txt").read_text() == "run\n"
+    assert (work / "retained-artifact.txt").read_text() == "keep me"
+    (metadata,) = (work / ".rattler-build/step-outputs").glob("*.txt")
+    assert metadata.read_text() == "about.summary cached metadata\n"

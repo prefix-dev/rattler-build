@@ -1492,7 +1492,7 @@ fn validate_selected_plan(
     build: &Stage1Build,
     context: &EvaluationContext,
 ) -> Result<(), ParseError> {
-    if build.skip || context.actions.selected.is_none() {
+    if build.skip || build.metadata.is_some() || context.actions.selected.is_none() {
         return Ok(());
     }
     match &build.plan {
@@ -2264,11 +2264,71 @@ impl Evaluate for Stage0Build {
         // empty or all steps filter out, so outputs don't accidentally inherit a
         // top-level script.
         let skip = evaluate_skip_list(&self.skip, context)?;
+        let metadata = if !skip && let Some(step) = &self.metadata {
+            if !context.jinja_config().experimental {
+                return Err(ParseError::invalid_value(
+                    "build.metadata",
+                    "`build.metadata` is an experimental feature: provide the `--experimental` flag to enable it",
+                    Span::new_blank(),
+                ));
+            }
+            let (optional, depends_on, condition, condition_span) = match step {
+                Stage0Step::Run(step) => (
+                    step.optional,
+                    &step.depends_on,
+                    step.condition.as_ref(),
+                    step.condition_span.as_ref(),
+                ),
+                Stage0Step::Uses(step) => (
+                    step.optional,
+                    &step.depends_on,
+                    step.condition.as_ref(),
+                    step.condition_span.as_ref(),
+                ),
+            };
+            if optional || !depends_on.is_empty() {
+                return Err(ParseError::invalid_value(
+                    "build.metadata",
+                    "`build.metadata` cannot be optional or depend on normal build steps",
+                    Span::new_blank(),
+                ));
+            }
+            if let Some(condition) = condition
+                && !evaluate_condition(condition, context, condition_span)?
+            {
+                None
+            } else {
+                let mut metadata_context = context.clone();
+                metadata_context.actions.selected = None;
+                let compiled =
+                    crate::actions::compile_steps(std::slice::from_ref(step), &metadata_context)?;
+                for variable in metadata_context.accessed_variables() {
+                    context.track_access(&variable);
+                }
+                Some(crate::stage1::build::MetadataPlan {
+                    steps: compiled.steps,
+                    requirements: compiled.requirements,
+                    provenance: compiled.provenance,
+                })
+            }
+        } else {
+            None
+        };
+        let bootstrap_context = metadata.as_ref().map(|_| {
+            let mut bootstrap_context = context.clone();
+            bootstrap_context.actions.selected = None;
+            bootstrap_context
+        });
         let (plan, actions) = if skip {
             (Stage1BuildPlan::Steps(Vec::new()), Default::default())
         } else {
-            evaluate_build_plan(&self.plan, context)?
+            evaluate_build_plan(&self.plan, bootstrap_context.as_ref().unwrap_or(context))?
         };
+        if let Some(bootstrap_context) = &bootstrap_context {
+            for variable in bootstrap_context.accessed_variables() {
+                context.track_access(&variable);
+            }
+        }
 
         // Evaluate noarch
         //
@@ -2377,6 +2437,7 @@ impl Evaluate for Stage0Build {
             number,
             string,
             plan,
+            metadata,
             noarch,
             flags,
             python,
@@ -3288,6 +3349,7 @@ fn merge_stage1_build(
     stage1::Build {
         action_requirements,
         action_provenance,
+        metadata: output.metadata.or(toplevel.metadata),
         plan,
         number,
         string,
@@ -6742,6 +6804,77 @@ package:
 
         let err = build.evaluate(&ctx).unwrap_err();
         assert!(err.to_string().contains("experimental"));
+    }
+
+    #[test]
+    fn test_build_metadata_requires_experimental() {
+        let build = Stage0Build {
+            metadata: Some(run_step("echo metadata")),
+            ..Default::default()
+        };
+        let err = build.evaluate(&EvaluationContext::new()).unwrap_err();
+        assert!(err.to_string().contains("experimental"));
+    }
+
+    #[test]
+    fn test_metadata_bootstrap_defers_generated_step_selection() {
+        let build = Stage0Build {
+            metadata: Some(run_step("echo metadata")),
+            plan: Stage0BuildPlan::Steps(vec![run_step("echo authored")]),
+            ..Default::default()
+        };
+        let mut ctx = EvaluationContext::with_variables_and_config(
+            IndexMap::new(),
+            JinjaConfig {
+                experimental: true,
+                ..Default::default()
+            },
+        );
+        ctx.actions.selected = Some(vec!["generated-later".to_owned()]);
+
+        let stage1 = build.evaluate(&ctx).unwrap();
+
+        assert_eq!(
+            stage1.metadata.unwrap().steps[0].run,
+            Stage1StepRun::Commands(vec!["echo metadata".to_string()])
+        );
+    }
+
+    #[test]
+    fn test_skipped_metadata_preserves_final_step_selection() {
+        let build = Stage0Build {
+            metadata: Some(Stage0Step::Run(Stage0RunStep {
+                condition: Some(step_condition("false")),
+                ..Default::default()
+            })),
+            plan: Stage0BuildPlan::Steps(vec![
+                run_step("echo default"),
+                Stage0Step::Run(Stage0RunStep {
+                    name: Some("selected".into()),
+                    optional: true,
+                    run: ConditionalList::new(vec![Item::Value(Value::new_concrete(
+                        "echo selected".to_owned(),
+                        None,
+                    ))]),
+                    ..Default::default()
+                }),
+            ]),
+            ..Default::default()
+        };
+        let mut context = EvaluationContext::with_variables_and_config(
+            IndexMap::new(),
+            JinjaConfig {
+                experimental: true,
+                ..Default::default()
+            },
+        );
+        context.actions.selected = Some(vec!["selected".into()]);
+        let rendered = build.evaluate(&context).unwrap();
+        assert!(rendered.metadata.is_none());
+        assert_eq!(
+            rendered.plan.steps().unwrap().iter().map(|step| step.run.clone()).collect::<Vec<_>>(),
+            vec![Stage1StepRun::Commands(vec!["echo selected".into()])]
+        );
     }
 
     #[test]
