@@ -1445,7 +1445,10 @@ pub(crate) fn evaluate_run_steps(
                 scripts.push(step);
             }
             Stage0Step::Uses(_) => {
-                return Err(ParseError::generic("action invocation requires action compilation", Span::new_blank()));
+                return Err(ParseError::generic(
+                    "action invocation requires action compilation",
+                    Span::new_blank(),
+                ));
             }
         }
     }
@@ -1477,9 +1480,10 @@ fn evaluate_build_plan(
             let plan = Stage1BuildPlan::Steps(std::mem::take(&mut compiled.steps));
             Ok((plan, compiled))
         }
-        Stage0BuildPlan::Script(script) => {
-            Ok((Stage1BuildPlan::Script(evaluate_script(script, context)?), Default::default()))
-        }
+        Stage0BuildPlan::Script(script) => Ok((
+            Stage1BuildPlan::Script(evaluate_script(script, context)?),
+            Default::default(),
+        )),
     }
 }
 
@@ -3129,10 +3133,18 @@ fn build_plan_inherits_from_toplevel(toplevel: &Stage1BuildPlan, output: &Stage1
 }
 
 fn merge_action_requirements(build: &mut Stage1Build, requirements: &mut Stage1Requirements) {
-    if !build.action_requirements.inherit.build { requirements.build.clear(); }
-    if !build.action_requirements.inherit.host { requirements.host.clear(); }
-    requirements.build.extend(std::mem::take(&mut build.action_requirements.build));
-    requirements.host.extend(std::mem::take(&mut build.action_requirements.host));
+    if !build.action_requirements.inherit.build {
+        requirements.build.clear();
+    }
+    if !build.action_requirements.inherit.host {
+        requirements.host.clear();
+    }
+    requirements
+        .build
+        .extend(std::mem::take(&mut build.action_requirements.build));
+    requirements
+        .host
+        .extend(std::mem::take(&mut build.action_requirements.host));
 }
 
 /// Merge two Stage1 Build configurations
@@ -3148,11 +3160,12 @@ fn merge_stage1_build(
     // when inheriting a top-level script, matching the historical multi-output
     // behavior. It does not inherit a top-level steps plan because there is no
     // whole-plan `cwd` to apply to steps without silently dropping it.
-    let (action_requirements, action_provenance) = if build_plan_inherits_from_toplevel(&toplevel.plan, &output.plan) {
-        (toplevel.action_requirements, toplevel.action_provenance)
-    } else {
-        (output.action_requirements, output.action_provenance)
-    };
+    let (action_requirements, action_provenance) =
+        if build_plan_inherits_from_toplevel(&toplevel.plan, &output.plan) {
+            (toplevel.action_requirements, toplevel.action_provenance)
+        } else {
+            (output.action_requirements, output.action_provenance)
+        };
     let plan = if build_plan_inherits_from_toplevel(&toplevel.plan, &output.plan) {
         toplevel.plan
     } else {
@@ -3380,8 +3393,10 @@ fn evaluate_package_output_to_recipe(
     let build = if inherits_from_toplevel {
         // Full merge including the build plan
         let mut toplevel_source = recipe.build.clone();
-        if !output.build.plan.is_default() {
-            toplevel_source.plan = Stage0BuildPlan::default();
+        if !output.build.plan.is_default()
+            && let Stage0BuildPlan::Steps(steps) = &mut toplevel_source.plan
+        {
+            steps.clear();
         }
         let toplevel_build = toplevel_source.evaluate(context)?;
         let output_build = output.build.evaluate(context)?;
@@ -6731,7 +6746,6 @@ package:
             Stage1StepRun::Commands(vec!["echo b".to_string()])
         );
     }
-
 
     #[test]
     fn test_build_evaluate_preserves_steps_mode_when_all_steps_filter_out() {

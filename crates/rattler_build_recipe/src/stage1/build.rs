@@ -293,7 +293,6 @@ impl StepRequirements {
     }
 }
 
-
 /// A stage1 build step with evaluated metadata and script content.
 ///
 /// This is deliberately separate from [`Script`]: rendered recipes use

@@ -150,7 +150,6 @@ impl StepRequirements {
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
 #[serde(deny_unknown_fields)]
 pub struct RunStep {
-
     /// Optional unique name used by `rattler-build run` and dependency edges.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,

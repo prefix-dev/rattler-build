@@ -8,7 +8,7 @@ use serde::Serialize;
 
 use crate::stage0::{
     about::About,
-    build::{Build, BuildPlan},
+    build::{Build, BuildPlan, Step},
     package::{Package, PackageMetadata},
     requirements::Requirements,
     source::Source,
@@ -22,10 +22,14 @@ fn recipe_free_specs(
 ) -> Vec<rattler_conda_types::PackageName> {
     Requirements::free_specs_from_lists(
         [&requirements.build, &requirements.host].into_iter().chain(
-            plan.steps().into_iter().flatten().flat_map(|step| {
-                let super::build::Step::Run(step) = step;
-                [&step.requirements.build, &step.requirements.host]
-            }),
+            plan.steps()
+                .into_iter()
+                .flatten()
+                .filter_map(|step| match step {
+                    Step::Run(run) => Some(&run.requirements),
+                    Step::Uses(_) => None,
+                })
+                .flat_map(|requirements| [&requirements.build, &requirements.host]),
         ),
     )
 }

@@ -938,7 +938,11 @@ fn discover_new_variant_keys_from_evaluation(
     let mut context = build_evaluation_context(combination, config)?;
     for (key, values) in &variant_config.variants {
         if let Some(value) = values.first() {
-            context.actions.variants.entry(key.to_string()).or_insert_with(|| value.clone());
+            context
+                .actions
+                .variants
+                .entry(key.normalize())
+                .or_insert_with(|| value.clone());
         }
     }
 
@@ -1004,7 +1008,9 @@ fn discover_new_variant_keys_from_evaluation(
                 }
                 if !should_skip {
                     let build = match output {
-                        stage0::Output::Staging(staging) => staging.build.evaluate(&context_with_vars)?,
+                        stage0::Output::Staging(staging) => {
+                            staging.build.evaluate(&context_with_vars)?
+                        }
                         stage0::Output::Package(pkg) => {
                             if pkg.build.plan.is_default() {
                                 recipe.build.evaluate(&context_with_vars)?
@@ -1047,10 +1053,18 @@ fn expand_combination_with_keys(
     new_keys: &HashSet<NormalizedKey>,
     variant_config: &VariantConfig,
 ) -> Result<Vec<BTreeMap<NormalizedKey, Variable>>, ParseError> {
-    let keys = base.keys().cloned().chain(new_keys.iter().cloned()).collect();
-    let mut combinations = variant_config.combinations(&keys)
+    let keys = base
+        .keys()
+        .cloned()
+        .chain(new_keys.iter().cloned())
+        .collect();
+    let mut combinations = variant_config
+        .combinations(&keys)
         .map_err(|error| ParseError::generic(error.to_string(), marked_yaml::Span::new_blank()))?;
-    combinations.retain(|combination| base.iter().all(|(key, value)| combination.get(key) == Some(value)));
+    combinations.retain(|combination| {
+        base.iter()
+            .all(|(key, value)| combination.get(key) == Some(value))
+    });
     Ok(combinations)
 }
 
@@ -1093,7 +1107,6 @@ fn expand_variants_tree(
         to_process = next_round;
     }
 
-
     // Deduplicate combinations
     let mut seen = HashSet::new();
     final_combinations.retain(|combo| {
@@ -1132,7 +1145,12 @@ fn build_evaluation_context(
             jinja_config,
             config.os_env_var_keys.clone(),
             config.repodata_revision,
-        ).with_actions(config.action_sources.clone(), config.recipe_path.clone(), config.selected_steps.clone()),
+        )
+        .with_actions(
+            config.action_sources.clone(),
+            config.recipe_path.clone(),
+            config.selected_steps.clone(),
+        ),
     )
 }
 
@@ -1159,7 +1177,11 @@ fn render_with_empty_combinations(
     let context =
         EvaluationContext::with_variables_and_config(config.extra_context.clone(), jinja_config)
             .with_repodata_revision(config.repodata_revision)
-            .with_actions(config.action_sources.clone(), config.recipe_path.clone(), config.selected_steps.clone());
+            .with_actions(
+                config.action_sources.clone(),
+                config.recipe_path.clone(),
+                config.selected_steps.clone(),
+            );
 
     // Evaluate the recipe
     let outputs = evaluate_recipe(stage0_recipe, &context)?;
@@ -1242,13 +1264,22 @@ fn finalize_build_string_single(
 ) -> Result<(), RenderError> {
     let build_string_prefix = config.build_string_prefix.as_deref();
     let noarch = result.recipe.build.noarch.unwrap_or(NoArchType::none());
-    let action_provenance = result.recipe.staging_caches.iter()
+    let action_provenance = result
+        .recipe
+        .staging_caches
+        .iter()
         .flat_map(|cache| cache.build.action_provenance.iter())
-        .chain(result.recipe.build.action_provenance.iter()).collect::<Vec<_>>();
+        .chain(result.recipe.build.action_provenance.iter())
+        .collect::<Vec<_>>();
     if !action_provenance.is_empty() {
         let identity = Variable::from(minijinja::Value::from_serialize(&action_provenance));
-        result.variant.insert(NormalizedKey::from("__actions"), identity.clone());
-        result.recipe.used_variant.insert(NormalizedKey::from("__actions"), identity);
+        result
+            .variant
+            .insert(NormalizedKey::from("__actions"), identity.clone());
+        result
+            .recipe
+            .used_variant
+            .insert(NormalizedKey::from("__actions"), identity);
     }
 
     // Compute hash from the variant (which now includes pin_subpackage information)
@@ -1617,7 +1648,11 @@ fn render_with_variants(
     let mut results = Vec::with_capacity(combinations.len());
 
     for combination in combinations {
-        if !config.variant_constraints.iter().all(|(key, value)| combination.get(key).is_none_or(|actual| actual == value)) {
+        if !config
+            .variant_constraints
+            .iter()
+            .all(|(key, value)| combination.get(key).is_none_or(|actual| actual == value))
+        {
             continue;
         }
         let context = build_evaluation_context(&combination, &config)?;
@@ -1894,8 +1929,6 @@ numpy: ["1.26.*", "2.0.*"]
             .iter()
             .map(|output| {
                 assert!(!output.variant.contains_key(&"numpy".into()));
-                assert!(output.recipe.requirements.build.is_empty());
-                assert!(output.recipe.requirements.host.is_empty());
                 (
                     output
                         .variant

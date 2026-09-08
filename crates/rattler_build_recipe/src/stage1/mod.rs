@@ -85,7 +85,10 @@ impl EvaluationContext {
         selected: Option<Vec<String>>,
     ) -> Self {
         self.actions = crate::actions::ActionEnvironment {
-            sources, origin, selected, variants: self.variables.clone(),
+            sources,
+            origin,
+            selected,
+            variants: self.variables.clone(),
         };
         self
     }

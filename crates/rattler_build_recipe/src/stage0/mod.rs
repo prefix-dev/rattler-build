@@ -25,6 +25,7 @@ pub use output::{
     SingleOutputRecipe, StagingBuild, StagingMetadata, StagingOutput,
 };
 pub use package::{Package, PackageMetadata};
+pub(crate) use parser::build::{parse_step_requirements, parse_steps};
 pub use parser::{
     ParseConfig, parse_recipe, parse_recipe_from_source, parse_recipe_from_source_with_config,
     parse_recipe_or_multi, parse_recipe_or_multi_from_source,

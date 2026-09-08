@@ -472,14 +472,29 @@ pub(crate) fn parse_step(node: &Node) -> Result<Step, ParseError> {
         let allowed = if is_uses {
             &["uses", "with", "name", "optional", "depends_on", "if"][..]
         } else {
-            &["run", "name", "optional", "depends_on", "if", "requirements", "interpreter", "cwd", "env"][..]
+            &[
+                "run",
+                "name",
+                "optional",
+                "depends_on",
+                "if",
+                "requirements",
+                "interpreter",
+                "cwd",
+                "env",
+            ][..]
         };
         if !allowed.contains(&key.as_str()) {
-            return Err(ParseError::invalid_value("steps", format!("field '{}' is not allowed on this step kind", key.as_str()), *key.span()));
+            return Err(ParseError::invalid_value(
+                "steps",
+                format!("field '{}' is not allowed on this step kind", key.as_str()),
+                *key.span(),
+            ));
         }
     }
 
     let mut run = None;
+    let mut uses = None;
     let mut name = None;
     let mut optional = false;
     let mut depends_on = Vec::new();
@@ -496,10 +511,14 @@ pub(crate) fn parse_step(node: &Node) -> Result<Step, ParseError> {
 
         match key {
             "with" => {
-                let values = value_node.as_mapping().ok_or_else(|| ParseError::expected_type(
-                    "mapping", "non-mapping", get_span(value_node)))?;
+                let values = value_node.as_mapping().ok_or_else(|| {
+                    ParseError::expected_type("mapping", "non-mapping", get_span(value_node))
+                })?;
                 for (key, value) in values.iter() {
-                    inputs.insert(key.as_str().to_owned(), crate::actions::ActionValue::parse(value)?);
+                    inputs.insert(
+                        key.as_str().to_owned(),
+                        crate::actions::ActionValue::parse(value)?,
+                    );
                 }
             }
             "uses" => {
@@ -588,7 +607,13 @@ pub(crate) fn parse_step(node: &Node) -> Result<Step, ParseError> {
     }
     if let Some(uses) = uses {
         return Ok(Step::Uses(crate::stage0::build::UsesStep {
-            uses, name, optional, depends_on, condition, condition_span, inputs,
+            uses,
+            name,
+            optional,
+            depends_on,
+            condition,
+            condition_span,
+            inputs,
         }));
     }
 
@@ -597,7 +622,9 @@ pub(crate) fn parse_step(node: &Node) -> Result<Step, ParseError> {
         optional,
         depends_on,
         requirements,
-        run,
+        run: run.ok_or_else(|| {
+            ParseError::invalid_value("steps", "a run step must contain 'run'", get_span(node))
+        })?,
         condition,
         condition_span,
         interpreter,
@@ -1377,26 +1404,26 @@ steps:
 
         assert!(matches!(&steps[0], Step::Run(_)));
         if let Step::Run(first) = &steps[0] {
-                assert_eq!(first.name.as_deref(), Some("configure"));
-                assert_eq!(first.run.len(), 1);
-                assert!(first.condition.is_none());
-                assert!(first.interpreter.is_none());
-                assert!(first.env.is_empty());
+            assert_eq!(first.name.as_deref(), Some("configure"));
+            assert_eq!(first.run.len(), 1);
+            assert!(first.condition.is_none());
+            assert!(first.interpreter.is_none());
+            assert!(first.env.is_empty());
         }
 
         assert!(matches!(&steps[1], Step::Run(_)));
         if let Step::Run(second) = &steps[1] {
-                assert_eq!(second.name.as_deref(), Some("test"));
-                assert!(second.optional);
-                assert_eq!(second.depends_on, ["configure"]);
-                assert_eq!(second.requirements.build.len(), 1);
-                assert_eq!(second.requirements.host.len(), 1);
-                assert!(!second.requirements.inherit.build);
-                assert!(!second.requirements.inherit.host);
-                assert!(second.condition.is_some());
-                assert!(second.interpreter.is_some());
-                assert!(second.cwd.is_some());
-                assert!(second.env.contains_key("FOO"));
+            assert_eq!(second.name.as_deref(), Some("test"));
+            assert!(second.optional);
+            assert_eq!(second.depends_on, ["configure"]);
+            assert_eq!(second.requirements.build.len(), 1);
+            assert_eq!(second.requirements.host.len(), 1);
+            assert!(!second.requirements.inherit.build);
+            assert!(!second.requirements.inherit.host);
+            assert!(second.condition.is_some());
+            assert!(second.interpreter.is_some());
+            assert!(second.cwd.is_some());
+            assert!(second.env.contains_key("FOO"));
         }
     }
 

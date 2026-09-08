@@ -107,6 +107,7 @@ def test_empty_action_keeps_named_dependencies_and_requirements(
         "3.11",
         "3.12",
     }
+    (project / "variants.yaml").write_text('python: ["3.11"]\n')
     run_action(rattler_build, project, tmp_path / "output")
     assert (project / "result.txt").read_text().strip() == "prepared"
 
