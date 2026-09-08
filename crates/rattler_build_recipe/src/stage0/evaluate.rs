@@ -2974,11 +2974,13 @@ impl Evaluate for Stage0Recipe {
 
         let accessed_vars = context_with_vars.accessed_variables();
         let free_specs = stage1::Requirements::free_specs_from_dependencies(
-            requirements.build_host().chain(build.plan.step_dependencies()),
+            requirements
+                .build_host()
+                .chain(build.plan.step_dependencies()),
         )
-            .into_iter()
-            .map(NormalizedKey::from)
-            .collect::<HashSet<_>>();
+        .into_iter()
+        .map(NormalizedKey::from)
+        .collect::<HashSet<_>>();
 
         // Get the noarch type to determine which variant keys to exclude
         let noarch = build.noarch.unwrap_or(NoArchType::none());
@@ -3425,11 +3427,13 @@ fn evaluate_package_output_to_recipe(
 
     let accessed_vars = context.accessed_variables();
     let mut free_specs = stage1::Requirements::free_specs_from_dependencies(
-        requirements.build_host().chain(build.plan.step_dependencies()),
+        requirements
+            .build_host()
+            .chain(build.plan.step_dependencies()),
     )
-        .into_iter()
-        .map(NormalizedKey::from)
-        .collect::<HashSet<_>>();
+    .into_iter()
+    .map(NormalizedKey::from)
+    .collect::<HashSet<_>>();
 
     // If this output inherits from a staging cache, also include the staging cache's free_specs
     // This ensures that variant variables from the staging cache are included in the hash

@@ -400,7 +400,10 @@ impl BuildPlan {
         &self,
     ) -> impl Iterator<Item = &super::requirements::Dependency> {
         self.steps().into_iter().flatten().flat_map(|step| {
-            step.requirements.build.iter().chain(&step.requirements.host)
+            step.requirements
+                .build
+                .iter()
+                .chain(&step.requirements.host)
         })
     }
 

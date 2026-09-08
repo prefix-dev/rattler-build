@@ -239,10 +239,15 @@ fn extract_pin_subpackages(recipe: &Stage1Recipe) -> BTreeMap<NormalizedKey, Pin
         .requirements
         .exact_pin_subpackages()
         .chain(
-            recipe.build.plan.step_dependencies()
+            recipe
+                .build
+                .plan
+                .step_dependencies()
                 .filter_map(|dependency| match dependency {
                     Dependency::PinSubpackage(pin) if pin.pin_subpackage.args.exact => Some(pin),
-                    Dependency::Spec(_) | Dependency::PinCompatible(_) | Dependency::PinSubpackage(_) => None,
+                    Dependency::Spec(_)
+                    | Dependency::PinCompatible(_)
+                    | Dependency::PinSubpackage(_) => None,
                 }),
         )
         .map(|pin| {
@@ -896,7 +901,7 @@ fn collect_used_variables(
 }
 
 fn evaluated_step_free_specs(
-    plan: &stage0::build::BuildPlan,
+    plan: &stage0::BuildPlan,
     context: &EvaluationContext,
 ) -> Result<Vec<rattler_conda_types::PackageName>, ParseError> {
     let Some(steps) = plan.steps() else {
@@ -905,7 +910,10 @@ fn evaluated_step_free_specs(
     let evaluated = stage0::evaluate::evaluate_steps(steps, context)?;
     Ok(crate::stage1::Requirements::free_specs_from_dependencies(
         evaluated.iter().flat_map(|step| {
-            step.requirements.build.iter().chain(&step.requirements.host)
+            step.requirements
+                .build
+                .iter()
+                .chain(&step.requirements.host)
         }),
     ))
 }
@@ -934,7 +942,10 @@ fn discover_new_variant_keys_from_evaluation(
             };
             let evaluated = recipe.requirements.evaluate(&context_with_vars)?;
             let mut free_specs = evaluated.free_specs();
-            free_specs.extend(evaluated_step_free_specs(&recipe.build.plan, &context_with_vars)?);
+            free_specs.extend(evaluated_step_free_specs(
+                &recipe.build.plan,
+                &context_with_vars,
+            )?);
             free_specs
         }
         Stage0Recipe::MultiOutput(recipe) => {
@@ -1855,8 +1866,8 @@ cmake: ["3.28.*", "3.29.*"]
 python: ["3.11.*", "3.12.*"]
 numpy: ["1.26.*", "2.0.*"]
 "#;
-        let recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml)
-            .expect("valid steps recipe");
+        let recipe =
+            stage0::parse_recipe_or_multi_from_source(recipe_yaml).expect("valid steps recipe");
         let variants = VariantConfig::from_yaml_str(variant_yaml).expect("valid variants");
         let rendered = render_recipe_with_variant_config(
             &recipe,
@@ -1874,8 +1885,16 @@ numpy: ["1.26.*", "2.0.*"]
                 assert!(output.recipe.requirements.build.is_empty());
                 assert!(output.recipe.requirements.host.is_empty());
                 (
-                    output.variant.get(&"cmake".into()).expect("build variant").to_string(),
-                    output.variant.get(&"python".into()).expect("host variant").to_string(),
+                    output
+                        .variant
+                        .get(&"cmake".into())
+                        .expect("build variant")
+                        .to_string(),
+                    output
+                        .variant
+                        .get(&"python".into())
+                        .expect("host variant")
+                        .to_string(),
                 )
             })
             .collect::<std::collections::BTreeSet<_>>();
@@ -1886,7 +1905,9 @@ numpy: ["1.26.*", "2.0.*"]
                 ("3.28.*".to_string(), "3.12.*".to_string()),
                 ("3.29.*".to_string(), "3.11.*".to_string()),
                 ("3.29.*".to_string(), "3.12.*".to_string()),
-            ].into_iter().collect(),
+            ]
+            .into_iter()
+            .collect(),
         );
         assert_eq!(rendered.len(), 4);
     }
@@ -1917,8 +1938,8 @@ outputs:
 "#;
         let recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml)
             .expect("valid multi-output steps recipe");
-        let variants = VariantConfig::from_yaml_str("cmake: ['3.28.*', '3.29.*']")
-            .expect("valid variants");
+        let variants =
+            VariantConfig::from_yaml_str("cmake: ['3.28.*', '3.29.*']").expect("valid variants");
         let rendered = render_recipe_with_variant_config(
             &recipe,
             &variants,
@@ -1926,21 +1947,37 @@ outputs:
         )
         .expect("step pins render");
         assert_eq!(rendered.len(), 4);
-        for (index, consumer) in rendered.iter().enumerate().filter(|(_, output)| {
-            output.recipe.package.name().as_normalized() == "consumer"
-        }) {
-            let pin = consumer.pin_subpackages.get(&"producer".into()).expect("exact step pin");
-            let producer = rendered[..index].iter().find(|output| {
-                output.recipe.package.name().as_normalized() == "producer"
-                    && output.full_combination == consumer.full_combination
-            }).expect("matching producer precedes consumer");
+        for (index, consumer) in rendered
+            .iter()
+            .enumerate()
+            .filter(|(_, output)| output.recipe.package.name().as_normalized() == "consumer")
+        {
+            let pin = consumer
+                .pin_subpackages
+                .get(&"producer".into())
+                .expect("exact step pin");
+            let producer = rendered[..index]
+                .iter()
+                .find(|output| {
+                    output.recipe.package.name().as_normalized() == "producer"
+                        && output.full_combination == consumer.full_combination
+                })
+                .expect("matching producer precedes consumer");
             assert_eq!(
                 pin.build_string.as_deref(),
                 producer.recipe.build.string.as_resolved(),
             );
             assert_eq!(
-                consumer.variant.get(&"producer".into()).expect("pin in variant").to_string(),
-                format!("{} {}", pin.version, pin.build_string.as_deref().expect("resolved build string")),
+                consumer
+                    .variant
+                    .get(&"producer".into())
+                    .expect("pin in variant")
+                    .to_string(),
+                format!(
+                    "{} {}",
+                    pin.version,
+                    pin.build_string.as_deref().expect("resolved build string")
+                ),
             );
         }
     }

@@ -268,4 +268,3 @@ impl Output {
         rattler_build_script::create_build_script(exec_args).await
     }
 }
-
