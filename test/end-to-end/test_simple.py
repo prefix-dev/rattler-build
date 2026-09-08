@@ -88,9 +88,7 @@ build:
     assert (source / "checked.txt").read_text().strip() == "checked"
 
 
-def test_build_steps_reject_uses(
-    rattler_build: RattlerBuild, tmp_path: Path
-):
+def test_build_steps_reject_uses(rattler_build: RattlerBuild, tmp_path: Path):
     recipe = tmp_path / "recipe.yaml"
     recipe.write_text(
         """package:
@@ -116,9 +114,7 @@ build:
     assert "uses" in result.stderr
 
 
-def test_run_render_only_is_read_only(
-    rattler_build: RattlerBuild, tmp_path: Path
-):
+def test_run_render_only_is_read_only(rattler_build: RattlerBuild, tmp_path: Path):
     recipe = tmp_path / "recipe.yaml"
     output = tmp_path / "output"
     recipe.write_text(

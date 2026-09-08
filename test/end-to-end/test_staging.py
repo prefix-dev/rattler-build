@@ -56,9 +56,7 @@ def test_staging_build_steps(
 def test_run_inherits_staging_build_steps(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
-    recipe_data = yaml.safe_load(
-        (recipes / "staging/build-steps.yaml").read_text()
-    )
+    recipe_data = yaml.safe_load((recipes / "staging/build-steps.yaml").read_text())
     recipe_data["outputs"] = recipe_data["outputs"][:2]
     recipe_data["outputs"][1]["build"]["steps"] = [
         {
