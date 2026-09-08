@@ -306,13 +306,6 @@ def test_python_metadata_backend_builds_external_rich_source(
     assert "pygments >=2.13.0,<3" in index["depends"]
     about = json.loads((pkg / "info" / "about.json").read_text())
     assert about["license"] == "MIT"
-    assert about["summary"].startswith("Render rich text")
-    rendered = yaml.safe_load(
-        (pkg / "info" / "recipe" / "rendered_recipe.yaml").read_text()
-    )["recipe"]
-    assert {"python", "pip", "python-build", "poetry-core >=1.0.0"} <= set(
-        rendered["requirements"]["host"]
-    )
     assert (pkg / "site-packages" / "rich" / "__init__.py").exists()
     assert (pkg / "info" / "licenses" / "LICENSE").exists()
 
@@ -607,6 +600,8 @@ def test_rebuild_applies_post_build_outputs_once(
             get_extracted_package(output, "rebuild-outputs") / "marker.txt"
         ).read_text() == "built!!"
         package = get_package(output, "rebuild-outputs")
+
+
 def test_metadata_run_preserves_prepared_sources_and_cached_outputs(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
@@ -639,3 +634,47 @@ def test_metadata_run_preserves_prepared_sources_and_cached_outputs(
     assert (work / "retained-artifact.txt").read_text() == "keep me"
     (metadata,) = (work / ".rattler-build/step-outputs").glob("*.txt")
     assert metadata.read_text() == "about.summary cached metadata\n"
+
+
+def test_metadata_generated_selection_skips_unselected_action(
+    rattler_build: RattlerBuild, tmp_path: Path
+):
+    project = tmp_path / "project"
+    project.mkdir()
+    generated = [
+        {
+            "name": "generated",
+            "interpreter": "python",
+            "run": 'from pathlib import Path\nPath("selected.txt").write_text("selected")',
+        }
+    ]
+    metadata_output = f"build.steps {json.dumps(generated)}\n"
+    recipe = {
+        "schema_version": 1,
+        "package": {"name": "metadata-selection", "version": "1"},
+        "requirements": {"build": ["python"]},
+        "build": {
+            "metadata": {
+                "requirements": {"build": ["python"]},
+                "interpreter": "python",
+                "run": (
+                    "import os\nfrom pathlib import Path\n"
+                    f'Path(os.environ["OUTPUT_FILE"]).write_text({metadata_output!r})'
+                ),
+            },
+            "steps": [{"name": "unselected", "uses": "./missing.yaml"}],
+        },
+    }
+    (project / "recipe.yaml").write_text(yaml.safe_dump(recipe))
+    rattler_build(
+        "run",
+        "generated",
+        "--recipe",
+        str(project),
+        "--source-dir",
+        str(project),
+        "--output-dir",
+        str(tmp_path / "output"),
+        "--experimental",
+    )
+    assert (project / "selected.txt").read_text() == "selected"

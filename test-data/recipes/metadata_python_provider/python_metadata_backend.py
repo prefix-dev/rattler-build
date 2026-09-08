@@ -171,7 +171,7 @@ def main() -> None:
             if value := metadata.get(field):
                 stream.write(emit(f"about.{field}", value))
         for license_file in metadata["license_files"]:
-            stream.write(emit("about.license_file.include", license_file, append=True))
+            stream.write(emit("about.license_file", license_file, append=True))
 
 
 if __name__ == "__main__":

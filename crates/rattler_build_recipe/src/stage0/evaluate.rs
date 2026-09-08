@@ -2314,21 +2314,13 @@ impl Evaluate for Stage0Build {
         } else {
             None
         };
-        let bootstrap_context = metadata.as_ref().map(|_| {
-            let mut bootstrap_context = context.clone();
-            bootstrap_context.actions.selected = None;
-            bootstrap_context
-        });
-        let (plan, actions) = if skip {
+        let (plan, actions) = if skip || metadata.is_some() {
+            // Metadata can generate the source plan, so compile it only during
+            // final rendering, when named-step selection is complete.
             (Stage1BuildPlan::Steps(Vec::new()), Default::default())
         } else {
-            evaluate_build_plan(&self.plan, bootstrap_context.as_ref().unwrap_or(context))?
+            evaluate_build_plan(&self.plan, context)?
         };
-        if let Some(bootstrap_context) = &bootstrap_context {
-            for variable in bootstrap_context.accessed_variables() {
-                context.track_access(&variable);
-            }
-        }
 
         // Evaluate noarch
         //

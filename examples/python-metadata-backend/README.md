@@ -47,7 +47,7 @@ requirements.host.append ["poetry-core >=1.0.0"]
 requirements.run.append ["python >=3.8.0","pygments >=2.13.0,<3","markdown-it-py >=2.2.0"]
 about.summary "Render rich text, tables, progress bars, syntax highlighting, markdown and more to the terminal"
 about.license "MIT"
-about.license_file.include.append "LICENSE"
+about.license_file.append "LICENSE"
 build.steps [{"name":"python-build","uses":"python:build@==0.1.0"}]
 ```
 

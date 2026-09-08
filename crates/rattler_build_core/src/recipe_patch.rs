@@ -74,9 +74,7 @@ impl OutputPhase {
         if parent_path == "requirements.run_exports" && parent.is_array() {
             *parent = serde_json::json!({"weak": std::mem::take(parent)});
         }
-        if (parent_path == "about.license_file" || parent_path == "build.files")
-            && (key == "include" || key == "exclude")
-        {
+        if parent_path == "build.files" && (key == "include" || key == "exclude") {
             let previous = std::mem::take(parent);
             *parent = match previous {
                 Value::Object(globs) if !globs.contains_key("if") => Value::Object(globs),
@@ -95,10 +93,10 @@ impl OutputPhase {
             let target = mapping
                 .entry(key.to_string())
                 .or_insert_with(|| Value::Array(Vec::new()));
-            if dotted_path == "build.variant.use_keys"
-                && let Value::String(value) = target
-            {
-                *target = Value::Array(vec![Value::String(std::mem::take(value))]);
+            match target {
+                Value::Null => *target = Value::Array(Vec::new()),
+                Value::String(_) => *target = Value::Array(vec![std::mem::take(target)]),
+                Value::Array(_) | Value::Object(_) | Value::Bool(_) | Value::Number(_) => {}
             }
         }
         Ok(())

@@ -77,8 +77,8 @@ from leaking into the tool environment. See
 the [`examples/adjacent`](https://github.com/prefix-dev/rattler-build/tree/main/examples/adjacent)
 recipe for an independent lint step and an optional C++ test step.
 
-`run --render-only` renders recipes without executing steps, fetching sources,
-or creating build environments. Dependency solving is disabled unless
+Without `build.metadata`, `run --render-only` renders recipes without executing
+steps, fetching sources, or creating build environments. Dependency solving is disabled unless
 `--with-solve` is explicitly supplied, as with `build --render-only`.
 
 ## Caching build steps
@@ -289,16 +289,16 @@ recipe.
 
 ## Pre-solve metadata step
 
-`build.metadata` is a single bootstrap step that runs after source fetching but
-before normal reusable-step resolution, final build-step DAG selection, and the
+`build.metadata` is a bootstrap Run or Uses invocation that executes after source
+fetching but before normal action compilation, named-step selection, and the
 final build/host dependency solve. It can inspect the prepared source tree and
-emit dependencies or the executable build plan itself. If metadata itself uses
-a provider, that one provider is resolved before source fetching.
+emit dependencies or the executable build plan itself. Packaged actions used by
+metadata are loaded during bootstrap compilation, before source fetching.
 
 !!! warning
-Metadata runs arbitrary recipe code during both builds and render-only
-operations. Do not render an untrusted recipe with experimental features
-enabled.
+    Metadata runs arbitrary recipe code during both builds and render-only
+    operations. Do not render an untrusted recipe with experimental features
+    enabled.
 
 The recipe receives a bootstrap render to discover its outputs before this
 phase. URL, Git, and path sources are then fetched, verified, extracted, and
@@ -313,21 +313,23 @@ output list. `build.metadata` is not yet supported in multi-output recipes:
 even an `about` change alters the upstream build hash, requiring the output
 graph's exact subpackage pins and dependent hashes to be recomputed.
 
-The metadata step uses the normal step fields `run`, `uses`, `with`,
-`interpreter`, `env`, `cwd`, and `requirements.build` / `requirements.host`.
-Its `cwd` is relative to `SRC_DIR`. Its requirements are solved and installed
-into a temporary bootstrap environment separate from the final package
-environments. Execution uses strict environment isolation and the build's
-configured sandbox policy. A metadata `uses` file must resolve to exactly one executable
-step; it cannot be optional or depend on normal build steps.
+Metadata uses the same strict Run and Uses schemas as normal steps. A Uses
+invocation accepts `with`, but cannot override execution fields such as `env` or
+`requirements`. Its action may recursively expand into multiple executable steps.
+The invocation cannot be optional or depend on normal build steps.
+
+Bootstrap requirements are solved and installed into temporary environments,
+separate from the final package environments. Each executable step runs with
+strict environment isolation and the configured sandbox policy. Its `cwd` is
+relative to `SRC_DIR` and must stay within that directory.
 
 The step receives `OUTPUT_FILE`, `RATTLER_BUILD_OUTPUT_FILE`, `RECIPE_DIR`,
 `SRC_DIR`, `PKG_NAME`, `PKG_VERSION`, `BUILD_PLATFORM`, `HOST_PLATFORM`, and
-`TARGET_PLATFORM`. A packaged metadata provider additionally receives
-`RATTLER_BUILD_PROVIDER_PREFIX` and `RATTLER_BUILD_PROVIDER_VERSION` so code
-and version-pinned normal build-step definitions can live in the same package. A successful metadata command must create
-`OUTPUT_FILE` (it may be empty when no changes are needed); otherwise the phase
-fails. The step writes the same line-oriented format as [post-build outputs](#post-build-metadata-outputs):
+`TARGET_PLATFORM`. Runtime tools and support code must be declared as action
+requirements; the transport cache is not a runtime environment. All steps in
+the metadata invocation share one `OUTPUT_FILE`. The completed plan must create
+that file, which may be empty when no changes are needed. It uses the same
+line-oriented format as [post-build outputs](#post-build-outputs):
 
 ```text
 requirements.build.append ["cmake", "ninja"]
@@ -340,15 +342,18 @@ Requirement fields are append-only. `build.steps` and `build.script` can be set
 or extended, and `build.python.entry_points` can be appended for generated
 Python console scripts. Backends that introduce variants not discoverable from
 a free dependency name (for example compiler variants) can append explicit keys
-to `build.variant.use_keys`. The normal post-build mutable fields can also be
-changed. Arrays and objects use JSON syntax. Emitted dependency values must be concrete
-match specs; selectors are not re-evaluated, but free dependency names drive the
-final variant expansion. Generated script content still receives normal
-late-bound build-script rendering. The output content and final variant values
-are included in the package hash.
+to `build.variant.use_keys`. Other mutable fields use their authored recipe
+shape; for example, `about.license_file.append "LICENSE"` extends the source
+license list. Valid JSON values retain their native types; other values are strings.
+The protocol patches authored recipe source, removes `build.metadata`, and
+renders it through the same action compiler, provider registry, and variant
+expansion as an ordinary recipe. Generated selectors and inputs therefore use
+the normal source schema. Free dependency names introduce configured variants,
+and script content retains normal late-bound rendering. The metadata content
+fingerprint and final variant values participate in the ordinary package hash.
 
-Every metadata-generated build step must have a unique `name`; a `uses`
-reference supplies its default name when omitted. Recipe-authored
+Every metadata-generated build step must have a unique, literal `name`,
+including Uses invocations. Recipe-authored
 `build.steps` with the same name replace the generated default; additional
 recipe-authored steps are appended (unnamed authored steps are allowed but
 cannot override by name). `build.steps.append` preserves authored order and adds
@@ -372,8 +377,7 @@ missing required, and incorrectly typed inputs fail during preprocessing.
 
 After a successful metadata step, rattler-build prints the effective `build`,
 `requirements`, and `about` metadata as YAML. It then prints a compact table of
-the final named steps for every expanded variant, including each step's provider
-and dependencies. During execution, each section is announced as
+the final named steps and dependencies for every expanded variant. During execution, each section is announced as
 `Running build step: NAME`. To inspect all of this without solving or building
 the final package, use:
 

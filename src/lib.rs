@@ -278,11 +278,17 @@ impl MetadataRenderer<'_> {
             vec![Variable::from(metadata.fingerprint.as_str())],
         );
         let mut final_config = self.render_config.clone();
+        // Constrain input choices, not derived build values such as a noarch
+        // target platform that is absent from the configured matrix.
         final_config.variant_constraints = output
             .build_configuration
             .variant
             .iter()
-            .filter(|(key, _)| self.variant_config.get(key).is_some())
+            .filter(|(key, value)| {
+                self.variant_config
+                    .get(key)
+                    .is_some_and(|values| values.contains(value))
+            })
             .map(|(key, value)| (key.clone(), value.clone()))
             .collect();
         let found = find_variants(
