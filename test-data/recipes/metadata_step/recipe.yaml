@@ -7,6 +7,9 @@ package:
 source:
   path: .
 
+requirements:
+  run_exports: [metadata-abi]
+
 build:
   metadata:
     requirements:

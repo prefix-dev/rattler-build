@@ -47,6 +47,64 @@ enum OutputPhase {
     PostBuild,
 }
 
+impl OutputPhase {
+    fn prepare_target(
+        self,
+        document: &mut Value,
+        dotted_path: &str,
+        append: bool,
+    ) -> miette::Result<()> {
+        match self {
+            Self::PostBuild => return Ok(()),
+            Self::Metadata => {}
+        }
+        let (parent_path, key) = dotted_path.rsplit_once('.').unwrap_or(("", dotted_path));
+        let mut parent = document;
+        for segment in parent_path.split('.').filter(|segment| !segment.is_empty()) {
+            if parent.is_null() {
+                *parent = Value::Object(Map::new());
+            }
+            let mapping = parent.as_object_mut().ok_or_else(|| {
+                miette::miette!("metadata field `{dotted_path}` traverses a non-mapping value")
+            })?;
+            parent = mapping
+                .entry(segment.to_string())
+                .or_insert_with(|| Value::Object(Map::new()));
+        }
+        if parent_path == "requirements.run_exports" && parent.is_array() {
+            *parent = serde_json::json!({"weak": std::mem::take(parent)});
+        }
+        if (parent_path == "about.license_file" || parent_path == "build.files")
+            && (key == "include" || key == "exclude")
+        {
+            let previous = std::mem::take(parent);
+            *parent = match previous {
+                Value::Object(globs) if !globs.contains_key("if") => Value::Object(globs),
+                Value::Array(include) => serde_json::json!({"include": include}),
+                Value::Null => Value::Object(Map::new()),
+                value => serde_json::json!({"include": [value]}),
+            };
+        }
+        if parent.is_null() {
+            *parent = Value::Object(Map::new());
+        }
+        let mapping = parent.as_object_mut().ok_or_else(|| {
+            miette::miette!("metadata field `{dotted_path}` has a non-mapping parent")
+        })?;
+        if append {
+            let target = mapping
+                .entry(key.to_string())
+                .or_insert_with(|| Value::Array(Vec::new()));
+            if dotted_path == "build.variant.use_keys"
+                && let Value::String(value) = target
+            {
+                *target = Value::Array(vec![Value::String(std::mem::take(value))]);
+            }
+        }
+        Ok(())
+    }
+}
+
 fn allowed_path(path: &str, phase: OutputPhase) -> bool {
     (phase == OutputPhase::Metadata
         && [
@@ -209,6 +267,7 @@ fn apply_text_output(
                 source.display()
             ));
         }
+        phase.prepare_target(document, dotted_path, append)?;
         if pointer.starts_with("/requirements/") && !append {
             return Err(miette::miette!(
                 "{} output {} must use `.append` for requirements",
@@ -289,16 +348,7 @@ fn apply_patch_file(recipe: &mut Recipe, path: &Path, phase: OutputPhase) -> mie
 }
 
 /// Apply pre-solve metadata to recipe source, never to an executable Stage1 plan.
-pub(crate) fn apply_metadata_output(
-    document: &mut Value,
-    contents: &str,
-) -> miette::Result<()> {
-    if let Some(keys) = document.pointer_mut("/build/variant/use_keys")
-        && let Value::String(key) = keys
-    {
-        *keys = Value::Array(vec![Value::String(std::mem::take(key))]);
-    }
-    normalize_patch_document(document);
+pub(crate) fn apply_metadata_output(document: &mut Value, contents: &str) -> miette::Result<()> {
     apply_text_output(
         document,
         contents,

@@ -5,8 +5,8 @@ use std::{collections::HashMap, path::Component};
 use miette::{IntoDiagnostic, WrapErr};
 use rattler_build_recipe::stage1::{Requirements, build::BuildPlan};
 use rattler_build_script::{EnvironmentIsolation, ExecutionContext, RuntimeEnv};
-use serde_json::Value;
 use rattler_conda_types::Platform;
+use serde_json::Value;
 use sha2::{Digest, Sha256};
 
 use crate::{
@@ -29,18 +29,25 @@ impl MetadataOutput {
         crate::recipe_patch::apply_metadata_output(&mut generated, &self.contents)?;
         merge_authored_steps(&mut generated, source)?;
         if let Some(build) = generated.get_mut("build").and_then(Value::as_object_mut) {
-            let variant = build.entry("variant").or_insert_with(|| serde_json::json!({}));
-            let variant = variant.as_object_mut().ok_or_else(|| {
-                miette::miette!("build.variant must be a mapping")
-            })?;
-            let keys = variant.entry("use_keys").or_insert_with(|| serde_json::json!([]));
+            let variant = build
+                .entry("variant")
+                .or_insert_with(|| serde_json::json!({}));
+            let variant = variant
+                .as_object_mut()
+                .ok_or_else(|| miette::miette!("build.variant must be a mapping"))?;
+            let keys = variant
+                .entry("use_keys")
+                .or_insert_with(|| serde_json::json!([]));
             if keys.is_string() {
                 *keys = Value::Array(vec![std::mem::take(keys)]);
             }
             let keys = keys.as_array_mut().ok_or_else(|| {
                 miette::miette!("build.variant.use_keys must be a string or list")
             })?;
-            if !keys.iter().any(|key| key.as_str() == Some("rattler_build_metadata")) {
+            if !keys
+                .iter()
+                .any(|key| key.as_str() == Some("rattler_build_metadata"))
+            {
                 keys.push(Value::String("rattler_build_metadata".into()));
             }
             build.remove("metadata");
@@ -81,7 +88,9 @@ fn merge_authored_steps(generated: &mut Value, authored: &Value) -> miette::Resu
             miette::miette!("build.metadata generated an unnamed build step; generated steps must have literal names so recipes can override them")
         })?;
         if !names.insert(name) {
-            return Err(miette::miette!("build.metadata generated duplicate build step name `{name}`"));
+            return Err(miette::miette!(
+                "build.metadata generated duplicate build step name `{name}`"
+            ));
         }
     }
     let mut authored_by_name = HashMap::new();
@@ -89,7 +98,9 @@ fn merge_authored_steps(generated: &mut Value, authored: &Value) -> miette::Resu
         if let Some(name) = step_name(step)
             && authored_by_name.insert(name, step).is_some()
         {
-            return Err(miette::miette!("duplicate recipe-authored build step name `{name}`"));
+            return Err(miette::miette!(
+                "duplicate recipe-authored build step name `{name}`"
+            ));
         }
     }
     if appended {
@@ -109,9 +120,12 @@ fn merge_authored_steps(generated: &mut Value, authored: &Value) -> miette::Resu
                 generated_steps.push(step);
             }
         }
-        generated_steps.extend(authored_steps.iter().filter(|step| {
-            step_name(step).is_none_or(|name| !consumed.contains(name))
-        }).cloned());
+        generated_steps.extend(
+            authored_steps
+                .iter()
+                .filter(|step| step_name(step).is_none_or(|name| !consumed.contains(name)))
+                .cloned(),
+        );
     }
     Ok(())
 }
@@ -242,56 +256,60 @@ pub async fn run_metadata_step(
     );
 
     for step in &plan.steps {
-    let context = ExecutionContext::separate(
-        RuntimeEnv::current(),
-        &directories.build_prefix,
-        output.build_configuration.build_platform.platform,
-        &directories.host_prefix,
-        output.build_configuration.host_platform.platform,
-    );
-    let recipe_dir = &output.build_configuration.directories.recipe_dir;
-    let work_dir = if let Some(cwd) = &step.cwd {
-        if cwd.is_absolute()
-            || cwd
-                .components()
-                .any(|component| matches!(component, Component::ParentDir))
-        {
-            return Err(miette::miette!(
-                "`build.metadata.cwd` must stay within the source directory"
-            ));
+        let context = ExecutionContext::separate(
+            RuntimeEnv::current(),
+            &directories.build_prefix,
+            output.build_configuration.build_platform.platform,
+            &directories.host_prefix,
+            output.build_configuration.host_platform.platform,
+        );
+        let recipe_dir = &output.build_configuration.directories.recipe_dir;
+        let work_dir = if let Some(cwd) = &step.cwd {
+            if cwd.is_absolute()
+                || cwd
+                    .components()
+                    .any(|component| matches!(component, Component::ParentDir))
+            {
+                return Err(miette::miette!(
+                    "`build.metadata.cwd` must stay within the source directory"
+                ));
+            }
+            source_dir.join(cwd)
+        } else {
+            source_dir.clone()
+        };
+        let jinja = crate::script::execution_jinja(
+            output.build_configuration.selector_config(),
+            &output.recipe.context,
+            step.action_context.as_ref(),
+        );
+        let renderer = |template: &str| {
+            jinja
+                .render_str(template)
+                .map_err(|error| error.to_string())
+        };
+        let mut script = step.to_script();
+        // Executor-provided metadata variables are reserved. `Script::run_script`
+        // normally lets script-local values override its base environment, so
+        // remove collisions before execution.
+        for key in env.keys() {
+            script.env.shift_remove(key);
         }
-        source_dir.join(cwd)
-    } else {
-        source_dir.clone()
-    };
-    let jinja = crate::script::execution_jinja(
-        output.build_configuration.selector_config(),
-        &output.recipe.context,
-        step.action_context.as_ref(),
-    );
-    let renderer = |template: &str| jinja.render_str(template).map_err(|error| error.to_string());
-    let mut script = step.to_script();
-    // Executor-provided metadata variables are reserved. `Script::run_script`
-    // normally lets script-local values override its base environment, so
-    // remove collisions before execution.
-    for key in env.keys() {
-        script.env.shift_remove(key);
-    }
-    // Keep generated wrappers in the temporary workspace while running the
-    // actual command in the local project directory.
-    script.cwd = Some(work_dir);
-    script
-        .run_script(
-            env.clone(),
-            &directories.work_dir,
-            recipe_dir,
-            context,
-            Some(renderer),
-            output.build_configuration.sandbox_config(),
-            EnvironmentIsolation::Strict,
-        )
-        .await
-        .map_err(|error| miette::miette!("metadata step failed: {error}"))?;
+        // Keep generated wrappers in the temporary workspace while running the
+        // actual command in the local project directory.
+        script.cwd = Some(work_dir);
+        script
+            .run_script(
+                env.clone(),
+                &directories.work_dir,
+                recipe_dir,
+                context,
+                Some(renderer),
+                output.build_configuration.sandbox_config(),
+                EnvironmentIsolation::Strict,
+            )
+            .await
+            .map_err(|error| miette::miette!("metadata step failed: {error}"))?;
     }
 
     if !output_file.is_file() {
@@ -336,11 +354,14 @@ mod tests {
             {"name": "install", "uses": "./install.yaml"}
         ]}});
         merge_authored_steps(&mut generated, &authored).unwrap();
-        assert_eq!(generated["build"]["steps"], json!([
-            {"name": "configure", "uses": "./configure.yaml", "with": {"enabled": true}},
-            {"name": "install", "run": "authored install"},
-            {"run": "authored cleanup"}
-        ]));
+        assert_eq!(
+            generated["build"]["steps"],
+            json!([
+                {"name": "configure", "uses": "./configure.yaml", "with": {"enabled": true}},
+                {"name": "install", "run": "authored install"},
+                {"run": "authored cleanup"}
+            ])
+        );
     }
 
     #[test]
@@ -354,10 +375,13 @@ mod tests {
             {"name": "install", "run": "generated install"}
         ]}});
         merge_authored_steps(&mut generated, &authored).unwrap();
-        assert_eq!(generated["build"]["steps"], json!([
-            {"name": "configure", "run": "authored configure"},
-            {"name": "install", "run": "generated install"}
-        ]));
+        assert_eq!(
+            generated["build"]["steps"],
+            json!([
+                {"name": "configure", "run": "authored configure"},
+                {"name": "install", "run": "generated install"}
+            ])
+        );
     }
 
     #[test]
@@ -370,7 +394,10 @@ mod tests {
             "build": {"metadata": {"uses": "./metadata.yaml"}}});
         let generated = metadata.apply_to_source(&source).unwrap();
         assert!(generated["build"].get("metadata").is_none());
-        assert_eq!(generated["build"]["steps"][0]["with"], json!({"debug": true, "levels": [1, 2]}));
+        assert_eq!(
+            generated["build"]["steps"][0]["with"],
+            json!({"debug": true, "levels": [1, 2]})
+        );
         assert_eq!(generated["build"]["steps"][0]["uses"], "./compile.yaml");
     }
 

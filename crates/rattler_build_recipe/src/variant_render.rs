@@ -1034,7 +1034,9 @@ fn discover_new_variant_keys_from_evaluation(
                     action_requirements.build = build.action_requirements.build;
                     action_requirements.host = build.action_requirements.host;
                     if let Some(metadata) = build.metadata {
-                        action_requirements.build.extend(metadata.requirements.build);
+                        action_requirements
+                            .build
+                            .extend(metadata.requirements.build);
                         action_requirements.host.extend(metadata.requirements.host);
                     }
                     all_free_specs.extend(action_requirements.free_specs());

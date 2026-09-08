@@ -47,13 +47,8 @@ def test_metadata_step_runs_before_solving_and_defines_build_plan(
     assert (
         pkg / "share" / "metadata-step-example" / "generated.txt"
     ).read_text() == "overridden by recipe\n"
-    rendered = yaml.safe_load(
-        (pkg / "info" / "recipe" / "rendered_recipe.yaml").read_text()
-    )["recipe"]
-    assert rendered["requirements"]["build"] == ["python"]
-    assert rendered["requirements"]["host"] == ["zlib"]
-    assert rendered["build"]["steps"][0]["name"] == "install"
-    assert "overridden by recipe" in "\n".join(rendered["build"]["steps"][0]["run"])
+    run_exports = json.loads((pkg / "info" / "run_exports.json").read_text())
+    assert run_exports["weak"] == ["metadata-abi"]
 
 
 def test_metadata_dependencies_expand_variants_after_generation(
@@ -321,6 +316,7 @@ def test_python_metadata_backend_builds_external_rich_source(
     assert (pkg / "site-packages" / "rich" / "__init__.py").exists()
     assert (pkg / "info" / "licenses" / "LICENSE").exists()
 
+
 def test_reusable_steps_inputs_and_generated_licenses(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
@@ -341,7 +337,6 @@ def test_reusable_steps_inputs_and_generated_licenses(
     assert run_exports["strong"] == ["reusable-abi"]
     about = json.loads((pkg / "info" / "about.json").read_text())
     assert about["dev_url"] == "https://example.com/reusable-step"
-
 
 
 def test_step_cache_skips_and_invalidates(

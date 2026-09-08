@@ -85,18 +85,7 @@ fetches the source before metadata execution, creates a bootstrap Python
 environment for the extractor, solves the emitted final requirements, executes
 the provider's wheel steps, and tests both `import rich` and Rich rendering.
 
-The example provider is also published on the beta prefix.dev channel. After
-building this feature branch's `rattler-build`, try Rich directly with:
-
-```console
-rattler-build build \
-  --recipe examples/python-metadata-backend \
-  --channel https://beta.prefix.dev/wolfv/rattler-build-steps \
-  --channel conda-forge \
-  --experimental
-```
-
-To upload a rebuilt provider with rattler-build 0.74.0 or newer:
+To publish the rebuilt provider:
 
 ```console
 rattler-build publish \

@@ -1,7 +1,11 @@
 # Experimental build steps
 
-`build.steps` is an experimental alternative to `build.script`. Enable it with
-`--experimental`. `script` and `steps` are mutually exclusive; even
+!!! warning "Experimental"
+    Named and reusable build steps may change or be removed. They require
+    `--experimental`.
+
+`build.steps` is an experimental alternative to `build.script`. `script` and
+`steps` are mutually exclusive; even
 `steps: []` explicitly selects steps mode and prevents default `build.sh` /
 `build.bat` discovery.
 
@@ -9,7 +13,6 @@ Each step is a scoped section of the generated build wrapper, so step-local
 `env` values and `cwd` changes do not leak into later steps. A step supports:
 
 - **`name`** - Optional unique name. Named steps can be selected from the CLI.
-  A `uses` reference becomes the default name when this is omitted.
 - **`optional`** - Exclude the step from normal package builds (default: `false`).
 - **`depends_on`** - Names of prerequisite steps, forming a DAG.
 - **`requirements.build` / `requirements.host`** - Extra dependencies added
@@ -17,8 +20,7 @@ Each step is a scoped section of the generated build wrapper, so step-local
 - **`requirements.inherit`** - Whether the solve group includes the parent
   recipe environments. Use `false` to disable both, or a `{build, host}`
   mapping to control them separately.
-- **`run` / `uses`** - Exactly one is required. `run` is an inline command,
-  multiline string, or command list. `uses` references a reusable step.
+- **`run`** - Required inline command, multiline string, or command list.
 - **`if`** - Optional Jinja selector expression, such as `unix` or
   `target_platform == "linux-64"`. Do not wrap expressions in `${{ }}`.
 - **`interpreter`** - Optional interpreter override for this step.
@@ -74,6 +76,216 @@ deterministic prefixes, preventing packages from an earlier parent-based run
 from leaking into the tool environment. See
 the [`examples/adjacent`](https://github.com/prefix-dev/rattler-build/tree/main/examples/adjacent)
 recipe for an independent lint step and an optional C++ test step.
+
+`run --render-only` renders recipes without executing steps, fetching sources,
+or creating build environments. Dependency solving is disabled unless
+`--with-solve` is explicitly supplied, as with `build --render-only`.
+
+## Caching build steps
+
+Each build step receives `RATTLER_BUILD_STEP_CACHE`, pointing to a persistent
+declaration file under the build directory. A successful step can write cache
+conditions to this file:
+
+```yaml
+- name: compile
+  run: |
+    cmake --build "$SRC_DIR/build"
+    cat > "$RATTLER_BUILD_STEP_CACHE" <<'EOF'
+    input-hash: CMakeLists.txt
+    input-hash: src/**
+    output-mtime: build/**
+    EOF
+```
+
+On Windows, write the same lines to `%RATTLER_BUILD_STEP_CACHE%`. Each line is
+`KEY: GLOB`; blank lines and `#` comments are ignored. `input-hash` and
+`output-hash` compare matching paths and contents. `input-mtime` and
+`output-mtime` compare paths, sizes, and modification times.
+Hash conditions include symlink identity and follow directory links using paths
+relative to the step working directory. Modification-time conditions inspect
+links themselves rather than their targets.
+
+Globs use `/`, are relative to the step working directory, and cannot be
+absolute or contain `..`. Every condition must match an entry. Missing inputs,
+deleted outputs, or changes to the script, interpreter, effective environment,
+working directory, or compiled plan invalidate the cache.
+
+After success, rattler-build stores fingerprints and a checksum-verified copy
+of `OUTPUT_FILE` outside disposable `work/`. A hit restores this metadata,
+including intentional absence. Missing or altered replay data causes a miss.
+Before executing a miss, the previous success record and declaration are
+removed: a failed rerun cannot revive stale success. A successful step must
+write its declaration again to remain cacheable. The adjacent `.state.json`
+and `.output` files belong to the executor and should not be edited.
+
+See [`examples/step-cache`](https://github.com/prefix-dev/rattler-build/tree/main/examples/step-cache)
+for a cross-platform example, and
+[`examples/adjacent`](https://github.com/prefix-dev/rattler-build/tree/main/examples/adjacent)
+for a CMake pipeline.
+
+## Reusable steps
+
+An action is a strict YAML document compiled during recipe rendering:
+
+```yaml title="recipe.yaml"
+build:
+  steps:
+    - name: lint
+      uses: ./steps/lint.yaml
+      with:
+        paths: [src, tests]
+```
+
+```yaml title="steps/lint.yaml"
+schema_version: 1
+action:
+  name: Python lint checks
+inputs:
+  paths:
+    type: list
+    items: string
+    default: ["."]
+requirements:
+  build: [ruff]
+steps:
+  - name: check
+    run: ruff check ${{ inputs.paths | join(" ") }}
+    env:
+      RUFF_NO_CACHE: "1"
+  - name: format
+    depends_on: [check]
+    run: ruff format --check ${{ inputs.paths | join(" ") }}
+```
+
+Local references must start with `./` or `../` and end in `.yaml` or `.yml`.
+Top-level references are relative to the recipe; nested references are relative
+to their containing action document. Actions may call other actions. Cycles are
+errors, nesting is limited to 64 documents, and repeated invocations are legal.
+`steps: []` is valid and still contributes the action's build and host requirements.
+
+Inputs require an explicit `string`, `boolean`, `integer` (signed 64-bit), or
+`list` type. Lists declare a scalar `items` type. A static default makes an input
+optional; otherwise it is required unless `required: false` is set. Optional
+inputs without defaults receive null. Explicit null overrides a default but is
+invalid for required inputs. Values are never coerced: quoted strings remain
+strings, standalone Jinja expressions preserve native types, and list elements
+can contain templates. Unknown fields and undeclared inputs are errors.
+
+An invocation accepts only `uses`, `with`, `name`, `optional`, `depends_on`, and
+`if`. Its condition is evaluated before loading the document or validating its
+inputs. Run steps own `env`, `cwd`, `interpreter`, and inline requirements.
+Action requirements merge into the effective recipe before variant expansion
+and solving. Configured variants are available implicitly inside actions, while
+recipe-private context is not: pass private values explicitly through `with`.
+`python` and `inputs.python` are separate names.
+
+Name invocations explicitly to select their whole group with `rattler-build run`.
+Selection and dependencies are resolved before flattening, including empty
+groups. Rendered recipes contain only executable run steps and native execution
+bindings; rebuilding them does not load action source documents.
+
+## Packaged actions
+
+Package references use `provider:step` syntax and may include a conda version
+constraint after `@`:
+
+```yaml
+- name: cargo-build
+  uses: cargo:build@>=0.3,<0.4
+```
+
+The invocation name remains a CLI target: `rattler-build run cargo-build`.
+During recipe compilation, an included invocation resolves
+`cargo-rattler-build-steps` for the build platform and installs it into a
+content-addressed prefix under the global cache. The cache identity includes the
+platform and complete solved package records, channels, and artifact checksums,
+using MD5 when SHA-256 is unavailable. Provider packages and their dependencies
+do not enter the recipe build or host environment.
+
+The compiler loads `etc/rattler-build/steps/cargo/build.yaml` (or `build.yml`)
+from that prefix using the same action schema as local documents.
+Nested `./helper.yaml` and `../shared/helper.yml` references resolve relative to
+their containing document; nested packaged references use the same transport.
+An invocation excluded by `if` does not resolve or install its provider.
+
+The rendered recipe contains the flat executable plan, native execution bindings,
+and portable provider provenance: reference, document SHA-256, package version,
+build, subdir, channel, and available artifact checksums. Cached absolute source
+paths are not serialized. Rebuild executes this embedded plan without reading
+action sources or resolving providers again.
+
+Provider installation does not execute package link scripts.
+Only action-owned `requirements.build` and `requirements.host` participate in
+the recipe's normal variant expansion and environment solve. Provider package
+dependencies are transport dependencies, not action requirements; tools such as
+`cargo` belong in the action document's `requirements.build`.
+Complete CMake, Meson, Rust, and Go recipes are available in
+[`examples/step-providers`](https://github.com/prefix-dev/rattler-build/tree/main/examples/step-providers).
+
+
+## Staging steps
+
+Staging actions use the same step execution and cache transactions as package
+actions. `RATTLER_BUILD_STEP_CACHE` is available, and successful declarations
+are recorded; a whole-stage cache hit still bypasses execution of the stage.
+
+Staging outputs do not have a package identity. Writing package metadata to
+`OUTPUT_FILE` from a staging step is rejected with an error before a success
+record is committed. Put metadata-producing actions, such as dependency-license
+collection, on the inheriting package output instead.
+
+## Post-build outputs
+
+Each build-step section receives a unique `OUTPUT_FILE` (also exposed as
+`RATTLER_BUILD_OUTPUT_FILE`). Write one dotted field, an optional `.append`
+operation, whitespace, and a value per line. Valid JSON preserves native
+booleans, numbers, null, lists, and objects; other values are plain strings.
+Quote a JSON-looking value such as `"true"` when a string is intended.
+
+For example, an action can collect dependency licenses after running its tools:
+
+```yaml
+schema_version: 1
+requirements:
+  build: [go, go-licenses]
+steps:
+  - run: |
+      go-licenses save ./... --save_path "$BUILD_DIR/go-dependencies"
+      dollar='$'
+      cat > "$OUTPUT_FILE" <<EOF
+      about.repository https://github.com/example/project
+      about.license_file.include.append ["$dollar{{ BUILD_DIR }}/go-dependencies/**"]
+      requirements.run.append ["libgcc >=14", "zlib"]
+      requirements.run_exports.strong.append ["project-abi >=1,<2"]
+      EOF
+```
+
+Outputs are applied in execution order after all build steps finish, before
+packaging. Supported requirement collections are `requirements.run`,
+`requirements.run_constraints`, and the `noarch`, `strong`, `weak`,
+`strong_constraints`, and `weak_constraints` collections under
+`requirements.run_exports`. They update package `index.json` and
+`run_exports.json`. Requirements are append-only: replacing finalized
+dependencies would be ambiguous.
+Embedded rebuild recipes retain the pre-output state, so rebuilding applies
+each emitted directive once rather than accumulating changes.
+
+Runtime output cannot change `requirements.build` or `requirements.host`.
+Declare those on the action document so the compiler includes them before
+solving and installing the environments.
+
+Post-build output can also update `about.*` and packaging fields under
+`build.dynamic_linking`, `build.prefix_detection`, `build.files`,
+`build.always_copy_files`, `build.always_include_files`, and
+`build.post_process`. Append targets are materialized when omitted from the
+recipe.
+
+!!! warning "Windows multiline steps"
+    On Windows, a multiline `run: |` block is emitted as one command-list item.
+    Rattler-Build inserts fail-fast guards between list items, not between the
+    physical lines inside one multiline scalar, so check `%errorlevel%` yourself
+    when a multiline `cmd.exe` block needs per-line failure handling.
 
 ## Pre-solve metadata step
 
@@ -211,198 +423,3 @@ For a fuller backend-style example that reads PEP 621 metadata, maps PyPI
 requirements to conda requirements, generates wheel build/install steps, and
 builds a tested noarch package, see
 [`examples/python-metadata-backend`](https://github.com/prefix-dev/rattler-build/tree/main/examples/python-metadata-backend).
-
-## Caching build steps
-
-Each build step receives `RATTLER_BUILD_STEP_CACHE`, pointing to a persistent
-file under the build directory. A successful step can write cache conditions to
-this file. On later invocations, rattler-build skips the step when all matching
-inputs and outputs are unchanged:
-
-```yaml
-- name: compile
-  run: |
-    cmake --build "$SRC_DIR/build"
-    cat > "$RATTLER_BUILD_STEP_CACHE" <<'EOF'
-    input-hash: CMakeLists.txt
-    input-hash: src/**
-    output-mtime: build/**
-    EOF
-```
-
-On Windows, write the same lines to `%RATTLER_BUILD_STEP_CACHE%`. The format is
-one `KEY: GLOB` declaration per line (blank lines and `#` comments are ignored):
-
-- `input-hash` / `output-hash` compare matching paths and file contents.
-- `input-mtime` / `output-mtime` compare matching paths, sizes, and modification
-  times.
-
-Globs use `/` separators, are relative to the step working directory, and may
-not be absolute or contain `..`. Every condition must match at least one file;
-a missing input or deleted output is a cache miss. Changes to the step's script,
-interpreter, effective environment (including secret values), resolved dependency
-set, or working directory also invalidate its cache.
-Rattler-build stores the fingerprints next to the declaration file after the
-step succeeds. It removes the old declaration before a cache-miss execution, so
-a step must write the file again to remain cacheable. Failed steps never update
-cache state. On a cache hit, the executor also retains that section's previous
-`OUTPUT_FILE`, so generated post-build metadata is replayed consistently.
-
-The declaration file is intentionally simple to generate from shell scripts;
-the adjacent executor-owned `.state.json` file is an implementation detail and
-should not be edited by the step.
-
-See [`examples/step-cache`](https://github.com/prefix-dev/rattler-build/tree/main/examples/step-cache)
-for a small cross-platform, two-step example using both hash and mtime checks.
-The [`examples/adjacent`](https://github.com/prefix-dev/rattler-build/tree/main/examples/adjacent)
-recipe shows the same feature around a real CMake configure/build pipeline.
-
-## Reusable steps
-
-A step can load its executable fields from a small YAML file:
-
-```yaml title="recipe.yaml"
-build:
-  steps:
-    - name: lint
-      uses: ./steps/lint.yaml
-      requirements:
-        inherit: false
-        build: [ruff]
-```
-
-```yaml title="steps/lint.yaml"
-steps:
-  - name: check
-    run: ruff check .
-    env:
-      RUFF_NO_CACHE: "1"
-  - name: format
-    depends_on: [check]
-    run: ruff format --check .
-```
-
-Local paths are relative to the recipe directory. A reusable file may contain
-either one step or a complete `steps:` pipeline. Pipeline DAG ordering and
-optional steps are supported. The referencing step may override the interpreter
-and working directory and extend/override the environment for every nested
-step. Reusable step requirements are preprocessed and included in the recipe's
-build or host solve.
-
-Package references use `provider:step` syntax and may include a conda version
-constraint after `@`:
-
-```yaml
-- uses: cargo:build@>=0.3,<0.4
-```
-
-With no explicit `name`, this step is named `cargo:build`, so it can be run as
-`rattler-build run cargo:build`. Before solving the recipe environments,
-rattler-build resolves `cargo-rattler-build-steps` for the build platform and
-installs it into a content-addressed provider prefix under the global cache.
-The cache identity includes the platform and complete solved records, channels,
-and artifact hashes. Provider packages never enter the recipe build or host
-prefix.
-
-Rattler-build loads `etc/rattler-build/steps/cargo/build.yaml` from that
-standalone prefix and stores the rendered steps, portable reference, content
-SHA-256, and exact provider package version, build, subdir, channel, and SHA-256
-in the rendered recipe. Provider installation is data-only: package link scripts
-are not executed during preprocessing. Requirements declared by those steps are
-added to the recipe solve. An extensionless `build` file is accepted as a
-fallback. Provider packages should therefore contain step definitions only;
-tools such as `cargo` belong in the reusable step's `requirements.build`.
-Complete CMake, Meson, Rust, and Go recipes are available in
-[`examples/step-providers`](https://github.com/prefix-dev/rattler-build/tree/main/examples/step-providers).
-
-Reusable pipelines can declare typed inputs and use them in Jinja templates:
-
-```yaml title="provider build.yaml"
-inputs:
-  extra_args:
-    type: list
-    default: []
-  install:
-    type: boolean
-    default: true
-steps:
-  - run: cmake -S "$SRC_DIR" -B "$BUILD_DIR/cmake" ${{ inputs.extra_args | join(' ') }}
-  - if: inputs.install
-    then:
-      - run: cmake --install "$BUILD_DIR/cmake"
-```
-
-```yaml title="recipe.yaml"
-build:
-  steps:
-    - uses: cmake:build
-      with:
-        extra_args: [-DBUILD_TESTING=ON]
-        install: false
-```
-
-Unknown inputs, missing required inputs, and values of the wrong declared type
-are rejected during preprocessing. Inputs may use recipe templates and therefore
-participate in normal used-variable tracking. Reusable files use the same valid-YAML
-`if` / `then` / `else` preprocessing selectors as recipes; `{% if %}` template
-blocks are not supported.
-
-## Staging steps
-
-Staging actions use the same step execution and cache transactions as package
-actions. `RATTLER_BUILD_STEP_CACHE` is available, and successful declarations
-are recorded; a whole-stage cache hit still bypasses execution of the stage.
-
-Staging outputs do not have a package identity. Writing package metadata to
-`OUTPUT_FILE` from a staging step is rejected with an error before a success
-record is committed. Put metadata-producing actions, such as dependency-license
-collection, on the inheriting package output instead.
-
-## Post-build metadata outputs
-
-Every build-step section receives a unique `OUTPUT_FILE` environment variable.
-A step can write line-oriented metadata to this file after generating files or
-inspecting build-system output. Each line contains a dotted field, an optional
-`.append` operation, whitespace, and a value. Plain values are strings; lists
-and objects use JSON syntax so they remain unambiguous and easy to generate with
-`cat`:
-
-```yaml
-requirements:
-  build: [go, go-licenses]
-run: |
-  go-licenses save ./... --save_path "$BUILD_DIR/go-dependencies"
-  dollar='$'
-  cat > "$OUTPUT_FILE" <<EOF
-  about.repository https://github.com/example/project
-  about.license_file.include.append ["$dollar{{ BUILD_DIR }}/go-dependencies/**"]
-  requirements.run.append ["libgcc >=14", "zlib"]
-  requirements.run_exports.strong.append ["project-abi >=1,<2"]
-  EOF
-```
-
-Outputs are applied in step execution order after all build steps finish and
-before packaging. Supported requirement collections are `requirements.run`,
-`requirements.run_constraints`, and the `noarch`, `strong`, `weak`,
-`strong_constraints`, and `weak_constraints` collections below
-`requirements.run_exports`. These update `index.json` and `run_exports.json` in
-the resulting package. Requirement fields are append-only because replacing an
-already finalized dependency set would be ambiguous.
-
-`requirements.build` and `requirements.host` cannot be emitted by a normal
-build step: its environments have already been solved and installed. Emit them
-from [`build.metadata`](#pre-solve-metadata-step), or declare them statically on
-a reusable step so rattler-build can collect them before the final solve.
-
-Post-build output may also update `about.*` and packaging-time fields under
-`build.dynamic_linking`, `build.prefix_detection`, `build.files`,
-`build.always_copy_files`, `build.always_include_files`, and
-`build.post_process`. Append targets are materialized even when omitted from the
-recipe. This line format replaces the prototype's RFC 6902 JSON Patch format so
-step output remains straightforward to inspect and generate.
-
-!!! warning "Windows multiline steps"
-On Windows, a multiline `run: |` block is emitted as one command-list item.
-Rattler-Build inserts fail-fast guards between list items, not between the
-physical lines inside one multiline scalar, so check `%errorlevel%` yourself
-when a multiline `cmd.exe` block needs per-line failure handling.

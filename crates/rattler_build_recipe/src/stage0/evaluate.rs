@@ -6872,7 +6872,13 @@ package:
         let rendered = build.evaluate(&context).unwrap();
         assert!(rendered.metadata.is_none());
         assert_eq!(
-            rendered.plan.steps().unwrap().iter().map(|step| step.run.clone()).collect::<Vec<_>>(),
+            rendered
+                .plan
+                .steps()
+                .unwrap()
+                .iter()
+                .map(|step| step.run.clone())
+                .collect::<Vec<_>>(),
             vec![Stage1StepRun::Commands(vec!["echo selected".into()])]
         );
     }
