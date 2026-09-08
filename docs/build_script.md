@@ -146,9 +146,12 @@ On Windows, write the same lines to `%RATTLER_BUILD_STEP_CACHE%`. Each line is
 `KEY: GLOB`; blank lines and `#` comments are ignored. `input-hash` and
 `output-hash` compare matching paths and contents. `input-mtime` and
 `output-mtime` compare paths, sizes, and modification times.
+Hash conditions include symlink identity and follow directory links using paths
+relative to the step working directory. Modification-time conditions inspect
+links themselves rather than their targets.
 
 Globs use `/`, are relative to the step working directory, and cannot be
-absolute or contain `..`. Every condition must match a file. Missing inputs,
+absolute or contain `..`. Every condition must match an entry. Missing inputs,
 deleted outputs, or changes to the script, interpreter, effective environment,
 working directory, or compiled plan invalidate the cache.
 
@@ -276,6 +279,7 @@ Quote a JSON-looking value such as `"true"` when a string is intended.
 For example, an action can collect dependency licenses after running its tools:
 
 ```yaml
+schema_version: 1
 requirements:
   build: [go, go-licenses]
 steps:
@@ -297,6 +301,8 @@ packaging. Supported requirement collections are `requirements.run`,
 `requirements.run_exports`. They update package `index.json` and
 `run_exports.json`. Requirements are append-only: replacing finalized
 dependencies would be ambiguous.
+Embedded rebuild recipes retain the pre-output state, so rebuilding applies
+each emitted directive once rather than accumulating changes.
 
 Runtime output cannot change `requirements.build` or `requirements.host`.
 Declare those on the action document so the compiler includes them before

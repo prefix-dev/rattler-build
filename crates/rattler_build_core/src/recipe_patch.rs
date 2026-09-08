@@ -314,15 +314,18 @@ mod tests {
             "about.boolean true\nabout.number 42\nabout.empty null\nabout.string \"true\"\nabout.plain human readable\n",
             Path::new("outputs.txt"),
         )?;
-        assert_eq!(document, serde_json::json!({
-            "about": {
-                "boolean": true,
-                "number": 42,
-                "empty": null,
-                "string": "true",
-                "plain": "human readable",
-            }
-        }));
+        assert_eq!(
+            document,
+            serde_json::json!({
+                "about": {
+                    "boolean": true,
+                    "number": 42,
+                    "empty": null,
+                    "string": "true",
+                    "plain": "human readable",
+                }
+            })
+        );
         Ok(())
     }
 
@@ -398,7 +401,6 @@ requirements.run_exports.strong.append ["abi >=2"]
         assert_eq!(changes.run_exports.strong.len(), 1);
         assert_eq!(recipe.requirements.run.len(), 2);
     }
-
 
     #[test]
     fn rejects_fields_consumed_before_build_execution() {

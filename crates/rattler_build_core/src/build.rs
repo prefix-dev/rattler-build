@@ -289,6 +289,9 @@ pub async fn run_build(
         }
     }
 
+    // Persist the execution input, not the metadata produced by this execution.
+    // Rebuilds reuse its finalized dependencies and replay the embedded plan.
+    let rebuild_output = output.clone();
     let post_build_requirements = crate::recipe_patch::apply_outputs(
         &mut output.recipe,
         &output.build_configuration.directories.work_dir,
@@ -297,7 +300,11 @@ pub async fn run_build(
 
     // Package all the new files
     let (result, paths_json) = output
-        .create_package(tool_configuration, install_added_files.as_ref())
+        .create_package(
+            tool_configuration,
+            install_added_files.as_ref(),
+            rebuild_output,
+        )
         .await
         .into_diagnostic()?;
 

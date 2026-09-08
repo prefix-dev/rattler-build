@@ -95,15 +95,22 @@ pub(crate) fn prepare_build_plan_execution_args(
             let output_file = crate::recipe_patch::output_file(&work_dir, index)
                 .to_string_lossy()
                 .into_owned();
-            script.env.insert("OUTPUT_FILE".to_string(), output_file.clone());
-            script.env.insert("RATTLER_BUILD_OUTPUT_FILE".to_string(), output_file);
+            script
+                .env
+                .insert("OUTPUT_FILE".to_string(), output_file.clone());
+            script
+                .env
+                .insert("RATTLER_BUILD_OUTPUT_FILE".to_string(), output_file);
             let build_dir = work_dir.parent().unwrap_or(&work_dir);
             let cache_file = build_dir
                 .join(crate::consts::STEP_CACHE_DIRECTORY_NAME)
                 .join(format!("{index}.cache"))
                 .to_string_lossy()
                 .into_owned();
-            script.env.insert(crate::consts::RATTLER_BUILD_STEP_CACHE.to_string(), cache_file);
+            script.env.insert(
+                crate::consts::RATTLER_BUILD_STEP_CACHE.to_string(),
+                cache_file,
+            );
         }
         let mut section_jinja =
             execution_jinja(selector_config.clone(), recipe_context, action_context);
@@ -197,20 +204,27 @@ fn cache_identity(
     }
 
     let mut hasher = Sha256::new();
-    update_bytes(&mut hasher, match &section.content {
-        ResolvedScriptContents::Path(_, _) => b"path",
-        ResolvedScriptContents::Inline(_) => b"inline",
-        ResolvedScriptContents::Commands(_) => b"commands",
-        ResolvedScriptContents::Missing => b"missing",
-    });
+    update_bytes(
+        &mut hasher,
+        match &section.content {
+            ResolvedScriptContents::Path(_, _) => b"path",
+            ResolvedScriptContents::Inline(_) => b"inline",
+            ResolvedScriptContents::Commands(_) => b"commands",
+            ResolvedScriptContents::Missing => b"missing",
+        },
+    );
     if let Some(path) = section.content.path() {
         update_bytes(&mut hasher, path.as_os_str().as_encoded_bytes());
     }
-    let inferred_interpreter = section.content.path()
+    let inferred_interpreter = section
+        .content
+        .path()
         .and_then(rattler_build_script::determine_interpreter_from_path);
     update_bytes(
         &mut hasher,
-        section.interpreter.as_deref()
+        section
+            .interpreter
+            .as_deref()
             .or(inferred_interpreter.as_deref())
             .unwrap_or(if cfg!(windows) { "cmd" } else { "bash" })
             .as_bytes(),
@@ -218,13 +232,19 @@ fn cache_identity(
     update_bytes(&mut hasher, section.content.script().as_bytes());
     update_bytes(
         &mut hasher,
-        section.cwd.as_ref()
+        section
+            .cwd
+            .as_ref()
             .map(|cwd| cwd.to_string_lossy())
             .as_deref()
             .unwrap_or_default()
             .as_bytes(),
     );
-    update_map(&mut hasher, &section.env, &[crate::consts::RATTLER_BUILD_STEP_CACHE]);
+    update_map(
+        &mut hasher,
+        &section.env,
+        &[crate::consts::RATTLER_BUILD_STEP_CACHE],
+    );
     // A fresh command timestamp must not invalidate an otherwise identical build.
     update_map(&mut hasher, base_env, &["SOURCE_DATE_EPOCH"]);
     update_map(&mut hasher, secrets, &[]);
@@ -340,7 +360,9 @@ impl Output {
         let output_root = &exec_args.work_dir;
         crate::recipe_patch::prepare_output_directory(output_root)?;
         fs_err::create_dir_all(
-            self.build_configuration.directories.build_dir
+            self.build_configuration
+                .directories
+                .build_dir
                 .join(crate::consts::STEP_CACHE_DIRECTORY_NAME),
         )?;
         let dependency_identity = serde_json::to_vec(&(
@@ -350,7 +372,8 @@ impl Output {
             &exec_args.sandbox_config,
             exec_args.context.build().platform(),
             exec_args.context.host().platform(),
-        )).map_err(std::io::Error::other)?;
+        ))
+        .map_err(std::io::Error::other)?;
         let process_env = rattler_build_script::runner::resolve_process_env(
             exec_args.env_isolation,
             &exec_args.env_vars,
@@ -358,16 +381,27 @@ impl Output {
             exec_args.context.runtime(),
         );
         for (section_index, section) in exec_args.sections.iter().cloned().enumerate() {
-            let cache_path = section.env
+            let cache_path = section
+                .env
                 .get(crate::consts::RATTLER_BUILD_STEP_CACHE)
                 .map(PathBuf::from)
-                .ok_or_else(|| std::io::Error::other("build step is missing its cache declaration path"))?;
-            let root = section.cwd.clone().unwrap_or_else(|| exec_args.work_dir.clone());
+                .ok_or_else(|| {
+                    std::io::Error::other("build step is missing its cache declaration path")
+                })?;
+            let root = section
+                .cwd
+                .clone()
+                .unwrap_or_else(|| exec_args.work_dir.clone());
             let identity = cache_identity(
-                &section, &process_env, &exec_args.secrets, &dependency_identity,
+                &section,
+                &process_env,
+                &exec_args.secrets,
+                &dependency_identity,
             );
             let cache = crate::step_cache::StepCacheEntry::new(
-                cache_path.clone(), root, identity,
+                cache_path.clone(),
+                root,
+                identity,
                 crate::recipe_patch::output_file(output_root, section_index),
             );
             let cache_hit = match cache.probe() {
@@ -375,7 +409,8 @@ impl Output {
                 Err(error) => {
                     tracing::warn!(
                         "Ignoring invalid build step cache {}: {}",
-                        cache_path.display(), error
+                        cache_path.display(),
+                        error
                     );
                     false
                 }

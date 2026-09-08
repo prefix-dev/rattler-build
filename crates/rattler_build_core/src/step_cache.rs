@@ -156,8 +156,8 @@ fn parse_declarations(contents: &str) -> Result<Vec<Declaration>, std::io::Error
     Ok(result)
 }
 
-fn matching_paths(root: &Path, pattern: &str) -> Result<Vec<PathBuf>, std::io::Error> {
-    let glob = GlobBuilder::new(pattern)
+fn matching_paths(root: &Path, declaration: &Declaration) -> Result<Vec<PathBuf>, std::io::Error> {
+    let glob = GlobBuilder::new(&declaration.glob)
         .literal_separator(true)
         .build()
         .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidData, error))?;
@@ -167,12 +167,15 @@ fn matching_paths(root: &Path, pattern: &str) -> Result<Vec<PathBuf>, std::io::E
         .build()
         .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidData, error))?;
     let mut paths = Vec::new();
-    if !root.is_dir() {
-        return Ok(paths);
+    match fs_err::metadata(root) {
+        Ok(metadata) if metadata.is_dir() => {}
+        Ok(_) => return Ok(paths),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(paths),
+        Err(error) => return Err(error),
     }
-    for entry in WalkDir::new(root).follow_links(false) {
+    for entry in WalkDir::new(root).follow_links(declaration.method == Method::Hash) {
         let entry = entry.map_err(std::io::Error::other)?;
-        if entry.file_type().is_dir() {
+        if entry.file_type().is_dir() && !entry.path_is_symlink() {
             continue;
         }
         let relative = entry.path().strip_prefix(root).unwrap_or(entry.path());
@@ -190,7 +193,7 @@ fn write_framed(writer: &mut impl std::io::Write, bytes: &[u8]) -> Result<(), st
 }
 
 fn fingerprint(root: &Path, declaration: &Declaration) -> Result<(String, usize), std::io::Error> {
-    let paths = matching_paths(root, &declaration.glob)?;
+    let paths = matching_paths(root, declaration)?;
     let count = paths.len();
     let mut hasher = HashingWriter::<_, Sha256>::new(std::io::sink());
     for path in paths {
@@ -199,7 +202,18 @@ fn fingerprint(root: &Path, declaration: &Declaration) -> Result<(String, usize)
         write_framed(&mut hasher, relative.as_bytes())?;
         match declaration.method {
             Method::Hash => {
+                let link_metadata = fs_err::symlink_metadata(&path)?;
+                if link_metadata.file_type().is_symlink() {
+                    write_framed(&mut hasher, b"symlink")?;
+                    let target = fs_err::read_link(&path)?;
+                    write_framed(&mut hasher, target.as_os_str().as_encoded_bytes())?;
+                } else {
+                    write_framed(&mut hasher, b"file")?;
+                }
                 let metadata = fs_err::metadata(&path)?;
+                if metadata.is_dir() {
+                    continue;
+                }
                 std::io::Write::write_all(&mut hasher, &metadata.len().to_le_bytes())?;
                 let mut file = File::open(&path)?;
                 let mut buffer = [0_u8; 64 * 1024];
@@ -227,7 +241,12 @@ fn fingerprint(root: &Path, declaration: &Declaration) -> Result<(String, usize)
     Ok((hex::encode(digest), count))
 }
 
-fn capture(root: &Path, contents: &str, step_identity: &str, metadata: MetadataState) -> Result<CacheState, std::io::Error> {
+fn capture(
+    root: &Path,
+    contents: &str,
+    step_identity: &str,
+    metadata: MetadataState,
+) -> Result<CacheState, std::io::Error> {
     let declarations = parse_declarations(contents)?;
     let mut conditions = Vec::with_capacity(declarations.len());
     for declaration in declarations {
@@ -346,6 +365,9 @@ impl StepCacheEntry {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(unix)]
+    use std::os::unix::fs::symlink;
+
     use super::*;
 
     #[test]
@@ -363,9 +385,14 @@ mod tests {
         )
         .unwrap();
 
-        let entry = |identity: &str| StepCacheEntry::new(
-            declaration.clone(), root.to_path_buf(), identity.to_string(), root.join("metadata"),
-        );
+        let entry = |identity: &str| {
+            StepCacheEntry::new(
+                declaration.clone(),
+                root.to_path_buf(),
+                identity.to_string(),
+                root.join("metadata"),
+            )
+        };
         assert!(!entry("step-v1").probe().unwrap());
         entry("step-v1").commit().unwrap();
         assert!(entry("step-v1").probe().unwrap());
@@ -383,9 +410,14 @@ mod tests {
         fs_err::write(root.join("output"), "output").unwrap();
         let declaration = root.join("step.cache");
         fs_err::write(&declaration, "input-hash: input\noutput-hash: output\n").unwrap();
-        let entry = || StepCacheEntry::new(
-            declaration.clone(), root.to_path_buf(), "step".to_string(), root.join("metadata"),
-        );
+        let entry = || {
+            StepCacheEntry::new(
+                declaration.clone(),
+                root.to_path_buf(),
+                "step".to_string(),
+                root.join("metadata"),
+            )
+        };
         entry().commit().unwrap();
         assert!(entry().probe().unwrap());
 
@@ -419,5 +451,55 @@ mod tests {
             fingerprint(first.path(), &declaration).unwrap(),
             fingerprint(second.path(), &declaration).unwrap()
         );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn directory_symlink_hash_tracks_matching_targets_and_link_identity() -> std::io::Result<()> {
+        let root = tempfile::tempdir()?;
+        let target = tempfile::tempdir()?;
+        let other = tempfile::tempdir()?;
+        fs_err::write(target.path().join("input.txt"), "one")?;
+        fs_err::write(other.path().join("input.txt"), "two")?;
+        let link = root.path().join("linked");
+        symlink(target.path(), &link)?;
+        let hash = Declaration {
+            side: Side::Input,
+            method: Method::Hash,
+            glob: "**".to_string(),
+        };
+        let mtime = Declaration {
+            side: Side::Input,
+            method: Method::Mtime,
+            glob: "**".to_string(),
+        };
+        let initial = fingerprint(root.path(), &hash)?;
+        let link_mtime = fingerprint(root.path(), &mtime)?;
+        assert_eq!(initial, fingerprint(root.path(), &hash)?);
+        fs_err::write(target.path().join("input.txt"), "two")?;
+        let changed = fingerprint(root.path(), &hash)?;
+        assert_ne!(initial, changed);
+        assert_eq!(link_mtime, fingerprint(root.path(), &mtime)?);
+
+        let matching_file = Declaration {
+            glob: "linked/*.txt".to_string(),
+            ..hash
+        };
+        assert_eq!(fingerprint(root.path(), &matching_file)?.1, 1);
+        let hash = Declaration {
+            glob: "**".to_string(),
+            ..matching_file
+        };
+        fs_err::remove_file(&link)?;
+        symlink(other.path(), &link)?;
+        assert_ne!(changed, fingerprint(root.path(), &hash)?);
+
+        fs_err::remove_file(&link)?;
+        symlink(root.path(), &link)?;
+        assert!(fingerprint(root.path(), &hash).is_err());
+        fs_err::remove_file(&link)?;
+        symlink(root.path().join("missing"), &link)?;
+        assert!(fingerprint(root.path(), &hash).is_err());
+        Ok(())
     }
 }

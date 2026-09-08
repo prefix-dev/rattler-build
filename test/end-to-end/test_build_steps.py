@@ -106,8 +106,14 @@ def test_step_cache_failed_miss_cannot_revive_success(
     )
     recipe_path.write_text(yaml.safe_dump(recipe))
     args = (
-        "run", "cached", "--recipe", str(project),
-        "--source-dir", str(project), "--output-dir", str(tmp_path / "output"),
+        "run",
+        "cached",
+        "--recipe",
+        str(project),
+        "--source-dir",
+        str(project),
+        "--output-dir",
+        str(tmp_path / "output"),
         "--experimental",
     )
     rattler_build(*args)
@@ -142,12 +148,16 @@ def test_step_cache_replays_package_metadata(
     recipe_path.write_text(yaml.safe_dump(recipe))
     output = tmp_path / "output"
     args = rattler_build.build_args(
-        project, output,
+        project,
+        output,
         extra_args=["--experimental", "--no-build-id", "--keep-build"],
     )
     rattler_build(*args)
     pkg = get_extracted_package(output, "step-cache-test")
-    assert json.loads((pkg / "info/about.json").read_text())["summary"] == "cached metadata"
+    assert (
+        json.loads((pkg / "info/about.json").read_text())["summary"]
+        == "cached metadata"
+    )
     shutil.rmtree(output / "extract")
     # A mutable work copy must never be authoritative on a cache hit.
     (metadata,) = output.glob("bld/*/work/.rattler-build/step-outputs/*.txt")
@@ -160,9 +170,14 @@ def test_step_cache_replays_package_metadata(
             payload.write_text("about.summary corrupted replay payload\n")
     rattler_build(*args)
     pkg = get_extracted_package(output, "step-cache-test")
-    assert json.loads((pkg / "info/about.json").read_text())["summary"] == "cached metadata"
+    assert (
+        json.loads((pkg / "info/about.json").read_text())["summary"]
+        == "cached metadata"
+    )
     expected_runs = 1 if payload_change is None else 2
-    assert (project / "run-count.txt").read_text().splitlines() == ["run"] * expected_runs
+    assert (project / "run-count.txt").read_text().splitlines() == [
+        "run"
+    ] * expected_runs
 
 
 def test_default_build_script_still_runs(
@@ -259,3 +274,55 @@ def test_packaged_step_provider_uses_standalone_environment(
     assert (
         rebuilt / "share/step-provider/nested.txt"
     ).read_text() == "exact-provider-worked"
+
+
+def test_rebuild_applies_post_build_outputs_once(
+    rattler_build: RattlerBuild, tmp_path: Path
+):
+    project = tmp_path / "project"
+    project.mkdir()
+    (project / "recipe.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "package": {"name": "rebuild-outputs", "version": "1"},
+                "requirements": {"build": ["python"]},
+                "build": {
+                    "steps": [
+                        {
+                            "interpreter": "python",
+                            "run": "\n".join(
+                                [
+                                    "import json",
+                                    "import os",
+                                    "from pathlib import Path",
+                                    'Path(os.environ["PREFIX"], "marker.txt").write_text("built")',
+                                    'rules = [{"files": ["**/marker.txt"], "regex": "$", "replacement": "!"}] * 2',
+                                    'Path(os.environ["OUTPUT_FILE"]).write_text("build.post_process.append " + json.dumps(rules) + "\\n")',
+                                ]
+                            ),
+                        }
+                    ]
+                },
+            }
+        )
+    )
+    output = tmp_path / "original"
+    rattler_build.build(project, output, extra_args=["--experimental"])
+    assert (
+        get_extracted_package(output, "rebuild-outputs") / "marker.txt"
+    ).read_text() == "built!!"
+    package = get_package(output, "rebuild-outputs")
+    for index in range(2):
+        output = tmp_path / f"rebuilt-{index}"
+        rattler_build(
+            "rebuild",
+            "--package-file",
+            str(package),
+            "--output-dir",
+            str(output),
+            "--experimental",
+        )
+        assert (
+            get_extracted_package(output, "rebuild-outputs") / "marker.txt"
+        ).read_text() == "built!!"
+        package = get_package(output, "rebuild-outputs")
