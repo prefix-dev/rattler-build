@@ -1,6 +1,9 @@
 from pathlib import Path
+import shutil
 
-from helpers import RattlerBuild, get_extracted_package
+import yaml
+
+from helpers import RattlerBuild, get_extracted_package, get_package
 
 
 def test_build_steps(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
@@ -40,3 +43,85 @@ def test_default_build_script_still_runs(
     marker = pkg / "share" / "default_build_script" / "marker.txt"
     assert marker.exists(), "default build script did not run"
     assert "default-build-script" in marker.read_text()
+
+
+def test_packaged_step_provider_uses_standalone_environment(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, monkeypatch
+):
+    """Packaged actions compile recursively before variants and rebuild source-free."""
+    cache = tmp_path / "cache"
+    monkeypatch.setenv("RATTLER_CACHE_DIR", str(cache))
+    provider_recipe = tmp_path / "provider-recipe"
+    consumer_recipe = tmp_path / "consumer-recipe"
+    shutil.copytree(recipes / "step_provider", provider_recipe)
+    shutil.copytree(recipes / "step_provider_consumer", consumer_recipe)
+    provider_output = tmp_path / "provider-output"
+    channel = tmp_path / "channel"
+    consumer_output = tmp_path / "consumer-output"
+    rattler_build.build(provider_recipe, provider_output)
+    provider_package = get_package(provider_output, "test-rattler-build-steps")
+    rattler_build("publish", str(provider_package), "--to", str(channel))
+
+    variants = tmp_path / "variants.yaml"
+    variants.write_text('python: ["3.11", "3.12"]\n')
+    rendered = rattler_build.render(
+        consumer_recipe,
+        consumer_output,
+        variant_config=variants,
+        custom_channels=[channel.as_uri(), "conda-forge"],
+        extra_args=["--experimental"],
+    )
+    assert {
+        output["build_configuration"]["variant"]["python"] for output in rendered
+    } == {"3.11", "3.12"}
+    assert {
+        requirement
+        for output in rendered
+        for requirement in output["recipe"]["requirements"]["build"]
+    } == {"python 3.11.*", "python 3.12.*"}
+
+    rattler_build.build(
+        consumer_recipe,
+        consumer_output,
+        custom_channels=[channel.as_uri(), "conda-forge"],
+        extra_args=["--experimental"],
+    )
+    pkg = get_extracted_package(consumer_output, "step-provider-consumer")
+    assert (
+        pkg / "share" / "step-provider" / "marker.txt"
+    ).read_text().strip() == "exact-provider-worked"
+    assert not any(pkg.rglob("test-rattler-build-steps*"))
+    assert (pkg / "share/step-provider/typed.txt").read_text() == "true:8:first,second"
+    assert (
+        pkg / "share/step-provider/nested.txt"
+    ).read_text() == "exact-provider-worked"
+    stored = yaml.safe_load((pkg / "info/recipe/rendered_recipe.yaml").read_text())
+    assert not {"six", "test-rattler-build-steps"}.intersection(
+        record["name"]
+        for record in stored["finalized_dependencies"]["build"]["resolved"]
+    )
+    assert all("uses" not in step for step in stored["recipe"]["build"]["steps"])
+    assert str(cache) not in yaml.safe_dump(stored["recipe"]["build"])
+
+    # Remove both installed documents and their channel: a rebuild must execute
+    # the embedded flat plan, not silently retrieve the provider a second time.
+    shutil.rmtree(provider_recipe)
+    shutil.rmtree(consumer_recipe)
+    shutil.rmtree(channel)
+    shutil.rmtree(cache)
+    rebuilt_output = tmp_path / "rebuilt-output"
+    rattler_build(
+        "rebuild",
+        "--package-file",
+        str(get_package(consumer_output, "step-provider-consumer")),
+        "--output-dir",
+        str(rebuilt_output),
+        "--experimental",
+    )
+    rebuilt = get_extracted_package(rebuilt_output, "step-provider-consumer")
+    assert (
+        rebuilt / "share/step-provider/typed.txt"
+    ).read_text() == "true:8:first,second"
+    assert (
+        rebuilt / "share/step-provider/nested.txt"
+    ).read_text() == "exact-provider-worked"

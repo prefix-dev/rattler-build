@@ -1,0 +1,26 @@
+schema_version: 1
+
+package:
+  name: provider-example-rust
+  version: 0.1.0
+
+source:
+  path: .
+
+build:
+  skip: win
+  steps:
+    - uses: rust:build@0.3.*
+      with:
+        locked: false
+        features:
+          - enthusiastic
+
+tests:
+  - script:
+      - hello-rust
+
+about:
+  license: MIT
+  license_file: LICENSE
+  summary: Minimal recipe using the Rust reusable build-step provider
