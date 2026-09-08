@@ -48,6 +48,8 @@ pub use rattler_build_types::{
 /// Evaluation context containing variables for template rendering and conditional evaluation
 #[derive(Debug, Clone)]
 pub struct EvaluationContext {
+    /// Render session, preserved when recipe-private context is added.
+    pub(crate) actions: crate::actions::ActionEnvironment,
     /// Variables available during evaluation (e.g., "name", "version", "py", "target_platform")
     variables: IndexMap<String, Variable>,
     /// Configuration for Jinja functions (compiler, cdt, etc.)
@@ -64,6 +66,7 @@ pub struct EvaluationContext {
 impl Default for EvaluationContext {
     fn default() -> Self {
         Self {
+            actions: Default::default(),
             variables: IndexMap::new(),
             jinja_config: JinjaConfig::default(),
             accessed_variables: Arc::new(Mutex::new(HashSet::new())),
@@ -74,6 +77,18 @@ impl Default for EvaluationContext {
 }
 
 impl EvaluationContext {
+    /// Configure action compilation before adding recipe-private variables.
+    pub fn with_actions(
+        mut self,
+        sources: crate::actions::ActionSources,
+        origin: Option<std::path::PathBuf>,
+        selected: Option<Vec<String>>,
+    ) -> Self {
+        self.actions = crate::actions::ActionEnvironment {
+            sources, origin, selected, variants: self.variables.clone(),
+        };
+        self
+    }
     /// Create a new empty evaluation context
     pub fn new() -> Self {
         Self::default()
@@ -100,6 +115,7 @@ impl EvaluationContext {
     #[cfg(test)]
     pub fn from_map(variables: IndexMap<String, String>) -> Self {
         Self {
+            actions: Default::default(),
             variables: variables
                 .into_iter()
                 .map(|(k, v)| (k, Variable::from(v)))
@@ -114,6 +130,7 @@ impl EvaluationContext {
     /// Create an evaluation context from a map of Variable values
     pub fn from_variables(variables: IndexMap<String, Variable>) -> Self {
         Self {
+            actions: Default::default(),
             variables,
             jinja_config: JinjaConfig::default(),
             accessed_variables: Arc::new(Mutex::new(HashSet::new())),
@@ -129,6 +146,7 @@ impl EvaluationContext {
         jinja_config: JinjaConfig,
     ) -> Self {
         Self {
+            actions: Default::default(),
             variables,
             jinja_config,
             accessed_variables: Arc::new(Mutex::new(HashSet::new())),
@@ -159,6 +177,7 @@ impl EvaluationContext {
         repodata_revision: RepodataRevision,
     ) -> Self {
         Self {
+            actions: Default::default(),
             variables,
             jinja_config,
             accessed_variables: Arc::new(Mutex::new(HashSet::new())),
@@ -170,6 +189,7 @@ impl EvaluationContext {
     /// Create an evaluation context with variables and Jinja config
     pub fn with_config(variables: IndexMap<String, String>, jinja_config: JinjaConfig) -> Self {
         Self {
+            actions: Default::default(),
             variables: variables
                 .into_iter()
                 .map(|(k, v)| (k, Variable::from(v)))

@@ -24,7 +24,7 @@ pub use rattler_build_script::{
 };
 
 use crate::{env_vars, metadata::Output};
-use rattler_build_recipe::stage1::build::BuildPlan;
+use rattler_build_recipe::stage1::build::{BuildPlan, Step};
 
 /// Prepare execution arguments for a stage1 build plan.
 ///
@@ -73,22 +73,20 @@ pub(crate) fn prepare_build_plan_execution_args(
     }
 
     let scripts: Vec<_> = match plan {
-        BuildPlan::Steps(steps) => steps
-            .iter()
-            .enumerate()
-            .map(|(index, step)| {
-                let label = step.name.clone().unwrap_or_else(|| format!("step {index}"));
-                (step.to_script(), Some(label))
-            })
-            .collect(),
-        BuildPlan::Script(script) => vec![(script.clone(), None)],
+        BuildPlan::Steps(steps) => steps.iter().enumerate().map(|(index, step)| {
+            (step.to_script(), Some(step.name.clone().unwrap_or_else(|| format!("step {index}"))), step.action_context.as_ref())
+        }).collect(),
+        BuildPlan::Script(script) => vec![(script.clone(), None, None)],
     };
 
     let mut secrets = IndexMap::new();
     let mut sections = Vec::with_capacity(scripts.len());
-    for (script, step_label) in scripts {
-        let mut section_jinja = Jinja::new(selector_config.clone()).with_context(recipe_context);
+    for (script, step_label, action_context) in scripts {
+        let mut section_jinja = execution_jinja(selector_config.clone(), recipe_context, action_context);
         for (key, value) in env_vars.iter().chain(script.env()) {
+            if action_context.is_some_and(|bindings| bindings.contains_key(key)) {
+                continue;
+            }
             section_jinja
                 .context_mut()
                 .insert(key.clone(), Value::from_safe_string(value.clone()));
@@ -140,7 +138,23 @@ pub(crate) fn prepare_build_plan_execution_args(
     })
 }
 
+fn execution_jinja(
+    config: JinjaConfig,
+    recipe_context: &IndexMap<String, Variable>,
+    action_context: Option<&IndexMap<String, Variable>>,
+) -> Jinja {
+    Jinja::new(config).with_context(action_context.unwrap_or(recipe_context))
+}
+
 impl Output {
+    /// Runtime renderer for a flat executable, respecting action-local scope.
+    pub(crate) fn step_jinja(&self, step: &Step) -> Jinja {
+        execution_jinja(
+            self.build_configuration.selector_config(),
+            &self.recipe.context,
+            step.action_context.as_ref(),
+        )
+    }
     /// Helper function to get a jinja renderer for the output's recipe context.
     pub(crate) fn jinja_renderer(&self) -> impl Fn(&str) -> Result<String, String> {
         let selector_config = self.build_configuration.selector_config();
@@ -268,3 +282,4 @@ impl Output {
         rattler_build_script::create_build_script(exec_args).await
     }
 }
+

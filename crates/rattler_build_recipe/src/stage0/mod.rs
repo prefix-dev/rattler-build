@@ -4,7 +4,7 @@
 use rattler_conda_types::RepodataRevision;
 
 mod about;
-mod build;
+pub mod build;
 pub mod evaluate;
 mod extra;
 mod match_spec;
@@ -17,7 +17,7 @@ mod tests;
 mod types;
 
 pub use about::{About, License};
-pub use build::{BinaryRelocation, Build, BuildPlan, PythonBuild, RunStep, Step};
+pub use build::{BinaryRelocation, Build, BuildPlan, PythonBuild, RunStep, Step, UsesStep};
 pub use extra::Extra;
 pub use match_spec::SerializableMatchSpec;
 pub use output::{

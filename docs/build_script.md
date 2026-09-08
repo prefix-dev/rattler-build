@@ -125,6 +125,68 @@ recipe for an independent lint step and an optional C++ test step.
 or creating build environments. Dependency solving is disabled unless
 `--with-solve` is explicitly supplied, as with `build --render-only`.
 
+### Reusable steps
+
+An action is a strict YAML document compiled during recipe rendering:
+
+```yaml title="recipe.yaml"
+build:
+  steps:
+    - name: lint
+      uses: ./steps/lint.yaml
+      with:
+        paths: [src, tests]
+```
+
+```yaml title="steps/lint.yaml"
+schema_version: 1
+action:
+  name: Python lint checks
+inputs:
+  paths:
+    type: list
+    items: string
+    default: ["."]
+requirements:
+  build: [ruff]
+steps:
+  - name: check
+    run: ruff check ${{ inputs.paths | join(" ") }}
+    env:
+      RUFF_NO_CACHE: "1"
+  - name: format
+    depends_on: [check]
+    run: ruff format --check ${{ inputs.paths | join(" ") }}
+```
+
+Local references must start with `./` or `../` and end in `.yaml` or `.yml`.
+Top-level references are relative to the recipe; nested references are relative
+to their containing action document. Actions may call other actions. Cycles are
+errors, nesting is limited to 64 documents, and repeated invocations are legal.
+`steps: []` is valid and still contributes the action's build and host requirements.
+
+Inputs require an explicit `string`, `boolean`, `integer` (signed 64-bit), or
+`list` type. Lists declare a scalar `items` type. A static default makes an input
+optional; otherwise it is required unless `required: false` is set. Optional
+inputs without defaults receive null. Explicit null overrides a default but is
+invalid for required inputs. Values are never coerced: quoted strings remain
+strings, standalone Jinja expressions preserve native types, and list elements
+can contain templates. Unknown fields and undeclared inputs are errors.
+
+An invocation accepts only `uses`, `with`, `name`, `optional`, `depends_on`, and
+`if`. Its condition is evaluated before loading the document or validating its
+inputs. Run steps own `env`, `cwd`, `interpreter`, and inline requirements.
+Action requirements merge into the effective recipe before variant expansion
+and solving. Configured variants are available implicitly inside actions, while
+recipe-private context is not: pass private values explicitly through `with`.
+`python` and `inputs.python` are separate names.
+
+Name invocations explicitly to select their whole group with `rattler-build run`.
+Selection and dependencies are resolved before flattening, including empty
+groups. Rendered recipes contain only executable run steps and native execution
+bindings; rebuilding them does not load action source documents.
+
+
 !!! warning "Windows multiline steps"
     On Windows, a multiline `run: |` block is emitted as one command-list item.
     Rattler-Build inserts fail-fast guards between list items, not between the

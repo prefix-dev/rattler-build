@@ -432,7 +432,7 @@ pub fn evaluate_license_files(
 }
 
 /// Evaluate a simple conditional expression
-fn evaluate_condition(
+pub(crate) fn evaluate_condition(
     expr: &JinjaExpression,
     context: &EvaluationContext,
     span: Option<&Span>,
@@ -1392,7 +1392,7 @@ pub fn evaluate_script(
 /// Each step's `if` condition is evaluated here, where the target platform and
 /// selectors are known, and excluded steps are dropped. `run` content keeps its
 /// templates so they render at build time, exactly like `build.script`.
-pub fn evaluate_steps(
+pub(crate) fn evaluate_run_steps(
     steps: &[Stage0Step],
     context: &EvaluationContext,
 ) -> Result<Vec<Stage1Step>, ParseError> {
@@ -1444,16 +1444,26 @@ pub fn evaluate_steps(
                 step.requirements.inherit.host = run.requirements.inherit.host;
                 scripts.push(step);
             }
+            Stage0Step::Uses(_) => {
+                return Err(ParseError::generic("action invocation requires action compilation", Span::new_blank()));
+            }
         }
     }
 
     Ok(scripts)
 }
 
+pub fn evaluate_steps(
+    steps: &[Stage0Step],
+    context: &EvaluationContext,
+) -> Result<Vec<Stage1Step>, ParseError> {
+    Ok(crate::actions::compile_steps(steps, context)?.steps)
+}
+
 fn evaluate_build_plan(
     plan: &Stage0BuildPlan,
     context: &EvaluationContext,
-) -> Result<Stage1BuildPlan, ParseError> {
+) -> Result<(Stage1BuildPlan, crate::actions::CompiledSteps), ParseError> {
     match plan {
         Stage0BuildPlan::Steps(steps) => {
             if !context.jinja_config().experimental {
@@ -1463,10 +1473,12 @@ fn evaluate_build_plan(
                     Span::new_blank(),
                 ));
             }
-            Ok(Stage1BuildPlan::Steps(evaluate_steps(steps, context)?))
+            let mut compiled = crate::actions::compile_steps(steps, context)?;
+            let plan = Stage1BuildPlan::Steps(std::mem::take(&mut compiled.steps));
+            Ok((plan, compiled))
         }
         Stage0BuildPlan::Script(script) => {
-            Ok(Stage1BuildPlan::Script(evaluate_script(script, context)?))
+            Ok((Stage1BuildPlan::Script(evaluate_script(script, context)?), Default::default()))
         }
     }
 }
@@ -2229,7 +2241,7 @@ impl Evaluate for Stage0Build {
         // (enforced during parsing). Steps mode is preserved even if the list is
         // empty or all steps filter out, so outputs don't accidentally inherit a
         // top-level script.
-        let plan = evaluate_build_plan(&self.plan, context)?;
+        let (plan, actions) = evaluate_build_plan(&self.plan, context)?;
 
         // Evaluate noarch
         //
@@ -2337,6 +2349,8 @@ impl Evaluate for Stage0Build {
         )?;
 
         Ok(Stage1Build {
+            action_provenance: actions.provenance,
+            action_requirements: actions.requirements,
             number,
             string,
             plan,
@@ -2360,8 +2374,13 @@ impl Evaluate for stage0::StagingBuild {
     type Output = Stage1Build;
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
+        let mut staging_context = context.clone();
+        staging_context.actions.selected = None;
+        let (plan, actions) = evaluate_build_plan(&self.plan, &staging_context)?;
         Ok(Stage1Build {
-            plan: evaluate_build_plan(&self.plan, context)?,
+            plan,
+            action_provenance: actions.provenance,
+            action_requirements: actions.requirements,
             ..Stage1Build::default()
         })
     }
@@ -2955,9 +2974,10 @@ impl Evaluate for Stage0Recipe {
             .cloned()
             .collect();
         let package = self.package.evaluate(&context_with_vars)?;
-        let build = self.build.evaluate(&context_with_vars)?;
+        let mut build = self.build.evaluate(&context_with_vars)?;
         let about = self.about.evaluate(&context_with_vars)?;
-        let requirements = self.requirements.evaluate(&context_with_vars)?;
+        let mut requirements = self.requirements.evaluate(&context_with_vars)?;
+        merge_action_requirements(&mut build, &mut requirements);
         let extra = self.extra.evaluate(&context_with_vars)?;
 
         // Evaluate source list (conditionals expand to multiple sources)
@@ -3108,6 +3128,13 @@ fn build_plan_inherits_from_toplevel(toplevel: &Stage1BuildPlan, output: &Stage1
     )
 }
 
+fn merge_action_requirements(build: &mut Stage1Build, requirements: &mut Stage1Requirements) {
+    if !build.action_requirements.inherit.build { requirements.build.clear(); }
+    if !build.action_requirements.inherit.host { requirements.host.clear(); }
+    requirements.build.extend(std::mem::take(&mut build.action_requirements.build));
+    requirements.host.extend(std::mem::take(&mut build.action_requirements.host));
+}
+
 /// Merge two Stage1 Build configurations
 /// The output build takes precedence, but if output has default/empty values, use top-level
 fn merge_stage1_build(
@@ -3121,6 +3148,11 @@ fn merge_stage1_build(
     // when inheriting a top-level script, matching the historical multi-output
     // behavior. It does not inherit a top-level steps plan because there is no
     // whole-plan `cwd` to apply to steps without silently dropping it.
+    let (action_requirements, action_provenance) = if build_plan_inherits_from_toplevel(&toplevel.plan, &output.plan) {
+        (toplevel.action_requirements, toplevel.action_provenance)
+    } else {
+        (output.action_requirements, output.action_provenance)
+    };
     let plan = if build_plan_inherits_from_toplevel(&toplevel.plan, &output.plan) {
         toplevel.plan
     } else {
@@ -3221,6 +3253,8 @@ fn merge_stage1_build(
     };
 
     stage1::Build {
+        action_requirements,
+        action_provenance,
         plan,
         number,
         string,
@@ -3345,7 +3379,11 @@ fn evaluate_package_output_to_recipe(
     //   (the cache has its own plan, and the output doesn't need one for filtering files)
     let build = if inherits_from_toplevel {
         // Full merge including the build plan
-        let toplevel_build = recipe.build.evaluate(context)?;
+        let mut toplevel_source = recipe.build.clone();
+        if !output.build.plan.is_default() {
+            toplevel_source.plan = Stage0BuildPlan::default();
+        }
+        let toplevel_build = toplevel_source.evaluate(context)?;
         let output_build = output.build.evaluate(context)?;
         merge_stage1_build(toplevel_build, output_build)
     } else {
@@ -3353,7 +3391,9 @@ fn evaluate_package_output_to_recipe(
         // output does not set itself, EXCEPT the build plan (the cache has its
         // own plan; a cache-inheriting output packages the restored files and
         // does not need to re-run the top-level plan).
-        let toplevel_build = recipe.build.evaluate(context)?;
+        let mut toplevel_source = recipe.build.clone();
+        toplevel_source.plan = Stage0BuildPlan::default();
+        let toplevel_build = toplevel_source.evaluate(context)?;
         let output_build = output.build.evaluate(context)?;
         let output_plan = output_build.plan.clone();
         let mut merged = merge_stage1_build(toplevel_build, output_build);
@@ -3393,7 +3433,8 @@ fn evaluate_package_output_to_recipe(
     };
 
     // Evaluate requirements
-    let requirements = output.requirements.evaluate(context)?;
+    let mut requirements = output.requirements.evaluate(context)?;
+    merge_action_requirements(&mut build, &mut requirements);
 
     // Use recipe-level extra (outputs don't have their own extra)
     let extra = recipe.extra.evaluate(context)?;
@@ -3586,16 +3627,7 @@ impl Evaluate for crate::stage0::MultiOutputRecipe {
                 // Evaluate staging output components
                 let mut build = staging_output.build.evaluate(&context_with_vars)?;
                 let mut requirements = staging_output.requirements.evaluate(&context_with_vars)?;
-                if build.plan.steps().is_some() {
-                    let selected = build.plan.select_steps(None).map_err(|error| {
-                        ParseError::invalid_value("staging build.steps", error, Span::new_blank())
-                    })?;
-                    for step in &selected {
-                        requirements.build.extend(step.requirements.build.clone());
-                        requirements.host.extend(step.requirements.host.clone());
-                    }
-                    build.plan = Stage1BuildPlan::Steps(selected);
-                }
+                merge_action_requirements(&mut build, &mut requirements);
 
                 // Staging outputs inherit top-level sources (prepend), then add their own
                 // (conditionals expand to multiple sources)
@@ -6699,6 +6731,7 @@ package:
             Stage1StepRun::Commands(vec!["echo b".to_string()])
         );
     }
+
 
     #[test]
     fn test_build_evaluate_preserves_steps_mode_when_all_steps_filter_out() {

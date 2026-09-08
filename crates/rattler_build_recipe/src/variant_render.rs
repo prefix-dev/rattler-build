@@ -88,6 +88,12 @@ pub struct PinSubpackageInfo {
 /// Configuration for rendering recipes with variants
 #[derive(Debug, Clone)]
 pub struct RenderConfig {
+    /// Shared render-time action source registry.
+    pub action_sources: crate::actions::ActionSources,
+    /// Literal source invocation names selected before action expansion.
+    pub selected_steps: Option<Vec<String>>,
+    /// Constraints on fully expanded combinations, used by metadata rerendering.
+    pub variant_constraints: BTreeMap<NormalizedKey, Variable>,
     /// Additional context variables to provide (beyond variant values)
     /// These can be strings, booleans, numbers, etc. using the Variable type
     pub extra_context: IndexMap<String, Variable>,
@@ -119,6 +125,9 @@ pub struct RenderConfig {
 impl Default for RenderConfig {
     fn default() -> Self {
         Self {
+            action_sources: crate::actions::ActionSources::default(),
+            selected_steps: None,
+            variant_constraints: BTreeMap::new(),
             extra_context: IndexMap::new(),
             experimental: false,
             repodata_revision: RepodataRevision::Legacy,
@@ -926,7 +935,12 @@ fn discover_new_variant_keys_from_evaluation(
     variant_config: &VariantConfig,
     config: &RenderConfig,
 ) -> Result<HashSet<NormalizedKey>, ParseError> {
-    let context = build_evaluation_context(combination, config)?;
+    let mut context = build_evaluation_context(combination, config)?;
+    for (key, values) in &variant_config.variants {
+        if let Some(value) = values.first() {
+            context.actions.variants.entry(key.to_string()).or_insert_with(|| value.clone());
+        }
+    }
 
     // Get requirements and evaluate them
     // NOTE: We need to merge the recipe's context variables into the evaluation context
@@ -940,13 +954,11 @@ fn discover_new_variant_keys_from_evaluation(
             } else {
                 (context.clone(), IndexMap::new())
             };
-            let evaluated = recipe.requirements.evaluate(&context_with_vars)?;
-            let mut free_specs = evaluated.free_specs();
-            free_specs.extend(evaluated_step_free_specs(
-                &recipe.build.plan,
-                &context_with_vars,
-            )?);
-            free_specs
+            let mut evaluated = recipe.requirements.evaluate(&context_with_vars)?;
+            let build = recipe.build.evaluate(&context_with_vars)?;
+            evaluated.build.extend(build.action_requirements.build);
+            evaluated.host.extend(build.action_requirements.host);
+            evaluated.free_specs()
         }
         Stage0Recipe::MultiOutput(recipe) => {
             // Merge recipe context variables into evaluation context
@@ -990,6 +1002,22 @@ fn discover_new_variant_keys_from_evaluation(
                         all_free_specs.extend(specs);
                     }
                 }
+                if !should_skip {
+                    let build = match output {
+                        stage0::Output::Staging(staging) => staging.build.evaluate(&context_with_vars)?,
+                        stage0::Output::Package(pkg) => {
+                            if pkg.build.plan.is_default() {
+                                recipe.build.evaluate(&context_with_vars)?
+                            } else {
+                                pkg.build.evaluate(&context_with_vars)?
+                            }
+                        }
+                    };
+                    let mut action_requirements = crate::stage1::Requirements::default();
+                    action_requirements.build = build.action_requirements.build;
+                    action_requirements.host = build.action_requirements.host;
+                    all_free_specs.extend(action_requirements.free_specs());
+                }
             }
             all_free_specs
         }
@@ -997,6 +1025,12 @@ fn discover_new_variant_keys_from_evaluation(
 
     // Find free specs that are variant keys but not in current combination
     let mut new_keys = HashSet::new();
+    for key in context.accessed_variables() {
+        let key = NormalizedKey::from(key);
+        if variant_config.get(&key).is_some() && !combination.contains_key(&key) {
+            new_keys.insert(key);
+        }
+    }
     for spec in free_specs {
         let key = NormalizedKey::from(spec.as_normalized());
         if variant_config.get(&key).is_some() && !combination.contains_key(&key) {
@@ -1012,40 +1046,12 @@ fn expand_combination_with_keys(
     base: &BTreeMap<NormalizedKey, Variable>,
     new_keys: &HashSet<NormalizedKey>,
     variant_config: &VariantConfig,
-) -> Vec<BTreeMap<NormalizedKey, Variable>> {
-    if new_keys.is_empty() {
-        return vec![base.clone()];
-    }
-
-    // Get values for each new key
-    let key_values: Vec<(NormalizedKey, Vec<Variable>)> = new_keys
-        .iter()
-        .filter_map(|key| {
-            variant_config
-                .get(key)
-                .map(|values| (key.clone(), values.clone()))
-        })
-        .collect();
-
-    if key_values.is_empty() {
-        return vec![base.clone()];
-    }
-
-    // Create cross-product of all new key values
-    let mut results = vec![base.clone()];
-    for (key, values) in key_values {
-        let mut new_results = Vec::new();
-        for combo in &results {
-            for value in &values {
-                let mut new_combo = combo.clone();
-                new_combo.insert(key.clone(), value.clone());
-                new_results.push(new_combo);
-            }
-        }
-        results = new_results;
-    }
-
-    results
+) -> Result<Vec<BTreeMap<NormalizedKey, Variable>>, ParseError> {
+    let keys = base.keys().cloned().chain(new_keys.iter().cloned()).collect();
+    let mut combinations = variant_config.combinations(&keys)
+        .map_err(|error| ParseError::generic(error.to_string(), marked_yaml::Span::new_blank()))?;
+    combinations.retain(|combination| base.iter().all(|(key, value)| combination.get(key) == Some(value)));
+    Ok(combinations)
 }
 
 /// Recursively expand variant combinations by discovering new variant keys from evaluation
@@ -1060,12 +1066,8 @@ fn expand_variants_tree(
     let mut final_combinations = Vec::new();
     let mut to_process = initial_combinations;
 
-    // Limit iterations to prevent infinite loops
-    const MAX_ITERATIONS: usize = 10;
-    let mut iteration = 0;
-
-    while !to_process.is_empty() && iteration < MAX_ITERATIONS {
-        iteration += 1;
+    // Each expansion adds a configured key, so the finite key set bounds progress.
+    while !to_process.is_empty() {
         let mut next_round = Vec::new();
 
         for combination in to_process {
@@ -1083,7 +1085,7 @@ fn expand_variants_tree(
             } else {
                 // Expand with new keys and process in next round
                 let expanded =
-                    expand_combination_with_keys(&combination, &new_keys, variant_config);
+                    expand_combination_with_keys(&combination, &new_keys, variant_config)?;
                 next_round.extend(expanded);
             }
         }
@@ -1091,8 +1093,6 @@ fn expand_variants_tree(
         to_process = next_round;
     }
 
-    // Add any remaining combinations (in case we hit iteration limit)
-    final_combinations.extend(to_process);
 
     // Deduplicate combinations
     let mut seen = HashSet::new();
@@ -1132,7 +1132,7 @@ fn build_evaluation_context(
             jinja_config,
             config.os_env_var_keys.clone(),
             config.repodata_revision,
-        ),
+        ).with_actions(config.action_sources.clone(), config.recipe_path.clone(), config.selected_steps.clone()),
     )
 }
 
@@ -1158,7 +1158,8 @@ fn render_with_empty_combinations(
     let jinja_config = create_jinja_config(config, &empty_variant);
     let context =
         EvaluationContext::with_variables_and_config(config.extra_context.clone(), jinja_config)
-            .with_repodata_revision(config.repodata_revision);
+            .with_repodata_revision(config.repodata_revision)
+            .with_actions(config.action_sources.clone(), config.recipe_path.clone(), config.selected_steps.clone());
 
     // Evaluate the recipe
     let outputs = evaluate_recipe(stage0_recipe, &context)?;
@@ -1241,6 +1242,14 @@ fn finalize_build_string_single(
 ) -> Result<(), RenderError> {
     let build_string_prefix = config.build_string_prefix.as_deref();
     let noarch = result.recipe.build.noarch.unwrap_or(NoArchType::none());
+    let action_provenance = result.recipe.staging_caches.iter()
+        .flat_map(|cache| cache.build.action_provenance.iter())
+        .chain(result.recipe.build.action_provenance.iter()).collect::<Vec<_>>();
+    if !action_provenance.is_empty() {
+        let identity = Variable::from(minijinja::Value::from_serialize(&action_provenance));
+        result.variant.insert(NormalizedKey::from("__actions"), identity.clone());
+        result.recipe.used_variant.insert(NormalizedKey::from("__actions"), identity);
+    }
 
     // Compute hash from the variant (which now includes pin_subpackage information)
     let mut hash_info = HashInfo::from_variant(&result.variant, &noarch);
@@ -1608,6 +1617,9 @@ fn render_with_variants(
     let mut results = Vec::with_capacity(combinations.len());
 
     for combination in combinations {
+        if !config.variant_constraints.iter().all(|(key, value)| combination.get(key).is_none_or(|actual| actual == value)) {
+            continue;
+        }
         let context = build_evaluation_context(&combination, &config)?;
         let outputs = evaluate_recipe(stage0_recipe, &context)?;
 

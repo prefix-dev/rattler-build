@@ -389,7 +389,7 @@ pub(crate) fn parse_steps(node: &Node) -> Result<Vec<Step>, ParseError> {
     Ok(steps)
 }
 
-fn parse_step_requirements(node: &Node) -> Result<StepRequirements, ParseError> {
+pub(crate) fn parse_step_requirements(node: &Node) -> Result<StepRequirements, ParseError> {
     // Keep the first prototype's list form as a host-only shorthand.
     if node.as_sequence().is_some() {
         return Ok(StepRequirements {
@@ -462,11 +462,22 @@ fn parse_step_requirements(node: &Node) -> Result<StepRequirements, ParseError> 
 }
 
 /// Parse a single build step mapping into a [`Step`].
-fn parse_step(node: &Node) -> Result<Step, ParseError> {
+pub(crate) fn parse_step(node: &Node) -> Result<Step, ParseError> {
     let mapping = node.as_mapping().ok_or_else(|| {
         ParseError::expected_type("mapping", "non-mapping", get_span(node))
             .with_message("Expected each step to be a mapping")
     })?;
+    let is_uses = mapping.iter().any(|(key, _)| key.as_str() == "uses");
+    for (key, _) in mapping.iter() {
+        let allowed = if is_uses {
+            &["uses", "with", "name", "optional", "depends_on", "if"][..]
+        } else {
+            &["run", "name", "optional", "depends_on", "if", "requirements", "interpreter", "cwd", "env"][..]
+        };
+        if !allowed.contains(&key.as_str()) {
+            return Err(ParseError::invalid_value("steps", format!("field '{}' is not allowed on this step kind", key.as_str()), *key.span()));
+        }
+    }
 
     let mut run = None;
     let mut name = None;
@@ -478,11 +489,22 @@ fn parse_step(node: &Node) -> Result<Step, ParseError> {
     let mut interpreter = None;
     let mut cwd = None;
     let mut env = indexmap::IndexMap::new();
+    let mut inputs = indexmap::IndexMap::new();
 
     for (key_node, value_node) in mapping.iter() {
         let key = key_node.as_str();
 
         match key {
+            "with" => {
+                let values = value_node.as_mapping().ok_or_else(|| ParseError::expected_type(
+                    "mapping", "non-mapping", get_span(value_node)))?;
+                for (key, value) in values.iter() {
+                    inputs.insert(key.as_str().to_owned(), crate::actions::ActionValue::parse(value)?);
+                }
+            }
+            "uses" => {
+                uses = Some(parse_field!("steps.uses", value_node));
+            }
             "name" => {
                 name = Some(
                     value_node
@@ -556,10 +578,19 @@ fn parse_step(node: &Node) -> Result<Step, ParseError> {
         }
     }
 
-    let run = run.ok_or_else(|| {
-        ParseError::invalid_value("steps", "a step must contain 'run'", get_span(node))
-            .with_suggestion("Add a 'run:' script")
-    })?;
+    if run.is_some() == uses.is_some() {
+        return Err(ParseError::invalid_value(
+            "steps",
+            "a step must contain exactly one of 'run' or 'uses'",
+            get_span(node),
+        )
+        .with_suggestion("Add either a 'run:' script or a 'uses:' reference"));
+    }
+    if let Some(uses) = uses {
+        return Ok(Step::Uses(crate::stage0::build::UsesStep {
+            uses, name, optional, depends_on, condition, condition_span, inputs,
+        }));
+    }
 
     Ok(Step::Run(RunStep {
         name,
@@ -1344,18 +1375,17 @@ steps:
         let steps = build.plan.steps().expect("steps mode");
         assert_eq!(steps.len(), 2);
 
-        match &steps[0] {
-            Step::Run(first) => {
+        assert!(matches!(&steps[0], Step::Run(_)));
+        if let Step::Run(first) = &steps[0] {
                 assert_eq!(first.name.as_deref(), Some("configure"));
                 assert_eq!(first.run.len(), 1);
                 assert!(first.condition.is_none());
                 assert!(first.interpreter.is_none());
                 assert!(first.env.is_empty());
-            }
         }
 
-        match &steps[1] {
-            Step::Run(second) => {
+        assert!(matches!(&steps[1], Step::Run(_)));
+        if let Step::Run(second) = &steps[1] {
                 assert_eq!(second.name.as_deref(), Some("test"));
                 assert!(second.optional);
                 assert_eq!(second.depends_on, ["configure"]);
@@ -1367,8 +1397,29 @@ steps:
                 assert!(second.interpreter.is_some());
                 assert!(second.cwd.is_some());
                 assert!(second.env.contains_key("FOO"));
-            }
         }
+    }
+
+    #[test]
+    fn test_parse_reusable_step_reference() {
+        let yaml = r#"
+steps:
+  - name: build
+    uses: cargo:build
+"#;
+        let node = marked_yaml::parse_yaml(0, yaml).unwrap();
+        let build = parse_build(&node).unwrap();
+        assert!(matches!(&build.plan.steps().unwrap()[0], Step::Uses(_)));
+        if let Step::Uses(step) = &build.plan.steps().unwrap()[0] {
+            assert_eq!(step.uses.as_concrete(), Some(&"cargo:build".to_string()));
+        }
+    }
+
+    #[test]
+    fn test_parse_step_rejects_run_and_uses() {
+        let yaml = "steps:\n  - uses: cargo:build\n    run: cargo build\n";
+        let node = marked_yaml::parse_yaml(0, yaml).unwrap();
+        assert!(parse_build(&node).is_err());
     }
 
     #[test]
@@ -1383,9 +1434,11 @@ steps:
 "#;
         let node = marked_yaml::parse_yaml(0, yaml).unwrap();
         let build = parse_build(&node).unwrap();
-        let Step::Run(step) = &build.plan.steps().unwrap()[0];
-        assert!(!step.requirements.inherit.build);
-        assert!(!step.requirements.inherit.host);
+        assert!(matches!(&build.plan.steps().unwrap()[0], Step::Run(_)));
+        if let Step::Run(step) = &build.plan.steps().unwrap()[0] {
+            assert!(!step.requirements.inherit.build);
+            assert!(!step.requirements.inherit.host);
+        }
     }
 
     #[test]

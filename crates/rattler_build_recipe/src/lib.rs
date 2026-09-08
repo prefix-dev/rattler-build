@@ -1,6 +1,7 @@
 //! Recipe data model and parsing for rattler-build, including multi-stage evaluation
 //! and variant rendering.
 
+pub mod actions;
 pub mod error;
 pub mod source_code;
 pub mod stage0;

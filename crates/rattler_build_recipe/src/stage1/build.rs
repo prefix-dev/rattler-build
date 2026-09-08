@@ -293,6 +293,7 @@ impl StepRequirements {
     }
 }
 
+
 /// A stage1 build step with evaluated metadata and script content.
 ///
 /// This is deliberately separate from [`Script`]: rendered recipes use
@@ -300,6 +301,9 @@ impl StepRequirements {
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Step {
+    /// Native isolated bindings for an action-owned executable.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub action_context: Option<IndexMap<String, rattler_build_jinja::Variable>>,
     /// Optional unique name used by the step DAG and CLI.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
@@ -330,6 +334,7 @@ impl Step {
     /// Create a step from an evaluated script payload.
     pub fn new(script: Script) -> Self {
         Self {
+            action_context: None,
             name: None,
             optional: false,
             depends_on: Vec::new(),
@@ -637,6 +642,12 @@ impl<'de> serde::Deserialize<'de> for PostProcess {
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(try_from = "BuildDeserialize")]
 pub struct Build {
+    /// Source identities contributing to this executable plan, including empty actions.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub action_provenance: Vec<crate::actions::ActionProvenance>,
+    /// Intermediate requirements consumed by effective recipe construction.
+    #[serde(skip)]
+    pub action_requirements: StepRequirements,
     /// Build number (increments with each rebuild)
     /// None means inherit from top-level, Some(n) means use n (even if n is 0)
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -736,6 +747,8 @@ where
 #[serde(deny_unknown_fields)]
 struct BuildDeserialize {
     #[serde(default)]
+    action_provenance: Vec<crate::actions::ActionProvenance>,
+    #[serde(default)]
     number: Option<u64>,
     #[serde(default)]
     string: BuildString,
@@ -785,6 +798,8 @@ impl TryFrom<BuildDeserialize> for Build {
         };
 
         Ok(Self {
+            action_provenance: raw.action_provenance,
+            action_requirements: StepRequirements::default(),
             number: raw.number,
             string: raw.string,
             plan,
