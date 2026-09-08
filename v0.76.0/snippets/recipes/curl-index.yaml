@@ -1,0 +1,42 @@
+context:
+  version: "8.0.1"
+
+package:
+  name: curl
+  version: ${{ version }}
+
+source:
+  url: http://curl.haxx.se/download/curl-${{ version }}.tar.bz2
+  sha256: 9b6b1e96b748d04b968786b6bdf407aa5c75ab53a3d37c1c8c81cdb736555ccf
+
+build:
+  number: 0
+
+requirements:
+  build:
+    - ${{ compiler('c') }}
+    - if: win
+      then:
+        - cmake
+        - ninja
+    - if: unix
+      then:
+        - make
+        - perl
+        - pkg-config
+        - libtool
+  host:
+    - if: linux
+      then:
+        - openssl
+
+about:
+  homepage: http://curl.haxx.se/
+  license: curl
+  license_file: COPYING
+  summary: tool and library for transferring data with URL syntax
+  description: |
+    Curl is an open source command line tool and library for transferring data
+    with URL syntax. It is used in command lines or scripts to transfer data.
+  documentation: https://curl.haxx.se/docs/
+  repository: https://github.com/curl/curl
