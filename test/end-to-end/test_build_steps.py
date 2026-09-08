@@ -67,6 +67,7 @@ def test_packaged_step_provider_uses_standalone_environment(
     rendered = rattler_build.render(
         consumer_recipe,
         consumer_output,
+        with_solve=True,
         variant_config=variants,
         custom_channels=[channel.as_uri(), "conda-forge"],
         extra_args=["--experimental"],
@@ -74,11 +75,12 @@ def test_packaged_step_provider_uses_standalone_environment(
     assert {
         output["build_configuration"]["variant"]["python"] for output in rendered
     } == {"3.11", "3.12"}
-    assert {
-        requirement
-        for output in rendered
-        for requirement in output["recipe"]["requirements"]["build"]
-    } == {"python 3.11.*", "python 3.12.*"}
+    for output in rendered:
+        assert {
+            ".".join(record["version"].split(".")[:2])
+            for record in output["finalized_dependencies"]["build"]["resolved"]
+            if record["name"] == "python"
+        } == {output["build_configuration"]["variant"]["python"]}
 
     rattler_build.build(
         consumer_recipe,
