@@ -5,6 +5,49 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.76.0] - 2026-09-08
+### ✨ Highlights
+
+Test scripts can now inspect package metadata through `PATHS_JSON` and `INDEX_JSON`. Multi-output builds warn about overlapping output files and unused staging files, and fixes improve sibling-output scheduling, inherited variant priority, and staging cache inputs. Empty `files: []` lists now package nothing, malformed `skip` expressions produce errors, and link checks run even when relocation is disabled.
+
+
+### Added
+
+- Set `__glibc` to 2.39 on `linux-riscv64` by @pavelzw in [#2775](https://github.com/prefix-dev/rattler-build/pull/2775)
+- Warn on overlapping output files and unused staging files by @wolfv in [#2790](https://github.com/prefix-dev/rattler-build/pull/2790)
+- Add `PATHS_JSON`/`INDEX_JSON` env vars at test-time by @pb01ka in [#2620](https://github.com/prefix-dev/rattler-build/pull/2620)
+
+
+### Changed
+
+- Bump flate2, indexmap, and lzma-rust2 by @dependabot[bot] in [#2797](https://github.com/prefix-dev/rattler-build/pull/2797)
+
+
+### Documentation
+
+- Recommend brush for cross-platform scripts by @wolfv in [#2786](https://github.com/prefix-dev/rattler-build/pull/2786)
+- Document glob syntax by @wolfv in [#2785](https://github.com/prefix-dev/rattler-build/pull/2785)
+- Use JSON Pointer (RFC 6901) syntax by @salim-b in [#2800](https://github.com/prefix-dev/rattler-build/pull/2800)
+- Consolidate recipe references by @wolfv in [#2788](https://github.com/prefix-dev/rattler-build/pull/2788)
+
+
+### Fixed
+
+- `files: []` packages nothing instead of everything by @wolfv in [#2784](https://github.com/prefix-dev/rattler-build/pull/2784)
+- Emit canonical MatchSpecs for v3 packages by @baszalmstra in [#2758](https://github.com/prefix-dev/rattler-build/pull/2758)
+- Schedule sibling outputs when their dependencies are ready by @baszalmstra in [#2796](https://github.com/prefix-dev/rattler-build/pull/2796)
+- Set `SRC_DIR` to the test working directory by @pavelzw in [#2795](https://github.com/prefix-dev/rattler-build/pull/2795)
+- Run link checks when relocation is disabled by @rootsec1 in [#2787](https://github.com/prefix-dev/rattler-build/pull/2787)
+- Diagnose malformed `skip` expressions instead of ignoring them by @wolfv in [#2783](https://github.com/prefix-dev/rattler-build/pull/2783)
+- Use backslashes in Windows `SP_DIR` path by @acosmicflamingo in [#2779](https://github.com/prefix-dev/rattler-build/pull/2779)
+- Document `ignore_keys` and propagate top-level `use_keys` / `ignore_keys` by @wolfv in [#2802](https://github.com/prefix-dev/rattler-build/pull/2802)
+- Preserve inherited variant priority and staging cache inputs by @wolfv in [#2804](https://github.com/prefix-dev/rattler-build/pull/2804)
+
+
+### New Contributors
+* @acosmicflamingo made their first contribution in [#2779](https://github.com/prefix-dev/rattler-build/pull/2779)
+* @rootsec1 made their first contribution in [#2787](https://github.com/prefix-dev/rattler-build/pull/2787)
+
 ## [0.75.0] - 2026-08-26
 ### ✨ Highlights
 
