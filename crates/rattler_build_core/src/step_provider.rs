@@ -1,9 +1,14 @@
 //! Transport for packaged action sources consumed by the recipe compiler.
 
-use std::{collections::HashMap, path::{Path, PathBuf}};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 
 use miette::{IntoDiagnostic, WrapErr};
-use rattler_build_recipe::actions::{ActionProvenance, ActionRequest, ActionSource, ActionSources, ResolvedProvider};
+use rattler_build_recipe::actions::{
+    ActionProvenance, ActionRequest, ActionSource, ActionSources, ResolvedProvider,
+};
 use rattler_conda_types::{ChannelUrl, MatchSpec, ParseStrictness, RepoDataRecord};
 use rattler_solve::{ChannelPriority, SolveStrategy};
 use sha2::{Digest, Sha256};
@@ -24,10 +29,15 @@ struct ProviderEnvironment {
 /// Solve settings for the independent build-platform provider environment.
 /// Provider dependencies are never added to recipe build or host requirements.
 pub struct ProviderSolveConfig<'a> {
+    /// Build platform and virtual packages used to solve the provider environment.
     pub build_platform: &'a PlatformWithVirtualPackages,
+    /// Ordered channels searched for provider packages.
     pub channels: &'a [ChannelUrl],
+    /// Channel priority applied during the provider solve.
     pub channel_priority: ChannelPriority,
+    /// Package-version selection strategy for the provider solve.
     pub solve_strategy: SolveStrategy,
+    /// Latest permitted package timestamp.
     pub exclude_newer: Option<jiff::Timestamp>,
 }
 
@@ -45,27 +55,49 @@ struct PackageReference<'a> {
 }
 
 fn package_reference(reference: &str) -> miette::Result<PackageReference<'_>> {
-    let invalid = || miette::miette!(
-        "invalid packaged action reference `{reference}`; expected `provider:step[@version]`"
-    );
+    let invalid = || {
+        miette::miette!(
+            "invalid packaged action reference `{reference}`; expected `provider:step[@version]`"
+        )
+    };
     let (provider, step_and_version) = reference.split_once(':').ok_or_else(invalid)?;
-    let (step, version) = step_and_version.split_once('@')
-        .map_or((step_and_version, None), |(step, version)| (step, Some(version)));
-    let valid = |value: &str| !value.is_empty() && value.chars().all(|character| {
-        character.is_ascii_alphanumeric() || matches!(character, '-' | '_')
-    });
-    if !valid(provider) || !valid(step) || version.is_some_and(|v| v.trim().is_empty() || v.contains('@')) {
+    let (step, version) = step_and_version
+        .split_once('@')
+        .map_or((step_and_version, None), |(step, version)| {
+            (step, Some(version))
+        });
+    let valid = |value: &str| {
+        !value.is_empty()
+            && value.chars().all(|character| {
+                character.is_ascii_alphanumeric() || matches!(character, '-' | '_')
+            })
+    };
+    if !valid(provider)
+        || !valid(step)
+        || version.is_some_and(|v| v.trim().is_empty() || v.contains('@'))
+    {
         return Err(invalid());
     }
-    Ok(PackageReference { provider, step, version })
+    Ok(PackageReference {
+        provider,
+        step,
+        version,
+    })
 }
 
 fn provider_step_path(prefix: &Path, provider: &str, step: &str) -> miette::Result<PathBuf> {
-    let path = prefix.join("etc/rattler-build/steps").join(provider).join(step);
+    let path = prefix
+        .join("etc/rattler-build/steps")
+        .join(provider)
+        .join(step);
     let path = [path.with_extension("yaml"), path.with_extension("yml")]
         .into_iter()
         .find(|candidate| candidate.is_file())
-        .ok_or_else(|| miette::miette!("provider `{provider}` does not contain action `{step}` (.yaml or .yml)"))?;
+        .ok_or_else(|| {
+            miette::miette!(
+                "provider `{provider}` does not contain action `{step}` (.yaml or .yml)"
+            )
+        })?;
     fs_err::canonicalize(path).into_diagnostic()
 }
 
@@ -74,10 +106,12 @@ fn sha256_bytes(bytes: &[u8]) -> String {
 }
 
 fn resolved_provider(record: &RepoDataRecord) -> ResolvedProvider {
-    let channel = record.channel.as_deref()
+    let channel = record
+        .channel
+        .as_deref()
         .and_then(|channel| channel.parse::<url::Url>().ok())
         .map(ChannelUrl::from)
-        .map(|channel| crate::packaging::metadata::clean_url(&channel))
+        .map(|channel| crate::packaging::clean_url(&channel))
         .unwrap_or_else(|| record.channel.clone().unwrap_or_default());
     ResolvedProvider {
         name: record.package_record.name.as_normalized().to_string(),
@@ -91,12 +125,17 @@ fn resolved_provider(record: &RepoDataRecord) -> ResolvedProvider {
 }
 
 fn environment_hash(platform: &str, records: &[RepoDataRecord]) -> miette::Result<String> {
-    let mut identities = records.iter().map(|record| {
-        // Both hashes participate: MD5-only repodata must not collapse distinct artifacts.
-        serde_json::to_string(&resolved_provider(record)).into_diagnostic()
-    }).collect::<miette::Result<Vec<_>>>()?;
+    let mut identities = records
+        .iter()
+        .map(|record| {
+            // Both hashes participate: MD5-only repodata must not collapse distinct artifacts.
+            serde_json::to_string(&resolved_provider(record)).into_diagnostic()
+        })
+        .collect::<miette::Result<Vec<_>>>()?;
     identities.sort();
-    Ok(sha256_bytes(format!("{platform}\n{}", identities.join("\n")).as_bytes()))
+    Ok(sha256_bytes(
+        format!("{platform}\n{}", identities.join("\n")).as_bytes(),
+    ))
 }
 
 impl StepProviderResolver {
@@ -108,35 +147,69 @@ impl StepProviderResolver {
     ) -> miette::Result<ProviderEnvironment> {
         let build_platform = settings.build_platform;
         let package_name = format!("{}-rattler-build-steps", reference.provider);
-        let key = format!("{}|{}|{}@{}|{:?}|{:?}|{:?}",
+        let key = format!(
+            "{}|{}|{}@{}|{:?}|{:?}|{:?}",
             build_platform.platform,
-            settings.channels.iter().map(ToString::to_string).collect::<Vec<_>>().join("|"),
-            package_name, reference.version.unwrap_or("*"),
-            settings.channel_priority, settings.solve_strategy, settings.exclude_newer,
+            settings
+                .channels
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+                .join("|"),
+            package_name,
+            reference.version.unwrap_or("*"),
+            settings.channel_priority,
+            settings.solve_strategy,
+            settings.exclude_newer,
         );
         if let Some(environment) = self.providers.get(&key) {
             return Ok(environment.clone());
         }
-        let spec = MatchSpec::from_str(&reference.version.map_or_else(
-            || package_name.clone(), |version| format!("{package_name} {version}"),
-        ), ParseStrictness::Strict).into_diagnostic()?;
+        let spec = MatchSpec::from_str(
+            &reference.version.map_or_else(
+                || package_name.clone(),
+                |version| format!("{package_name} {version}"),
+            ),
+            ParseStrictness::Strict,
+        )
+        .into_diagnostic()?;
         let records = solve_environment(
-            &format!("action provider {}", reference.provider), &[spec], build_platform,
-            settings.channels, tool_configuration, settings.channel_priority,
-            settings.solve_strategy, settings.exclude_newer,
-        ).await?;
-        let provider_record = records.iter()
+            &format!("action provider {}", reference.provider),
+            &[spec],
+            build_platform,
+            settings.channels,
+            tool_configuration,
+            settings.channel_priority,
+            settings.solve_strategy,
+            settings.exclude_newer,
+        )
+        .await?;
+        let provider_record = records
+            .iter()
             .find(|record| record.package_record.name.as_normalized() == package_name)
-            .ok_or_else(|| miette::miette!("action provider solve did not return `{package_name}`"))?;
+            .ok_or_else(|| {
+                miette::miette!("action provider solve did not return `{package_name}`")
+            })?;
         let provider = resolved_provider(provider_record);
         let fingerprint = environment_hash(&build_platform.platform.to_string(), &records)?;
-        let prefix = tool_configuration.cache_dir.join("rattler-build")
-            .join("step-providers").join(&fingerprint);
+        let prefix = tool_configuration
+            .cache_dir
+            .join("rattler-build")
+            .join("step-providers")
+            .join(&fingerprint);
         install_packages_without_link_scripts(
-            &format!("action provider {}", reference.provider), &records,
-            build_platform.platform, &prefix, tool_configuration,
-        ).await?;
-        let environment = ProviderEnvironment { prefix, provider, fingerprint };
+            &format!("action provider {}", reference.provider),
+            &records,
+            build_platform.platform,
+            &prefix,
+            tool_configuration,
+        )
+        .await?;
+        let environment = ProviderEnvironment {
+            prefix,
+            provider,
+            fingerprint,
+        };
         self.providers.insert(key, environment.clone());
         Ok(environment)
     }
@@ -152,9 +225,12 @@ impl StepProviderResolver {
         tool_configuration: &Configuration,
     ) -> miette::Result<()> {
         let reference = package_reference(&request.reference)?;
-        let environment = self.resolve(&reference, settings, tool_configuration).await?;
+        let environment = self
+            .resolve(&reference, settings, tool_configuration)
+            .await?;
         let path = provider_step_path(&environment.prefix, reference.provider, reference.step)?;
-        let contents = fs_err::read_to_string(&path).into_diagnostic()
+        let contents = fs_err::read_to_string(&path)
+            .into_diagnostic()
             .wrap_err_with(|| format!("failed to read packaged action `{}`", request.reference))?;
         let content_sha256 = sha256_bytes(contents.as_bytes());
         let provenance = ActionProvenance {
@@ -163,9 +239,15 @@ impl StepProviderResolver {
             content_sha256,
             fingerprint: Some(environment.fingerprint.clone()),
         };
-        sources.register(request, ActionSource {
-            path, contents, fingerprint: Some(environment.fingerprint), provenance: Some(provenance),
-        });
+        sources.register(
+            request,
+            ActionSource {
+                path,
+                contents,
+                fingerprint: Some(environment.fingerprint),
+                provenance: Some(provenance),
+            },
+        );
         Ok(())
     }
 }
@@ -177,8 +259,21 @@ mod tests {
     #[test]
     fn versioned_reference_preserves_conda_constraint() {
         let parsed = package_reference("cmake:build@>=0.3,<0.4").unwrap();
-        assert_eq!(parsed, PackageReference { provider: "cmake", step: "build", version: Some(">=0.3,<0.4") });
-        for reference in ["cmake:../build", "../cmake:build", "cmake:build@", "cmake:build@1@2", "C:\\build.yaml"] {
+        assert_eq!(
+            parsed,
+            PackageReference {
+                provider: "cmake",
+                step: "build",
+                version: Some(">=0.3,<0.4")
+            }
+        );
+        for reference in [
+            "cmake:../build",
+            "../cmake:build",
+            "cmake:build@",
+            "cmake:build@1@2",
+            "C:\\build.yaml",
+        ] {
             assert!(package_reference(reference).is_err(), "{reference}");
         }
     }
@@ -190,7 +285,10 @@ mod tests {
         fs_err::create_dir_all(&directory).unwrap();
         let path = directory.join("build.yml");
         fs_err::write(&path, "steps: []\n").unwrap();
-        assert_eq!(provider_step_path(prefix.path(), "test", "build").unwrap(), fs_err::canonicalize(path).unwrap());
+        assert_eq!(
+            provider_step_path(prefix.path(), "test", "build").unwrap(),
+            fs_err::canonicalize(path).unwrap()
+        );
         assert!(provider_step_path(prefix.path(), "test", "missing").is_err());
     }
 

@@ -9,7 +9,7 @@ use std::{
 use fs_err as fs;
 use fs_err::File;
 use indicatif::HumanBytes;
-use metadata::clean_url;
+pub(crate) use metadata::clean_url;
 use rattler_build_types::{GlobVec, LateBoundGlobVec};
 use rattler_conda_types::{
     ChannelUrl, Platform,

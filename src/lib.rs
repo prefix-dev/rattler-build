@@ -166,9 +166,10 @@ async fn find_variants(
                         .map(|channel| NamedChannelOrUrl::from_str(channel).into_diagnostic())
                         .collect::<miette::Result<Vec<_>>>()?
                 } else {
-                    build_data.channels.clone().unwrap_or_else(|| {
-                        vec![NamedChannelOrUrl::Name("conda-forge".to_string())]
-                    })
+                    build_data
+                        .channels
+                        .clone()
+                        .unwrap_or_else(|| vec![NamedChannelOrUrl::Name("conda-forge".to_string())])
                 };
                 let channels = channels
                     .into_iter()
