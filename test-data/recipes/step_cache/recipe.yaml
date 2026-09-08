@@ -1,0 +1,24 @@
+package:
+  name: step-cache-test
+  version: 0.1.0
+
+requirements:
+  build:
+    - python
+
+build:
+  steps:
+    - name: cached
+      interpreter: python
+      run: |
+        import os
+        from pathlib import Path
+
+        count = Path("run-count.txt")
+        count.write_text(count.read_text() + "run\n" if count.exists() else "run\n")
+        Path("generated.txt").write_text(Path("input.txt").read_text())
+        if Path("input.txt").read_text().strip() == "first":
+            Path(os.environ["OUTPUT_FILE"]).write_text("about.summary cached metadata\n")
+        Path(os.environ["RATTLER_BUILD_STEP_CACHE"]).write_text(
+            "input-hash: input.txt\noutput-hash: generated.txt\n"
+        )

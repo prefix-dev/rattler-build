@@ -1,0 +1,40 @@
+package:
+  name: step-cache-example
+  version: 0.1.0
+
+requirements:
+  build:
+    - python
+
+build:
+  steps:
+    # Hash mode compares file paths and contents. The Python interpreter makes
+    # this example identical on Unix and Windows.
+    - name: generate
+      interpreter: python
+      run: |
+        import os
+        from pathlib import Path
+
+        source = Path("input.txt")
+        Path("generated.txt").write_text(source.read_text().upper())
+        Path(os.environ["RATTLER_BUILD_STEP_CACHE"]).write_text(
+            "input-hash: input.txt\n"
+            "output-hash: generated.txt\n"
+        )
+
+    # Mtime mode is cheaper for large outputs. This step reruns when either the
+    # upstream output or its own output path, size, or mtime changes.
+    - name: summarize
+      depends_on: [generate]
+      interpreter: python
+      run: |
+        import os
+        from pathlib import Path
+
+        generated = Path("generated.txt")
+        Path("summary.txt").write_text(f"{len(generated.read_text())} bytes\n")
+        Path(os.environ["RATTLER_BUILD_STEP_CACHE"]).write_text(
+            "input-mtime: generated.txt\n"
+            "output-mtime: summary.txt\n"
+        )

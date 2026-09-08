@@ -125,6 +125,46 @@ recipe for an independent lint step and an optional C++ test step.
 or creating build environments. Dependency solving is disabled unless
 `--with-solve` is explicitly supplied, as with `build --render-only`.
 
+### Caching build steps
+
+Each build step receives `RATTLER_BUILD_STEP_CACHE`, pointing to a persistent
+declaration file under the build directory. A successful step can write cache
+conditions to this file:
+
+```yaml
+- name: compile
+  run: |
+    cmake --build "$SRC_DIR/build"
+    cat > "$RATTLER_BUILD_STEP_CACHE" <<'EOF'
+    input-hash: CMakeLists.txt
+    input-hash: src/**
+    output-mtime: build/**
+    EOF
+```
+
+On Windows, write the same lines to `%RATTLER_BUILD_STEP_CACHE%`. Each line is
+`KEY: GLOB`; blank lines and `#` comments are ignored. `input-hash` and
+`output-hash` compare matching paths and contents. `input-mtime` and
+`output-mtime` compare paths, sizes, and modification times.
+
+Globs use `/`, are relative to the step working directory, and cannot be
+absolute or contain `..`. Every condition must match a file. Missing inputs,
+deleted outputs, or changes to the script, interpreter, effective environment,
+working directory, or compiled plan invalidate the cache.
+
+After success, rattler-build stores fingerprints and a checksum-verified copy
+of `OUTPUT_FILE` outside disposable `work/`. A hit restores this metadata,
+including intentional absence. Missing or altered replay data causes a miss.
+Before executing a miss, the previous success record and declaration are
+removed: a failed rerun cannot revive stale success. A successful step must
+write its declaration again to remain cacheable. The adjacent `.state.json`
+and `.output` files belong to the executor and should not be edited.
+
+See [`examples/step-cache`](https://github.com/prefix-dev/rattler-build/tree/main/examples/step-cache)
+for a cross-platform example, and
+[`examples/adjacent`](https://github.com/prefix-dev/rattler-build/tree/main/examples/adjacent)
+for a CMake pipeline.
+
 ### Reusable steps
 
 An action is a strict YAML document compiled during recipe rendering:
@@ -224,6 +264,49 @@ dependencies are transport dependencies, not action requirements; tools such as
 Complete CMake, Meson, Rust, and Go recipes are available in
 [`examples/step-providers`](https://github.com/prefix-dev/rattler-build/tree/main/examples/step-providers).
 
+
+### Post-build outputs
+
+Each build-step section receives a unique `OUTPUT_FILE` (also exposed as
+`RATTLER_BUILD_OUTPUT_FILE`). Write one dotted field, an optional `.append`
+operation, whitespace, and a value per line. Valid JSON preserves native
+booleans, numbers, null, lists, and objects; other values are plain strings.
+Quote a JSON-looking value such as `"true"` when a string is intended.
+
+For example, an action can collect dependency licenses after running its tools:
+
+```yaml
+requirements:
+  build: [go, go-licenses]
+steps:
+  - run: |
+      go-licenses save ./... --save_path "$BUILD_DIR/go-dependencies"
+      dollar='$'
+      cat > "$OUTPUT_FILE" <<EOF
+      about.repository https://github.com/example/project
+      about.license_file.include.append ["$dollar{{ BUILD_DIR }}/go-dependencies/**"]
+      requirements.run.append ["libgcc >=14", "zlib"]
+      requirements.run_exports.strong.append ["project-abi >=1,<2"]
+      EOF
+```
+
+Outputs are applied in execution order after all build steps finish, before
+packaging. Supported requirement collections are `requirements.run`,
+`requirements.run_constraints`, and the `noarch`, `strong`, `weak`,
+`strong_constraints`, and `weak_constraints` collections under
+`requirements.run_exports`. They update package `index.json` and
+`run_exports.json`. Requirements are append-only: replacing finalized
+dependencies would be ambiguous.
+
+Runtime output cannot change `requirements.build` or `requirements.host`.
+Declare those on the action document so the compiler includes them before
+solving and installing the environments.
+
+Post-build output can also update `about.*` and packaging fields under
+`build.dynamic_linking`, `build.prefix_detection`, `build.files`,
+`build.always_copy_files`, `build.always_include_files`, and
+`build.post_process`. Append targets are materialized when omitted from the
+recipe.
 
 !!! warning "Windows multiline steps"
     On Windows, a multiline `run: |` block is emitted as one command-list item.

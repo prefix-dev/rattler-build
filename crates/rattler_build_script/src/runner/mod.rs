@@ -9,7 +9,7 @@ use async_trait::async_trait;
 use indexmap::IndexMap;
 use rattler_conda_types::Platform;
 
-pub(crate) use environment::resolve_process_env;
+pub use environment::resolve_process_env;
 pub use local::LocalRunner;
 
 /// Error returned while preparing or driving a runner session.

@@ -1,6 +1,8 @@
+import json
 import shutil
 from pathlib import Path
 
+import pytest
 import yaml
 from helpers import RattlerBuild, get_extracted_package, get_package
 
@@ -30,6 +32,137 @@ def test_build_steps(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path)
         "step-local env did not reach the section"
     )
     assert "unset" in step3.read_text(), "step-local env leaked to a later section"
+
+
+def test_reusable_steps_inputs_and_generated_licenses(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Reusable inputs render before solving and generated licenses are metadata-only."""
+    rattler_build.build(
+        recipes / "reusable_steps", tmp_path, extra_args=["--experimental"]
+    )
+    pkg = get_extracted_package(tmp_path, "reusable_steps_test")
+
+    assert (pkg / "share" / "reusable-steps" / "marker.txt").exists()
+    license_file = pkg / "info" / "licenses" / "dependency.txt"
+    assert license_file.read_text().strip() == "dependency-license"
+    assert not (pkg / "generated-licenses").exists()
+
+    index = json.loads((pkg / "info" / "index.json").read_text())
+    assert "zlib" in index["depends"]
+    run_exports = json.loads((pkg / "info" / "run_exports.json").read_text())
+    assert run_exports["strong"] == ["reusable-abi"]
+    about = json.loads((pkg / "info" / "about.json").read_text())
+    assert about["dev_url"] == "https://example.com/reusable-step"
+
+
+def test_step_cache_skips_and_invalidates(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Step-written input/output conditions skip work until an input changes."""
+    project = tmp_path / "project"
+    shutil.copytree(recipes / "step_cache", project)
+    output = tmp_path / "output"
+    args = (
+        "run",
+        "cached",
+        "--recipe",
+        str(project),
+        "--source-dir",
+        str(project),
+        "--output-dir",
+        str(output),
+        "--experimental",
+    )
+
+    rattler_build(*args)
+    (metadata,) = output.glob("bld/*/work/.rattler-build/step-outputs/*.txt")
+    assert metadata.read_text() == "about.summary cached metadata\n"
+    assert not (project / ".rattler-build").exists()
+    rattler_build(*args)
+    assert metadata.read_text() == "about.summary cached metadata\n"
+    assert (project / "run-count.txt").read_text().splitlines() == ["run"]
+
+    (project / "input.txt").write_text("changed\n")
+    rattler_build(*args)
+    assert (project / "run-count.txt").read_text().splitlines() == ["run", "run"]
+    assert (project / "generated.txt").read_text() == "changed\n"
+    assert not metadata.exists(), "a cache miss must discard stale metadata"
+    metadata.write_text("about.summary stale metadata\n")
+    rattler_build(*args)
+    assert not metadata.exists(), "a cache hit must replay intentional metadata absence"
+    assert (project / "run-count.txt").read_text().splitlines() == ["run", "run"]
+
+
+def test_step_cache_failed_miss_cannot_revive_success(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    project = tmp_path / "project"
+    shutil.copytree(recipes / "step_cache", project)
+    recipe_path = project / "recipe.yaml"
+    recipe = yaml.safe_load(recipe_path.read_text())
+    recipe["build"]["steps"][0]["run"] += (
+        '\nif Path("fail").exists():\n    raise SystemExit(42)\n'
+    )
+    recipe_path.write_text(yaml.safe_dump(recipe))
+    args = (
+        "run", "cached", "--recipe", str(project),
+        "--source-dir", str(project), "--output-dir", str(tmp_path / "output"),
+        "--experimental",
+    )
+    rattler_build(*args)
+    # Force a miss, then recreate exactly the successful output/declarations
+    # before failing. A surviving old state would incorrectly skip the retry.
+    (project / "generated.txt").unlink()
+    (project / "fail").touch()
+    assert rattler_build(*args, need_result_object=True).returncode != 0
+    assert rattler_build(*args, need_result_object=True).returncode != 0
+    assert (project / "run-count.txt").read_text().splitlines() == ["run"] * 3
+    (project / "fail").unlink()
+    rattler_build(*args)
+    rattler_build(*args)
+    assert (project / "run-count.txt").read_text().splitlines() == ["run"] * 4
+
+
+@pytest.mark.parametrize("payload_change", [None, "delete", "alter"])
+def test_step_cache_replays_package_metadata(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, payload_change
+):
+    """Repeated ordinary builds recreate work/, but preserve verified metadata."""
+    project = tmp_path / "project"
+    shutil.copytree(recipes / "step_cache", project)
+    recipe_path = project / "recipe.yaml"
+    recipe = yaml.safe_load(recipe_path.read_text())
+    step = recipe["build"]["steps"][0]
+    step["cwd"] = str(project)
+    step["run"] += (
+        '\nwith Path(os.environ["OUTPUT_FILE"]).open("a") as output:\n'
+        '    output.write("build.prefix_detection.ignore_binary_files true\\n")\n'
+    )
+    recipe_path.write_text(yaml.safe_dump(recipe))
+    output = tmp_path / "output"
+    args = rattler_build.build_args(
+        project, output,
+        extra_args=["--experimental", "--no-build-id", "--keep-build"],
+    )
+    rattler_build(*args)
+    pkg = get_extracted_package(output, "step-cache-test")
+    assert json.loads((pkg / "info/about.json").read_text())["summary"] == "cached metadata"
+    shutil.rmtree(output / "extract")
+    # A mutable work copy must never be authoritative on a cache hit.
+    (metadata,) = output.glob("bld/*/work/.rattler-build/step-outputs/*.txt")
+    metadata.write_text("about.summary corrupted work copy\n")
+    if payload_change is not None:
+        (payload,) = output.glob("bld/*/.rattler-build-step-cache/*.output")
+        if payload_change == "delete":
+            payload.unlink()
+        else:
+            payload.write_text("about.summary corrupted replay payload\n")
+    rattler_build(*args)
+    pkg = get_extracted_package(output, "step-cache-test")
+    assert json.loads((pkg / "info/about.json").read_text())["summary"] == "cached metadata"
+    expected_runs = 1 if payload_change is None else 2
+    assert (project / "run-count.txt").read_text().splitlines() == ["run"] * expected_runs
 
 
 def test_default_build_script_still_runs(
