@@ -1011,13 +1011,16 @@ fn discover_new_variant_keys_from_evaluation(
                         stage0::Output::Staging(staging) => {
                             staging.build.evaluate(&context_with_vars)?
                         }
-                        stage0::Output::Package(pkg) => {
-                            if pkg.build.plan.is_default() {
+                        stage0::Output::Package(pkg) => match &pkg.inherit {
+                            stage0::Inherit::TopLevel if pkg.build.plan.is_default() => {
                                 recipe.build.evaluate(&context_with_vars)?
-                            } else {
+                            }
+                            stage0::Inherit::TopLevel
+                            | stage0::Inherit::CacheName(_)
+                            | stage0::Inherit::CacheWithOptions(_) => {
                                 pkg.build.evaluate(&context_with_vars)?
                             }
-                        }
+                        },
                     };
                     let mut action_requirements = crate::stage1::Requirements::default();
                     action_requirements.build = build.action_requirements.build;

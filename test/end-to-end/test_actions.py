@@ -406,6 +406,7 @@ def test_staging_actions_share_package_compilation(
         yaml.safe_dump(
             {
                 "recipe": {"name": "action-staging", "version": "1.0"},
+                "build": {"steps": [{"uses": "./unused.yaml"}]},
                 "outputs": [
                     {
                         "staging": {"name": "prepared"},
@@ -414,20 +415,6 @@ def test_staging_actions_share_package_compilation(
                     {
                         "package": {"name": "action-staging"},
                         "inherit": "prepared",
-                        "build": {
-                            "steps": [
-                                {
-                                    "name": "verify",
-                                    "run": [
-                                        {
-                                            "if": "win",
-                                            "then": 'if not exist "%PREFIX%/staged.txt" exit /b 17',
-                                            "else": 'test -f "$PREFIX/staged.txt"',
-                                        },
-                                    ],
-                                }
-                            ]
-                        },
                     },
                 ],
             }
@@ -477,3 +464,48 @@ def test_excluded_action_does_not_consume_argument_variants(
     assert [
         item["build_configuration"]["variant"].get("python") for item in rendered
     ] == [None]
+
+
+def test_named_execution_rejects_script_mode(
+    rattler_build: RattlerBuild, tmp_path: Path
+):
+    (tmp_path / "recipe.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "package": {"name": "script-selection", "version": "1"},
+                "build": {"script": "echo unexpected > marker.txt"},
+            }
+        )
+    )
+    with pytest.raises(CalledProcessError):
+        run_action(rattler_build, tmp_path, tmp_path / "output", name="missing")
+    assert not (tmp_path / "marker.txt").exists()
+
+
+def test_output_selection_ignores_discarded_top_level_actions(
+    rattler_build: RattlerBuild, tmp_path: Path
+):
+    (tmp_path / "recipe.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "schema_version": 1,
+                "recipe": {"name": "output-selection", "version": "1"},
+                "build": {"steps": [{"name": "unused", "uses": "./missing.yaml"}]},
+                "outputs": [
+                    {
+                        "package": {"name": "output-selection"},
+                        "build": {
+                            "steps": [
+                                {
+                                    "name": "check",
+                                    "run": "echo selected > marker.txt",
+                                }
+                            ]
+                        },
+                    }
+                ],
+            }
+        )
+    )
+    run_action(rattler_build, tmp_path, tmp_path / "output", name="check")
+    assert (tmp_path / "marker.txt").read_text().strip() == "selected"

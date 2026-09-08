@@ -45,7 +45,7 @@ build:
 ## Experimental build steps
 
 !!! warning "Experimental"
-    Named inline build steps may change or be removed. They require
+    Named and reusable build steps may change or be removed. They require
     `--experimental`.
 
 `build.steps` is an experimental alternative to `build.script`. `script` and

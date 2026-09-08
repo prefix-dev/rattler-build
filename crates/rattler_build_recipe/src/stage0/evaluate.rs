@@ -20,6 +20,7 @@
 //! 5. Call `Build::render_build_string_with_hash()` to finalize the build string
 
 use std::{
+    borrow::Cow,
     collections::{BTreeMap, HashSet},
     path::PathBuf,
     str::FromStr,
@@ -1483,6 +1484,23 @@ fn evaluate_build_plan(
         Stage0BuildPlan::Script(script) => Ok((
             Stage1BuildPlan::Script(evaluate_script(script, context)?),
             Default::default(),
+        )),
+    }
+}
+
+fn validate_selected_plan(
+    build: &Stage1Build,
+    context: &EvaluationContext,
+) -> Result<(), ParseError> {
+    if build.skip || context.actions.selected.is_none() {
+        return Ok(());
+    }
+    match &build.plan {
+        Stage1BuildPlan::Steps(_) => Ok(()),
+        Stage1BuildPlan::Script(_) => Err(ParseError::invalid_value(
+            "build.steps",
+            "named step execution requires a build.steps plan",
+            Span::new_blank(),
         )),
     }
 }
@@ -2979,6 +2997,7 @@ impl Evaluate for Stage0Recipe {
             .collect();
         let package = self.package.evaluate(&context_with_vars)?;
         let mut build = self.build.evaluate(&context_with_vars)?;
+        validate_selected_plan(&build, &context_with_vars)?;
         let about = self.about.evaluate(&context_with_vars)?;
         let mut requirements = self.requirements.evaluate(&context_with_vars)?;
         merge_action_requirements(&mut build, &mut requirements);
@@ -3393,12 +3412,16 @@ fn evaluate_package_output_to_recipe(
     let build = if inherits_from_toplevel {
         // Full merge including the build plan
         let mut toplevel_source = recipe.build.clone();
+        let mut toplevel_context = Cow::Borrowed(context);
         if !output.build.plan.is_default()
             && let Stage0BuildPlan::Steps(steps) = &mut toplevel_source.plan
         {
             steps.clear();
+            if context.actions.selected.is_some() {
+                toplevel_context.to_mut().actions.selected = None;
+            }
         }
-        let toplevel_build = toplevel_source.evaluate(context)?;
+        let toplevel_build = toplevel_source.evaluate(&toplevel_context)?;
         let output_build = output.build.evaluate(context)?;
         merge_stage1_build(toplevel_build, output_build)
     } else {
@@ -3415,6 +3438,7 @@ fn evaluate_package_output_to_recipe(
         merged.plan = output_plan;
         merged
     };
+    validate_selected_plan(&build, context)?;
 
     // Multi-output recipes do not auto-discover `build.sh`/`build.bat`: a single
     // shared build script is almost never what each output wants (e.g. noarch
