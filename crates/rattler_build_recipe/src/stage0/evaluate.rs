@@ -6835,13 +6835,13 @@ package:
     #[test]
     fn test_skipped_metadata_preserves_final_step_selection() {
         let build = Stage0Build {
-            metadata: Some(Stage0Step::Run(Stage0RunStep {
+            metadata: Some(Stage0Step::Run(Box::new(Stage0RunStep {
                 condition: Some(step_condition("false")),
                 ..Default::default()
-            })),
+            }))),
             plan: Stage0BuildPlan::Steps(vec![
                 run_step("echo default"),
-                Stage0Step::Run(Stage0RunStep {
+                Stage0Step::Run(Box::new(Stage0RunStep {
                     name: Some("selected".into()),
                     optional: true,
                     run: ConditionalList::new(vec![Item::Value(Value::new_concrete(
@@ -6849,7 +6849,7 @@ package:
                         None,
                     ))]),
                     ..Default::default()
-                }),
+                })),
             ]),
             ..Default::default()
         };
