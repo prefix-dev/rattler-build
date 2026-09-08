@@ -29,15 +29,15 @@ pub struct VariantKeyUsage {
 
 /// A single build step.
 ///
-/// Steps are an ordered, GitHub-Actions-style alternative to a monolithic
-/// `build.script`. A step is an inline `run` script.
+/// Source steps are inline scripts or action invocations compiled into
+/// executable steps.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(untagged)]
 pub enum Step {
     /// An inline script step.
-    Run(RunStep),
+    Run(Box<RunStep>),
     /// A render-time action invocation, never an executable step.
-    Uses(UsesStep),
+    Uses(Box<UsesStep>),
 }
 
 /// Source-only action invocation.

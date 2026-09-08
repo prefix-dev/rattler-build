@@ -606,7 +606,7 @@ pub(crate) fn parse_step(node: &Node) -> Result<Step, ParseError> {
         .with_suggestion("Add either a 'run:' script or a 'uses:' reference"));
     }
     if let Some(uses) = uses {
-        return Ok(Step::Uses(crate::stage0::build::UsesStep {
+        return Ok(Step::Uses(Box::new(crate::stage0::build::UsesStep {
             uses,
             name,
             optional,
@@ -614,10 +614,10 @@ pub(crate) fn parse_step(node: &Node) -> Result<Step, ParseError> {
             condition,
             condition_span,
             inputs,
-        }));
+        })));
     }
 
-    Ok(Step::Run(RunStep {
+    Ok(Step::Run(Box::new(RunStep {
         name,
         optional,
         depends_on,
@@ -630,7 +630,7 @@ pub(crate) fn parse_step(node: &Node) -> Result<Step, ParseError> {
         interpreter,
         cwd,
         env,
-    }))
+    })))
 }
 
 /// Parse a step `if` condition as a verbatim Jinja expression.

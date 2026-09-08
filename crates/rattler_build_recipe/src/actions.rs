@@ -526,10 +526,10 @@ fn selected_order(
 ) -> Result<Vec<usize>, ParseError> {
     let mut names = HashMap::new();
     for (index, step) in steps.iter().enumerate() {
-        if let Some(name) = source_metadata(step).0 {
-            if names.insert(name, index).is_some() {
-                return Err(invalid(format!("duplicate step name '{name}'")));
-            }
+        if let Some(name) = source_metadata(step).0
+            && names.insert(name, index).is_some()
+        {
+            return Err(invalid(format!("duplicate step name '{name}'")));
         }
     }
     fn visit(
@@ -659,7 +659,7 @@ impl Compiler {
                             .parent()
                             .unwrap_or(std::path::Path::new("."))
                             .join(path);
-                        let contents = std::fs::read_to_string(&path).map_err(|error| {
+                        let contents = fs_err::read_to_string(&path).map_err(|error| {
                             invalid(format!("cannot load action '{}': {error}", path.display()))
                         })?;
                         ActionSource {

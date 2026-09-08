@@ -6470,13 +6470,13 @@ package:
     }
 
     fn run_step(cmd: &str) -> Stage0Step {
-        Stage0Step::Run(Stage0RunStep {
+        Stage0Step::Run(Box::new(Stage0RunStep {
             run: ConditionalList::new(vec![Item::Value(Value::new_concrete(
                 cmd.to_string(),
                 None,
             ))]),
             ..Default::default()
-        })
+        }))
     }
 
     fn step_condition(expr: &str) -> JinjaExpression {
@@ -6503,14 +6503,14 @@ package:
 
     #[test]
     fn test_evaluate_steps_if_filters_step() {
-        let win_step = Stage0Step::Run(Stage0RunStep {
+        let win_step = Stage0Step::Run(Box::new(Stage0RunStep {
             run: ConditionalList::new(vec![Item::Value(Value::new_concrete(
                 "echo windows".to_string(),
                 None,
             ))]),
             condition: Some(step_condition("win")),
             ..Default::default()
-        });
+        }));
         let steps = vec![run_step("echo always"), win_step];
 
         let mut ctx = EvaluationContext::new();
@@ -6528,14 +6528,14 @@ package:
 
     #[test]
     fn test_evaluate_steps_if_tracks_accessed_variables() {
-        let gated_step = Stage0Step::Run(Stage0RunStep {
+        let gated_step = Stage0Step::Run(Box::new(Stage0RunStep {
             run: ConditionalList::new(vec![Item::Value(Value::new_concrete(
                 "echo enabled".to_string(),
                 None,
             ))]),
             condition: Some(step_condition("enable_feature")),
             ..Default::default()
-        });
+        }));
         let mut ctx = EvaluationContext::new();
         ctx.insert("enable_feature".to_string(), Variable::from(true));
 
@@ -6550,14 +6550,14 @@ package:
 
     #[test]
     fn test_evaluate_steps_if_undefined_variable_errors() {
-        let undefined_step = Stage0Step::Run(Stage0RunStep {
+        let undefined_step = Stage0Step::Run(Box::new(Stage0RunStep {
             run: ConditionalList::new(vec![Item::Value(Value::new_concrete(
                 "echo undefined".to_string(),
                 None,
             ))]),
             condition: Some(step_condition("undefined_feature")),
             ..Default::default()
-        });
+        }));
         let ctx = EvaluationContext::new();
 
         let err = evaluate_steps(&[undefined_step], &ctx).unwrap_err();
@@ -6570,14 +6570,14 @@ package:
 
     #[test]
     fn test_evaluate_steps_tracks_filtered_out_step_variables() {
-        let step = Stage0Step::Run(Stage0RunStep {
+        let step = Stage0Step::Run(Box::new(Stage0RunStep {
             run: ConditionalList::new(vec![Item::Value(Value::new_template(
                 JinjaTemplate::new("echo ${{ flavor }}".to_string()).unwrap(),
                 None,
             ))]),
             condition: Some(step_condition("win")),
             ..Default::default()
-        });
+        }));
         let mut ctx = EvaluationContext::new();
         ctx.insert("win".to_string(), Variable::from(false));
         ctx.insert("flavor".to_string(), Variable::from("vanilla"));
@@ -6590,14 +6590,14 @@ package:
 
     #[test]
     fn test_evaluate_steps_if_expression_compares_target_platform() {
-        let step = Stage0Step::Run(Stage0RunStep {
+        let step = Stage0Step::Run(Box::new(Stage0RunStep {
             run: ConditionalList::new(vec![Item::Value(Value::new_concrete(
                 "echo gated".to_string(),
                 None,
             ))]),
             condition: Some(step_condition("target_platform == 'win-64'")),
             ..Default::default()
-        });
+        }));
         let mut linux_ctx = EvaluationContext::new();
         linux_ctx.insert("target_platform".to_string(), Variable::from("linux-64"));
 
@@ -6617,7 +6617,7 @@ package:
 
     /// A run step that sets an explicit interpreter and step-local env.
     fn run_step_with(cmd: &str, interpreter: &str, env: &[(&str, &str)]) -> Stage0Step {
-        Stage0Step::Run(Stage0RunStep {
+        Stage0Step::Run(Box::new(Stage0RunStep {
             run: ConditionalList::new(vec![Item::Value(Value::new_concrete(
                 cmd.to_string(),
                 None,
@@ -6628,7 +6628,7 @@ package:
                 .map(|(k, v)| (k.to_string(), Value::new_concrete(v.to_string(), None)))
                 .collect(),
             ..Default::default()
-        })
+        }))
     }
 
     #[test]
@@ -6695,14 +6695,14 @@ package:
 
     #[test]
     fn test_evaluate_steps_carries_cwd() {
-        let step = Stage0Step::Run(Stage0RunStep {
+        let step = Stage0Step::Run(Box::new(Stage0RunStep {
             run: ConditionalList::new(vec![Item::Value(Value::new_concrete(
                 "make install".to_string(),
                 None,
             ))]),
             cwd: Some(Value::new_concrete("subdir".to_string(), None)),
             ..Default::default()
-        });
+        }));
         let ctx = EvaluationContext::new();
 
         let scripts = evaluate_steps(&[step], &ctx).unwrap();
@@ -6773,14 +6773,14 @@ package:
 
     #[test]
     fn test_build_evaluate_preserves_steps_mode_when_all_steps_filter_out() {
-        let false_step = Stage0Step::Run(Stage0RunStep {
+        let false_step = Stage0Step::Run(Box::new(Stage0RunStep {
             run: ConditionalList::new(vec![Item::Value(Value::new_concrete(
                 "echo filtered".to_string(),
                 None,
             ))]),
             condition: Some(step_condition("win")),
             ..Default::default()
-        });
+        }));
         let build = Stage0Build {
             plan: Stage0BuildPlan::Steps(vec![false_step]),
             ..Default::default()
