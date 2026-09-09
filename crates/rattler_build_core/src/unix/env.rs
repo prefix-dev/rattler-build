@@ -16,6 +16,10 @@ pub fn default_env_vars_target(
         Some("Unix Makefiles".to_string()),
     );
     vars.insert(
+        "CMAKE_TEST_LAUNCHER".to_string(),
+        runtime.var("CMAKE_TEST_LAUNCHER").map(str::to_owned),
+    );
+    vars.insert(
         "SSL_CERT_FILE".to_string(),
         runtime.var("SSL_CERT_FILE").map(str::to_owned),
     );
@@ -29,16 +33,21 @@ mod tests {
     #[test]
     fn pkconfig_path_uses_prefix() {
         let tmp = tempfile::tempdir().expect("create temp dir");
-        let env_vars = default_env_vars_target(
-            tmp.path(),
-            &RuntimeEnv::for_test(rattler_conda_types::Platform::Linux64),
-        );
+        let runtime = RuntimeEnv::for_test(rattler_conda_types::Platform::Linux64)
+            .with_var("CMAKE_TEST_LAUNCHER", "sde64");
+        let env_vars = default_env_vars_target(tmp.path(), &runtime);
         let expected = tmp
             .path()
             .join("lib/pkgconfig")
             .to_string_lossy()
             .to_string();
         assert_eq!(env_vars.get("PKG_CONFIG_PATH"), Some(&Some(expected)));
+        assert_eq!(
+            env_vars
+                .get("CMAKE_TEST_LAUNCHER")
+                .and_then(|value| value.as_deref()),
+            Some("sde64")
+        );
     }
 
     #[test]

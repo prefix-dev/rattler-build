@@ -220,6 +220,7 @@ pub fn language_vars(output: &Output) -> HashMap<String, Option<String>> {
 ///
 /// Forwards the following environment variables:
 /// - PATH: Path where executables are found
+/// - CROSSCOMPILING_EMULATOR: Emulator used to run cross-compiled binaries
 pub fn os_vars(
     prefix: &Path,
     target_platform: &Platform,
@@ -282,6 +283,10 @@ pub fn os_vars(
     vars.insert(
         path_var.to_string(),
         runtime.var(path_var).map(str::to_owned),
+    );
+    vars.insert(
+        "CROSSCOMPILING_EMULATOR".to_string(),
+        runtime.var("CROSSCOMPILING_EMULATOR").map(str::to_owned),
     );
 
     if os_platform.is_windows() {
@@ -623,7 +628,9 @@ mod test {
 
     #[test]
     fn os_vars_uses_the_injected_runtime_environment() {
-        let runtime = RuntimeEnv::for_test(Platform::Linux64).with_var("PATH", "/injected/bin");
+        let runtime = RuntimeEnv::for_test(Platform::Linux64)
+            .with_var("PATH", "/injected/bin")
+            .with_var("CROSSCOMPILING_EMULATOR", "qemu-aarch64");
 
         let vars = os_vars(
             Path::new("/some/prefix"),
@@ -640,6 +647,11 @@ mod test {
             Some("/injected/bin")
         );
         assert_eq!(vars.get("LANG"), Some(&None));
+        assert_eq!(
+            vars.get("CROSSCOMPILING_EMULATOR")
+                .and_then(|value| value.as_deref()),
+            Some("qemu-aarch64")
+        );
     }
 
     /// noarch on a Windows host still emits Windows target vars (issue #2475).
