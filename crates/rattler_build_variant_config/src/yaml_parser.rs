@@ -20,7 +20,7 @@ pub struct Stage0VariantConfig {
     pub zip_keys: Option<Vec<Vec<NormalizedKey>>>,
 
     /// Variant keys that should be included in every build
-    pub force_use: Option<Vec<NormalizedKey>>,
+    pub force_use_keys: Option<Vec<NormalizedKey>>,
 
     /// The variant values - a mapping of keys to lists with conditionals and templates
     pub variants: BTreeMap<NormalizedKey, ConditionalList>,
@@ -94,7 +94,7 @@ fn parse_node(node: &Node) -> ParseResult<Stage0VariantConfig> {
         .ok_or_else(|| ParseError::expected_type("mapping", "other", *node.span()))?;
 
     let mut zip_keys = None;
-    let mut force_use = None;
+    let mut force_use_keys = None;
     let mut variants = BTreeMap::new();
 
     for (key_node, value_node) in mapping.iter() {
@@ -105,9 +105,9 @@ fn parse_node(node: &Node) -> ParseResult<Stage0VariantConfig> {
             continue;
         }
 
-        if key_str == "force_use" {
-            let keys: Vec<String> = value_node.parse_sequence("force_use")?;
-            force_use = Some(keys.into_iter().map(NormalizedKey::from).collect());
+        if key_str == "force_use_keys" {
+            let keys: Vec<String> = value_node.parse_sequence("force_use_keys")?;
+            force_use_keys = Some(keys.into_iter().map(NormalizedKey::from).collect());
             continue;
         }
 
@@ -127,7 +127,7 @@ fn parse_node(node: &Node) -> ParseResult<Stage0VariantConfig> {
 
     Ok(Stage0VariantConfig {
         zip_keys,
-        force_use,
+        force_use_keys,
         variants,
         path: None,
     })

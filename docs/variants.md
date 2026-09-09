@@ -163,12 +163,12 @@ The resulting variants with the zip applied are:
 
 ### Force use
 
-The `force_use` key lists variant keys that should be included in every build,
+The `force_use_keys` key lists variant keys that should be included in every build,
 even when they are not referenced by the recipe. Their values are added to the
 build matrix, hash input, and build-script environment.
 
 ```yaml
-force_use:
+force_use_keys:
   - TARGET
   - CROSSCOMPILING_EMULATOR
 

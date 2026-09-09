@@ -1576,8 +1576,8 @@ fn render_with_variants(
         for mut recipe in outputs {
             let mut variant = recipe.used_variant.clone();
 
-            // force_use applies to every package and staging build.
-            for key in variant_config.force_use.iter().flatten() {
+            // force_use_keys applies to every package and staging build.
+            for key in variant_config.force_use_keys.iter().flatten() {
                 if let Some(value) = combination.get(key) {
                     variant.insert(key.clone(), value.clone());
                     recipe.used_variant.insert(key.clone(), value.clone());
@@ -3855,7 +3855,7 @@ build:
     }
 
     #[test]
-    fn test_force_use_applies_to_package_and_staging_builds() {
+    fn test_force_use_keys_applies_to_package_and_staging_builds() {
         let recipe_yaml = r#"
 recipe:
   name: force-use-test
@@ -3864,11 +3864,18 @@ outputs:
   - staging:
       name: build-stage
   - package:
-      name: force-use-test
+      name: uses-target
     inherit: build-stage
+  - package:
+      name: ignores-target
+    inherit: build-stage
+    build:
+      variant:
+        ignore_keys:
+          - target
 "#;
         let variant_yaml = r#"
-force_use:
+force_use_keys:
   - target
 target:
   - x86_64-conda-linux-gnu
@@ -3882,11 +3889,14 @@ unused:
             render_recipe_with_variant_config(&stage0_recipe, &variant_config, RenderConfig::new())
                 .unwrap();
 
-        assert_eq!(rendered.len(), 2);
+        assert_eq!(rendered.len(), 4);
         for output in rendered {
-            assert!(output.variant.contains_key(&"target".into()));
+            let ignores_target = output.recipe.package.name.as_normalized() == "ignores-target";
+            assert_eq!(
+                output.variant.contains_key(&"target".into()),
+                !ignores_target
+            );
             assert!(!output.variant.contains_key(&"unused".into()));
-            assert!(output.recipe.used_variant.contains_key(&"target".into()));
             assert!(
                 output.recipe.staging_caches[0]
                     .used_variant
