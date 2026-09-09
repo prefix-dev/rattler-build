@@ -1573,8 +1573,19 @@ fn render_with_variants(
         let outputs = evaluate_recipe(stage0_recipe, &context)?;
 
         // Convert each output to a RenderedVariant
-        for recipe in outputs {
+        for mut recipe in outputs {
             let mut variant = recipe.used_variant.clone();
+
+            // force_use applies to every package and staging build.
+            for key in variant_config.force_use.iter().flatten() {
+                if let Some(value) = combination.get(key) {
+                    variant.insert(key.clone(), value.clone());
+                    recipe.used_variant.insert(key.clone(), value.clone());
+                    for cache in &mut recipe.staging_caches {
+                        cache.used_variant.insert(key.clone(), value.clone());
+                    }
+                }
+            }
 
             // Add use_keys to the variant (forces them to be included even if not referenced)
             // We need to get them from the combination since they were used to compute it
@@ -3841,6 +3852,47 @@ build:
             bs.ends_with("_42"),
             "build string should end with '_42', got '{bs}'"
         );
+    }
+
+    #[test]
+    fn test_force_use_applies_to_package_and_staging_builds() {
+        let recipe_yaml = r#"
+recipe:
+  name: force-use-test
+  version: "1.0"
+outputs:
+  - staging:
+      name: build-stage
+  - package:
+      name: force-use-test
+    inherit: build-stage
+"#;
+        let variant_yaml = r#"
+force_use:
+  - target
+target:
+  - x86_64-conda-linux-gnu
+  - aarch64-conda-linux-gnu
+unused:
+  - ignored
+"#;
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config = VariantConfig::from_yaml_str(variant_yaml).unwrap();
+        let rendered =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, RenderConfig::new())
+                .unwrap();
+
+        assert_eq!(rendered.len(), 2);
+        for output in rendered {
+            assert!(output.variant.contains_key(&"target".into()));
+            assert!(!output.variant.contains_key(&"unused".into()));
+            assert!(output.recipe.used_variant.contains_key(&"target".into()));
+            assert!(
+                output.recipe.staging_caches[0]
+                    .used_variant
+                    .contains_key(&"target".into())
+            );
+        }
     }
 
     #[test]

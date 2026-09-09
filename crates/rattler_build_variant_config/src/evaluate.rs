@@ -26,6 +26,7 @@ pub fn evaluate_variant_config(
 
     Ok(VariantConfig {
         zip_keys: stage0.zip_keys.clone(),
+        force_use: stage0.force_use.clone(),
         variants,
     })
 }
