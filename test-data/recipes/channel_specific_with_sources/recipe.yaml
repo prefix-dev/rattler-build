@@ -1,0 +1,11 @@
+package:
+  name: channel_specific_with_sources
+  version: 1.0.0
+
+requirements:
+  run:
+    - bioconda::r-dwls
+
+tests:
+  - script:
+      - R -e "library('DWLS')"
