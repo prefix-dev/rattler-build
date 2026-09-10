@@ -1916,6 +1916,40 @@ requirements:
     }
 
     #[test]
+    fn test_render_v3_matchspec_in_extras_without_v3_config() {
+        let recipe_yaml = r#"
+package:
+  name: test-pkg
+  version: "1.0.0"
+
+requirements:
+  extras:
+    one:
+      - libcxx
+    two:
+      - 'test-pkg[extras=[one]]'
+      - 'libcxx[when="target_platform == osx-64"]'
+"#;
+
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let rendered = render_recipe_with_variant_config(
+            &stage0_recipe,
+            &VariantConfig::default(),
+            RenderConfig::new(),
+        )
+        .unwrap();
+
+        assert_eq!(
+            rendered[0].recipe.requirements.extras["two"][0].to_string(),
+            "test-pkg[extras=[one]]"
+        );
+        assert_eq!(
+            rendered[0].recipe.requirements.extras["two"][1].to_string(),
+            "libcxx[when=\"target_platform==osx-64\"]"
+        );
+    }
+
+    #[test]
     fn test_render_v3_recipe_fields_require_render_config() {
         let recipe_yaml = r#"
 package:
