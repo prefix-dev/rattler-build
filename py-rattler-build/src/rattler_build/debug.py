@@ -9,12 +9,11 @@ re-run the build script, inspecting output each time.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from rattler_build._rattler_build import debug as _debug
-from rattler_build.exclude_newer import ExcludeNewer, _to_native
+from rattler_build.exclude_newer import ExcludeNewer
 
 if TYPE_CHECKING:
     from rattler_build.progress import ProgressCallback
@@ -100,7 +99,7 @@ class DebugSession:
         channels: list[str] | None = None,
         no_build_id: bool = True,
         progress_callback: ProgressCallback | None = None,
-        exclude_newer: datetime | ExcludeNewer | None = None,
+        exclude_newer: ExcludeNewer | None = None,
     ) -> DebugSession:
         """Create a debug session from a rendered variant.
 
@@ -124,7 +123,7 @@ class DebugSession:
         progress_callback:
             Optional callback for progress events during setup.
         exclude_newer:
-            Dependency cutoff policy, or a datetime for a global cutoff.
+            Dependency cutoff policy.
 
         Returns
         -------
@@ -142,7 +141,7 @@ class DebugSession:
             progress_callback=progress_callback,
             recipe_path=variant._recipe_path,
             repodata_revision=variant._repodata_revision,
-            exclude_newer=_to_native(exclude_newer),
+            exclude_newer=exclude_newer._inner if exclude_newer is not None else None,
         )
         return cls(inner)
 

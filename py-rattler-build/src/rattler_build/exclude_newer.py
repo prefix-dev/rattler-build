@@ -47,12 +47,3 @@ class ExcludeNewer:
             channels=channels,
             include_unknown_timestamp=include_unknown_timestamp,
         )
-
-
-def _to_native(exclude_newer: datetime | ExcludeNewer | None) -> _ExcludeNewer | None:
-    """Preserve the datetime shorthand accepted by existing build methods."""
-    if exclude_newer is None:
-        return None
-    if isinstance(exclude_newer, ExcludeNewer):
-        return exclude_newer._inner
-    return _ExcludeNewer(exclude_newer)

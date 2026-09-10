@@ -188,7 +188,7 @@ def test_build_and_test_cutoff(cutoff_channel: str, tmp_path: Path, entrypoint: 
         options["exclude_newer"] = ExcludeNewer(packages={"cutoff-dependency": CUTOFF, "cutoff-other": CUTOFF})
         result = recipe.run_build(**options)[0]
     elif entrypoint == "variant":
-        options["exclude_newer"] = CUTOFF
+        options["exclude_newer"] = ExcludeNewer(CUTOFF)
         result = recipe.render()[0].run_build(**options)
     else:
         options["exclude_newer"] = ExcludeNewer(channels={cutoff_channel: CUTOFF})
@@ -196,7 +196,7 @@ def test_build_and_test_cutoff(cutoff_channel: str, tmp_path: Path, entrypoint: 
 
     package = Package.from_file(result.packages[0])
     assert package.timestamp is not None and package.timestamp > CUTOFF
-    tests = package.run_tests(channel=[cutoff_channel], exclude_newer=CUTOFF)
+    tests = package.run_tests(channel=[cutoff_channel], exclude_newer=ExcludeNewer(CUTOFF))
     assert len(tests) == 1 and tests[0].success
     assert package.run_test(
         0,

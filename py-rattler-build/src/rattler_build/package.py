@@ -36,7 +36,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, Union
 
 from rattler_build._rattler_build import _package
-from rattler_build.exclude_newer import ExcludeNewer, _to_native
+from rattler_build.exclude_newer import ExcludeNewer
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -233,7 +233,7 @@ class Package:
         use_zstd: bool = True,
         use_sharded: bool = True,
         progress_callback: "ProgressCallback | None" = None,
-        exclude_newer: datetime | ExcludeNewer | None = None,
+        exclude_newer: ExcludeNewer | None = None,
     ) -> "TestResult":
         """Run a specific test by index.
 
@@ -248,7 +248,7 @@ class Package:
             use_zstd: Enable zstd repodata
             use_sharded: Enable sharded repodata
             progress_callback: Optional callback for streaming log output in real-time
-            exclude_newer: Dependency cutoff policy, or a datetime for a global cutoff.
+            exclude_newer: Dependency cutoff policy.
 
         Returns:
             TestResult with success status and output
@@ -275,7 +275,7 @@ class Package:
                 use_zstd=use_zstd,
                 use_sharded=use_sharded,
                 progress_callback=progress_callback,
-                exclude_newer=_to_native(exclude_newer),
+                exclude_newer=exclude_newer._inner if exclude_newer is not None else None,
             )
         )
 
@@ -291,7 +291,7 @@ class Package:
         use_zstd: bool = True,
         use_sharded: bool = True,
         progress_callback: "ProgressCallback | None" = None,
-        exclude_newer: datetime | ExcludeNewer | None = None,
+        exclude_newer: ExcludeNewer | None = None,
     ) -> list["TestResult"]:
         """Run all tests in the package.
 
@@ -305,7 +305,7 @@ class Package:
             use_zstd: Enable zstd repodata
             use_sharded: Enable sharded repodata
             progress_callback: Optional callback for streaming log output in real-time
-            exclude_newer: Dependency cutoff policy, or a datetime for a global cutoff.
+            exclude_newer: Dependency cutoff policy.
 
         Returns:
             List of TestResult objects, one per test
@@ -337,7 +337,7 @@ class Package:
                 use_zstd=use_zstd,
                 use_sharded=use_sharded,
                 progress_callback=progress_callback,
-                exclude_newer=_to_native(exclude_newer),
+                exclude_newer=exclude_newer._inner if exclude_newer is not None else None,
             )
         ]
 

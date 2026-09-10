@@ -19,7 +19,7 @@ from rattler_build._rattler_build import (
 )
 from rattler_build._rattler_build import render as _render
 from rattler_build.build_result import BuildResult
-from rattler_build.exclude_newer import ExcludeNewer, _to_native
+from rattler_build.exclude_newer import ExcludeNewer
 from rattler_build.tool_config import PlatformConfig, ToolConfiguration
 
 if TYPE_CHECKING:
@@ -410,6 +410,9 @@ class RenderedVariant:
 
         rust_siblings = [v._inner for v in self._siblings]
 
+        if isinstance(exclude_newer, datetime):
+            exclude_newer = ExcludeNewer(exclude_newer)
+
         # Build this single variant
         rust_result = build_rendered_variant_py(
             rendered_variant=self._inner,
@@ -421,7 +424,7 @@ class RenderedVariant:
             no_build_id=no_build_id,
             package_format=package_format,
             no_include_recipe=no_include_recipe,
-            exclude_newer=_to_native(exclude_newer),
+            exclude_newer=exclude_newer._inner if exclude_newer is not None else None,
             env_isolation=env_isolation,
             sibling_variants=rust_siblings,
             repodata_revision=self._repodata_revision,
