@@ -1928,6 +1928,7 @@ requirements:
       - libcxx
     two:
       - 'test-pkg[extras=[one]]'
+      - 'libcxx[when="target_platform == osx-64"]'
 "#;
 
         let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
@@ -1941,6 +1942,10 @@ requirements:
         assert_eq!(
             rendered[0].recipe.requirements.extras["two"][0].to_string(),
             "test-pkg[extras=[one]]"
+        );
+        assert_eq!(
+            rendered[0].recipe.requirements.extras["two"][1].to_string(),
+            "libcxx[when=\"target_platform==osx-64\"]"
         );
     }
 

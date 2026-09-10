@@ -244,7 +244,11 @@ def test_legacy_build_keeps_legacy_index_json(
     index_json = json.loads((extracted / "info/index.json").read_text())
     assert_legacy_index_json(index_json)
     assert index_json["extra_depends"] == {
-        "test": ["pytest >=8", "legacy-index-shape[extras=[test]]"]
+        "test": [
+            "pytest >=8",
+            "legacy-index-shape[extras=[test]]",
+            'scipy[when="python>=3.10"]',
+        ]
     }
 
 
