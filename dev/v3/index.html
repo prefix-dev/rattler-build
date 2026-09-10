@@ -4126,7 +4126,8 @@ before:</p>
 <li>Recipes that use V3-only fields (<code>build.flags</code>) fail to evaluate with an
   error pointing at <code>--v3</code>.</li>
 <li><code>MatchSpec</code> strings that use V3-only bracket keys (<code>flags=[…]</code>,
-  <code>extras=[…]</code>, <code>when="…"</code>) fail to parse with the same error.</li>
+  <code>extras=[…]</code>, <code>when="…"</code>) fail to parse with the same error, except inside
+  <code>requirements.extras</code>, which legacy clients ignore.</li>
 <li>Built packages get the legacy <code>index.json</code> shape — there is no
   <code>repodata_revision</code> field and no <code>flags</code> array.</li>
 </ul>
