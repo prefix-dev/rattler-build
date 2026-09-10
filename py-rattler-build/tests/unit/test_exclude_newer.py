@@ -21,7 +21,7 @@ import pytest
 from xprocess import ProcessStarter
 from xprocess.xprocess import XProcess
 
-from rattler_build import Package, Stage0Recipe, ToolConfiguration
+from rattler_build import ExcludeNewer, Package, Stage0Recipe, ToolConfiguration
 from rattler_build.debug import DebugSession
 from rattler_build.render import build_rendered_variants
 
@@ -185,13 +185,13 @@ def test_build_and_test_cutoff(cutoff_channel: str, tmp_path: Path, entrypoint: 
         "tool_config": ToolConfiguration(test_strategy="native"),
     }
     if entrypoint == "recipe":
-        options["exclude_newer_package"] = {"cutoff-dependency": CUTOFF, "cutoff-other": CUTOFF}
+        options["exclude_newer"] = ExcludeNewer(packages={"cutoff-dependency": CUTOFF, "cutoff-other": CUTOFF})
         result = recipe.run_build(**options)[0]
     elif entrypoint == "variant":
         options["exclude_newer"] = CUTOFF
         result = recipe.render()[0].run_build(**options)
     else:
-        options["exclude_newer_channel"] = {cutoff_channel: CUTOFF}
+        options["exclude_newer"] = ExcludeNewer(channels={cutoff_channel: CUTOFF})
         result = build_rendered_variants(recipe.render(), **options)[0]
 
     package = Package.from_file(result.packages[0])
@@ -201,14 +201,13 @@ def test_build_and_test_cutoff(cutoff_channel: str, tmp_path: Path, entrypoint: 
     assert package.run_test(
         0,
         channel=[cutoff_channel],
-        exclude_newer_package={"cutoff-dependency": CUTOFF, "cutoff-other": CUTOFF},
+        exclude_newer=options["exclude_newer"],
     ).success
     if entrypoint == "variant":
         # Explicit package cutoffs take precedence over the test channel exemption.
         blocked = package.run_tests(
             channel=[cutoff_channel],
-            exclude_newer=CUTOFF,
-            exclude_newer_package={"cutoff-result": CUTOFF},
+            exclude_newer=ExcludeNewer(CUTOFF, packages={"cutoff-result": CUTOFF}),
         )
         assert len(blocked) == 1 and not blocked[0].success
 
@@ -237,9 +236,11 @@ def test_debug_cutoff_overrides(
         dependency_recipe().render()[0],
         output_dir=tmp_path / "debug",
         channels=[cutoff_channel],
-        exclude_newer=global_cutoff,
-        exclude_newer_package=package_cutoffs,
-        exclude_newer_channel=None if channel_cutoff == "unset" else {cutoff_channel: channel_cutoff},
+        exclude_newer=ExcludeNewer(
+            global_cutoff,
+            packages=package_cutoffs,
+            channels=None if channel_cutoff == "unset" else {cutoff_channel: channel_cutoff},
+        ),
     )
     assert (session.build_prefix / "share/cutoff-dependency.txt").read_text().strip() == expected[0]
     assert (session.host_prefix / "share/cutoff-other.txt").read_text().strip() == expected[1]
@@ -274,10 +275,7 @@ requirements:
             recipe.render()[0],
             output_dir=tmp_path / "debug",
             channels=[cutoff_channel],
-            exclude_newer=cutoff,
-            exclude_newer_package={},
-            exclude_newer_channel={},
-            exclude_newer_include_unknown_timestamp=include_unknown,
+            exclude_newer=ExcludeNewer(cutoff, packages={}, channels={}, include_unknown_timestamp=include_unknown),
         )
 
     if succeeds:
@@ -289,13 +287,9 @@ requirements:
             create_session()
 
 
-def test_invalid_package_override(tmp_path: Path) -> None:
-    with pytest.raises(ValueError, match="invalid exclude_newer_package name"):
-        dependency_recipe().render()[0].run_build(
-            output_dir=tmp_path / "output",
-            channels=[],
-            exclude_newer_package={"invalid package name": CUTOFF},
-        )
+def test_invalid_package_override() -> None:
+    with pytest.raises(ValueError, match="invalid ExcludeNewer package name"):
+        ExcludeNewer(packages={"invalid package name": CUTOFF})
 
 
 @pytest.mark.parametrize("authentication", ["none", "basic", "token"])
@@ -313,7 +307,7 @@ def test_channel_cutoff_matches_authenticated_urls(
         dependency_recipe().render()[0],
         output_dir=tmp_path / "debug",
         channels=[channel],
-        exclude_newer_channel={channel: CUTOFF},
+        exclude_newer=ExcludeNewer(channels={channel: CUTOFF}),
         tool_config=ToolConfiguration(use_bz2=False, use_zstd=False, use_sharded=False),
     )
     assert (session.build_prefix / "share/cutoff-dependency.txt").read_text().strip() == "1"
@@ -321,10 +315,6 @@ def test_channel_cutoff_matches_authenticated_urls(
 
 
 @pytest.mark.parametrize("channel", ["conda-forge", "relative/channel", "mailto:channel@example.com"])
-def test_invalid_channel_override(tmp_path: Path, channel: str) -> None:
-    with pytest.raises(ValueError, match="exclude_newer_channel"):
-        dependency_recipe().render()[0].run_build(
-            output_dir=tmp_path / "output",
-            channels=[],
-            exclude_newer_channel={channel: CUTOFF},
-        )
+def test_invalid_channel_override(channel: str) -> None:
+    with pytest.raises(ValueError, match="ExcludeNewer channel"):
+        ExcludeNewer(channels={channel: CUTOFF})

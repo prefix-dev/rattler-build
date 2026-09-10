@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from rattler_build._rattler_build import debug as _debug
+from rattler_build.exclude_newer import ExcludeNewer, _to_native
 
 if TYPE_CHECKING:
     from rattler_build.progress import ProgressCallback
@@ -99,10 +100,7 @@ class DebugSession:
         channels: list[str] | None = None,
         no_build_id: bool = True,
         progress_callback: ProgressCallback | None = None,
-        exclude_newer: datetime | None = None,
-        exclude_newer_package: dict[str, datetime | None] | None = None,
-        exclude_newer_channel: dict[str, datetime | None] | None = None,
-        exclude_newer_include_unknown_timestamp: bool = False,
+        exclude_newer: datetime | ExcludeNewer | None = None,
     ) -> DebugSession:
         """Create a debug session from a rendered variant.
 
@@ -126,13 +124,7 @@ class DebugSession:
         progress_callback:
             Optional callback for progress events during setup.
         exclude_newer:
-            Exclude packages newer than this timestamp.
-        exclude_newer_package:
-            Package-specific cutoffs. ``None`` values exempt a package.
-        exclude_newer_channel:
-            Cutoffs keyed by exact channel URL. ``None`` values exempt a channel.
-        exclude_newer_include_unknown_timestamp:
-            Include packages without a timestamp when filtering.
+            Dependency cutoff policy, or a datetime for a global cutoff.
 
         Returns
         -------
@@ -150,10 +142,7 @@ class DebugSession:
             progress_callback=progress_callback,
             recipe_path=variant._recipe_path,
             repodata_revision=variant._repodata_revision,
-            exclude_newer=exclude_newer,
-            exclude_newer_package=exclude_newer_package,
-            exclude_newer_channel=exclude_newer_channel,
-            exclude_newer_include_unknown_timestamp=exclude_newer_include_unknown_timestamp,
+            exclude_newer=_to_native(exclude_newer),
         )
         return cls(inner)
 

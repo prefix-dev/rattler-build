@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Any
 from rattler_build._rattler_build import EnvironmentIsolation, RepodataRevision
 from rattler_build._rattler_build import render as _render
 from rattler_build._rattler_build import stage0 as _stage0
+from rattler_build.exclude_newer import ExcludeNewer
 from rattler_build.render import RenderConfig, RenderedVariant
 from rattler_build.tool_config import ToolConfiguration
 from rattler_build.variant_config import VariantConfig
@@ -300,13 +301,9 @@ class Stage0Recipe(ABC):
         no_build_id: bool = False,
         package_format: str | None = None,
         no_include_recipe: bool = False,
-        exclude_newer: datetime | None = None,
+        exclude_newer: datetime | ExcludeNewer | None = None,
         env_isolation: EnvironmentIsolation = EnvironmentIsolation.STRICT,
         render_config: RenderConfig | None = None,
-        *,
-        exclude_newer_package: dict[str, datetime | None] | None = None,
-        exclude_newer_channel: dict[str, datetime | None] | None = None,
-        exclude_newer_include_unknown_timestamp: bool = False,
     ) -> list[BuildResult]:
         """Build this recipe.
 
@@ -324,12 +321,9 @@ class Stage0Recipe(ABC):
             no_build_id: Don't include build ID in output directory.
             package_format: Package format ("conda" or "tar.bz2").
             no_include_recipe: Don't include recipe in the output package.
-            exclude_newer: Exclude packages newer than this timestamp.
+            exclude_newer: Dependency cutoff policy, or a datetime for a global cutoff.
             env_isolation: Environment isolation mode. Defaults to ``EnvironmentIsolation.STRICT``.
             render_config: Optional RenderConfig to use when rendering before building.
-            exclude_newer_package: Package-specific cutoffs. ``None`` values exempt a package.
-            exclude_newer_channel: Cutoffs keyed by exact channel URL. ``None`` values exempt a channel.
-            exclude_newer_include_unknown_timestamp: Include packages without a timestamp when filtering.
 
         Returns:
             list[BuildResult]: List of build results, one per variant built.
@@ -366,9 +360,6 @@ class Stage0Recipe(ABC):
                 no_include_recipe=no_include_recipe,
                 exclude_newer=exclude_newer,
                 env_isolation=env_isolation,
-                exclude_newer_package=exclude_newer_package,
-                exclude_newer_channel=exclude_newer_channel,
-                exclude_newer_include_unknown_timestamp=exclude_newer_include_unknown_timestamp,
             )
             results.append(result)
 

@@ -19,7 +19,7 @@ use std::{
 };
 
 use crate::error::RattlerBuildError;
-use crate::exclude_newer::exclude_newer_policy;
+use crate::exclude_newer::PyExcludeNewer;
 use crate::render;
 use crate::repodata_revision::PyRepodataRevision;
 use crate::run_async_task;
@@ -250,7 +250,7 @@ use std::path::Path;
 /// directly without needing to write temporary files.
 #[pyfunction]
 #[allow(clippy::too_many_arguments)]
-#[pyo3(signature = (rendered_variant, tool_config, output_dir, channels, progress_callback=None, recipe_path=None, no_build_id=false, package_format=None, no_include_recipe=false, exclude_newer=None, env_isolation=PyEnvironmentIsolation::Strict, sibling_variants=Vec::new(), repodata_revision=None, *, exclude_newer_package=None, exclude_newer_channel=None, exclude_newer_include_unknown_timestamp=false))]
+#[pyo3(signature = (rendered_variant, tool_config, output_dir, channels, progress_callback=None, recipe_path=None, no_build_id=false, package_format=None, no_include_recipe=false, exclude_newer=None, env_isolation=PyEnvironmentIsolation::Strict, sibling_variants=Vec::new(), repodata_revision=None))]
 pub fn build_rendered_variant_py(
     py: Python<'_>,
     rendered_variant: render::PyRenderedVariant,
@@ -262,21 +262,13 @@ pub fn build_rendered_variant_py(
     no_build_id: bool,
     package_format: Option<String>,
     no_include_recipe: bool,
-    exclude_newer: Option<jiff::Timestamp>,
+    exclude_newer: Option<PyExcludeNewer>,
     env_isolation: PyEnvironmentIsolation,
     sibling_variants: Vec<render::PyRenderedVariant>,
     repodata_revision: Option<PyRepodataRevision>,
-    exclude_newer_package: Option<HashMap<String, Option<jiff::Timestamp>>>,
-    exclude_newer_channel: Option<HashMap<String, Option<jiff::Timestamp>>>,
-    exclude_newer_include_unknown_timestamp: bool,
 ) -> PyResult<BuildResultPy> {
     let tool_config = tool_config.inner;
-    let exclude_newer = exclude_newer_policy(
-        exclude_newer,
-        exclude_newer_package,
-        exclude_newer_channel,
-        exclude_newer_include_unknown_timestamp,
-    )?;
+    let exclude_newer = exclude_newer.and_then(|policy| policy.inner);
 
     let package_format = package_format
         .map(|p| PackageFormatAndCompression::from_str(&p))
