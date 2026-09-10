@@ -100,7 +100,7 @@ pub fn parse_multi_output_recipe(
     };
 
     let tests = if let Some(tests_node) = mapping.get("tests") {
-        parse_tests(tests_node)?
+        parse_tests(tests_node, config)?
     } else {
         ConditionalList::default()
     };
@@ -488,7 +488,7 @@ fn parse_package_output(
 
     // Parse optional tests
     let tests = if let Some(tests_node) = mapping.get("tests") {
-        parse_tests(tests_node)?
+        parse_tests(tests_node, config)?
     } else {
         ConditionalList::default()
     };

@@ -17,8 +17,8 @@ use crate::{
     },
 };
 
-struct MatchSpecConverter {
-    repodata_revision: RepodataRevision,
+pub(super) struct MatchSpecConverter {
+    pub(super) repodata_revision: RepodataRevision,
 }
 
 impl NodeConverter<SerializableMatchSpec> for MatchSpecConverter {
