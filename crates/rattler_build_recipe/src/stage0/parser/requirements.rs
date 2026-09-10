@@ -121,7 +121,12 @@ pub(crate) fn parse_requirements_with_config(
         .ok_or_else(|| ParseError::expected_type("mapping", "non-mapping", get_span(yaml)))?;
 
     if let Some(extras) = mapping.get("extras") {
-        requirements.extras = parse_extras(extras, &matchspec_converter)?;
+        requirements.extras = parse_extras(
+            extras,
+            &MatchSpecConverter {
+                repodata_revision: RepodataRevision::V3,
+            },
+        )?;
     }
 
     if let Some(run_exports) = mapping.get("run_exports") {

@@ -243,7 +243,9 @@ def test_legacy_build_keeps_legacy_index_json(
     extracted = get_extracted_package(output_dir, "legacy-index-shape")
     index_json = json.loads((extracted / "info/index.json").read_text())
     assert_legacy_index_json(index_json)
-    assert index_json["extra_depends"] == {"test": ["pytest >=8"]}
+    assert index_json["extra_depends"] == {
+        "test": ["pytest >=8", "legacy-index-shape[extras=[test]]"]
+    }
 
 
 @pytest.mark.parametrize(
@@ -253,11 +255,6 @@ def test_legacy_build_keeps_legacy_index_json(
             "v3-build-flags-rejected",
             "package flags require the --v3 flag",
             "Enable --v3 to use build.flags.",
-        ),
-        (
-            "v3-extra-matchspec-rejected",
-            "invalid bracket key: when",
-            "Enable --v3 to use V3 MatchSpec keys",
         ),
         (
             "v3-conditional-matchspec-rejected",

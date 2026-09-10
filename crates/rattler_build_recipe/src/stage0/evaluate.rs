@@ -1209,10 +1209,18 @@ pub fn evaluate_dependency_list(
     list: &crate::stage0::types::ConditionalList<crate::stage0::SerializableMatchSpec>,
     context: &EvaluationContext,
 ) -> Result<Vec<crate::stage1::Dependency>, ParseError> {
+    evaluate_dependency_list_with_revision(list, context, context.repodata_revision())
+}
+
+fn evaluate_dependency_list_with_revision(
+    list: &crate::stage0::types::ConditionalList<crate::stage0::SerializableMatchSpec>,
+    context: &EvaluationContext,
+    repodata_revision: RepodataRevision,
+) -> Result<Vec<crate::stage1::Dependency>, ParseError> {
     evaluate_conditional_list(list.as_slice(), context, |value, ctx| {
         match value.inner() {
             ValueInner::Concrete(match_spec) => {
-                ensure_matchspec_v3_allowed(&match_spec.0, ctx, value.span())?;
+                ensure_matchspec_v3_allowed(&match_spec.0, repodata_revision, value.span())?;
                 Ok(Some(Dependency::Spec(Box::new(match_spec.0.clone()))))
             }
             ValueInner::Template(template) => {
@@ -1224,7 +1232,7 @@ pub fn evaluate_dependency_list(
                 }
 
                 let span_opt = value.span().copied();
-                let dep = parse_dependency_string(&s, &span_opt, ctx.repodata_revision())?;
+                let dep = parse_dependency_string(&s, &span_opt, repodata_revision)?;
                 Ok(Some(dep))
             }
         }
@@ -1233,10 +1241,10 @@ pub fn evaluate_dependency_list(
 
 fn ensure_matchspec_v3_allowed(
     spec: &MatchSpec,
-    context: &EvaluationContext,
+    repodata_revision: RepodataRevision,
     span: Option<&Span>,
 ) -> Result<(), ParseError> {
-    if !stage0::supports_v3_repodata_features(context.repodata_revision())
+    if !stage0::supports_v3_repodata_features(repodata_revision)
         && spec.required_repodata_revision() == RepodataRevision::V3
     {
         return Err(ParseError::invalid_value(
@@ -1845,7 +1853,12 @@ impl Evaluate for Stage0Requirements {
         let extras = self
             .extras
             .iter()
-            .map(|(name, deps)| Ok((name.clone(), evaluate_dependency_list(deps, context)?)))
+            .map(|(name, deps)| {
+                Ok((
+                    name.clone(),
+                    evaluate_dependency_list_with_revision(deps, context, RepodataRevision::V3)?,
+                ))
+            })
             .collect::<Result<_, ParseError>>()?;
 
         Ok(Stage1Requirements {
