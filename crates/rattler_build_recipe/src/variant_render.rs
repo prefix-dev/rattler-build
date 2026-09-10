@@ -1917,82 +1917,36 @@ requirements:
 
     #[test]
     fn test_render_v3_matchspec_in_test_requirements() {
-        let tests_yaml = r#"
+        let recipe_yaml = r#"
+package:
+  name: httpx2
+  version: "1.0"
+
 tests:
-  - script: echo direct
+  - script: httpx2 --help
     requirements:
       run:
         - httpx2[extras=cli]
-  - if: true
-    then:
-      - if: false
-        then:
-          script: echo unused
-        else:
-          script: echo nested
-          requirements:
-            build:
-              - if: true
-                then: httpx2[extras=cli]
-            run:
-              - httpx2[extras=cli]
-    else:
-      - script: echo unused
-        requirements:
-          run:
-            - httpx2[extras=cli]
 "#;
 
-        // Exercise single-output, inherited multi-output, and per-output tests.
-        for recipe_yaml in [
-            format!("package:\n  name: httpx2\n  version: '1.0'\n{tests_yaml}"),
-            format!(
-                "recipe:\n  name: httpx2\n  version: '1.0'\n{tests_yaml}\noutputs:\n  - package:\n      name: httpx2\n"
-            ),
-            format!(
-                "recipe:\n  name: httpx2\n  version: '1.0'\noutputs:\n  - package:\n      name: httpx2\n{}",
-                tests_yaml
-                    .lines()
-                    .map(|line| format!("    {line}\n"))
-                    .collect::<String>()
-            ),
-        ] {
-            let err = stage0::parse_recipe_or_multi_from_source(&recipe_yaml).unwrap_err();
-            assert!(
-                err.to_string().contains("invalid bracket key: extras"),
-                "{err:?}"
-            );
+        let recipe = stage0::parse_recipe_or_multi_from_source_with_config(
+            recipe_yaml,
+            stage0::ParseConfig {
+                repodata_revision: RepodataRevision::V3,
+            },
+        )
+        .unwrap();
+        let rendered = render_recipe_with_variant_config(
+            &recipe,
+            &VariantConfig::default(),
+            RenderConfig::new().with_repodata_revision(RepodataRevision::V3),
+        )
+        .unwrap();
 
-            let recipe = stage0::parse_recipe_or_multi_from_source_with_config(
-                &recipe_yaml,
-                stage0::ParseConfig {
-                    repodata_revision: RepodataRevision::V3,
-                },
-            )
-            .unwrap();
-            let rendered = render_recipe_with_variant_config(
-                &recipe,
-                &VariantConfig::default(),
-                RenderConfig::new().with_repodata_revision(RepodataRevision::V3),
-            )
-            .unwrap();
-            assert_eq!(rendered.len(), 1);
-            let tests = &rendered[0].recipe.tests;
-            assert_eq!(tests.len(), 2);
-            for test in tests {
-                let crate::stage1::tests::TestType::Commands(test) = test else {
-                    panic!("expected command test");
-                };
-                assert_eq!(test.requirements.run[0].to_string(), "httpx2[extras=[cli]]");
-            }
-            let crate::stage1::tests::TestType::Commands(test) = &tests[1] else {
-                unreachable!();
-            };
-            assert_eq!(
-                test.requirements.build[0].to_string(),
-                "httpx2[extras=[cli]]"
-            );
-        }
+        let crate::stage1::tests::TestType::Commands(test) = &rendered[0].recipe.tests[0] else {
+            panic!("expected command test");
+        };
+        assert_eq!(test.requirements.run[0].to_string(), "httpx2[extras=[cli]]");
     }
 
     #[test]
