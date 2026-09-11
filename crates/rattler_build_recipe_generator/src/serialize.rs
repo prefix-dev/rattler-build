@@ -3,8 +3,9 @@ use std::fmt;
 use std::path::PathBuf;
 
 use indexmap::IndexMap;
-use serde::Serialize;
+use serde::{Serialize, Serializer};
 use serde_with::{OneOrMany, formats::PreferOne, serde_as};
+use serde_yaml::{Mapping, Value};
 
 #[derive(Debug, Serialize)]
 #[serde(untagged)]
@@ -48,16 +49,134 @@ pub struct GitSourceElement {
 
 #[derive(Default, Debug, Serialize)]
 pub struct Build {
+    #[serde(serialize_with = "serialize_build_number")]
     pub number: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub skip: Option<String>,
-    pub script: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub noarch: Option<String>,
+    pub script: Script,
     #[serde(skip_serializing_if = "Python::is_default")]
     pub python: Python,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub noarch: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub dynamic_linking: Option<DynamicLinking>,
+    #[serde(skip_serializing_if = "Variant::is_empty")]
+    pub variant: Variant,
+}
+
+/// Variant handling for the package (`build.variant`).
+#[derive(Default, Debug, Serialize)]
+pub struct Variant {
+    /// Variant keys that must not become part of the package's variant, and
+    /// therefore of its build hash.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub ignore_keys: Vec<String>,
+}
+
+impl Variant {
+    fn is_empty(&self) -> bool {
+        self.ignore_keys.is_empty()
+    }
+}
+
+/// Emit the build number as an integer when it is one (e.g. `0`) and as the
+/// raw string otherwise (e.g. `${{ build_number }}`).
+fn serialize_build_number<S: Serializer>(number: &str, serializer: S) -> Result<S::Ok, S::Error> {
+    match number.parse::<u64>() {
+        Ok(number) => serializer.serialize_u64(number),
+        Err(_) => serializer.serialize_str(number),
+    }
+}
+
+/// The `build.script` field: a single command, or a list of steps.
+#[derive(Debug, Serialize)]
+#[serde(untagged)]
+pub enum Script {
+    Command(String),
+    Steps(Vec<ScriptStep>),
+}
+
+impl Default for Script {
+    fn default() -> Self {
+        Script::Command(String::new())
+    }
+}
+
+impl From<String> for Script {
+    fn from(command: String) -> Self {
+        Script::Command(command)
+    }
+}
+
+impl From<&str> for Script {
+    fn from(command: &str) -> Self {
+        Script::Command(command.to_string())
+    }
+}
+
+/// One step of a `build.script` list: an `if`/`then`/`else` selector choosing
+/// between commands.
+#[derive(Debug, Serialize)]
+pub struct ScriptStep {
+    #[serde(rename = "if")]
+    pub condition: String,
+    pub then: String,
+    #[serde(rename = "else", skip_serializing_if = "Option::is_none")]
+    pub otherwise: Option<String>,
+}
+
+/// The key of the marker mapping a [`Requirement::Suggested`] serializes as.
+/// YAML comments cannot be expressed in a value tree, so the emitter
+/// recognises this shape and writes a comment line for it instead.
+const SUGGESTED_KEY: &str = "__suggested__";
+
+/// One entry of a requirements list: a match spec, an `if`/`then` selector
+/// adding specs only when the condition holds, or a dependency that upstream
+/// merely suggests.
+#[derive(Debug, PartialEq, Serialize)]
+#[serde(untagged)]
+pub enum Requirement {
+    Spec(String),
+    Conditional {
+        #[serde(rename = "if")]
+        condition: String,
+        then: Vec<String>,
+    },
+    /// Rendered as a comment, so that a packager can promote the suggested
+    /// dependencies their tests actually need.
+    Suggested {
+        #[serde(rename = "__suggested__")]
+        spec: String,
+    },
+}
+
+impl Requirement {
+    /// A dependency to render as a comment rather than as a real requirement.
+    pub fn suggested(spec: String) -> Self {
+        Requirement::Suggested { spec }
+    }
+}
+
+/// The spec of a serialized [`Requirement::Suggested`], if `map` is one.
+fn suggested_spec(map: &Mapping) -> Option<&str> {
+    let mut entries = map.iter();
+    let (key, value) = entries.next()?;
+    if entries.next().is_some() || key.as_str() != Some(SUGGESTED_KEY) {
+        return None;
+    }
+    value.as_str()
+}
+
+impl From<String> for Requirement {
+    fn from(spec: String) -> Self {
+        Requirement::Spec(spec)
+    }
+}
+
+impl From<&str> for Requirement {
+    fn from(spec: &str) -> Self {
+        Requirement::Spec(spec.to_string())
+    }
 }
 
 /// Dynamic linking settings for compiled packages (e.g. `rpaths`).
@@ -107,8 +226,38 @@ pub struct Package {
     pub version: String,
 }
 
+/// Extra files from the source checkout to copy into the test environment.
+#[derive(Default, Debug, Serialize)]
+pub struct ScriptTestFiles {
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub source: Vec<String>,
+}
+
+impl ScriptTestFiles {
+    fn is_empty(&self) -> bool {
+        self.source.is_empty()
+    }
+}
+
+/// Additional packages to install into the test environment.
+#[derive(Default, Debug, Serialize)]
+pub struct ScriptTestRequirements {
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub run: Vec<String>,
+}
+
+impl ScriptTestRequirements {
+    fn is_empty(&self) -> bool {
+        self.run.is_empty()
+    }
+}
+
 #[derive(Default, Debug, Serialize)]
 pub struct ScriptTest {
+    #[serde(skip_serializing_if = "ScriptTestFiles::is_empty")]
+    pub files: ScriptTestFiles,
+    #[serde(skip_serializing_if = "ScriptTestRequirements::is_empty")]
+    pub requirements: ScriptTestRequirements,
     pub script: Vec<String>,
 }
 
@@ -123,49 +272,87 @@ pub struct PythonTest {
     pub python: PythonTestInner,
 }
 
+#[derive(Default, Debug, Serialize)]
+pub struct RTestInner {
+    pub libraries: Vec<String>,
+}
+
+/// The `r:` test type: load each library in a fresh R session.
+#[derive(Default, Debug, Serialize)]
+pub struct RTest {
+    pub r: RTestInner,
+}
+
 #[derive(Debug, Serialize)]
 #[serde(untagged)]
 pub enum Test {
     Script(ScriptTest),
     Python(PythonTest),
+    R(RTest),
 }
 
+/// Free-form `extra:` section.
+#[derive(Default, Debug, Serialize)]
+pub struct Extra {
+    #[serde(rename = "recipe-maintainers", skip_serializing_if = "Vec::is_empty")]
+    pub recipe_maintainers: Vec<String>,
+}
+
+impl Extra {
+    fn is_empty(&self) -> bool {
+        self.recipe_maintainers.is_empty()
+    }
+}
+
+/// The recipe format version. This crate only emits the v1 format.
+#[derive(Debug, Serialize)]
+#[serde(transparent)]
+pub struct SchemaVersion(u32);
+
+impl Default for SchemaVersion {
+    fn default() -> Self {
+        Self(1)
+    }
+}
+
+#[serde_as]
 #[derive(Default, Debug, Serialize)]
 pub struct Recipe {
+    pub schema_version: SchemaVersion,
     pub context: IndexMap<String, String>,
     pub package: Package,
+    /// A single source is emitted as a mapping, several as a list.
+    #[serde_as(as = "OneOrMany<_, PreferOne>")]
     pub source: Vec<SourceElement>,
     pub build: Build,
     pub requirements: Requirements,
     pub tests: Vec<Test>,
     pub about: About,
+    #[serde(skip_serializing_if = "Extra::is_empty")]
+    pub extra: Extra,
 }
 
 #[derive(Default, Debug, Serialize)]
 pub struct Requirements {
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub build: Vec<String>,
+    pub build: Vec<Requirement>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub host: Vec<String>,
+    pub host: Vec<Requirement>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub run: Vec<String>,
+    pub run: Vec<Requirement>,
 }
 
 impl fmt::Display for Recipe {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let string = serde_yaml::to_string(self).unwrap();
-        // add a newline before every top-level key
-        let lines = string.split('\n').collect::<Vec<&str>>();
-        let mut first_line = true;
-        for line in lines {
-            if line.chars().next().map(|c| c.is_alphabetic()) == Some(true) && !first_line {
-                writeln!(f)?;
-            }
-            first_line = false;
-            // Inject a warning comment above the license field if present
-            if line.starts_with("  license:")
-                && let Some(warning) = &self.about.license_warning
-            {
+        let value = serde_yaml::to_value(self).map_err(|_| fmt::Error)?;
+        let string = emit_document(&value);
+        // Inject the warning comment above the license field if present; the
+        // field is #[serde(skip)], so it cannot travel through the Value tree.
+        let Some(warning) = &self.about.license_warning else {
+            return f.write_str(&string);
+        };
+        for line in string.lines() {
+            if line.starts_with("  license:") {
                 for comment_line in warning.lines() {
                     writeln!(f, "  # {comment_line}")?;
                 }
@@ -174,6 +361,215 @@ impl fmt::Display for Recipe {
         }
         Ok(())
     }
+}
+
+/// Render a recipe as block-style YAML with sequences indented under their
+/// parent key. `serde_yaml` (libyaml) always emits *indentless* sequences,
+/// which is not the style used by recipes in the wild, so the tree is walked
+/// here instead; scalar quoting is still delegated to `serde_yaml`.
+fn emit_document(root: &Value) -> String {
+    let mut out = String::new();
+    if let Value::Mapping(map) = root {
+        for (key, value) in map {
+            if !out.is_empty() {
+                // A blank line between top-level sections keeps recipes
+                // readable.
+                out.push('\n');
+            }
+            match value {
+                // `Recipe::context` holds versions and the like, which follow
+                // their own quoting rule (see `context_value_text`).
+                Value::Mapping(context)
+                    if key.as_str() == Some("context") && !context.is_empty() =>
+                {
+                    out.push_str("context:\n");
+                    for (name, value) in context {
+                        out.push_str("  ");
+                        out.push_str(&scalar_text(name, 2));
+                        out.push_str(": ");
+                        out.push_str(&context_value_text(value));
+                        out.push('\n');
+                    }
+                }
+                _ => emit_entry(&mut out, key, value, 0),
+            }
+        }
+    }
+    out
+}
+
+/// Text of a value under `context:`. Anything that starts with a digit
+/// (typically a version such as `1.0` or `0.3.1`) is double-quoted so it is
+/// never re-read as a number, matching the conda-forge convention; values that
+/// `serde_yaml` would quote anyway are double-quoted as well, for consistency.
+fn context_value_text(value: &Value) -> String {
+    let rendered = scalar_text(value, 2);
+    let Value::String(string) = value else {
+        return rendered;
+    };
+    // `string_text` renders without trailing newlines; compare and quote the
+    // same text, so that a quoted context value cannot keep what every other
+    // scalar in the document drops.
+    let string = string.trim_end_matches('\n');
+    let needs_quotes =
+        string.starts_with(|c: char| c.is_ascii_digit()) || rendered.as_str() != string;
+    if needs_quotes {
+        double_quoted(string)
+    } else {
+        rendered
+    }
+}
+
+/// A YAML double-quoted scalar for `string`, escaping everything the style
+/// requires (quotes, backslashes, and non-printable characters).
+fn double_quoted(string: &str) -> String {
+    let mut out = String::with_capacity(string.len() + 2);
+    out.push('"');
+    for character in string.chars() {
+        match character {
+            '\\' => out.push_str("\\\\"),
+            '"' => out.push_str("\\\""),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            character
+                if (character as u32) < 0x20 || (0x7f..=0x9f).contains(&(character as u32)) =>
+            {
+                out.push_str(&format!("\\x{:02X}", character as u32));
+            }
+            character => out.push(character),
+        }
+    }
+    out.push('"');
+    out
+}
+
+/// Write `key: value` (the caller has already written the indentation of the
+/// key) and descend into nested mappings and sequences.
+fn emit_entry(out: &mut String, key: &Value, value: &Value, indent: usize) {
+    out.push_str(&scalar_text(key, indent));
+    out.push(':');
+    match value {
+        Value::Mapping(map) if !map.is_empty() => {
+            out.push('\n');
+            emit_mapping(out, map, indent + 2, false);
+        }
+        Value::Sequence(seq) if !seq.is_empty() => {
+            out.push('\n');
+            emit_sequence(out, seq, indent + 2);
+        }
+        _ => {
+            out.push(' ');
+            out.push_str(&scalar_text(value, indent));
+            out.push('\n');
+        }
+    }
+}
+
+/// Write the entries of `map` at `indent`. With `inline_first` the first key
+/// continues the current line (right after a `- ` sequence marker).
+fn emit_mapping(out: &mut String, map: &Mapping, indent: usize, inline_first: bool) {
+    for (i, (key, value)) in map.iter().enumerate() {
+        if !(inline_first && i == 0) {
+            push_indent(out, indent);
+        }
+        emit_entry(out, key, value, indent);
+    }
+}
+
+/// Write `indent` spaces.
+fn push_indent(out: &mut String, indent: usize) {
+    out.extend(std::iter::repeat_n(' ', indent));
+}
+
+/// Write the items of `seq` as `- item` lines at `indent`.
+fn emit_sequence(out: &mut String, seq: &[Value], indent: usize) {
+    for item in seq {
+        push_indent(out, indent);
+        match item {
+            Value::Mapping(map) if !map.is_empty() => {
+                if let Some(spec) = suggested_spec(map) {
+                    out.push_str(&format!("# - {spec}  # suggested\n"));
+                    continue;
+                }
+                out.push_str("- ");
+                emit_mapping(out, map, indent + 2, true);
+            }
+            Value::Sequence(inner) if !inner.is_empty() => {
+                out.push_str("-\n");
+                emit_sequence(out, inner, indent + 2);
+            }
+            _ => {
+                out.push_str("- ");
+                out.push_str(&scalar_text(item, indent));
+                out.push('\n');
+            }
+        }
+    }
+}
+
+/// Text of a scalar (or of an empty collection), using `serde_yaml` for the
+/// quoting decision. Multi-line strings become `|-` block scalars whose body
+/// is re-indented relative to `indent`, the column of the owning key or dash.
+fn scalar_text(value: &Value, indent: usize) -> String {
+    match value {
+        Value::Null => "null".to_string(),
+        Value::Bool(boolean) => boolean.to_string(),
+        Value::Number(number) => number.to_string(),
+        Value::String(string) => string_text(string, indent),
+        Value::Mapping(map) if map.is_empty() => "{}".to_string(),
+        Value::Sequence(seq) if seq.is_empty() => "[]".to_string(),
+        // Non-empty collections are always handled by `emit_entry` /
+        // `emit_sequence`; splicing YAML here would corrupt the document
+        // silently, so fail loudly instead.
+        other => unreachable!("collections are emitted structurally: {other:?}"),
+    }
+}
+
+/// Whether `string` can be written as a plain YAML scalar without asking
+/// `serde_yaml`. Deliberately conservative: an ASCII word of letters, digits
+/// and `-_./` starting with a letter has no indicator character, cannot be
+/// read back as a number or timestamp, and only needs quoting when it spells
+/// a boolean or null keyword.
+fn is_plainly_safe(string: &str) -> bool {
+    string.starts_with(|c: char| c.is_ascii_alphabetic())
+        && string
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '/'))
+        && !matches!(
+            string.to_ascii_lowercase().as_str(),
+            "y" | "n" | "yes" | "no" | "true" | "false" | "on" | "off" | "null"
+        )
+}
+
+fn string_text(string: &str, indent: usize) -> String {
+    // Trailing newlines carry no meaning in a recipe, and keeping them would
+    // make libyaml choose the `|+` (keep) block style, whose trailing blank
+    // lines the surrounding layout does not preserve. Drop them so multi-line
+    // text always becomes a `|-` block and single lines stay plain scalars.
+    let string = string.trim_end_matches('\n');
+    if is_plainly_safe(string) {
+        return string.to_string();
+    }
+    let rendered = serde_yaml::to_string(&Value::String(string.to_string())).unwrap_or_default();
+    let rendered = rendered.trim_end_matches('\n');
+
+    if string.contains('\n') {
+        // libyaml emits `|-` followed by the body indented by two spaces;
+        // shift the body so it sits two deeper than our key.
+        let mut lines = rendered.lines();
+        let mut text = lines.next().unwrap_or("|-").to_string();
+        for line in lines {
+            text.push('\n');
+            if !line.is_empty() {
+                text.push_str(&" ".repeat(indent));
+            }
+            text.push_str(line);
+        }
+        return text;
+    }
+
+    rendered.to_string()
 }
 
 /// Write a recipe to "{package_name}/recipe.yaml"
@@ -195,4 +591,235 @@ pub fn write_recipe(package_name: &str, recipe: &str) -> std::io::Result<()> {
     tracing::info!("Writing recipe to {}", path.display());
 
     fs_err::write(path, recipe)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sample_recipe() -> Recipe {
+        let mut recipe = Recipe::default();
+        recipe
+            .context
+            .insert("version".to_string(), "1.0".to_string());
+        recipe
+            .context
+            .insert("build_number".to_string(), "0".to_string());
+        recipe
+            .context
+            .insert("name".to_string(), "${{ env.get('NAME') }}".to_string());
+        recipe
+            .context
+            .insert("mirror".to_string(), "https://example.com".to_string());
+        recipe.package.name = "demo".to_string();
+        recipe.package.version = "${{ version }}".to_string();
+        recipe.source.push(
+            UrlSourceElement {
+                url: vec!["https://example.com/demo-${{ version }}.tar.gz".to_string()],
+                sha256: Some("abc".to_string()),
+                md5: None,
+            }
+            .into(),
+        );
+        recipe.build.number = "${{ build_number }}".to_string();
+        recipe.build.script = "make install".into();
+        recipe.build.noarch = Some("generic".to_string());
+        recipe.requirements.host = vec!["r-base".into()];
+        recipe.requirements.build = vec![
+            Requirement::Conditional {
+                condition: "build_platform != target_platform".to_string(),
+                then: vec!["cross-r-base ${{ r_base }}".to_string()],
+            },
+            "${{ compiler('c') }}".into(),
+        ];
+        recipe.tests.push(Test::R(RTest {
+            r: RTestInner {
+                libraries: vec!["demo".to_string()],
+            },
+        }));
+        recipe.tests.push(Test::Script(ScriptTest {
+            files: ScriptTestFiles {
+                source: vec!["tests/".to_string()],
+            },
+            requirements: ScriptTestRequirements {
+                run: vec!["r-testthat".to_string()],
+            },
+            script: vec!["Rscript -e \"cat('hi: there')\"".to_string()],
+        }));
+        recipe.about.summary = Some("A demo: with a colon".to_string());
+        recipe.about.description =
+            Some("First line.\n\nThird line, indented:\n  - item".to_string());
+        recipe.about.license = Some("MIT".to_string());
+        recipe.about.license_file = vec!["LICENSE".to_string()];
+        recipe.about.license_warning = Some("check this".to_string());
+        recipe.extra.recipe_maintainers = vec!["octocat".to_string()];
+        recipe
+    }
+
+    #[test]
+    fn emits_indented_sequences_and_single_source_mapping() {
+        insta::assert_snapshot!(sample_recipe().to_string());
+    }
+
+    #[test]
+    fn emits_integer_build_number_and_multiple_sources_as_list() {
+        let mut recipe = sample_recipe();
+        recipe.build.number = "0".to_string();
+        recipe.source.push(
+            GitSourceElement {
+                git: "https://example.com/demo.git".to_string(),
+                tag: Some("v1.0".to_string()),
+                branch: None,
+            }
+            .into(),
+        );
+        recipe.tests.clear();
+        recipe.extra = Extra::default();
+        recipe.about.license_warning = None;
+        insta::assert_snapshot!(recipe.to_string());
+    }
+
+    #[test]
+    fn context_values_starting_with_a_digit_are_quoted() {
+        let mut recipe = Recipe::default();
+        recipe
+            .context
+            .insert("version".to_string(), "0.7-5.1".to_string());
+        recipe
+            .context
+            .insert("posix".to_string(), "'m2-' if win else ''".to_string());
+        recipe
+            .context
+            .insert("flag".to_string(), "true".to_string());
+        recipe
+            .context
+            .insert("plain".to_string(), "hello".to_string());
+        recipe
+            .context
+            .insert("inner_quotes".to_string(), "say \"hi\"".to_string());
+        let yaml = recipe.to_string();
+        // starts with a digit -> always quoted
+        assert!(yaml.contains("  version: \"0.7-5.1\"\n"), "{yaml}");
+        // serde_yaml would single-quote these -> double-quoted instead
+        assert!(
+            yaml.contains("  posix: \"'m2-' if win else ''\"\n"),
+            "{yaml}"
+        );
+        assert!(yaml.contains("  flag: \"true\"\n"), "{yaml}");
+        // plain scalars stay plain (YAML allows inner double quotes)
+        assert!(yaml.contains("  plain: hello\n"), "{yaml}");
+        assert!(yaml.contains("  inner_quotes: say \"hi\"\n"), "{yaml}");
+    }
+
+    /// The plain-scalar fast path must agree with `serde_yaml` on every input.
+    #[test]
+    fn plainly_safe_scalars_render_like_serde_yaml() {
+        for string in [
+            "r-base",
+            "generic",
+            "make",
+            "GPL-3.0-only",
+            "lib/R/lib/",
+            "tests/testthat.R",
+            "https://example.com",
+            "r-cli >=3.6.2",
+            "${{ version }}",
+            "yes",
+            "No",
+            "TRUE",
+            "null",
+            "on",
+            "n",
+            "1.0",
+            "0.3.1",
+            "4",
+            ".inf",
+            "-dash",
+            "a: b",
+            "a #b",
+            " leading",
+            "trailing ",
+            "",
+            "*star",
+            "&anchor",
+            "!tag",
+            "%directive",
+            "@at",
+            "`tick",
+            "[bracket",
+            "{brace",
+            "2026-08-24",
+        ] {
+            let expected = serde_yaml::to_string(&Value::String(string.to_string()))
+                .unwrap()
+                .trim_end_matches('\n')
+                .to_string();
+            assert_eq!(string_text(string, 0), expected, "{string:?}");
+        }
+    }
+
+    /// Context values lose trailing newlines like every other scalar.
+    #[test]
+    fn quoted_context_values_drop_trailing_newlines() {
+        let mut recipe = Recipe::default();
+        recipe
+            .context
+            .insert("version".to_string(), "1.0\n".to_string());
+        recipe
+            .context
+            .insert("name".to_string(), "demo\n".to_string());
+        let yaml = recipe.to_string();
+        assert!(yaml.contains("  version: \"1.0\"\n"), "{yaml}");
+        assert!(yaml.contains("  name: demo\n"), "{yaml}");
+        let reparsed: Value = serde_yaml::from_str(&yaml).unwrap();
+        assert_eq!(reparsed["context"]["version"].as_str(), Some("1.0"));
+        assert_eq!(reparsed["context"]["name"].as_str(), Some("demo"));
+    }
+
+    /// A broken (or malicious) registry version must not change meaning or
+    /// break the document when it is quoted.
+    #[test]
+    fn quoted_context_values_escape_control_characters() {
+        let mut recipe = Recipe::default();
+        recipe
+            .context
+            .insert("cr".to_string(), "1.0\rbeta".to_string());
+        recipe
+            .context
+            .insert("bell".to_string(), "1.0\u{7}x".to_string());
+        let yaml = recipe.to_string();
+        assert!(yaml.contains("  cr: \"1.0\\rbeta\"\n"), "{yaml}");
+        assert!(yaml.contains("  bell: \"1.0\\x07x\"\n"), "{yaml}");
+        let reparsed: Value = serde_yaml::from_str(&yaml).expect("document must stay parseable");
+        assert_eq!(reparsed["context"]["cr"].as_str(), Some("1.0\rbeta"));
+        assert_eq!(reparsed["context"]["bell"].as_str(), Some("1.0\u{7}x"));
+    }
+
+    #[test]
+    fn trailing_newlines_are_dropped_rather_than_kept_by_the_block_style() {
+        let mut recipe = Recipe::default();
+        recipe.about.summary = Some("one line\n".to_string());
+        recipe.about.description = Some("First.\nSecond.\n\n".to_string());
+        let yaml = recipe.to_string();
+        assert!(yaml.contains("  summary: one line\n"), "{yaml}");
+        assert!(
+            yaml.contains("  description: |-\n    First.\n    Second.\n"),
+            "{yaml}"
+        );
+        let reparsed: Value = serde_yaml::from_str(&yaml).unwrap();
+        assert_eq!(reparsed["about"]["summary"].as_str(), Some("one line"));
+        assert_eq!(
+            reparsed["about"]["description"].as_str(),
+            Some("First.\nSecond.")
+        );
+    }
+
+    #[test]
+    fn emitted_yaml_round_trips() {
+        let recipe = sample_recipe();
+        let yaml = recipe.to_string();
+        let reparsed: Value = serde_yaml::from_str(&yaml).expect("emitted YAML must parse");
+        let expected = serde_yaml::to_value(&recipe).unwrap();
+        assert_eq!(reparsed, expected);
+    }
 }
