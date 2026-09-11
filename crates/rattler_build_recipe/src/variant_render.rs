@@ -3871,6 +3871,46 @@ postgresql:
     }
 
     #[test]
+    fn test_forwarded_build_control_variants_are_always_used() {
+        let recipe_yaml = r#"
+package:
+  name: test-pkg
+  version: "1.0.0"
+"#;
+        let variant_yaml = r#"
+CROSSCOMPILING_EMULATOR:
+  - qemu-aarch64
+  - qemu-x86_64
+CMAKE_TEST_LAUNCHER:
+  - sde64
+CONDA_BUILD_SKIP_TESTS:
+  - 0
+"#;
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config = VariantConfig::from_yaml_str(variant_yaml).unwrap();
+
+        let rendered = render_recipe_with_variant_config(
+            &stage0_recipe,
+            &variant_config,
+            RenderConfig::new().with_os_env_var_keys(HashSet::from([
+                "CROSSCOMPILING_EMULATOR".to_string(),
+                "CMAKE_TEST_LAUNCHER".to_string(),
+                "CONDA_BUILD_SKIP_TESTS".to_string(),
+            ])),
+        )
+        .unwrap();
+
+        assert_eq!(rendered.len(), 2);
+        for key in [
+            "CROSSCOMPILING_EMULATOR",
+            "CMAKE_TEST_LAUNCHER",
+            "CONDA_BUILD_SKIP_TESTS",
+        ] {
+            assert!(rendered.iter().all(|r| r.variant.contains_key(&key.into())));
+        }
+    }
+
+    #[test]
     fn test_build_string_prefix_simple() {
         let recipe_yaml = r#"
 package:

@@ -121,6 +121,7 @@ pub fn default_env_vars_build(
         "USERNAME",
         "USERPROFILE",
         "windir",
+        "CONDA_BUILD_SKIP_TESTS",
         // CPU data, see https://github.com/conda/conda-build/issues/2064
         "PROCESSOR_ARCHITEW6432",
         "PROCESSOR_ARCHITECTURE",
@@ -173,7 +174,8 @@ mod test {
     fn build_vars_use_the_injected_runtime_environment() {
         let runtime = RuntimeEnv::for_test(Platform::Win64)
             .with_var("vs140comntools", "C:\\VS140")
-            .with_var("BUILD", "injected-build");
+            .with_var("BUILD", "injected-build")
+            .with_var("CONDA_BUILD_SKIP_TESTS", "1");
         let vars = default_env_vars_build(&Platform::Win64, &runtime);
 
         assert_eq!(
@@ -184,6 +186,11 @@ mod test {
         assert_eq!(
             vars.get("BUILD").and_then(|value| value.as_deref()),
             Some("injected-build")
+        );
+        assert_eq!(
+            vars.get("CONDA_BUILD_SKIP_TESTS")
+                .and_then(|value| value.as_deref()),
+            Some("1")
         );
     }
 

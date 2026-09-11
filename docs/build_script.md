@@ -427,6 +427,18 @@ noted, no variables are inherited from the shell environment in which you invoke
 : Set to `1` when the build platform and the target platform differ (i.e.
   the package is being cross-compiled), and `0` otherwise.
 
+`CROSSCOMPILING_EMULATOR`
+
+: Forwarded from the user's shell environment when set. It can also be set in
+  variant configuration; configured values override the shell environment and
+  are always included in the build matrix and package hash.
+
+`CMAKE_TEST_LAUNCHER`
+
+: Forwarded from the user's shell environment or variant configuration for
+  native test emulation, such as x86-64 microarchitecture testing. Configured
+  values are always included in the build matrix and package hash.
+
 `SUBDIR`
 
 : The target subdirectory (platform) for the package being built, e.g.
@@ -611,7 +623,8 @@ defined only on Windows.
 | `LIB`            | `LIBRARY_LIB` prepended to the inherited `LIB` variable, used by MSVC to find link libraries.                                |
 | `INCLUDE`        | `LIBRARY_INC` prepended to the inherited `INCLUDE` variable, used by MSVC to find headers.                                   |
 | `CYGWIN_PREFIX`  | The host prefix translated to a Cygwin-style path, such as `/cygdrive/c/path/to/prefix`.                                     |
-| `BUILD`          | A target triple of the form `<arch>-pc-windows-<msvc_version>` (e.g. `amd64-pc-windows-19.0.0`). Inherited from env if set.  |
+| `BUILD`                  | A target triple of the form `<arch>-pc-windows-<msvc_version>` (e.g. `amd64-pc-windows-19.0.0`). Inherited from env if set. |
+| `CONDA_BUILD_SKIP_TESTS` | Set to `1` by conda-forge CI when cross-compiled binaries cannot be run, and `0` otherwise.                                |
 
 Additionally, on Windows, any environment variables matching the regular
 expressions `^VS[0-9]{2,3}COMNTOOLS$` and `^VS[0-9]{4}INSTALLDIR$` are
