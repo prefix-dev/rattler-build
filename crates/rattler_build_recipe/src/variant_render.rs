@@ -1916,6 +1916,40 @@ requirements:
     }
 
     #[test]
+    fn test_render_v3_matchspec_in_test_requirements() {
+        let recipe_yaml = r#"
+package:
+  name: httpx2
+  version: "1.0"
+
+tests:
+  - script: httpx2 --help
+    requirements:
+      run:
+        - httpx2[extras=cli]
+"#;
+
+        let recipe = stage0::parse_recipe_or_multi_from_source_with_config(
+            recipe_yaml,
+            stage0::ParseConfig {
+                repodata_revision: RepodataRevision::V3,
+            },
+        )
+        .unwrap();
+        let rendered = render_recipe_with_variant_config(
+            &recipe,
+            &VariantConfig::default(),
+            RenderConfig::new().with_repodata_revision(RepodataRevision::V3),
+        )
+        .unwrap();
+
+        let crate::stage1::tests::TestType::Commands(test) = &rendered[0].recipe.tests[0] else {
+            panic!("expected command test");
+        };
+        assert_eq!(test.requirements.run[0].to_string(), "httpx2[extras=[cli]]");
+    }
+
+    #[test]
     fn test_render_v3_matchspec_in_extras_without_v3_config() {
         let recipe_yaml = r#"
 package:
