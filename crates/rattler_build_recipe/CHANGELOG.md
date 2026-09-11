@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.15](https://github.com/prefix-dev/rattler-build/compare/rattler_build_recipe-v0.1.14...rattler_build_recipe-v0.1.15) - 2026-09-11
+
+### Fixed
+
+- allow extras in test section ([#2813](https://github.com/prefix-dev/rattler-build/pull/2813))
+- allow v3 matchspecs in legacy extras ([#2812](https://github.com/prefix-dev/rattler-build/pull/2812))
+- preserve inherited variant priority and staging cache inputs ([#2804](https://github.com/prefix-dev/rattler-build/pull/2804))
+- document `ignore_keys` and propagate top-level `use_keys` / `ignore_keys` ([#2802](https://github.com/prefix-dev/rattler-build/pull/2802))
+- diagnose malformed `skip` expressions instead of ignoring them ([#2783](https://github.com/prefix-dev/rattler-build/pull/2783))
+- schedule sibling outputs when their dependencies are ready ([#2796](https://github.com/prefix-dev/rattler-build/pull/2796))
+- emit canonical MatchSpecs for v3 packages ([#2758](https://github.com/prefix-dev/rattler-build/pull/2758))
+- `files: []` packages nothing instead of everything ([#2784](https://github.com/prefix-dev/rattler-build/pull/2784))
+
 ## [0.1.14](https://github.com/prefix-dev/rattler-build/compare/rattler_build_recipe-v0.1.13...rattler_build_recipe-v0.1.14) - 2026-08-27
 
 ### Fixed

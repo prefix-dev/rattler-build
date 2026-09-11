@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.14](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.13...rattler_build_core-v0.2.14) - 2026-09-11
+
+### Added
+
+- Add `PATHS_JSON`/`INDEX_JSON` env vars at test-time ([#2620](https://github.com/prefix-dev/rattler-build/pull/2620))
+- warn on overlapping output files and unused staging files ([#2790](https://github.com/prefix-dev/rattler-build/pull/2790))
+
+### Fixed
+
+- preserve inherited variant priority and staging cache inputs ([#2804](https://github.com/prefix-dev/rattler-build/pull/2804))
+- use backslashes in Windows SP_DIR path ([#2779](https://github.com/prefix-dev/rattler-build/pull/2779))
+- run link checks when relocation is disabled ([#2787](https://github.com/prefix-dev/rattler-build/pull/2787))
+- Set SRC_PATH in tests ([#2795](https://github.com/prefix-dev/rattler-build/pull/2795))
+- schedule sibling outputs when their dependencies are ready ([#2796](https://github.com/prefix-dev/rattler-build/pull/2796))
+- emit canonical MatchSpecs for v3 packages ([#2758](https://github.com/prefix-dev/rattler-build/pull/2758))
+- `files: []` packages nothing instead of everything ([#2784](https://github.com/prefix-dev/rattler-build/pull/2784))
+
 ## [0.2.13](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.12...rattler_build_core-v0.2.13) - 2026-08-27
 
 ### Other
