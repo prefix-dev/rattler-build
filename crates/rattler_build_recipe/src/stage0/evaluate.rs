@@ -1427,13 +1427,22 @@ pub fn evaluate_steps(
                     .map(|cwd| evaluate_string_value(cwd, context).map(PathBuf::from))
                     .transpose()?;
 
-                scripts.push(Stage1Step::new(rattler_build_script::Script {
+                let mut step = Stage1Step::new(rattler_build_script::Script {
                     interpreter,
                     env: evaluate_env_map("steps.env", &run.env, context)?,
                     content: ScriptContent::Commands(commands),
                     cwd,
                     ..Default::default()
-                }));
+                });
+                step.name.clone_from(&run.name);
+                step.optional = run.optional;
+                step.depends_on.clone_from(&run.depends_on);
+                step.requirements.build =
+                    evaluate_dependency_list(&run.requirements.build, context)?;
+                step.requirements.host = evaluate_dependency_list(&run.requirements.host, context)?;
+                step.requirements.inherit.build = run.requirements.inherit.build;
+                step.requirements.inherit.host = run.requirements.inherit.host;
+                scripts.push(step);
             }
         }
     }
@@ -2964,11 +2973,14 @@ impl Evaluate for Stage0Recipe {
         }
 
         let accessed_vars = context_with_vars.accessed_variables();
-        let free_specs = requirements
-            .free_specs()
-            .into_iter()
-            .map(NormalizedKey::from)
-            .collect::<HashSet<_>>();
+        let free_specs = stage1::Requirements::free_specs_from_dependencies(
+            requirements
+                .build_host()
+                .chain(build.plan.step_dependencies()),
+        )
+        .into_iter()
+        .map(NormalizedKey::from)
+        .collect::<HashSet<_>>();
 
         // Get the noarch type to determine which variant keys to exclude
         let noarch = build.noarch.unwrap_or(NoArchType::none());
@@ -3414,11 +3426,14 @@ fn evaluate_package_output_to_recipe(
     let resolved_context = context.variables().clone();
 
     let accessed_vars = context.accessed_variables();
-    let mut free_specs = requirements
-        .free_specs()
-        .into_iter()
-        .map(NormalizedKey::from)
-        .collect::<HashSet<_>>();
+    let mut free_specs = stage1::Requirements::free_specs_from_dependencies(
+        requirements
+            .build_host()
+            .chain(build.plan.step_dependencies()),
+    )
+    .into_iter()
+    .map(NormalizedKey::from)
+    .collect::<HashSet<_>>();
 
     // If this output inherits from a staging cache, also include the staging cache's free_specs
     // This ensures that variant variables from the staging cache are included in the hash
@@ -3569,8 +3584,18 @@ impl Evaluate for crate::stage0::MultiOutputRecipe {
                     evaluate_string_value(&staging_output.staging.name, &context_with_vars)?;
 
                 // Evaluate staging output components
-                let build = staging_output.build.evaluate(&context_with_vars)?;
-                let requirements = staging_output.requirements.evaluate(&context_with_vars)?;
+                let mut build = staging_output.build.evaluate(&context_with_vars)?;
+                let mut requirements = staging_output.requirements.evaluate(&context_with_vars)?;
+                if build.plan.steps().is_some() {
+                    let selected = build.plan.select_steps(None).map_err(|error| {
+                        ParseError::invalid_value("staging build.steps", error, Span::new_blank())
+                    })?;
+                    for step in &selected {
+                        requirements.build.extend(step.requirements.build.clone());
+                        requirements.host.extend(step.requirements.host.clone());
+                    }
+                    build.plan = Stage1BuildPlan::Steps(selected);
+                }
 
                 // Staging outputs inherit top-level sources (prepend), then add their own
                 // (conditionals expand to multiple sources)
@@ -4548,6 +4573,83 @@ outputs:
                 );
             }
             _ => panic!("Expected MultiOutputRecipe"),
+        }
+    }
+
+    #[test]
+    fn staging_steps_select_dependencies_and_collect_only_selected_requirements() {
+        let yaml = r#"
+recipe:
+  version: 1.0
+outputs:
+  - staging:
+      name: common
+    build:
+      steps:
+        - name: install
+          depends_on: [compile]
+          run: install
+          requirements:
+            host: [zlib]
+        - name: unused
+          optional: true
+          run: unused
+          requirements:
+            build: [unused-tool]
+        - name: compile
+          optional: true
+          run: compile
+          requirements:
+            build: [cmake]
+  - package:
+      name: result
+    inherit: common
+"#;
+        let ctx = EvaluationContext::with_variables_and_config(
+            IndexMap::new(),
+            JinjaConfig {
+                experimental: true,
+                ..Default::default()
+            },
+        );
+        let stage0::Recipe::MultiOutput(recipe) = parse_recipe_or_multi_from_source(yaml).unwrap()
+        else {
+            panic!("expected multi-output recipe");
+        };
+        let outputs = recipe.evaluate(&ctx).unwrap();
+        let cache = &outputs[0].staging_caches[0];
+        let names = cache
+            .build
+            .plan
+            .steps()
+            .unwrap()
+            .iter()
+            .map(|step| step.name.as_deref().unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(names, ["compile", "install"]);
+        assert_eq!(cache.requirements.build.len(), 1);
+        assert_eq!(
+            cache.requirements.build[0].name().unwrap().as_normalized(),
+            "cmake"
+        );
+        assert_eq!(
+            cache.requirements.host[0].name().unwrap().as_normalized(),
+            "zlib"
+        );
+
+        for invalid in [
+            yaml.replace("[compile]", "[missing]"),
+            yaml.replace(
+                "run: compile",
+                "depends_on: [install]\n          run: compile",
+            ),
+        ] {
+            let stage0::Recipe::MultiOutput(recipe) =
+                parse_recipe_or_multi_from_source(&invalid).unwrap()
+            else {
+                unreachable!();
+            };
+            assert!(recipe.evaluate(&ctx).is_err());
         }
     }
 

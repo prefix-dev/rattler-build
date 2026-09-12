@@ -401,7 +401,15 @@ pub fn vars(output: &Output, build_state: &str) -> HashMap<String, Option<String
         directories.build_prefix.to_string_lossy()
     );
     insert!(vars, "RECIPE_DIR", directories.recipe_dir.to_string_lossy());
-    insert!(vars, "SRC_DIR", directories.work_dir.to_string_lossy());
+    insert!(
+        vars,
+        "SRC_DIR",
+        directories
+            .source_dir
+            .as_ref()
+            .unwrap_or(&directories.work_dir)
+            .to_string_lossy()
+    );
     insert!(vars, "BUILD_DIR", directories.build_dir.to_string_lossy());
     insert!(
         vars,
