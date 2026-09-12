@@ -357,81 +357,109 @@ impl Output {
             return Ok(());
         }
 
-        let output_root = &exec_args.work_dir;
-        crate::recipe_patch::prepare_output_directory(output_root)?;
-        fs_err::create_dir_all(
-            self.build_configuration
-                .directories
-                .build_dir
-                .join(crate::consts::STEP_CACHE_DIRECTORY_NAME),
-        )?;
-        let dependency_identity = serde_json::to_vec(&(
-            &self.finalized_dependencies,
-            &self.recipe.build().plan,
-            exec_args.env_isolation,
-            &exec_args.sandbox_config,
-            exec_args.context.build().platform(),
-            exec_args.context.host().platform(),
-        ))
-        .map_err(std::io::Error::other)?;
-        let process_env = rattler_build_script::runner::resolve_process_env(
-            exec_args.env_isolation,
-            &exec_args.env_vars,
-            &exec_args.secrets,
-            exec_args.context.runtime(),
-        );
-        for (section_index, section) in exec_args.sections.iter().cloned().enumerate() {
-            let cache_path = section
-                .env
-                .get(crate::consts::RATTLER_BUILD_STEP_CACHE)
-                .map(PathBuf::from)
-                .ok_or_else(|| {
-                    std::io::Error::other("build step is missing its cache declaration path")
-                })?;
-            let root = section
-                .cwd
-                .clone()
-                .unwrap_or_else(|| exec_args.work_dir.clone());
-            let identity = cache_identity(
-                &section,
-                &process_env,
-                &exec_args.secrets,
-                &dependency_identity,
-            );
-            let cache = crate::step_cache::StepCacheEntry::new(
-                cache_path.clone(),
-                root,
-                identity,
-                crate::recipe_patch::output_file(output_root, section_index),
-            );
-            let cache_hit = match cache.probe() {
-                Ok(hit) => hit,
-                Err(error) => {
-                    tracing::warn!(
-                        "Ignoring invalid build step cache {}: {}",
-                        cache_path.display(),
-                        error
-                    );
-                    false
-                }
-            };
-            if cache_hit {
-                tracing::info!(
-                    "Skipping build step {} (cache hit)",
-                    section.label.as_deref().unwrap_or("unnamed")
-                );
-                continue;
-            }
-            cache.begin()?;
-            let mut section_args = exec_args.clone();
-            section_args.sections = vec![section];
-            rattler_build_script::run_script(section_args).await?;
-            cache.commit()?;
-        }
+        run_prepared_build_steps(
+            exec_args,
+            &(&self.finalized_dependencies, &self.recipe.build().plan),
+            true,
+        )
+        .await
+    }
+}
 
-        Ok(())
+fn prepare_step_directories(work_dir: &Path) -> std::io::Result<()> {
+    crate::recipe_patch::prepare_output_directory(work_dir)?;
+    fs_err::create_dir_all(
+        work_dir
+            .parent()
+            .unwrap_or(work_dir)
+            .join(crate::consts::STEP_CACHE_DIRECTORY_NAME),
+    )
+}
+
+/// Execute package or staging steps with the same cache transaction and output paths.
+/// Staging has no package identity: package metadata must be emitted by an inheritor.
+pub(crate) async fn run_prepared_build_steps(
+    exec_args: ExecutionArgs,
+    dependencies: &impl serde::Serialize,
+    allow_metadata_outputs: bool,
+) -> Result<(), InterpreterError> {
+    let output_root = &exec_args.work_dir;
+    prepare_step_directories(output_root)?;
+    let dependency_identity = serde_json::to_vec(&(
+        dependencies,
+        allow_metadata_outputs,
+        exec_args.env_isolation,
+        &exec_args.sandbox_config,
+        exec_args.context.build().platform(),
+        exec_args.context.host().platform(),
+    ))
+    .map_err(std::io::Error::other)?;
+    let process_env = rattler_build_script::runner::resolve_process_env(
+        exec_args.env_isolation,
+        &exec_args.env_vars,
+        &exec_args.secrets,
+        exec_args.context.runtime(),
+    );
+    for (section_index, section) in exec_args.sections.iter().cloned().enumerate() {
+        let cache_path = section
+            .env
+            .get(crate::consts::RATTLER_BUILD_STEP_CACHE)
+            .map(PathBuf::from)
+            .ok_or_else(|| {
+                std::io::Error::other("build step is missing its cache declaration path")
+            })?;
+        let root = section
+            .cwd
+            .clone()
+            .unwrap_or_else(|| exec_args.work_dir.clone());
+        let identity = cache_identity(
+            &section,
+            &process_env,
+            &exec_args.secrets,
+            &dependency_identity,
+        );
+        let cache = crate::step_cache::StepCacheEntry::new(
+            cache_path.clone(),
+            root,
+            identity,
+            crate::recipe_patch::output_file(output_root, section_index),
+        );
+        let cache_hit = match cache.probe() {
+            Ok(hit) => hit,
+            Err(error) => {
+                tracing::warn!(
+                    "Ignoring invalid build step cache {}: {}",
+                    cache_path.display(),
+                    error
+                );
+                false
+            }
+        };
+        if cache_hit {
+            tracing::info!(
+                "Skipping build step {} (cache hit)",
+                section.label.as_deref().unwrap_or("unnamed")
+            );
+            continue;
+        }
+        cache.begin()?;
+        let mut section_args = exec_args.clone();
+        section_args.sections = vec![section];
+        rattler_build_script::run_script(section_args).await?;
+        if !allow_metadata_outputs
+            && crate::recipe_patch::output_file(output_root, section_index).try_exists()?
+        {
+            return Err(std::io::Error::other(
+                    "staging steps cannot emit package metadata through OUTPUT_FILE; move the metadata-producing action to an inheriting package output",
+                ).into());
+        }
+        cache.commit()?;
     }
 
+    Ok(())
+}
+
+impl Output {
     /// Create the build script files without executing them.
     ///
     /// This method generates the build script and environment setup files in the working
@@ -452,9 +480,7 @@ impl Output {
         let _enter = span.enter();
 
         if self.recipe.build().plan.steps().is_some() {
-            crate::recipe_patch::prepare_output_directory(
-                &self.build_configuration.directories.work_dir,
-            )?;
+            prepare_step_directories(&self.build_configuration.directories.work_dir)?;
         }
         let exec_args = self.prepare_build_script().await?;
         rattler_build_script::create_build_script(exec_args).await

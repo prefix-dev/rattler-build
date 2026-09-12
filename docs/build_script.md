@@ -268,6 +268,17 @@ Complete CMake, Meson, Rust, and Go recipes are available in
 [`examples/step-providers`](https://github.com/prefix-dev/rattler-build/tree/main/examples/step-providers).
 
 
+### Staging steps
+
+Staging actions use the same step execution and cache transactions as package
+actions. `RATTLER_BUILD_STEP_CACHE` is available, and successful declarations
+are recorded; a whole-stage cache hit still bypasses execution of the stage.
+
+Staging outputs do not have a package identity. Writing package metadata to
+`OUTPUT_FILE` from a staging step is rejected with an error before a success
+record is committed. Put metadata-producing actions, such as dependency-license
+collection, on the inheriting package output instead.
+
 ### Post-build outputs
 
 Each build-step section receives a unique `OUTPUT_FILE` (also exposed as
