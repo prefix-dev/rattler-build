@@ -103,8 +103,13 @@ def test_run_refuses_changed_sources_without_discarding_edits(
     recipe_path = tmp_path / "recipe.yaml"
     recipe_path.write_text(yaml.safe_dump(recipe))
     args = [
-        "run", "check", "--recipe", str(recipe_path), "--experimental",
-        "--output-dir", str(tmp_path / "output"),
+        "run",
+        "check",
+        "--recipe",
+        str(recipe_path),
+        "--experimental",
+        "--output-dir",
+        str(tmp_path / "output"),
     ]
     result = rattler_build(*args, capture_output=True)
     assert result.returncode == 0, result.stderr
