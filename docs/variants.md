@@ -103,6 +103,53 @@ To build against multiple Python versions you can separate the variant strings b
 
 This will follow the same logic as using multiple variant files: the CLI will overwrite any variant keys set by files that were loaded.
 
+## Variables used in build scripts
+
+Variant variables are exported as environment variables to the build script.
+Because of that, `rattler-build` also scans the build scripts of a recipe for
+environment variable usage and cross-references the found names with the
+variant configuration. Any variant key that is referenced in a build script
+counts as a "used variable" — exactly as if it had been referenced with
+`${{ ... }}` in the recipe — and becomes part of the variant matrix and the
+package hash.
+
+For example, with the following variant configuration:
+
+```yaml title="variants.yaml"
+TARGET:
+  - aarch64-unknown-linux-gnu
+  - x86_64-unknown-linux-gnu
+```
+
+... and a `build.sh` that contains `${TARGET}` (or `$TARGET`), two variants
+are built, without needing to forward the variable manually via
+`build.variant.use_keys`.
+
+The scan covers inline scripts, script files referenced via `script.file`, and
+the default `build.sh` / `build.bat` discovery.
+
+The rule is deliberately simple and interpreter-agnostic: a variant key counts
+as used when its (normalized) name occurs **literally** in the script text as
+a standalone word — case-sensitive, not embedded in a longer identifier — and
+is directly preceded by a *usage sigil*: one of `$`, `{`, `%`, `!`, `#`, `:`,
+a quote (`"` or `'`), or an `env.` prefix. This covers the access spellings of
+every interpreter rattler-build supports (bash, brush, cmd.exe, powershell,
+python, nushell, perl, R, ruby, node):
+
+- matches: `$TARGET`, `${TARGET}`, `${TARGET:-default}`, `%TARGET%`,
+  `!TARGET!`, `$env:TARGET`, `os.environ["TARGET"]`, `Sys.getenv("TARGET")`,
+  `ENV['TARGET']`, `$ENV{TARGET}`, `$env.TARGET`, `process.env.TARGET`
+- does not match: a bare prose mention (`# adjust TARGET here`), a command
+  name that happens to equal a variant key (running `cmake` while the config
+  pins `cmake`), a longer identifier (`$TARGET_ARCH`), or different casing
+  (`$target`)
+
+Because the search is a heuristic rather than a full parser, a sigil-prefixed
+key inside a comment or string still matches, and dynamically constructed
+variable names cannot be detected. In those cases you can use
+`build.variant.use_keys` to forward a variant key explicitly, or
+`build.variant.ignore_keys` to opt out of a detected one.
+
 ## Package hash from variant
 
 You might have wondered what the role of the build string is. The build string is (if not explicitly set) computed from the variant configuration.
