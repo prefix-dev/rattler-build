@@ -2,13 +2,13 @@ schema_version: 1
 
 package:
   name: python-rattler-build-steps
-  version: 0.1.0
+  version: 0.2.0
 
 source:
   path: .
 
 build:
-  number: 2
+  number: 0
   noarch: generic
   script:
     interpreter: python

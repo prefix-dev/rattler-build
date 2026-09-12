@@ -32,7 +32,7 @@ source:
 build:
   noarch: python
   metadata:
-    uses: python:metadata@0.1.*
+    uses: python:metadata@0.2.*
 
 tests:
   - python:
@@ -48,7 +48,7 @@ requirements.run.append ["python >=3.8.0","pygments >=2.13.0,<3","markdown-it-py
 about.summary "Render rich text, tables, progress bars, syntax highlighting, markdown and more to the terminal"
 about.license "MIT"
 about.license_file.append "LICENSE"
-build.steps [{"name":"python-build","uses":"python:build@==0.1.0"}]
+build.steps [{"name":"python-build","uses":"python:build@==0.2.0"}]
 ```
 
 ## Run the complete example locally
@@ -65,7 +65,7 @@ Publish that artifact to a temporary local channel:
 
 ```console
 rattler-build publish \
-  output/provider/noarch/python-rattler-build-steps-0.1.0-*.conda \
+  output/provider/noarch/python-rattler-build-steps-0.2.0-*.conda \
   --to output/provider-channel
 ```
 
@@ -89,11 +89,20 @@ To publish the rebuilt provider:
 
 ```console
 rattler-build publish \
-  output/provider/noarch/python-rattler-build-steps-0.1.0-*.conda \
+  output/provider/noarch/python-rattler-build-steps-0.2.0-*.conda \
   --to prefix://beta.prefix.dev/wolfv/rattler-build-steps
 ```
 
 Publishing requires an authenticated prefix.dev account with upload permission.
+
+## Migrating older published providers
+
+Provider 0.2.0 uses the compiled-action contract. Older 0.1.0 artifacts may
+still reference `RATTLER_BUILD_PROVIDER_PREFIX`, which the executor no longer
+supplies. Rebuild and publish the provider above before using the remote
+channel; changing the consumer recipe alone does not update published packages.
+The backend must be an explicit bootstrap build requirement and is loaded from
+`BUILD_PREFIX`. Do not point it at the action transport cache.
 
 ## Provider layout
 

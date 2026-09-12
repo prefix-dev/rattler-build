@@ -14,7 +14,7 @@ source:
 build:
   noarch: python
   metadata:
-    uses: python:metadata@0.1.*
+    uses: python:metadata@0.2.*
     with:
       backend_args: [--config-setting, rich-build=true]
 

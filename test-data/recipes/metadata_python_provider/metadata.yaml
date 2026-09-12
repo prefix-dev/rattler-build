@@ -5,13 +5,13 @@ inputs:
     default: []
 
 requirements:
-  build: [python >=3.11, packaging, python-rattler-build-steps ==0.1.0]
+  build: [python >=3.11, packaging, python-rattler-build-steps ==0.2.0]
 
 steps:
   - name: python-metadata
     interpreter: python
     env:
-      RATTLER_BUILD_PROVIDER_VERSION: "0.1.0"
+      RATTLER_BUILD_PROVIDER_VERSION: "0.2.0"
       RATTLER_BUILD_BACKEND_ARGS: ${{ inputs.backend_args | join(' ') }}
     run: |
       import os
