@@ -27,7 +27,7 @@ rattler-build run [OPTIONS] <STEPS>...
 - <a id="arg---recipe-dir" href="#arg---recipe-dir">`--recipe-dir <RECIPE_DIR>`</a>
 :  The directory that contains recipes
 - <a id="arg---up-to" href="#arg---up-to">`--up-to <UP_TO>`</a>
-:  Build recipes up to the specified package
+:  Build only the specified package and outputs needed to build it. Runtime and explicit test dependencies are also included unless tests are skipped
 - <a id="arg---build-platform" href="#arg---build-platform">`--build-platform <BUILD_PLATFORM>`</a>
 :  The build platform to use for the build (e.g. for building with emulation, or rendering)
 - <a id="arg---target-platform" href="#arg---target-platform">`--target-platform <TARGET_PLATFORM>`</a>
@@ -105,6 +105,10 @@ e.g. `tar-bz2:<number>` (from 1 to 9) or `conda:<number>` (from -7 to
 :  Error if the host prefix is detected in any binary files
 - <a id="arg---allow-symlinks-on-windows" href="#arg---allow-symlinks-on-windows">`--allow-symlinks-on-windows`</a>
 :  Allow symlinks in packages on Windows (defaults to false - symlinks are forbidden on Windows)
+- <a id="arg---error-overlapping-files" href="#arg---error-overlapping-files">`--error-overlapping-files`</a>
+:  Error instead of warn when outputs of one recipe package the same file
+- <a id="arg---error-unused-staging-files" href="#arg---error-unused-staging-files">`--error-unused-staging-files`</a>
+:  Error instead of warn when files from a staging cache are not included in any output that inherits from it
 - <a id="arg---exclude-newer" href="#arg---exclude-newer">`--exclude-newer <EXCLUDE_NEWER>`</a>
 :  Exclude packages newer than this date from the solver, in RFC3339 format (e.g. 2024-03-15T12:00:00Z)
 
