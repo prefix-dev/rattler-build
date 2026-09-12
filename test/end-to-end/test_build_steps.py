@@ -184,6 +184,32 @@ outputs:
     assert "Running pre-solve metadata step" not in result.stderr
 
 
+@pytest.mark.parametrize("reusable", [False, True])
+def test_metadata_runtime_jinja_matches_step_environment(
+    rattler_build: RattlerBuild, tmp_path: Path, reusable: bool
+):
+    step = {
+        "env": {"MESSAGE": "from-step-env", "OUTPUT_FILE": "wrong-output.txt"},
+        "run": 'echo about.summary ${{ MESSAGE }} > "${{OUTPUT_FILE}}"',
+    }
+    (tmp_path / "metadata.yaml").write_text(yaml.safe_dump({"steps": [step]}))
+    (tmp_path / "recipe.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "package": {"name": "metadata-jinja", "version": "1"},
+                "build": {
+                    "metadata": {"uses": "./metadata.yaml"} if reusable else step
+                },
+            }
+        )
+    )
+    rendered = rattler_build.render(
+        tmp_path, tmp_path / "output", extra_args=["--experimental"]
+    )
+    assert rendered[0]["recipe"]["about"]["summary"] == "from-step-env"
+    assert not list(tmp_path.rglob("wrong-output.txt"))
+
+
 def test_metadata_requires_output_file(rattler_build: RattlerBuild, tmp_path: Path):
     """A successful command that forgets the metadata protocol is an error."""
     recipe = tmp_path / "missing-output" / "recipe.yaml"

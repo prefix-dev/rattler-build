@@ -278,16 +278,6 @@ pub async fn run_metadata_step(
         } else {
             source_dir.clone()
         };
-        let jinja = crate::script::execution_jinja(
-            output.build_configuration.selector_config(),
-            &output.recipe.context,
-            step.action_context.as_ref(),
-        );
-        let renderer = |template: &str| {
-            jinja
-                .render_str(template)
-                .map_err(|error| error.to_string())
-        };
         let mut script = step.to_script();
         // Executor-provided metadata variables are reserved. `Script::run_script`
         // normally lets script-local values override its base environment, so
@@ -295,6 +285,19 @@ pub async fn run_metadata_step(
         for key in env.keys() {
             script.env.shift_remove(key);
         }
+        let jinja = crate::script::execution_jinja(
+            output.build_configuration.selector_config(),
+            &output.recipe.context,
+            step.action_context.as_ref(),
+            env.iter()
+                .filter_map(|(key, value)| value.as_ref().map(|value| (key, value)))
+                .chain(script.env.iter()),
+        );
+        let renderer = |template: &str| {
+            jinja
+                .render_str(template)
+                .map_err(|error| error.to_string())
+        };
         // Keep generated wrappers in the temporary workspace while running the
         // actual command in the local project directory.
         script.cwd = Some(work_dir);
