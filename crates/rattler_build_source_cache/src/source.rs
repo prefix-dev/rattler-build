@@ -180,7 +180,7 @@ pub struct IdentityCheck {
 /// Attestation verification configuration for the cache layer
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AttestationVerification {
-    /// URL to download the attestation bundle from, or None for auto-derived PyPI URLs
+    /// URL to download the attestation bundle from, or None for automatic provider discovery
     pub bundle_url: Option<url::Url>,
     /// Identity checks to perform. All must pass.
     pub identity_checks: Vec<IdentityCheck>,

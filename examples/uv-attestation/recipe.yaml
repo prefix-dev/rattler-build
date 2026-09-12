@@ -1,0 +1,52 @@
+# Example: GitHub immutable-release attestation verification
+#
+# uv uploads source.tar.gz as a release asset. Rattler-Build derives the
+# repository attestations API URL from the asset SHA-256, so no bundle_url or
+# unstable GitHub attestation download ID is needed.
+#
+# `github:astral-sh/uv` binds the signed release statement to the repository
+# subject `pkg:github/astral-sh/uv@${{ version }}`. The certificate itself is
+# issued to GitHub's release service (`https://dotcom.releases.github.com`).
+
+context:
+  version: "0.12.1"
+
+package:
+  name: uv
+  version: ${{ version }}
+
+source:
+  url: https://github.com/astral-sh/uv/releases/download/${{ version }}/source.tar.gz
+  sha256: 5f0503f896f1209f6114835a7754369c2484331b0caab4c1ecd4579dfd2a31b0
+  attestation:
+    publishers:
+      - github:astral-sh/uv
+
+build:
+  number: 0
+  skip:
+    - win
+  script:
+    - cargo install --locked --root "$PREFIX" --path crates/uv
+
+requirements:
+  build:
+    - ${{ compiler("c") }}
+    - ${{ compiler("cxx") }}
+    - ${{ compiler("rust") }}
+    - ${{ stdlib("c") }}
+    - cmake
+    - make
+
+tests:
+  - script:
+      - uv --version
+
+about:
+  homepage: https://github.com/astral-sh/uv
+  license: Apache-2.0 OR MIT
+  license_file:
+    - LICENSE-APACHE
+    - LICENSE-MIT
+  summary: An extremely fast Python package and project manager, written in Rust
+  repository: https://github.com/astral-sh/uv
