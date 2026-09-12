@@ -1,8 +1,7 @@
-from pathlib import Path
 import shutil
+from pathlib import Path
 
 import yaml
-
 from helpers import RattlerBuild, get_extracted_package, get_package
 
 
