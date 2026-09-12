@@ -915,15 +915,17 @@ pub async fn get_build_output(
             .await?;
         for mut output in expanded {
             show_effective_build_steps(&output);
-            subpackages.insert(
-                output.name().clone(),
-                PackageIdentifier {
-                    name: output.name().clone(),
-                    version: output.recipe.package().version().clone(),
-                    build_string: output.build_string().into_owned(),
-                },
-            );
-            output.build_configuration.subpackages = subpackages.clone();
+            let identifier = PackageIdentifier {
+                name: output.name().clone(),
+                version: output.recipe.package().version().clone(),
+                build_string: output.build_string().into_owned(),
+            };
+            subpackages.insert(output.name().clone(), identifier.clone());
+            // Refresh this output without replacing variant-specific sibling pins.
+            output
+                .build_configuration
+                .subpackages
+                .insert(identifier.name.clone(), identifier);
             outputs.push(output);
         }
     }
