@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Any
 from rattler_build._rattler_build import EnvironmentIsolation, RepodataRevision
 from rattler_build._rattler_build import render as _render
 from rattler_build._rattler_build import stage0 as _stage0
+from rattler_build.exclude_newer import ExcludeNewer
 from rattler_build.render import RenderConfig, RenderedVariant
 from rattler_build.tool_config import ToolConfiguration
 from rattler_build.variant_config import VariantConfig
@@ -300,7 +301,7 @@ class Stage0Recipe(ABC):
         no_build_id: bool = False,
         package_format: str | None = None,
         no_include_recipe: bool = False,
-        exclude_newer: datetime | None = None,
+        exclude_newer: datetime | ExcludeNewer | None = None,
         env_isolation: EnvironmentIsolation = EnvironmentIsolation.STRICT,
         render_config: RenderConfig | None = None,
     ) -> list[BuildResult]:
@@ -320,7 +321,7 @@ class Stage0Recipe(ABC):
             no_build_id: Don't include build ID in output directory.
             package_format: Package format ("conda" or "tar.bz2").
             no_include_recipe: Don't include recipe in the output package.
-            exclude_newer: Exclude packages newer than this timestamp.
+            exclude_newer: Dependency cutoff policy, or a datetime for a global cutoff.
             env_isolation: Environment isolation mode. Defaults to ``EnvironmentIsolation.STRICT``.
             render_config: Optional RenderConfig to use when rendering before building.
 

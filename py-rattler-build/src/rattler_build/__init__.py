@@ -22,6 +22,7 @@ from rattler_build.cli_api import (
     test_package,
 )
 from rattler_build.debug import DebugPaths, DebugSession, ScriptResult
+from rattler_build.exclude_newer import ExcludeNewer
 from rattler_build.jinja_config import JinjaConfig
 from rattler_build.package import (
     CommandsTest,
@@ -80,6 +81,7 @@ __all__ = [
     "DownstreamTest",
     # Build configuration
     "EnvironmentIsolation",
+    "ExcludeNewer",
     "FileChecks",
     "FileEntry",
     "IoError",

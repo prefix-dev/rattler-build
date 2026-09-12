@@ -267,7 +267,7 @@ impl PyPackage {
     }
 
     /// Run a specific test by index
-    #[pyo3(signature = (index, channel=None, channel_priority=None, auth_file=None, allow_insecure_host=None, compression_threads=None, use_bz2=true, use_zstd=true, use_sharded=true, progress_callback=None))]
+    #[pyo3(signature = (index, channel=None, channel_priority=None, auth_file=None, allow_insecure_host=None, compression_threads=None, use_bz2=true, use_zstd=true, use_sharded=true, progress_callback=None, *, exclude_newer=None))]
     #[allow(clippy::too_many_arguments)]
     fn run_test(
         &self,
@@ -281,6 +281,7 @@ impl PyPackage {
         use_zstd: bool,
         use_sharded: bool,
         progress_callback: Option<Py<PyAny>>,
+        exclude_newer: Option<crate::exclude_newer::PyExcludeNewer>,
     ) -> PyResult<PyTestResult> {
         self.run_test_internal(
             Some(index),
@@ -293,12 +294,13 @@ impl PyPackage {
             use_zstd,
             use_sharded,
             progress_callback,
+            exclude_newer.and_then(|policy| policy.inner),
         )
         .map(|results| results.into_iter().next().unwrap())
     }
 
     /// Run all tests in the package
-    #[pyo3(signature = (channel=None, channel_priority=None, auth_file=None, allow_insecure_host=None, compression_threads=None, use_bz2=true, use_zstd=true, use_sharded=true, progress_callback=None))]
+    #[pyo3(signature = (channel=None, channel_priority=None, auth_file=None, allow_insecure_host=None, compression_threads=None, use_bz2=true, use_zstd=true, use_sharded=true, progress_callback=None, *, exclude_newer=None))]
     #[allow(clippy::too_many_arguments)]
     fn run_tests(
         &self,
@@ -311,6 +313,7 @@ impl PyPackage {
         use_zstd: bool,
         use_sharded: bool,
         progress_callback: Option<Py<PyAny>>,
+        exclude_newer: Option<crate::exclude_newer::PyExcludeNewer>,
     ) -> PyResult<Vec<PyTestResult>> {
         self.run_test_internal(
             None,
@@ -323,6 +326,7 @@ impl PyPackage {
             use_zstd,
             use_sharded,
             progress_callback,
+            exclude_newer.and_then(|policy| policy.inner),
         )
     }
 
@@ -492,6 +496,7 @@ impl PyPackage {
         use_zstd: bool,
         use_sharded: bool,
         progress_callback: Option<Py<PyAny>>,
+        exclude_newer: Option<rattler_solve::ExcludeNewer>,
     ) -> PyResult<Vec<PyTestResult>> {
         use ::rattler_build::{
             config::Config,
@@ -547,13 +552,14 @@ impl PyPackage {
             .into());
         }
 
-        let test_data = TestData::new(
+        let mut test_data = TestData::new(
             self.path.clone(),
             channel,
             compression_threads,
             test_index,
             common,
         );
+        test_data.exclude_newer = exclude_newer;
 
         // Run the test(s) with log capture and optional streaming callback
         let (result, log_buffer) = tracing_subscriber::with_log_capture(progress_callback, || {
