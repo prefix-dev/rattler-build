@@ -108,6 +108,10 @@ With `--source-dir .`, commands execute directly in the project checkout,
 `SRC_DIR` points there, and tools such as CMake reuse the project's cache.
 This intentionally bypasses recipe source fetching and patch application; the
 checkout is treated as already prepared.
+Without `--source-dir`, repeated runs reuse prepared sources only while their
+recipe path and source definitions match. If they change, execution stops rather
+than discarding local edits or using stale sources. Preserve your edits and move
+the reported work directory aside to fetch fresh sources on the next run.
 Set `requirements.inherit: false` to create a standalone tool environment,
 such as for a Python `ruff` lint step, while retaining the step requirements.
 Use `inherit: {build: false, host: true}` (or the expanded YAML mapping) to

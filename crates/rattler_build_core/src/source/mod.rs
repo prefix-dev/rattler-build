@@ -526,6 +526,7 @@ pub async fn fetch_sources(
         recipe_path: directories.recipe_path.clone(),
         source_cache: cache_src,
         sources: rendered_sources.clone(),
+        requested_sources: Some(sources.to_vec()),
         extracted_paths,
     };
     let source_info_path = work_dir.join(".source_info.json");
@@ -549,6 +550,10 @@ pub struct SourceInformation {
     /// The sources used in the recipe
     pub sources: Vec<Source>,
 
+    /// Authored source definitions before resolving Git revisions and other mutable references.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub requested_sources: Option<Vec<Source>>,
+
     /// Mapping from source index to extracted directory path (for URL sources that were extracted)
     /// This is optional for backward compatibility
     #[serde(default, skip_serializing_if = "std::collections::HashMap::is_empty")]
@@ -556,6 +561,35 @@ pub struct SourceInformation {
 }
 
 impl Output {
+    /// Check that a persistent work tree still belongs to this recipe's source definitions.
+    /// Refuse mismatches rather than deleting edits or silently executing outdated sources.
+    pub fn has_reusable_sources(&self) -> miette::Result<bool> {
+        use miette::IntoDiagnostic;
+
+        // Staging restores its own source tree and source-info file. Package sources
+        // must be applied on top of that tree, not mistaken for the staged sources.
+        if !self.recipe.staging_caches.is_empty() {
+            return Ok(false);
+        }
+        let directories = &self.build_configuration.directories;
+        let path = directories.work_dir.join(".source_info.json");
+        let contents = match fs::read(&path) {
+            Ok(contents) => contents,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+            Err(error) => return Err(error).into_diagnostic(),
+        };
+        let info: SourceInformation = serde_json::from_slice(&contents).into_diagnostic()?;
+        if info.recipe_path != directories.recipe_path
+            || info.requested_sources.as_deref() != Some(self.recipe.source.as_slice())
+        {
+            return Err(miette::miette!(
+                "prepared sources in {} do not match the recipe (or predate source tracking); preserve any edits and move the work directory aside before rerunning, or use --source-dir for an explicitly prepared checkout",
+                directories.work_dir.display()
+            ));
+        }
+        Ok(true)
+    }
+
     /// Fetches the sources for the given output and returns a new output with the finalized sources attached
     pub async fn fetch_sources(
         self,

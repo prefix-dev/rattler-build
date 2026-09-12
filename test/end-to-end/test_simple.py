@@ -88,6 +88,49 @@ build:
     assert (source / "checked.txt").read_text().strip() == "checked"
 
 
+def test_run_refuses_changed_sources_without_discarding_edits(
+    rattler_build: RattlerBuild, tmp_path: Path
+):
+    for name in ["first", "second"]:
+        source = tmp_path / name
+        source.mkdir()
+        (source / "input.txt").write_text(name)
+    recipe = {
+        "package": {"name": "persistent-source-check", "version": "1"},
+        "source": {"path": "first"},
+        "build": {"steps": [{"name": "check", "run": "echo ran >> runs.txt"}]},
+    }
+    recipe_path = tmp_path / "recipe.yaml"
+    recipe_path.write_text(yaml.safe_dump(recipe))
+    args = [
+        "run", "check", "--recipe", str(recipe_path), "--experimental",
+        "--output-dir", str(tmp_path / "output"),
+    ]
+    result = rattler_build(*args, capture_output=True)
+    assert result.returncode == 0, result.stderr
+    (work,) = (tmp_path / "output" / "bld").glob("*/work")
+    (work / "input.txt").write_text("local edit")
+    result = rattler_build(*args, capture_output=True)
+    assert result.returncode == 0, result.stderr
+    assert len((work / "runs.txt").read_text().splitlines()) == 2
+
+    recipe["source"]["path"] = "second"
+    recipe["package"]["version"] = "2"
+    recipe_path.write_text(yaml.safe_dump(recipe))
+    result = rattler_build(*args, capture_output=True)
+    assert result.returncode != 0
+    assert "prepared sources" in result.stderr
+    assert "do not match" in result.stderr
+    assert (work / "input.txt").read_text() == "local edit"
+    assert len((work / "runs.txt").read_text().splitlines()) == 2
+
+    result = rattler_build(
+        *args, "--source-dir", str(tmp_path / "second"), capture_output=True
+    )
+    assert result.returncode == 0, result.stderr
+    assert (tmp_path / "second" / "runs.txt").is_file()
+
+
 def test_build_steps_reject_uses(rattler_build: RattlerBuild, tmp_path: Path):
     recipe = tmp_path / "recipe.yaml"
     recipe.write_text(

@@ -1711,14 +1711,9 @@ pub async fn run_steps(
         output.finalized_cache_sources = Some(sources);
         output.staging_library_name_map = Some(library_name_map);
     }
-    let source_info = output
-        .build_configuration
-        .directories
-        .work_dir
-        .join(".source_info.json");
     if let Some(source_dir) = &output.build_configuration.directories.source_dir {
         tracing::info!("Using project source tree in {}", source_dir.display());
-    } else if source_info.exists() {
+    } else if output.has_reusable_sources()? {
         tracing::info!(
             "Reusing source tree in {}",
             output.build_configuration.directories.work_dir.display()
