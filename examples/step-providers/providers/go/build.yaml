@@ -1,0 +1,31 @@
+schema_version: 1
+
+inputs:
+  packages:
+    type: string
+    default: ./...
+  build_args:
+    type: list
+    items: string
+    default: []
+  collect_licenses:
+    type: boolean
+    default: false
+  license_args:
+    type: list
+    items: string
+    default: []
+steps:
+  - name: go-build
+    requirements:
+      build: [go]
+    run: mkdir -p "$PREFIX/bin" && GOBIN="$PREFIX/bin" go install ${{ inputs.build_args | join(' ') }} ${GO_BUILD_ARGS:-} ${{ inputs.packages }}
+  - name: go-licenses
+    if: inputs.collect_licenses
+    depends_on: [go-build]
+    requirements:
+      build: [go-licenses]
+    run: |
+      rm -rf "$BUILD_DIR/go-dependencies" && go-licenses save ${{ inputs.packages }} --save_path "$BUILD_DIR/go-dependencies" ${{ inputs.license_args | join(' ') }} ${GO_LICENSE_ARGS:-} && mkdir -p "$BUILD_DIR/go-dependencies"
+      dollar='$'
+      printf 'about.license_file.include.append "%s{{ BUILD_DIR }}/go-dependencies/**"\n' "$dollar" >> "$OUTPUT_FILE"

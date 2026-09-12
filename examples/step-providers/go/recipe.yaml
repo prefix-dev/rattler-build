@@ -10,7 +10,7 @@ source:
 build:
   skip: win
   steps:
-    - uses: go:build@0.4.*
+    - uses: go:build@0.5.*
       with:
         packages: ./...
         collect_licenses: true

@@ -10,7 +10,7 @@ source:
 build:
   skip: win
   steps:
-    - uses: rust:build@0.3.*
+    - uses: rust:build@0.4.*
       with:
         locked: false
         features:

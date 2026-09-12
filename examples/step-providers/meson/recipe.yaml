@@ -10,7 +10,7 @@ source:
 build:
   skip: win
   steps:
-    - uses: meson:build@0.3.*
+    - uses: meson:build@0.4.*
       with:
         build_type: debugoptimized
         extra_args:

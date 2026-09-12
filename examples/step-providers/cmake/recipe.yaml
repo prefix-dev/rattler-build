@@ -10,7 +10,7 @@ source:
 build:
   skip: win
   steps:
-    - uses: cmake:build@0.3.*
+    - uses: cmake:build@0.4.*
       with:
         build_type: RelWithDebInfo
         extra_args:
