@@ -757,7 +757,8 @@ def test_metadata_selection_allocates_standalone_prefixes(
     assert (
         bld / "rattler-build_metadata-prefix-isolation-steps-lint-no-build-no-host"
     ).is_dir()
-    assert len(list(bld.glob("*/host*/parent-marker"))) == 1
+    host_prefix = "h_env" if os.name == "nt" else "host_env*"
+    assert len(list(bld.glob(f"*/{host_prefix}/parent-marker"))) == 1
 
 
 def test_metadata_generated_selection_skips_unselected_action(
