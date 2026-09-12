@@ -11,6 +11,8 @@ steps:
 
       output = Path(os.environ["BUILD_DIR"]) / "python-wheels"
       output.mkdir(parents=True, exist_ok=True)
+      for wheel in output.glob("*.whl"):
+          wheel.unlink()
       ProjectBuilder(os.environ["SRC_DIR"]).build("wheel", str(output))
 
   - name: install-wheel

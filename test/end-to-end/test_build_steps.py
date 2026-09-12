@@ -336,6 +336,43 @@ def test_python_metadata_backend_builds_external_rich_source(
     assert (pkg / "info" / "licenses" / "LICENSE").exists()
 
 
+def test_python_build_action_discards_wheels_from_previous_runs(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    project = tmp_path / "project"
+    project.mkdir()
+    shutil.copyfile(
+        recipes / "metadata_python_provider" / "build.yaml", project / "build.yaml"
+    )
+    (project / "hello.py").write_text('message = "hello"\n')
+    recipe = {
+        "package": {"name": "wheel-cleanup", "version": "1"},
+        "build": {"steps": [{"name": "build", "uses": "./build.yaml"}]},
+        "requirements": {"host": ["setuptools"]},
+    }
+    (project / "recipe.yaml").write_text(yaml.safe_dump(recipe))
+    output = tmp_path / "output"
+    for version in ["1.0", "2.0"]:
+        (project / "pyproject.toml").write_text(
+            '[build-system]\nrequires = ["setuptools"]\nbuild-backend = "setuptools.build_meta"\n'
+            f'[project]\nname = "wheel-cleanup"\nversion = "{version}"\n'
+        )
+        rattler_build(
+            "run",
+            "build",
+            "--recipe",
+            str(project),
+            "--source-dir",
+            str(project),
+            "--output-dir",
+            str(output),
+            "--experimental",
+        )
+        wheels = list(output.glob("bld/*/python-wheels/*.whl"))
+        assert len(wheels) == 1
+        assert wheels[0].name.startswith(f"wheel_cleanup-{version}-")
+
+
 def test_reusable_steps_inputs_and_generated_licenses(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
