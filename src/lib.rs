@@ -312,6 +312,30 @@ impl MetadataRenderer<'_> {
             candidate.build_configuration.hash = discovered.hash;
             candidate.build_configuration.variant = discovered.used_vars;
             candidate.build_configuration.target_platform = discovered.target_platform;
+            // Metadata's bootstrap plan cannot determine the selected group's
+            // inheritance policy. Allocate its isolated prefixes only now.
+            if let Some(name) = isolated_step_build_name(
+                candidate.name().as_normalized(),
+                &candidate.recipe,
+                self.build_data.selected_steps.as_deref(),
+            ) {
+                let directories = &candidate.build_configuration.directories;
+                let source_dir = directories.source_dir.clone();
+                let mut final_directories = Directories::builder(
+                    &name,
+                    self.recipe_path,
+                    &directories.output_dir,
+                    &candidate.build_configuration.timestamp,
+                    Platform::current(),
+                )
+                .no_build_id(self.build_data.no_build_id)
+                .merge_build_and_host(candidate.recipe.build.merge_build_and_host_envs)
+                .skip_directory_creation(self.build_data.render_only)
+                .build()
+                .into_diagnostic()?;
+                final_directories.source_dir = source_dir;
+                candidate.build_configuration.directories = final_directories;
+            }
             tracing::info!(
                 "Generated metadata for {}:\n{}",
                 candidate.identifier(),
@@ -321,6 +345,34 @@ impl MetadataRenderer<'_> {
         }
         Ok(expanded)
     }
+}
+
+fn isolated_step_build_name(
+    name: &str,
+    recipe: &Recipe,
+    selected: Option<&[String]>,
+) -> Option<String> {
+    let selected = selected?;
+    let inherit = &recipe.build.action_requirements.inherit;
+    if inherit.build && inherit.host {
+        return None;
+    }
+    let group = selected
+        .join("-")
+        .chars()
+        .map(|character| {
+            if character.is_ascii_alphanumeric() || matches!(character, '-' | '_') {
+                character
+            } else {
+                '_'
+            }
+        })
+        .collect::<String>();
+    Some(format!(
+        "{name}-steps-{group}{}{}",
+        if inherit.build { "" } else { "-no-build" },
+        if inherit.host { "" } else { "-no-host" },
+    ))
 }
 
 fn show_effective_build_steps(output: &Output) {
@@ -675,25 +727,6 @@ pub async fn get_build_output(
     let timestamp = jiff::Timestamp::now();
 
     for discovered_output in outputs_and_variants {
-        let root_inheritance = discovered_output
-            .recipe
-            .build
-            .plan
-            .steps()
-            .unwrap_or_default()
-            .iter()
-            .find(|step| {
-                step.name.as_ref().is_some_and(|name| {
-                    build_data
-                        .selected_steps
-                        .as_ref()
-                        .is_some_and(|selected| selected.contains(name))
-                })
-            })
-            .map(|step| &step.requirements.inherit);
-        let inherit_parent_build = root_inheritance.is_none_or(|inherit| inherit.build);
-        let inherit_parent_host = root_inheritance.is_none_or(|inherit| inherit.host);
-
         let recipe = &discovered_output.recipe;
 
         // Check if this build should be skipped based on skip conditions
@@ -732,7 +765,7 @@ pub async fn get_build_output(
         // Use the global build name for outputs that inherit from staging caches
         // This ensures staging caches and their dependent packages share the same build directory
         // Otherwise, use the output's own name for the build directory
-        let mut build_name = if recipe.inherits_from.is_some() {
+        let build_name = if recipe.inherits_from.is_some() {
             global_build_name.clone()
         } else {
             recipe.package().name().as_normalized().to_string()
@@ -740,31 +773,9 @@ pub async fn get_build_output(
         // An isolated local solve gets its own deterministic prefixes. This
         // prevents packages left by a previous parent-based solve from leaking
         // into a standalone lint/tool environment.
-        if build_data.selected_steps.is_some() && (!inherit_parent_build || !inherit_parent_host) {
-            let step_group = build_data
-                .selected_steps
-                .as_deref()
-                .unwrap_or_default()
-                .join("-")
-                .chars()
-                .map(|character| {
-                    if character.is_ascii_alphanumeric() || matches!(character, '-' | '_') {
-                        character
-                    } else {
-                        '_'
-                    }
-                })
-                .collect::<String>();
-            build_name.push_str(&format!(
-                "-steps-{step_group}{}{}",
-                if !inherit_parent_build {
-                    "-no-build"
-                } else {
-                    ""
-                },
-                if !inherit_parent_host { "-no-host" } else { "" },
-            ));
-        }
+        let build_name =
+            isolated_step_build_name(&build_name, recipe, build_data.selected_steps.as_deref())
+                .unwrap_or(build_name);
 
         let variant_channels = if let Some(channel_sources) = discovered_output
             .used_vars

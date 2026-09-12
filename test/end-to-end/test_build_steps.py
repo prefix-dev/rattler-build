@@ -1,4 +1,5 @@
 import json
+import os
 import shutil
 from pathlib import Path
 from subprocess import STDOUT
@@ -697,6 +698,66 @@ def test_metadata_run_preserves_prepared_sources_and_cached_outputs(
     assert (work / "retained-artifact.txt").read_text() == "keep me"
     (metadata,) = (work / ".rattler-build/step-outputs").glob("*.txt")
     assert metadata.read_text() == "about.summary cached metadata\n"
+
+
+@pytest.mark.parametrize("generated", [False, True])
+def test_metadata_selection_allocates_standalone_prefixes(
+    rattler_build: RattlerBuild, tmp_path: Path, generated: bool
+):
+    steps = [
+        {
+            "name": "build",
+            "run": 'echo parent > "%PREFIX%/parent-marker"'
+            if os.name == "nt"
+            else 'echo parent > "$PREFIX/parent-marker"',
+        },
+        {
+            "name": "lint",
+            "optional": True,
+            "requirements": {"inherit": False},
+            "run": 'if exist "%PREFIX%/parent-marker" exit /b 1'
+            if os.name == "nt"
+            else 'test ! -e "$PREFIX/parent-marker"',
+        },
+    ]
+    contents = (
+        f"build.steps {json.dumps(steps)}\n"
+        if generated
+        else "about.summary generated\n"
+    )
+    build = {
+        "metadata": {
+            "interpreter": "python",
+            "requirements": {"build": ["python"]},
+            "run": "import os\nfrom pathlib import Path\n"
+            f'Path(os.environ["OUTPUT_FILE"]).write_text({contents!r})',
+        }
+    }
+    if not generated:
+        build["steps"] = steps
+    (tmp_path / "recipe.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "package": {"name": "metadata-prefix-isolation", "version": "1"},
+                "build": build,
+            }
+        )
+    )
+    for name in ["build", "lint"]:
+        rattler_build(
+            "run",
+            name,
+            "--recipe",
+            str(tmp_path),
+            "--experimental",
+            "--output-dir",
+            str(tmp_path / "output"),
+        )
+    bld = tmp_path / "output" / "bld"
+    assert (
+        bld / "rattler-build_metadata-prefix-isolation-steps-lint-no-build-no-host"
+    ).is_dir()
+    assert len(list(bld.glob("*/host*/parent-marker"))) == 1
 
 
 def test_metadata_generated_selection_skips_unselected_action(
