@@ -1,0 +1,41 @@
+context:
+  version: "0.5.4"
+
+package:
+  name: libml_dtypes-headers
+  version: ${{ version }}
+
+source:
+  url: https://github.com/jax-ml/ml_dtypes/archive/v${{ version }}.tar.gz
+  sha256: acaef497b420a15761cb525562b04d880b5c7afacea02d435a5d166fd8a99a16
+
+build:
+  number: 0
+  noarch: generic # (1)!
+  script:
+    - if: unix # (2)!
+      then:
+        - mkdir -p $PREFIX/include/ml_dtypes
+        - cp -r ml_dtypes/include $PREFIX/include/ml_dtypes/
+      else:
+        - md %LIBRARY_PREFIX%\include\ml_dtypes
+        - xcopy /E /I ml_dtypes\include %LIBRARY_PREFIX%\include\ml_dtypes\include
+
+requirements:
+  run:
+    - if: unix # (3)!
+      then: __unix
+      else: __win
+
+tests:
+  - package_contents:
+      files:
+        - if: unix # (4)!
+          then: include/ml_dtypes/include/float8.h
+          else: Library/include/ml_dtypes/include/float8.h
+
+about:
+  homepage: https://github.com/jax-ml/ml_dtypes
+  summary: A stand-alone implementation of several NumPy dtype extensions used in machine learning
+  license: Apache-2.0
+  license_file: LICENSE

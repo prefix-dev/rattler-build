@@ -4,8 +4,8 @@ This section contains examples for packaging software in different languages wit
 
 | Example | Description |
 |---------|-------------|
-| [Python](python.md) | Build pure Python packages with `noarch: python` and compiled packages like NumPy |
-| [C++](cpp.md) | Package header-only and compiled C++ libraries using CMake |
+| [Python](python.md) | Build pure Python packages with `noarch: python` (including multiple variants per Python version) and compiled packages like NumPy |
+| [C++](cpp.md) | Package header-only (also as `noarch: generic`) and compiled C++ libraries using CMake |
 | [JavaScript](javascript.md) | Create packages for NodeJS applications using NPM |
 | [Rust](rust.md) | Build Rust packages with proper license bundling using `cargo-bundle-licenses` |
 | [Go](go.md) | Package Go applications with `go-cgo` or `go-nocgo` compilers |
