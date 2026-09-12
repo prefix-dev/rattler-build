@@ -878,13 +878,7 @@ pub async fn get_build_output(
 
         if output.recipe.build.metadata.is_some()
             && output.build_configuration.directories.source_dir.is_none()
-            && !(build_data.selected_steps.is_some()
-                && output
-                    .build_configuration
-                    .directories
-                    .work_dir
-                    .join(".source_info.json")
-                    .exists())
+            && !(build_data.selected_steps.is_some() && output.has_reusable_sources()?)
         {
             // Metadata may inspect the fetched project (for example,
             // pyproject.toml) before producing the final solve requirements.
