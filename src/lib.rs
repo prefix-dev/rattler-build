@@ -83,6 +83,7 @@ use crate::publish::{
     resolve_channel_for_repodata, upload_and_index_channel,
 };
 use indexmap::IndexSet;
+use rattler_build_core::step_provider::{ProviderSolveConfig, StepProviderResolver};
 use rattler_build_recipe::topological_sort_by_dependencies;
 
 /// Convert the CLI `--v3` boolean flag into a [`RepodataRevision`].
@@ -102,11 +103,14 @@ struct FoundVariants {
 }
 
 /// Find all variants from the recipe and variant config
-fn find_variants(
+async fn find_variants(
     variant_config: &VariantConfig,
     recipe_path: &std::path::Path,
     recipe_content: &str,
     render_config: RenderConfig,
+    build_data: &BuildData,
+    tool_config: &Configuration,
+    provider_resolver: &mut StepProviderResolver,
 ) -> Result<FoundVariants, miette::Error> {
     // Parse the recipe
     let source = rattler_build_recipe::source_code::Source::from_string(
@@ -134,10 +138,72 @@ fn find_variants(
 
     let target_platform = render_config.target_platform;
 
-    // Render with variant config (handles both single and multi-output recipes)
-    let rendered_variants =
-        rattler_build_recipe::render_recipe(&source, &stage0_recipe, variant_config, render_config)
-            .wrap_err("Failed to render recipe with variants")?;
+    let sources = render_config.action_sources.clone();
+    let rendered_variants = loop {
+        match rattler_build_recipe::render_recipe(
+            &source,
+            &stage0_recipe,
+            variant_config,
+            render_config.clone(),
+        ) {
+            Ok(rendered) => break rendered,
+            Err(error) => {
+                let Some(request) = sources.take_pending() else {
+                    return Err(error).wrap_err("Failed to render recipe with variants");
+                };
+                if request.channel_sources.is_some()
+                    && build_data.channels.is_some()
+                    && !build_data.channels_from_config
+                {
+                    return Err(miette::miette!(
+                        "channel_sources and channels cannot both be set at the same time"
+                    ));
+                }
+                let channels = if let Some(channel_sources) = &request.channel_sources {
+                    channel_sources
+                        .split(',')
+                        .map(str::trim)
+                        .map(|channel| NamedChannelOrUrl::from_str(channel).into_diagnostic())
+                        .collect::<miette::Result<Vec<_>>>()?
+                } else {
+                    build_data
+                        .channels
+                        .clone()
+                        .unwrap_or_else(|| vec![NamedChannelOrUrl::Name("conda-forge".to_string())])
+                };
+                let channels = channels
+                    .into_iter()
+                    .map(|channel| channel.into_base_url(&tool_config.channel_config))
+                    .collect::<Result<Vec<_>, _>>()
+                    .into_diagnostic()?;
+                let build_platform = PlatformWithVirtualPackages::detect_for_platform(
+                    build_data.build_platform,
+                    &VirtualPackageOverrides::from_env(),
+                )
+                .into_diagnostic()?;
+                let previous_sources = sources.len();
+                provider_resolver
+                    .register_requested(
+                        request,
+                        &sources,
+                        &ProviderSolveConfig {
+                            build_platform: &build_platform,
+                            channels: &channels,
+                            channel_priority: tool_config.channel_priority,
+                            solve_strategy: SolveStrategy::Highest,
+                            exclude_newer: build_data.exclude_newer,
+                        },
+                        tool_config,
+                    )
+                    .await?;
+                if sources.len() <= previous_sources {
+                    return Err(miette::miette!(
+                        "action provider resolution made no source registry progress"
+                    ));
+                }
+            }
+        }
+    };
 
     // Convert to DiscoveredOutputs
     let mut recipes = IndexSet::new();
@@ -425,10 +491,20 @@ pub async fn get_build_output(
         ..RenderConfig::default()
     };
 
+    let mut step_provider_resolver = StepProviderResolver::default();
     let FoundVariants {
         outputs: outputs_and_variants,
         recipe_name,
-    } = find_variants(&variant_config, recipe_path, &recipe_content, render_config)?;
+    } = find_variants(
+        &variant_config,
+        recipe_path,
+        &recipe_content,
+        render_config,
+        build_data,
+        tool_config,
+        &mut step_provider_resolver,
+    )
+    .await?;
 
     tracing::info!("Found {} variants\n", outputs_and_variants.len());
     for discovered_output in &outputs_and_variants {

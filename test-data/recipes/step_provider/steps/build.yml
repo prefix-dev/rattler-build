@@ -1,0 +1,28 @@
+schema_version: 1
+action:
+  name: provider-build
+inputs:
+  message:
+    type: string
+    default: provider-worked
+  enabled:
+    type: boolean
+  count:
+    type: integer
+  labels:
+    type: list
+    items: string
+steps:
+  - uses: ./nested/emit.yaml
+    with:
+      message: ${{ inputs.message }}
+      enabled: ${{ inputs.enabled }}
+      count: ${{ inputs.count }}
+      labels: ${{ inputs.labels }}
+  - uses: test:finish@=1.0.0
+    with:
+      message: ${{ inputs.message }}
+  - if: false
+    uses: missing-provider:missing
+    with:
+      undeclared: ignored
