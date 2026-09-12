@@ -174,7 +174,25 @@ fn matching_paths(root: &Path, declaration: &Declaration) -> Result<Vec<PathBuf>
         Err(error) => return Err(error),
     }
     for entry in WalkDir::new(root).follow_links(declaration.method == Method::Hash) {
-        let entry = entry.map_err(std::io::Error::other)?;
+        let entry = match entry {
+            Ok(entry) => entry,
+            Err(error)
+                if error
+                    .io_error()
+                    .is_some_and(|error| error.kind() == std::io::ErrorKind::NotFound)
+                    && error.path().is_some_and(|path| {
+                        fs_err::symlink_metadata(path)
+                            .is_ok_and(|metadata| metadata.file_type().is_symlink())
+                            && !matcher.is_match(path.strip_prefix(root).unwrap_or(path))
+                    }) =>
+            {
+                // A dangling link has no descendants. It matters only if the
+                // link itself is declared; do not hide unreadable directories
+                // or cycles, which could conceal matching inputs.
+                continue;
+            }
+            Err(error) => return Err(std::io::Error::other(error)),
+        };
         if entry.file_type().is_dir() && !entry.path_is_symlink() {
             continue;
         }
@@ -451,6 +469,30 @@ mod tests {
             fingerprint(first.path(), &declaration).unwrap(),
             fingerprint(second.path(), &declaration).unwrap()
         );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn unrelated_dangling_link_does_not_break_hash_cache() -> std::io::Result<()> {
+        let temp = tempfile::tempdir()?;
+        let root = temp.path();
+        fs_err::write(root.join("input.txt"), "input")?;
+        symlink("missing", root.join("unrelated"))?;
+        let declaration = root.join("step.cache");
+        fs_err::write(&declaration, "input-hash: input.txt\n")?;
+        let entry = || {
+            StepCacheEntry::new(
+                declaration.clone(),
+                root.to_path_buf(),
+                "step".into(),
+                root.join("metadata"),
+            )
+        };
+        entry().commit()?;
+        assert!(entry().probe()?);
+        fs_err::write(&declaration, "input-hash: unrelated\n")?;
+        assert!(entry().commit().is_err());
+        Ok(())
     }
 
     #[cfg(unix)]
