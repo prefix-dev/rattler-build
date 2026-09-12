@@ -33,7 +33,7 @@ fn platform_passthrough_vars(platform: Platform) -> &'static [&'static str] {
 /// Computes the complete child environment for the given isolation mode.
 ///
 /// This reads only its arguments and never the ambient process environment.
-pub(crate) fn resolve_process_env(
+pub fn resolve_process_env(
     env_isolation: EnvironmentIsolation,
     env_vars: &IndexMap<String, String>,
     secrets: &IndexMap<String, String>,

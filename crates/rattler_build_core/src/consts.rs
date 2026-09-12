@@ -17,6 +17,14 @@ pub const RATTLER_BUILD_ENABLE_GITHUB_INTEGRATION: &str = "RATTLER_BUILD_ENABLE_
 /// package contents instead of the default "new files in `$PREFIX`" diff.
 pub const RATTLER_BUILD_PACKAGE_FILES: &str = "RATTLER_BUILD_PACKAGE_FILES";
 
+/// Environment variable pointing to the current build step's cache declaration
+/// file. A step may write input/output glob conditions to this file.
+pub const RATTLER_BUILD_STEP_CACHE: &str = "RATTLER_BUILD_STEP_CACHE";
+
+/// Directory name used under the build directory for per-step declarations and
+/// their executor-managed fingerprints.
+pub const STEP_CACHE_DIRECTORY_NAME: &str = ".rattler-build-step-cache";
+
 /// File name used (under the build directory) for the package files override
 /// list pointed at by [`RATTLER_BUILD_PACKAGE_FILES`]. The name is dot-prefixed
 /// and namespaced so that build scripts are extremely unlikely to clobber it
