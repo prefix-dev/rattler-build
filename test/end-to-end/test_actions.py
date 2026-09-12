@@ -116,9 +116,7 @@ def test_empty_action_keeps_named_dependencies_and_requirements(
 def test_skipped_output_does_not_resolve_actions(
     rattler_build: RattlerBuild, tmp_path: Path, reference: str
 ):
-    project = action_project(
-        tmp_path, {"steps": []}, steps=[{"uses": reference}]
-    )
+    project = action_project(tmp_path, {"steps": []}, steps=[{"uses": reference}])
     path = project / "recipe.yaml"
     recipe = yaml.safe_load(path.read_text())
     recipe["build"]["skip"] = True
