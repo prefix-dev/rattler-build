@@ -290,15 +290,13 @@ def test_rebuild_applies_post_build_outputs_once(
                     "steps": [
                         {
                             "interpreter": "python",
-                            "run": "\n".join(
-                                [
-                                    "import json",
-                                    "import os",
-                                    "from pathlib import Path",
-                                    'Path(os.environ["PREFIX"], "marker.txt").write_text("built")',
-                                    'rules = [{"files": ["**/marker.txt"], "regex": "$", "replacement": "!"}] * 2',
-                                    'Path(os.environ["OUTPUT_FILE"]).write_text("build.post_process.append " + json.dumps(rules) + "\\n")',
-                                ]
+                            "run": (
+                                "import json\n"
+                                "import os\n"
+                                "from pathlib import Path\n"
+                                'Path(os.environ["PREFIX"], "marker.txt").write_text("built")\n'
+                                'rules = [{"files": ["**/marker.txt"], "regex": "$", "replacement": "!"}] * 2\n'
+                                'Path(os.environ["OUTPUT_FILE"]).write_text("build.post_process.append " + json.dumps(rules) + "\\n")'
                             ),
                         }
                     ]
