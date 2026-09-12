@@ -1,7 +1,7 @@
 import shutil
 import tarfile
 from pathlib import Path
-from subprocess import CalledProcessError, STDOUT
+from subprocess import STDOUT, CalledProcessError
 
 import pytest
 import yaml
@@ -388,17 +388,19 @@ def test_compiled_action_rebuild_does_not_need_action_documents(
         get_extracted_package(original_output, "action-contract") / "marker.txt"
     ).read_text().strip() == "compiled-action"
     stripped = tmp_path / original_package.name
-    with tarfile.open(original_package, "r:bz2") as source:
-        with tarfile.open(stripped, "w:bz2") as target:
-            for member in source:
-                if (
-                    member.name.startswith("info/recipe/")
-                    and member.name != "info/recipe/rendered_recipe.yaml"
-                ):
-                    continue
-                target.addfile(
-                    member, source.extractfile(member) if member.isfile() else None
-                )
+    with (
+        tarfile.open(original_package, "r:bz2") as source,
+        tarfile.open(stripped, "w:bz2") as target,
+    ):
+        for member in source:
+            if (
+                member.name.startswith("info/recipe/")
+                and member.name != "info/recipe/rendered_recipe.yaml"
+            ):
+                continue
+            target.addfile(
+                member, source.extractfile(member) if member.isfile() else None
+            )
     shutil.rmtree(project)
     rebuilt_output = tmp_path / "rebuilt"
     rattler_build(
