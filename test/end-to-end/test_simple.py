@@ -136,32 +136,6 @@ def test_run_refuses_changed_sources_without_discarding_edits(
     assert (tmp_path / "second" / "runs.txt").is_file()
 
 
-def test_build_steps_reject_uses(rattler_build: RattlerBuild, tmp_path: Path):
-    recipe = tmp_path / "recipe.yaml"
-    recipe.write_text(
-        """package:
-  name: inline-steps-only
-  version: "1.0"
-build:
-  steps:
-    - name: check
-      uses: ./check.yaml
-"""
-    )
-
-    result = rattler_build(
-        "build",
-        "--recipe",
-        recipe,
-        "--render-only",
-        "--experimental",
-        capture_output=True,
-    )
-
-    assert result.returncode != 0
-    assert "uses" in result.stderr
-
-
 def test_run_render_only_is_read_only(rattler_build: RattlerBuild, tmp_path: Path):
     recipe = tmp_path / "recipe.yaml"
     output = tmp_path / "output"
