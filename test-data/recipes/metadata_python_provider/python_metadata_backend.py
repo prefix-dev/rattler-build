@@ -8,13 +8,12 @@ from __future__ import annotations
 
 import json
 import os
-from pathlib import Path
 import re
-import tomllib
+from pathlib import Path
 
+import tomllib
 from packaging.requirements import Requirement
 from packaging.version import Version
-
 
 SOURCE = Path(os.environ["SRC_DIR"])
 PYPROJECT = SOURCE / "pyproject.toml"
@@ -170,8 +169,10 @@ def main() -> None:
         for field in ["summary", "license", "homepage", "repository", "documentation"]:
             if value := metadata.get(field):
                 stream.write(emit(f"about.{field}", value))
-        for license_file in metadata["license_files"]:
-            stream.write(emit("about.license_file", license_file, append=True))
+        stream.writelines(
+            emit("about.license_file", license_file, append=True)
+            for license_file in metadata["license_files"]
+        )
 
 
 if __name__ == "__main__":
