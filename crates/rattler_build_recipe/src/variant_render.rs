@@ -958,6 +958,10 @@ fn discover_new_variant_keys_from_evaluation(
             } else {
                 (context.clone(), IndexMap::new())
             };
+            if crate::stage0::evaluate::evaluate_skip_list(&recipe.build.skip, &context_with_vars)?
+            {
+                return Ok(HashSet::new());
+            }
             let mut evaluated = recipe.requirements.evaluate(&context_with_vars)?;
             let build = recipe.build.evaluate(&context_with_vars)?;
             evaluated.build.extend(build.action_requirements.build);

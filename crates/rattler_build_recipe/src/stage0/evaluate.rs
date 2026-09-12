@@ -2263,7 +2263,12 @@ impl Evaluate for Stage0Build {
         // (enforced during parsing). Steps mode is preserved even if the list is
         // empty or all steps filter out, so outputs don't accidentally inherit a
         // top-level script.
-        let (plan, actions) = evaluate_build_plan(&self.plan, context)?;
+        let skip = evaluate_skip_list(&self.skip, context)?;
+        let (plan, actions) = if skip {
+            (Stage1BuildPlan::Steps(Vec::new()), Default::default())
+        } else {
+            evaluate_build_plan(&self.plan, context)?
+        };
 
         // Evaluate noarch
         //
@@ -2292,10 +2297,6 @@ impl Evaluate for Stage0Build {
                 }
             }
         };
-
-        // Evaluate skip conditions as Jinja boolean expressions
-        // This tracks accessed variables for proper variant hash computation
-        let skip = evaluate_skip_list(&self.skip, context)?;
 
         // Evaluate V3 package flags.
         let flags = evaluate_flag_list(&self.flags, context)?;

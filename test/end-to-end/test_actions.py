@@ -112,6 +112,29 @@ def test_empty_action_keeps_named_dependencies_and_requirements(
     assert (project / "result.txt").read_text().strip() == "prepared"
 
 
+@pytest.mark.parametrize("reference", ["./missing.yaml", "missing-provider:build@0"])
+def test_skipped_output_does_not_resolve_actions(
+    rattler_build: RattlerBuild, tmp_path: Path, reference: str
+):
+    project = action_project(
+        tmp_path, {"steps": []}, steps=[{"uses": reference}]
+    )
+    path = project / "recipe.yaml"
+    recipe = yaml.safe_load(path.read_text())
+    recipe["build"]["skip"] = True
+    path.write_text(yaml.safe_dump(recipe))
+    rendered = rattler_build.render(
+        project, tmp_path / "output", extra_args=["--experimental"]
+    )
+    assert rendered == []
+    recipe["build"]["skip"] = False
+    path.write_text(yaml.safe_dump(recipe))
+    with pytest.raises(CalledProcessError):
+        rattler_build.render(
+            project, tmp_path / "output", extra_args=["--experimental"]
+        )
+
+
 def test_false_invocation_skips_resolution_and_input_validation(
     rattler_build: RattlerBuild, tmp_path: Path
 ):
