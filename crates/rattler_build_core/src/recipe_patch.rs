@@ -122,7 +122,11 @@ fn normalize_patch_document(document: &mut Value) {
         normalize_globs(document, &["build", "dynamic_linking"], key);
     }
     ensure_object(document, &["build", "prefix_detection"]);
-    for key in ["files", "always_copy_files", "always_include_files"] {
+    // An omitted file filter includes all files; an explicit empty filter includes none.
+    if document.pointer("/build/files").is_some() {
+        normalize_globs(document, &["build"], "files");
+    }
+    for key in ["always_copy_files", "always_include_files"] {
         normalize_globs(document, &["build"], key);
     }
     ensure_array(document, &["build"], "post_process");
@@ -400,6 +404,19 @@ requirements.run_exports.strong.append ["abi >=2"]
         assert_eq!(changes.run.len(), 2);
         assert_eq!(changes.run_exports.strong.len(), 1);
         assert_eq!(recipe.requirements.run.len(), 2);
+    }
+
+    #[test]
+    fn unrelated_outputs_preserve_omitted_and_empty_file_filters() {
+        let temp = tempfile::tempdir().unwrap();
+        prepare_output_directory(temp.path()).unwrap();
+        fs_err::write(output_file(temp.path(), 0), "about.summary generated\n").unwrap();
+        for files in [None, Some(Default::default())] {
+            let mut recipe = recipe();
+            recipe.build.files = files.clone();
+            apply_outputs(&mut recipe, temp.path()).unwrap();
+            assert_eq!(recipe.build.files, files);
+        }
     }
 
     #[test]
