@@ -1,0 +1,61 @@
+context:
+  version: 2.0.1
+  default_abi_level: 1.21
+
+package:
+  name: numpy
+  version: ${{ version }}
+
+source:
+  - url: https://github.com/numpy/numpy/releases/download/v${{ version }}/numpy-${{ version }}.tar.gz
+    sha256: 485b87235796410c3519a699cfe1faab097e509e90ebb05dcd098db2ae87e7b3
+
+build:
+  python:
+    entry_points:
+      - f2py = numpy.f2py.f2py2e:main # [win]
+      - numpy-config = numpy._configtool:main
+
+requirements:
+  build:
+    - ${{ compiler('c') }}
+    - ${{ compiler('cxx') }}
+    # note: some `host` dependencies that run at build time (e.g., `cython`, `meson-python`)
+    #       should ideally be in `build` instead, this is because cross compilation of
+    #       Python packages in conda-forge uses `crossenv` rather than regular cross compilation.
+  host:
+    # note: variant is injected here!
+    - python
+    - pip
+    - meson-python
+    - pkg-config
+    - python-build
+    - cython
+    - libblas
+    - libcblas
+    - liblapack
+  run:
+    - python
+  run_exports:
+    - numpy >=${{ default_abi_level }},<3.0.0a0
+
+tests:
+  - python:
+      imports:
+        - numpy
+        - numpy.fft
+        - numpy.linalg
+        - numpy.random
+        - numpy.ctypeslib
+
+  - script:
+      - f2py -v
+      - numpy-config --cflags
+
+about:
+  homepage: http://numpy.org/
+  license: BSD-3-Clause
+  license_file: LICENSE.txt
+  summary: The fundamental package for scientific computing with Python.
+  documentation: https://numpy.org/doc/stable/
+  repository: https://github.com/numpy/numpy
