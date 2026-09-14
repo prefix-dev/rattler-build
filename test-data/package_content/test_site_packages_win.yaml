@@ -9,3 +9,11 @@ paths:
   - Lib/site-packages/numpy/__init__.py
   - Lib/site-packages/numpy/blabla.py
   - Lib/site-packages/numpy/superfunc/__init__.py
+  # new file layout used by Python 3.15+ on Windows
+  - lib/python/site-packages/numpy/__init__.py
+  - lib/python/site-packages/numpy/blabla.py
+  - lib/python/site-packages/numpy/superfunc/__init__.py
+
+fail_paths:
+  - lib/site-packages/numpy/__init__.py
+  - lib/python3.15/site-packages/numpy/__init__.py
