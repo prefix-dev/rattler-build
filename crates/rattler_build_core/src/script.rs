@@ -10,7 +10,7 @@ use std::{
 
 use indexmap::IndexMap;
 use minijinja::Value;
-use rattler_build_jinja::{Jinja, JinjaConfig, Variable};
+use rattler_build_jinja::{Jinja, JinjaConfig, UndefinedBehavior, Variable};
 
 // Re-export from rattler_build_script
 pub use rattler_build_script::{
@@ -77,18 +77,25 @@ pub(crate) fn prepare_build_plan_execution_args(
             .iter()
             .enumerate()
             .map(|(index, step)| {
-                let label = step.name.clone().unwrap_or_else(|| format!("step {index}"));
-                (step.to_script(), Some(label))
+                (
+                    step.to_script(),
+                    Some(step.name.clone().unwrap_or_else(|| format!("step {index}"))),
+                    step.action_context.as_ref(),
+                )
             })
             .collect(),
-        BuildPlan::Script(script) => vec![(script.clone(), None)],
+        BuildPlan::Script(script) => vec![(script.clone(), None, None)],
     };
 
     let mut secrets = IndexMap::new();
     let mut sections = Vec::with_capacity(scripts.len());
-    for (script, step_label) in scripts {
-        let mut section_jinja = Jinja::new(selector_config.clone()).with_context(recipe_context);
+    for (script, step_label, action_context) in scripts {
+        let mut section_jinja =
+            execution_jinja(selector_config.clone(), recipe_context, action_context);
         for (key, value) in env_vars.iter().chain(script.env()) {
+            if action_context.is_some_and(|bindings| bindings.contains_key(key)) {
+                continue;
+            }
             section_jinja
                 .context_mut()
                 .insert(key.clone(), Value::from_safe_string(value.clone()));
@@ -138,6 +145,17 @@ pub(crate) fn prepare_build_plan_execution_args(
         sandbox_config,
         env_isolation,
     })
+}
+
+pub(crate) fn execution_jinja(
+    mut config: JinjaConfig,
+    recipe_context: &IndexMap<String, Variable>,
+    action_context: Option<&IndexMap<String, Variable>>,
+) -> Jinja {
+    if action_context.is_some() {
+        config.undefined_behavior = UndefinedBehavior::Strict;
+    }
+    Jinja::new(config).with_context(action_context.unwrap_or(recipe_context))
 }
 
 impl Output {

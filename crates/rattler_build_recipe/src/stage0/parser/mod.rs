@@ -5,7 +5,7 @@
 //! error messages.
 
 mod about;
-mod build;
+pub(crate) mod build;
 mod extra;
 mod helpers;
 mod output_parser;

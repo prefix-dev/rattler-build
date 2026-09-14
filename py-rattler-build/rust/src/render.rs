@@ -100,6 +100,7 @@ impl PyRenderConfig {
                 os_env_var_keys,
                 build_string_prefix,
                 build_number_override,
+                ..RustRenderConfig::default()
             },
         })
     }
