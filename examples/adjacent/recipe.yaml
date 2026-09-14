@@ -12,16 +12,27 @@ source:
 build:
   steps:
     - name: configure
-      run: >-
-        cmake -S "$SRC_DIR" -B "$SRC_DIR/build" -G Ninja
-        -DBUILD_PYTHON_BINDINGS=OFF
-        -DCMAKE_BUILD_TYPE=Release
-        -DCMAKE_POLICY_VERSION_MINIMUM=3.5
-        -DCMAKE_INSTALL_PREFIX="$PREFIX"
+      run: |
+        cmake -S "$SRC_DIR" -B "$SRC_DIR/build" -G Ninja \
+          -DBUILD_PYTHON_BINDINGS=OFF \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+          -DCMAKE_INSTALL_PREFIX="$PREFIX"
+        cat > "$RATTLER_BUILD_STEP_CACHE" <<'EOF'
+        input-hash: CMakeLists.txt
+        output-hash: build/CMakeCache.txt
+        EOF
 
     - name: build
       depends_on: [configure]
-      run: cmake --build "$SRC_DIR/build"
+      run: |
+        cmake --build "$SRC_DIR/build"
+        cat > "$RATTLER_BUILD_STEP_CACHE" <<'EOF'
+        input-hash: CMakeLists.txt
+        input-hash: include/**
+        input-hash: src/**
+        output-mtime: build/adjacent_test*
+        EOF
 
     # This has no edge to build/configure, so `rattler-build run lint` does not
     # populate or touch the CMake build tree.

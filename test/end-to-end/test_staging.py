@@ -53,6 +53,62 @@ def test_staging_build_steps(
     assert content2 == content1
 
 
+@pytest.mark.parametrize("emit_metadata", [False, True])
+def test_staging_step_cache_and_package_metadata_contract(
+    rattler_build: RattlerBuild, tmp_path: Path, emit_metadata: bool
+):
+    script = """import os
+from pathlib import Path
+Path("input.txt").write_text("input")
+Path(os.environ["PREFIX"], "marker.txt").write_text("staged")
+Path(os.environ["RATTLER_BUILD_STEP_CACHE"]).write_text("input-hash: input.txt\\n")
+"""
+    if emit_metadata:
+        script += (
+            'Path(os.environ["OUTPUT_FILE"]).write_text("about.summary generated\\n")\n'
+        )
+    (tmp_path / "recipe.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "recipe": {"name": "staging-protocol", "version": "1"},
+                "outputs": [
+                    {
+                        "staging": {"name": "prepared"},
+                        "requirements": {"build": ["python"]},
+                        "build": {"steps": [{"interpreter": "python", "run": script}]},
+                    },
+                    {"package": {"name": "staging-protocol"}, "inherit": "prepared"},
+                ],
+            }
+        )
+    )
+    output = tmp_path / "output"
+    result = rattler_build(
+        "build",
+        "--recipe",
+        str(tmp_path),
+        "--output-dir",
+        str(output),
+        "--experimental",
+        "--keep-build",
+        "--package-format",
+        "tar-bz2",
+        capture_output=True,
+    )
+    states = list(output.glob("bld/*/.rattler-build-step-cache/*.state.json"))
+    if emit_metadata:
+        assert result.returncode != 0
+        assert "staging steps cannot emit package metadata" in result.stderr
+        assert "No such file or directory" not in result.stderr
+        assert not states, "a rejected output must not commit a success record"
+    else:
+        assert result.returncode == 0, result.stderr
+        assert len(states) == 1
+        assert (
+            get_extracted_package(output, "staging-protocol") / "marker.txt"
+        ).read_text() == "staged"
+
+
 def test_run_inherits_staging_build_steps(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
