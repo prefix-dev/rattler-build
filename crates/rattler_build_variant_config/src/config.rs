@@ -42,6 +42,10 @@ pub struct VariantConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub zip_keys: Option<Vec<Vec<NormalizedKey>>>,
 
+    /// Variant keys that should be included in every build, even when the recipe does not use them.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub force_use_keys: Option<Vec<NormalizedKey>>,
+
     /// The variant values - a mapping of keys to lists of possible values.
     /// Each key represents a variable in the build matrix.
     #[serde(flatten)]
@@ -201,14 +205,17 @@ impl VariantConfig {
 
     /// Merge another variant configuration into this one
     ///
-    /// Variant values are replaced (not merged), and zip_keys from `other` take precedence.
+    /// Variant values are replaced (not merged), and special keys from `other` take precedence.
     pub fn merge(&mut self, other: VariantConfig) {
         // Extend variants (later values replace earlier ones)
         self.variants.extend(other.variants);
 
-        // Replace zip_keys if provided
+        // Replace special keys if provided
         if other.zip_keys.is_some() {
             self.zip_keys = other.zip_keys;
+        }
+        if other.force_use_keys.is_some() {
+            self.force_use_keys = other.force_use_keys;
         }
     }
 
@@ -235,8 +242,10 @@ impl VariantConfig {
         &self,
         used_vars: &HashSet<NormalizedKey>,
     ) -> Result<Vec<BTreeMap<NormalizedKey, Variable>>, VariantExpandError> {
+        let mut used_vars = used_vars.clone();
+        used_vars.extend(self.force_use_keys.iter().flatten().cloned());
         let zip_keys = self.zip_keys.as_deref().unwrap_or(&[]);
-        compute_combinations(&self.variants, zip_keys, used_vars)
+        compute_combinations(&self.variants, zip_keys, &used_vars)
     }
 
     /// Get all variant keys
@@ -297,6 +306,20 @@ zip_keys:
     }
 
     #[test]
+    fn test_parse_force_use_keys() {
+        let config = VariantConfig::from_yaml_str(
+            "force_use_keys: [target, emulator]\ntarget: [x86_64-linux-gnu]\nemulator: [qemu]",
+        )
+        .unwrap();
+        assert_eq!(
+            config.force_use_keys,
+            Some(vec!["target".into(), "emulator".into()])
+        );
+        assert!(!config.variants.contains_key(&"force_use_keys".into()));
+        assert_eq!(config.combinations(&HashSet::new()).unwrap()[0].len(), 2);
+    }
+
+    #[test]
     fn test_merge_configs() {
         let mut config1 = VariantConfig::new();
         config1.insert("python", vec!["3.9".into(), "3.10".into()]);
@@ -304,9 +327,11 @@ zip_keys:
         let mut config2 = VariantConfig::new();
         config2.insert("numpy", vec!["1.20".into(), "1.21".into()]);
         config2.insert("python", vec!["3.11".into()]); // Should override
+        config2.force_use_keys = Some(vec!["numpy".into()]);
 
         config1.merge(config2);
 
+        assert_eq!(config1.force_use_keys, Some(vec!["numpy".into()]));
         assert_eq!(config1.variants.len(), 2);
         assert_eq!(config1.get(&"python".into()).unwrap().len(), 1); // Overridden
         assert_eq!(
