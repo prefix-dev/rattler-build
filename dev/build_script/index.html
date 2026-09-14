@@ -4593,6 +4593,12 @@ noted, no variables are inherited from the shell environment in which you invoke
 <p>Set to <code>1</code> when the build platform and the target platform differ (i.e.
   the package is being cross-compiled), and <code>0</code> otherwise.</p>
 </dd>
+<dt><code>CROSSCOMPILING_EMULATOR</code></dt>
+<dd>
+<p>Forwarded from the user's shell environment when set. It can also be set in
+  variant configuration; configured values override the shell environment and
+  are always included in the build matrix and package hash.</p>
+</dd>
 <dt><code>SUBDIR</code></dt>
 <dd>
 <p>The target subdirectory (platform) for the package being built, e.g.
