@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.76.1] - 2026-09-14
+### ✨ Highlights
+
+This patch release forwards `CROSSCOMPILING_EMULATOR` reliably, improves legacy and v3 test metadata compatibility, supports Python 3.15's Windows package layout, and recognizes additional bzip2 archive extensions.
+
+
+### Fixed
+
+- Allow v3 matchspecs in legacy extras by @wolfv in [#2812](https://github.com/prefix-dev/rattler-build/pull/2812)
+- Allow extras in test section by @pavelzw in [#2813](https://github.com/prefix-dev/rattler-build/pull/2813)
+- Accept new Python 3.15 site-packages layout on Windows in package_contents tests by @wolfv in [#2819](https://github.com/prefix-dev/rattler-build/pull/2819)
+- Extract .tbz and .tz2 archives as bzip2 by @ManuelLerchner in [#2817](https://github.com/prefix-dev/rattler-build/pull/2817)
+- Always use CROSSCOMPILING_EMULATOR variant by @wolfv in [#2810](https://github.com/prefix-dev/rattler-build/pull/2810)
+
+
+### New Contributors
+* @ManuelLerchner made their first contribution in [#2817](https://github.com/prefix-dev/rattler-build/pull/2817)
+
 ## [0.76.0] - 2026-09-08
 ### ✨ Highlights
 
