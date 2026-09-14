@@ -427,6 +427,12 @@ noted, no variables are inherited from the shell environment in which you invoke
 : Set to `1` when the build platform and the target platform differ (i.e.
   the package is being cross-compiled), and `0` otherwise.
 
+`CROSSCOMPILING_EMULATOR`
+
+: Forwarded from the user's shell environment when set. It can also be set in
+  variant configuration; configured values override the shell environment and
+  are always included in the build matrix and package hash.
+
 `SUBDIR`
 
 : The target subdirectory (platform) for the package being built, e.g.
