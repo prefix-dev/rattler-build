@@ -1,0 +1,22 @@
+schema_version: 1
+
+inputs:
+  features:
+    type: list
+    items: string
+    default: []
+  locked:
+    type: boolean
+    default: true
+  install:
+    type: boolean
+    default: true
+steps:
+  - name: cargo-build
+    requirements:
+      build: [rust]
+    run: cargo build --release ${{ '--locked' if inputs.locked else '' }} ${{ '--features ' ~ (inputs.features | join(',')) if inputs.features else '' }} ${CARGO_BUILD_ARGS:-}
+  - name: cargo-install
+    if: inputs.install
+    depends_on: [cargo-build]
+    run: cargo install --path . --root "$PREFIX" ${{ '--locked' if inputs.locked else '' }} ${{ '--features ' ~ (inputs.features | join(',')) if inputs.features else '' }} ${CARGO_INSTALL_ARGS:-}
