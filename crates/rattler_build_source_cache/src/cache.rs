@@ -654,7 +654,11 @@ fn extract_tar(archive: &Path, target: &Path) -> Result<(), CacheError> {
         archive
             .unpack(target)
             .map_err(|e| CacheError::ExtractionError(format!("Failed to extract tar.gz: {}", e)))?;
-    } else if name.ends_with(".tar.bz2") || name.ends_with(".tbz2") {
+    } else if name.ends_with(".tar.bz2")
+        || name.ends_with(".tbz")
+        || name.ends_with(".tbz2")
+        || name.ends_with(".tz2")
+    {
         let mut archive = tar::Archive::new(bzip2::read::BzDecoder::new(file));
         archive.unpack(target).map_err(|e| {
             CacheError::ExtractionError(format!("Failed to extract tar.bz2: {}", e))
@@ -764,6 +768,41 @@ mod tests {
             extract_filename_from_header("attachment; filename=\"test.tar.gz\""),
             Some("test.tar.gz".to_string())
         );
+    }
+
+    #[test]
+    fn test_extract_bzip2_tarball_aliases() {
+        for extension in [".tar.bz2", ".tbz", ".tbz2", ".tz2"] {
+            let temp_dir = tempfile::tempdir().unwrap();
+            let archive_path = temp_dir.path().join(format!("test{extension}"));
+            let target_dir = temp_dir.path().join("out");
+
+            let file = fs_err::File::create(&archive_path).unwrap();
+            let encoder = bzip2::write::BzEncoder::new(file, bzip2::Compression::default());
+            let mut builder = tar::Builder::new(encoder);
+
+            let contents = b"hello";
+            let mut header = tar::Header::new_gnu();
+            header.set_size(contents.len() as u64);
+            header.set_mode(0o644);
+            header.set_cksum();
+
+            builder
+                .append_data(&mut header, "hello.txt", &contents[..])
+                .unwrap();
+
+            let encoder = builder.into_inner().unwrap();
+            encoder.finish().unwrap();
+
+            fs_err::create_dir_all(&target_dir).unwrap();
+
+            extract_tar(&archive_path, &target_dir).unwrap();
+
+            assert_eq!(
+                fs_err::read(target_dir.join("hello.txt")).unwrap(),
+                contents
+            );
+        }
     }
 
     #[test]
