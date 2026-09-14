@@ -292,7 +292,9 @@ impl PackageContentsTestExt for PackageContentsTest {
                     let base = if version_independent {
                         "site-packages"
                     } else if target_platform.is_windows() {
-                        "Lib/site-packages"
+                        // Python <= 3.14 uses `Lib/site-packages`, Python >= 3.15
+                        // uses `lib/python/site-packages` on Windows
+                        "{Lib,lib/python}/site-packages"
                     } else {
                         "lib/python*/site-packages"
                     };
