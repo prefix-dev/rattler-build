@@ -87,8 +87,14 @@ pub struct Directories {
     /// Exposed as `$BUILD_PREFIX` (or `%BUILD_PREFIX%` on Windows) in the build
     /// script
     pub build_prefix: PathBuf,
-    /// The work directory is the directory where the source code is copied to
+    /// The work directory containing generated build wrappers and, for normal
+    /// builds, the copied source tree.
     pub work_dir: PathBuf,
+    /// An optional external source tree used by local step execution. When set,
+    /// `SRC_DIR` and the default step working directory point here while build
+    /// wrappers remain in `work_dir`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_dir: Option<PathBuf>,
     /// The parent directory of host, build and work directories
     pub build_dir: PathBuf,
     /// The output directory or local channel directory
@@ -104,8 +110,10 @@ pub struct ExecutionDirectories {
     pub host_prefix: PathBuf,
     /// Build dependency prefix as observed by the build script.
     pub build_prefix: PathBuf,
-    /// Working directory as observed by the build script.
+    /// Working directory containing generated build wrappers.
     pub work_dir: PathBuf,
+    /// Optional external project source directory.
+    pub source_dir: Option<PathBuf>,
     /// Build directory as observed by the build script.
     pub build_dir: PathBuf,
     /// Recipe directory as observed by the build script.
@@ -224,6 +232,7 @@ impl Directories {
             cache_dir,
             host_prefix,
             work_dir: build_dir.join("work"),
+            source_dir: None,
             recipe_dir,
             recipe_path: recipe_path.to_path_buf(),
             output_dir,
@@ -250,6 +259,7 @@ impl Directories {
             host_prefix: self.host_prefix.clone(),
             build_prefix: self.build_prefix.clone(),
             work_dir: self.work_dir.clone(),
+            source_dir: self.source_dir.clone(),
             build_dir: self.build_dir.clone(),
             recipe_dir: self.recipe_dir.clone(),
         }

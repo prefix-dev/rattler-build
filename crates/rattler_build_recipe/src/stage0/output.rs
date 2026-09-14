@@ -16,6 +16,20 @@ use crate::stage0::{
     types::{ConditionalList, Item, Value},
 };
 
+fn recipe_free_specs(
+    requirements: &Requirements,
+    plan: &BuildPlan,
+) -> Vec<rattler_conda_types::PackageName> {
+    Requirements::free_specs_from_lists(
+        [&requirements.build, &requirements.host].into_iter().chain(
+            plan.steps().into_iter().flatten().flat_map(|step| {
+                let super::build::Step::Run(step) = step;
+                [&step.requirements.build, &step.requirements.host]
+            }),
+        ),
+    )
+}
+
 /// A recipe can be either a single-output or multi-output recipe
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(untagged)]
@@ -294,7 +308,7 @@ impl SingleOutputRecipe {
 
     /// Get all free specs (specs without version or build constraints) in this single-output recipe
     pub fn free_specs(&self) -> Vec<rattler_conda_types::PackageName> {
-        self.requirements.free_specs()
+        recipe_free_specs(&self.requirements, &self.build.plan)
     }
 
     /// Get all use_keys from build.variant.use_keys
@@ -453,7 +467,7 @@ impl StagingOutput {
 
     /// Get all free specs (specs without version or build constraints) in this staging output
     pub fn free_specs(&self) -> Vec<rattler_conda_types::PackageName> {
-        self.requirements.free_specs()
+        recipe_free_specs(&self.requirements, &self.build.plan)
     }
 }
 
@@ -488,7 +502,7 @@ impl PackageOutput {
 
     /// Get all free specs (specs without version or build constraints) in this package output
     pub fn free_specs(&self) -> Vec<rattler_conda_types::PackageName> {
-        self.requirements.free_specs()
+        recipe_free_specs(&self.requirements, &self.build.plan)
     }
 
     /// Get all use_keys from build.variant.use_keys

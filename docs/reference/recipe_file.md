@@ -615,14 +615,25 @@ requirements:
 
 #### Build steps (experimental)
 
-`build.steps` is an experimental alternative to `build.script` and requires
-`--experimental`. `script` and `steps` are mutually exclusive, including
-`steps: []`.
+!!! warning "Experimental"
+    `build.steps` and `rattler-build run` may change or be removed.
+    They require `--experimental`.
+
+`build.steps` is an experimental alternative to `build.script`. `script` and
+`steps` are mutually exclusive, including `steps: []`.
 
 Each step is a scoped build-wrapper section. Step-local `env` values and `cwd`
 changes apply only to that step. A step supports:
 
-- **`run`** - Required inline command, multiline string, or list of commands.
+- **`name`** - Optional unique name used by `rattler-build run <name>`.
+- **`optional`** - Excludes the step from normal builds when `true`.
+- **`depends_on`** - Names of prerequisite steps in the step DAG.
+- **`requirements.build` / `requirements.host`** - Extra dependencies added
+  to the selected step solve group.
+- **`requirements.inherit`** - Controls inheritance from parent recipe
+  environments. A boolean applies to both; a `{build, host}` mapping controls
+  them separately.
+- **`run`** - Required inline command, multiline string, or command list.
 - **`if`** - Optional Jinja selector expression evaluated before the step runs. Do not wrap expressions in `${{ }}`.
 - **`interpreter`** - Optional interpreter override for this step.
 - **`cwd`** - Optional working directory for this step. Relative paths are
