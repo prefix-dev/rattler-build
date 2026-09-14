@@ -4737,7 +4737,7 @@ dependencies = [
 
 [[package]]
 name = "rattler_build_core"
-version = "0.2.14"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "arwen-codesign",
