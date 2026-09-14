@@ -1,8 +1,7 @@
 # Example: GitHub-released software with attestation verification
 #
-# For non-PyPI sources, you must provide `bundle_url` explicitly since it
-# cannot be auto-derived. The bundle is a standard sigstore .sigstore.json file
-# published alongside the release artifact.
+# This project publishes a standalone sigstore bundle alongside the release
+# artifact, so its `bundle_url` is supplied explicitly.
 #
 # GitHub Actions artifacts are signed with:
 #   identity: https://github.com/{owner}/{repo}/...
