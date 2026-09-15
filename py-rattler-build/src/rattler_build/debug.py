@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from rattler_build._rattler_build import debug as _debug
+from rattler_build.exclude_newer import ExcludeNewer
 
 if TYPE_CHECKING:
     from rattler_build.progress import ProgressCallback
@@ -98,6 +99,7 @@ class DebugSession:
         channels: list[str] | None = None,
         no_build_id: bool = True,
         progress_callback: ProgressCallback | None = None,
+        exclude_newer: ExcludeNewer | None = None,
     ) -> DebugSession:
         """Create a debug session from a rendered variant.
 
@@ -120,6 +122,8 @@ class DebugSession:
             giving stable paths across iterations.
         progress_callback:
             Optional callback for progress events during setup.
+        exclude_newer:
+            Dependency cutoff policy.
 
         Returns
         -------
@@ -137,6 +141,7 @@ class DebugSession:
             progress_callback=progress_callback,
             recipe_path=variant._recipe_path,
             repodata_revision=variant._repodata_revision,
+            exclude_newer=exclude_newer._inner if exclude_newer is not None else None,
         )
         return cls(inner)
 
