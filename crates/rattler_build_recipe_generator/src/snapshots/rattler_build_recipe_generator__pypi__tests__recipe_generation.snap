@@ -1,8 +1,8 @@
 ---
 source: crates/rattler_build_recipe_generator/src/pypi.rs
-assertion_line: 911
 expression: recipe
 ---
+schema_version: 1
 context:
   version: 1.24.0
   build_number: "0"
@@ -10,8 +10,8 @@ package:
   name: numpy
   version: "${{ version }}"
 source:
-  - url: "https://files.pythonhosted.org/packages/source/n/numpy/numpy-${{ version }}.tar.gz"
-    sha256: c4ab7c9711fe6b235e86487ca74c1b092a6dd59a3cb45b63241ea0a148501853
+  url: "https://files.pythonhosted.org/packages/source/n/numpy/numpy-${{ version }}.tar.gz"
+  sha256: c4ab7c9711fe6b235e86487ca74c1b092a6dd59a3cb45b63241ea0a148501853
 build:
   number: "${{ build_number }}"
   script: "${{ PYTHON }} -m pip install ."
