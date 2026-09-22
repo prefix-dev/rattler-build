@@ -4341,6 +4341,7 @@ dependencies = [
  "rattler_config",
  "rattler_networking",
  "rattler_package_streaming",
+ "rattler_redaction",
  "rattler_solve",
  "rattler_upload",
  "rattler_virtual_packages",

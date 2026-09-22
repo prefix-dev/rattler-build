@@ -1154,6 +1154,7 @@ pub struct TestData {
     pub compression_threads: Option<u32>,
     pub common: CommonData,
     pub test_index: Option<usize>,
+    pub exclude_newer: Option<rattler_solve::ExcludeNewer>,
 }
 
 impl TestData {
@@ -1183,6 +1184,7 @@ impl TestData {
             compression_threads,
             test_index,
             common,
+            exclude_newer: None,
         }
     }
 }

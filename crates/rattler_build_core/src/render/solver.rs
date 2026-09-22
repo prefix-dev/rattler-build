@@ -12,7 +12,9 @@ use rattler_conda_types::{
     Channel, ChannelNoticeLevel, ChannelUrl, MatchSpec, Platform, PrefixRecord, RepoDataRecord,
 };
 use rattler_repodata_gateway::ChannelNoticeResult;
-use rattler_solve::{ChannelPriority, SolveStrategy, SolverImpl, SolverTask, resolvo::Solver};
+use rattler_solve::{
+    ChannelPriority, ExcludeNewer, SolveStrategy, SolverImpl, SolverTask, resolvo::Solver,
+};
 
 use super::reporters::GatewayReporter;
 
@@ -63,7 +65,7 @@ pub async fn solve_environment(
     tool_configuration: &tool_configuration::Configuration,
     channel_priority: ChannelPriority,
     solve_strategy: SolveStrategy,
-    exclude_newer: Option<jiff::Timestamp>,
+    exclude_newer: Option<ExcludeNewer>,
 ) -> miette::Result<Vec<RepoDataRecord>> {
     let span_msg = format!("Resolving {name} environment");
     let span = tracing::info_span!("", message = %span_msg);
@@ -107,7 +109,7 @@ pub async fn solve_environment(
         specs: specs.to_vec(),
         channel_priority,
         strategy: solve_strategy,
-        exclude_newer: exclude_newer.map(Into::into),
+        exclude_newer,
         ..SolverTask::from_iter(&repo_data)
     };
 
@@ -135,7 +137,7 @@ pub async fn create_environment(
     tool_configuration: &tool_configuration::Configuration,
     channel_priority: ChannelPriority,
     solve_strategy: SolveStrategy,
-    exclude_newer: Option<jiff::Timestamp>,
+    exclude_newer: Option<ExcludeNewer>,
 ) -> miette::Result<Vec<RepoDataRecord>> {
     let required_packages = solve_environment(
         name,

@@ -609,7 +609,7 @@ pub async fn get_build_output(
                 experimental: build_data.common.experimental,
                 env_isolation: build_data.env_isolation,
                 sandbox_config: build_data.sandbox_configuration.clone(),
-                exclude_newer: build_data.exclude_newer,
+                exclude_newer: build_data.exclude_newer.map(Into::into),
                 repodata_revision: repodata_revision_from_v3_flag(build_data.common.v3),
             },
             finalized_dependencies: None,
@@ -662,7 +662,9 @@ async fn run_queued_tests(
                 tool_configuration: tool_configuration.clone(),
                 test_index: None,
                 output_dir: output.build_configuration.directories.output_dir.clone(),
-                exclude_newer: output.build_configuration.exclude_newer,
+                exclude_newer: output
+                    .build_configuration
+                    .exclude_newer_with_build_outputs(),
                 env_isolation: output.build_configuration.env_isolation,
             },
             None,
@@ -933,7 +935,7 @@ pub async fn run_test(
         solve_strategy: SolveStrategy::Highest,
         tool_configuration: tool_config,
         output_dir: test_data.common.output_dir,
-        exclude_newer: None,
+        exclude_newer: test_data.exclude_newer,
         env_isolation: rattler_build_script::EnvironmentIsolation::default(),
     };
 

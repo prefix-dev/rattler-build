@@ -307,8 +307,9 @@ python:
     assert python_versions == {"3.9", "3.10"}
 
 
-def test_run_build_exclude_newer_datetime_conversion(tmp_path: Path) -> None:
-    """Test that Python datetime converts correctly to Rust chrono::DateTime<Utc>."""
+@pytest.mark.parametrize("entrypoint", ["recipe", "variant", "variants"])
+def test_run_build_exclude_newer_datetime_conversion(tmp_path: Path, entrypoint: str) -> None:
+    """Existing build APIs still accept a datetime for the global cutoff."""
     from datetime import datetime, timezone
 
     recipe_yaml = """
@@ -325,10 +326,16 @@ build:
     variant_config = VariantConfig()
     rendered = recipe.render(variant_config)
 
-    # Create a timezone-aware datetime (required for chrono::DateTime<Utc>)
     exclude_newer = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
 
-    result = rendered[0].run_build(output_dir=tmp_path, exclude_newer=exclude_newer)
+    if entrypoint == "recipe":
+        result = recipe.run_build(output_dir=tmp_path, exclude_newer=exclude_newer)[0]
+    elif entrypoint == "variant":
+        result = rendered[0].run_build(output_dir=tmp_path, exclude_newer=exclude_newer)
+    else:
+        from rattler_build.render import build_rendered_variants
+
+        result = build_rendered_variants(rendered, output_dir=tmp_path, exclude_newer=exclude_newer)[0]
     assert result.name == "datetime-test"
 
 
