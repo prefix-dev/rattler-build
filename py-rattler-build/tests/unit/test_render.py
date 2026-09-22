@@ -30,7 +30,7 @@ def test_data_dir() -> Path:
 
 def test_render_config_with_platforms() -> None:
     """Test RenderConfig with custom platforms."""
-    platform_config = PlatformConfig(target_platform="linux-64")
+    platform_config = PlatformConfig(target_platform="linux-64", build_platform="linux-64")
     config = RenderConfig(platform=platform_config)
     assert config.target_platform == "linux-64"
     assert config.build_platform == "linux-64"

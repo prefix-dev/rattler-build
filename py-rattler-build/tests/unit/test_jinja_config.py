@@ -7,7 +7,7 @@ from rattler_build import JinjaConfig, PlatformConfig, PlatformParseError
 
 def test_jinja_config_with_platforms() -> None:
     """Test creating a JinjaConfig with specific platforms."""
-    platform = PlatformConfig(target_platform="linux-64")
+    platform = PlatformConfig(target_platform="linux-64", build_platform="linux-64")
     config = JinjaConfig(platform=platform)
 
     assert config.target_platform == "linux-64"
