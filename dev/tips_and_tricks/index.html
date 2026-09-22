@@ -4031,7 +4031,10 @@ location. Since Rattler-Build, by default, always creates a new build
 directory with the timestamp, you need to use the <code>--no-build-id</code> flag. This
 will disable the time stamp in the build directory and allow <code>ccache</code> and
 <code>sccache</code> to cache the build.</p>
-<div class="language-sh highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>rattler-build<span class="w"> </span>build<span class="w"> </span>--no-build-id<span class="w"> </span>--recipe<span class="w"> </span>./path/to/recipe.yaml
+<p>Furthermore, unless this variables are defined in the build script,
+you also need to pass the <code>--env-isolation none</code> flag, to ensure that the
+system environment variables are visible in the build phase.</p>
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>rattler-build<span class="w"> </span>build<span class="w"> </span>--no-build-id<span class="w"> </span>--env-isolation<span class="w"> </span>none<span class="w"> </span>--recipe<span class="w"> </span>./path/to/recipe.yaml
 </span></code></pre></div>
 <h2 id="building-your-own-forge">Building your own "forge"<a class="headerlink" href="#building-your-own-forge" title="Permanent link">#</a></h2>
 <p>You might want to publish your own software packages to a channel you control.
