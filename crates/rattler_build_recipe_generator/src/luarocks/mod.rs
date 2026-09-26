@@ -407,15 +407,16 @@ fn rockspec_to_recipe(rockspec: &LuarocksRockspec) -> miette::Result<Recipe> {
         build: Build {
             number: "${{ build_number }}".to_string(),
             skip: None,
-            script: "# Take the first `rockspec` we find (in non-deterministic places unfortunately)\nROCK=$(find . -name \"*.rockspec\" | sort -n -r | head -n 1)\nluarocks install ${ROCK} --tree=${{ PREFIX }}".to_string(),
+            script: "# Take the first `rockspec` we find (in non-deterministic places unfortunately)\nROCK=$(find . -name \"*.rockspec\" | sort -n -r | head -n 1)\nluarocks install ${ROCK} --tree=${{ PREFIX }}".into(),
             python: Python::default(),
             noarch: None,
             dynamic_linking: None,
+            ..Default::default()
         },
         requirements: Requirements {
-            build: vec!["luarocks".to_string()],
-            host: vec!["lua".to_string()],
-            run: vec!["lua".to_string()],
+            build: vec!["luarocks".into()],
+            host: vec!["lua".into()],
+            run: vec!["lua".into()],
         },
         tests: vec![generate_require_test(rockspec)],
         about: About {
@@ -425,6 +426,7 @@ fn rockspec_to_recipe(rockspec: &LuarocksRockspec) -> miette::Result<Recipe> {
             description: rockspec.description.detailed.as_deref().map(str::trim).map(ToOwned::to_owned).clone(),
             ..Default::default()
         },
+        ..Default::default()
     };
 
     // Add dependencies
@@ -438,7 +440,7 @@ fn rockspec_to_recipe(rockspec: &LuarocksRockspec) -> miette::Result<Recipe> {
             recipe
                 .requirements
                 .run
-                .push(dep_name.as_normalized().to_string());
+                .push(dep_name.as_normalized().into());
         }
     }
 
@@ -464,7 +466,10 @@ fn generate_require_test(spec: &LuarocksRockspec) -> Test {
         .into_iter()
         .map(|m| format!("lua -e \"require('{}')\"", m))
         .collect();
-    Test::Script(ScriptTest { script })
+    Test::Script(ScriptTest {
+        script,
+        ..Default::default()
+    })
 }
 
 fn normalize_lua_name(name: &str) -> miette::Result<PackageName> {
@@ -520,6 +525,7 @@ fn map_license(license: Option<&str>) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::serialize::Script;
 
     #[test]
     fn test_normalize_lua_name() {
@@ -659,6 +665,8 @@ dependencies = { "lua >= 5.1" }"#;
         };
 
         let recipe = rockspec_to_recipe(&rockspec).unwrap();
+        // The rendered YAML is what users get; keep it under snapshot.
+        insta::assert_snapshot!("luasocket_rendered", recipe.to_string());
 
         assert_eq!(recipe.package.name, "lua-luasocket");
         assert_eq!(recipe.package.version, "${{ version }}");
@@ -683,11 +691,14 @@ dependencies = { "lua >= 5.1" }"#;
             }
         }
 
-        assert!(recipe.build.script.contains("luarocks install"),);
+        assert!(matches!(
+            &recipe.build.script,
+            Script::Command(command) if command.contains("luarocks install")
+        ));
 
-        assert!(recipe.requirements.build.contains(&"luarocks".to_string()));
-        assert!(recipe.requirements.host.contains(&"lua".to_string()));
-        assert!(recipe.requirements.run.contains(&"lua".to_string()));
+        assert!(recipe.requirements.build.contains(&"luarocks".into()));
+        assert!(recipe.requirements.host.contains(&"lua".into()));
+        assert!(recipe.requirements.run.contains(&"lua".into()));
 
         assert_eq!(
             recipe.about.summary,

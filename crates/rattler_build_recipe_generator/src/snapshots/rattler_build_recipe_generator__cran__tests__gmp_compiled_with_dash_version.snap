@@ -1,0 +1,68 @@
+---
+source: crates/rattler_build_recipe_generator/src/cran.rs
+expression: recipe.to_string()
+---
+schema_version: 1
+
+context:
+  version: "0.7-5.1"
+
+package:
+  name: r-gmp
+  version: ${{ version | replace("-", "_") }}
+
+source:
+  url:
+    - https://cloud.r-project.org/src/contrib/gmp_${{ version }}.tar.gz
+    - https://cloud.r-project.org/src/contrib/Archive/gmp/gmp_${{ version }}.tar.gz
+
+build:
+  number: 0
+  skip: match(r_base, "<3.5")
+  script:
+    - if: win
+      then: '"${{ R }}" CMD INSTALL --build . %R_ARGS%'
+      else: '"${{ R }}" CMD INSTALL --build . ${R_ARGS}'
+  dynamic_linking:
+    rpaths:
+      - lib/R/lib/
+      - lib/
+
+requirements:
+  build:
+    - if: build_platform != target_platform
+      then:
+        - cross-r-base ${{ r_base }}
+    - ${{ compiler('c') }}
+    - ${{ compiler('cxx') }}
+    - make
+  host:
+    - r-base
+  run:
+    - r-base
+    # - r-rmpfr  # suggested
+    # - r-mass  # suggested
+    # - r-round  # suggested
+
+tests:
+  - r:
+      libraries:
+        - gmp
+
+about:
+  homepage: https://forgemia.inra.fr/sylvain.jasson/gmp
+  summary: Multiple Precision Arithmetic
+  description: |-
+    Multiple Precision Arithmetic (big integers and rationals,
+    prime number tests, matrix computation), "arithmetic without
+    limitations" using the C library GMP (GNU Multiple Precision
+    Arithmetic).
+  license: GPL-2.0-or-later
+  license_file:
+    - ${{ PREFIX }}/lib/R/share/licenses/GPL-2
+  repository: https://github.com/cran/gmp
+
+extra:
+  recipe-maintainers:
+    - octocat
+    - conda-forge/r

@@ -182,45 +182,32 @@ async fn extract_build_requirements(
     url: &str,
     client: &reqwest::Client,
 ) -> miette::Result<Vec<String>> {
-    let tar_data = client
-        .get(url)
-        .send()
-        .await
-        .into_diagnostic()?
-        .bytes()
-        .await
-        .into_diagnostic()?;
-    let tar = flate2::read::GzDecoder::new(&tar_data[..]);
-    let mut archive = tar::Archive::new(tar);
+    let tar_data = crate::tarball::download(client, url).await?;
+    // Only the sdist's own pyproject.toml counts; vendored or documentation
+    // copies deeper in the archive must not win.
+    let Some(contents) = crate::tarball::find_archive_files(&tar_data, &["pyproject.toml"])?
+        .remove("pyproject.toml")
+    else {
+        return Ok(Vec::new());
+    };
 
-    // Find and read pyproject.toml
-    for entry in archive.entries().into_diagnostic()? {
-        let mut entry = entry.into_diagnostic()?;
-        if entry.path().into_diagnostic()?.ends_with("pyproject.toml") {
-            let mut contents = String::new();
-            entry.read_to_string(&mut contents).into_diagnostic()?;
+    // Parse TOML
+    let toml: toml::Table = contents.parse().into_diagnostic()?;
 
-            // Parse TOML
-            let toml: toml::Table = contents.parse().into_diagnostic()?;
-
-            // Try different build system specs
-            return Ok(match toml.get("build-system") {
-                Some(build) => build
-                    .get("requires")
-                    .and_then(|r| r.as_array())
-                    .map(|arr| {
-                        arr.iter()
-                            .filter_map(|v| v.as_str())
-                            .map(|s| s.to_string())
-                            .collect()
-                    })
-                    .unwrap_or_default(),
-                None => Vec::new(),
-            });
-        }
-    }
-
-    Ok(Vec::new())
+    // Try different build system specs
+    Ok(match toml.get("build-system") {
+        Some(build) => build
+            .get("requires")
+            .and_then(|r| r.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str())
+                    .map(|s| s.to_string())
+                    .collect()
+            })
+            .unwrap_or_default(),
+        None => Vec::new(),
+    })
 }
 
 /// Fetch and cache the conda-forge mapping from conda package names to PyPI names.
@@ -858,13 +845,14 @@ pub async fn create_recipe(
         recipe
             .requirements
             .host
-            .push(format!("python {}", python_req));
+            .push(format!("python {}", python_req).into());
         recipe
             .requirements
             .run
-            .push(format!("python {}", python_req));
+            .push(format!("python {}", python_req).into());
     } else {
-        recipe.requirements.host.push("python".to_string());
+        recipe.requirements.host.push("python".into());
+        recipe.requirements.run.push("python".into());
     }
 
     let mapping = if opts.use_mapping {
@@ -878,7 +866,7 @@ pub async fn create_recipe(
         Ok(build_reqs) => {
             for req in build_reqs {
                 let mapped_req = map_requirement(&req, mapping, opts.use_mapping).await;
-                recipe.requirements.host.push(mapped_req);
+                recipe.requirements.host.push(mapped_req.into());
             }
         }
         Err(e) => {
@@ -889,7 +877,7 @@ pub async fn create_recipe(
             );
         }
     }
-    recipe.requirements.host.push("pip".to_string());
+    recipe.requirements.host.push("pip".into());
 
     // Process runtime dependencies
     if let Some(deps) = &metadata.info.requires_dist {
@@ -899,11 +887,11 @@ pub async fn create_recipe(
             recipe
                 .requirements
                 .run
-                .push(formatted_req.trim_start_matches("- ").to_string());
+                .push(formatted_req.trim_start_matches("- ").into());
         }
     }
 
-    recipe.build.script = "${{ PYTHON }} -m pip install .".to_string();
+    recipe.build.script = "${{ PYTHON }} -m pip install .".into();
 
     recipe.tests.push(Test::Python(PythonTest {
         python: PythonTestInner {
@@ -1036,6 +1024,12 @@ mod tests {
         let recipe = create_recipe(&opts, &metadata, &client).await.unwrap();
 
         assert_yaml_snapshot!(recipe);
+        // The rendered YAML is what users get (flask's description ends in a
+        // blank line, which exercises the block scalar handling).
+        insta::assert_snapshot!(
+            "flask_noarch_rendered",
+            post_process_markers(recipe.to_string())
+        );
     }
 
     /// Helper: extract just the SPDX string from `extract_license`.
