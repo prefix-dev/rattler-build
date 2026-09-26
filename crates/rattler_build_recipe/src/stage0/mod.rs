@@ -4,7 +4,7 @@
 use rattler_conda_types::RepodataRevision;
 
 mod about;
-mod build;
+pub mod build;
 pub mod evaluate;
 mod extra;
 mod match_spec;
@@ -17,7 +17,7 @@ mod tests;
 mod types;
 
 pub use about::{About, License};
-pub use build::{BinaryRelocation, Build, BuildPlan, PythonBuild, RunStep, Step};
+pub use build::{BinaryRelocation, Build, BuildPlan, PythonBuild, RunStep, Step, UsesStep};
 pub use extra::Extra;
 pub use match_spec::SerializableMatchSpec;
 pub use output::{
@@ -25,6 +25,7 @@ pub use output::{
     SingleOutputRecipe, StagingBuild, StagingMetadata, StagingOutput,
 };
 pub use package::{Package, PackageMetadata};
+pub(crate) use parser::build::{parse_step_requirements, parse_steps};
 pub use parser::{
     ParseConfig, parse_recipe, parse_recipe_from_source, parse_recipe_from_source_with_config,
     parse_recipe_or_multi, parse_recipe_or_multi_from_source,

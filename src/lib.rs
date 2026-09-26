@@ -421,6 +421,7 @@ pub async fn get_build_output(
         os_env_var_keys,
         build_number_override: build_data.build_num_override,
         build_string_prefix: build_data.build_string_prefix.clone(),
+        selected_steps: build_data.selected_steps.clone(),
         ..RenderConfig::default()
     };
 
@@ -476,67 +477,25 @@ pub async fn get_build_output(
 
     let timestamp = jiff::Timestamp::now();
 
-    for mut discovered_output in outputs_and_variants {
-        let mut inherit_parent_build = true;
-        let mut inherit_parent_host = true;
-        // Resolve the step DAG before solving so step-local host requirements
-        // participate in environment creation. A normal build selects all
-        // non-optional roots; `run` supplies explicit roots.
-        if discovered_output.recipe.build.plan.steps().is_some() {
-            let selected = discovered_output
-                .recipe
-                .build
-                .plan
-                .select_steps(build_data.selected_steps.as_deref())
-                .map_err(|error| miette::miette!("invalid build steps: {error}"))?;
-            if let Some(requested_steps) = build_data.selected_steps.as_deref() {
-                // The explicitly requested roots define the solve group. DAG
-                // prerequisites execute in that same environment; their own
-                // inheritance setting applies only when selected directly.
-                let mut root_inheritance = requested_steps.iter().map(|requested| {
-                    selected
-                        .iter()
-                        .find(|step| step.name.as_deref() == Some(requested.as_str()))
-                        .expect("selected root must be present after DAG resolution")
-                        .requirements
-                        .inherit
-                        .clone()
-                });
-                if let Some(first) = root_inheritance.next() {
-                    if root_inheritance.any(|inherit| inherit != first) {
-                        return Err(miette::miette!(
-                            "selected build steps use incompatible parent environment inheritance; run them separately"
-                        ));
-                    }
-                    inherit_parent_build = first.build;
-                    inherit_parent_host = first.host;
-                }
-                if !inherit_parent_build {
-                    discovered_output.recipe.requirements.build.clear();
-                }
-                if !inherit_parent_host {
-                    discovered_output.recipe.requirements.host.clear();
-                }
-            }
-            for step in &selected {
-                discovered_output
-                    .recipe
-                    .requirements
-                    .build
-                    .extend(step.requirements.build.clone());
-                discovered_output
-                    .recipe
-                    .requirements
-                    .host
-                    .extend(step.requirements.host.clone());
-            }
-            discovered_output.recipe.build.plan =
-                rattler_build_recipe::stage1::build::BuildPlan::Steps(selected);
-        } else if build_data.selected_steps.is_some() {
-            return Err(miette::miette!(
-                "named steps were requested, but this recipe uses build.script"
-            ));
-        }
+    for discovered_output in outputs_and_variants {
+        let root_inheritance = discovered_output
+            .recipe
+            .build
+            .plan
+            .steps()
+            .unwrap_or_default()
+            .iter()
+            .find(|step| {
+                step.name.as_ref().is_some_and(|name| {
+                    build_data
+                        .selected_steps
+                        .as_ref()
+                        .is_some_and(|selected| selected.contains(name))
+                })
+            })
+            .map(|step| &step.requirements.inherit);
+        let inherit_parent_build = root_inheritance.is_none_or(|inherit| inherit.build);
+        let inherit_parent_host = root_inheritance.is_none_or(|inherit| inherit.host);
 
         let recipe = &discovered_output.recipe;
 
