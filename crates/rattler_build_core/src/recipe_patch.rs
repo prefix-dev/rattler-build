@@ -41,8 +41,81 @@ pub(crate) fn prepare_output_directory(work_dir: &Path) -> std::io::Result<()> {
     fs_err::create_dir_all(directory)
 }
 
-fn allowed_path(path: &str) -> bool {
-    path.starts_with("/about/")
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum OutputPhase {
+    Metadata,
+    PostBuild,
+}
+
+impl OutputPhase {
+    fn prepare_target(
+        self,
+        document: &mut Value,
+        dotted_path: &str,
+        append: bool,
+    ) -> miette::Result<()> {
+        match self {
+            Self::PostBuild => return Ok(()),
+            Self::Metadata => {}
+        }
+        let (parent_path, key) = dotted_path.rsplit_once('.').unwrap_or(("", dotted_path));
+        let mut parent = document;
+        for segment in parent_path.split('.').filter(|segment| !segment.is_empty()) {
+            if parent.is_null() {
+                *parent = Value::Object(Map::new());
+            }
+            let mapping = parent.as_object_mut().ok_or_else(|| {
+                miette::miette!("metadata field `{dotted_path}` traverses a non-mapping value")
+            })?;
+            parent = mapping
+                .entry(segment.to_string())
+                .or_insert_with(|| Value::Object(Map::new()));
+        }
+        if parent_path == "requirements.run_exports" && parent.is_array() {
+            *parent = serde_json::json!({"weak": std::mem::take(parent)});
+        }
+        if parent_path == "build.files" && (key == "include" || key == "exclude") {
+            let previous = std::mem::take(parent);
+            *parent = match previous {
+                Value::Object(globs) if !globs.contains_key("if") => Value::Object(globs),
+                Value::Array(include) => serde_json::json!({"include": include}),
+                Value::Null => Value::Object(Map::new()),
+                value => serde_json::json!({"include": [value]}),
+            };
+        }
+        if parent.is_null() {
+            *parent = Value::Object(Map::new());
+        }
+        let mapping = parent.as_object_mut().ok_or_else(|| {
+            miette::miette!("metadata field `{dotted_path}` has a non-mapping parent")
+        })?;
+        if append {
+            let target = mapping
+                .entry(key.to_string())
+                .or_insert_with(|| Value::Array(Vec::new()));
+            match target {
+                Value::Null => *target = Value::Array(Vec::new()),
+                Value::String(_) => *target = Value::Array(vec![std::mem::take(target)]),
+                Value::Array(_) | Value::Object(_) | Value::Bool(_) | Value::Number(_) => {}
+            }
+        }
+        Ok(())
+    }
+}
+
+fn allowed_path(path: &str, phase: OutputPhase) -> bool {
+    (phase == OutputPhase::Metadata
+        && [
+            "/requirements/build",
+            "/requirements/host",
+            "/build/steps",
+            "/build/script",
+            "/build/python/entry_points",
+            "/build/variant/use_keys",
+        ]
+        .iter()
+        .any(|prefix| path == *prefix || path.starts_with(&format!("{prefix}/"))))
+        || path.starts_with("/about/")
         || path == "/requirements/run"
         || path.starts_with("/requirements/run/")
         || path == "/requirements/run_constraints"
@@ -122,6 +195,8 @@ fn normalize_patch_document(document: &mut Value) {
         normalize_globs(document, &["build", "dynamic_linking"], key);
     }
     ensure_object(document, &["build", "prefix_detection"]);
+    ensure_array(document, &["build", "python"], "entry_points");
+    ensure_array(document, &["build", "variant"], "use_keys");
     // An omitted file filter includes all files; an explicit empty filter includes none.
     if document.pointer("/build/files").is_some() {
         normalize_globs(document, &["build"], "files");
@@ -131,7 +206,7 @@ fn normalize_patch_document(document: &mut Value) {
     }
     ensure_array(document, &["build"], "post_process");
 
-    for key in ["run", "run_constraints"] {
+    for key in ["build", "host", "run", "run_constraints"] {
         ensure_array(document, &["requirements"], key);
     }
     for key in [
@@ -149,7 +224,12 @@ fn parse_output_value(raw: &str) -> Value {
     serde_json::from_str(raw).unwrap_or_else(|_| Value::String(raw.to_string()))
 }
 
-fn apply_text_output(document: &mut Value, contents: &str, source: &Path) -> miette::Result<()> {
+fn apply_text_output(
+    document: &mut Value,
+    contents: &str,
+    source: &Path,
+    phase: OutputPhase,
+) -> miette::Result<()> {
     for (index, raw_line) in contents.lines().enumerate() {
         let line = raw_line.trim();
         if line.is_empty() || line.starts_with('#') {
@@ -166,23 +246,48 @@ fn apply_text_output(document: &mut Value, contents: &str, source: &Path) -> mie
             .strip_suffix(".append")
             .map_or((directive, false), |path| (path, true));
         let pointer = format!("/{}", dotted_path.replace('.', "/"));
-        if dotted_path == "requirements.build" || dotted_path == "requirements.host" {
+        if phase == OutputPhase::PostBuild
+            && (dotted_path == "requirements.build" || dotted_path == "requirements.host")
+        {
             return Err(miette::miette!(
-                "build-step output {} cannot add `{dotted_path}` after environments have been solved; declare build/host requirements on the reusable step",
+                "build-step output {} cannot add `{dotted_path}` after environments have been solved; use `build.metadata` or declare build/host requirements on the reusable step",
                 source.display()
             ));
         }
-        if !allowed_path(&pointer) {
+        if !allowed_path(&pointer, phase) {
             return Err(miette::miette!(
-                "build-step output {} cannot modify `{dotted_path}` after build execution",
+                "{} output {} cannot modify `{dotted_path}` at this phase",
+                if phase == OutputPhase::Metadata {
+                    "metadata-step"
+                } else {
+                    "build-step"
+                },
                 source.display()
             ));
         }
+        phase.prepare_target(document, dotted_path, append)?;
         if pointer.starts_with("/requirements/") && !append {
             return Err(miette::miette!(
-                "build-step output {} must use `.append` for post-build requirements",
+                "{} output {} must use `.append` for requirements",
+                if phase == OutputPhase::Metadata {
+                    "metadata-step"
+                } else {
+                    "build-step"
+                },
                 source.display()
             ));
+        }
+
+        if phase == OutputPhase::Metadata && pointer == "/build/steps" {
+            let build = object(ensure_object(document, &["build"]));
+            build.remove("script");
+            if append {
+                build
+                    .entry("steps".to_string())
+                    .or_insert_with(|| Value::Array(Vec::new()));
+            }
+        } else if phase == OutputPhase::Metadata && pointer == "/build/script" {
+            object(ensure_object(document, &["build"])).remove("steps");
         }
 
         let value = parse_output_value(raw_value.trim());
@@ -217,7 +322,7 @@ fn apply_text_output(document: &mut Value, contents: &str, source: &Path) -> mie
     Ok(())
 }
 
-fn apply_patch_file(recipe: &mut Recipe, path: &Path) -> miette::Result<()> {
+fn apply_patch_file(recipe: &mut Recipe, path: &Path, phase: OutputPhase) -> miette::Result<()> {
     let contents = fs_err::read_to_string(path)
         .into_diagnostic()
         .wrap_err_with(|| format!("failed to read recipe patch {}", path.display()))?;
@@ -226,7 +331,7 @@ fn apply_patch_file(recipe: &mut Recipe, path: &Path) -> miette::Result<()> {
         .into_diagnostic()
         .wrap_err("failed to serialize recipe before applying build-step output")?;
     normalize_patch_document(&mut document);
-    apply_text_output(&mut document, &contents, path)?;
+    apply_text_output(&mut document, &contents, path, phase)?;
     let mut updated: Recipe = serde_json::from_value(document)
         .into_diagnostic()
         .wrap_err_with(|| {
@@ -238,6 +343,16 @@ fn apply_patch_file(recipe: &mut Recipe, path: &Path) -> miette::Result<()> {
     updated.used_variant = used_variant;
     *recipe = updated;
     Ok(())
+}
+
+/// Apply pre-solve metadata to recipe source, never to an executable Stage1 plan.
+pub(crate) fn apply_metadata_output(document: &mut Value, contents: &str) -> miette::Result<()> {
+    apply_text_output(
+        document,
+        contents,
+        Path::new("build.metadata output"),
+        OutputPhase::Metadata,
+    )
 }
 
 /// Requirements that were appended after the build completed.
@@ -268,7 +383,7 @@ pub(crate) fn apply_outputs(
         .collect::<Vec<_>>();
     outputs.sort();
     for output in outputs {
-        apply_patch_file(recipe, &output)?;
+        apply_patch_file(recipe, &output, OutputPhase::PostBuild)?;
     }
     let exports = &recipe.requirements.run_exports;
     Ok(PostBuildRequirements {
@@ -317,6 +432,7 @@ mod tests {
             &mut document,
             "about.boolean true\nabout.number 42\nabout.empty null\nabout.string \"true\"\nabout.plain human readable\n",
             Path::new("outputs.txt"),
+            OutputPhase::PostBuild,
         )?;
         assert_eq!(
             document,
