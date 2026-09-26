@@ -312,9 +312,13 @@ impl Requirements {
 
     /// Get the free specs of the rendered dependencies (any MatchSpec without pins)
     pub fn free_specs(&self) -> Vec<PackageName> {
-        self.build
-            .iter()
-            .chain(self.host.iter())
+        Self::free_specs_from_dependencies(self.build_host())
+    }
+
+    pub(crate) fn free_specs_from_dependencies<'a>(
+        dependencies: impl Iterator<Item = &'a Dependency>,
+    ) -> Vec<PackageName> {
+        dependencies
             .filter_map(|dep| match dep {
                 Dependency::Spec(spec) => {
                     if is_free_matchspec(spec.as_ref()) {
