@@ -1,0 +1,11 @@
+schema_version: 1
+inputs:
+  message:
+    type: string
+steps:
+  - interpreter: python
+    run: |
+      import os
+      from pathlib import Path
+      marker = Path(os.environ['PREFIX']) / 'share' / 'step-provider'
+      (marker / 'nested.txt').write_text('${{ inputs.message }}')
