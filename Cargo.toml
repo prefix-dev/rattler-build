@@ -101,7 +101,7 @@ marked-yaml = "0.8.0"
 rstest = "0.27.0"
 petgraph = { version = "0.8.3", default-features = false }
 sha1 = { version = "0.11.0" }
-lzma-rust2 = { version = "0.20", features = ["xz"] }
+lzma-rust2 = { version = "0.21", features = ["xz"] }
 line-ending = "1.5.1"
 anyhow = "1.0.104"
 content_inspector = "0.2.4"
@@ -134,37 +134,37 @@ tracing-subscriber = { version = "0.3", features = [
 tracing-test = "0.2.6"
 
 # Rattler crates
-rattler_conda_types = { version = "0.52", default-features = false }
-rattler_digest = { version = "1.3.2", default-features = false, features = [
+rattler_conda_types = { version = "0.54", default-features = false }
+rattler_digest = { version = "1.4.0", default-features = false, features = [
   "serde",
 ] }
 rattler_networking = { version = "0.30", default-features = false }
 rattler_package_streaming = { version = "0.27", default-features = false }
-rattler_shell = { version = "0.27", default-features = false, features = [
+rattler_shell = { version = "0.28", default-features = false, features = [
   "sysinfo",
 ] }
 rattler_git = { version = "0.3" }
 rattler_prefix_guard = { version = "0.1.2" }
 
 rattler_config = { version = "0.7" }
-rattler = { version = "0.48", default-features = false, features = [
+rattler = { version = "0.50", default-features = false, features = [
   "cli-tools",
   "indicatif",
 ] }
 rattler_cache = { version = "0.10", default-features = false }
 rattler_index = { version = "0.31", default-features = false }
-rattler_upload = { version = "0.10", default-features = false }
+rattler_upload = { version = "0.11", default-features = false }
 rattler_s3 = { version = "0.2" }
 rattler_redaction = { version = "0.2", default-features = false }
 rattler_repodata_gateway = { version = "0.33", default-features = false, features = [
   "gateway",
 ] }
-rattler_solve = { version = "9.0", default-features = false, features = [
+rattler_solve = { version = "10.0", default-features = false, features = [
   "resolvo",
   "serde",
 ] }
-rattler_virtual_packages = { version = "6.0", default-features = false }
-rattler_menuinst = "0.2"
+rattler_virtual_packages = { version = "7.1", default-features = false }
+rattler_menuinst = "0.3"
 
 
 # Internal rattler-build crates

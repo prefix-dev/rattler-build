@@ -4,7 +4,7 @@ use jiff::Timestamp;
 use pyo3::{exceptions::PyValueError, prelude::*};
 use rattler_conda_types::{ChannelUrl, PackageName};
 use rattler_redaction::Redact;
-use rattler_solve::ExcludeNewer;
+use rattler_solve::{ExcludeNewer, TimestampPolicy};
 
 /// A validated cutoff policy shared by builds, tests, and debug sessions.
 #[pyclass(name = "ExcludeNewer", from_py_object)]
@@ -43,7 +43,11 @@ fn exclude_newer_policy(
     }
 
     let mut policy = ExcludeNewer::from_datetime(cutoff.unwrap_or(Timestamp::MAX))
-        .with_include_unknown_timestamp(include_unknown_timestamp);
+        .with_timestamp_policy(if include_unknown_timestamp {
+            TimestampPolicy::AllowMissing
+        } else {
+            TimestampPolicy::RequireTimestamp
+        });
     for (name, cutoff) in packages {
         let package = PackageName::from_str(&name).map_err(|err| {
             PyValueError::new_err(format!("invalid ExcludeNewer package name {name:?}: {err}"))

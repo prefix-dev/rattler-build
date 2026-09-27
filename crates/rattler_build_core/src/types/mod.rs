@@ -66,7 +66,7 @@ impl PlatformWithVirtualPackages {
     /// Returns the current platform and the virtual packages available on the
     /// current system.
     pub fn detect(overrides: &VirtualPackageOverrides) -> Result<Self, DetectVirtualPackageError> {
-        let platform = Platform::current();
+        let platform = Platform::current().expect("unsupported build platform");
         Self::detect_for_platform(platform, overrides)
     }
 

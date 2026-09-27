@@ -123,9 +123,12 @@ impl Default for RenderConfig {
             experimental: false,
             repodata_revision: RepodataRevision::Legacy,
             recipe_path: None,
-            target_platform: rattler_conda_types::Platform::current(),
-            build_platform: rattler_conda_types::Platform::current(),
-            host_platform: rattler_conda_types::Platform::current(),
+            target_platform: rattler_conda_types::Platform::current()
+                .unwrap_or(rattler_conda_types::Platform::NoArch),
+            build_platform: rattler_conda_types::Platform::current()
+                .unwrap_or(rattler_conda_types::Platform::NoArch),
+            host_platform: rattler_conda_types::Platform::current()
+                .unwrap_or(rattler_conda_types::Platform::NoArch),
             os_env_var_keys: HashSet::new(),
             build_string_prefix: None,
             build_number_override: None,

@@ -159,17 +159,20 @@ pub(crate) fn output_from_rendered_variant(
     let target_platform = variant
         .get(&NormalizedKey("target_platform".to_string()))
         .and_then(|v| v.to_string().parse::<Platform>().ok())
-        .unwrap_or_else(Platform::current);
+        .or_else(Platform::current)
+        .ok_or_else(|| RattlerBuildError::Other("unsupported build platform".into()))?;
 
     let build_platform = variant
         .get(&NormalizedKey("build_platform".to_string()))
         .and_then(|v| v.to_string().parse::<Platform>().ok())
-        .unwrap_or_else(Platform::current);
+        .or_else(Platform::current)
+        .ok_or_else(|| RattlerBuildError::Other("unsupported build platform".into()))?;
 
     let host_platform = variant
         .get(&NormalizedKey("host_platform".to_string()))
         .and_then(|v| v.to_string().parse::<Platform>().ok())
-        .unwrap_or_else(Platform::current);
+        .or_else(Platform::current)
+        .ok_or_else(|| RattlerBuildError::Other("unsupported build platform".into()))?;
 
     let channels_urls: Vec<ChannelUrl> = channels
         .iter()
@@ -205,7 +208,8 @@ pub(crate) fn output_from_rendered_variant(
                 &safe_recipe_path,
                 output_dir,
                 &timestamp,
-                Platform::current(),
+                Platform::current()
+                    .ok_or_else(|| RattlerBuildError::Other("unsupported build platform".into()))?,
             )
             .no_build_id(no_build_id)
             .build()

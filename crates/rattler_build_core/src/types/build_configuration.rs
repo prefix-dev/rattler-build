@@ -129,7 +129,8 @@ impl BuildConfiguration {
 
 #[cfg(test)]
 mod tests {
-    use rattler_conda_types::utils::TimestampMs;
+    use rattler_conda_types::{PackageRecord, RepoDataRecord, Version, utils::TimestampMs};
+    use rattler_solve::TimestampPolicy;
 
     use super::*;
 
@@ -155,36 +156,39 @@ mod tests {
         config.directories.output_dir = output_dir.path().to_path_buf();
         config.exclude_newer = Some(cutoff.into());
 
+        let record = |channel: &str, timestamp| RepoDataRecord {
+            package_record: PackageRecord {
+                timestamp,
+                ..PackageRecord::new(
+                    package.clone(),
+                    "1.0".parse::<Version>().unwrap(),
+                    "0".into(),
+                )
+            },
+            identifier: "fresh-output-1.0-0.conda".parse().unwrap(),
+            url: "https://example.com/channel/noarch/fresh-output-1.0-0.conda"
+                .parse()
+                .unwrap(),
+            channel: Some(channel.to_string()),
+        };
+        let output_url = output_channel.base_url.url().as_str();
         let policy = config.exclude_newer_with_build_outputs().unwrap();
-        assert!(!policy.is_excluded(
-            &package,
-            Some(output_channel.base_url.url().as_str()),
-            Some(&timestamp),
-        ));
-        assert!(policy.is_excluded(
-            &package,
-            Some(dependency_channel.base_url.url().as_str()),
-            Some(&timestamp),
-        ));
-        assert!(policy.is_excluded(
-            &package,
-            Some("https://example.com/channel/"),
-            Some(&timestamp)
-        ));
-        assert!(policy.is_excluded(&package, Some(output_channel.base_url.url().as_str()), None));
+        assert!(!policy.is_excluded(&record(output_url, Some(timestamp))));
+        assert!(policy.is_excluded(&record(
+            dependency_channel.base_url.url().as_str(),
+            Some(timestamp),
+        )));
+        assert!(policy.is_excluded(&record("https://example.com/channel/", Some(timestamp))));
+        assert!(policy.is_excluded(&record(output_url, None)));
 
         config.exclude_newer = Some(
             ExcludeNewer::from_datetime(cutoff)
                 .with_package_cutoff(package.clone(), cutoff)
-                .with_include_unknown_timestamp(true),
+                .with_timestamp_policy(TimestampPolicy::AllowMissing),
         );
         let policy = config.exclude_newer_with_build_outputs().unwrap();
-        assert!(policy.is_excluded(
-            &package,
-            Some(output_channel.base_url.url().as_str()),
-            Some(&timestamp),
-        ));
-        assert!(!policy.is_excluded(&package, Some(output_channel.base_url.url().as_str()), None));
+        assert!(policy.is_excluded(&record(output_url, Some(timestamp))));
+        assert!(!policy.is_excluded(&record(output_url, None)));
     }
 
     #[test]

@@ -351,7 +351,9 @@ pub struct TestConfiguration {
 }
 
 fn configured_test_platforms(config: &TestConfiguration) -> (Platform, Platform, Platform) {
-    let target_platform = config.target_platform.unwrap_or(Platform::current());
+    let target_platform = config
+        .target_platform
+        .unwrap_or(config.current_platform.platform);
     let build_platform = config.current_platform.platform;
     let host_platform = config
         .host_platform
@@ -1410,7 +1412,7 @@ mod tests {
                 "version": "1.0",
                 "build": "0",
                 "build_number": 0,
-                "subdir": Platform::current().to_string(),
+                "subdir": Platform::current().unwrap().to_string(),
                 "depends": [],
                 "timestamp": 1735689600000i64,
             }))
@@ -1437,7 +1439,7 @@ mod tests {
             target_platform: None,
             host_platform: None,
             current_platform: PlatformWithVirtualPackages {
-                platform: Platform::current(),
+                platform: Platform::current().unwrap(),
                 virtual_packages: Vec::new(),
             },
             keep_test_prefix: false,

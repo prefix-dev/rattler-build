@@ -1031,10 +1031,10 @@ mod tests {
             env_vars: IndexMap::new(),
             secrets: IndexMap::new(),
             context: ExecutionContext::shared(
-                RuntimeEnv::for_test(Platform::current()),
+                RuntimeEnv::for_test(Platform::current().unwrap()),
                 prefix,
-                Platform::current(),
-                Platform::current(),
+                Platform::current().unwrap(),
+                Platform::current().unwrap(),
             ),
             work_dir: tmp.path().to_path_buf(),
             sandbox_config: None,
@@ -1059,7 +1059,7 @@ mod tests {
             EnvironmentIsolation::None,
             &env_vars,
             &secrets,
-            &RuntimeEnv::for_test(Platform::current()),
+            &RuntimeEnv::for_test(Platform::current().unwrap()),
         );
 
         assert!(
@@ -1397,7 +1397,7 @@ mod tests {
     /// the prefix's bin directory and returns its path.
     fn create_fake_executable(prefix: &Path, name: &str) -> PathBuf {
         let exe_name = format!("{}{}", name, std::env::consts::EXE_SUFFIX);
-        let bin_dir = prefix_path_entries(prefix, &Platform::current())
+        let bin_dir = prefix_path_entries(prefix, &Platform::current().unwrap())
             .into_iter()
             .next()
             .expect("prefix has executable path entries");
@@ -1431,8 +1431,8 @@ mod tests {
             context: ExecutionContext::shared(
                 RuntimeEnv::current(),
                 run_prefix,
-                Platform::current(),
-                Platform::current(),
+                Platform::current().unwrap(),
+                Platform::current().unwrap(),
             ),
             work_dir,
             sandbox_config: None,
@@ -1446,7 +1446,7 @@ mod tests {
     /// test does not touch the real process environment.
     #[test]
     fn test_strict_env_clear_and_passthrough_whitelist() {
-        let runtime = RuntimeEnv::for_test(Platform::current())
+        let runtime = RuntimeEnv::for_test(Platform::current().unwrap())
             .with_var("RB_TEST_RANDOM_VAR", "should-not-leak")
             .with_var("SSL_CERT_FILE", "/host/cacert.pem");
 
@@ -1672,7 +1672,7 @@ mod tests {
             &replacements,
             &process_env,
             None,
-            &RuntimeEnv::for_test(Platform::current()),
+            &RuntimeEnv::for_test(Platform::current().unwrap()),
         )
         .await
         .unwrap();
