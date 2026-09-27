@@ -17,6 +17,7 @@ def upload_package_to_quetz(
     *,
     api_key: str | None = None,
     auth_file: str | Path | None = None,
+    force: bool = False,
 ) -> None:
     """
     Upload to a Quetz server. Authentication is used from the keychain / auth-file.
@@ -27,11 +28,12 @@ def upload_package_to_quetz(
         channels: The channels to upload the package to.
         api_key: The API key for authentication.
         auth_file: The authentication file.
+        force: Whether to force overwrite existing packages.
 
     Returns:
         None
     """
-    upload_package_to_quetz_py(package_files, url, channels, api_key, auth_file)
+    upload_package_to_quetz_py(package_files, url, channels, api_key, auth_file, force)
 
 
 def upload_package_to_artifactory(
