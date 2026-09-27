@@ -23,7 +23,7 @@ pub fn upload_package_to_quetz_py(
     let store = tool_configuration::get_auth_store(auth_file).map_err(RattlerBuildError::Auth)?;
 
     let url = Url::parse(&url).map_err(RattlerBuildError::from)?;
-    let quetz_data = QuetzData::new(url, channels, api_key);
+    let quetz_data = QuetzData::new(url, channels, api_key, ForceOverwrite(false));
 
     run_async_task(async {
         upload::upload_package_to_quetz(&store, &package_files, quetz_data).await?;

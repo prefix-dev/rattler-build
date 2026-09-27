@@ -637,10 +637,10 @@ mod tests {
             PathBuf::from("."),
             Path::new("."),
             ExecutionContext::shared(
-                RuntimeEnv::for_test(Platform::current()),
+                RuntimeEnv::for_test(Platform::current().unwrap()),
                 Path::new("."),
-                Platform::current(),
-                Platform::current(),
+                Platform::current().unwrap(),
+                Platform::current().unwrap(),
             ),
             None,
             EnvironmentIsolation::default(),

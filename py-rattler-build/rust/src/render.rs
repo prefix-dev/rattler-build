@@ -46,13 +46,15 @@ impl PyRenderConfig {
             .map(|p| p.parse::<Platform>())
             .transpose()
             .map_err(RattlerBuildError::from)?
-            .unwrap_or_else(Platform::current);
+            .or_else(Platform::current)
+            .ok_or_else(|| RattlerBuildError::Other("unsupported build platform".into()))?;
 
         let build_platform = build_platform
             .map(|p| p.parse::<Platform>())
             .transpose()
             .map_err(RattlerBuildError::from)?
-            .unwrap_or_else(Platform::current);
+            .or_else(Platform::current)
+            .ok_or_else(|| RattlerBuildError::Other("unsupported build platform".into()))?;
 
         let host_platform = host_platform
             .map(|p| p.parse::<Platform>())

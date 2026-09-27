@@ -69,7 +69,7 @@ pub struct RuntimeEnv {
 impl RuntimeEnv {
     /// Captures the real process environment variables and the current platform.
     pub fn current() -> Self {
-        let process_platform = Platform::current();
+        let process_platform = Platform::current().expect("unsupported build platform");
         Self {
             env: EnvironmentVariables::from_iter(std::env::vars(), process_platform),
             process_platform,

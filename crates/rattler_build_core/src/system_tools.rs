@@ -118,9 +118,12 @@ impl SystemTools {
     pub fn find_tool(&self, tool: Tool) -> Result<PathBuf, which::Error> {
         let which = |tool: &str| -> Result<PathBuf, which::Error> {
             if let Some(build_prefix) = &self.build_prefix {
-                let build_prefix_activator =
-                    Activator::from_path(build_prefix, shell::Bash::default(), Platform::current())
-                        .unwrap();
+                let build_prefix_activator = Activator::from_path(
+                    build_prefix,
+                    shell::Bash::default(),
+                    Platform::current().expect("unsupported build platform"),
+                )
+                .unwrap();
 
                 let paths = std::env::join_paths(build_prefix_activator.paths).ok();
                 let mut found_tool = which::which_in_global(&tool, paths)?;

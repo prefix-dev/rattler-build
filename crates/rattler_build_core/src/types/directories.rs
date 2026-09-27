@@ -399,14 +399,14 @@ mod tests {
             &tempdir.path().join("recipe"),
             &tempdir.path().join("output"),
             &Timestamp::now(),
-            Platform::current(),
+            Platform::current().unwrap(),
         )
         .build()
         .unwrap();
 
         assert_eq!(
             directories.host_prefix,
-            padded_host_prefix(&directories.build_dir, Platform::current())
+            padded_host_prefix(&directories.build_dir, Platform::current().unwrap())
         );
 
         let execution = directories.exec_view();
@@ -430,7 +430,7 @@ mod tests {
             &tempdir.path().join("recipe"),
             &tempdir.path().join("output"),
             &Timestamp::now(),
-            Platform::current(),
+            Platform::current().unwrap(),
         )
         .build()
         .unwrap();
@@ -464,7 +464,7 @@ mod tests {
             &tempdir.path().join("recipe"),
             &tempdir.path().join("output"),
             &Timestamp::now(),
-            Platform::current(),
+            Platform::current().unwrap(),
         )
         .build()
         .unwrap();

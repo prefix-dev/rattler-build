@@ -67,7 +67,8 @@ pub struct JinjaConfig {
 
 impl Default for JinjaConfig {
     fn default() -> Self {
-        let current = Platform::current();
+        // WASM has no native conda platform; callers can supply explicit platforms.
+        let current = Platform::current().unwrap_or(Platform::NoArch);
         Self {
             target_platform: current,
             build_platform: current,
@@ -201,8 +202,8 @@ impl Jinja {
 
         let mut seen_families = HashSet::new();
         for platform in Platform::iter() {
-            // Skip noarch and unknown platforms
-            if matches!(platform, Platform::NoArch | Platform::Unknown) {
+            // Skip noarch
+            if matches!(platform, Platform::NoArch) {
                 continue;
             }
 

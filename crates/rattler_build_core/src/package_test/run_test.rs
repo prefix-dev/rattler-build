@@ -351,7 +351,9 @@ pub struct TestConfiguration {
 }
 
 fn configured_test_platforms(config: &TestConfiguration) -> (Platform, Platform, Platform) {
-    let target_platform = config.target_platform.unwrap_or(Platform::current());
+    let target_platform = config
+        .target_platform
+        .unwrap_or(config.current_platform.platform);
     let build_platform = config.current_platform.platform;
     let host_platform = config
         .host_platform

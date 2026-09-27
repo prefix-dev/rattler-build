@@ -518,7 +518,7 @@ async fn upload_to_quetz(
     package_paths: &[PathBuf],
     publish_config: &PublishConfig,
 ) -> miette::Result<()> {
-    use rattler_upload::upload::opt::QuetzData;
+    use rattler_upload::upload::opt::{ForceOverwrite, QuetzData};
     use rattler_upload::upload::upload_package_to_quetz;
 
     tracing::info!("Uploading packages to Quetz server: {}", url);
@@ -547,7 +547,12 @@ async fn upload_to_quetz(
     server_url.set_path("");
 
     // Create QuetzData with server URL, channel, and optional API key
-    let quetz_data = QuetzData::new(server_url, channel, None);
+    let quetz_data = QuetzData::new(
+        server_url,
+        channel,
+        None,
+        ForceOverwrite(publish_config.force),
+    );
 
     // Upload packages
     upload_package_to_quetz(&auth_storage, &package_paths.to_vec(), quetz_data)

@@ -979,13 +979,17 @@ impl BuildData {
     ) -> Self {
         Self {
             up_to,
-            build_platform: build_platform.unwrap_or(Platform::current()),
+            build_platform: build_platform
+                .or_else(Platform::current)
+                .expect("unsupported build platform"),
             target_platform: target_platform
                 .or(host_platform)
-                .unwrap_or(Platform::current()),
+                .or_else(Platform::current)
+                .expect("unsupported build platform"),
             host_platform: host_platform
                 .or(target_platform)
-                .unwrap_or(Platform::current()),
+                .or_else(Platform::current)
+                .expect("unsupported build platform"),
             channels,
             channels_from_config: false,
             variant_config: variant_config.unwrap_or_default(),
@@ -1296,11 +1300,19 @@ impl DebugData {
                 .output_dir
                 .clone()
                 .unwrap_or_else(|| PathBuf::from("./output")),
-            build_platform: opts.build_platform.unwrap_or(Platform::current()),
-            target_platform: opts.target_platform.unwrap_or(Platform::current()),
+            build_platform: opts
+                .build_platform
+                .or_else(Platform::current)
+                .expect("unsupported build platform"),
+            target_platform: opts
+                .target_platform
+                .or_else(Platform::current)
+                .expect("unsupported build platform"),
             host_platform: opts
                 .host_platform
-                .unwrap_or_else(|| opts.target_platform.unwrap_or(Platform::current())),
+                .or(opts.target_platform)
+                .or_else(Platform::current)
+                .expect("unsupported build platform"),
             channels: opts.channels,
             common: CommonData::from_opts_and_config(opts.common, config.unwrap_or_default()),
             output_name: opts.output_name,

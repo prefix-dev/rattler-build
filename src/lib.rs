@@ -588,7 +588,7 @@ pub async fn get_build_output(
                     recipe_path,
                     &output_dir,
                     &timestamp,
-                    Platform::current(),
+                    Platform::current().expect("unsupported build platform"),
                 )
                 .no_build_id(build_data.no_build_id)
                 .merge_build_and_host(recipe.build().merge_build_and_host_envs)

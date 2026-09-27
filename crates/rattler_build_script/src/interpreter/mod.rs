@@ -343,8 +343,8 @@ mod tests {
             context: ExecutionContext::shared(
                 RuntimeEnv::current(),
                 run_prefix,
-                Platform::current(),
-                Platform::current(),
+                Platform::current().unwrap(),
+                Platform::current().unwrap(),
             ),
             work_dir,
             sandbox_config: None,
@@ -367,7 +367,7 @@ mod tests {
 
     fn create_fake_executable(prefix: &Path, name: &str) -> PathBuf {
         let exe_name = format!("{}{}", name, std::env::consts::EXE_SUFFIX);
-        let bin_dir = prefix_path_entries(prefix, &Platform::current())
+        let bin_dir = prefix_path_entries(prefix, &Platform::current().unwrap())
             .into_iter()
             .next()
             .expect("prefix has executable path entries");
@@ -717,7 +717,7 @@ mod tests {
             fs::set_permissions(&exe, Permissions::from_mode(0o755)).unwrap();
         }
 
-        let runtime = RuntimeEnv::for_test(Platform::current())
+        let runtime = RuntimeEnv::for_test(Platform::current().unwrap())
             .with_var("PATH", path_dir.to_string_lossy().into_owned());
 
         let context = shared_context(runtime, &prefix);
@@ -789,14 +789,14 @@ mod tests {
         // The tool exists only in the host prefix.
         let tool = create_fake_executable(&host_prefix, "rb_host_tool");
         // Empty runtime PATH so resolution can only come from a prefix.
-        let runtime = RuntimeEnv::for_test(Platform::current()).with_var("PATH", "");
+        let runtime = RuntimeEnv::for_test(Platform::current().unwrap()).with_var("PATH", "");
 
         let context = ExecutionContext::separate(
             runtime,
             &build_prefix,
-            Platform::current(),
+            Platform::current().unwrap(),
             &host_prefix,
-            Platform::current(),
+            Platform::current().unwrap(),
         );
         let found = find_interpreter(
             "rb_host_tool",

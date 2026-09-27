@@ -196,7 +196,7 @@ mod tests {
 
     fn session_spec(work_dir: &Path) -> SessionSpec {
         SessionSpec {
-            platform: Platform::current(),
+            platform: Platform::current().unwrap(),
             mounts: Vec::<Mount>::new(),
             image: None,
             work_dir: GuestPath(work_dir.to_path_buf()),
