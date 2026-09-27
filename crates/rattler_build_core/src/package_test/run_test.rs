@@ -30,7 +30,7 @@ use rattler_shell::{
     activation::ActivationError,
     shell::{Shell, ShellEnum},
 };
-use rattler_solve::{ChannelPriority, SolveStrategy};
+use rattler_solve::{ChannelPriority, ExcludeNewer, SolveStrategy};
 use std::collections::BTreeMap;
 use std::fmt::Write;
 use std::{
@@ -344,8 +344,8 @@ pub struct TestConfiguration {
     pub tool_configuration: tool_configuration::Configuration,
     /// The output directory to create the test prefixes in (will be `output_dir/test`)
     pub output_dir: PathBuf,
-    /// Exclude packages newer than this date from the solver
-    pub exclude_newer: Option<jiff::Timestamp>,
+    /// Exclude packages according to global, channel, and package cutoff dates.
+    pub exclude_newer: Option<ExcludeNewer>,
     /// The environment isolation mode for test scripts
     pub env_isolation: EnvironmentIsolation,
 }
@@ -595,13 +595,16 @@ pub async fn run_test(
         .map_err(|e| TestError::TestFailed(format!("failed to cache package: {e}")))?;
     let package_folder = cache_metadata.path().to_path_buf();
 
+    let test_channel = Channel::try_from_directory(tmp_repo.path())
+        .expect("could not create channel from directory")
+        .base_url;
+    let exclude_newer = config.exclude_newer.clone().map(|policy| {
+        // Only the artifacts explicitly copied into this temporary channel
+        // bypass the global cutoff. Package overrides retain precedence.
+        policy.with_channel_cutoff(test_channel.url().as_str(), jiff::Timestamp::MAX)
+    });
     let mut channels = config.channels.clone();
-    channels.insert(
-        0,
-        Channel::try_from_directory(tmp_repo.path())
-            .expect("could not create channel from directory")
-            .base_url,
-    );
+    channels.insert(0, test_channel);
 
     let host_platform = config.host_platform.clone().unwrap_or_else(|| {
         if target_platform == Platform::NoArch {
@@ -618,6 +621,7 @@ pub async fn run_test(
         target_platform: Some(target_platform),
         host_platform: Some(host_platform.clone()),
         channels,
+        exclude_newer,
         tool_configuration: tool_configuration::Configuration {
             package_cache: temp_package_cache,
             ..config.tool_configuration.clone()
@@ -662,7 +666,7 @@ pub async fn run_test(
             &config.tool_configuration,
             config.channel_priority,
             config.solve_strategy,
-            config.exclude_newer,
+            config.exclude_newer.clone(),
         )
         .await
         .wrap_err("failed to setup test environment")
@@ -882,7 +886,7 @@ async fn run_python_test_inner(
         &config.tool_configuration,
         config.channel_priority,
         config.solve_strategy,
-        config.exclude_newer,
+        config.exclude_newer.clone(),
     )
     .await
     .wrap_err("failed to setup test environment")
@@ -982,7 +986,7 @@ async fn run_perl_test(
         &config.tool_configuration,
         config.channel_priority,
         config.solve_strategy,
-        config.exclude_newer,
+        config.exclude_newer.clone(),
     )
     .await
     .wrap_err("failed to setup test environment")
@@ -1059,7 +1063,7 @@ async fn run_commands_test(
             &config.tool_configuration,
             config.channel_priority,
             config.solve_strategy,
-            config.exclude_newer,
+            config.exclude_newer.clone(),
         )
         .await
         .wrap_err("failed to setup test environment")
@@ -1090,7 +1094,7 @@ async fn run_commands_test(
         &config.tool_configuration,
         config.channel_priority,
         config.solve_strategy,
-        config.exclude_newer,
+        config.exclude_newer.clone(),
     )
     .await
     .wrap_err("failed to setup test environment")
@@ -1177,7 +1181,7 @@ async fn run_downstream_test(
         &config.tool_configuration,
         config.channel_priority,
         config.solve_strategy,
-        config.exclude_newer,
+        config.exclude_newer.clone(),
     )
     .await;
 
@@ -1271,7 +1275,7 @@ async fn run_r_test(
         &config.tool_configuration,
         config.channel_priority,
         config.solve_strategy,
-        config.exclude_newer,
+        config.exclude_newer.clone(),
     )
     .await
     .wrap_err("failed to setup test environment")
@@ -1347,7 +1351,7 @@ async fn run_ruby_test(
         &config.tool_configuration,
         config.channel_priority,
         config.solve_strategy,
-        config.exclude_newer,
+        config.exclude_newer.clone(),
     )
     .await
     .wrap_err("failed to setup test environment")
@@ -1394,6 +1398,72 @@ async fn run_ruby_test(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn exclude_newer_allows_the_test_artifact_and_preserves_package_overrides() {
+        let package = tempfile::tempdir().unwrap();
+        fs::create_dir_all(package.path().join("info/test")).unwrap();
+        fs::write(
+            package.path().join("info/index.json"),
+            serde_json::to_vec(&serde_json::json!({
+                "name": "cutoff-test-artifact",
+                "version": "1.0",
+                "build": "0",
+                "build_number": 0,
+                "subdir": Platform::current().to_string(),
+                "depends": [],
+                "timestamp": 1735689600000i64,
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        fs::write(
+            package.path().join("info/paths.json"),
+            r#"{"paths_version":1,"paths":[]}"#,
+        )
+        .unwrap();
+        fs::write(package.path().join("info/files"), "").unwrap();
+        fs::write(
+            package.path().join("info/test/test_time_dependencies.json"),
+            "[]",
+        )
+        .unwrap();
+
+        let test_dir = tempfile::tempdir().unwrap();
+        let cache_dir = tempfile::tempdir().unwrap();
+        let cutoff: jiff::Timestamp = "2020-01-01T00:00:00Z".parse().unwrap();
+        let mut config = TestConfiguration {
+            test_prefix: test_dir.path().join("test"),
+            target_platform: None,
+            host_platform: None,
+            current_platform: PlatformWithVirtualPackages {
+                platform: Platform::current(),
+                virtual_packages: Vec::new(),
+            },
+            keep_test_prefix: false,
+            test_index: None,
+            channels: Vec::new(),
+            channel_priority: ChannelPriority::Strict,
+            solve_strategy: SolveStrategy::Highest,
+            tool_configuration: tool_configuration::Configuration::builder()
+                .with_cache_dir(cache_dir.path().to_path_buf())
+                .finish(),
+            output_dir: test_dir.path().to_path_buf(),
+            exclude_newer: Some(cutoff.into()),
+            env_isolation: EnvironmentIsolation::default(),
+        };
+
+        run_test(package.path(), &config, None).await.unwrap();
+
+        config.exclude_newer = Some(
+            ExcludeNewer::from_datetime(cutoff)
+                .with_package_cutoff("cutoff-test-artifact".parse().unwrap(), cutoff),
+        );
+        assert!(matches!(
+            run_test(package.path(), &config, None).await,
+            Err(TestError::TestEnvironmentSetup(_))
+        ));
+    }
 
     #[tokio::test]
     async fn legacy_tests_use_build_platform_scripts() {
