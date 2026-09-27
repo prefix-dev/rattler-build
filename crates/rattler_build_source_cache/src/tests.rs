@@ -108,6 +108,139 @@ mod source_cache_tests {
         assert_ne!(err.expected, err.actual);
     }
 
+    /// Serves `responses` in order, one per request: the `Content-Length` advertised
+    /// paired with the bytes actually sent. The last entry repeats.
+    fn spawn_scripted_server(
+        responses: Vec<(usize, &'static [u8])>,
+    ) -> (String, std::sync::Arc<std::sync::atomic::AtomicUsize>) {
+        use std::io::{BufRead, BufReader, Write};
+        use std::sync::Arc;
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        assert!(!responses.is_empty());
+
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        let hits = Arc::new(AtomicUsize::new(0));
+        let hits_for_thread = Arc::clone(&hits);
+
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let Ok(mut stream) = stream else { break };
+
+                // Drain the request head so the client can finish writing.
+                let mut reader = BufReader::new(stream.try_clone().unwrap());
+                let mut line = String::new();
+                while reader.read_line(&mut line).unwrap_or(0) > 0 {
+                    if line == "\r\n" {
+                        break;
+                    }
+                    line.clear();
+                }
+
+                let n = hits_for_thread.fetch_add(1, Ordering::SeqCst);
+                let (declared_len, body) = responses[n.min(responses.len() - 1)];
+
+                let _ = write!(
+                    stream,
+                    "HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: {declared_len}\r\nConnection: close\r\n\r\n"
+                );
+                let _ = stream.write_all(body);
+                let _ = stream.flush();
+            }
+        });
+
+        (format!("http://{addr}"), hits)
+    }
+
+    async fn fetch_scripted(
+        temp_dir: &TempDir,
+        responses: Vec<(usize, &'static [u8])>,
+        checksum_of: &[u8],
+    ) -> (
+        Result<SourceResult, CacheError>,
+        std::sync::Arc<std::sync::atomic::AtomicUsize>,
+    ) {
+        use sha2::{Digest, Sha256};
+
+        let (base_url, hits) = spawn_scripted_server(responses);
+        let cache = SourceCacheBuilder::new()
+            .cache_dir(temp_dir.path())
+            .build()
+            .await
+            .unwrap();
+
+        let source = Source::Url(UrlSource {
+            urls: vec![url::Url::parse(&format!("{base_url}/payload.txt")).unwrap()],
+            checksums: vec![Checksum::Sha256(Sha256::digest(checksum_of).to_vec())],
+            file_name: None,
+            attestation: None,
+        });
+
+        (cache.get_source(&source).await, hits)
+    }
+
+    const PAYLOAD: &[u8] = b"the real payload";
+
+    #[tokio::test]
+    async fn test_empty_response_is_retried() {
+        use std::sync::atomic::Ordering;
+
+        let temp_dir = TempDir::new().unwrap();
+        let (result, hits) =
+            fetch_scripted(&temp_dir, vec![(0, b""), (PAYLOAD.len(), PAYLOAD)], PAYLOAD).await;
+
+        let result = result.expect("the retry should have produced the real payload");
+        assert_eq!(fs_err::read(&result.path).unwrap(), PAYLOAD);
+        assert_eq!(hits.load(Ordering::SeqCst), 2);
+    }
+
+    #[tokio::test]
+    async fn test_truncated_response_is_retried() {
+        use std::sync::atomic::Ordering;
+
+        let temp_dir = TempDir::new().unwrap();
+        let (result, hits) = fetch_scripted(
+            &temp_dir,
+            vec![(PAYLOAD.len(), &PAYLOAD[..4]), (PAYLOAD.len(), PAYLOAD)],
+            PAYLOAD,
+        )
+        .await;
+
+        let result = result.expect("the retry should have produced the real payload");
+        assert_eq!(fs_err::read(&result.path).unwrap(), PAYLOAD);
+        assert_eq!(hits.load(Ordering::SeqCst), 2);
+    }
+
+    /// Repeating the download cannot change a stale checksum, so it must not cost a
+    /// second request.
+    #[tokio::test]
+    async fn test_complete_but_mismatched_body_is_not_retried() {
+        use std::sync::atomic::Ordering;
+
+        const WRONG: &[u8] = b"something else entirely";
+
+        let temp_dir = TempDir::new().unwrap();
+        let (result, hits) = fetch_scripted(&temp_dir, vec![(WRONG.len(), WRONG)], PAYLOAD).await;
+
+        assert!(matches!(result, Err(CacheError::ValidationFailed { .. })));
+        assert_eq!(hits.load(Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn test_empty_response_gives_up_after_max_attempts() {
+        use std::sync::atomic::Ordering;
+
+        let temp_dir = TempDir::new().unwrap();
+        let (result, hits) = fetch_scripted(&temp_dir, vec![(0, b"")], PAYLOAD).await;
+
+        assert!(result.is_err());
+        assert_eq!(
+            hits.load(Ordering::SeqCst),
+            crate::cache::MAX_DOWNLOAD_ATTEMPTS as usize
+        );
+    }
+
     #[tokio::test]
     async fn test_path_source_passthrough() {
         let temp_dir = TempDir::new().unwrap();
