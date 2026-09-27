@@ -7236,11 +7236,11 @@ Defaults to <code>&lt;recipe_dir&gt;/output</code>.</p>
                 <code>exclude_newer</code>
             </td>
             <td>
-                  <code><span title="datetime.datetime">datetime</span> | None</code>
+                  <code><span title="datetime.datetime">datetime</span> | <span title="rattler_build.exclude_newer.ExcludeNewer">ExcludeNewer</span> | None</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Exclude packages newer than this timestamp.</p>
+                <p>Dependency cutoff policy, or a datetime for a global cutoff.</p>
               </div>
             </td>
             <td>

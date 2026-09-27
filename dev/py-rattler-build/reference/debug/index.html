@@ -4855,7 +4855,8 @@ print(result.stdout)
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">channels</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
 </span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">no_build_id</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
 </span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">progress_callback</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="p">)</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">exclude_newer</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="p">)</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">
@@ -4877,7 +4878,9 @@ no_build_id:
     If <code>True</code> (default), omit the build ID from directory paths,
     giving stable paths across iterations.
 progress_callback:
-    Optional callback for progress events during setup.</p>
+    Optional callback for progress events during setup.
+exclude_newer:
+    Dependency cutoff policy.</p>
 <h4 id="rattler_build.debug.DebugSession.create--returns">Returns<a class="headerlink" href="#rattler_build.debug.DebugSession.create--returns" title="Permanent link">#</a></h4>
 <p>DebugSession
     A session with the environment fully set up and ready to run.</p>
