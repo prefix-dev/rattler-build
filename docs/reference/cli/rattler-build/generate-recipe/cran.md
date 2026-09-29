@@ -28,3 +28,6 @@ rattler-build generate-recipe cran [OPTIONS] <PACKAGE>
 <br>May be provided more than once.
 - <a id="arg---write" href="#arg---write">`--write (-w)`</a>
 :  Whether to write the recipe to a folder
+- <a id="arg---maintainer" href="#arg---maintainer">`--maintainer (-m) <GITHUB_ID>`</a>
+:  GitHub handle(s) to list under `extra.recipe-maintainers` (repeatable)
+<br>May be provided more than once.

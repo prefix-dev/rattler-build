@@ -256,11 +256,23 @@ pub struct PythonTest {
     pub python: PythonTestInner,
 }
 
+#[derive(Default, Debug, Serialize)]
+pub struct RTestInner {
+    pub libraries: Vec<String>,
+}
+
+/// The `r:` test type: load each library in a fresh R session.
+#[derive(Default, Debug, Serialize)]
+pub struct RTest {
+    pub r: RTestInner,
+}
+
 #[derive(Debug, Serialize)]
 #[serde(untagged)]
 pub enum Test {
     Script(ScriptTest),
     Python(PythonTest),
+    R(RTest),
 }
 
 /// Free-form `extra:` section.
@@ -609,6 +621,11 @@ mod tests {
             },
             "${{ compiler('c') }}".into(),
         ];
+        recipe.tests.push(Test::R(RTest {
+            r: RTestInner {
+                libraries: vec!["demo".to_string()],
+            },
+        }));
         recipe.tests.push(Test::Script(ScriptTest {
             files: ScriptTestFiles {
                 source: vec!["tests/".to_string()],
