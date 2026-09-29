@@ -96,6 +96,13 @@ pub struct CranOpts {
         arg(short, long = "maintainer", value_name = "GITHUB_ID")
     )]
     pub maintainers: Vec<String>,
+
+    /// Shape the recipe for a conda-forge staged-recipes submission: download
+    /// through conda-forge's `cran_mirror` variant, leave out the `skip` for a
+    /// minimum R version and append the package's DESCRIPTION file for
+    /// reviewers
+    #[cfg_attr(feature = "cli", arg(long))]
+    pub staged_recipes: bool,
 }
 
 /// Commit information from the R-universe/CRAN API.
@@ -262,6 +269,8 @@ struct CranTarball {
     /// be read and came from the host the recipe's source URLs reference (the
     /// CRAN mirror).
     sha256: Option<String>,
+    /// The package's `DESCRIPTION` file (`<package>/DESCRIPTION`).
+    description: Option<String>,
     /// Whether the package ships the testthat runner, `tests/testthat.R`.
     has_testthat_runner: bool,
 }
@@ -271,12 +280,31 @@ impl CranTarball {
         // One decompression pass for everything the tarball can tell us. A
         // failure here means the bytes are not a source archive at all, so
         // nothing about them — the checksum included — can be trusted.
-        let files = tarball::find_archive_files(bytes, &["tests/testthat.R"])?;
+        let mut files = tarball::find_archive_files(bytes, &["DESCRIPTION", "tests/testthat.R"])?;
         Ok(Self {
             sha256: Some(hex::encode(compute_bytes_digest::<Sha256>(bytes))),
+            description: files.remove("DESCRIPTION"),
             has_testthat_runner: files.contains_key("tests/testthat.R"),
         })
     }
+}
+
+/// Append the package's DESCRIPTION file to the rendered recipe as a comment
+/// block, in the format `conda skeleton cran` used, so that reviewers can check
+/// the recipe against the upstream metadata without opening the tarball.
+fn append_description_comment(recipe: &str, description: &str) -> String {
+    let mut out = recipe.trim_end_matches('\n').to_string();
+    out.push_str("\n\n# The original CRAN metadata for this package was:\n\n");
+    for line in description
+        .lines()
+        .map(str::trim_end)
+        .filter(|line| !line.is_empty())
+    {
+        out.push_str("# ");
+        out.push_str(&serialize::comment_text(line));
+        out.push('\n');
+    }
+    out
 }
 
 // Found when running `installed.packages()` in an `r-base` environment
@@ -338,6 +366,14 @@ const CRAN_MIRROR: &str = "https://cloud.r-project.org";
 pub struct RecipeOptions {
     /// GitHub handles to list under `extra.recipe-maintainers`.
     pub maintainers: Vec<String>,
+    /// Follow the conventions of a conda-forge staged-recipes submission:
+    /// download through conda-forge's `cran_mirror` variant rather than from a
+    /// mirror named in the recipe. rattler-build itself knows no `cran_mirror`,
+    /// so such a recipe needs a variant config that defines one. Also leaves
+    /// out the `skip` for a minimum R version, which the R versions conda-forge
+    /// builds for make unnecessary, and appends the package's DESCRIPTION file
+    /// to the recipe as a comment block.
+    pub staged_recipes: bool,
 }
 
 /// Placeholder maintainer when none is given on the command line (the same
@@ -492,12 +528,22 @@ fn package_info_to_recipe(
         "${{ version }}".to_string()
     };
 
-    // The recipe names the mirror itself: rattler-build defines no
-    // `cran_mirror` variable.
+    // A staged-recipes submission downloads through conda-forge's pinned
+    // `cran_mirror`; anywhere else the recipe has to name a mirror itself,
+    // because rattler-build defines no such variable.
+    let mirror = if options.staged_recipes {
+        // Reading the variant would otherwise make it part of the package's
+        // variant, so that the mirror a package came from would change its
+        // build string.
+        recipe.build.variant.ignore_keys = vec!["cran_mirror".to_string()];
+        "${{ cran_mirror }}"
+    } else {
+        CRAN_MIRROR
+    };
     let file_name = format!("{}_${{{{ version }}}}.tar.gz", info.Package);
     recipe.source.push(
         UrlSourceElement {
-            url: cran_source_urls(CRAN_MIRROR, &info.Package, &file_name),
+            url: cran_source_urls(mirror, &info.Package, &file_name),
             sha256: tarball.and_then(|tarball| tarball.sha256.clone()),
             md5: None,
         }
@@ -531,7 +577,7 @@ fn package_info_to_recipe(
                 // Keep the first constraint that translates into a skip: a
                 // later entry (e.g. an upper bound) has none, and must not
                 // clear the minimum-R condition.
-                if recipe.build.skip.is_none() {
+                if recipe.build.skip.is_none() && !options.staged_recipes {
                     recipe.build.skip = r_dep_version_to_skip(ver);
                 }
             }
@@ -672,7 +718,13 @@ async fn fetch_and_render(
 ) -> miette::Result<GeneratedRecipe> {
     let (info, tarball) = fetch_package(client, package, universe.unwrap_or("cran")).await?;
     let (recipe, remaining_deps) = package_info_to_recipe(&info, tarball.as_ref(), options);
-    let yaml = recipe.to_string();
+    let mut yaml = recipe.to_string();
+    if options.staged_recipes {
+        match tarball.and_then(|tarball| tarball.description) {
+            Some(description) => yaml = append_description_comment(&yaml, &description),
+            None => tracing::warn!("No DESCRIPTION file available to append to the recipe"),
+        }
+    }
     Ok(GeneratedRecipe {
         package_name: recipe.package.name,
         yaml,
@@ -718,6 +770,7 @@ async fn generate_r_recipe_with_client(
         opts.universe.as_deref(),
         &RecipeOptions {
             maintainers: cli_maintainers(&opts.maintainers),
+            staged_recipes: opts.staged_recipes,
         },
     )
     .await?;
@@ -769,9 +822,11 @@ mod tests {
                 "425bc04af76483b8cf713ad141bdebb963cf54dd363fbdbee3a709820ec4d23e".to_string(),
             ),
             has_testthat_runner: true,
+            ..Default::default()
         };
         let options = RecipeOptions {
             maintainers: cli_maintainers(&[]),
+            ..Default::default()
         };
         let (recipe, deps) = package_info_to_recipe(&info, Some(&tarball), &options);
         assert!(deps.contains("commonmark"));
@@ -787,6 +842,7 @@ mod tests {
         let info = fixture("gmp");
         let options = RecipeOptions {
             maintainers: vec!["octocat".to_string(), "conda-forge/r".to_string()],
+            ..Default::default()
         };
         let (recipe, deps) = package_info_to_recipe(&info, None, &options);
         assert!(deps.is_empty(), "gmp only depends on base R packages");
@@ -801,6 +857,64 @@ mod tests {
         let script = serde_yaml::to_string(&compiled_build_script()).unwrap();
         assert!(script.contains("R CMD INSTALL --build ."), "{script}");
         assert!(!script.contains("${{"), "{script}");
+    }
+
+    /// rattler-build knows no `cran_mirror`, so only a staged-recipes
+    /// submission — which conda-forge's pinning covers — may refer to it.
+    #[test]
+    fn only_staged_recipes_refer_to_the_cran_mirror_variant() {
+        let info = fixture("tinkr");
+
+        let (recipe, _) = package_info_to_recipe(&info, None, &RecipeOptions::default());
+        let yaml = recipe.to_string();
+        assert!(
+            yaml.contains(
+                "    - https://cloud.r-project.org/src/contrib/tinkr_${{ version }}.tar.gz\n"
+            ),
+            "{yaml}"
+        );
+        assert!(!yaml.contains("cran_mirror"), "{yaml}");
+
+        let staged = RecipeOptions {
+            staged_recipes: true,
+            ..Default::default()
+        };
+        let (recipe, _) = package_info_to_recipe(&info, None, &staged);
+        let yaml = recipe.to_string();
+        assert!(
+            yaml.contains("    - ${{ cran_mirror }}/src/contrib/tinkr_${{ version }}.tar.gz\n"),
+            "{yaml}"
+        );
+        assert!(
+            yaml.contains(
+                "    - ${{ cran_mirror }}/src/contrib/Archive/tinkr/tinkr_${{ version }}.tar.gz\n"
+            ),
+            "{yaml}"
+        );
+        // Referring to the variant must not put the mirror in the build hash.
+        assert!(yaml.contains("      - cran_mirror\n"), "{yaml}");
+        // The mirror comes from the variant config, not from `context`.
+        assert!(!yaml.contains("  cran_mirror:"), "{yaml}");
+    }
+
+    /// tinkr depends on `R (>= 4.1.0)`; conda-forge only builds for R versions
+    /// that satisfy such a bound, so a staged-recipes submission has no `skip`.
+    #[test]
+    fn only_staged_recipes_leave_out_the_minimum_r_skip() {
+        let info = fixture("tinkr");
+
+        let (recipe, _) = package_info_to_recipe(&info, None, &RecipeOptions::default());
+        assert_eq!(
+            recipe.build.skip.as_deref(),
+            Some("match(r_base, \"<4.1\")")
+        );
+
+        let staged = RecipeOptions {
+            staged_recipes: true,
+            ..Default::default()
+        };
+        let (recipe, _) = package_info_to_recipe(&info, None, &staged);
+        assert_eq!(recipe.build.skip, None);
     }
 
     /// Only the minimum-R constraint maps to a skip; a second `R` entry must
@@ -912,6 +1026,28 @@ mod tests {
             "description bullet must stay untouched: {yaml}"
         );
         assert!(yaml.contains("    # - r-knitr  # suggested\n"), "{yaml}");
+    }
+
+    #[test]
+    fn description_is_appended_as_a_comment_block() {
+        let recipe = "package:\n  name: r-tinkr\n";
+        let description =
+            "Package: tinkr\nTitle: Cast '(R)Markdown' Files\n    to 'XML'  \n\nLicense: GPL-3\n";
+        insta::assert_snapshot!(append_description_comment(recipe, description));
+    }
+
+    /// DESCRIPTION is free text; nothing in it may end its comment line and
+    /// become part of the recipe.
+    #[test]
+    fn the_description_comment_adds_nothing_to_the_recipe() {
+        let recipe = "package:\n  name: r-tinkr\n";
+        let description = "\u{feff}Package: tinkr\nAuthor: A\u{2028}injected: 1\rother: 2\n";
+        let commented = append_description_comment(recipe, description);
+        assert_eq!(
+            serde_yaml::from_str::<serde_yaml::Value>(&commented).unwrap(),
+            serde_yaml::from_str::<serde_yaml::Value>(recipe).unwrap(),
+            "{commented}"
+        );
     }
 
     #[test]

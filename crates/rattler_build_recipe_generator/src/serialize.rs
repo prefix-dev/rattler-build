@@ -60,6 +60,23 @@ pub struct Build {
     pub python: Python,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dynamic_linking: Option<DynamicLinking>,
+    #[serde(skip_serializing_if = "Variant::is_empty")]
+    pub variant: Variant,
+}
+
+/// Variant handling for the package (`build.variant`).
+#[derive(Default, Debug, Serialize)]
+pub struct Variant {
+    /// Variant keys that must not become part of the package's variant, and
+    /// therefore of its build hash.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub ignore_keys: Vec<String>,
+}
+
+impl Variant {
+    fn is_empty(&self) -> bool {
+        self.ignore_keys.is_empty()
+    }
 }
 
 /// Emit the build number as an integer when it is one (e.g. `0`) and as the
