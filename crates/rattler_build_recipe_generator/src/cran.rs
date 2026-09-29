@@ -622,15 +622,6 @@ fn package_info_to_recipe(
     let mut remaining_deps = HashSet::new();
     for dep in info._dependencies.iter() {
         if dep.package == "R" {
-            // Keep the first lower bound: a later entry that is none (e.g. an
-            // upper bound) must not clear the minimum-R condition.
-            if recipe.build.skip.is_none() {
-                recipe.build.skip = dep
-                    .version
-                    .as_deref()
-                    .and_then(r_minimum_version)
-                    .map(r_skip_condition);
-            }
             continue;
         }
 
@@ -656,6 +647,15 @@ fn package_info_to_recipe(
             suggested.push(format_r_package(&dep.package, dep.version.as_ref()));
         }
     }
+
+    // Several entries may bound R; the strictest lower bound decides.
+    recipe.build.skip = info
+        ._dependencies
+        .iter()
+        .filter(|dep| dep.package == "R")
+        .filter_map(|dep| r_minimum_version(dep.version.as_deref()?))
+        .max()
+        .map(r_skip_condition);
 
     recipe.requirements.host = std::iter::once(r_base.clone())
         .chain(host)
@@ -926,10 +926,11 @@ mod tests {
         assert!(!script.contains("${{"), "{script}");
     }
 
-    /// Only a lower bound on R maps to a skip; an entry that is none must
-    /// neither clear it nor take its place.
+    /// A package may bound R more than once (`ppgm` does); the skip follows
+    /// the strictest lower bound in whatever order they come, and ignores what
+    /// is not a lower bound.
     #[test]
-    fn only_a_lower_bound_on_r_decides_the_skip() {
+    fn the_strictest_minimum_r_decides_the_skip() {
         let skip_for = |constraints: &[&str]| {
             let mut info = fixture("tinkr");
             info._dependencies.retain(|dep| dep.package != "R");
@@ -946,8 +947,12 @@ mod tests {
         };
         let skip = |version: &str| Some(format!("match(r_base, \"<{version}\")"));
 
+        assert_eq!(skip_for(&[">= 4.4.0", ">= 2.10"]), skip("4.4"));
+        assert_eq!(skip_for(&[">= 2.10", ">= 4.4.0"]), skip("4.4"));
+        // Compared as numbers: 2.10 is newer than 2.9.
+        assert_eq!(skip_for(&[">= 2.9", ">= 2.10"]), skip("2.10"));
         assert_eq!(skip_for(&["<= 4.5", ">= 4.1.0"]), skip("4.1"));
-        assert_eq!(skip_for(&[">= 4.1.0", "<= 4.5"]), skip("4.1"));
+        assert_eq!(skip_for(&["> 4"]), skip("4"));
         assert_eq!(skip_for(&["< 5"]), None);
         assert_eq!(skip_for(&[]), None);
     }
