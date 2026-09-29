@@ -1,0 +1,432 @@
+{
+  "_id": "6a61c074f673e46fff56ee34",
+  "Package": "tinkr",
+  "Title": "Cast '(R)Markdown' Files to 'XML' and Back Again",
+  "Version": "0.3.1",
+  "Authors@R": "c(person(given = \"Ma\u00eblle\",\nfamily = \"Salmon\",\nrole = c(\"aut\"),\nemail = \"msmaellesalmon@gmail.com\",\ncomment = c(ORCID = \"0000-0002-2815-0399\")),\nperson(given = \"Zhian N.\",\nfamily = \"Kamvar\",\nrole = c(\"aut\", \"cre\"),\nemail = \"zkamvar@gmail.com\",\ncomment = c(ORCID = \"0000-0003-1458-7108\")),\nperson(given = \"Jeroen\",\nfamily = \"Ooms\",\nrole = \"aut\"),\nperson(given = \"Nick\",\nfamily = \"Wellnhofer\",\nrole = \"cph\",\ncomment = \"Nick Wellnhofer wrote the XSLT stylesheet.\"),\nperson(given = \"rOpenSci\",\nrole = \"fnd\",\ncomment = c(ROR = \"019jywm96\")),\nperson(given = \"Peter\",\nfamily = \"Daengeli\",\nrole = \"ctb\"))",
+  "Description": "Parsing '(R)Markdown' files with numerous regular\nexpressions can be fraught with peril, but it does not have to\nbe this way. Converting '(R)Markdown' files to 'XML' using the\n'commonmark' package allows in-memory editing via of 'markdown'\nelements via 'XPath' through the extensible 'R6' class called\n'yarn'. These modified 'XML' representations can be written to\n'(R)Markdown' documents via an 'xslt' stylesheet which\nimplements an extended version of 'GitHub'-flavoured 'markdown'\nso that you can tinker to your hearts content.",
+  "License": "GPL-3",
+  "URL": "https://docs.ropensci.org/tinkr/,\nhttps://github.com/ropensci/tinkr",
+  "BugReports": "https://github.com/ropensci/tinkr/issues",
+  "Config/testthat/edition": "3",
+  "Encoding": "UTF-8",
+  "RoxygenNote": "7.3.2.9000",
+  "VignetteBuilder": "knitr",
+  "Config/Needs/build": "moodymudskipper/devtag",
+  "Language": "en-US",
+  "NeedsCompilation": "no",
+  "Packaged": {
+    "Date": "2026-07-23 07:16:31 UTC",
+    "User": "root"
+  },
+  "Author": "Ma\u00eblle Salmon [aut] (ORCID:\n<https://orcid.org/0000-0002-2815-0399>), Zhian N. Kamvar [aut,\ncre] (ORCID: <https://orcid.org/0000-0003-1458-7108>), Jeroen\nOoms [aut], Nick Wellnhofer [cph] (Nick Wellnhofer wrote the\nXSLT stylesheet.), rOpenSci [fnd] (ROR:\n<https://ror.org/019jywm96>), Peter Daengeli [ctb]",
+  "Maintainer": "Zhian N. Kamvar <zkamvar@gmail.com>",
+  "Repository": "https://cran.r-universe.dev",
+  "Date/Publication": "2025-10-04 20:31:08 UTC",
+  "RemoteUrl": "https://github.com/cran/tinkr",
+  "RemoteRef": "HEAD",
+  "RemoteSha": "63948a99da26b30e34385672b55f751446e0abde",
+  "_user": "cran",
+  "_type": "src",
+  "_file": "tinkr_0.3.1.tar.gz",
+  "_fileid": "https://r2.ropensci.org/e834605302c98a1f64356b1a6dd0ea50114fe43f88e29e3564622388dd213218",
+  "_filesize": 248459,
+  "_sha256": "e834605302c98a1f64356b1a6dd0ea50114fe43f88e29e3564622388dd213218",
+  "_expires": "2026-10-31T07:19:14.000Z",
+  "_created": "2026-07-23T07:16:31.000Z",
+  "_published": "2026-07-23T07:19:16.282Z",
+  "_jobs": [
+    {
+      "job": 89143321702,
+      "time": 116,
+      "config": "linux-devel-x86_64",
+      "r": "4.7.0",
+      "check": "OK",
+      "artifact": "8555755590"
+    },
+    {
+      "job": 89143321693,
+      "time": 125,
+      "config": "linux-release-x86_64",
+      "r": "4.6.1",
+      "check": "OK",
+      "artifact": "8555757754"
+    },
+    {
+      "job": 89142829516,
+      "time": 189,
+      "config": "source",
+      "r": "4.6.1",
+      "check": "OK",
+      "artifact": "8555714973"
+    },
+    {
+      "job": 89143321661,
+      "time": 120,
+      "config": "wasm-release",
+      "r": "4.6.0",
+      "check": "OK",
+      "artifact": "8555757147"
+    },
+    {
+      "job": 89143321670,
+      "time": 78,
+      "config": "windows-devel-x86_64",
+      "r": "4.7.0",
+      "check": "OK",
+      "artifact": "8555741810"
+    }
+  ],
+  "_host": "GitHub-Actions",
+  "_buildurl": "https://github.com/r-universe/cran/actions/runs/29987573417",
+  "_status": "success",
+  "_upstream": "https://github.com/cran/tinkr",
+  "_commit": {
+    "id": "63948a99da26b30e34385672b55f751446e0abde",
+    "author": "Zhian N. Kamvar <zkamvar@gmail.com>",
+    "committer": "cran-robot <csardi.gabor+cran@gmail.com>",
+    "message": "version 0.3.1\n",
+    "time": 1759609868
+  },
+  "_maintainer": {
+    "name": "Zhian N. Kamvar",
+    "email": "zkamvar@gmail.com",
+    "login": "zkamvar",
+    "mastodon": "@zkamvar@hachyderm.io",
+    "linkedin": "in/zkamvar",
+    "orcid": "0000-0003-1458-7108",
+    "description": "Research Software Engineer | Interested in education, pop genetics, evolution, bioinformatics, and R programming",
+    "uuid": 3639446
+  },
+  "_distro": "resolute",
+  "_registered": true,
+  "_dependencies": [
+    {
+      "package": "R",
+      "version": ">= 4.1.0",
+      "role": "Depends"
+    },
+    {
+      "package": "commonmark",
+      "version": ">= 1.6",
+      "role": "Imports"
+    },
+    {
+      "package": "glue",
+      "role": "Imports"
+    },
+    {
+      "package": "lifecycle",
+      "role": "Imports"
+    },
+    {
+      "package": "magrittr",
+      "role": "Imports"
+    },
+    {
+      "package": "purrr",
+      "role": "Imports"
+    },
+    {
+      "package": "R6",
+      "role": "Imports"
+    },
+    {
+      "package": "rlang",
+      "version": ">= 0.4.5",
+      "role": "Imports"
+    },
+    {
+      "package": "xml2",
+      "role": "Imports"
+    },
+    {
+      "package": "xslt",
+      "role": "Imports"
+    },
+    {
+      "package": "knitr",
+      "role": "Suggests"
+    },
+    {
+      "package": "rmarkdown",
+      "role": "Suggests"
+    },
+    {
+      "package": "covr",
+      "role": "Suggests"
+    },
+    {
+      "package": "testthat",
+      "version": ">= 3.0.0",
+      "role": "Suggests"
+    },
+    {
+      "package": "withr",
+      "role": "Suggests"
+    }
+  ],
+  "_owner": "cran",
+  "_selfowned": false,
+  "_usedby": 3,
+  "_updates": [
+    {
+      "week": "2025-40",
+      "n": 1
+    }
+  ],
+  "_tags": [
+    {
+      "name": "0.3.1",
+      "date": "2025-10-04"
+    }
+  ],
+  "_stars": 0,
+  "_contributors": [
+    {
+      "user": "zkamvar",
+      "count": 4,
+      "uuid": 3639446
+    }
+  ],
+  "_userbio": {
+    "uuid": 6899542,
+    "type": "organization",
+    "name": "cran",
+    "followers": 623,
+    "description": "Unofficial read-only mirror of all CRAN R packages"
+  },
+  "_downloads": {
+    "count": 391,
+    "source": "https://cranlogs.r-pkg.org/downloads/total/last-month/tinkr"
+  },
+  "_devurl": "https://github.com/ropensci/tinkr",
+  "_pkgdown": "https://docs.ropensci.org/tinkr/",
+  "_searchresults": 5,
+  "_rbuild": "4.6.1",
+  "_assets": [
+    "extra/citation.cff",
+    "extra/citation.html",
+    "extra/citation.json",
+    "extra/citation.txt",
+    "extra/contents.json",
+    "extra/NEWS.html",
+    "extra/NEWS.txt",
+    "extra/readme.html",
+    "extra/readme.md",
+    "extra/tinkr.html",
+    "manual.pdf"
+  ],
+  "_homeurl": "https://github.com/ropensci/tinkr",
+  "_realowner": "ropensci",
+  "_cranurl": false,
+  "_releases": [
+    {
+      "version": "0.1.0",
+      "date": "2022-08-19"
+    },
+    {
+      "version": "0.2.0",
+      "date": "2023-03-28"
+    },
+    {
+      "version": "0.3.0",
+      "date": "2025-05-03"
+    },
+    {
+      "version": "0.3.1",
+      "date": "2025-10-04"
+    }
+  ],
+  "_exports": [
+    "find_between",
+    "get_protected",
+    "md_ns",
+    "protect_curly",
+    "protect_fences",
+    "protect_math",
+    "show_block",
+    "show_censor",
+    "show_list",
+    "stylesheet",
+    "to_md",
+    "to_md_vec",
+    "to_xml",
+    "yarn"
+  ],
+  "_help": [
+    {
+      "page": "find_between",
+      "title": "Find between a pattern",
+      "topics": [
+        "find_between"
+      ]
+    },
+    {
+      "page": "get_protected",
+      "title": "Get protected nodes",
+      "topics": [
+        "get_protected"
+      ]
+    },
+    {
+      "page": "md_ns",
+      "title": "Aliased namespace prefix for commonmark",
+      "topics": [
+        "md_ns"
+      ]
+    },
+    {
+      "page": "protect_curly",
+      "title": "Protect curly elements for further processing",
+      "topics": [
+        "protect_curly"
+      ]
+    },
+    {
+      "page": "protect_fences",
+      "title": "Protect fences of Pandoc fences divs for further processing",
+      "topics": [
+        "protect_fences"
+      ]
+    },
+    {
+      "page": "protect_math",
+      "title": "Protect math elements from commonmark's character escape",
+      "topics": [
+        "protect_math"
+      ]
+    },
+    {
+      "page": "show",
+      "title": "Display a node or nodelist as markdown",
+      "topics": [
+        "show_block",
+        "show_censor",
+        "show_list"
+      ]
+    },
+    {
+      "page": "stylesheet",
+      "title": "The tinkr stylesheet",
+      "topics": [
+        "stylesheet"
+      ]
+    },
+    {
+      "page": "to_md",
+      "title": "Write front-matter (YAML, TOML or JSON) and XML back to disk as (R)Markdown",
+      "topics": [
+        "to_md",
+        "to_md_vec"
+      ]
+    },
+    {
+      "page": "to_xml",
+      "title": "Transform file to XML",
+      "topics": [
+        "to_xml"
+      ]
+    },
+    {
+      "page": "yarn",
+      "title": "R6 class containing XML representation of Markdown",
+      "topics": [
+        "yarn"
+      ]
+    }
+  ],
+  "_readme": "https://github.com/cran/tinkr/raw/HEAD/README.md",
+  "_rundeps": [
+    "cli",
+    "commonmark",
+    "glue",
+    "lifecycle",
+    "magrittr",
+    "purrr",
+    "R6",
+    "Rcpp",
+    "rlang",
+    "vctrs",
+    "xml2",
+    "xslt"
+  ],
+  "_vignettes": [
+    {
+      "source": "tinkr.Rmd",
+      "filename": "tinkr.html",
+      "title": "Introduction to the tinkr package",
+      "engine": "knitr::rmarkdown",
+      "headings": [
+        "Use Cases",
+        "Workflow",
+        "Examples",
+        "Markdown",
+        "R Markdown",
+        "Inserting new Markdown elements",
+        "Background / pre-requisites",
+        "Loss of Markdown style",
+        "General principles and solution",
+        "The special case of tables",
+        "LaTeX equations"
+      ],
+      "created": "2022-08-19 11:30:02",
+      "modified": "2022-08-19 11:30:02",
+      "commits": 1
+    }
+  ],
+  "_score": 3.6532125137753435,
+  "_indexed": false,
+  "_nocasepkg": "tinkr",
+  "_universes": [
+    "cran"
+  ],
+  "_indexurl": "https://ropensci.r-universe.dev/tinkr",
+  "_binaries": [
+    {
+      "r": "4.7.0",
+      "os": "linux",
+      "version": "0.3.1",
+      "date": "2026-07-23T07:18:33.000Z",
+      "distro": "resolute",
+      "commit": "63948a99da26b30e34385672b55f751446e0abde",
+      "fileid": "https://r2.ropensci.org/e69a40b759f60ba90dee0ec0730196ae2d1efce972a3dd93603d793720fe0b8b",
+      "status": "success",
+      "check": "OK",
+      "buildurl": "https://github.com/r-universe/cran/actions/runs/29987573417"
+    },
+    {
+      "r": "4.6.1",
+      "os": "linux",
+      "version": "0.3.1",
+      "date": "2026-07-23T07:18:35.000Z",
+      "distro": "resolute",
+      "commit": "63948a99da26b30e34385672b55f751446e0abde",
+      "fileid": "https://r2.ropensci.org/3ab40ca88f7b7e0a5f9087230d2eeddde46aa226b72025502df458774e46723f",
+      "status": "success",
+      "check": "OK",
+      "buildurl": "https://github.com/r-universe/cran/actions/runs/29987573417"
+    },
+    {
+      "r": "4.6.0",
+      "os": "wasm",
+      "version": "0.3.1",
+      "date": "2026-07-23T07:18:51.000Z",
+      "commit": "63948a99da26b30e34385672b55f751446e0abde",
+      "fileid": "https://r2.ropensci.org/39ab1c2a2a21535607e86d25bdd161425a8435a064074a6cfdfa520535e00643",
+      "status": "success",
+      "buildurl": "https://github.com/r-universe/cran/actions/runs/29987573417"
+    },
+    {
+      "r": "4.7.0",
+      "os": "win",
+      "version": "0.3.1",
+      "date": "2026-07-23T07:17:38.000Z",
+      "commit": "63948a99da26b30e34385672b55f751446e0abde",
+      "fileid": "https://r2.ropensci.org/dc40f06e740ff62c089afb9cb52a8f39ca308ae474297d1013e9b0fe31eb2e67",
+      "status": "success",
+      "check": "OK",
+      "buildurl": "https://github.com/r-universe/cran/actions/runs/29987573417"
+    }
+  ]
+}

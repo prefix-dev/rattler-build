@@ -33,6 +33,9 @@ requirements:
     - r-base
 
 tests:
+  - r:
+      libraries:
+        - demo
   - files:
       source:
         - tests/
