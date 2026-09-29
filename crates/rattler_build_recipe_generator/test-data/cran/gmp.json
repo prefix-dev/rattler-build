@@ -1,0 +1,1120 @@
+{
+  "_id": "6a6b4776da966e020e81760a",
+  "Package": "gmp",
+  "Version": "0.7-5.1",
+  "Date": "2024-08-23",
+  "Title": "Multiple Precision Arithmetic",
+  "Authors@R": "c(person(\"Antoine\",\"Lucas\",role = c(\"aut\",\"cre\"),\nemail = \"antoinelucas@gmail.com\", comment = c(ORCID=\"0000-0002-8059-9767\")),\nperson(\"Immanuel\",\"Scholz\", role= \"aut\"),\nperson(\"Rainer\",\"Boehme\", role = \"ctb\", email= \"rb-gmp@reflex-studio.de\"),\nperson(\"Sylvain\",\"Jasson\", role = \"ctb\", email= \"Sylvain.Jasson@inrae.fr\"),\nperson(\"Martin\", \"Maechler\", role = \"ctb\", email=\"maechler@stat.math.ethz.ch\"))",
+  "Maintainer": "Antoine Lucas <antoinelucas@gmail.com>",
+  "Description": "Multiple Precision Arithmetic (big integers and rationals,\nprime number tests, matrix computation), \"arithmetic without\nlimitations\" using the C library GMP (GNU Multiple Precision\nArithmetic).",
+  "SystemRequirements": "gmp (>= 4.2.3)",
+  "License": "GPL (>= 2)",
+  "BuildResaveData": "no",
+  "LazyDataNote": "not available, as we use data/*.R *and* our classes",
+  "NeedsCompilation": "yes",
+  "URL": "https://forgemia.inra.fr/sylvain.jasson/gmp",
+  "Packaged": {
+    "Date": "2026-07-30 12:35:14 UTC",
+    "User": "root"
+  },
+  "Author": "Antoine Lucas [aut, cre] (ORCID:\n<https://orcid.org/0000-0002-8059-9767>), Immanuel Scholz\n[aut], Rainer Boehme [ctb], Sylvain Jasson [ctb], Martin\nMaechler [ctb]",
+  "Config/pak/sysreqs": "libgmp3-dev",
+  "Repository": "https://cran.r-universe.dev",
+  "Date/Publication": "2026-02-09 09:19:08 UTC",
+  "RemoteUrl": "https://github.com/cran/gmp",
+  "RemoteRef": "HEAD",
+  "RemoteSha": "22e4f569339fdfdc54c66ba2bcc7ed88aa0576b6",
+  "_user": "cran",
+  "_type": "src",
+  "_file": "gmp_0.7-5.1.tar.gz",
+  "_fileid": "https://r2.ropensci.org/4f945694c72f9b88a302193604e6f09c6932b1ecd922bd4741c4e49983883749",
+  "_filesize": 453130,
+  "_sha256": "4f945694c72f9b88a302193604e6f09c6932b1ecd922bd4741c4e49983883749",
+  "_expires": "2026-11-07T12:45:40.000Z",
+  "_created": "2026-07-30T12:35:14.000Z",
+  "_published": "2026-07-30T12:45:41.960Z",
+  "_jobs": [
+    {
+      "job": 90872730780,
+      "time": 118,
+      "config": "linux-devel-arm64",
+      "r": "4.7.0",
+      "check": "OK",
+      "artifact": "8759723711"
+    },
+    {
+      "job": 90872730676,
+      "time": 136,
+      "config": "linux-devel-x86_64",
+      "r": "4.7.0",
+      "check": "OK",
+      "artifact": "8759731809"
+    },
+    {
+      "job": 90872730752,
+      "time": 115,
+      "config": "linux-release-arm64",
+      "r": "4.6.1",
+      "check": "OK",
+      "artifact": "8759722797"
+    },
+    {
+      "job": 90872730722,
+      "time": 126,
+      "config": "linux-release-x86_64",
+      "r": "4.6.1",
+      "check": "OK",
+      "artifact": "8759731034"
+    },
+    {
+      "job": 90871808878,
+      "time": 188,
+      "config": "source",
+      "r": "4.6.1",
+      "check": "OK",
+      "artifact": "8759557514"
+    },
+    {
+      "job": 90872730616,
+      "time": 138,
+      "config": "wasm-release",
+      "r": "4.6.0",
+      "check": "OK",
+      "artifact": "8759732536"
+    },
+    {
+      "job": 90872730686,
+      "time": 214,
+      "config": "windows-devel-arm64",
+      "r": "4.7.0",
+      "check": "OK",
+      "artifact": "8759769635"
+    },
+    {
+      "job": 90872730658,
+      "time": 102,
+      "config": "windows-devel-x86_64",
+      "r": "4.7.0",
+      "check": "OK",
+      "artifact": "8759717341"
+    },
+    {
+      "job": 90872730738,
+      "time": 339,
+      "config": "windows-release-arm64",
+      "r": "4.6.1",
+      "check": "OK",
+      "artifact": "8759833514"
+    },
+    {
+      "job": 90872730721,
+      "time": 100,
+      "config": "windows-release-x86_64",
+      "r": "4.6.1",
+      "check": "OK",
+      "artifact": "8759716375"
+    }
+  ],
+  "_host": "GitHub-Actions",
+  "_buildurl": "https://github.com/r-universe/cran/actions/runs/30542888437",
+  "_status": "success",
+  "_upstream": "https://github.com/cran/gmp",
+  "_commit": {
+    "id": "22e4f569339fdfdc54c66ba2bcc7ed88aa0576b6",
+    "author": "Antoine Lucas <antoinelucas@gmail.com>",
+    "committer": "cran-robot <csardi.gabor+cran@gmail.com>",
+    "message": "version 0.7-5.1\n",
+    "time": 1770628748
+  },
+  "_maintainer": {
+    "name": "Antoine Lucas",
+    "email": "antoinelucas@gmail.com",
+    "login": "antoinelucas64",
+    "linkedin": "in/antoine-lucas-8348841",
+    "description": "Computer Scientist\n",
+    "uuid": 97435407,
+    "orcid": "0000-0002-8059-9767"
+  },
+  "_distro": "resolute",
+  "_registered": true,
+  "_dependencies": [
+    {
+      "package": "R",
+      "version": ">= 3.5.0",
+      "role": "Depends"
+    },
+    {
+      "package": "methods",
+      "role": "Imports"
+    },
+    {
+      "package": "Rmpfr",
+      "role": "Suggests"
+    },
+    {
+      "package": "MASS",
+      "role": "Suggests"
+    },
+    {
+      "package": "round",
+      "role": "Suggests"
+    }
+  ],
+  "_owner": "cran",
+  "_selfowned": false,
+  "_usedby": 321,
+  "_updates": [
+    {
+      "week": "2026-07",
+      "n": 1
+    }
+  ],
+  "_tags": [
+    {
+      "name": "0.7-5.1",
+      "date": "2026-02-09"
+    }
+  ],
+  "_stars": 1,
+  "_contributors": [
+    {
+      "user": "antoinelucas64",
+      "count": 43,
+      "uuid": 97435407
+    }
+  ],
+  "_userbio": {
+    "uuid": 6899542,
+    "type": "organization",
+    "name": "cran",
+    "followers": 622,
+    "description": "Unofficial read-only mirror of all CRAN R packages"
+  },
+  "_downloads": {
+    "count": 47566,
+    "source": "https://cranlogs.r-pkg.org/downloads/total/last-month/gmp"
+  },
+  "_mentions": 2,
+  "_searchresults": 712,
+  "_topics": [
+    "gmp",
+    "cpp"
+  ],
+  "_rbuild": "4.6.1",
+  "_assets": [
+    "extra/citation.cff",
+    "extra/citation.html",
+    "extra/citation.json",
+    "extra/citation.txt",
+    "extra/contents.json",
+    "extra/gmp.html",
+    "manual.pdf"
+  ],
+  "_realowner": "antoinelucas64",
+  "_cranurl": false,
+  "_releases": [
+    {
+      "version": "0.1",
+      "date": "2004-09-28"
+    },
+    {
+      "version": "0.2-2",
+      "date": "2004-12-27"
+    },
+    {
+      "version": "0.3",
+      "date": "2005-02-14"
+    },
+    {
+      "version": "0.3-1",
+      "date": "2005-03-17"
+    },
+    {
+      "version": "0.3-2",
+      "date": "2005-05-09"
+    },
+    {
+      "version": "0.3-3",
+      "date": "2005-07-27"
+    },
+    {
+      "version": "0.3-4",
+      "date": "2006-01-20"
+    },
+    {
+      "version": "0.4-0",
+      "date": "2006-06-26"
+    },
+    {
+      "version": "0.4-1",
+      "date": "2006-10-09"
+    },
+    {
+      "version": "0.4-2",
+      "date": "2007-01-21"
+    },
+    {
+      "version": "0.4-4",
+      "date": "2007-05-13"
+    },
+    {
+      "version": "0.4-6",
+      "date": "2007-09-21"
+    },
+    {
+      "version": "0.4-8",
+      "date": "2008-02-28"
+    },
+    {
+      "version": "0.4-10",
+      "date": "2009-02-01"
+    },
+    {
+      "version": "0.4-11",
+      "date": "2009-10-27"
+    },
+    {
+      "version": "0.4-12",
+      "date": "2010-04-10"
+    },
+    {
+      "version": "0.5-1",
+      "date": "2012-01-21"
+    },
+    {
+      "version": "0.5-2",
+      "date": "2012-05-16"
+    },
+    {
+      "version": "0.5-3",
+      "date": "2013-02-03"
+    },
+    {
+      "version": "0.5-4",
+      "date": "2013-02-05"
+    },
+    {
+      "version": "0.5-6",
+      "date": "2013-09-11"
+    },
+    {
+      "version": "0.5-5",
+      "date": "2013-09-11"
+    },
+    {
+      "version": "0.5-7",
+      "date": "2013-09-12"
+    },
+    {
+      "version": "0.5-8",
+      "date": "2013-10-29"
+    },
+    {
+      "version": "0.5-9",
+      "date": "2013-10-29"
+    },
+    {
+      "version": "0.5-10",
+      "date": "2013-10-31"
+    },
+    {
+      "version": "0.5-11",
+      "date": "2013-12-04"
+    },
+    {
+      "version": "0.5-12",
+      "date": "2014-07-28"
+    },
+    {
+      "version": "0.5-13",
+      "date": "2017-01-08"
+    },
+    {
+      "version": "0.5-13.1",
+      "date": "2017-03-10"
+    },
+    {
+      "version": "0.5-13.2",
+      "date": "2018-07-14"
+    },
+    {
+      "version": "0.5-13.4",
+      "date": "2019-03-04"
+    },
+    {
+      "version": "0.5-13.5",
+      "date": "2019-03-11"
+    },
+    {
+      "version": "0.5-13.6",
+      "date": "2020-01-24"
+    },
+    {
+      "version": "0.5-14",
+      "date": "2020-05-17"
+    },
+    {
+      "version": "0.6-0",
+      "date": "2020-06-09"
+    },
+    {
+      "version": "0.6-1",
+      "date": "2020-10-01"
+    },
+    {
+      "version": "0.6-2",
+      "date": "2021-01-07"
+    },
+    {
+      "version": "0.6-2.1",
+      "date": "2021-11-02"
+    },
+    {
+      "version": "0.6-4",
+      "date": "2022-02-24"
+    },
+    {
+      "version": "0.6-5",
+      "date": "2022-03-17"
+    },
+    {
+      "version": "0.6-6",
+      "date": "2022-08-10"
+    },
+    {
+      "version": "0.6-7",
+      "date": "2022-10-28"
+    },
+    {
+      "version": "0.6-8",
+      "date": "2022-11-09"
+    },
+    {
+      "version": "0.6-9",
+      "date": "2022-12-15"
+    },
+    {
+      "version": "0.6-10",
+      "date": "2023-01-17"
+    },
+    {
+      "version": "0.7-1",
+      "date": "2023-02-07"
+    },
+    {
+      "version": "0.7-2",
+      "date": "2023-07-01"
+    },
+    {
+      "version": "0.7-3",
+      "date": "2023-11-28"
+    },
+    {
+      "version": "0.7-4",
+      "date": "2024-01-15"
+    },
+    {
+      "version": "0.7-5",
+      "date": "2024-08-26"
+    },
+    {
+      "version": "0.7-5.1",
+      "date": "2026-02-09"
+    }
+  ],
+  "_exports": [
+    "..as.bigz",
+    ".as.bigz",
+    ".as.char.bigz",
+    ".sub.bigq",
+    "%*%",
+    "add.bigq",
+    "add.bigz",
+    "apply",
+    "apply.bigq",
+    "apply.bigz",
+    "apply.default",
+    "as.bigq",
+    "as.bigz",
+    "as.bigz.bigq",
+    "as.vector.bigq",
+    "as.vector.bigz",
+    "asNumeric",
+    "BernoulliQ",
+    "biginteger_as",
+    "biginteger_as_character",
+    "c_bigq",
+    "c_bigz",
+    "chooseZ",
+    "crossprod",
+    "dbinomQ",
+    "denominator",
+    "denominator<-",
+    "div.bigq",
+    "div.bigz",
+    "divq.bigz",
+    "Eulerian",
+    "Eulerian.all",
+    "factorialZ",
+    "factorize",
+    "fibnum",
+    "fibnum2",
+    "formatN",
+    "frexpZ",
+    "gcd",
+    "gcd.bigz",
+    "gcd.default",
+    "gcdex",
+    "gmpVersion",
+    "inv.bigz",
+    "is.bigq",
+    "is.bigz",
+    "is.matrixZQ",
+    "is.whole",
+    "isprime",
+    "lcm.bigz",
+    "lcm.default",
+    "log.bigz",
+    "log10.bigz",
+    "log2.bigz",
+    "lucnum",
+    "lucnum2",
+    "matrix",
+    "matrix.bigq",
+    "matrix.bigz",
+    "matrix.default",
+    "max.bigq",
+    "max.bigz",
+    "min.bigq",
+    "min.bigz",
+    "mod.bigz",
+    "modulus",
+    "modulus<-",
+    "mul.bigq",
+    "mul.bigz",
+    "NA_bigq_",
+    "NA_bigz_",
+    "ncol.bigq",
+    "ncol.bigz",
+    "nextprime",
+    "nrow.bigq",
+    "nrow.bigz",
+    "numerator",
+    "numerator<-",
+    "outer",
+    "pow.bigq",
+    "pow.bigz",
+    "powm",
+    "prod.bigq",
+    "prod.bigz",
+    "rep.bigq",
+    "rep.bigz",
+    "round0",
+    "roundQ",
+    "sizeinbase",
+    "solve.bigq",
+    "solve.bigz",
+    "Stirling1",
+    "Stirling1.all",
+    "Stirling2",
+    "Stirling2.all",
+    "sub.bigq",
+    "sub.bigz",
+    "sum.bigq",
+    "sum.bigz",
+    "tcrossprod",
+    "urand.bigz",
+    "which.max",
+    "which.min"
+  ],
+  "_datasets": [
+    {
+      "name": "Oakley1",
+      "title": "RFC 2409 Oakley Groups - Parameters for Diffie-Hellman Key Exchange",
+      "object": "Oakley1",
+      "file": "Oakley1.R",
+      "class": [
+        "bigz"
+      ],
+      "fields": [],
+      "table": false,
+      "tojson": false
+    },
+    {
+      "name": "Oakley2",
+      "title": "RFC 2409 Oakley Groups - Parameters for Diffie-Hellman Key Exchange",
+      "object": "Oakley2",
+      "file": "Oakley2.R",
+      "class": [
+        "bigz"
+      ],
+      "fields": [],
+      "table": false,
+      "tojson": false
+    }
+  ],
+  "_help": [
+    {
+      "page": "apply",
+      "title": "Apply Functions Over Matrix Margins (Rows or Columns)",
+      "topics": [
+        "apply",
+        "apply.bigq",
+        "apply.bigz",
+        "apply.default"
+      ]
+    },
+    {
+      "page": "asNumeric",
+      "title": "Coerce to 'numeric', not Loosing Dimensions",
+      "topics": [
+        "asNumeric",
+        "asNumeric,ANY-method",
+        "asNumeric,bigq-method",
+        "asNumeric,bigz-method",
+        "asNumeric-methods"
+      ]
+    },
+    {
+      "page": "BernoulliQ",
+      "title": "Exact Bernoulli Numbers",
+      "topics": [
+        "BernoulliQ"
+      ]
+    },
+    {
+      "page": "bigrational",
+      "title": "Large sized rationals",
+      "topics": [
+        "as.bigq",
+        "as.bigz.bigq",
+        "as.character.bigq",
+        "as.double.bigq",
+        "bigq",
+        "bigq-class",
+        "c_bigq",
+        "denominator",
+        "denominator<-",
+        "is.bigq",
+        "is.na.bigq",
+        "NA_bigq_",
+        "numerator",
+        "numerator<-",
+        "print.bigq"
+      ]
+    },
+    {
+      "page": "comp.bigq",
+      "title": "Relational Operators",
+      "topics": [
+        "!=.bigq",
+        "<.bigq",
+        "<=.bigq",
+        "==.bigq",
+        ">.bigq",
+        ">=.bigq",
+        "sign.bigq"
+      ]
+    },
+    {
+      "page": "operators_bigq",
+      "title": "Basic arithmetic operators for large rationals",
+      "topics": [
+        "*.bigq",
+        "+.bigq",
+        "-.bigq",
+        "/.bigq",
+        "abs.bigq",
+        "add.bigq",
+        "div.bigq",
+        "mul.bigq",
+        "pow.bigq",
+        "sub.bigq",
+        "^.bigq"
+      ]
+    },
+    {
+      "page": "biginteger",
+      "title": "Large Sized Integer Values",
+      "topics": [
+        "as.bigz",
+        "as.character.bigz",
+        "as.double.bigz",
+        "biginteger_as",
+        "biginteger_as_character",
+        "bigz",
+        "bigz-class",
+        "c_bigz",
+        "is.bigz",
+        "is.na.bigz",
+        "NA_bigz_",
+        "print.bigz"
+      ]
+    },
+    {
+      "page": "add.biginteger",
+      "title": "Basic Arithmetic Operators for Large Integers (\"bigz\")",
+      "topics": [
+        "%%.bigz",
+        "%/%.bigz",
+        "*.bigz",
+        "+.bigz",
+        "-.bigz",
+        "/.bigz",
+        "abs.bigz",
+        "add.bigz",
+        "div.bigz",
+        "divq.bigz",
+        "inv",
+        "inv.bigz",
+        "log.bigz",
+        "log10.bigz",
+        "log2.bigz",
+        "mod.bigz",
+        "mul.bigz",
+        "pow",
+        "pow.bigz",
+        "sub.bigz",
+        "^.bigz"
+      ]
+    },
+    {
+      "page": "binomQ",
+      "title": "Exact Rational Binomial Probabilities",
+      "topics": [
+        "dbinomQ"
+      ]
+    },
+    {
+      "page": "cumsum",
+      "title": "(Cumulative) Sums, Products of Large Integers and Rationals",
+      "topics": [
+        "cumsum.bigq",
+        "cumsum.bigz",
+        "prod.bigq",
+        "prod.bigz",
+        "sum.bigq",
+        "sum.bigz"
+      ]
+    },
+    {
+      "page": "extract",
+      "title": "Extract or Replace Parts of a 'bigz' or 'bigq' Object",
+      "topics": [
+        "c.bigq",
+        "c.bigz",
+        "length.bigq",
+        "length.bigz",
+        "length<-.bigq",
+        "length<-.bigz",
+        "rep.bigq",
+        "rep.bigz",
+        "[.bigq",
+        "[.bigz",
+        "[<-.bigq",
+        "[<-.bigz",
+        "[[.bigq",
+        "[[.bigz",
+        "[[<-.bigq",
+        "[[<-.bigz"
+      ]
+    },
+    {
+      "page": "extreme",
+      "title": "Extrema (Maxima and Minima)",
+      "topics": [
+        "max.bigq",
+        "max.bigz",
+        "min.bigq",
+        "min.bigz",
+        "which.max,bigq-method",
+        "which.max,bigz-method",
+        "which.min,bigq-method",
+        "which.min,bigz-method"
+      ]
+    },
+    {
+      "page": "factorialZ",
+      "title": "Factorial and Binomial Coefficient as Big Integer",
+      "topics": [
+        "chooseZ",
+        "factorialZ"
+      ]
+    },
+    {
+      "page": "factor",
+      "title": "Factorize a number",
+      "topics": [
+        "factorize"
+      ]
+    },
+    {
+      "page": "formatN",
+      "title": "Format Numbers Keeping Classes Distinguishable",
+      "topics": [
+        "formatN",
+        "formatN.bigq",
+        "formatN.bigz",
+        "formatN.default",
+        "formatN.double",
+        "formatN.integer"
+      ]
+    },
+    {
+      "page": "frexpZ",
+      "title": "Split Number into Fractional and Exponent of 2 Parts",
+      "topics": [
+        "frexp",
+        "frexpZ"
+      ]
+    },
+    {
+      "page": "gcd",
+      "title": "Greatest Common Divisor (GCD) and Least Common Multiple (LCM)",
+      "concept": [
+        "GCD",
+        "LCM"
+      ],
+      "topics": [
+        "gcd",
+        "gcd.bigz",
+        "gcd.default",
+        "lcm.bigz",
+        "lcm.default"
+      ]
+    },
+    {
+      "page": "gcdex",
+      "title": "Compute Bezoult Coefficient",
+      "topics": [
+        "gcdex"
+      ]
+    },
+    {
+      "page": "base-copies",
+      "title": "Base Functions in 'gmp'-ified Versions",
+      "topics": [
+        "outer"
+      ]
+    },
+    {
+      "page": "utils",
+      "title": "GMP Number Utilities",
+      "topics": [
+        "gmpVersion"
+      ]
+    },
+    {
+      "page": "is.whole",
+      "title": "Whole (\"Integer\") Numbers",
+      "topics": [
+        "is.whole",
+        "is.whole.bigq",
+        "is.whole.bigz",
+        "is.whole.default"
+      ]
+    },
+    {
+      "page": "isprime",
+      "title": "Determine if number is (very probably) prime",
+      "topics": [
+        "isprime"
+      ]
+    },
+    {
+      "page": "fibonacci",
+      "title": "Compute Fibonacci and Lucas numbers",
+      "topics": [
+        "fibnum",
+        "fibnum2",
+        "lucnum",
+        "lucnum2"
+      ]
+    },
+    {
+      "page": "matrix",
+      "title": "Matrix manipulation with gmp",
+      "topics": [
+        "%*%",
+        "%*%.bigq",
+        "%*%.bigz",
+        "%*%.default",
+        "as.matrix.bigq",
+        "as.matrix.bigz",
+        "as.vector.bigq",
+        "as.vector.bigz",
+        "cbind.bigq",
+        "cbind.bigz",
+        "crossprod",
+        "crossprod.bigq",
+        "crossprod.bigz",
+        "crossprod.default",
+        "dim.bigq",
+        "dim.bigz",
+        "dim<-.bigq",
+        "dim<-.bigz",
+        "is.matrixZQ",
+        "matrix",
+        "matrix.bigq",
+        "matrix.bigz",
+        "matrix.default",
+        "ncol.bigq",
+        "ncol.bigz",
+        "nrow.bigq",
+        "nrow.bigz",
+        "rbind.bigq",
+        "rbind.bigz",
+        "t.bigq",
+        "t.bigz",
+        "tcrossprod",
+        "tcrossprod.bigq",
+        "tcrossprod.bigz",
+        "tcrossprod.default"
+      ]
+    },
+    {
+      "page": "modulus",
+      "title": "Modulus of a Big Integer",
+      "topics": [
+        "modulus",
+        "modulus.bigz",
+        "modulus<-",
+        "modulus<-.bigz"
+      ]
+    },
+    {
+      "page": "mpfr",
+      "title": "Exported function for mpfr use",
+      "topics": [
+        "..as.bigz",
+        ".as.bigz",
+        ".as.char.bigz",
+        ".sub.bigq"
+      ]
+    },
+    {
+      "page": "nextprime",
+      "title": "Next Prime Number",
+      "topics": [
+        "nextprime"
+      ]
+    },
+    {
+      "page": "Oakley",
+      "title": "RFC 2409 Oakley Groups - Parameters for Diffie-Hellman Key Exchange",
+      "topics": [
+        "Oakley",
+        "Oakley1",
+        "Oakley2"
+      ]
+    },
+    {
+      "page": "powm",
+      "title": "Exponentiation function",
+      "topics": [
+        "powm"
+      ]
+    },
+    {
+      "page": "biginteger.rand",
+      "title": "Generate a random number",
+      "topics": [
+        "urand.bigz"
+      ]
+    },
+    {
+      "page": "comp.biginteger",
+      "title": "Relational Operators",
+      "topics": [
+        "!=.bigz",
+        "<.bigz",
+        "<=.bigz",
+        "==.bigz",
+        ">.bigz",
+        ">=.bigz",
+        "sign.bigz"
+      ]
+    },
+    {
+      "page": "roundQ",
+      "title": "Rounding Big Rationals (\"bigq\") to Decimals",
+      "concept": [
+        "Rounding"
+      ],
+      "topics": [
+        "round.bigq",
+        "round0",
+        "roundQ"
+      ]
+    },
+    {
+      "page": "sizeinbase",
+      "title": "Compute size of a bigz in a base",
+      "topics": [
+        "sizeinbase"
+      ]
+    },
+    {
+      "page": "solve",
+      "title": "Solve a system of equation",
+      "topics": [
+        "solve.bigq",
+        "solve.bigz"
+      ]
+    },
+    {
+      "page": "Stirling",
+      "title": "Eulerian and Stirling Numbers of First and Second Kind",
+      "topics": [
+        "Eulerian",
+        "Eulerian.all",
+        "Stirling1",
+        "Stirling1.all",
+        "Stirling2",
+        "Stirling2.all"
+      ]
+    }
+  ],
+  "_rundeps": [],
+  "_sysdeps": [
+    {
+      "shlib": "libgmp",
+      "package": "libgmp10",
+      "headers": "libgmp-dev",
+      "source": "gmp",
+      "version": "2:6.3.0+dfsg-5ubuntu2",
+      "name": "gmp",
+      "homepage": "https://gmplib.org/",
+      "description": "Multiprecision arithmetic library"
+    },
+    {
+      "shlib": "libstdc++",
+      "package": "libstdc++6",
+      "source": "gcc",
+      "version": "16-20260322-1ubuntu1",
+      "name": "c++",
+      "homepage": "http://gcc.gnu.org/",
+      "description": "GNU Standard C++ Library v3"
+    }
+  ],
+  "_score": 7.814432907959455,
+  "_indexed": false,
+  "_nocasepkg": "gmp",
+  "_universes": [
+    "cran"
+  ],
+  "_indexurl": "https://antoinelucas64.r-universe.dev/gmp",
+  "_binaries": [
+    {
+      "r": "4.7.0",
+      "os": "linux",
+      "version": "0.7-5.1",
+      "date": "2026-07-30T12:41:04.000Z",
+      "distro": "resolute",
+      "arch": "aarch64",
+      "commit": "22e4f569339fdfdc54c66ba2bcc7ed88aa0576b6",
+      "fileid": "https://r2.ropensci.org/323d547face5542c9ee54252154f4da147ddfcb8da88cc1e93ef7f1f3bc0b4d5",
+      "status": "success",
+      "check": "OK",
+      "buildurl": "https://github.com/r-universe/cran/actions/runs/30542888437"
+    },
+    {
+      "r": "4.7.0",
+      "os": "linux",
+      "version": "0.7-5.1",
+      "date": "2026-07-30T12:41:14.000Z",
+      "distro": "resolute",
+      "arch": "x86_64",
+      "commit": "22e4f569339fdfdc54c66ba2bcc7ed88aa0576b6",
+      "fileid": "https://r2.ropensci.org/0d5cfa370890ebbcccc7ce5e9a6a9a66d659475e94dd72a71722ccf3f9c78ed2",
+      "status": "success",
+      "check": "OK",
+      "buildurl": "https://github.com/r-universe/cran/actions/runs/30542888437"
+    },
+    {
+      "r": "4.6.1",
+      "os": "linux",
+      "version": "0.7-5.1",
+      "date": "2026-07-30T12:41:02.000Z",
+      "distro": "resolute",
+      "arch": "aarch64",
+      "commit": "22e4f569339fdfdc54c66ba2bcc7ed88aa0576b6",
+      "fileid": "https://r2.ropensci.org/fbb2599f40be3ab95534751c3b5f00d1ea978e1463c96ad98d072339a238804a",
+      "status": "success",
+      "check": "OK",
+      "buildurl": "https://github.com/r-universe/cran/actions/runs/30542888437"
+    },
+    {
+      "r": "4.6.1",
+      "os": "linux",
+      "version": "0.7-5.1",
+      "date": "2026-07-30T12:41:17.000Z",
+      "distro": "resolute",
+      "arch": "x86_64",
+      "commit": "22e4f569339fdfdc54c66ba2bcc7ed88aa0576b6",
+      "fileid": "https://r2.ropensci.org/afd3025b55f93c3e1d9729d2e6ee90bc07e3696a29c20b84d6e6f510ee69b739",
+      "status": "success",
+      "check": "OK",
+      "buildurl": "https://github.com/r-universe/cran/actions/runs/30542888437"
+    },
+    {
+      "r": "4.6.0",
+      "os": "wasm",
+      "version": "0.7-5.1",
+      "date": "2026-07-30T12:41:30.000Z",
+      "arch": "emscripten",
+      "commit": "22e4f569339fdfdc54c66ba2bcc7ed88aa0576b6",
+      "fileid": "https://r2.ropensci.org/cff2291c600fcaae96d869bc17eb211385e5afd74b2862b232a1193ad310a474",
+      "status": "success",
+      "buildurl": "https://github.com/r-universe/cran/actions/runs/30542888437"
+    },
+    {
+      "r": "4.7.0",
+      "os": "win",
+      "version": "0.7-5.1",
+      "date": "2026-07-30T12:42:00.000Z",
+      "arch": "aarch64",
+      "commit": "22e4f569339fdfdc54c66ba2bcc7ed88aa0576b6",
+      "fileid": "https://r2.ropensci.org/fb74c957794ec6453b62b75793af6e3e0033d0c1397e5def52004bb2c3c59e40",
+      "status": "success",
+      "check": "OK",
+      "buildurl": "https://github.com/r-universe/cran/actions/runs/30542888437"
+    },
+    {
+      "r": "4.7.0",
+      "os": "win",
+      "version": "0.7-5.1",
+      "date": "2026-07-30T12:40:21.000Z",
+      "arch": "x86_64",
+      "commit": "22e4f569339fdfdc54c66ba2bcc7ed88aa0576b6",
+      "fileid": "https://r2.ropensci.org/fbb976e48f2b6fa92c920270334bcaf87c4ed6d1bfa174a63d2b9727bdee352c",
+      "status": "success",
+      "check": "OK",
+      "buildurl": "https://github.com/r-universe/cran/actions/runs/30542888437"
+    },
+    {
+      "r": "4.6.1",
+      "os": "win",
+      "version": "0.7-5.1",
+      "date": "2026-07-30T12:44:11.000Z",
+      "arch": "aarch64",
+      "commit": "22e4f569339fdfdc54c66ba2bcc7ed88aa0576b6",
+      "fileid": "https://r2.ropensci.org/a1761263788021c78524ec18180946c23169bbd7d678827af0130b5a8e050ef9",
+      "status": "success",
+      "check": "OK",
+      "buildurl": "https://github.com/r-universe/cran/actions/runs/30542888437"
+    },
+    {
+      "r": "4.6.1",
+      "os": "win",
+      "version": "0.7-5.1",
+      "date": "2026-07-30T12:40:12.000Z",
+      "arch": "x86_64",
+      "commit": "22e4f569339fdfdc54c66ba2bcc7ed88aa0576b6",
+      "fileid": "https://r2.ropensci.org/e9a1da2c14c43ffd13ba799dccecb602f01e74f4b9459682fba2ffe53cf6f603",
+      "status": "success",
+      "check": "OK",
+      "buildurl": "https://github.com/r-universe/cran/actions/runs/30542888437"
+    }
+  ]
+}
