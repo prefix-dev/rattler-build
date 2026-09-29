@@ -411,6 +411,7 @@ fn rockspec_to_recipe(rockspec: &LuarocksRockspec) -> miette::Result<Recipe> {
             python: Python::default(),
             noarch: None,
             dynamic_linking: None,
+            ..Default::default()
         },
         requirements: Requirements {
             build: vec!["luarocks".into()],
