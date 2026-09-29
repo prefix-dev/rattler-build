@@ -392,22 +392,26 @@ fn cli_maintainers(given: &[String]) -> Vec<String> {
     }
 }
 
-/// Convert an R `Depends: R (>= x.y.z)` version string into a rattler-build
-/// `skip` expression. Only `>=` constraints are handled; returns `None` for
-/// anything else.
-fn r_dep_version_to_skip(version: &str) -> Option<String> {
-    let num = version
-        .trim()
-        .trim_start_matches(">=")
-        .trim_start_matches('>')
-        .trim();
-    let parts: Vec<&str> = num.splitn(3, '.').collect();
-    match parts.as_slice() {
-        [major, minor, ..] if !major.is_empty() => {
-            Some(format!("match(r_base, \"<{}.{}\")", major, minor))
-        }
-        [major] if !major.is_empty() => Some(format!("match(r_base, \"<{}\")", major)),
-        _ => None,
+/// The R version that a `Depends: R (>= x.y.z)` constraint asks for at least,
+/// as `(major, minor)`. Only lower bounds (`>=` and `>`) with numeric
+/// components are understood; anything else gives `None`. R separates the
+/// components of a version with `.` or `-`.
+fn r_minimum_version(constraint: &str) -> Option<(u64, Option<u64>)> {
+    let constraint = constraint.trim();
+    let version = constraint
+        .strip_prefix(">=")
+        .or_else(|| constraint.strip_prefix('>'))?;
+    let mut components = version.trim().split(['.', '-']);
+    let major = components.next()?.parse().ok()?;
+    let minor = components.next().map(str::parse).transpose().ok()?;
+    Some((major, minor))
+}
+
+/// The rattler-build `skip` expression for an R older than `major.minor`.
+fn r_skip_condition((major, minor): (u64, Option<u64>)) -> String {
+    match minor {
+        Some(minor) => format!("match(r_base, \"<{major}.{minor}\")"),
+        None => format!("match(r_base, \"<{major}\")"),
     }
 }
 
@@ -573,13 +577,14 @@ fn package_info_to_recipe(
     let mut remaining_deps = HashSet::new();
     for dep in info._dependencies.iter() {
         if dep.package == "R" {
-            if let Some(ver) = &dep.version {
-                // Keep the first constraint that translates into a skip: a
-                // later entry (e.g. an upper bound) has none, and must not
-                // clear the minimum-R condition.
-                if recipe.build.skip.is_none() && !options.staged_recipes {
-                    recipe.build.skip = r_dep_version_to_skip(ver);
-                }
+            // Keep the first lower bound: a later entry that is none (e.g. an
+            // upper bound) must not clear the minimum-R condition.
+            if recipe.build.skip.is_none() && !options.staged_recipes {
+                recipe.build.skip = dep
+                    .version
+                    .as_deref()
+                    .and_then(r_minimum_version)
+                    .map(r_skip_condition);
             }
             continue;
         }
@@ -917,21 +922,30 @@ mod tests {
         assert_eq!(recipe.build.skip, None);
     }
 
-    /// Only the minimum-R constraint maps to a skip; a second `R` entry must
-    /// not clear it.
+    /// Only a lower bound on R maps to a skip; an entry that is none must
+    /// neither clear it nor take its place.
     #[test]
-    fn a_later_r_constraint_does_not_clear_the_skip() {
-        let mut info = fixture("tinkr");
-        info._dependencies.push(Dependency {
-            package: "R".to_string(),
-            version: Some("<= 4.5".to_string()),
-            role: "Depends".to_string(),
-        });
-        let (recipe, _) = package_info_to_recipe(&info, None, &RecipeOptions::default());
-        assert_eq!(
-            recipe.build.skip.as_deref(),
-            Some("match(r_base, \"<4.1\")")
-        );
+    fn only_a_lower_bound_on_r_decides_the_skip() {
+        let skip_for = |constraints: &[&str]| {
+            let mut info = fixture("tinkr");
+            info._dependencies.retain(|dep| dep.package != "R");
+            info._dependencies
+                .extend(constraints.iter().map(|constraint| Dependency {
+                    package: "R".to_string(),
+                    version: Some(constraint.to_string()),
+                    role: "Depends".to_string(),
+                }));
+            package_info_to_recipe(&info, None, &RecipeOptions::default())
+                .0
+                .build
+                .skip
+        };
+        let skip = |version: &str| Some(format!("match(r_base, \"<{version}\")"));
+
+        assert_eq!(skip_for(&["<= 4.5", ">= 4.1.0"]), skip("4.1"));
+        assert_eq!(skip_for(&[">= 4.1.0", "<= 4.5"]), skip("4.1"));
+        assert_eq!(skip_for(&["< 5"]), None);
+        assert_eq!(skip_for(&[]), None);
     }
 
     /// R-universe reports an unusable `_devurl` for some packages; the CRAN
@@ -1066,20 +1080,16 @@ mod tests {
     }
 
     #[test]
-    fn test_r_dep_version_to_skip() {
-        assert_eq!(
-            r_dep_version_to_skip(">= 4.1.0").as_deref(),
-            Some("match(r_base, \"<4.1\")")
-        );
-        assert_eq!(
-            r_dep_version_to_skip(">=3.5").as_deref(),
-            Some("match(r_base, \"<3.5\")")
-        );
-        assert_eq!(
-            r_dep_version_to_skip("> 4").as_deref(),
-            Some("match(r_base, \"<4\")")
-        );
-        assert_eq!(r_dep_version_to_skip(""), None);
+    fn only_lower_bounds_give_a_minimum_r_version() {
+        assert_eq!(r_minimum_version(">= 4.1.0"), Some((4, Some(1))));
+        assert_eq!(r_minimum_version(">=3.5"), Some((3, Some(5))));
+        assert_eq!(r_minimum_version("> 4"), Some((4, None)));
+        assert_eq!(r_minimum_version(">= 3.1-0"), Some((3, Some(1))));
+        for constraint in [
+            "", "4.1", "<= 4.5", "< 5", "< 4.5.0", "== 4.1", "!= 4.2", ">= x.y", ">= 4.x",
+        ] {
+            assert_eq!(r_minimum_version(constraint), None, "{constraint:?}");
+        }
     }
 
     #[test]
