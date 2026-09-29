@@ -190,22 +190,42 @@ pub fn python_vars_from_records(
 /// - R_USER: Path to R user directory
 ///
 pub fn r_vars(output: &Output) -> HashMap<String, Option<String>> {
+    // Prefer the `r_base` variant value, but fall back to the resolved host
+    // `r-base` record so that `${{ R }}` also works for recipes built without a
+    // variant config (mirrors how `python_vars` falls back to the resolved
+    // python record above).
+    let r_version = output
+        .variant()
+        .get(&"r-base".into())
+        .map(|version| major_minor(&version.to_string()))
+        .or_else(|| {
+            output
+                .find_resolved_package("r-base")
+                .map(|(record, _)| version_major_minor(&record.package_record.version))
+        });
+
+    match r_version {
+        Some(r_ver) => r_vars_for(output.prefix(), output.host_platform().platform, &r_ver),
+        None => HashMap::new(),
+    }
+}
+
+/// R-related environment variables for an R installation of version `r_ver`
+/// (`major.minor`) living in `prefix`.
+fn r_vars_for(prefix: &Path, platform: Subdir, r_ver: &str) -> HashMap<String, Option<String>> {
     let mut result = HashMap::new();
 
-    if let Some(r_ver) = output.variant().get(&"r-base".into()) {
-        insert!(result, "R_VER", r_ver);
+    insert!(result, "R_VER", r_ver);
 
-        let r_bin = if output.host_platform().platform.is_windows() {
-            output.prefix().join("Scripts/R.exe")
-        } else {
-            output.prefix().join("bin/R")
-        };
+    let r_bin = if platform.is_windows() {
+        prefix.join("Scripts/R.exe")
+    } else {
+        prefix.join("bin/R")
+    };
+    let r_user = prefix.join("Libs/R");
 
-        let r_user = output.prefix().join("Libs/R");
-
-        insert!(result, "R", r_bin.to_string_lossy());
-        insert!(result, "R_USER", r_user.to_string_lossy());
-    }
+    insert!(result, "R", r_bin.to_string_lossy());
+    insert!(result, "R_USER", r_user.to_string_lossy());
 
     result
 }
@@ -658,6 +678,29 @@ mod test {
         assert!(!is_python_3("2"));
         assert!(!is_python_3("2.7"));
         assert!(!is_python_3("30"));
+    }
+
+    #[test]
+    fn r_vars_for_picks_platform_paths() {
+        let prefix = Path::new("prefix");
+
+        let vars = r_vars_for(prefix, Subdir::Linux64, "4.4");
+        assert_eq!(vars.get("R_VER").and_then(|v| v.as_deref()), Some("4.4"));
+        assert_eq!(
+            vars.get("R").and_then(|v| v.as_deref()).map(Path::new),
+            Some(prefix.join("bin/R").as_path())
+        );
+        assert_eq!(
+            vars.get("R_USER").and_then(|v| v.as_deref()).map(Path::new),
+            Some(prefix.join("Libs/R").as_path())
+        );
+
+        let vars = r_vars_for(prefix, Subdir::Win64, "4.4");
+        assert_eq!(vars.get("R_VER").and_then(|v| v.as_deref()), Some("4.4"));
+        assert_eq!(
+            vars.get("R").and_then(|v| v.as_deref()).map(Path::new),
+            Some(prefix.join("Scripts/R.exe").as_path())
+        );
     }
 
     #[test]
