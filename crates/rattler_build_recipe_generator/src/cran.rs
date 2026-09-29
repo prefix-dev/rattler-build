@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use url::Url;
 
-use crate::serialize::{self, ScriptTest, Test, UrlSourceElement};
+use crate::serialize::{self, Requirement, Script, ScriptStep, ScriptTest, Test, UrlSourceElement};
 #[cfg(not(target_arch = "wasm32"))]
 use crate::write_recipe;
 /// Package metadata returned by the R-universe/CRAN API.
@@ -267,18 +267,27 @@ const R_BUILTINS: &[&str] = &[
     "utils",
 ];
 
-/// Placeholder pushed into `requirements.build` for compiled packages. It is
-/// expanded by [`format_cran_recipe_with_suggests`] into a `build_platform !=
-/// target_platform` selector that pulls in `cross-r-base` when cross-compiling.
-///
-/// A plain identifier is used so that `serde_yaml` emits it unquoted, which
-/// keeps the post-processing match simple.
-const CROSS_R_BASE_MARKER: &str = "CROSS_R_BASE_PLACEHOLDER";
+/// The build command.
+const R_CMD_INSTALL: &str = "R CMD INSTALL --build .";
 
-/// Placeholder stored in `build.script`. Expanded by
-/// [`format_cran_recipe_with_suggests`] into a platform-conditional list that
-/// uses `${R_ARGS}` on Unix and `%R_ARGS%` on Windows.
-const CRAN_R_SCRIPT_MARKER: &str = "CRAN_R_SCRIPT_PLACEHOLDER";
+/// The build script: [`R_CMD_INSTALL`] with `R_ARGS` passed through (spelled
+/// per shell), so that recipe authors can inject e.g. `--configure-args`.
+fn compiled_build_script() -> Script {
+    Script::Steps(vec![ScriptStep {
+        condition: "win".to_string(),
+        then: format!("{R_CMD_INSTALL} %R_ARGS%"),
+        otherwise: Some(format!("{R_CMD_INSTALL} ${{R_ARGS}}")),
+    }])
+}
+
+/// `cross-r-base` is required to cross-compile; `r_base` is the conda-forge
+/// variant key pinning the R version.
+fn cross_r_base_requirement() -> Requirement {
+    Requirement::Conditional {
+        condition: "build_platform != target_platform".to_string(),
+        then: vec!["cross-r-base ${{ r_base }}".to_string()],
+    }
+}
 
 /// Convert an R `Depends: R (>= x.y.z)` version string into a rattler-build
 /// `skip` expression. Only `>=` constraints are handled; returns `None` for
@@ -297,46 +306,6 @@ fn r_dep_version_to_skip(version: &str) -> Option<String> {
         [major] if !major.is_empty() => Some(format!("match(r_base, \"<{}\")", major)),
         _ => None,
     }
-}
-
-fn format_cran_recipe_with_suggests(recipe: &serialize::Recipe) -> String {
-    let recipe_str = format!("{}", recipe);
-    let mut final_recipe = String::new();
-    for line in recipe_str.lines() {
-        if let Some(indent) = line
-            .strip_suffix(CROSS_R_BASE_MARKER)
-            .and_then(|prefix| prefix.strip_suffix("- "))
-        {
-            // Expand the placeholder into a cross-compilation selector. `r_base`
-            // is the conda-forge variant key pinning the R version.
-            final_recipe.push_str(&format!(
-                "{indent}- if: build_platform != target_platform\n\
-                 {indent}  then:\n\
-                 {indent}    - cross-r-base ${{{{ r_base }}}}\n"
-            ));
-        } else if line
-            .trim_start()
-            .starts_with(&format!("script: {CRAN_R_SCRIPT_MARKER}"))
-        {
-            // Expand into a platform-conditional script list.
-            let indent_len = line.len() - line.trim_start().len();
-            let indent = &line[..indent_len];
-            final_recipe.push_str(&format!(
-                "{indent}script:\n\
-                 {indent}  - if: win\n\
-                 {indent}    then: R CMD INSTALL --build . %R_ARGS%\n\
-                 {indent}    else: R CMD INSTALL --build . ${{R_ARGS}}\n"
-            ));
-        } else if line.contains("SUGGEST") {
-            final_recipe.push_str(&format!(
-                "{}  # suggested\n",
-                line.replace(" - SUGGEST", " # - ")
-            ));
-        } else {
-            final_recipe.push_str(&format!("{}\n", line));
-        }
-    }
-    final_recipe
 }
 
 async fn build_cran_recipe_and_deps(
@@ -403,15 +372,7 @@ async fn build_cran_recipe_and_deps(
     recipe.source.push(source.into());
 
     recipe.build.number = "${{ build_number }}".to_string();
-    // Expanded by `format_cran_recipe_with_suggests` into a platform-specific
-    // list (${R_ARGS} on Unix, %R_ARGS% on Windows).
-    recipe.build.script = CRAN_R_SCRIPT_MARKER.to_string();
-
-    let build_tools = vec![
-        "${{ compiler('c') }}".to_string(),
-        "${{ compiler('cxx') }}".to_string(),
-        "make".to_string(),
-    ];
+    recipe.build.script = compiled_build_script();
 
     // Whether the package contains code that has to be compiled. Packages that
     // declare `LinkingTo` dependencies also compile against those headers, so
@@ -424,6 +385,7 @@ async fn build_cran_recipe_and_deps(
     let r_base = "r-base".to_string();
     let mut host = Vec::new();
     let mut run = Vec::new();
+    let mut suggested = Vec::new();
 
     let mut remaining_deps = HashSet::new();
     for dep in package_info._dependencies.iter() {
@@ -450,25 +412,32 @@ async fn build_cran_recipe_and_deps(
             run.push(spec);
             remaining_deps.insert(dep.package.clone());
         } else if dep.role == "Suggests" {
-            run.push(format!(
-                "SUGGEST {}",
-                format_r_package(&dep.package, dep.version.as_ref())
-            ));
+            suggested.push(format_r_package(&dep.package, dep.version.as_ref()));
         }
     }
 
     recipe.requirements.host = std::iter::once(r_base.clone())
         .chain(host)
         .unique()
+        .map(Requirement::from)
         .collect();
-    recipe.requirements.run = std::iter::once(r_base).chain(run).unique().collect();
+    recipe.requirements.run = std::iter::once(r_base)
+        .chain(run)
+        .unique()
+        .map(Requirement::from)
+        // Suggested dependencies follow the real ones, as comments.
+        .chain(suggested.into_iter().unique().map(Requirement::suggested))
+        .collect();
 
     if needs_compilation {
         // Compiled packages need a toolchain, `cross-r-base` for cross builds,
         // and rpaths so the linker can find R's shared libraries.
-        let mut build = vec![CROSS_R_BASE_MARKER.to_string()];
-        build.extend(build_tools);
-        recipe.requirements.build = build.into_iter().unique().collect();
+        recipe.requirements.build = vec![
+            cross_r_base_requirement(),
+            "${{ compiler('c') }}".into(),
+            "${{ compiler('cxx') }}".into(),
+            "make".into(),
+        ];
         recipe.build.dynamic_linking = Some(serialize::DynamicLinking {
             rpaths: vec!["lib/R/lib/".to_string(), "lib/".to_string()],
         });
@@ -499,6 +468,7 @@ async fn build_cran_recipe_and_deps(
             "Rscript -e 'library(\"{}\")'",
             package_info.Package
         )],
+        ..Default::default()
     }));
 
     Ok((recipe, remaining_deps))
@@ -510,7 +480,7 @@ pub async fn generate_r_recipe_string(
     universe: Option<&str>,
 ) -> miette::Result<String> {
     let (recipe, _remaining_deps) = build_cran_recipe_and_deps(package, universe).await?;
-    Ok(format_cran_recipe_with_suggests(&recipe))
+    Ok(recipe.to_string())
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -524,7 +494,7 @@ pub async fn generate_r_recipe(opts: &CranOpts) -> miette::Result<()> {
     let (recipe, remaining_deps) =
         build_cran_recipe_and_deps(&opts.package, opts.universe.as_deref()).await?;
 
-    let final_recipe = format_cran_recipe_with_suggests(&recipe);
+    let final_recipe = recipe.to_string();
 
     if opts.write {
         write_recipe(&recipe.package.name, &final_recipe).into_diagnostic()?;
