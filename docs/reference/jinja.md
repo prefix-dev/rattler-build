@@ -42,13 +42,28 @@ Note that the final output will still contain the `target_platform`, so that the
 full compiler will read `clang_linux-64 9.0` when compiling with
 `--target-platform linux-64`.
 
-Rattler-Build defines some default compilers for the following languages
-(inherited from `conda-build`):
+Rattler-Build defines built-in default compilers (inherited from
+`conda-build`) for `c`, `cxx` and `fortran`:
 
-- `c`: `gcc` on Linux, `clang` on `osx` and `vs2022` on Windows
-- `cxx`: `gxx` on Linux, `clangxx` on `osx` and `vs2022` on Windows
-- `fortran`: `gfortran` on Linux, `gfortran` on `osx` and `flang` on Windows
-- `rust`: `rust`
+- **`c`**: `gcc` on Linux, `clang` on `osx`/`ios`/Android, `emscripten` on
+  `emscripten-wasm32` and `vs2022` on Windows
+- **`cxx`**: `gxx` on Linux, `clangxx` on `osx`/`ios`/Android, `emscripten` on
+  `emscripten-wasm32` and `vs2022` on Windows
+- **`fortran`**: `gfortran` on Linux and `osx`, `flang` on Windows
+
+For any other language, the compiler name defaults to the language string itself
+(e.g. `compiler('rust')` defaults to `rust`, `compiler('cuda')` defaults to
+`cuda` etc.). This means the following commonly used values are also supported
+out of the box:
+
+- **`rust`**: `rust` on all platforms
+- **`cuda`**: `cuda` on all platforms
+- **`go-cgo`**: `go-cgo` on all platforms
+- **`go-nocgo`**: `go-nocgo` on all platforms
+
+All of these defaults can be overridden with the `<lang>_compiler` and
+`<lang>_compiler_version` variant configuration variables, which also allow
+to define a compiler for any other custom language that isn't listed here.
 
 ### The `stdlib` function
 
