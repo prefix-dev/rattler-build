@@ -7,6 +7,8 @@ extend-exclude = [
   "tests/data/mapping_files/*",
   "test-data/conda_forge/**/*",
   "test-data/patch_application/**/*",
+  # verbatim R-universe API responses (R author roles such as `fnd`)
+  "crates/rattler_build_recipe_generator/test-data/**/*",
   "**/*.ipynb",
   "**/__marimo__/",
 ]
