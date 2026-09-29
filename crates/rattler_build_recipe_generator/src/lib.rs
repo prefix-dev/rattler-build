@@ -9,6 +9,7 @@ mod cran;
 mod luarocks;
 mod pypi;
 mod serialize;
+mod tarball;
 
 pub use self::cpan::{CpanOpts, generate_cpan_recipe_string};
 pub use self::cran::{CranOpts, generate_r_recipe_string};
