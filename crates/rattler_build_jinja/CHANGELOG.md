@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.16](https://github.com/prefix-dev/rattler-build/compare/rattler_build_jinja-v0.1.15...rattler_build_jinja-v0.1.16) - 2026-09-30
+
+### Other
+
+- update rattler and sigstore crates ([#2834](https://github.com/prefix-dev/rattler-build/pull/2834))
+- *(deps)* update cargo dependencies and rattler ([#2829](https://github.com/prefix-dev/rattler-build/pull/2829))
+
 ## [0.1.15](https://github.com/prefix-dev/rattler-build/compare/rattler_build_jinja-v0.1.14...rattler_build_jinja-v0.1.15) - 2026-09-14
 
 ### Other
