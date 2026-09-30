@@ -42,6 +42,6 @@ def test_selector_config_experimental() -> None:
 
 def test_selector_config_invalid_platform() -> None:
     """Test that invalid platforms raise PlatformParseError."""
-    with pytest.raises(PlatformParseError, match="'invalid-platform' is not a known platform."):
+    with pytest.raises(PlatformParseError, match="'invalid-platform' is not a known subdir."):
         platform_config = PlatformConfig(target_platform="invalid-platform")
         JinjaConfig(platform=platform_config)
