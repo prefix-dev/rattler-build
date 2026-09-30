@@ -99,8 +99,8 @@ pub struct CranOpts {
 
     /// Shape the recipe for a conda-forge staged-recipes submission: download
     /// through conda-forge's `cran_mirror` variant, leave out the `skip` for a
-    /// minimum R version and append the package's DESCRIPTION file for
-    /// reviewers
+    /// minimum R version, require the C standard library next to the
+    /// compilers and append the package's DESCRIPTION file for reviewers
     #[cfg_attr(feature = "cli", arg(long))]
     pub staged_recipes: bool,
 }
@@ -371,8 +371,9 @@ pub struct RecipeOptions {
     /// mirror named in the recipe. rattler-build itself knows no `cran_mirror`,
     /// so such a recipe needs a variant config that defines one. Also leaves
     /// out the `skip` for a minimum R version, which the R versions conda-forge
-    /// builds for make unnecessary, and appends the package's DESCRIPTION file
-    /// to the recipe as a comment block.
+    /// builds for make unnecessary, requires `${{ stdlib("c") }}` next to the
+    /// compilers of a compiled package, as conda-forge's linter demands, and
+    /// appends the package's DESCRIPTION file to the recipe as a comment block.
     pub staged_recipes: bool,
 }
 
@@ -630,12 +631,19 @@ fn package_info_to_recipe(
     if needs_compilation {
         // Compiled packages need a toolchain, `cross-r-base` for cross builds,
         // and rpaths so the linker can find R's shared libraries.
-        recipe.requirements.build = vec![
+        let mut build = vec![
             cross_r_base_requirement(),
             "${{ compiler(\"c\") }}".into(),
             "${{ compiler(\"cxx\") }}".into(),
-            "make".into(),
         ];
+        if options.staged_recipes {
+            // conda-forge's linter requires the C standard library next to a
+            // compiler. rattler-build itself knows no `c_stdlib`, so a plain
+            // build could not render it.
+            build.push("${{ stdlib(\"c\") }}".into());
+        }
+        build.push("make".into());
+        recipe.requirements.build = build;
         recipe.build.dynamic_linking = Some(serialize::DynamicLinking {
             rpaths: vec!["lib/R/lib/".to_string(), "lib/".to_string()],
         });
@@ -922,6 +930,38 @@ mod tests {
         };
         let (recipe, _) = package_info_to_recipe(&info, None, &staged);
         assert_eq!(recipe.build.skip, None);
+    }
+
+    /// conda-forge's linter wants `stdlib("c")` next to a compiler; plain
+    /// rattler-build cannot render it without a `c_stdlib` variant, so only a
+    /// staged-recipes submission lists it, and only for a compiled package.
+    #[test]
+    fn only_staged_recipes_of_compiled_packages_require_the_c_stdlib() {
+        let build_of = |name: &str, staged_recipes: bool| {
+            let options = RecipeOptions {
+                staged_recipes,
+                ..Default::default()
+            };
+            package_info_to_recipe(&fixture(name), None, &options)
+                .0
+                .requirements
+                .build
+        };
+        let stdlib = || Requirement::from("${{ stdlib(\"c\") }}");
+
+        assert!(!build_of("gmp", false).contains(&stdlib()));
+        assert_eq!(
+            build_of("gmp", true),
+            vec![
+                cross_r_base_requirement(),
+                "${{ compiler(\"c\") }}".into(),
+                "${{ compiler(\"cxx\") }}".into(),
+                stdlib(),
+                "make".into(),
+            ]
+        );
+        // Pure-R packages have no compiler, so nothing to pair it with.
+        assert!(build_of("tinkr", true).is_empty());
     }
 
     /// A package may bound R more than once (`ppgm` does); the skip follows
