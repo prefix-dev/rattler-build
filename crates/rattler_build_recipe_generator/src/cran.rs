@@ -632,8 +632,8 @@ fn package_info_to_recipe(
         // and rpaths so the linker can find R's shared libraries.
         recipe.requirements.build = vec![
             cross_r_base_requirement(),
-            "${{ compiler('c') }}".into(),
-            "${{ compiler('cxx') }}".into(),
+            "${{ compiler(\"c\") }}".into(),
+            "${{ compiler(\"cxx\") }}".into(),
             "make".into(),
         ];
         recipe.build.dynamic_linking = Some(serialize::DynamicLinking {
