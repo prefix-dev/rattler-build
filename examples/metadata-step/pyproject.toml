@@ -1,0 +1,7 @@
+[project]
+name = "metadata-step-example"
+version = "1.0.0"
+
+[tool.rattler-build]
+build = ["python"]
+host = ["zlib"]

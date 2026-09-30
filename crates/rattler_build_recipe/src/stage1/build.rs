@@ -230,6 +230,18 @@ pub struct StepRequirements {
     pub inherit: StepRequirementsInheritance,
 }
 
+impl StepRequirements {
+    /// Return unpinned build and host dependencies that can introduce variants.
+    pub fn free_specs(&self) -> Vec<rattler_conda_types::PackageName> {
+        super::requirements::Requirements {
+            build: self.build.clone(),
+            host: self.host.clone(),
+            ..Default::default()
+        }
+        .free_specs()
+    }
+}
+
 /// Parent recipe environment inheritance for an evaluated step.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct StepRequirementsInheritance {
@@ -291,6 +303,20 @@ impl StepRequirements {
     pub fn is_empty(&self) -> bool {
         self.build.is_empty() && self.host.is_empty() && self.inherit.is_default()
     }
+}
+
+/// Flat executable bootstrap plan used to generate recipe source metadata.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MetadataPlan {
+    /// Flattened executable bootstrap steps with action-local input bindings.
+    pub steps: Vec<Step>,
+    /// Effective build and host dependencies for the bootstrap environment.
+    #[serde(default, skip_serializing_if = "StepRequirements::is_empty")]
+    pub requirements: StepRequirements,
+    /// Action identities included in the metadata fingerprint.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub provenance: Vec<crate::actions::ActionProvenance>,
 }
 
 /// A stage1 build step with evaluated metadata and script content.
@@ -668,6 +694,10 @@ pub struct Build {
     #[serde(default, flatten, skip_serializing_if = "BuildPlan::is_default")]
     pub plan: BuildPlan,
 
+    /// Experimental step that emits recipe metadata before dependency solving.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<MetadataPlan>,
+
     /// Noarch type - "python" or "generic" if set
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub noarch: Option<NoArchType>,
@@ -763,6 +793,8 @@ struct BuildDeserialize {
     #[serde(default)]
     steps: PresentField<Vec<Step>>,
     #[serde(default)]
+    metadata: Option<MetadataPlan>,
+    #[serde(default)]
     noarch: Option<NoArchType>,
     #[serde(default)]
     flags: Vec<Flag>,
@@ -809,6 +841,7 @@ impl TryFrom<BuildDeserialize> for Build {
             number: raw.number,
             string: raw.string,
             plan,
+            metadata: raw.metadata,
             noarch: raw.noarch,
             flags: raw.flags,
             python: raw.python,

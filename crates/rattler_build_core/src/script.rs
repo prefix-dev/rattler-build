@@ -112,16 +112,12 @@ pub(crate) fn prepare_build_plan_execution_args(
                 cache_file,
             );
         }
-        let mut section_jinja =
-            execution_jinja(selector_config.clone(), recipe_context, action_context);
-        for (key, value) in env_vars.iter().chain(script.env()) {
-            if action_context.is_some_and(|bindings| bindings.contains_key(key)) {
-                continue;
-            }
-            section_jinja
-                .context_mut()
-                .insert(key.clone(), Value::from_safe_string(value.clone()));
-        }
+        let section_jinja = execution_jinja(
+            selector_config.clone(),
+            recipe_context,
+            action_context,
+            env_vars.iter().chain(script.env()),
+        );
         let section_jinja_renderer = |template: &str| {
             section_jinja
                 .render_str(template)
@@ -169,15 +165,24 @@ pub(crate) fn prepare_build_plan_execution_args(
     })
 }
 
-pub(crate) fn execution_jinja(
+pub(crate) fn execution_jinja<'a>(
     mut config: JinjaConfig,
     recipe_context: &IndexMap<String, Variable>,
     action_context: Option<&IndexMap<String, Variable>>,
+    env: impl IntoIterator<Item = (&'a String, &'a String)>,
 ) -> Jinja {
     if action_context.is_some() {
         config.undefined_behavior = UndefinedBehavior::Strict;
     }
-    Jinja::new(config).with_context(action_context.unwrap_or(recipe_context))
+    let mut jinja = Jinja::new(config).with_context(action_context.unwrap_or(recipe_context));
+    for (key, value) in env {
+        if !action_context.is_some_and(|bindings| bindings.contains_key(key)) {
+            jinja
+                .context_mut()
+                .insert(key.clone(), Value::from_safe_string(value.clone()));
+        }
+    }
+    jinja
 }
 
 fn cache_identity(
