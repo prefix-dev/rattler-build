@@ -24,7 +24,7 @@ use rattler_build::{
         App, BuildData, BumpRecipeOpts, DebugData, DebugSubCommands, MigrateRecipeOpts,
         PackageCommands, PublishData, RebuildData, ShellCompletion, SubCommands, TestData,
     },
-    publish_packages, rebuild, run_test, show_package_info,
+    publish_packages, rebuild, run_steps, run_test, show_package_info,
     tool_configuration::APP_USER_AGENT,
 };
 use rattler_upload::upload_from_args;
@@ -245,6 +245,29 @@ async fn async_main() -> miette::Result<()> {
             }
 
             build_recipes(recipe_paths, build_data, &Some(log_handler)).await
+        }
+
+        Some(SubCommands::Run(run_args)) => {
+            let config = load_config(app.no_config, app.config_file)?;
+            let recipes = run_args.build.recipes.clone();
+            let recipe_dir = run_args.build.recipe_dir.clone();
+            let source_dir = run_args.source_dir;
+            let mut build_data = BuildData::from_opts_and_config(run_args.build, config);
+            build_data.selected_steps = Some(run_args.steps);
+            let (recipe_paths, _temp_dir) = recipe_paths(recipes, recipe_dir.as_ref())?;
+            if recipe_paths.len() != 1 {
+                return Err(miette::miette!(
+                    "`rattler-build run` requires exactly one recipe (found {})",
+                    recipe_paths.len()
+                ));
+            }
+            run_steps(
+                recipe_paths.into_iter().next().unwrap(),
+                build_data,
+                source_dir,
+                &Some(log_handler),
+            )
+            .await
         }
 
         Some(SubCommands::Publish(publish_args)) => {

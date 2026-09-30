@@ -37,6 +37,169 @@ def test_completion_stderr_is_clean(rattler_build: RattlerBuild):
     assert result.stderr == ""
 
 
+def test_run_named_inline_step(rattler_build: RattlerBuild, tmp_path: Path):
+    recipe = tmp_path / "recipe"
+    source = tmp_path / "source"
+    output = tmp_path / "output"
+    recipe.mkdir()
+    source.mkdir()
+    (recipe / "recipe.yaml").write_text(
+        """package:
+  name: named-steps-test
+  version: "1.0"
+build:
+  steps:
+    - name: prepare
+      run: echo prepared > prepared.txt
+    - name: check
+      optional: true
+      depends_on: [prepare]
+      run: echo checked > checked.txt
+"""
+    )
+
+    without_experimental = rattler_build(
+        "run",
+        "check",
+        "--recipe",
+        recipe,
+        "--source-dir",
+        source,
+        "--output-dir",
+        output,
+        capture_output=True,
+    )
+    assert without_experimental.returncode != 0
+    assert "experimental" in without_experimental.stderr
+
+    rattler_build(
+        "run",
+        "check",
+        "--recipe",
+        recipe,
+        "--source-dir",
+        source,
+        "--output-dir",
+        output,
+        "--experimental",
+        stderr=STDOUT,
+    )
+    assert (source / "prepared.txt").read_text().strip() == "prepared"
+    assert (source / "checked.txt").read_text().strip() == "checked"
+
+
+def test_run_refuses_changed_sources_without_discarding_edits(
+    rattler_build: RattlerBuild, tmp_path: Path
+):
+    for name in ["first", "second"]:
+        source = tmp_path / name
+        source.mkdir()
+        (source / "input.txt").write_text(name)
+    recipe = {
+        "package": {"name": "persistent-source-check", "version": "1"},
+        "source": {"path": "first"},
+        "build": {"steps": [{"name": "check", "run": "echo ran >> runs.txt"}]},
+    }
+    recipe_path = tmp_path / "recipe.yaml"
+    recipe_path.write_text(yaml.safe_dump(recipe))
+    args = [
+        "run",
+        "check",
+        "--recipe",
+        str(recipe_path),
+        "--experimental",
+        "--output-dir",
+        str(tmp_path / "output"),
+    ]
+    result = rattler_build(*args, capture_output=True)
+    assert result.returncode == 0, result.stderr
+    (work,) = (tmp_path / "output" / "bld").glob("*/work")
+    (work / "input.txt").write_text("local edit")
+    result = rattler_build(*args, capture_output=True)
+    assert result.returncode == 0, result.stderr
+    assert len((work / "runs.txt").read_text().splitlines()) == 2
+
+    recipe["source"]["path"] = "second"
+    recipe["package"]["version"] = "2"
+    recipe_path.write_text(yaml.safe_dump(recipe))
+    result = rattler_build(*args, capture_output=True)
+    assert result.returncode != 0
+    assert "prepared sources" in result.stderr
+    assert "do not match" in result.stderr
+    assert (work / "input.txt").read_text() == "local edit"
+    assert len((work / "runs.txt").read_text().splitlines()) == 2
+
+    result = rattler_build(
+        *args, "--source-dir", str(tmp_path / "second"), capture_output=True
+    )
+    assert result.returncode == 0, result.stderr
+    assert (tmp_path / "second" / "runs.txt").is_file()
+
+
+def test_build_steps_reject_uses(rattler_build: RattlerBuild, tmp_path: Path):
+    recipe = tmp_path / "recipe.yaml"
+    recipe.write_text(
+        """package:
+  name: inline-steps-only
+  version: "1.0"
+build:
+  steps:
+    - name: check
+      uses: ./check.yaml
+"""
+    )
+
+    result = rattler_build(
+        "build",
+        "--recipe",
+        recipe,
+        "--render-only",
+        "--experimental",
+        capture_output=True,
+    )
+
+    assert result.returncode != 0
+    assert "uses" in result.stderr
+
+
+def test_run_render_only_is_read_only(rattler_build: RattlerBuild, tmp_path: Path):
+    recipe = tmp_path / "recipe.yaml"
+    output = tmp_path / "output"
+    recipe.write_text(
+        """package:
+  name: read-only-steps
+  version: "1.0"
+source:
+  path: missing-source
+requirements:
+  host:
+    - rattler-build-nonexistent-render-only-dependency ==0
+build:
+  steps:
+    - name: check
+      run: exit 1
+"""
+    )
+
+    result = rattler_build(
+        "run",
+        "check",
+        "--recipe",
+        recipe,
+        "--output-dir",
+        output,
+        "--render-only",
+        "--experimental",
+        capture_output=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    outputs = json.loads(result.stdout)
+    assert outputs[0]["recipe"]["package"]["name"] == "read-only-steps"
+    assert not outputs[0].get("finalized_dependencies")
+    assert not output.exists()
+
+
 def test_license_glob(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     rattler_build.build(recipes / "globtest", tmp_path)
     pkg = get_extracted_package(tmp_path, "globtest")
@@ -156,15 +319,30 @@ def test_python_noarch(rattler_build: RattlerBuild, recipes: Path, tmp_path: Pat
     assert "python >=3.11" in index_json["depends"]
 
 
+@pytest.mark.parametrize("command", [["build"], ["run", "check"]])
 def test_render_only_with_solve_does_not_install_packages(
-    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, command: list[str]
 ):
-    result = rattler_build.render(
-        recipes / "toml",
+    recipe = recipes / "toml"
+    if command[0] == "run":
+        recipe_data = yaml.safe_load((recipe / "recipe.yaml").read_text())
+        script = recipe_data["build"].pop("script")
+        recipe_data["build"]["steps"] = [{"name": "check", "run": script}]
+        recipe = tmp_path / "recipe.yaml"
+        recipe.write_text(yaml.safe_dump(recipe_data))
+
+    result = rattler_build(
+        *command,
+        "--recipe",
+        recipe,
+        "--output-dir",
         tmp_path,
-        with_solve=True,
-        custom_channels=["conda-forge"],
-        raw=True,
+        "--render-only",
+        "--with-solve",
+        "--channel",
+        "conda-forge",
+        "--experimental",
+        capture_output=True,
     )
 
     assert result.returncode == 0
