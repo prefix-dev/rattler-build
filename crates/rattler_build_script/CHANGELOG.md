@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.12](https://github.com/prefix-dev/rattler-build/compare/rattler_build_script-v0.2.11...rattler_build_script-v0.2.12) - 2026-09-30
+
+### Other
+
+- update rattler and sigstore crates ([#2834](https://github.com/prefix-dev/rattler-build/pull/2834))
+- *(deps)* update cargo dependencies and rattler ([#2829](https://github.com/prefix-dev/rattler-build/pull/2829))
+
 ## [0.2.11](https://github.com/prefix-dev/rattler-build/compare/rattler_build_script-v0.2.10...rattler_build_script-v0.2.11) - 2026-09-14
 
 ### Other

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.15](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.14...rattler_build_core-v0.2.15) - 2026-09-30
+
+### Added
+
+- expose exclude-newer policies for Python builds, tests, and debug sessions ([#2801](https://github.com/prefix-dev/rattler-build/pull/2801))
+
+### Other
+
+- update rattler and sigstore crates ([#2834](https://github.com/prefix-dev/rattler-build/pull/2834))
+- *(deps)* update cargo dependencies and rattler ([#2829](https://github.com/prefix-dev/rattler-build/pull/2829))
+
 ## [0.2.14](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.13...rattler_build_core-v0.2.14) - 2026-09-14
 
 ### Added
