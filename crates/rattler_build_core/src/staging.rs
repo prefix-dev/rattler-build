@@ -350,9 +350,19 @@ impl Output {
             self.build_configuration.experimental,
         )
         .into_diagnostic()?;
-        rattler_build_script::run_script(exec_args)
+        if staging.build.plan.steps().is_some() {
+            crate::script::run_prepared_build_steps(
+                exec_args,
+                &(staging, &finalized_dependencies),
+                false,
+            )
             .await
             .into_diagnostic()?;
+        } else {
+            rattler_build_script::run_script(exec_args)
+                .await
+                .into_diagnostic()?;
+        }
 
         // Find the new files in the prefix
         let new_files = Files::from_prefix(
