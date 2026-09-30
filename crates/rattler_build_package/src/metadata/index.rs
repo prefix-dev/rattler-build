@@ -3,7 +3,7 @@
 use jiff::Timestamp;
 use rattler_conda_types::package::IndexJson;
 use rattler_conda_types::utils::TimestampMs;
-use rattler_conda_types::{NoArchType, PackageName, Platform, VersionWithSource};
+use rattler_conda_types::{NoArchType, PackageName, Subdir, VersionWithSource};
 
 use crate::Result;
 
@@ -89,8 +89,8 @@ impl IndexJsonBuilder {
         self
     }
 
-    /// Set arch and platform from a Platform
-    pub fn with_target_platform(mut self, target: &Platform) -> Self {
+    /// Set arch and platform from a Subdir
+    pub fn with_target_platform(mut self, target: &Subdir) -> Self {
         self.arch = target.arch().map(|a| a.to_string());
         self.platform = target.only_platform().map(|p| p.to_string());
         self.subdir = Some(target.to_string());

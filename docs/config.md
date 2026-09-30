@@ -65,5 +65,5 @@ You can configure your S3 buckets that are used during build by specifying `s3-o
 [s3-options.my-bucket]
 endpoint-url = "https://fsn1.your-objectstorage.com"
 region = "US"
-force-path-style = false
+addressing-style = "virtual-host"
 ```

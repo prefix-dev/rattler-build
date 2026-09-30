@@ -98,11 +98,11 @@ pub struct RenderConfig {
     /// Path to the recipe file (for relative path resolution in Jinja functions)
     pub recipe_path: Option<PathBuf>,
     /// Target platform for the build
-    pub target_platform: rattler_conda_types::Platform,
+    pub target_platform: rattler_conda_types::Subdir,
     /// Build platform (where the build runs)
-    pub build_platform: rattler_conda_types::Platform,
+    pub build_platform: rattler_conda_types::Subdir,
     /// Host platform (for cross-compilation)
-    pub host_platform: rattler_conda_types::Platform,
+    pub host_platform: rattler_conda_types::Subdir,
     /// OS environment variable keys that can be overridden by variant configuration.
     /// These are typically derived from `env_vars::os_vars()` and include variables
     /// like `MACOSX_DEPLOYMENT_TARGET` on macOS that have default values but can be
@@ -123,12 +123,12 @@ impl Default for RenderConfig {
             experimental: false,
             repodata_revision: RepodataRevision::Legacy,
             recipe_path: None,
-            target_platform: rattler_conda_types::Platform::current()
-                .unwrap_or(rattler_conda_types::Platform::NoArch),
-            build_platform: rattler_conda_types::Platform::current()
-                .unwrap_or(rattler_conda_types::Platform::NoArch),
-            host_platform: rattler_conda_types::Platform::current()
-                .unwrap_or(rattler_conda_types::Platform::NoArch),
+            target_platform: rattler_conda_types::Subdir::current()
+                .unwrap_or(rattler_conda_types::Subdir::NoArch),
+            build_platform: rattler_conda_types::Subdir::current()
+                .unwrap_or(rattler_conda_types::Subdir::NoArch),
+            host_platform: rattler_conda_types::Subdir::current()
+                .unwrap_or(rattler_conda_types::Subdir::NoArch),
             os_env_var_keys: HashSet::new(),
             build_string_prefix: None,
             build_number_override: None,
@@ -171,20 +171,20 @@ impl RenderConfig {
     /// This also sets `host_platform` to the same value (mirroring the CLI
     /// behavior). Call [`with_host_platform`](Self::with_host_platform) afterwards
     /// if you need a different host platform.
-    pub fn with_target_platform(mut self, platform: rattler_conda_types::Platform) -> Self {
+    pub fn with_target_platform(mut self, platform: rattler_conda_types::Subdir) -> Self {
         self.target_platform = platform;
         self.host_platform = platform;
         self
     }
 
     /// Set the build platform
-    pub fn with_build_platform(mut self, platform: rattler_conda_types::Platform) -> Self {
+    pub fn with_build_platform(mut self, platform: rattler_conda_types::Subdir) -> Self {
         self.build_platform = platform;
         self
     }
 
     /// Set the host platform
-    pub fn with_host_platform(mut self, platform: rattler_conda_types::Platform) -> Self {
+    pub fn with_host_platform(mut self, platform: rattler_conda_types::Subdir) -> Self {
         self.host_platform = platform;
         self
     }
@@ -1331,13 +1331,13 @@ fn create_jinja_config(
     // (e.g., rendering a Windows variant on Linux to check if outputs would be skipped)
     let target_platform = variant
         .get(&"target_platform".into())
-        .and_then(|v| v.to_string().parse::<rattler_conda_types::Platform>().ok())
+        .and_then(|v| v.to_string().parse::<rattler_conda_types::Subdir>().ok())
         .unwrap_or(config.target_platform);
 
     // Similarly for host_platform (defaults to target_platform if not specified)
     let host_platform = variant
         .get(&"host_platform".into())
-        .and_then(|v| v.to_string().parse::<rattler_conda_types::Platform>().ok())
+        .and_then(|v| v.to_string().parse::<rattler_conda_types::Subdir>().ok())
         .unwrap_or_else(|| {
             // If host_platform not in variant, use config.host_platform if it differs from default,
             // otherwise use the (potentially variant-derived) target_platform
@@ -3090,7 +3090,7 @@ openssl:
 
         // Use linux platform to ensure `unix` is true
         let config =
-            RenderConfig::new().with_target_platform(rattler_conda_types::Platform::Linux64);
+            RenderConfig::new().with_target_platform(rattler_conda_types::Subdir::Linux64);
 
         let rendered =
             render_recipe_with_variant_config(&stage0_recipe, &variant_config, config).unwrap();
@@ -3238,7 +3238,7 @@ outputs:
         let variant_config = VariantConfig::default();
 
         // RenderConfig with Windows as target platform
-        let config = RenderConfig::new().with_target_platform(rattler_conda_types::Platform::Win64);
+        let config = RenderConfig::new().with_target_platform(rattler_conda_types::Subdir::Win64);
 
         // The rendering should NOT fail - even though stdlib('c') would fail on Windows,
         // the output is skipped (skip: win) so requirements should not be evaluated
@@ -3669,7 +3669,7 @@ build:
 
         let variant_config = VariantConfig::default();
         let config =
-            RenderConfig::new().with_target_platform(rattler_conda_types::Platform::Linux64);
+            RenderConfig::new().with_target_platform(rattler_conda_types::Subdir::Linux64);
 
         let rendered = render_recipe_with_variant_config(&stage0, &variant_config, config).unwrap();
 
@@ -3745,7 +3745,7 @@ python:
         // On Linux: python 3.10 should be skipped entirely (top-level skip),
         // python 3.11 and 3.12 should each produce 2 outputs
         let config_linux =
-            RenderConfig::new().with_target_platform(rattler_conda_types::Platform::Linux64);
+            RenderConfig::new().with_target_platform(rattler_conda_types::Subdir::Linux64);
         let rendered_linux =
             render_recipe_with_variant_config(&stage0_recipe, &variant_config, config_linux)
                 .unwrap();
@@ -3761,7 +3761,7 @@ python:
         // tests output skipped by output-level "win", so only the main package
         // for python 3.11 and 3.12
         let config_win =
-            RenderConfig::new().with_target_platform(rattler_conda_types::Platform::Win64);
+            RenderConfig::new().with_target_platform(rattler_conda_types::Subdir::Win64);
         let rendered_win =
             render_recipe_with_variant_config(&stage0_recipe, &variant_config, config_win).unwrap();
         // 2 python versions * 1 output (tests skipped on win) = 2
@@ -3816,7 +3816,7 @@ outputs:
         // On Windows: top-level skip: win should prevent requirement evaluation
         // for all outputs, avoiding stdlib('c') errors
         let config_win =
-            RenderConfig::new().with_target_platform(rattler_conda_types::Platform::Win64);
+            RenderConfig::new().with_target_platform(rattler_conda_types::Subdir::Win64);
         let result = render_recipe_with_variant_config(&stage0_recipe, &variant_config, config_win);
         assert!(
             result.is_ok(),

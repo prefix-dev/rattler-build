@@ -9,7 +9,7 @@ use itertools::Itertools;
 use miette::{IntoDiagnostic, WrapErr};
 use rattler::install::{DefaultProgressFormatter, IndicatifReporter, Installer};
 use rattler_conda_types::{
-    Channel, ChannelNoticeLevel, ChannelUrl, MatchSpec, Platform, PrefixRecord, RepoDataRecord,
+    Channel, ChannelNoticeLevel, ChannelUrl, MatchSpec, Subdir, PrefixRecord, RepoDataRecord,
 };
 use rattler_repodata_gateway::ChannelNoticeResult;
 use rattler_solve::{
@@ -191,7 +191,7 @@ fn display_channel_notices(
 /// specs.
 pub async fn load_repodatas(
     channels: &[ChannelUrl],
-    target_platform: Platform,
+    target_platform: Subdir,
     specs: &[MatchSpec],
     tool_configuration: &tool_configuration::Configuration,
 ) -> miette::Result<Vec<rattler_repodata_gateway::RepoData>> {
@@ -204,7 +204,7 @@ pub async fn load_repodatas(
         .repodata_gateway
         .query(
             channels,
-            [target_platform, Platform::NoArch],
+            [target_platform, Subdir::NoArch],
             specs.to_vec(),
         )
         .channel_notices(true)
@@ -251,7 +251,7 @@ pub async fn load_repodatas(
 pub async fn install_packages(
     name: &str,
     required_packages: &[RepoDataRecord],
-    target_platform: Platform,
+    target_platform: Subdir,
     target_prefix: &Path,
     tool_configuration: &tool_configuration::Configuration,
 ) -> miette::Result<()> {
@@ -380,7 +380,7 @@ mod tests {
         };
         load_repodatas(
             &[channel.base_url],
-            Platform::Linux64,
+            Subdir::Linux64,
             &[spec],
             &configuration,
         )

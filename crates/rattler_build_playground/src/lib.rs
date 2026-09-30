@@ -15,7 +15,7 @@ use rattler_build_recipe_generator::{
     generate_r_recipe_string,
 };
 use rattler_build_variant_config::{VariantConfig, parse_conda_build_config};
-use rattler_conda_types::{Platform, RepodataRevision};
+use rattler_conda_types::{Subdir, RepodataRevision};
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
 
@@ -115,7 +115,7 @@ pub fn evaluate_recipe(yaml_source: &str, variables_json: &str, target_platform:
     };
 
     // Parse platform
-    let platform = Platform::from_str(target_platform).unwrap_or(Platform::Linux64);
+    let platform = Subdir::from_str(target_platform).unwrap_or(Subdir::Linux64);
 
     let jinja_config = JinjaConfig {
         target_platform: platform,
@@ -199,7 +199,7 @@ pub fn get_used_variables(yaml_source: &str) -> String {
 /// Get available platform strings for the UI dropdown.
 #[wasm_bindgen]
 pub fn get_platforms() -> String {
-    let platforms: Vec<&str> = Platform::all().map(|p| p.as_str()).collect();
+    let platforms: Vec<&str> = Subdir::all().map(|p| p.as_str()).collect();
     serde_json::to_string(&platforms).unwrap_or_default()
 }
 
@@ -252,7 +252,7 @@ pub fn render_variants(
     };
 
     // Parse platform
-    let platform = Platform::from_str(target_platform).unwrap_or(Platform::Linux64);
+    let platform = Subdir::from_str(target_platform).unwrap_or(Subdir::Linux64);
 
     let jinja_config = JinjaConfig {
         target_platform: platform,

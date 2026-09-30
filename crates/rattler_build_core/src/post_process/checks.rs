@@ -14,7 +14,7 @@ use crate::{
 
 use crate::render::resolved_dependencies::RunExportDependency;
 use globset::{Glob, GlobBuilder, GlobSet, GlobSetBuilder};
-use rattler_conda_types::{PackageName, Platform, PrefixRecord};
+use rattler_conda_types::{PackageName, Subdir, PrefixRecord};
 use text_stub_library::TbdVersionedRecord;
 use walkdir::WalkDir;
 
@@ -151,7 +151,7 @@ struct DsoList {
     allow: Vec<String>,
     #[serde(default)]
     deny: Vec<String>,
-    subdir: Platform,
+    subdir: Subdir,
 }
 
 /// Validate that a dsolist glob pattern uses forward slashes and is either
@@ -246,7 +246,7 @@ type DsoAllowDeny = (Vec<String>, Vec<String>);
 /// allowlist means "nothing is allowed".
 fn load_dsolists(
     prefix: &Path,
-    subdir: &Platform,
+    subdir: &Subdir,
 ) -> Result<Option<DsoAllowDeny>, LinkingCheckError> {
     let dsolists_dir = prefix.join("etc/conda-build/dsolists.d");
     let mut allow_patterns = Vec::new();
@@ -795,7 +795,7 @@ mod tests {
         });
         fs_err::write(dsolists_dir.join("test.json"), json.to_string()).unwrap();
 
-        let (allow, deny) = load_dsolists(tmp.path(), &Platform::Win64)
+        let (allow, deny) = load_dsolists(tmp.path(), &Subdir::Win64)
             .unwrap()
             .expect("should find matching dsolist files");
         assert_eq!(
@@ -823,7 +823,7 @@ mod tests {
 
         // File exists but targets a different subdir → no match
         assert!(
-            load_dsolists(tmp.path(), &Platform::Win64)
+            load_dsolists(tmp.path(), &Subdir::Win64)
                 .unwrap()
                 .is_none(),
             "should return None when no files match the subdir"
@@ -843,7 +843,7 @@ mod tests {
         });
         fs_err::write(dsolists_dir.join("test.json"), json.to_string()).unwrap();
 
-        let result = load_dsolists(tmp.path(), &Platform::Win64);
+        let result = load_dsolists(tmp.path(), &Subdir::Win64);
         assert!(result.is_err());
         let err = result.unwrap_err().to_string();
         assert!(err.contains("Unsupported dsolist version 99"), "got: {err}");
@@ -853,7 +853,7 @@ mod tests {
     fn test_load_dsolists_no_directory() {
         let tmp = tempfile::tempdir().unwrap();
         assert!(
-            load_dsolists(tmp.path(), &Platform::Win64)
+            load_dsolists(tmp.path(), &Subdir::Win64)
                 .unwrap()
                 .is_none(),
             "should return None when directory does not exist"
@@ -880,7 +880,7 @@ mod tests {
         fs_err::write(dsolists_dir.join("a.json"), json1.to_string()).unwrap();
         fs_err::write(dsolists_dir.join("b.json"), json2.to_string()).unwrap();
 
-        let (allow, deny) = load_dsolists(tmp.path(), &Platform::Win64)
+        let (allow, deny) = load_dsolists(tmp.path(), &Subdir::Win64)
             .unwrap()
             .expect("should find matching dsolist files");
         assert!(allow.contains(&"C:/Windows/System32/KERNEL32.dll".to_string()));
@@ -901,7 +901,7 @@ mod tests {
         });
         fs_err::write(dsolists_dir.join("test.json"), json.to_string()).unwrap();
 
-        let result = load_dsolists(tmp.path(), &Platform::Win64);
+        let result = load_dsolists(tmp.path(), &Subdir::Win64);
         assert!(result.is_err());
         let err = result.unwrap_err().to_string();
         assert!(err.contains("backslashes"), "got: {err}");
@@ -920,7 +920,7 @@ mod tests {
         });
         fs_err::write(dsolists_dir.join("test.json"), json.to_string()).unwrap();
 
-        let result = load_dsolists(tmp.path(), &Platform::Win64);
+        let result = load_dsolists(tmp.path(), &Subdir::Win64);
         assert!(result.is_err());
         let err = result.unwrap_err().to_string();
         assert!(err.contains("not an absolute path"), "got: {err}");
@@ -940,7 +940,7 @@ mod tests {
         });
         fs_err::write(dsolists_dir.join("test.json"), json.to_string()).unwrap();
 
-        let (allow, deny) = load_dsolists(tmp.path(), &Platform::Win64)
+        let (allow, deny) = load_dsolists(tmp.path(), &Subdir::Win64)
             .unwrap()
             .expect("should find matching dsolist files");
         assert_eq!(allow, vec!["**/R.dll", "C:/Windows/System32/*.dll"]);

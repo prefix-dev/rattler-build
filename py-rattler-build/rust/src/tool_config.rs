@@ -3,7 +3,7 @@ use pyo3::prelude::*;
 use rattler_build::tool_configuration::{
     Configuration, ContinueOnFailure, SkipExisting, TestStrategy,
 };
-use rattler_conda_types::Platform;
+use rattler_conda_types::Subdir;
 use rattler_solve::ChannelPriority;
 
 use crate::error::RattlerBuildError;
@@ -82,7 +82,7 @@ impl PyToolConfiguration {
 
         let noarch_build_platform = noarch_build_platform
             .map(|p| {
-                p.parse::<Platform>()
+                p.parse::<Subdir>()
                     .map_err(|e| RattlerBuildError::Other(format!("Invalid platform: {}", e)))
             })
             .transpose()?;

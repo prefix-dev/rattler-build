@@ -8,7 +8,7 @@ use clap_complete_nushell::Nushell;
 use clap_verbosity_flag::{InfoLevel, Verbosity};
 use rattler_build_script::{SandboxArguments, SandboxConfiguration};
 use rattler_conda_types::{
-    NamedChannelOrUrl, Platform, compression_level::CompressionLevel, package::CondaArchiveType,
+    NamedChannelOrUrl, Subdir, compression_level::CompressionLevel, package::CondaArchiveType,
 };
 use rattler_config::config::build::PackageFormatAndCompression;
 use rattler_networking::mirror_middleware;
@@ -181,15 +181,15 @@ pub struct DebugSetupOpts {
 
     /// The target platform to build for
     #[arg(long)]
-    pub target_platform: Option<Platform>,
+    pub target_platform: Option<Subdir>,
 
     /// The host platform to build for (defaults to target_platform)
     #[arg(long)]
-    pub host_platform: Option<Platform>,
+    pub host_platform: Option<Subdir>,
 
     /// The build platform to build for (defaults to current platform)
     #[arg(long)]
-    pub build_platform: Option<Platform>,
+    pub build_platform: Option<Subdir>,
 
     /// Channels to use when building
     #[arg(short = 'c', long = "channel")]
@@ -594,16 +594,16 @@ pub struct BuildOpts {
     /// The build platform to use for the build (e.g. for building with
     /// emulation, or rendering).
     #[arg(long)]
-    pub build_platform: Option<Platform>,
+    pub build_platform: Option<Subdir>,
 
     /// The target platform for the build.
     #[arg(long)]
-    pub target_platform: Option<Platform>,
+    pub target_platform: Option<Subdir>,
 
     /// The host platform for the build. If set, it will be used to determine
     /// also the target_platform (as long as it is not noarch).
     #[arg(long)]
-    pub host_platform: Option<Platform>,
+    pub host_platform: Option<Subdir>,
 
     /// Add a channel to search for dependencies in.
     #[arg(short = 'c', long = "channel")]
@@ -695,7 +695,7 @@ pub struct BuildOpts {
     /// Define a "noarch platform" for which the noarch packages will be built
     /// for. The noarch builds will be skipped on the other platforms.
     #[arg(long, help_heading = "Modifying result")]
-    pub noarch_build_platform: Option<Platform>,
+    pub noarch_build_platform: Option<Subdir>,
 
     /// Extra metadata to include in about.json
     #[arg(long, value_parser = parse_key_val)]
@@ -899,9 +899,9 @@ impl PublishData {
 #[derive(Clone, Debug)]
 pub struct BuildData {
     pub up_to: Option<String>,
-    pub build_platform: Platform,
-    pub target_platform: Platform,
-    pub host_platform: Platform,
+    pub build_platform: Subdir,
+    pub target_platform: Subdir,
+    pub host_platform: Subdir,
     pub channels: Option<Vec<NamedChannelOrUrl>>,
     /// Whether `channels` was filled from the configuration file's
     /// `default-channels` rather than passed explicitly. Config channels are a
@@ -924,7 +924,7 @@ pub struct BuildData {
     pub env_isolation: rattler_build_script::EnvironmentIsolation,
     pub common: CommonData,
     pub skip_existing: SkipExisting,
-    pub noarch_build_platform: Option<Platform>,
+    pub noarch_build_platform: Option<Subdir>,
     pub extra_meta: Option<Vec<(String, Value)>>,
     pub sandbox_configuration: Option<SandboxConfiguration>,
     pub continue_on_failure: ContinueOnFailure,
@@ -944,9 +944,9 @@ impl BuildData {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         up_to: Option<String>,
-        build_platform: Option<Platform>,
-        target_platform: Option<Platform>,
-        host_platform: Option<Platform>,
+        build_platform: Option<Subdir>,
+        target_platform: Option<Subdir>,
+        host_platform: Option<Subdir>,
         channels: Option<Vec<NamedChannelOrUrl>>,
         variant_config: Option<Vec<PathBuf>>,
         variant_overrides: HashMap<String, Vec<String>>,
@@ -962,7 +962,7 @@ impl BuildData {
         test: Option<TestStrategy>,
         common: CommonData,
         skip_existing: Option<SkipExisting>,
-        noarch_build_platform: Option<Platform>,
+        noarch_build_platform: Option<Subdir>,
         extra_meta: Option<Vec<(String, Value)>>,
         sandbox_configuration: Option<SandboxConfiguration>,
         env_isolation: rattler_build_script::EnvironmentIsolation,
@@ -980,15 +980,15 @@ impl BuildData {
         Self {
             up_to,
             build_platform: build_platform
-                .or_else(Platform::current)
+                .or_else(Subdir::current)
                 .expect("unsupported build platform"),
             target_platform: target_platform
                 .or(host_platform)
-                .or_else(Platform::current)
+                .or_else(Subdir::current)
                 .expect("unsupported build platform"),
             host_platform: host_platform
                 .or(target_platform)
-                .or_else(Platform::current)
+                .or_else(Subdir::current)
                 .expect("unsupported build platform"),
             channels,
             channels_from_config: false,
@@ -1272,11 +1272,11 @@ pub struct DebugData {
     /// Directory where build artifacts will be stored
     pub output_dir: PathBuf,
     /// Platform where the build is being executed
-    pub build_platform: Platform,
+    pub build_platform: Subdir,
     /// Target platform for the build
-    pub target_platform: Platform,
+    pub target_platform: Subdir,
     /// Host platform for runtime dependencies
-    pub host_platform: Platform,
+    pub host_platform: Subdir,
     /// List of channels to search for dependencies
     pub channels: Option<Vec<NamedChannelOrUrl>>,
     /// Common configuration options
@@ -1304,16 +1304,16 @@ impl DebugData {
                 .unwrap_or_else(|| PathBuf::from("./output")),
             build_platform: opts
                 .build_platform
-                .or_else(Platform::current)
+                .or_else(Subdir::current)
                 .expect("unsupported build platform"),
             target_platform: opts
                 .target_platform
-                .or_else(Platform::current)
+                .or_else(Subdir::current)
                 .expect("unsupported build platform"),
             host_platform: opts
                 .host_platform
                 .or(opts.target_platform)
-                .or_else(Platform::current)
+                .or_else(Subdir::current)
                 .expect("unsupported build platform"),
             channels: opts.channels,
             common: CommonData::from_opts_and_config(opts.common, config.unwrap_or_default()),

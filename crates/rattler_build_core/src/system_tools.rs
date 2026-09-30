@@ -1,6 +1,6 @@
 //! System tools are installed on the system (git, patchelf, install_name_tool, etc.)
 
-use rattler_conda_types::Platform;
+use rattler_conda_types::Subdir;
 use rattler_shell::{activation::Activator, shell};
 use serde::{Deserialize, Serialize, Serializer, ser::SerializeMap};
 use std::{
@@ -121,7 +121,7 @@ impl SystemTools {
                 let build_prefix_activator = Activator::from_path(
                     build_prefix,
                     shell::Bash::default(),
-                    Platform::current().expect("unsupported build platform"),
+                    Subdir::current().expect("unsupported build platform"),
                 )
                 .unwrap();
 

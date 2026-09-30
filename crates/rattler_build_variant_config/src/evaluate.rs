@@ -126,7 +126,7 @@ fn evaluate_value(
 mod tests {
     use super::*;
     use crate::yaml_parser::parse_variant_str;
-    use rattler_conda_types::Platform;
+    use rattler_conda_types::Subdir;
 
     #[test]
     fn test_evaluate_simple() {
@@ -159,8 +159,8 @@ vc:
 
         // Test with Linux platform (unix = true)
         let jinja_config = JinjaConfig {
-            target_platform: Platform::Linux64,
-            host_platform: Platform::Linux64,
+            target_platform: Subdir::Linux64,
+            host_platform: Subdir::Linux64,
             ..Default::default()
         };
         let config = evaluate_variant_config(&stage0, &jinja_config).unwrap();
@@ -183,8 +183,8 @@ vc:
 
         // Test with Windows platform (win = true)
         let jinja_config = JinjaConfig {
-            target_platform: Platform::Win64,
-            host_platform: Platform::Win64,
+            target_platform: Subdir::Win64,
+            host_platform: Subdir::Win64,
             ..Default::default()
         };
         let config = evaluate_variant_config(&stage0, &jinja_config).unwrap();
@@ -203,8 +203,8 @@ target:
         let stage0 = parse_variant_str(yaml, None).unwrap();
 
         let jinja_config = JinjaConfig {
-            target_platform: Platform::Linux64,
-            host_platform: Platform::Linux64,
+            target_platform: Subdir::Linux64,
+            host_platform: Subdir::Linux64,
             ..Default::default()
         };
         let config = evaluate_variant_config(&stage0, &jinja_config).unwrap();
@@ -228,8 +228,8 @@ mixed:
         let stage0 = parse_variant_str(yaml, None).unwrap();
 
         let jinja_config = JinjaConfig {
-            target_platform: Platform::Linux64,
-            host_platform: Platform::Linux64,
+            target_platform: Subdir::Linux64,
+            host_platform: Subdir::Linux64,
             ..Default::default()
         };
         let config = evaluate_variant_config(&stage0, &jinja_config).unwrap();
@@ -253,8 +253,8 @@ python:
         let stage0 = parse_variant_str(yaml, None).unwrap();
 
         let jinja_config = JinjaConfig {
-            target_platform: Platform::Linux64,
-            host_platform: Platform::Linux64,
+            target_platform: Subdir::Linux64,
+            host_platform: Subdir::Linux64,
             ..Default::default()
         };
         let config = evaluate_variant_config(&stage0, &jinja_config).unwrap();
@@ -320,8 +320,8 @@ zip_keys:
 
         // Test with emscripten-wasm32 platform
         let jinja_config = JinjaConfig {
-            target_platform: Platform::EmscriptenWasm32,
-            host_platform: Platform::EmscriptenWasm32,
+            target_platform: Subdir::EmscriptenWasm32,
+            host_platform: Subdir::EmscriptenWasm32,
             ..Default::default()
         };
         let config = evaluate_variant_config(&stage0, &jinja_config).unwrap();
@@ -367,8 +367,8 @@ zip_keys:
 
         // Test with Linux platform - emscripten conditionals should not match
         let jinja_config = JinjaConfig {
-            target_platform: Platform::Linux64,
-            host_platform: Platform::Linux64,
+            target_platform: Subdir::Linux64,
+            host_platform: Subdir::Linux64,
             ..Default::default()
         };
         let config = evaluate_variant_config(&stage0, &jinja_config).unwrap();

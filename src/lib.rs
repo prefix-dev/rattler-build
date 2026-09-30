@@ -58,7 +58,7 @@ use rattler_build_core::consts;
 use rattler_build_recipe::stage0;
 use rattler_build_variant_config::VariantConfig;
 use rattler_conda_types::{
-    NamedChannelOrUrl, NoArchType, Platform, RepodataRevision, compression_level::CompressionLevel,
+    NamedChannelOrUrl, NoArchType, Subdir, RepodataRevision, compression_level::CompressionLevel,
     package::CondaArchiveType,
 };
 use rattler_config::config::build::PackageFormatAndCompression;
@@ -148,7 +148,7 @@ fn find_variants(
         let effective_target_platform = if recipe.build().noarch.is_none() {
             target_platform
         } else {
-            Platform::NoArch
+            Subdir::NoArch
         };
 
         // The recipe has already been evaluated and has its build string resolved
@@ -278,8 +278,8 @@ pub async fn get_build_output(
         output_dir = canonicalize(&output_dir).into_diagnostic()?;
     }
 
-    if build_data.target_platform == Platform::NoArch
-        || build_data.build_platform == Platform::NoArch
+    if build_data.target_platform == Subdir::NoArch
+        || build_data.build_platform == Subdir::NoArch
     {
         return Err(miette::miette!(
             "target-platform / build-platform cannot be `noarch` - that should be defined in the recipe"
@@ -588,7 +588,7 @@ pub async fn get_build_output(
                     recipe_path,
                     &output_dir,
                     &timestamp,
-                    Platform::current().expect("unsupported build platform"),
+                    Subdir::current().expect("unsupported build platform"),
                 )
                 .no_build_id(build_data.no_build_id)
                 .merge_build_and_host(recipe.build().merge_build_and_host_envs)
@@ -771,7 +771,7 @@ pub async fn run_build_from_args(
             TestStrategy::Skip => (true, "the argument --test=skip was set".to_string()),
             TestStrategy::Native => {
                 // Skip if `host_platform != build_platform` and `target_platform != noarch`
-                if output.build_configuration.target_platform != Platform::NoArch
+                if output.build_configuration.target_platform != Subdir::NoArch
                     && output.build_configuration.host_platform.platform
                         != output.build_configuration.build_platform.platform
                 {
@@ -852,7 +852,7 @@ pub async fn skip_noarch(
             // - target_platform is "noarch"
             // and
             // - build_platform != noarch_build_platform
-            let should_skip = output.build_configuration.target_platform == Platform::NoArch
+            let should_skip = output.build_configuration.target_platform == Subdir::NoArch
                 && output.build_configuration.build_platform.platform != noarch_build_platform;
 
             if should_skip {

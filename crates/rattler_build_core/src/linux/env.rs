@@ -3,21 +3,21 @@ use std::env::consts::ARCH;
 use std::{collections::HashMap, path::Path};
 
 use rattler_build_script::{EnvironmentIsolation, RuntimeEnv};
-use rattler_conda_types::Platform;
+use rattler_conda_types::Subdir;
 
 use crate::unix;
 
 /// Get default env vars for Linux
 pub fn default_env_vars_target(
     prefix: &Path,
-    target_platform: &Platform,
+    target_platform: &Subdir,
     env_isolation: EnvironmentIsolation,
     runtime: &RuntimeEnv,
 ) -> HashMap<String, Option<String>> {
     let mut vars = unix::env::default_env_vars_target(prefix, runtime);
 
     let build_distro = match target_platform {
-        Platform::Linux32 | Platform::Linux64 => "cos6",
+        Subdir::Linux32 | Subdir::Linux64 => "cos6",
         _ => "cos7",
     };
 
@@ -75,17 +75,17 @@ pub fn default_env_vars_target(
     vars
 }
 
-pub fn default_env_vars_build(build_platform: &Platform) -> HashMap<String, Option<String>> {
+pub fn default_env_vars_build(build_platform: &Subdir) -> HashMap<String, Option<String>> {
     let mut vars = HashMap::<String, Option<String>>::new();
     let build_distro = match build_platform {
-        Platform::Linux32 | Platform::Linux64 => "cos6",
+        Subdir::Linux32 | Subdir::Linux64 => "cos6",
         _ => "cos7",
     };
 
     let build_arch = match build_platform {
-        Platform::Linux32 => "i686",
-        Platform::Linux64 => "x86_64",
-        Platform::LinuxPpc64le => "powerpc64le",
+        Subdir::Linux32 => "i686",
+        Subdir::Linux64 => "x86_64",
+        Subdir::LinuxPpc64le => "powerpc64le",
         _ => build_platform
             .arch()
             .expect("arch for build_platform missing")
@@ -106,11 +106,11 @@ mod tests {
     #[test]
     fn build_and_ld_run_path_defaults() {
         let tmp_prefix = tempfile::tempdir().unwrap();
-        let runtime = RuntimeEnv::for_test(Platform::Linux64);
+        let runtime = RuntimeEnv::for_test(Subdir::Linux64);
 
         let vars = default_env_vars_target(
             tmp_prefix.path(),
-            &Platform::Linux64,
+            &Subdir::Linux64,
             EnvironmentIsolation::Strict,
             &runtime,
         );
@@ -133,11 +133,11 @@ mod tests {
     fn ld_run_path_env_preserved() {
         let tmp_prefix = tempfile::tempdir().unwrap();
         let runtime =
-            RuntimeEnv::for_test(Platform::Linux64).with_var("LD_RUN_PATH", "/custom/lib");
+            RuntimeEnv::for_test(Subdir::Linux64).with_var("LD_RUN_PATH", "/custom/lib");
 
         let vars = default_env_vars_target(
             tmp_prefix.path(),
-            &Platform::Linux64,
+            &Subdir::Linux64,
             EnvironmentIsolation::Strict,
             &runtime,
         );
@@ -152,9 +152,9 @@ mod tests {
         let tmp_prefix = tempfile::tempdir().unwrap();
         let vars = default_env_vars_target(
             tmp_prefix.path(),
-            &Platform::Linux64,
+            &Subdir::Linux64,
             EnvironmentIsolation::Strict,
-            &RuntimeEnv::for_test(Platform::Linux64),
+            &RuntimeEnv::for_test(Subdir::Linux64),
         );
         assert_eq!(vars.get("CFLAGS"), None);
         assert_eq!(vars.get("CXXFLAGS"), None);

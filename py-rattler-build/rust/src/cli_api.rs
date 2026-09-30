@@ -14,7 +14,7 @@ use ::rattler_build::{
 use clap::ValueEnum;
 use pyo3::prelude::*;
 use rattler_build_script::EnvironmentIsolation;
-use rattler_conda_types::{NamedChannelOrUrl, Platform};
+use rattler_conda_types::{NamedChannelOrUrl, Subdir};
 use rattler_config::config::build::PackageFormatAndCompression;
 
 use crate::error::RattlerBuildError;
@@ -85,15 +85,15 @@ pub fn build_recipes_py(
         use_sharded,
     );
     let build_platform = build_platform
-        .map(|p| Platform::from_str(&p))
+        .map(|p| Subdir::from_str(&p))
         .transpose()
         .map_err(RattlerBuildError::from)?;
     let target_platform = target_platform
-        .map(|p| Platform::from_str(&p))
+        .map(|p| Subdir::from_str(&p))
         .transpose()
         .map_err(RattlerBuildError::from)?;
     let host_platform = host_platform
-        .map(|p| Platform::from_str(&p))
+        .map(|p| Subdir::from_str(&p))
         .transpose()
         .map_err(RattlerBuildError::from)?;
     let package_format = package_format
@@ -103,7 +103,7 @@ pub fn build_recipes_py(
     let test = test.map(|t| TestStrategy::from_str(&t, false).unwrap());
     let skip_existing = skip_existing.map(|s| SkipExisting::from_str(&s, false).unwrap());
     let noarch_build_platform = noarch_build_platform
-        .map(|p| Platform::from_str(&p))
+        .map(|p| Subdir::from_str(&p))
         .transpose()
         .map_err(RattlerBuildError::from)?;
     let channel = match channel {

@@ -66,8 +66,8 @@ pub fn check_overlapping_files(outputs: &[Output], error: bool) -> miette::Resul
                 let a_platform = a.build_configuration.target_platform;
                 let b_platform = b.build_configuration.target_platform;
                 if a.name() == b.name()
-                    || (a_platform != rattler_conda_types::Platform::NoArch
-                        && b_platform != rattler_conda_types::Platform::NoArch
+                    || (a_platform != rattler_conda_types::Subdir::NoArch
+                        && b_platform != rattler_conda_types::Subdir::NoArch
                         && a_platform != b_platform)
                 {
                     continue;

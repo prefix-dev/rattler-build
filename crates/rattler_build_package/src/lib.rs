@@ -33,14 +33,14 @@
 //!
 //! ```rust,no_run
 //! use rattler_build_package::{PackageBuilder, PackageConfig};
-//! use rattler_conda_types::{PackageName, Platform};
+//! use rattler_conda_types::{PackageName, Subdir};
 //! use std::path::Path;
 //! use std::str::FromStr;
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let name = PackageName::new_unchecked("mypackage");
 //! let version = "1.0.0".parse()?;
-//! let platform = Platform::Linux64;
+//! let platform = Subdir::Linux64;
 //! let config = PackageConfig::default();
 //!
 //! let output = PackageBuilder::new(name, version, platform, config)

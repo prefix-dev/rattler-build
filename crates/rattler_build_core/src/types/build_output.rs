@@ -4,7 +4,7 @@ use rattler_build_jinja::Variable;
 use rattler_build_recipe::{Stage1Recipe, stage1::Source};
 use rattler_build_types::NormalizedKey;
 use rattler_conda_types::{
-    PackageName, Platform, RepoDataRecord, VersionWithSource,
+    PackageName, Subdir, RepoDataRecord, VersionWithSource,
     package::{PathType, PathsEntry, PathsJson},
 };
 use serde::{Deserialize, Serialize};
@@ -152,7 +152,7 @@ impl BuildOutput {
     }
 
     /// Shorthand to retrieve the target platform for this output
-    pub fn target_platform(&self) -> &Platform {
+    pub fn target_platform(&self) -> &Subdir {
         &self.build_configuration.target_platform
     }
 

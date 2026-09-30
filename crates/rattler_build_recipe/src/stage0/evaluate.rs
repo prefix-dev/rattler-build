@@ -3946,9 +3946,9 @@ mod tests {
         // Create JinjaConfig with the variant and target_platform
         let jinja_config = JinjaConfig {
             variant: variant.clone(),
-            target_platform: rattler_conda_types::Platform::Linux64,
-            build_platform: rattler_conda_types::Platform::Linux64,
-            host_platform: rattler_conda_types::Platform::Linux64,
+            target_platform: rattler_conda_types::Subdir::Linux64,
+            build_platform: rattler_conda_types::Subdir::Linux64,
+            host_platform: rattler_conda_types::Subdir::Linux64,
             ..Default::default()
         };
 
@@ -4392,7 +4392,7 @@ outputs:
 
         match parsed {
             stage0::Recipe::MultiOutput(multi) => {
-                let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
+                let ctx = EvaluationContext::for_platform(rattler_conda_types::Subdir::Linux64);
 
                 let recipes = multi.evaluate(&ctx).unwrap();
 
@@ -4477,7 +4477,7 @@ outputs:
 
         match parsed {
             stage0::Recipe::MultiOutput(multi) => {
-                let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
+                let ctx = EvaluationContext::for_platform(rattler_conda_types::Subdir::Linux64);
                 let err = multi.evaluate(&ctx).unwrap_err();
                 assert!(err.to_string().contains("experimental"), "{err}");
             }
@@ -4520,9 +4520,9 @@ outputs:
                 let ctx = EvaluationContext::with_variables_and_config(
                     variables,
                     JinjaConfig {
-                        target_platform: rattler_conda_types::Platform::Linux64,
-                        host_platform: rattler_conda_types::Platform::Linux64,
-                        build_platform: rattler_conda_types::Platform::Linux64,
+                        target_platform: rattler_conda_types::Subdir::Linux64,
+                        host_platform: rattler_conda_types::Subdir::Linux64,
+                        build_platform: rattler_conda_types::Subdir::Linux64,
                         experimental: true,
                         ..Default::default()
                     },
@@ -4606,9 +4606,9 @@ outputs:
                     .map(|(k, v)| (NormalizedKey::from(k.as_str()), v.clone()))
                     .collect();
                 let jinja_config = JinjaConfig {
-                    target_platform: rattler_conda_types::Platform::Linux64,
-                    build_platform: rattler_conda_types::Platform::Linux64,
-                    host_platform: rattler_conda_types::Platform::Linux64,
+                    target_platform: rattler_conda_types::Subdir::Linux64,
+                    build_platform: rattler_conda_types::Subdir::Linux64,
+                    host_platform: rattler_conda_types::Subdir::Linux64,
                     variant: jinja_variant,
                     ..Default::default()
                 };
@@ -4682,7 +4682,7 @@ outputs:
 
         match parsed {
             stage0::Recipe::MultiOutput(multi) => {
-                let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
+                let ctx = EvaluationContext::for_platform(rattler_conda_types::Subdir::Linux64);
 
                 let recipes = multi.evaluate(&ctx).unwrap();
 
@@ -4734,7 +4734,7 @@ outputs:
 
         match parsed {
             stage0::Recipe::MultiOutput(multi) => {
-                let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
+                let ctx = EvaluationContext::for_platform(rattler_conda_types::Subdir::Linux64);
 
                 let recipes = multi.evaluate(&ctx).unwrap();
                 println!("{:#?}", recipes);
@@ -4811,7 +4811,7 @@ outputs:
 
         match parsed {
             stage0::Recipe::MultiOutput(multi) => {
-                let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
+                let ctx = EvaluationContext::for_platform(rattler_conda_types::Subdir::Linux64);
 
                 let recipes = multi.evaluate(&ctx).unwrap();
                 assert_eq!(recipes.len(), 2);
@@ -4873,7 +4873,7 @@ outputs:
 
         match parsed {
             stage0::Recipe::MultiOutput(multi) => {
-                let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
+                let ctx = EvaluationContext::for_platform(rattler_conda_types::Subdir::Linux64);
 
                 let recipes = multi.evaluate(&ctx).unwrap();
                 assert_eq!(recipes.len(), 2); // Only package outputs
@@ -4957,7 +4957,7 @@ outputs:
 
         match parsed {
             stage0::Recipe::MultiOutput(multi) => {
-                let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
+                let ctx = EvaluationContext::for_platform(rattler_conda_types::Subdir::Linux64);
 
                 let recipes = multi.evaluate(&ctx).unwrap();
                 assert_eq!(recipes.len(), 2);
@@ -5052,7 +5052,7 @@ outputs:
 
         match parsed {
             stage0::Recipe::MultiOutput(multi) => {
-                let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
+                let ctx = EvaluationContext::for_platform(rattler_conda_types::Subdir::Linux64);
 
                 let recipes = multi.evaluate(&ctx).unwrap();
                 assert_eq!(recipes.len(), 2);
@@ -5109,7 +5109,7 @@ outputs:
 
         match parsed {
             stage0::Recipe::MultiOutput(multi) => {
-                let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
+                let ctx = EvaluationContext::for_platform(rattler_conda_types::Subdir::Linux64);
 
                 let recipes = multi.evaluate(&ctx).unwrap();
                 assert_eq!(recipes.len(), 2);
@@ -5192,7 +5192,7 @@ outputs:
             panic!("Expected MultiOutputRecipe");
         };
 
-        let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
+        let ctx = EvaluationContext::for_platform(rattler_conda_types::Subdir::Linux64);
         let recipes = multi.evaluate(&ctx).unwrap();
         assert_eq!(recipes.len(), 3);
 
@@ -5255,7 +5255,7 @@ outputs:
 
         match parsed {
             stage0::Recipe::MultiOutput(multi) => {
-                let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
+                let ctx = EvaluationContext::for_platform(rattler_conda_types::Subdir::Linux64);
 
                 let recipes = multi.evaluate(&ctx).unwrap();
                 assert_eq!(recipes.len(), 2);
@@ -5342,7 +5342,7 @@ outputs:
 
         match parsed {
             stage0::Recipe::MultiOutput(multi) => {
-                let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
+                let ctx = EvaluationContext::for_platform(rattler_conda_types::Subdir::Linux64);
 
                 let recipes = multi.evaluate(&ctx).unwrap();
                 assert_eq!(recipes.len(), 2); // Only package outputs, not staging
@@ -5434,7 +5434,7 @@ outputs:
 
         match parsed {
             stage0::Recipe::MultiOutput(multi) => {
-                let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
+                let ctx = EvaluationContext::for_platform(rattler_conda_types::Subdir::Linux64);
                 let recipes = multi.evaluate(&ctx).unwrap();
                 assert_eq!(recipes.len(), 1);
 
@@ -5475,9 +5475,9 @@ outputs:
         match parsed {
             stage0::Recipe::MultiOutput(multi) => {
                 let jinja_config = JinjaConfig {
-                    target_platform: rattler_conda_types::Platform::Linux64,
-                    build_platform: rattler_conda_types::Platform::Linux64,
-                    host_platform: rattler_conda_types::Platform::Linux64,
+                    target_platform: rattler_conda_types::Subdir::Linux64,
+                    build_platform: rattler_conda_types::Subdir::Linux64,
+                    host_platform: rattler_conda_types::Subdir::Linux64,
                     experimental: true,
                     ..Default::default()
                 };
@@ -5518,7 +5518,7 @@ outputs:
         let parsed = parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
         match parsed {
             stage0::Recipe::MultiOutput(multi) => {
-                let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
+                let ctx = EvaluationContext::for_platform(rattler_conda_types::Subdir::Linux64);
                 let recipes = multi.evaluate(&ctx).unwrap();
                 assert_eq!(recipes.len(), 2);
                 for recipe in &recipes {
@@ -5556,7 +5556,7 @@ requirements:
         let parsed = parse_recipe_from_source(recipe_yaml).unwrap();
 
         // Create context with both build_platform and target_platform
-        let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
+        let ctx = EvaluationContext::for_platform(rattler_conda_types::Subdir::Linux64);
 
         // Evaluate the recipe
         let result = parsed.evaluate(&ctx);
@@ -5595,7 +5595,7 @@ build:
 
         // Create context with all required variables
         // Using python=3.8 and python_min=3.8 so that match() succeeds and is_abi3 is evaluated
-        let mut ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
+        let mut ctx = EvaluationContext::for_platform(rattler_conda_types::Subdir::Linux64);
         ctx.insert("python".to_string(), Variable::from_string("3.8"));
         ctx.insert("python_min".to_string(), Variable::from_string("3.8"));
         ctx.insert("is_abi3".to_string(), Variable::from(true));
@@ -5852,9 +5852,9 @@ outputs:
             stage0::Recipe::MultiOutput(multi) => {
                 // Test on Windows - the output should be skipped and not fail
                 let jinja_config = JinjaConfig {
-                    target_platform: rattler_conda_types::Platform::Win64,
-                    build_platform: rattler_conda_types::Platform::Win64,
-                    host_platform: rattler_conda_types::Platform::Win64,
+                    target_platform: rattler_conda_types::Subdir::Win64,
+                    build_platform: rattler_conda_types::Subdir::Win64,
+                    host_platform: rattler_conda_types::Subdir::Win64,
                     // Note: no c_stdlib in variant - stdlib('c') would fail on Windows
                     variant: std::collections::BTreeMap::new(),
                     ..Default::default()
@@ -5925,9 +5925,9 @@ outputs:
                 variant.insert("cxx_compiler_version".into(), Variable::from_string("12"));
 
                 let jinja_config = JinjaConfig {
-                    target_platform: rattler_conda_types::Platform::Linux64,
-                    build_platform: rattler_conda_types::Platform::Linux64,
-                    host_platform: rattler_conda_types::Platform::Linux64,
+                    target_platform: rattler_conda_types::Subdir::Linux64,
+                    build_platform: rattler_conda_types::Subdir::Linux64,
+                    host_platform: rattler_conda_types::Subdir::Linux64,
                     variant,
                     ..Default::default()
                 };
@@ -5988,7 +5988,7 @@ build:
         let parsed = parse_recipe_from_source(recipe_yaml).unwrap();
 
         // Test with unix=true, win=false
-        let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
+        let ctx = EvaluationContext::for_platform(rattler_conda_types::Subdir::Linux64);
 
         let result = parsed.evaluate(&ctx).unwrap();
 
@@ -6002,7 +6002,7 @@ build:
         assert_eq!(result.build.post_process[1].regex.as_str(), "always");
 
         // Test with unix=false, win=true
-        let ctx2 = EvaluationContext::for_platform(rattler_conda_types::Platform::Win64);
+        let ctx2 = EvaluationContext::for_platform(rattler_conda_types::Subdir::Win64);
 
         let result2 = parsed.evaluate(&ctx2).unwrap();
 
@@ -6036,7 +6036,7 @@ build:
         let parsed = parse_recipe_from_source(recipe_yaml).unwrap();
 
         // Create a minimal evaluation context
-        let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
+        let ctx = EvaluationContext::for_platform(rattler_conda_types::Subdir::Linux64);
 
         // Evaluate the recipe - it should be skipped
         let result = parsed.evaluate(&ctx);
@@ -6092,7 +6092,7 @@ build:
 "#;
 
         let parsed = parse_recipe_from_source(recipe_yaml).unwrap();
-        let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
+        let ctx = EvaluationContext::for_platform(rattler_conda_types::Subdir::Linux64);
         let err = parsed
             .evaluate(&ctx)
             .expect_err("malformed rendered skip condition should be an error");
@@ -6109,7 +6109,7 @@ build:
         // behaviour most operators error out when a variant key is missing, and skip
         // conditions are evaluated against incomplete combinations during variant
         // discovery. Only genuinely broken expressions are errors.
-        let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
+        let ctx = EvaluationContext::for_platform(rattler_conda_types::Subdir::Linux64);
 
         for condition in [
             "is_abi3",
@@ -6241,7 +6241,7 @@ package:
 
         match parsed {
             stage0::Recipe::SingleOutput(recipe) => {
-                let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Win64);
+                let ctx = EvaluationContext::for_platform(rattler_conda_types::Subdir::Win64);
                 let result = recipe.evaluate(&ctx);
 
                 assert!(

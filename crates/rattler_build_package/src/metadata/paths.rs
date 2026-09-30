@@ -1,7 +1,7 @@
 //! PathsJson builder
 
 use fs_err as fs;
-use rattler_conda_types::Platform;
+use rattler_conda_types::Subdir;
 use rattler_conda_types::package::{FileMode, PathType, PathsEntry, PathsJson, PrefixPlaceholder};
 use rattler_digest::{compute_bytes_digest, compute_file_digest};
 use rayon::prelude::*;
@@ -25,7 +25,7 @@ pub struct PathsJsonBuilder {
     files: Vec<FileEntry>,
 
     /// Target platform
-    target_platform: Platform,
+    target_platform: Subdir,
 
     /// Prefix detection configuration
     prefix_detection: PrefixDetectionConfig,
@@ -33,7 +33,7 @@ pub struct PathsJsonBuilder {
 
 impl PathsJsonBuilder {
     /// Create a new PathsJsonBuilder
-    pub fn new(prefix: PathBuf, target_platform: Platform) -> Self {
+    pub fn new(prefix: PathBuf, target_platform: Subdir) -> Self {
         Self {
             prefix,
             files: Vec::new(),
@@ -231,7 +231,7 @@ mod tests {
     #[test]
     fn test_paths_builder_empty() -> Result<()> {
         let temp_dir = tempfile::tempdir()?;
-        let builder = PathsJsonBuilder::new(temp_dir.path().to_path_buf(), Platform::Linux64);
+        let builder = PathsJsonBuilder::new(temp_dir.path().to_path_buf(), Subdir::Linux64);
         let paths = builder.build()?;
 
         assert_eq!(paths.paths_version, 1);
@@ -252,7 +252,7 @@ mod tests {
         let file1 = FileEntry::from_paths(&base.join("test1.txt"), &PathBuf::from("test1.txt"))?;
         let file2 = FileEntry::from_paths(&base.join("test2.txt"), &PathBuf::from("test2.txt"))?;
 
-        let builder = PathsJsonBuilder::new(base.to_path_buf(), Platform::Linux64)
+        let builder = PathsJsonBuilder::new(base.to_path_buf(), Subdir::Linux64)
             .add_file(file1)
             .add_file(file2);
 
@@ -280,7 +280,7 @@ mod tests {
 
         let file = FileEntry::from_paths(&base.join("test.txt"), &PathBuf::from("test.txt"))?;
 
-        let builder = PathsJsonBuilder::new(base.to_path_buf(), Platform::Linux64).add_file(file);
+        let builder = PathsJsonBuilder::new(base.to_path_buf(), Subdir::Linux64).add_file(file);
 
         let paths = builder.build()?;
 

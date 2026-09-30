@@ -1,6 +1,6 @@
 use rattler_build_jinja::JinjaConfig;
 use rattler_build_variant_config::{VariantConfig, load_conda_build_config};
-use rattler_conda_types::Platform;
+use rattler_conda_types::Subdir;
 use std::collections::HashSet;
 use std::path::PathBuf;
 
@@ -96,8 +96,8 @@ fn test_zip_keys_all_combinations() {
 fn test_conda_build_config_linux() {
     let path = test_data_dir().join("conda_build_config/conda_build_config.yaml");
     let context = JinjaConfig {
-        target_platform: Platform::Linux64,
-        host_platform: Platform::Linux64,
+        target_platform: Subdir::Linux64,
+        host_platform: Subdir::Linux64,
         ..Default::default()
     };
 
@@ -109,8 +109,8 @@ fn test_conda_build_config_linux() {
 fn test_conda_build_config_osx() {
     let path = test_data_dir().join("conda_build_config/conda_build_config.yaml");
     let context = JinjaConfig {
-        target_platform: Platform::OsxArm64,
-        host_platform: Platform::OsxArm64,
+        target_platform: Subdir::OsxArm64,
+        host_platform: Subdir::OsxArm64,
         ..Default::default()
     };
 
@@ -122,8 +122,8 @@ fn test_conda_build_config_osx() {
 fn test_conda_build_config_win() {
     let path = test_data_dir().join("conda_build_config/conda_build_config.yaml");
     let context = JinjaConfig {
-        target_platform: Platform::Win64,
-        host_platform: Platform::Win64,
+        target_platform: Subdir::Win64,
+        host_platform: Subdir::Win64,
         ..Default::default()
     };
 
@@ -138,7 +138,7 @@ fn test_multi_file_merge() {
 
     let config = VariantConfig::from_files(
         &[base, override_file],
-        rattler_conda_types::Platform::Linux64,
+        rattler_conda_types::Subdir::Linux64,
     )
     .unwrap();
     insta::assert_yaml_snapshot!("multi_file_merged", config);
@@ -156,7 +156,7 @@ fn test_multi_file_combinations() {
 
     let config = VariantConfig::from_files(
         &[base, override_file],
-        rattler_conda_types::Platform::Linux64,
+        rattler_conda_types::Subdir::Linux64,
     )
     .unwrap();
 
@@ -192,9 +192,9 @@ fn test_partial_variable_usage() {
 fn test_flatten_selectors_linux() {
     let path = test_data_dir().join("with_selectors/variants.yaml");
     let jinja_config = rattler_build_jinja::JinjaConfig {
-        target_platform: Platform::Linux64,
-        host_platform: Platform::Linux64,
-        build_platform: Platform::Linux64,
+        target_platform: Subdir::Linux64,
+        host_platform: Subdir::Linux64,
+        build_platform: Subdir::Linux64,
         ..Default::default()
     };
 
@@ -212,9 +212,9 @@ fn test_flatten_selectors_linux() {
 fn test_flatten_selectors_win() {
     let path = test_data_dir().join("with_selectors/variants.yaml");
     let jinja_config = rattler_build_jinja::JinjaConfig {
-        target_platform: Platform::Win64,
-        host_platform: Platform::Win64,
-        build_platform: Platform::Win64,
+        target_platform: Subdir::Win64,
+        host_platform: Subdir::Win64,
+        build_platform: Subdir::Win64,
         ..Default::default()
     };
 
@@ -234,8 +234,8 @@ fn test_flatten_selectors_win() {
 fn test_load_conda_build_config_with_types() {
     let path = test_data_dir().join("variant_files/variant_config_1.yaml");
     let context = JinjaConfig {
-        target_platform: Platform::Linux64,
-        host_platform: Platform::Linux64,
+        target_platform: Subdir::Linux64,
+        host_platform: Subdir::Linux64,
         ..Default::default()
     };
 
@@ -273,8 +273,8 @@ fn test_load_variant_config_with_types() {
     let path = test_data_dir().join("variant_files/variant_config_1.yaml");
 
     let jinja_config = rattler_build_jinja::JinjaConfig {
-        target_platform: Platform::Linux64,
-        host_platform: Platform::Linux64,
+        target_platform: Subdir::Linux64,
+        host_platform: Subdir::Linux64,
         ..Default::default()
     };
     let config = VariantConfig::from_file_with_context(&path, &jinja_config).unwrap();
@@ -349,8 +349,8 @@ compiler:
   - clang
 "#;
     let jinja_config = rattler_build_jinja::JinjaConfig {
-        target_platform: Platform::Linux64,
-        host_platform: Platform::Linux64,
+        target_platform: Subdir::Linux64,
+        host_platform: Subdir::Linux64,
         ..Default::default()
     };
     let result = VariantConfig::from_yaml_str_with_context(yaml, &jinja_config);
@@ -376,8 +376,8 @@ compiler:
   - clang
 "#;
     let jinja_config = rattler_build_jinja::JinjaConfig {
-        target_platform: Platform::Linux64,
-        host_platform: Platform::Linux64,
+        target_platform: Subdir::Linux64,
+        host_platform: Subdir::Linux64,
         ..Default::default()
     };
     let result = VariantConfig::from_yaml_str_with_context(yaml, &jinja_config);

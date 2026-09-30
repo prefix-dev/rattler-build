@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use fs_err as fs;
 use jiff::Timestamp;
-use rattler_conda_types::Platform;
+use rattler_conda_types::Subdir;
 use serde::{Deserialize, Serialize};
 
 use dunce::canonicalize;
@@ -16,7 +16,7 @@ pub struct DirectoriesBuilder<'a> {
     recipe_path: &'a Path,
     output_dir: &'a Path,
     timestamp: &'a Timestamp,
-    platform: Platform,
+    platform: Subdir,
     no_build_id: bool,
     merge_build_and_host: bool,
     skip_directory_creation: bool,
@@ -29,7 +29,7 @@ impl<'a> DirectoriesBuilder<'a> {
         recipe_path: &'a Path,
         output_dir: &'a Path,
         timestamp: &'a Timestamp,
-        platform: Platform,
+        platform: Subdir,
     ) -> Self {
         Self {
             name,
@@ -122,7 +122,7 @@ impl ExecutionDirectories {
 /// Host prefix directory under `build_dir` for the given platform. Windows
 /// uses the short `h_env`; other platforms pad `host_env` with `_placehold`
 /// repetitions so the absolute prefix path is 255 characters long.
-pub fn padded_host_prefix(build_dir: &Path, platform: Platform) -> PathBuf {
+pub fn padded_host_prefix(build_dir: &Path, platform: Subdir) -> PathBuf {
     if platform.is_windows() {
         build_dir.join("h_env")
     } else {
@@ -165,7 +165,7 @@ impl Directories {
         recipe_path: &'a Path,
         output_dir: &'a Path,
         timestamp: &'a Timestamp,
-        platform: Platform,
+        platform: Subdir,
     ) -> DirectoriesBuilder<'a> {
         DirectoriesBuilder::new(name, recipe_path, output_dir, timestamp, platform)
     }
@@ -379,14 +379,14 @@ mod tests {
         let tempdir = tempfile::tempdir().unwrap();
         let build_dir = tempdir.path().join("build");
 
-        for platform in [Platform::Linux64, Platform::OsxArm64] {
+        for platform in [Subdir::Linux64, Subdir::OsxArm64] {
             assert_eq!(
                 padded_host_prefix(&build_dir, platform).as_os_str().len(),
                 255
             );
         }
         assert_eq!(
-            padded_host_prefix(&build_dir, Platform::Win64),
+            padded_host_prefix(&build_dir, Subdir::Win64),
             build_dir.join("h_env")
         );
     }
@@ -399,14 +399,14 @@ mod tests {
             &tempdir.path().join("recipe"),
             &tempdir.path().join("output"),
             &Timestamp::now(),
-            Platform::current().unwrap(),
+            Subdir::current().unwrap(),
         )
         .build()
         .unwrap();
 
         assert_eq!(
             directories.host_prefix,
-            padded_host_prefix(&directories.build_dir, Platform::current().unwrap())
+            padded_host_prefix(&directories.build_dir, Subdir::current().unwrap())
         );
 
         let execution = directories.exec_view();
@@ -430,7 +430,7 @@ mod tests {
             &tempdir.path().join("recipe"),
             &tempdir.path().join("output"),
             &Timestamp::now(),
-            Platform::current().unwrap(),
+            Subdir::current().unwrap(),
         )
         .build()
         .unwrap();
@@ -464,7 +464,7 @@ mod tests {
             &tempdir.path().join("recipe"),
             &tempdir.path().join("output"),
             &Timestamp::now(),
-            Platform::current().unwrap(),
+            Subdir::current().unwrap(),
         )
         .build()
         .unwrap();

@@ -13,12 +13,12 @@ pub use late_bound_path::{LICENSE_VARS, LateBoundPath, PATCH_VARS};
 pub use pin::*;
 pub use variant_config::NormalizedKey;
 
-use rattler_conda_types::Platform;
+use rattler_conda_types::Subdir;
 
 /// Returns the shared library extension for the given platform (e.g. `.so` for
 /// Linux, `.dylib` for macOS, and `.dll` for Windows). Returns
 /// `.not_implemented` for platforms without a known extension (e.g. `noarch`).
-pub fn shlib_ext(platform: &Platform) -> &'static str {
+pub fn shlib_ext(platform: &Subdir) -> &'static str {
     if platform.is_windows() {
         ".dll"
     } else if platform.is_osx() || platform.is_ios() {
@@ -53,20 +53,20 @@ mod tests {
     #[test]
     fn shlib_ext_follows_object_format() {
         // Mach-O
-        assert_eq!(shlib_ext(&Platform::Osx64), ".dylib");
-        assert_eq!(shlib_ext(&Platform::OsxArm64), ".dylib");
-        assert_eq!(shlib_ext(&Platform::IosArm64), ".dylib");
-        assert_eq!(shlib_ext(&Platform::IosSimulatorArm64), ".dylib");
-        assert_eq!(shlib_ext(&Platform::IosSimulator64), ".dylib");
+        assert_eq!(shlib_ext(&Subdir::Osx64), ".dylib");
+        assert_eq!(shlib_ext(&Subdir::OsxArm64), ".dylib");
+        assert_eq!(shlib_ext(&Subdir::IosArm64), ".dylib");
+        assert_eq!(shlib_ext(&Subdir::IosSimulatorArm64), ".dylib");
+        assert_eq!(shlib_ext(&Subdir::IosSimulator64), ".dylib");
         // ELF
-        assert_eq!(shlib_ext(&Platform::Linux64), ".so");
-        assert_eq!(shlib_ext(&Platform::AndroidAarch64), ".so");
-        assert_eq!(shlib_ext(&Platform::AndroidArmV7a), ".so");
-        assert_eq!(shlib_ext(&Platform::Android64), ".so");
-        assert_eq!(shlib_ext(&Platform::Android32), ".so");
+        assert_eq!(shlib_ext(&Subdir::Linux64), ".so");
+        assert_eq!(shlib_ext(&Subdir::AndroidAarch64), ".so");
+        assert_eq!(shlib_ext(&Subdir::AndroidArmV7a), ".so");
+        assert_eq!(shlib_ext(&Subdir::Android64), ".so");
+        assert_eq!(shlib_ext(&Subdir::Android32), ".so");
         // PE
-        assert_eq!(shlib_ext(&Platform::Win64), ".dll");
+        assert_eq!(shlib_ext(&Subdir::Win64), ".dll");
         // no known extension
-        assert_eq!(shlib_ext(&Platform::NoArch), ".not_implemented");
+        assert_eq!(shlib_ext(&Subdir::NoArch), ".not_implemented");
     }
 }

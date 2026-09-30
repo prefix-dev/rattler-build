@@ -11,7 +11,7 @@ use async_zip::base::read::seek::ZipFileReader;
 use futures::StreamExt;
 use http::HeaderMap;
 use miette::{Context as _, IntoDiagnostic};
-use rattler_conda_types::{Channel, MatchSpec, ParseStrictness, Platform, RepoDataRecord};
+use rattler_conda_types::{Channel, MatchSpec, ParseStrictness, Subdir, RepoDataRecord};
 use rattler_networking::LazyClient;
 use rattler_repodata_gateway::{
     Gateway, fetch,
@@ -63,7 +63,7 @@ async fn main() {
     let repo_path = result.repo_data_json_path.clone();
 
     let channel = Channel::from_url(Url::parse("https://conda.anaconda.org/conda-forge/").unwrap());
-    let platform = Platform::Linux64;
+    let platform = Subdir::Linux64;
 
     let repo_data =
         SparseRepoData::from_file(channel.clone(), "linux-64".to_string(), repo_path, None)

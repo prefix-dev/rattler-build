@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 use rattler_build_jinja::{JinjaConfig, Variable};
 use rattler_build_recipe::stage1::HashInfo;
 use rattler_build_types::NormalizedKey;
-use rattler_conda_types::{Channel, ChannelUrl, PackageName, Platform, RepodataRevision};
+use rattler_conda_types::{Channel, ChannelUrl, PackageName, RepodataRevision, Subdir};
 use rattler_solve::{ChannelPriority, ExcludeNewer, SolveStrategy};
 use serde::{Deserialize, Serialize};
 
@@ -31,7 +31,7 @@ where
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BuildConfiguration {
     /// The target platform for the build
-    pub target_platform: Platform,
+    pub target_platform: Subdir,
     /// The host platform (usually target platform, but for `noarch` it's the
     /// build platform)
     pub host_platform: PlatformWithVirtualPackages,

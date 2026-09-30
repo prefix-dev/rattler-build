@@ -9,7 +9,7 @@ use crate::error::RattlerBuildError;
 use pyo3::prelude::*;
 
 use rattler_build_jinja::{JinjaConfig, NormalizedKey, UndefinedBehavior, Variable};
-use rattler_conda_types::Platform;
+use rattler_conda_types::Subdir;
 
 /// Python wrapper for JinjaConfig
 #[pyclass(name = "PyJinjaConfig", from_py_object)]
@@ -34,23 +34,23 @@ impl PyJinjaConfig {
         recipe_path: Option<PathBuf>,
     ) -> PyResult<Self> {
         let target_platform = target_platform
-            .map(|p| Platform::from_str(&p))
+            .map(|p| Subdir::from_str(&p))
             .transpose()
             .map_err(RattlerBuildError::from)?
-            .or_else(Platform::current)
+            .or_else(Subdir::current)
             .ok_or_else(|| RattlerBuildError::Other("unsupported build platform".into()))?;
 
         let host_platform = host_platform
-            .map(|p| Platform::from_str(&p))
+            .map(|p| Subdir::from_str(&p))
             .transpose()
             .map_err(RattlerBuildError::from)?
             .unwrap_or(target_platform);
 
         let build_platform = build_platform
-            .map(|p| Platform::from_str(&p))
+            .map(|p| Subdir::from_str(&p))
             .transpose()
             .map_err(RattlerBuildError::from)?
-            .or_else(Platform::current)
+            .or_else(Subdir::current)
             .ok_or_else(|| RattlerBuildError::Other("unsupported build platform".into()))?;
 
         // Convert variant from Python dict to BTreeMap<NormalizedKey, Variable>

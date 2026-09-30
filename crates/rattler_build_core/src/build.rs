@@ -5,7 +5,7 @@ use std::{path::PathBuf, vec};
 use miette::{Context, IntoDiagnostic};
 use rattler_build_recipe::stage1::TestType;
 use rattler_build_script::InterpreterError;
-use rattler_conda_types::{Channel, MatchSpec, Platform, package::PathsJson};
+use rattler_conda_types::{Channel, MatchSpec, Subdir, package::PathsJson};
 
 use crate::{
     metadata::{Output, build_reindexed_channels},
@@ -247,7 +247,7 @@ pub async fn run_build(
     // Skip the check for noarch packages that have __unix in run dependencies,
     // since they will never be installed on Windows.
     if (output.build_configuration.target_platform.is_windows()
-        || (output.build_configuration.target_platform == Platform::NoArch
+        || (output.build_configuration.target_platform == Subdir::NoArch
             && !has_unix_virtual_package(&output)))
         && !tool_configuration.allow_symlinks_on_windows
     {

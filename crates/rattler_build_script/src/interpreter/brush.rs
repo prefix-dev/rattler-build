@@ -1,4 +1,4 @@
-use rattler_conda_types::Platform;
+use rattler_conda_types::Subdir;
 
 use super::InterpreterInvocation;
 
@@ -7,7 +7,7 @@ pub struct BrushInvocation;
 // Uses the default `build_only` scope: a system `brush` is never used, for
 // reproducibility.
 impl InterpreterInvocation for BrushInvocation {
-    fn executable_names(&self, _build_platform: &Platform) -> &'static [&'static str] {
+    fn executable_names(&self, _build_platform: &Subdir) -> &'static [&'static str] {
         &["brush"]
     }
 

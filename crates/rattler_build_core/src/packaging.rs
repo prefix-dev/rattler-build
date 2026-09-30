@@ -12,7 +12,7 @@ use indicatif::HumanBytes;
 use metadata::clean_url;
 use rattler_build_types::{GlobVec, LateBoundGlobVec};
 use rattler_conda_types::{
-    ChannelUrl, Platform,
+    ChannelUrl, Subdir,
     compression_level::CompressionLevel,
     package::{CondaArchiveType, FileMode, PackageFile, PathType, PathsJson},
 };
@@ -933,7 +933,7 @@ pub fn package_conda(
 
     fs::create_dir_all(&output_folder)?;
 
-    if let Platform::NoArch = output.build_configuration.target_platform {
+    if let Subdir::NoArch = output.build_configuration.target_platform {
         create_empty_build_folder(
             local_channel_dir,
             &output.build_configuration.build_platform.platform,
@@ -1001,7 +1001,7 @@ pub fn package_conda(
 /// https://github.com/conda-forge/conda-forge-ci-setup-feedstock/blob/main/recipe/conda_forge_ci_setup/feedstock_outputs.py#L164
 fn create_empty_build_folder(
     local_channel_dir: &Path,
-    build_platform: &Platform,
+    build_platform: &Subdir,
 ) -> miette::Result<(), PackagingError> {
     let build_output_folder = local_channel_dir.join(build_platform.to_string());
 
