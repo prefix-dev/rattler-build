@@ -33,8 +33,8 @@ requirements:
     - if: build_platform != target_platform
       then:
         - cross-r-base ${{ r_base }}
-    - ${{ compiler('c') }}
-    - ${{ compiler('cxx') }}
+    - ${{ compiler("c") }}
+    - ${{ compiler("cxx") }}
     - make
   host:
     - r-base
