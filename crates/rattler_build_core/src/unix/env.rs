@@ -31,7 +31,7 @@ mod tests {
         let tmp = tempfile::tempdir().expect("create temp dir");
         let env_vars = default_env_vars_target(
             tmp.path(),
-            &RuntimeEnv::for_test(rattler_conda_types::Platform::Linux64),
+            &RuntimeEnv::for_test(rattler_conda_types::Subdir::Linux64),
         );
         let expected = tmp
             .path()
@@ -45,7 +45,7 @@ mod tests {
     fn home_not_set_by_default_env_vars() {
         let env_vars = default_env_vars_target(
             Path::new("/some/prefix"),
-            &RuntimeEnv::for_test(rattler_conda_types::Platform::Linux64),
+            &RuntimeEnv::for_test(rattler_conda_types::Subdir::Linux64),
         );
         assert_eq!(env_vars.get("HOME"), None);
     }

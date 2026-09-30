@@ -13,7 +13,7 @@ use std::{
 };
 
 use rattler_build_jinja::{Jinja, JinjaConfig, Variable};
-use rattler_conda_types::{Platform, RepodataRevision};
+use rattler_conda_types::{RepodataRevision, Subdir};
 
 pub mod about;
 pub mod build;
@@ -83,7 +83,7 @@ impl EvaluationContext {
     ///
     /// This sets the JinjaConfig's target/build/host platforms, ensuring
     /// all derived platform variables (`linux`, `win`, `unix`, etc.) are correct.
-    pub fn for_platform(platform: Platform) -> Self {
+    pub fn for_platform(platform: Subdir) -> Self {
         let jinja_config = JinjaConfig {
             target_platform: platform,
             build_platform: platform,

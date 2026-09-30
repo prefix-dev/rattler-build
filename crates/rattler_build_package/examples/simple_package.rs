@@ -4,7 +4,7 @@ use fs_err as fs;
 use rattler_build_package::{
     AboutJsonBuilder, ArchiveType, IndexJsonBuilder, PackageBuilder, PackageConfig,
 };
-use rattler_conda_types::{PackageName, Platform, VersionWithSource};
+use rattler_conda_types::{PackageName, Subdir, VersionWithSource};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create a temporary directory with some files
@@ -25,7 +25,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Define package metadata
     let name = PackageName::new_unchecked("my-simple-package");
     let version: VersionWithSource = "1.0.0".parse()?;
-    let platform = Platform::Linux64;
+    let platform = Subdir::Linux64;
 
     // Create about.json metadata
     let about = AboutJsonBuilder::new()

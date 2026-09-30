@@ -18,7 +18,7 @@ mod ruby;
 
 use std::path::{Path, PathBuf};
 
-use rattler_conda_types::Platform;
+use rattler_conda_types::Subdir;
 use rattler_shell::activation::prefix_path_entries;
 
 use crate::ExecutionContext;
@@ -165,14 +165,14 @@ pub(crate) trait InterpreterInvocation: Send + Sync {
     ///
     /// Recipe-facing interpreter names may differ from executable names, for
     /// example `nushell` maps to `nu`.
-    fn executable_names(&self, build_platform: &Platform) -> &'static [&'static str];
+    fn executable_names(&self, build_platform: &Subdir) -> &'static [&'static str];
 
     /// Returns where the executable should be searched for.
     ///
     /// Defaults to the build environment only, for reproducibility. Native
     /// shells and language interpreters override this to also search the host
     /// environment and the system `PATH`; `brush` keeps the default.
-    fn search_scope(&self, _build_platform: &Platform) -> InterpreterSearchScope {
+    fn search_scope(&self, _build_platform: &Subdir) -> InterpreterSearchScope {
         InterpreterSearchScope::build_only()
     }
 
@@ -320,7 +320,7 @@ mod tests {
     };
     use fs_err as fs;
     use indexmap::IndexMap;
-    use rattler_conda_types::Platform;
+    use rattler_conda_types::Subdir;
     use rattler_shell::activation::prefix_path_entries;
     use std::path::{Path, PathBuf};
 
@@ -343,8 +343,8 @@ mod tests {
             context: ExecutionContext::shared(
                 RuntimeEnv::current(),
                 run_prefix,
-                Platform::current().unwrap(),
-                Platform::current().unwrap(),
+                Subdir::current().unwrap(),
+                Subdir::current().unwrap(),
             ),
             work_dir,
             sandbox_config: None,
@@ -367,7 +367,7 @@ mod tests {
 
     fn create_fake_executable(prefix: &Path, name: &str) -> PathBuf {
         let exe_name = format!("{}{}", name, std::env::consts::EXE_SUFFIX);
-        let bin_dir = prefix_path_entries(prefix, &Platform::current().unwrap())
+        let bin_dir = prefix_path_entries(prefix, &Subdir::current().unwrap())
             .into_iter()
             .next()
             .expect("prefix has executable path entries");
@@ -586,11 +586,11 @@ mod tests {
     struct RejectFirstStub;
 
     impl InterpreterInvocation for RejectFirstStub {
-        fn executable_names(&self, _build_platform: &Platform) -> &'static [&'static str] {
+        fn executable_names(&self, _build_platform: &Subdir) -> &'static [&'static str] {
             &["stub_first", "stub_second"]
         }
 
-        fn search_scope(&self, _build_platform: &Platform) -> InterpreterSearchScope {
+        fn search_scope(&self, _build_platform: &Subdir) -> InterpreterSearchScope {
             InterpreterSearchScope::build_only()
         }
 
@@ -717,7 +717,7 @@ mod tests {
             fs::set_permissions(&exe, Permissions::from_mode(0o755)).unwrap();
         }
 
-        let runtime = RuntimeEnv::for_test(Platform::current().unwrap())
+        let runtime = RuntimeEnv::for_test(Subdir::current().unwrap())
             .with_var("PATH", path_dir.to_string_lossy().into_owned());
 
         let context = shared_context(runtime, &prefix);
@@ -789,14 +789,14 @@ mod tests {
         // The tool exists only in the host prefix.
         let tool = create_fake_executable(&host_prefix, "rb_host_tool");
         // Empty runtime PATH so resolution can only come from a prefix.
-        let runtime = RuntimeEnv::for_test(Platform::current().unwrap()).with_var("PATH", "");
+        let runtime = RuntimeEnv::for_test(Subdir::current().unwrap()).with_var("PATH", "");
 
         let context = ExecutionContext::separate(
             runtime,
             &build_prefix,
-            Platform::current().unwrap(),
+            Subdir::current().unwrap(),
             &host_prefix,
-            Platform::current().unwrap(),
+            Subdir::current().unwrap(),
         );
         let found = find_interpreter(
             "rb_host_tool",
@@ -821,7 +821,7 @@ mod tests {
     /// has a system fallback, so a system `pwsh` would leak into resolution).
     #[test]
     fn powershell_lists_pwsh_then_powershell_on_windows() {
-        let names = super::powershell::PowerShellInvocation.executable_names(&Platform::Win64);
+        let names = super::powershell::PowerShellInvocation.executable_names(&Subdir::Win64);
         assert_eq!(names, &["pwsh", "powershell"]);
     }
 
@@ -856,7 +856,7 @@ mod tests {
         fs::create_dir_all(fake_cmd.parent().unwrap()).unwrap();
         fs::write(&fake_cmd, "").unwrap();
 
-        let runtime = RuntimeEnv::for_test(Platform::Win64)
+        let runtime = RuntimeEnv::for_test(Subdir::Win64)
             .with_var("COMSPEC", fake_cmd.to_string_lossy().into_owned());
 
         let resolved = super::cmd_exe::CmdExeInvocation

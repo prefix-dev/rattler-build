@@ -1,6 +1,6 @@
 //! iOS specific environment variables
 use rattler_build_script::RuntimeEnv;
-use rattler_conda_types::Platform;
+use rattler_conda_types::Subdir;
 use std::{collections::HashMap, path::Path};
 
 use crate::unix;
@@ -11,11 +11,11 @@ const DEFAULT_DEPLOYMENT_TARGET: &str = "13.0";
 
 /// Returns the clang target triple for an iOS platform, e.g. `arm64-apple-ios`
 /// for a device or `arm64-apple-ios-simulator` for the simulator.
-fn target_triple(target_platform: &Platform) -> Option<String> {
+fn target_triple(target_platform: &Subdir) -> Option<String> {
     let arch = target_platform.arch()?.as_str().to_string();
     match target_platform {
-        Platform::IosArm64 => Some(format!("{arch}-apple-ios")),
-        Platform::IosSimulatorArm64 | Platform::IosSimulator64 => {
+        Subdir::IosArm64 => Some(format!("{arch}-apple-ios")),
+        Subdir::IosSimulatorArm64 | Subdir::IosSimulator64 => {
             Some(format!("{arch}-apple-ios-simulator"))
         }
         _ => None,
@@ -25,7 +25,7 @@ fn target_triple(target_platform: &Platform) -> Option<String> {
 /// Get default env vars for iOS
 pub fn default_env_vars_target(
     prefix: &Path,
-    target_platform: &Platform,
+    target_platform: &Subdir,
     runtime: &RuntimeEnv,
 ) -> HashMap<String, Option<String>> {
     let mut vars = unix::env::default_env_vars_target(prefix, runtime);
@@ -55,26 +55,26 @@ mod tests {
     #[test]
     fn triples_distinguish_device_and_simulator() {
         assert_eq!(
-            target_triple(&Platform::IosArm64).as_deref(),
+            target_triple(&Subdir::IosArm64).as_deref(),
             Some("arm64-apple-ios")
         );
         assert_eq!(
-            target_triple(&Platform::IosSimulatorArm64).as_deref(),
+            target_triple(&Subdir::IosSimulatorArm64).as_deref(),
             Some("arm64-apple-ios-simulator")
         );
         assert_eq!(
-            target_triple(&Platform::IosSimulator64).as_deref(),
+            target_triple(&Subdir::IosSimulator64).as_deref(),
             Some("x86_64-apple-ios-simulator")
         );
-        assert_eq!(target_triple(&Platform::OsxArm64), None);
+        assert_eq!(target_triple(&Subdir::OsxArm64), None);
     }
 
     #[test]
     fn target_vars_include_unix_and_ios_specific_vars() {
         let vars = default_env_vars_target(
             Path::new("/some/prefix"),
-            &Platform::IosArm64,
-            &RuntimeEnv::for_test(Platform::Linux64),
+            &Subdir::IosArm64,
+            &RuntimeEnv::for_test(Subdir::Linux64),
         );
         // inherited from the generic unix vars
         assert!(vars.contains_key("PKG_CONFIG_PATH"));

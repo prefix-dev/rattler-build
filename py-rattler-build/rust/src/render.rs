@@ -8,7 +8,7 @@ use rattler_build_recipe::variant_render::{
     RenderConfig as RustRenderConfig, RenderedVariant as RustRenderedVariant,
     render_recipe_with_variant_config,
 };
-use rattler_conda_types::Platform;
+use rattler_conda_types::Subdir;
 
 use rattler_build_script::EnvironmentIsolation;
 
@@ -43,21 +43,21 @@ impl PyRenderConfig {
         build_number_override: Option<u64>,
     ) -> PyResult<Self> {
         let target_platform = target_platform
-            .map(|p| p.parse::<Platform>())
+            .map(|p| p.parse::<Subdir>())
             .transpose()
             .map_err(RattlerBuildError::from)?
-            .or_else(Platform::current)
+            .or_else(Subdir::current)
             .ok_or_else(|| RattlerBuildError::Other("unsupported build platform".into()))?;
 
         let build_platform = build_platform
-            .map(|p| p.parse::<Platform>())
+            .map(|p| p.parse::<Subdir>())
             .transpose()
             .map_err(RattlerBuildError::from)?
-            .or_else(Platform::current)
+            .or_else(Subdir::current)
             .ok_or_else(|| RattlerBuildError::Other("unsupported build platform".into()))?;
 
         let host_platform = host_platform
-            .map(|p| p.parse::<Platform>())
+            .map(|p| p.parse::<Subdir>())
             .transpose()
             .map_err(RattlerBuildError::from)?
             .unwrap_or(target_platform);

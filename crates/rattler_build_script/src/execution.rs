@@ -1013,7 +1013,7 @@ pub(crate) async fn run_process_with_replacements(
 mod tests {
     use super::*;
     use crate::ExecutionContext;
-    use rattler_conda_types::Platform;
+    use rattler_conda_types::Subdir;
     use tokio_util::bytes::BytesMut;
 
     /// `CONDA_BUILD=1` must live inside the sourced activation script so that
@@ -1031,10 +1031,10 @@ mod tests {
             env_vars: IndexMap::new(),
             secrets: IndexMap::new(),
             context: ExecutionContext::shared(
-                RuntimeEnv::for_test(Platform::current().unwrap()),
+                RuntimeEnv::for_test(Subdir::current().unwrap()),
                 prefix,
-                Platform::current().unwrap(),
-                Platform::current().unwrap(),
+                Subdir::current().unwrap(),
+                Subdir::current().unwrap(),
             ),
             work_dir: tmp.path().to_path_buf(),
             sandbox_config: None,
@@ -1059,7 +1059,7 @@ mod tests {
             EnvironmentIsolation::None,
             &env_vars,
             &secrets,
-            &RuntimeEnv::for_test(Platform::current().unwrap()),
+            &RuntimeEnv::for_test(Subdir::current().unwrap()),
         );
 
         assert!(
@@ -1144,10 +1144,10 @@ mod tests {
             env_vars: IndexMap::new(),
             secrets: IndexMap::new(),
             context: ExecutionContext::shared(
-                RuntimeEnv::for_test(Platform::Win64),
+                RuntimeEnv::for_test(Subdir::Win64),
                 prefix,
-                Platform::Win64,
-                Platform::Win64,
+                Subdir::Win64,
+                Subdir::Win64,
             ),
             work_dir: tmp.path().to_path_buf(),
             sandbox_config: None,
@@ -1397,7 +1397,7 @@ mod tests {
     /// the prefix's bin directory and returns its path.
     fn create_fake_executable(prefix: &Path, name: &str) -> PathBuf {
         let exe_name = format!("{}{}", name, std::env::consts::EXE_SUFFIX);
-        let bin_dir = prefix_path_entries(prefix, &Platform::current().unwrap())
+        let bin_dir = prefix_path_entries(prefix, &Subdir::current().unwrap())
             .into_iter()
             .next()
             .expect("prefix has executable path entries");
@@ -1431,8 +1431,8 @@ mod tests {
             context: ExecutionContext::shared(
                 RuntimeEnv::current(),
                 run_prefix,
-                Platform::current().unwrap(),
-                Platform::current().unwrap(),
+                Subdir::current().unwrap(),
+                Subdir::current().unwrap(),
             ),
             work_dir,
             sandbox_config: None,
@@ -1446,7 +1446,7 @@ mod tests {
     /// test does not touch the real process environment.
     #[test]
     fn test_strict_env_clear_and_passthrough_whitelist() {
-        let runtime = RuntimeEnv::for_test(Platform::current().unwrap())
+        let runtime = RuntimeEnv::for_test(Subdir::current().unwrap())
             .with_var("RB_TEST_RANDOM_VAR", "should-not-leak")
             .with_var("SSL_CERT_FILE", "/host/cacert.pem");
 
@@ -1489,7 +1489,7 @@ mod tests {
 
     #[test]
     fn test_none_env_uses_injected_runtime_with_explicit_overrides() {
-        let runtime = RuntimeEnv::for_test(Platform::Linux64)
+        let runtime = RuntimeEnv::for_test(Subdir::Linux64)
             .with_var("RUNTIME_ONLY", "runtime")
             .with_var("OVERLAY", "runtime");
         let mut env_vars = IndexMap::new();
@@ -1523,7 +1523,7 @@ mod tests {
     fn test_platform_passthrough_follows_runtime_platform() {
         let env_vars = IndexMap::new();
         let secrets = IndexMap::new();
-        let runtime = RuntimeEnv::for_test(Platform::Win64).with_var("SYSTEMROOT", "C:\\Windows");
+        let runtime = RuntimeEnv::for_test(Subdir::Win64).with_var("SYSTEMROOT", "C:\\Windows");
 
         let windows_env =
             resolve_process_env(EnvironmentIsolation::Strict, &env_vars, &secrets, &runtime);
@@ -1536,7 +1536,7 @@ mod tests {
             EnvironmentIsolation::Strict,
             &env_vars,
             &secrets,
-            &runtime.with_process_platform(Platform::Linux64),
+            &runtime.with_process_platform(Subdir::Linux64),
         );
         assert!(!linux_env.contains_key("SYSTEMROOT"));
     }
@@ -1672,7 +1672,7 @@ mod tests {
             &replacements,
             &process_env,
             None,
-            &RuntimeEnv::for_test(Platform::current().unwrap()),
+            &RuntimeEnv::for_test(Subdir::current().unwrap()),
         )
         .await
         .unwrap();
@@ -1877,7 +1877,7 @@ mod tests {
         let args = ExecutionArgs {
             context: args
                 .context
-                .with_runtime(RuntimeEnv::for_test(Platform::Linux64)),
+                .with_runtime(RuntimeEnv::for_test(Subdir::Linux64)),
             ..args
         };
         generate_build_script(&args).await.unwrap();
@@ -1904,7 +1904,7 @@ echo hi
         let args = ExecutionArgs {
             context: args
                 .context
-                .with_runtime(RuntimeEnv::for_test(Platform::Linux64)),
+                .with_runtime(RuntimeEnv::for_test(Subdir::Linux64)),
             ..args
         };
         generate_build_script(&args).await.unwrap();
@@ -1928,7 +1928,7 @@ echo hi
         let args = ExecutionArgs {
             context: args
                 .context
-                .with_runtime(RuntimeEnv::for_test(Platform::Win64)),
+                .with_runtime(RuntimeEnv::for_test(Subdir::Win64)),
             ..args
         };
         generate_build_script(&args).await.unwrap();
@@ -1961,10 +1961,10 @@ endlocal & if %RB_SECTION_ERRORLEVEL% neq 0 exit /b %RB_SECTION_ERRORLEVEL%
 
         let args = ExecutionArgs {
             context: ExecutionContext::shared(
-                RuntimeEnv::for_test(Platform::Win64),
+                RuntimeEnv::for_test(Subdir::Win64),
                 base.context.host().path(),
-                Platform::Win64,
-                Platform::Win64,
+                Subdir::Win64,
+                Subdir::Win64,
             ),
             sections: vec![
                 BuildScriptSection {
@@ -2021,10 +2021,10 @@ endlocal & if %RB_SECTION_ERRORLEVEL% neq 0 exit /b %RB_SECTION_ERRORLEVEL%
         );
         let args = ExecutionArgs {
             context: ExecutionContext::shared(
-                RuntimeEnv::for_test(Platform::Win64),
+                RuntimeEnv::for_test(Subdir::Win64),
                 args.context.host().path(),
-                Platform::Win64,
-                Platform::Win64,
+                Subdir::Win64,
+                Subdir::Win64,
             ),
             ..args
         };
@@ -2057,10 +2057,10 @@ endlocal & if %RB_SECTION_ERRORLEVEL% neq 0 exit /b %RB_SECTION_ERRORLEVEL%
 
         let args = ExecutionArgs {
             context: ExecutionContext::shared(
-                RuntimeEnv::for_test(Platform::Win64),
+                RuntimeEnv::for_test(Subdir::Win64),
                 base.context.host().path(),
-                Platform::Win64,
-                Platform::Win64,
+                Subdir::Win64,
+                Subdir::Win64,
             ),
             sections: vec![
                 BuildScriptSection {
@@ -2107,10 +2107,10 @@ endlocal & if %RB_SECTION_ERRORLEVEL% neq 0 exit /b %RB_SECTION_ERRORLEVEL%
 
         let args = ExecutionArgs {
             context: ExecutionContext::shared(
-                RuntimeEnv::for_test(Platform::Linux64),
+                RuntimeEnv::for_test(Subdir::Linux64),
                 base.context.host().path(),
-                Platform::Linux64,
-                Platform::Linux64,
+                Subdir::Linux64,
+                Subdir::Linux64,
             ),
             sections: vec![
                 BuildScriptSection {

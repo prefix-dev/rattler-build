@@ -213,7 +213,7 @@ outputs:
 
 def test_render_invalid_platform() -> None:
     """Test that invalid platform raises PlatformParseError."""
-    with pytest.raises(PlatformParseError, match="'invalid-platform' is not a known platform."):
+    with pytest.raises(PlatformParseError, match="'invalid-platform' is not a known subdir."):
         platform_config = PlatformConfig(target_platform="invalid-platform")
         RenderConfig(platform=platform_config)
 

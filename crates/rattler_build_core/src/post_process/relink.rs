@@ -8,7 +8,7 @@ use crate::macos::link::Dylib;
 use crate::metadata::Output;
 use crate::system_tools::{SystemTools, ToolError};
 use crate::windows::link::Dll;
-use rattler_conda_types::{Arch, Platform};
+use rattler_conda_types::{Arch, Subdir};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use thiserror::Error;
@@ -105,7 +105,7 @@ pub trait Relinker {
 }
 
 /// Returns the relink helper for the current platform.
-pub fn get_relinker(platform: Platform, path: &Path) -> Result<Box<dyn Relinker>, RelinkError> {
+pub fn get_relinker(platform: Subdir, path: &Path) -> Result<Box<dyn Relinker>, RelinkError> {
     if platform.is_linux() || platform.is_android() {
         // Android produces ELF objects, just like Linux — but its linker only reads
         // DT_RUNPATH, so the relinker needs to know which of the two it is.
@@ -152,7 +152,7 @@ pub fn relink(temp_files: &TempFiles, output: &Output) -> Result<(), RelinkError
     let target_platform = output.build_configuration.target_platform;
     let relocation_config = &dynamic_linking.binary_relocation;
 
-    if target_platform == Platform::NoArch
+    if target_platform == Subdir::NoArch
         // skip linking checks for wasm
         || target_platform.arch() == Some(Arch::Wasm32)
         || target_platform.arch() == Some(Arch::Wasm64)

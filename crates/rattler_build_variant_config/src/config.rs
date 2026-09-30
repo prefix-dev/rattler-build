@@ -77,11 +77,11 @@ impl VariantConfig {
     /// ```no_run
     /// use rattler_build_variant_config::VariantConfig;
     /// use rattler_build_jinja::JinjaConfig;
-    /// use rattler_conda_types::Platform;
+    /// use rattler_conda_types::Subdir;
     /// use std::path::Path;
     ///
     /// let mut jinja_config = JinjaConfig::default();
-    /// jinja_config.target_platform = Platform::Linux64;
+    /// jinja_config.target_platform = Subdir::Linux64;
     ///
     /// let config = VariantConfig::from_file_with_context(
     ///     Path::new("variants.yaml"),
@@ -154,7 +154,7 @@ impl VariantConfig {
     #[cfg(not(target_arch = "wasm32"))]
     pub fn from_files(
         paths: &[impl AsRef<Path>],
-        target_platform: rattler_conda_types::Platform,
+        target_platform: rattler_conda_types::Subdir,
     ) -> Result<Self, VariantConfigError> {
         let jinja_config = rattler_build_jinja::JinjaConfig {
             target_platform,

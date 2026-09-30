@@ -7,7 +7,7 @@ use std::path::PathBuf;
 
 use async_trait::async_trait;
 use indexmap::IndexMap;
-use rattler_conda_types::Platform;
+use rattler_conda_types::Subdir;
 
 pub(crate) use environment::resolve_process_env;
 pub use local::LocalRunner;
@@ -49,7 +49,7 @@ pub struct Mount {
 #[derive(Debug, Clone)]
 pub struct SessionSpec {
     /// The platform scripts execute on.
-    pub platform: Platform,
+    pub platform: Subdir,
     /// The bind mounts the session must provide.
     pub mounts: Vec<Mount>,
     /// The container image for runners that need one.
@@ -96,7 +96,7 @@ impl From<std::process::ExitStatus> for ExecStatus {
 #[non_exhaustive]
 pub struct GuestInfo {
     /// The platform scripts execute on.
-    pub platform: Platform,
+    pub platform: Subdir,
 }
 
 /// Which stream a raw output line arrived on.
@@ -121,7 +121,7 @@ pub trait Runner: Send + Sync {
     fn name(&self) -> &str;
 
     /// The platform scripts execute on.
-    fn execution_platform(&self) -> Platform;
+    fn execution_platform(&self) -> Subdir;
 
     /// Performs a cheap availability check.
     async fn check_usable(&self) -> Result<(), RunnerError>;

@@ -1,9 +1,7 @@
 //! Functions for publishing conda packages to various backends (local filesystem, S3, Quetz, etc.)
 
 use miette::{Context, IntoDiagnostic};
-use rattler_conda_types::{
-    Channel, ChannelUrl, MatchSpec, NamedChannelOrUrl, PackageName, Platform,
-};
+use rattler_conda_types::{Channel, ChannelUrl, MatchSpec, NamedChannelOrUrl, PackageName, Subdir};
 use rattler_index::{IndexFsConfig, index_fs};
 use rattler_repodata_gateway::{CacheClearMode, Gateway, SubdirSelection};
 use std::collections::HashMap;
@@ -65,7 +63,7 @@ impl BuildNumberOverride {
 pub async fn fetch_highest_build_numbers(
     target_url: &NamedChannelOrUrl,
     outputs: &[Output],
-    target_platform: Platform,
+    target_platform: Subdir,
     tool_config: &Configuration,
 ) -> miette::Result<HashMap<(PackageName, String), u64>> {
     // Convert target URL to channel
@@ -120,7 +118,7 @@ pub async fn fetch_highest_build_numbers(
         .repodata_gateway
         .query(
             vec![channel],
-            [target_platform, Platform::NoArch],
+            [target_platform, Subdir::NoArch],
             package_specs,
         )
         .with_reporter(
@@ -485,7 +483,7 @@ async fn upload_to_s3(
         tracing::info!("Indexing S3 channel at {} / {}", url, subdir);
 
         let target_platform = subdir
-            .parse::<Platform>()
+            .parse::<Subdir>()
             .map_err(|e| miette::miette!("Invalid platform subdir '{}': {}", subdir, e))?;
 
         let index_config = IndexS3Config {
@@ -800,7 +798,7 @@ async fn upload_to_local_filesystem(
 
     for subdir in subdirs {
         let target_platform = subdir
-            .parse::<Platform>()
+            .parse::<Subdir>()
             .map_err(|e| miette::miette!("Invalid platform subdir '{}': {}", subdir, e))?;
 
         let index_config = IndexFsConfig {

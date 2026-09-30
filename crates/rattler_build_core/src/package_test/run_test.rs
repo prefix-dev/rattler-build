@@ -18,8 +18,8 @@ use rattler_build_script::{
 };
 use rattler_build_types::NormalizedKey;
 use rattler_conda_types::{
-    Channel, ChannelUrl, MatchSpec, PackageName, PackageNameMatcher, ParseStrictness, Platform,
-    RepoDataRecord, StringMatcher, Version, VersionSpec,
+    Channel, ChannelUrl, MatchSpec, PackageName, PackageNameMatcher, ParseStrictness,
+    RepoDataRecord, StringMatcher, Subdir, Version, VersionSpec,
     compression_level::CompressionLevel,
     package::{ArchiveIdentifier, CondaArchiveIdentifier, IndexJson, PackageFile},
     version_spec::EqualityOperator,
@@ -279,7 +279,7 @@ impl Tests {
 
 async fn legacy_tests_from_folder(
     pkg: &Path,
-    build_platform: Platform,
+    build_platform: Subdir,
 ) -> Result<(PathBuf, Vec<Tests>), std::io::Error> {
     let mut tests = Vec::new();
 
@@ -323,7 +323,7 @@ pub struct TestConfiguration {
     pub test_prefix: PathBuf,
     /// The target platform. If not set it will be discovered from the
     /// index.json metadata.
-    pub target_platform: Option<Platform>,
+    pub target_platform: Option<Subdir>,
     /// The host platform for run-time dependencies. If not set it will be
     /// discovered from the index.json metadata.
     pub host_platform: Option<PlatformWithVirtualPackages>,
@@ -350,7 +350,7 @@ pub struct TestConfiguration {
     pub env_isolation: EnvironmentIsolation,
 }
 
-fn configured_test_platforms(config: &TestConfiguration) -> (Platform, Platform, Platform) {
+fn configured_test_platforms(config: &TestConfiguration) -> (Subdir, Subdir, Subdir) {
     let target_platform = config
         .target_platform
         .unwrap_or(config.current_platform.platform);
@@ -365,7 +365,7 @@ fn configured_test_platforms(config: &TestConfiguration) -> (Platform, Platform,
 
 /// Tests without a separate build environment execute programs from the test
 /// prefix, so their wrapper architecture must match the package host platform.
-fn shared_test_context(prefix: &Path, host_platform: Platform) -> ExecutionContext {
+fn shared_test_context(prefix: &Path, host_platform: Subdir) -> ExecutionContext {
     ExecutionContext::shared(RuntimeEnv::current(), prefix, host_platform, host_platform)
 }
 
@@ -523,7 +523,7 @@ pub async fn run_test(
         let subdir = index_json
             .subdir
             .ok_or(TestError::CouldNotDetermineTargetPlatform)?;
-        Platform::from_str(&subdir).map_err(|_| TestError::CouldNotDetermineTargetPlatform)?
+        Subdir::from_str(&subdir).map_err(|_| TestError::CouldNotDetermineTargetPlatform)?
     };
 
     let subdir = tmp_repo.path().join(target_platform.to_string());
@@ -609,7 +609,7 @@ pub async fn run_test(
     channels.insert(0, test_channel);
 
     let host_platform = config.host_platform.clone().unwrap_or_else(|| {
-        if target_platform == Platform::NoArch {
+        if target_platform == Subdir::NoArch {
             config.current_platform.clone()
         } else {
             PlatformWithVirtualPackages {
@@ -1412,7 +1412,7 @@ mod tests {
                 "version": "1.0",
                 "build": "0",
                 "build_number": 0,
-                "subdir": Platform::current().unwrap().to_string(),
+                "subdir": Subdir::current().unwrap().to_string(),
                 "depends": [],
                 "timestamp": 1735689600000i64,
             }))
@@ -1439,7 +1439,7 @@ mod tests {
             target_platform: None,
             host_platform: None,
             current_platform: PlatformWithVirtualPackages {
-                platform: Platform::current().unwrap(),
+                platform: Subdir::current().unwrap(),
                 virtual_packages: Vec::new(),
             },
             keep_test_prefix: false,
@@ -1477,8 +1477,8 @@ mod tests {
         }
 
         for (platform, command_test) in [
-            (Platform::Linux64, "run_test.sh"),
-            (Platform::Win64, "run_test.bat"),
+            (Subdir::Linux64, "run_test.sh"),
+            (Subdir::Win64, "run_test.bat"),
         ] {
             let (_, tests) = legacy_tests_from_folder(package.path(), platform)
                 .await
@@ -1501,11 +1501,11 @@ mod tests {
 
     #[test]
     fn shared_test_context_executes_the_host_prefix_platform() {
-        let context = shared_test_context(Path::new("test-prefix"), Platform::WinArm64);
+        let context = shared_test_context(Path::new("test-prefix"), Subdir::WinArm64);
         assert_eq!(context.build().path(), Path::new("test-prefix"));
         assert_eq!(context.host().path(), Path::new("test-prefix"));
-        assert_eq!(context.build().platform(), Platform::WinArm64);
-        assert_eq!(context.host().platform(), Platform::WinArm64);
+        assert_eq!(context.build().platform(), Subdir::WinArm64);
+        assert_eq!(context.host().platform(), Subdir::WinArm64);
     }
 
     /// Verifies that a trailing-underscore version (the openssl ordering

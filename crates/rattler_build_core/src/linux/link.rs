@@ -6,7 +6,7 @@ use goblin::strtab::Strtab;
 use itertools::Itertools;
 use memmap2::MmapMut;
 use rattler_build_recipe::stage1::GlobVec;
-use rattler_conda_types::Platform;
+use rattler_conda_types::Subdir;
 use scroll::Pwrite;
 use scroll::ctx::SizeWith;
 use std::collections::{HashMap, HashSet};
@@ -47,7 +47,7 @@ impl SharedObject {
     ///
     /// Prefer this over [`Relinker::new`] when the target platform is known, so that
     /// Android binaries get `DT_RUNPATH` rather than a `DT_RPATH` their linker ignores.
-    pub fn new_for_platform(path: &Path, target_platform: Platform) -> Result<Self, RelinkError> {
+    pub fn new_for_platform(path: &Path, target_platform: Subdir) -> Result<Self, RelinkError> {
         Ok(Self {
             use_runpath: target_platform.is_android(),
             ..<Self as Relinker>::new(path)?
@@ -760,10 +760,8 @@ mod test {
         let prefix = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/binary_files");
         let binary_path = prefix.join("zlink");
 
-        assert!(!SharedObject::new_for_platform(&binary_path, Platform::LinuxAarch64)?.use_runpath);
-        assert!(
-            SharedObject::new_for_platform(&binary_path, Platform::AndroidAarch64)?.use_runpath
-        );
+        assert!(!SharedObject::new_for_platform(&binary_path, Subdir::LinuxAarch64)?.use_runpath);
+        assert!(SharedObject::new_for_platform(&binary_path, Subdir::AndroidAarch64)?.use_runpath);
 
         Ok(())
     }

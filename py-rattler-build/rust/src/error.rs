@@ -20,7 +20,7 @@ create_exception!(rattler_build, PyBuildError, PyRattlerBuildError);
 #[derive(Error, Debug)]
 pub enum RattlerBuildError {
     #[error("Platform parse error: {0}")]
-    PlatformParse(#[from] rattler_conda_types::ParsePlatformError),
+    PlatformParse(#[from] rattler_conda_types::ParseSubdirError),
 
     #[error("Channel error: {0}")]
     Channel(String),

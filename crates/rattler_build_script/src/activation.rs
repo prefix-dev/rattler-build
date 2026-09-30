@@ -91,7 +91,7 @@ pub(crate) fn activation_script<T: Shell + Clone + 'static>(
 #[cfg(test)]
 mod tests {
     use indexmap::IndexMap;
-    use rattler_conda_types::Platform;
+    use rattler_conda_types::Subdir;
     use rattler_shell::shell;
 
     use crate::execution::{EnvironmentIsolation, ExecutionArgs};
@@ -116,10 +116,10 @@ mod tests {
             env_vars,
             secrets: IndexMap::new(),
             context: ExecutionContext::shared(
-                RuntimeEnv::for_test(Platform::Win64),
+                RuntimeEnv::for_test(Subdir::Win64),
                 &prefix,
-                Platform::WinArm64,
-                Platform::WinArm64,
+                Subdir::WinArm64,
+                Subdir::WinArm64,
             ),
             work_dir: tmp.path().to_path_buf(),
             sandbox_config: None,
@@ -150,11 +150,11 @@ mod tests {
             env_vars: IndexMap::new(),
             secrets: IndexMap::new(),
             context: ExecutionContext::separate(
-                RuntimeEnv::for_test(Platform::current().unwrap()),
+                RuntimeEnv::for_test(Subdir::current().unwrap()),
                 build_prefix.clone(),
-                Platform::current().unwrap(),
+                Subdir::current().unwrap(),
                 run_prefix.clone(),
-                Platform::current().unwrap(),
+                Subdir::current().unwrap(),
             ),
             work_dir: tmp.path().to_path_buf(),
             sandbox_config: None,

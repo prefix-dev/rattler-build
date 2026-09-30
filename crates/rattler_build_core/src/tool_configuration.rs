@@ -10,7 +10,7 @@ use std::{
 use clap::ValueEnum;
 use rattler::package_cache::PackageCache;
 use rattler_build_script::runner::{LocalRunner, Runner};
-use rattler_conda_types::{ChannelConfig, Platform};
+use rattler_conda_types::{ChannelConfig, Subdir};
 #[cfg(feature = "s3")]
 use rattler_networking::s3_middleware;
 use rattler_networking::{
@@ -111,7 +111,7 @@ pub struct Configuration {
     pub skip_existing: SkipExisting,
 
     /// The noarch platform to use (noarch builds are skipped on other platforms)
-    pub noarch_build_platform: Option<Platform>,
+    pub noarch_build_platform: Option<Subdir>,
 
     /// The channel configuration to use when parsing channels.
     pub channel_config: ChannelConfig,
@@ -215,7 +215,7 @@ pub struct ConfigurationBuilder {
     use_bz2: bool,
     use_sharded: bool,
     skip_existing: SkipExisting,
-    noarch_build_platform: Option<Platform>,
+    noarch_build_platform: Option<Subdir>,
     channel_config: Option<ChannelConfig>,
     compression_threads: Option<u32>,
     io_concurrency_limit: Option<usize>,
@@ -439,7 +439,7 @@ impl ConfigurationBuilder {
     }
 
     /// Define the noarch platform
-    pub fn with_noarch_build_platform(self, noarch_build_platform: Option<Platform>) -> Self {
+    pub fn with_noarch_build_platform(self, noarch_build_platform: Option<Subdir>) -> Self {
         Self {
             noarch_build_platform,
             ..self
@@ -580,7 +580,7 @@ pub async fn resolve_s3_credentials(
     s3_config: &HashMap<String, s3_middleware::S3Config>,
     auth_file: Option<PathBuf>,
     bucket_url: &Url,
-) -> Result<rattler_s3::ResolvedS3Credentials, S3CredentialError> {
+) -> Result<rattler_s3::S3CredentialSource, S3CredentialError> {
     let bucket_name = bucket_url.host_str().unwrap_or_default();
 
     // Check if we have custom S3 config for this bucket
@@ -588,18 +588,15 @@ pub async fn resolve_s3_credentials(
         && let s3_middleware::S3Config::Custom {
             endpoint_url,
             region,
-            force_path_style,
+            addressing_style,
+            ..
         } = config
     {
         // Create S3Credentials from the config
         let s3_creds = rattler_s3::S3Credentials {
             endpoint_url: endpoint_url.clone(),
             region: region.clone(),
-            addressing_style: if *force_path_style {
-                rattler_s3::S3AddressingStyle::Path
-            } else {
-                rattler_s3::S3AddressingStyle::VirtualHost
-            },
+            addressing_style: *addressing_style,
             access_key_id: None,
             secret_access_key: None,
             session_token: None,
@@ -612,7 +609,7 @@ pub async fn resolve_s3_credentials(
                 "Resolved S3 credentials for bucket '{}' from config + auth storage",
                 bucket_name
             );
-            return Ok(resolved);
+            return Ok(resolved.into());
         }
     }
 
@@ -621,6 +618,6 @@ pub async fn resolve_s3_credentials(
         "Using AWS SDK default credential chain for bucket '{}'",
         bucket_name
     );
-    let resolved = rattler_s3::ResolvedS3Credentials::from_sdk().await?;
-    Ok(resolved)
+    let source = rattler_s3::S3CredentialSource::from_sdk().await?;
+    Ok(source)
 }

@@ -8,7 +8,7 @@ use std::path::Path;
 
 use sha2::{Digest, Sha256};
 use sigstore_trust_root::TrustedRoot;
-use sigstore_types::SignatureContent;
+use sigstore_types::{Sha256Hash, SignatureContent};
 use sigstore_verify::{VerificationPolicy, verify};
 
 use crate::error::CacheError;
@@ -231,7 +231,7 @@ async fn download_attestation_bundle(
 /// This is a critical security check: without it, an attestation for a
 /// *different* artifact (e.g. a different release) would be accepted as valid.
 fn verify_artifact_subject(
-    artifact_sha256_hex: &str,
+    artifact_sha256: &Sha256Hash,
     bundles: &[sigstore_types::Bundle],
 ) -> Result<(), CacheError> {
     let mut found_any_subjects = false;
@@ -249,13 +249,12 @@ fn verify_artifact_subject(
             continue;
         }
 
-        // Decode and parse the in-toto statement
-        let payload_bytes = envelope.decode_payload();
-
-        let statement: sigstore_types::Statement = match serde_json::from_slice(&payload_bytes) {
-            Ok(s) => s,
-            Err(_) => continue,
-        };
+        // Parse the in-toto statement
+        let statement: sigstore_types::Statement =
+            match serde_json::from_slice(envelope.payload.as_bytes()) {
+                Ok(s) => s,
+                Err(_) => continue,
+            };
 
         if statement.subject.is_empty() {
             continue;
@@ -264,7 +263,7 @@ fn verify_artifact_subject(
         found_any_subjects = true;
 
         // Check if the artifact hash matches any subject's sha256 digest
-        if statement.matches_sha256(artifact_sha256_hex) {
+        if statement.matches_sha256(artifact_sha256) {
             return Ok(());
         }
 
@@ -285,7 +284,7 @@ fn verify_artifact_subject(
 
     let mut msg = format!(
         "artifact SHA-256 ({}) does not match any subject in the attestation",
-        artifact_sha256_hex,
+        artifact_sha256,
     );
     if !found_subject_digests.is_empty() {
         msg.push_str("\n  subjects in attestation:");
@@ -363,8 +362,8 @@ pub(crate) async fn verify_attestation(
     // Always verify the artifact's digest matches a subject in the attestation.
     // This prevents accepting an attestation for a different file (e.g., from a
     // different release or a different artifact entirely).
-    let artifact_sha256_hex = hex::encode(Sha256::digest(&artifact_bytes));
-    verify_artifact_subject(&artifact_sha256_hex, &parsed.bundles)?;
+    let artifact_sha256 = Sha256Hash::new(Sha256::digest(&artifact_bytes).into());
+    verify_artifact_subject(&artifact_sha256, &parsed.bundles)?;
 
     // For each required identity check, find a matching bundle and verify it
     for check in &attestation_config.identity_checks {
@@ -376,14 +375,17 @@ pub(crate) async fn verify_attestation(
             // Verify with just the issuer in the policy — we do prefix matching on identity ourselves.
             // For PyPI-converted bundles, skip tlog verification since we can't reconstruct
             // the canonicalized rekor body from the PEP 740 format.
-            let mut policy = VerificationPolicy::default().require_issuer(check.issuer.clone());
+            let mut policy =
+                VerificationPolicy::any_identity().require_issuer(check.issuer.clone());
             if parsed.from_pypi {
-                policy = policy.skip_tlog();
+                policy = policy.skip_tlog_unsafe();
             }
 
             match verify(artifact_bytes.as_slice(), bundle, &policy, &trusted_root) {
                 Ok(result) => {
-                    if let Some(ref actual_identity) = result.identity {
+                    if let Some(actual_identity) =
+                        result.identity().map(|identity| identity.as_str())
+                    {
                         if identity_matches(&check.identity, actual_identity) {
                             tracing::info!(
                                 "\u{2714} Attestation verified (identity={})",
@@ -392,7 +394,7 @@ pub(crate) async fn verify_attestation(
                             matched = true;
                             break;
                         } else {
-                            found_identities.push(actual_identity.clone());
+                            found_identities.push(actual_identity.to_string());
                         }
                     }
                 }
@@ -632,17 +634,17 @@ mod tests {
     #[test]
     fn test_verify_artifact_subject_matching_digest() {
         let artifact = b"hello world";
-        let sha256_hex = hex::encode(Sha256::digest(artifact));
-        let bundle = make_bundle_with_subjects(&[("test.tar.gz", &sha256_hex)]);
-        assert!(verify_artifact_subject(&sha256_hex, &[bundle]).is_ok());
+        let sha256 = Sha256Hash::new(Sha256::digest(artifact).into());
+        let bundle = make_bundle_with_subjects(&[("test.tar.gz", &sha256.to_hex())]);
+        assert!(verify_artifact_subject(&sha256, &[bundle]).is_ok());
     }
 
     #[test]
     fn test_verify_artifact_subject_mismatched_digest() {
-        let sha256_hex = hex::encode(Sha256::digest(b"hello world"));
+        let sha256 = Sha256Hash::new(Sha256::digest(b"hello world").into());
         let wrong_hash = "0000000000000000000000000000000000000000000000000000000000000000";
         let bundle = make_bundle_with_subjects(&[("test.tar.gz", wrong_hash)]);
-        let err = verify_artifact_subject(&sha256_hex, &[bundle]).unwrap_err();
+        let err = verify_artifact_subject(&sha256, &[bundle]).unwrap_err();
         assert!(
             err.to_string().contains("does not match any subject"),
             "unexpected error: {}",
@@ -652,20 +654,20 @@ mod tests {
 
     #[test]
     fn test_verify_artifact_subject_multiple_subjects_one_matches() {
-        let sha256_hex = hex::encode(Sha256::digest(b"my artifact"));
+        let sha256 = Sha256Hash::new(Sha256::digest(b"my artifact").into());
         let wrong_hash = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
         let bundle = make_bundle_with_subjects(&[
             ("other.tar.gz", wrong_hash),
-            ("correct.tar.gz", &sha256_hex),
+            ("correct.tar.gz", &sha256.to_hex()),
         ]);
-        assert!(verify_artifact_subject(&sha256_hex, &[bundle]).is_ok());
+        assert!(verify_artifact_subject(&sha256, &[bundle]).is_ok());
     }
 
     #[test]
     fn test_verify_artifact_subject_empty_subjects() {
-        let sha256_hex = hex::encode(Sha256::digest(b"test"));
+        let sha256 = Sha256Hash::new(Sha256::digest(b"test").into());
         let bundle = make_bundle_with_subjects(&[]);
-        let err = verify_artifact_subject(&sha256_hex, &[bundle]).unwrap_err();
+        let err = verify_artifact_subject(&sha256, &[bundle]).unwrap_err();
         assert!(
             err.to_string()
                 .contains("does not contain any in-toto subjects"),

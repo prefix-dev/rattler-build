@@ -8,7 +8,7 @@
 use fs_err as fs;
 use indexmap::IndexMap;
 use minijinja::Value;
-use rattler_conda_types::Platform;
+use rattler_conda_types::Subdir;
 use rattler_digest::Sha256Hash;
 use regex::Regex;
 use reqwest::Client;
@@ -572,9 +572,9 @@ pub fn build_url_with_version(
 ) -> Result<String, BumpRecipeError> {
     // Create a JinjaConfig with default platform settings
     let jinja_config = JinjaConfig {
-        target_platform: Platform::current().expect("unsupported build platform"),
-        host_platform: Platform::current().expect("unsupported build platform"),
-        build_platform: Platform::current().expect("unsupported build platform"),
+        target_platform: Subdir::current().expect("unsupported build platform"),
+        host_platform: Subdir::current().expect("unsupported build platform"),
+        build_platform: Subdir::current().expect("unsupported build platform"),
         variant: BTreeMap::new(),
         experimental: false,
         recipe_path: None,

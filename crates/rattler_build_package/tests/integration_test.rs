@@ -4,7 +4,7 @@ use fs_err as fs;
 use rattler_build_package::{
     AboutJsonBuilder, ArchiveType, IndexJsonBuilder, PackageBuilder, PackageConfig,
 };
-use rattler_conda_types::{PackageName, Platform, VersionWithSource};
+use rattler_conda_types::{PackageName, Subdir, VersionWithSource};
 
 #[cfg(feature = "recipe")]
 use rattler_build_recipe::stage1::{About, Build, Extra, Package, Recipe, Requirements};
@@ -29,7 +29,7 @@ fn test_complete_package_creation() -> Result<(), Box<dyn std::error::Error>> {
     // Create metadata
     let name = PackageName::new_unchecked("test-package");
     let version: VersionWithSource = "1.0.0".parse()?;
-    let platform = Platform::Linux64;
+    let platform = Subdir::Linux64;
 
     let about = AboutJsonBuilder::new()
         .with_homepage("https://github.com/test/test-package".to_string())
@@ -96,7 +96,7 @@ fn test_package_with_minimal_metadata() -> Result<(), Box<dyn std::error::Error>
 
     let name = PackageName::new_unchecked("minimal-pkg");
     let version: VersionWithSource = "0.1.0".parse()?;
-    let platform = Platform::NoArch;
+    let platform = Subdir::NoArch;
 
     let config = PackageConfig {
         compression_level: 1,
@@ -132,7 +132,7 @@ fn test_package_creation_conda_format() -> Result<(), Box<dyn std::error::Error>
         ..Default::default()
     };
 
-    let output = PackageBuilder::new(name, version, Platform::Linux64, config)
+    let output = PackageBuilder::new(name, version, Subdir::Linux64, config)
         .with_build_string("py310_0")
         .with_files_from_dir(temp_source.path())?
         .build(temp_output.path())?;
@@ -160,7 +160,7 @@ fn test_package_with_prefix_detection() -> Result<(), Box<dyn std::error::Error>
         ..Default::default()
     };
 
-    let output = PackageBuilder::new(name, version, Platform::Linux64, config)
+    let output = PackageBuilder::new(name, version, Subdir::Linux64, config)
         .with_build_string("0")
         .with_files_from_dir(temp_source.path())?
         .build(temp_output.path())?;
@@ -182,7 +182,7 @@ fn test_empty_package_fails() -> Result<(), Box<dyn std::error::Error>> {
     let name = PackageName::new_unchecked("empty-pkg");
     let version: VersionWithSource = "1.0.0".parse()?;
 
-    let result = PackageBuilder::new(name, version, Platform::Linux64, PackageConfig::default())
+    let result = PackageBuilder::new(name, version, Subdir::Linux64, PackageConfig::default())
         .with_build_string("0")
         // No files added!
         .build(temp_output.path());
@@ -200,7 +200,7 @@ fn test_package_without_build_string_fails() {
     let name = PackageName::new_unchecked("test");
     let version: VersionWithSource = "1.0.0".parse().unwrap();
 
-    let result = PackageBuilder::new(name, version, Platform::Linux64, PackageConfig::default())
+    let result = PackageBuilder::new(name, version, Subdir::Linux64, PackageConfig::default())
         // Missing build_string!
         .build(temp_output.path());
 
@@ -260,7 +260,7 @@ fn test_from_recipe_with_metadata() -> Result<(), Box<dyn std::error::Error>> {
 
     // Build from recipe
     let output =
-        PackageBuilder::from_recipe(&recipe, Platform::Linux64, "py310_0".to_string(), config)
+        PackageBuilder::from_recipe(&recipe, Subdir::Linux64, "py310_0".to_string(), config)
             .with_files_from_dir(temp_source.path())?
             .build(temp_output.path())?;
 
@@ -297,7 +297,7 @@ fn test_package_with_license_and_test_files() -> Result<(), Box<dyn std::error::
         ..Default::default()
     };
 
-    let output = PackageBuilder::new(name, version, Platform::Linux64, config)
+    let output = PackageBuilder::new(name, version, Subdir::Linux64, config)
         .with_build_string("0")
         .with_files_from_dir(temp_source.path())?
         .with_license_files(vec![license_file])
@@ -346,7 +346,7 @@ fn test_package_with_recipe_files() -> Result<(), Box<dyn std::error::Error>> {
         ..Default::default()
     };
 
-    let output = PackageBuilder::new(name, version, Platform::Osx64, config)
+    let output = PackageBuilder::new(name, version, Subdir::Osx64, config)
         .with_build_string("h123_0")
         .with_files_from_dir(temp_source.path())?
         .with_recipe_dir(temp_recipe.path().to_path_buf())

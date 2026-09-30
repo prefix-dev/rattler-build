@@ -1,14 +1,14 @@
 //! The runtime environment rattler-build itself executes in.
 //!
 //! [`RuntimeEnv`] bundles the process environment variables (including `PATH`)
-//! and the current [`Platform`]. Threading a `RuntimeEnv` explicitly through
+//! and the current [`Subdir`]. Threading a `RuntimeEnv` explicitly through
 //! script generation and execution, instead of reading process globals
-//! (`std::env::var`, `Platform::current`), keeps behavior deterministic and lets
+//! (`std::env::var`, `Subdir::current`), keeps behavior deterministic and lets
 //! tests inject a synthetic environment without mutating global process state.
 
 use std::collections::HashMap;
 
-use rattler_conda_types::Platform;
+use rattler_conda_types::Subdir;
 
 #[derive(Debug, Clone)]
 struct EnvironmentVariables {
@@ -24,7 +24,7 @@ impl EnvironmentVariables {
         }
     }
 
-    fn from_iter(values: impl IntoIterator<Item = (String, String)>, platform: Platform) -> Self {
+    fn from_iter(values: impl IntoIterator<Item = (String, String)>, platform: Subdir) -> Self {
         let mut environment = Self::new(platform.is_windows());
         for (name, value) in values {
             environment.insert(name, value);
@@ -63,13 +63,13 @@ impl EnvironmentVariables {
 #[derive(Debug, Clone)]
 pub struct RuntimeEnv {
     env: EnvironmentVariables,
-    process_platform: Platform,
+    process_platform: Subdir,
 }
 
 impl RuntimeEnv {
     /// Captures the real process environment variables and the current platform.
     pub fn current() -> Self {
-        let process_platform = Platform::current().expect("unsupported build platform");
+        let process_platform = Subdir::current().expect("unsupported build platform");
         Self {
             env: EnvironmentVariables::from_iter(std::env::vars(), process_platform),
             process_platform,
@@ -79,7 +79,7 @@ impl RuntimeEnv {
     /// Creates a runtime environment with an empty variable set and the given
     /// platform. Intended for tests; combine with [`RuntimeEnv::with_var`] to
     /// inject the variables a test needs.
-    pub fn for_test(platform: Platform) -> Self {
+    pub fn for_test(platform: Subdir) -> Self {
         Self {
             env: EnvironmentVariables::new(platform.is_windows()),
             process_platform: platform,
@@ -87,7 +87,7 @@ impl RuntimeEnv {
     }
 
     /// The platform of the rattler-build process.
-    pub fn process_platform(&self) -> Platform {
+    pub fn process_platform(&self) -> Subdir {
         self.process_platform
     }
 
@@ -126,7 +126,7 @@ impl RuntimeEnv {
 
     /// Returns a copy with the given rattler-build process platform (for tests).
     #[must_use]
-    pub fn with_process_platform(mut self, platform: Platform) -> Self {
+    pub fn with_process_platform(mut self, platform: Subdir) -> Self {
         self.process_platform = platform;
         self
     }
@@ -138,16 +138,16 @@ mod tests {
 
     #[test]
     fn exe_suffix_follows_the_platform() {
-        assert_eq!(RuntimeEnv::for_test(Platform::Win64).exe_suffix(), ".exe");
-        assert_eq!(RuntimeEnv::for_test(Platform::Linux64).exe_suffix(), "");
-        assert_eq!(RuntimeEnv::for_test(Platform::OsxArm64).exe_suffix(), "");
+        assert_eq!(RuntimeEnv::for_test(Subdir::Win64).exe_suffix(), ".exe");
+        assert_eq!(RuntimeEnv::for_test(Subdir::Linux64).exe_suffix(), "");
+        assert_eq!(RuntimeEnv::for_test(Subdir::OsxArm64).exe_suffix(), "");
     }
 
     #[test]
     fn environment_variables_from_iter_uses_platform_casing() {
         let environment = EnvironmentVariables::from_iter(
             [("Path".to_string(), "C:\\bin".to_string())],
-            Platform::Win64,
+            Subdir::Win64,
         );
 
         assert_eq!(environment.get("PATH"), Some("C:\\bin"));
@@ -155,7 +155,7 @@ mod tests {
 
     #[test]
     fn env_var_case_insensitive_on_windows() {
-        let runtime_env = RuntimeEnv::for_test(Platform::Win64);
+        let runtime_env = RuntimeEnv::for_test(Subdir::Win64);
         assert_eq!(
             runtime_env
                 .with_var("TEST_CASE", "1")

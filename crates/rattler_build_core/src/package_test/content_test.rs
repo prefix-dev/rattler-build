@@ -3,7 +3,7 @@ use std::{collections::HashSet, path::PathBuf};
 use globset::{Glob, GlobBuilder, GlobSet};
 use rattler_build_recipe::stage1::tests::PackageContentsTest;
 use rattler_build_types::GlobWithSource;
-use rattler_conda_types::{Platform, package::PathsJson};
+use rattler_conda_types::{Subdir, package::PathsJson};
 
 use crate::{package_test::TestError, types::Output};
 
@@ -75,7 +75,7 @@ pub trait PackageContentsTestExt {
         &self,
         section: Section,
         exists: bool,
-        target_platform: &Platform,
+        target_platform: &Subdir,
         version_independent: bool,
     ) -> Result<Vec<(String, GlobSet)>, globset::Error>;
 
@@ -84,45 +84,45 @@ pub trait PackageContentsTestExt {
         &self,
         section: Section,
         exists: bool,
-        target_platform: &Platform,
+        target_platform: &Subdir,
         version_independent: bool,
     ) -> Result<Vec<(String, GlobSet)>, globset::Error>;
 
     /// Get include globs that should exist
     fn include_as_globs(
         &self,
-        target_platform: &Platform,
+        target_platform: &Subdir,
     ) -> Result<Vec<(String, GlobSet)>, globset::Error>;
 
     /// Get bin globs that should exist
     fn bin_as_globs(
         &self,
-        target_platform: &Platform,
+        target_platform: &Subdir,
     ) -> Result<Vec<(String, GlobSet)>, globset::Error>;
 
     /// Get lib globs that should exist
     fn lib_as_globs(
         &self,
-        target_platform: &Platform,
+        target_platform: &Subdir,
     ) -> Result<Vec<(String, GlobSet)>, globset::Error>;
 
     /// Get site packages globs that should exist
     fn site_packages_as_globs(
         &self,
-        target_platform: &Platform,
+        target_platform: &Subdir,
         version_independent: bool,
     ) -> Result<Vec<(String, GlobSet)>, globset::Error>;
 
     /// Get files globs that should exist
     fn files_as_globs(
         &self,
-        target_platform: &Platform,
+        target_platform: &Subdir,
     ) -> Result<Vec<(String, GlobSet)>, globset::Error>;
 
     /// Get files globs that should not exist
     fn files_not_exists_as_globs(
         &self,
-        target_platform: &Platform,
+        target_platform: &Subdir,
     ) -> Result<Vec<(String, GlobSet)>, globset::Error>;
 
     /// Run the package content test
@@ -193,7 +193,7 @@ impl PackageContentsTestExt for PackageContentsTest {
         &self,
         section: Section,
         exists: bool,
-        target_platform: &Platform,
+        target_platform: &Subdir,
         version_independent: bool,
     ) -> Result<Vec<(String, GlobSet)>, globset::Error> {
         match section {
@@ -229,7 +229,7 @@ impl PackageContentsTestExt for PackageContentsTest {
                             format!("Library/usr/bin/{bin_raw}{ext}"),
                             format!("{bin_raw}{ext}"),
                         ]
-                    } else if matches!(target_platform, &Platform::EmscriptenWasm32) {
+                    } else if matches!(target_platform, &Subdir::EmscriptenWasm32) {
                         vec![format!("bin/{bin_raw}.js"), format!("bin/{bin_raw}.wasm")]
                     } else {
                         vec![format!("bin/{bin_raw}")]
@@ -333,7 +333,7 @@ impl PackageContentsTestExt for PackageContentsTest {
         &self,
         section: Section,
         exists: bool,
-        target_platform: &Platform,
+        target_platform: &Subdir,
         version_independent: bool,
     ) -> Result<Vec<(String, GlobSet)>, globset::Error> {
         self.build_section_globs(section, exists, target_platform, version_independent)
@@ -342,7 +342,7 @@ impl PackageContentsTestExt for PackageContentsTest {
     /// Get include globs that should exist
     fn include_as_globs(
         &self,
-        target_platform: &Platform,
+        target_platform: &Subdir,
     ) -> Result<Vec<(String, GlobSet)>, globset::Error> {
         self.get_globs_for_section(Section::Include, true, target_platform, false)
     }
@@ -350,7 +350,7 @@ impl PackageContentsTestExt for PackageContentsTest {
     /// Get bin globs that should exist
     fn bin_as_globs(
         &self,
-        target_platform: &Platform,
+        target_platform: &Subdir,
     ) -> Result<Vec<(String, GlobSet)>, globset::Error> {
         self.get_globs_for_section(Section::Bin, true, target_platform, false)
     }
@@ -358,7 +358,7 @@ impl PackageContentsTestExt for PackageContentsTest {
     /// Get lib globs that should exist
     fn lib_as_globs(
         &self,
-        target_platform: &Platform,
+        target_platform: &Subdir,
     ) -> Result<Vec<(String, GlobSet)>, globset::Error> {
         self.get_globs_for_section(Section::Lib, true, target_platform, false)
     }
@@ -366,7 +366,7 @@ impl PackageContentsTestExt for PackageContentsTest {
     /// Get site packages globs that should exist
     fn site_packages_as_globs(
         &self,
-        target_platform: &Platform,
+        target_platform: &Subdir,
         version_independent: bool,
     ) -> Result<Vec<(String, GlobSet)>, globset::Error> {
         self.get_globs_for_section(
@@ -380,7 +380,7 @@ impl PackageContentsTestExt for PackageContentsTest {
     /// Get files globs that should exist
     fn files_as_globs(
         &self,
-        target_platform: &Platform,
+        target_platform: &Subdir,
     ) -> Result<Vec<(String, GlobSet)>, globset::Error> {
         self.get_globs_for_section(Section::Files, true, target_platform, false)
     }
@@ -388,7 +388,7 @@ impl PackageContentsTestExt for PackageContentsTest {
     /// Get files globs that should not exist
     fn files_not_exists_as_globs(
         &self,
-        target_platform: &Platform,
+        target_platform: &Subdir,
     ) -> Result<Vec<(String, GlobSet)>, globset::Error> {
         self.get_globs_for_section(Section::Files, false, target_platform, false)
     }
@@ -509,7 +509,7 @@ mod tests {
     use globset::GlobSet;
     use rattler_build_recipe::stage1::tests::{PackageContentsCheckFiles, PackageContentsTest};
     use rattler_build_types::GlobVec;
-    use rattler_conda_types::Platform;
+    use rattler_conda_types::Subdir;
     use serde::Deserialize;
 
     #[derive(Debug)]
@@ -556,7 +556,7 @@ mod tests {
         };
 
         let globs = package_contents
-            .get_globs_for_section(Section::Include, true, &Platform::Linux64, false)
+            .get_globs_for_section(Section::Include, true, &Subdir::Linux64, false)
             .unwrap();
 
         // The display string should reflect the *expanded* pattern (with the
@@ -566,7 +566,7 @@ mod tests {
         assert_eq!(display, vec!["include/foo", "include/bar"]);
 
         let win_globs = package_contents
-            .get_globs_for_section(Section::Include, true, &Platform::Win64, false)
+            .get_globs_for_section(Section::Include, true, &Subdir::Win64, false)
             .unwrap();
         let win_display: Vec<&str> = win_globs.iter().map(|(g, _)| g.as_str()).collect();
         assert_eq!(
@@ -583,7 +583,7 @@ mod tests {
         };
 
         let globs = package_contents
-            .get_globs_for_section(Section::Include, true, &Platform::Linux64, false)
+            .get_globs_for_section(Section::Include, true, &Subdir::Linux64, false)
             .unwrap();
 
         let paths = &["lib/foo".to_string(), "asd/bar".to_string()];
@@ -598,7 +598,7 @@ mod tests {
         };
 
         let globs = package_contents
-            .get_globs_for_section(Section::Bin, true, &Platform::EmscriptenWasm32, false)
+            .get_globs_for_section(Section::Bin, true, &Subdir::EmscriptenWasm32, false)
             .unwrap();
 
         // For sections that expand into multiple candidate patterns, the display
@@ -623,7 +623,7 @@ mod tests {
 
     #[derive(Debug, Deserialize)]
     struct TestCase {
-        platform: Platform,
+        platform: Subdir,
         package_contents: PackageContentsTest,
         paths: Vec<String>,
         #[serde(default)]
@@ -720,7 +720,7 @@ mod tests {
             lib: make_check_files(vec!["libssl.3.dylib"], None),
             ..Default::default()
         };
-        let globs = package_contents.lib_as_globs(&Platform::IosArm64).unwrap();
+        let globs = package_contents.lib_as_globs(&Subdir::IosArm64).unwrap();
         assert_eq!(globs[0].0, "lib/libssl.3.dylib");
         test_glob_matches(&globs, &["lib/libssl.3.dylib".to_string()]).unwrap();
     }

@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 use jiff::Timestamp;
 use rattler_conda_types::package::{AboutJson, IndexJson, PathsJson, RunExportsJson};
-use rattler_conda_types::{PackageName, Platform, VersionWithSource};
+use rattler_conda_types::{PackageName, Subdir, VersionWithSource};
 
 use crate::files::FileEntry;
 use crate::{ArchiveType, PackageError, Result};
@@ -55,7 +55,7 @@ impl Default for PackageConfig {
 /// ## From metadata
 /// ```rust,no_run
 /// use rattler_build_package::{PackageBuilder, PackageConfig};
-/// use rattler_conda_types::{PackageName, Platform};
+/// use rattler_conda_types::{PackageName, Subdir};
 /// use std::path::Path;
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -63,7 +63,7 @@ impl Default for PackageConfig {
 /// let output = PackageBuilder::new(
 ///         PackageName::new_unchecked("mypackage"),
 ///         "1.0.0".parse()?,
-///         Platform::Linux64,
+///         Subdir::Linux64,
 ///         config
 ///     )
 ///     .with_files_from_dir(Path::new("/files"))?
@@ -75,7 +75,7 @@ pub struct PackageBuilder {
     // Required fields
     name: PackageName,
     version: VersionWithSource,
-    target_platform: Platform,
+    target_platform: Subdir,
     config: PackageConfig,
 
     // Metadata (can be set or derived)
@@ -106,7 +106,7 @@ impl PackageBuilder {
     pub fn new(
         name: PackageName,
         version: VersionWithSource,
-        target_platform: Platform,
+        target_platform: Subdir,
         config: PackageConfig,
     ) -> Self {
         Self {
@@ -461,7 +461,7 @@ impl PackageBuilder {
     /// * `config` - Package creation configuration
     pub fn from_recipe(
         recipe: &rattler_build_recipe::Stage1Recipe,
-        target_platform: Platform,
+        target_platform: Subdir,
         build_string: String,
         config: PackageConfig,
     ) -> Self {

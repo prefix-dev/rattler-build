@@ -1,7 +1,7 @@
 use std::path::Path;
 use std::process::Command;
 
-use rattler_conda_types::Platform;
+use rattler_conda_types::Subdir;
 
 use super::{InterpreterError, InterpreterInvocation, InterpreterSearchScope};
 
@@ -43,7 +43,7 @@ fn is_pwsh_new_enough(pwsh_path: &Path) -> bool {
 }
 
 impl InterpreterInvocation for PowerShellInvocation {
-    fn executable_names(&self, build_platform: &Platform) -> &'static [&'static str] {
+    fn executable_names(&self, build_platform: &Subdir) -> &'static [&'static str] {
         if build_platform.is_windows() {
             &["pwsh", "powershell"]
         } else {
@@ -51,7 +51,7 @@ impl InterpreterInvocation for PowerShellInvocation {
         }
     }
 
-    fn search_scope(&self, build_platform: &Platform) -> InterpreterSearchScope {
+    fn search_scope(&self, build_platform: &Subdir) -> InterpreterSearchScope {
         if build_platform.is_windows() {
             InterpreterSearchScope::build_and_host_with_system_fallback()
         } else {

@@ -13,7 +13,7 @@ mod tests {
     use indexmap::IndexMap;
     use rattler_build_jinja::{JinjaConfig, Variable};
     use rattler_build_types::NormalizedKey;
-    use rattler_conda_types::{NoArchType, Platform};
+    use rattler_conda_types::{NoArchType, Subdir};
     use std::collections::BTreeMap;
 
     /// Helper to parse a recipe YAML and evaluate it
@@ -31,8 +31,8 @@ mod tests {
         let target_platform = variant
             .get("target_platform")
             .map(|v| v.to_string())
-            .and_then(|s| s.parse::<Platform>().ok())
-            .unwrap_or(Platform::Linux64);
+            .and_then(|s| s.parse::<Subdir>().ok())
+            .unwrap_or(Subdir::Linux64);
 
         let variant_map: BTreeMap<NormalizedKey, Variable> = variant
             .iter()

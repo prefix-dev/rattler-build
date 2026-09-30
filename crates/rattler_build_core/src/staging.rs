@@ -588,7 +588,7 @@ mod tests {
         build::{BuildPlan, Step, StepRun},
     };
     use rattler_build_script::EnvironmentIsolation;
-    use rattler_conda_types::Platform;
+    use rattler_conda_types::Subdir;
 
     #[test]
     fn staging_cache_key_tracks_forced_variant_values() {
@@ -637,10 +637,10 @@ mod tests {
             PathBuf::from("."),
             Path::new("."),
             ExecutionContext::shared(
-                RuntimeEnv::for_test(Platform::current().unwrap()),
+                RuntimeEnv::for_test(Subdir::current().unwrap()),
                 Path::new("."),
-                Platform::current().unwrap(),
-                Platform::current().unwrap(),
+                Subdir::current().unwrap(),
+                Subdir::current().unwrap(),
             ),
             None,
             EnvironmentIsolation::default(),

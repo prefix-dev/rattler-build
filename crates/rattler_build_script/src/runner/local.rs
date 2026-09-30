@@ -47,7 +47,7 @@ impl Runner for LocalRunner {
         "local"
     }
 
-    fn execution_platform(&self) -> rattler_conda_types::Platform {
+    fn execution_platform(&self) -> rattler_conda_types::Subdir {
         self.runtime.process_platform()
     }
 
@@ -156,7 +156,7 @@ impl Session for LocalSession {
     }
 }
 
-fn is_executable_file(path: &Path, _platform: rattler_conda_types::Platform) -> bool {
+fn is_executable_file(path: &Path, _platform: rattler_conda_types::Subdir) -> bool {
     if !path.is_file() {
         return false;
     }
@@ -180,7 +180,7 @@ mod tests {
     use std::sync::Arc;
 
     use indexmap::IndexMap;
-    use rattler_conda_types::Platform;
+    use rattler_conda_types::Subdir;
 
     use super::*;
     use crate::runner::{Mount, OutputSink, SessionSpec};
@@ -196,7 +196,7 @@ mod tests {
 
     fn session_spec(work_dir: &Path) -> SessionSpec {
         SessionSpec {
-            platform: Platform::current().unwrap(),
+            platform: Subdir::current().unwrap(),
             mounts: Vec::<Mount>::new(),
             image: None,
             work_dir: GuestPath(work_dir.to_path_buf()),
@@ -267,9 +267,9 @@ mod tests {
     async fn strict_isolation_applies_resolved_env() {
         let temp_dir = tempfile::tempdir().unwrap();
         let platform = if cfg!(windows) {
-            Platform::Win64
+            Subdir::Win64
         } else {
-            Platform::Linux64
+            Subdir::Linux64
         };
         let runner = LocalRunner::new(EnvironmentIsolation::Strict).with_runtime(
             RuntimeEnv::for_test(platform)
@@ -380,7 +380,7 @@ mod tests {
         let names = vec!["tool".to_string()];
 
         let windows_runner = LocalRunner::new(EnvironmentIsolation::Strict)
-            .with_runtime(RuntimeEnv::for_test(Platform::Win64));
+            .with_runtime(RuntimeEnv::for_test(Subdir::Win64));
         let mut windows_session = start_local_session(&windows_runner, directory).await;
         assert_eq!(
             windows_session
@@ -391,7 +391,7 @@ mod tests {
         );
 
         let linux_runner = LocalRunner::new(EnvironmentIsolation::Strict)
-            .with_runtime(RuntimeEnv::for_test(Platform::Linux64));
+            .with_runtime(RuntimeEnv::for_test(Subdir::Linux64));
         let mut linux_session = start_local_session(&linux_runner, directory).await;
         assert_eq!(
             linux_session

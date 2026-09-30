@@ -1,5 +1,5 @@
 use indexmap::IndexMap;
-use rattler_conda_types::Platform;
+use rattler_conda_types::Subdir;
 
 use crate::{EnvironmentIsolation, RuntimeEnv};
 
@@ -20,7 +20,7 @@ const PASSTHROUGH_ENV_VARS: &[&str] = &[
 ];
 
 /// Platform-critical environment variables required for basic OS functionality.
-fn platform_passthrough_vars(platform: Platform) -> &'static [&'static str] {
+fn platform_passthrough_vars(platform: Subdir) -> &'static [&'static str] {
     if platform.is_windows() {
         &["SYSTEMROOT", "WINDIR", "COMSPEC", "TEMP", "TMP", "PATHEXT"]
     } else if platform.is_osx() {

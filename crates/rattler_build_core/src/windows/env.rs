@@ -4,7 +4,7 @@ use std::{
 };
 
 use rattler_build_script::RuntimeEnv;
-use rattler_conda_types::Platform;
+use rattler_conda_types::Subdir;
 use regex::Regex;
 
 fn get_drive_letter(path: &Path) -> Option<char> {
@@ -88,7 +88,7 @@ pub fn default_env_vars_target(
 }
 
 pub fn default_env_vars_build(
-    build_platform: &Platform,
+    build_platform: &Subdir,
     runtime: &RuntimeEnv,
 ) -> HashMap<String, Option<String>> {
     let mut vars = HashMap::<String, Option<String>>::new();
@@ -135,10 +135,10 @@ pub fn default_env_vars_build(
     let win_msvc = "19.0.0";
 
     let win_arch = match build_platform {
-        Platform::Win32 => "i386",
-        Platform::Win64 => "amd64",
-        Platform::WinArm64 => "arm64",
-        Platform::NoArch => "noarch",
+        Subdir::Win32 => "i386",
+        Subdir::Win64 => "amd64",
+        Subdir::WinArm64 => "arm64",
+        Subdir::NoArch => "noarch",
         _ => panic!("Non windows platform passed to windows env vars"),
     };
 
@@ -171,10 +171,10 @@ mod test {
 
     #[test]
     fn build_vars_use_the_injected_runtime_environment() {
-        let runtime = RuntimeEnv::for_test(Platform::Win64)
+        let runtime = RuntimeEnv::for_test(Subdir::Win64)
             .with_var("vs140comntools", "C:\\VS140")
             .with_var("BUILD", "injected-build");
-        let vars = default_env_vars_build(&Platform::Win64, &runtime);
+        let vars = default_env_vars_build(&Subdir::Win64, &runtime);
 
         assert_eq!(
             vars.get("vs140comntools")

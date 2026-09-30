@@ -15,7 +15,7 @@ use fs_err::File;
 use itertools::Itertools;
 use rattler_build_recipe::stage1::build::PrefixDetection;
 use rattler_conda_types::{
-    ChannelUrl, NoArchType, Platform, RepodataRevision,
+    ChannelUrl, NoArchType, RepodataRevision, Subdir,
     package::{
         AboutJson, FileMode, IndexJson, LinkJson, NoArchLinks, PackageFile, PathType, PathsEntry,
         PathsJson, PrefixPlaceholder, PythonEntryPoints, RunExportsJson,
@@ -134,7 +134,7 @@ pub fn contains_prefix_text(
 /// This function will also search in the file for the prefix and determine if
 /// the file is binary or text.
 pub fn create_prefix_placeholder(
-    target_platform: &Platform,
+    target_platform: &Subdir,
     file_path: &Path,
     prefix: &Path,
     encoded_prefix: &Path,
@@ -637,7 +637,7 @@ impl Output {
 #[cfg(test)]
 mod test {
     use content_inspector::ContentType;
-    use rattler_conda_types::{ChannelUrl, Platform, RepodataRevision};
+    use rattler_conda_types::{ChannelUrl, RepodataRevision, Subdir};
     use url::Url;
 
     #[cfg(unix)]
@@ -670,7 +670,7 @@ mod test {
         let prefix = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
 
         create_prefix_placeholder(
-            &Platform::Linux64,
+            &Subdir::Linux64,
             &test_data,
             prefix,
             prefix,

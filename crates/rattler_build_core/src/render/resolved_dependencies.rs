@@ -11,7 +11,7 @@ use rattler_build_recipe::stage1::{Dependency, Requirements};
 use rattler_build_types::{PinArgs, PinError};
 use rattler_conda_types::{
     ChannelUrl, MatchSpec, NamelessMatchSpec, PackageName, PackageNameMatcher, PackageRecord,
-    Platform, RepoDataRecord, package::RunExportsJson,
+    RepoDataRecord, Subdir, package::RunExportsJson,
 };
 use rattler_repodata_gateway::{Gateway, RunExportExtractorError, RunExportsReporter};
 use serde::{Deserialize, Serialize};
@@ -1084,7 +1084,7 @@ pub(crate) async fn resolve_dependencies(
     let host_run_exports = filter_run_exports(&ignore_run_exports, &host_run_exports, "host")?;
 
     // add the host run exports to the run dependencies
-    if output.target_platform() == &Platform::NoArch {
+    if output.target_platform() == &Subdir::NoArch {
         // ignore build noarch depends
         depends.extend(host_run_exports.noarch.iter().cloned());
     } else {

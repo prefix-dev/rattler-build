@@ -7,7 +7,7 @@ use std::{
 use fs_err::File;
 use goblin::pe::PE;
 use rattler_build_recipe::stage1::GlobVec;
-use rattler_conda_types::Platform;
+use rattler_conda_types::Subdir;
 use rattler_shell::activation::prefix_path_entries;
 use std::io::Read;
 
@@ -119,7 +119,7 @@ impl Relinker for Dll {
             //    Following Windows DLL search order: prefix PATH entries, then
             //    system directories (System32), then the host PATH.
             let mut found = false;
-            let path_entries = prefix_path_entries(encoded_prefix, &Platform::Win64);
+            let path_entries = prefix_path_entries(encoded_prefix, &Subdir::Win64);
             let path = std::env::var("PATH").unwrap_or_default();
 
             // Add Windows system directories so that system DLLs resolve to

@@ -17,7 +17,7 @@ use std::{
     str::FromStr as _,
 };
 
-use rattler_conda_types::{Arch, PackageName, ParseStrictness, Platform, Version, VersionSpec};
+use rattler_conda_types::{Arch, PackageName, ParseStrictness, Subdir, Version, VersionSpec};
 use strum::IntoEnumIterator as _;
 
 use crate::variable::Variable;
@@ -50,11 +50,11 @@ const KNOWN_FUNCTIONS: &[&str] = &[
 #[derive(Debug, Clone)]
 pub struct JinjaConfig {
     /// The target platform for the build
-    pub target_platform: Platform,
+    pub target_platform: Subdir,
     /// The build platform (where the build is happening)
-    pub build_platform: Platform,
+    pub build_platform: Subdir,
     /// The host platform (where the package will run, defaults to target_platform if not set)
-    pub host_platform: Platform,
+    pub host_platform: Subdir,
     /// Variant configuration (compiler versions, etc.)
     pub variant: BTreeMap<NormalizedKey, Variable>,
     /// Whether experimental features are enabled
@@ -68,7 +68,7 @@ pub struct JinjaConfig {
 impl Default for JinjaConfig {
     fn default() -> Self {
         // WASM has no native conda platform; callers can supply explicit platforms.
-        let current = Platform::current().unwrap_or(Platform::NoArch);
+        let current = Subdir::current().unwrap_or(Subdir::NoArch);
         Self {
             target_platform: current,
             build_platform: current,
@@ -201,9 +201,9 @@ impl Jinja {
         }
 
         let mut seen_families = HashSet::new();
-        for platform in Platform::iter() {
+        for platform in Subdir::iter() {
             // Skip noarch
-            if matches!(platform, Platform::NoArch) {
+            if matches!(platform, Subdir::NoArch) {
                 continue;
             }
 
@@ -453,7 +453,7 @@ fn jinja_pin_function(
     Ok(internal_repr.to_json(&pin))
 }
 
-fn default_compiler(platform: Platform, language: &str) -> Option<Variable> {
+fn default_compiler(platform: Subdir, language: &str) -> Option<Variable> {
     Some(
         match language {
             // Platform agnostic compilers
@@ -481,7 +481,7 @@ fn default_compiler(platform: Platform, language: &str) -> Option<Variable> {
                         "cxx" => "clangxx",
                         _ => unreachable!(),
                     }
-                } else if matches!(platform, Platform::EmscriptenWasm32) {
+                } else if matches!(platform, Subdir::EmscriptenWasm32) {
                     match language {
                         "c" => "emscripten",
                         "cxx" => "emscripten",
@@ -502,7 +502,7 @@ fn default_compiler(platform: Platform, language: &str) -> Option<Variable> {
 
 fn compiler_stdlib_eval(
     lang: &str,
-    platform: Platform,
+    platform: Subdir,
     variant: &Arc<BTreeMap<NormalizedKey, Variable>>,
     prefix: &str,
     accessed_variables: &Arc<Mutex<HashSet<String>>>,
@@ -522,7 +522,7 @@ fn compiler_stdlib_eval(
     let default_fn = if prefix == "compiler" {
         default_compiler
     } else {
-        |_: Platform, _: &str| None
+        |_: Subdir, _: &str| None
     };
 
     let res = if let Some(name) = variant
@@ -628,8 +628,8 @@ fn default_filters(env: &mut Environment) {
     env.add_filter("split", minijinja::filters::split);
 }
 
-fn parse_platform(platform: &str) -> Result<Platform, minijinja::Error> {
-    Platform::from_str(platform).map_err(|e| {
+fn parse_platform(platform: &str) -> Result<Subdir, minijinja::Error> {
+    Subdir::from_str(platform).map_err(|e| {
         minijinja::Error::new(
             minijinja::ErrorKind::InvalidOperation,
             format!("Invalid platform: {e}"),
@@ -960,7 +960,7 @@ fn set_jinja(
 mod tests {
     // git version is too old in cross container for aarch64
     use fs_err as fs;
-    use rattler_conda_types::Platform;
+    use rattler_conda_types::Subdir;
     #[cfg(not(all(
         any(target_arch = "aarch64", target_arch = "powerpc64"),
         target_os = "linux"
@@ -1044,16 +1044,16 @@ mod tests {
     )))]
     fn eval_git() {
         let options = JinjaConfig {
-            target_platform: Platform::Linux64,
-            build_platform: Platform::Linux64,
-            host_platform: Platform::Linux64,
+            target_platform: Subdir::Linux64,
+            build_platform: Subdir::Linux64,
+            host_platform: Subdir::Linux64,
             experimental: true,
             ..Default::default()
         };
         let options_wo_experimental = JinjaConfig {
-            target_platform: Platform::Linux64,
-            build_platform: Platform::Linux64,
-            host_platform: Platform::Linux64,
+            target_platform: Subdir::Linux64,
+            build_platform: Subdir::Linux64,
+            host_platform: Subdir::Linux64,
             ..Default::default()
         };
 
@@ -1125,9 +1125,9 @@ mod tests {
         fs::write(&recipe_file, "").unwrap();
 
         let options = JinjaConfig {
-            target_platform: Platform::Linux64,
-            build_platform: Platform::Linux64,
-            host_platform: Platform::Linux64,
+            target_platform: Subdir::Linux64,
+            build_platform: Subdir::Linux64,
+            host_platform: Subdir::Linux64,
             experimental: true,
             recipe_path: Some(recipe_file),
             ..Default::default()
@@ -1186,9 +1186,9 @@ mod tests {
         // after the tag. This catches any regression where the wrong field of
         // `git describe --tags --long` output is extracted.
         let options = JinjaConfig {
-            target_platform: Platform::Linux64,
-            build_platform: Platform::Linux64,
-            host_platform: Platform::Linux64,
+            target_platform: Subdir::Linux64,
+            build_platform: Subdir::Linux64,
+            host_platform: Subdir::Linux64,
             experimental: true,
             ..Default::default()
         };
@@ -1250,9 +1250,9 @@ mod tests {
         //   splitn(3,'-')[1]  = "rc1" (wrong)
         //   rsplitn(3,'-')[1] = "5"   (correct, after 5 extra commits)
         let options = JinjaConfig {
-            target_platform: Platform::Linux64,
-            build_platform: Platform::Linux64,
-            host_platform: Platform::Linux64,
+            target_platform: Subdir::Linux64,
+            build_platform: Subdir::Linux64,
+            host_platform: Subdir::Linux64,
             experimental: true,
             ..Default::default()
         };
@@ -1313,9 +1313,9 @@ mod tests {
     #[test]
     fn eval_load_from_file() {
         let options = JinjaConfig {
-            target_platform: Platform::Linux64,
-            build_platform: Platform::Linux64,
-            host_platform: Platform::Linux64,
+            target_platform: Subdir::Linux64,
+            build_platform: Subdir::Linux64,
+            host_platform: Subdir::Linux64,
             experimental: true,
             ..Default::default()
         };
@@ -1369,9 +1369,9 @@ mod tests {
         fs::write(&json_path, "{ \"hello\": \"world\" }").unwrap();
 
         let options = JinjaConfig {
-            target_platform: Platform::Linux64,
-            build_platform: Platform::Linux64,
-            host_platform: Platform::Linux64,
+            target_platform: Subdir::Linux64,
+            build_platform: Subdir::Linux64,
+            host_platform: Subdir::Linux64,
             experimental: true,
             recipe_path: Some(recipe_path),
             ..Default::default()
@@ -1400,9 +1400,9 @@ mod tests {
         fs::write(&json_path, "{ \"hello\": \"world\" }").unwrap();
 
         let options_wo_experimental = JinjaConfig {
-            target_platform: Platform::Linux64,
-            build_platform: Platform::Linux64,
-            host_platform: Platform::Linux64,
+            target_platform: Subdir::Linux64,
+            build_platform: Subdir::Linux64,
+            host_platform: Subdir::Linux64,
             experimental: false,
             recipe_path: Some(recipe_path),
             ..Default::default()
@@ -1438,9 +1438,9 @@ mod tests {
     #[test]
     fn eval() {
         let options = JinjaConfig {
-            target_platform: Platform::Linux64,
-            host_platform: Platform::Linux64,
-            build_platform: Platform::Linux64,
+            target_platform: Subdir::Linux64,
+            host_platform: Subdir::Linux64,
+            build_platform: Subdir::Linux64,
             ..Default::default()
         };
 
@@ -1474,9 +1474,9 @@ mod tests {
         // to NoArch. The unix/linux/osx/win selectors should still work
         // based on the host platform (where the package will run).
         let options = JinjaConfig {
-            target_platform: Platform::NoArch,
-            host_platform: Platform::Linux64,
-            build_platform: Platform::Linux64,
+            target_platform: Subdir::NoArch,
+            host_platform: Subdir::Linux64,
+            build_platform: Subdir::Linux64,
             ..Default::default()
         };
 
@@ -1508,9 +1508,9 @@ mod tests {
         // shortcuts (unix, linux, osx, win) and arch variables should
         // reflect the host_platform (where the package runs).
         let options = JinjaConfig {
-            target_platform: Platform::Linux64,
-            host_platform: Platform::OsxArm64,
-            build_platform: Platform::Linux64,
+            target_platform: Subdir::Linux64,
+            host_platform: Subdir::OsxArm64,
+            build_platform: Subdir::Linux64,
             ..Default::default()
         };
 
@@ -1554,9 +1554,9 @@ mod tests {
     fn eval_platform_shortcuts_windows_host() {
         // Verify win shortcut works when host is Windows
         let options = JinjaConfig {
-            target_platform: Platform::Linux64,
-            host_platform: Platform::Win64,
-            build_platform: Platform::Linux64,
+            target_platform: Subdir::Linux64,
+            host_platform: Subdir::Win64,
+            build_platform: Subdir::Linux64,
             ..Default::default()
         };
 
@@ -1574,16 +1574,16 @@ mod tests {
         // `SHLIB_EXT` should be available in the Jinja context and resolve to the
         // target platform's shared library extension (see issue #2532).
         let cases = [
-            (Platform::Linux64, ".so"),
-            (Platform::LinuxAarch64, ".so"),
-            (Platform::OsxArm64, ".dylib"),
-            (Platform::Osx64, ".dylib"),
-            (Platform::Win64, ".dll"),
+            (Subdir::Linux64, ".so"),
+            (Subdir::LinuxAarch64, ".so"),
+            (Subdir::OsxArm64, ".dylib"),
+            (Subdir::Osx64, ".dylib"),
+            (Subdir::Win64, ".dll"),
             // iOS is Mach-O, Android is ELF
-            (Platform::IosArm64, ".dylib"),
-            (Platform::IosSimulatorArm64, ".dylib"),
-            (Platform::AndroidAarch64, ".so"),
-            (Platform::AndroidArmV7a, ".so"),
+            (Subdir::IosArm64, ".dylib"),
+            (Subdir::IosSimulatorArm64, ".dylib"),
+            (Subdir::AndroidAarch64, ".so"),
+            (Subdir::AndroidArmV7a, ".so"),
         ];
         for (target_platform, expected) in cases {
             let jinja = Jinja::new(JinjaConfig {
@@ -1606,9 +1606,9 @@ mod tests {
     #[should_panic]
     fn eval2() {
         let options = JinjaConfig {
-            target_platform: Platform::Linux64,
-            host_platform: Platform::Linux64,
-            build_platform: Platform::Linux64,
+            target_platform: Subdir::Linux64,
+            host_platform: Subdir::Linux64,
+            build_platform: Subdir::Linux64,
             ..Default::default()
         };
 
@@ -1621,9 +1621,9 @@ mod tests {
     fn eval_cdt_x86_64() {
         let variant = BTreeMap::new();
         let options = JinjaConfig {
-            target_platform: Platform::Linux64,
-            host_platform: Platform::Linux64,
-            build_platform: Platform::Linux64,
+            target_platform: Subdir::Linux64,
+            host_platform: Subdir::Linux64,
+            build_platform: Subdir::Linux64,
             variant,
             ..Default::default()
         };
@@ -1651,9 +1651,9 @@ mod tests {
     fn eval_cdt_x86() {
         let variant = BTreeMap::new();
         let options = JinjaConfig {
-            target_platform: Platform::Linux32,
-            host_platform: Platform::Linux32,
-            build_platform: Platform::Linux32,
+            target_platform: Subdir::Linux32,
+            host_platform: Subdir::Linux32,
+            build_platform: Subdir::Linux32,
             variant,
             ..Default::default()
         };
@@ -1681,9 +1681,9 @@ mod tests {
     fn eval_cdt_aarch64() {
         let variant = BTreeMap::new();
         let options = JinjaConfig {
-            target_platform: Platform::LinuxAarch64,
-            host_platform: Platform::LinuxAarch64,
-            build_platform: Platform::LinuxAarch64,
+            target_platform: Subdir::LinuxAarch64,
+            host_platform: Subdir::LinuxAarch64,
+            build_platform: Subdir::LinuxAarch64,
             variant,
             ..Default::default()
         };
@@ -1711,9 +1711,9 @@ mod tests {
     fn eval_cdt_arm6() {
         let variant = BTreeMap::new();
         let options = JinjaConfig {
-            target_platform: Platform::LinuxArmV6l,
-            host_platform: Platform::LinuxArmV6l,
-            build_platform: Platform::LinuxArmV6l,
+            target_platform: Subdir::LinuxArmV6l,
+            host_platform: Subdir::LinuxArmV6l,
+            build_platform: Subdir::LinuxArmV6l,
             variant,
             ..Default::default()
         };
@@ -1743,9 +1743,9 @@ mod tests {
         let variant = BTreeMap::from_iter(vec![("python".into(), "3.7".into())]);
 
         let options = JinjaConfig {
-            target_platform: Platform::Linux64,
-            build_platform: Platform::Linux64,
-            host_platform: Platform::Linux64,
+            target_platform: Subdir::Linux64,
+            build_platform: Subdir::Linux64,
+            host_platform: Subdir::Linux64,
             variant,
             ..Default::default()
         };
@@ -1796,9 +1796,9 @@ mod tests {
         let variant = BTreeMap::from_iter(vec![("python".into(), "3.7.* *_cpython".into())]);
 
         let options = JinjaConfig {
-            target_platform: Platform::Linux64,
-            build_platform: Platform::Linux64,
-            host_platform: Platform::Linux64,
+            target_platform: Subdir::Linux64,
+            build_platform: Subdir::Linux64,
+            host_platform: Subdir::Linux64,
             variant,
             ..Default::default()
         };
@@ -1865,9 +1865,9 @@ mod tests {
     #[test]
     fn eval_pin_subpackage() {
         let options = JinjaConfig {
-            target_platform: Platform::Linux64,
-            build_platform: Platform::Linux64,
-            host_platform: Platform::Linux64,
+            target_platform: Subdir::Linux64,
+            build_platform: Subdir::Linux64,
+            host_platform: Subdir::Linux64,
             ..Default::default()
         };
 
@@ -1997,9 +1997,9 @@ mod tests {
     #[test]
     fn eval_env() {
         let options = JinjaConfig {
-            target_platform: Platform::Linux64,
-            build_platform: Platform::Linux64,
-            host_platform: Platform::Linux64,
+            target_platform: Subdir::Linux64,
+            build_platform: Subdir::Linux64,
+            host_platform: Subdir::Linux64,
             ..Default::default()
         };
         let jinja = Jinja::new(options);
@@ -2114,9 +2114,9 @@ mod tests {
         // it tracks the variable access
         let variant = BTreeMap::from_iter(vec![("cdt_name".into(), "conda".into())]);
         let options = JinjaConfig {
-            target_platform: Platform::LinuxAarch64,
-            host_platform: Platform::LinuxAarch64,
-            build_platform: Platform::LinuxAarch64,
+            target_platform: Subdir::LinuxAarch64,
+            host_platform: Subdir::LinuxAarch64,
+            build_platform: Subdir::LinuxAarch64,
             variant,
             ..Default::default()
         };
@@ -2141,9 +2141,9 @@ mod tests {
         // it tracks the variable access
         let variant = BTreeMap::from_iter(vec![("cdt_arch".into(), "custom_arch".into())]);
         let options = JinjaConfig {
-            target_platform: Platform::Linux64,
-            host_platform: Platform::Linux64,
-            build_platform: Platform::Linux64,
+            target_platform: Subdir::Linux64,
+            host_platform: Subdir::Linux64,
+            build_platform: Subdir::Linux64,
             variant,
             ..Default::default()
         };
@@ -2168,9 +2168,9 @@ mod tests {
         // it does NOT track the variable (since it wasn't actually read from the variant)
         let variant = BTreeMap::new();
         let options = JinjaConfig {
-            target_platform: Platform::LinuxAarch64,
-            host_platform: Platform::LinuxAarch64,
-            build_platform: Platform::LinuxAarch64,
+            target_platform: Subdir::LinuxAarch64,
+            host_platform: Subdir::LinuxAarch64,
+            build_platform: Subdir::LinuxAarch64,
             variant,
             ..Default::default()
         };
@@ -2200,9 +2200,9 @@ mod tests {
             ("go_cgo_compiler_version".into(), "1.24".into()),
         ]);
         let options = JinjaConfig {
-            target_platform: Platform::Linux64,
-            host_platform: Platform::Linux64,
-            build_platform: Platform::Linux64,
+            target_platform: Subdir::Linux64,
+            host_platform: Subdir::Linux64,
+            build_platform: Subdir::Linux64,
             variant,
             ..Default::default()
         };
@@ -2273,7 +2273,7 @@ mod tests {
 
     #[test]
     fn test_default_compiler() {
-        let platform = Platform::Linux64;
+        let platform = Subdir::Linux64;
         assert_eq!(
             "gxx",
             default_compiler(platform, "cxx").unwrap().to_string()
@@ -2284,7 +2284,7 @@ mod tests {
         );
         assert_eq!("gcc", default_compiler(platform, "c").unwrap().to_string());
 
-        let platform = Platform::Linux32;
+        let platform = Subdir::Linux32;
         assert_eq!(
             "gxx",
             default_compiler(platform, "cxx").unwrap().to_string()
@@ -2295,7 +2295,7 @@ mod tests {
         );
         assert_eq!("gcc", default_compiler(platform, "c").unwrap().to_string());
 
-        let platform = Platform::Win64;
+        let platform = Subdir::Win64;
         assert_eq!(
             "vs2022",
             default_compiler(platform, "cxx").unwrap().to_string()
@@ -2318,14 +2318,14 @@ mod tests {
     fn test_default_compiler_apple_and_android_use_clang() {
         // Apple platforms and the Android NDK all use clang.
         for platform in [
-            Platform::OsxArm64,
-            Platform::IosArm64,
-            Platform::IosSimulatorArm64,
-            Platform::IosSimulator64,
-            Platform::AndroidAarch64,
-            Platform::AndroidArmV7a,
-            Platform::Android64,
-            Platform::Android32,
+            Subdir::OsxArm64,
+            Subdir::IosArm64,
+            Subdir::IosSimulatorArm64,
+            Subdir::IosSimulator64,
+            Subdir::AndroidAarch64,
+            Subdir::AndroidArmV7a,
+            Subdir::Android64,
+            Subdir::Android32,
         ] {
             assert_eq!(
                 "clang",
@@ -2345,9 +2345,9 @@ mod tests {
         // The `ios` selector covers devices *and* simulators, while
         // `iossimulator` stays narrow.
         let jinja = Jinja::new(JinjaConfig {
-            target_platform: Platform::IosSimulatorArm64,
-            host_platform: Platform::IosSimulatorArm64,
-            build_platform: Platform::OsxArm64,
+            target_platform: Subdir::IosSimulatorArm64,
+            host_platform: Subdir::IosSimulatorArm64,
+            build_platform: Subdir::OsxArm64,
             ..Default::default()
         });
         assert!(jinja.eval("ios").expect("host is ios").is_true());
@@ -2361,9 +2361,9 @@ mod tests {
         assert!(!jinja.eval("osx").expect("ios is not osx").is_true());
 
         let jinja = Jinja::new(JinjaConfig {
-            target_platform: Platform::IosArm64,
-            host_platform: Platform::IosArm64,
-            build_platform: Platform::OsxArm64,
+            target_platform: Subdir::IosArm64,
+            host_platform: Subdir::IosArm64,
+            build_platform: Subdir::OsxArm64,
             ..Default::default()
         });
         assert!(jinja.eval("ios").expect("host is ios").is_true());
@@ -2375,9 +2375,9 @@ mod tests {
         );
 
         let jinja = Jinja::new(JinjaConfig {
-            target_platform: Platform::AndroidAarch64,
-            host_platform: Platform::AndroidAarch64,
-            build_platform: Platform::Linux64,
+            target_platform: Subdir::AndroidAarch64,
+            host_platform: Subdir::AndroidAarch64,
+            build_platform: Subdir::Linux64,
             ..Default::default()
         });
         assert!(jinja.eval("android").expect("host is android").is_true());
