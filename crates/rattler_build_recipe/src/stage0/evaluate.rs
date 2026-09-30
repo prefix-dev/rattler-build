@@ -20,6 +20,7 @@
 //! 5. Call `Build::render_build_string_with_hash()` to finalize the build string
 
 use std::{
+    borrow::Cow,
     collections::{BTreeMap, HashSet},
     path::PathBuf,
     str::FromStr,
@@ -432,7 +433,7 @@ pub fn evaluate_license_files(
 }
 
 /// Evaluate a simple conditional expression
-fn evaluate_condition(
+pub(crate) fn evaluate_condition(
     expr: &JinjaExpression,
     context: &EvaluationContext,
     span: Option<&Span>,
@@ -1392,7 +1393,7 @@ pub fn evaluate_script(
 /// Each step's `if` condition is evaluated here, where the target platform and
 /// selectors are known, and excluded steps are dropped. `run` content keeps its
 /// templates so they render at build time, exactly like `build.script`.
-pub fn evaluate_steps(
+pub(crate) fn evaluate_run_steps(
     steps: &[Stage0Step],
     context: &EvaluationContext,
 ) -> Result<Vec<Stage1Step>, ParseError> {
@@ -1444,16 +1445,29 @@ pub fn evaluate_steps(
                 step.requirements.inherit.host = run.requirements.inherit.host;
                 scripts.push(step);
             }
+            Stage0Step::Uses(_) => {
+                return Err(ParseError::generic(
+                    "action invocation requires action compilation",
+                    Span::new_blank(),
+                ));
+            }
         }
     }
 
     Ok(scripts)
 }
 
+pub fn evaluate_steps(
+    steps: &[Stage0Step],
+    context: &EvaluationContext,
+) -> Result<Vec<Stage1Step>, ParseError> {
+    Ok(crate::actions::compile_steps(steps, context)?.steps)
+}
+
 fn evaluate_build_plan(
     plan: &Stage0BuildPlan,
     context: &EvaluationContext,
-) -> Result<Stage1BuildPlan, ParseError> {
+) -> Result<(Stage1BuildPlan, crate::actions::CompiledSteps), ParseError> {
     match plan {
         Stage0BuildPlan::Steps(steps) => {
             if !context.jinja_config().experimental {
@@ -1463,11 +1477,31 @@ fn evaluate_build_plan(
                     Span::new_blank(),
                 ));
             }
-            Ok(Stage1BuildPlan::Steps(evaluate_steps(steps, context)?))
+            let mut compiled = crate::actions::compile_steps(steps, context)?;
+            let plan = Stage1BuildPlan::Steps(std::mem::take(&mut compiled.steps));
+            Ok((plan, compiled))
         }
-        Stage0BuildPlan::Script(script) => {
-            Ok(Stage1BuildPlan::Script(evaluate_script(script, context)?))
-        }
+        Stage0BuildPlan::Script(script) => Ok((
+            Stage1BuildPlan::Script(evaluate_script(script, context)?),
+            Default::default(),
+        )),
+    }
+}
+
+fn validate_selected_plan(
+    build: &Stage1Build,
+    context: &EvaluationContext,
+) -> Result<(), ParseError> {
+    if build.skip || context.actions.selected.is_none() {
+        return Ok(());
+    }
+    match &build.plan {
+        Stage1BuildPlan::Steps(_) => Ok(()),
+        Stage1BuildPlan::Script(_) => Err(ParseError::invalid_value(
+            "build.steps",
+            "named step execution requires a build.steps plan",
+            Span::new_blank(),
+        )),
     }
 }
 
@@ -2229,7 +2263,12 @@ impl Evaluate for Stage0Build {
         // (enforced during parsing). Steps mode is preserved even if the list is
         // empty or all steps filter out, so outputs don't accidentally inherit a
         // top-level script.
-        let plan = evaluate_build_plan(&self.plan, context)?;
+        let skip = evaluate_skip_list(&self.skip, context)?;
+        let (plan, actions) = if skip {
+            (Stage1BuildPlan::Steps(Vec::new()), Default::default())
+        } else {
+            evaluate_build_plan(&self.plan, context)?
+        };
 
         // Evaluate noarch
         //
@@ -2258,10 +2297,6 @@ impl Evaluate for Stage0Build {
                 }
             }
         };
-
-        // Evaluate skip conditions as Jinja boolean expressions
-        // This tracks accessed variables for proper variant hash computation
-        let skip = evaluate_skip_list(&self.skip, context)?;
 
         // Evaluate V3 package flags.
         let flags = evaluate_flag_list(&self.flags, context)?;
@@ -2337,6 +2372,8 @@ impl Evaluate for Stage0Build {
         )?;
 
         Ok(Stage1Build {
+            action_provenance: actions.provenance,
+            action_requirements: actions.requirements,
             number,
             string,
             plan,
@@ -2360,8 +2397,13 @@ impl Evaluate for stage0::StagingBuild {
     type Output = Stage1Build;
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
+        let mut staging_context = context.clone();
+        staging_context.actions.selected = None;
+        let (plan, actions) = evaluate_build_plan(&self.plan, &staging_context)?;
         Ok(Stage1Build {
-            plan: evaluate_build_plan(&self.plan, context)?,
+            plan,
+            action_provenance: actions.provenance,
+            action_requirements: actions.requirements,
             ..Stage1Build::default()
         })
     }
@@ -2955,9 +2997,11 @@ impl Evaluate for Stage0Recipe {
             .cloned()
             .collect();
         let package = self.package.evaluate(&context_with_vars)?;
-        let build = self.build.evaluate(&context_with_vars)?;
+        let mut build = self.build.evaluate(&context_with_vars)?;
+        validate_selected_plan(&build, &context_with_vars)?;
         let about = self.about.evaluate(&context_with_vars)?;
-        let requirements = self.requirements.evaluate(&context_with_vars)?;
+        let mut requirements = self.requirements.evaluate(&context_with_vars)?;
+        merge_action_requirements(&mut build, &mut requirements);
         let extra = self.extra.evaluate(&context_with_vars)?;
 
         // Evaluate source list (conditionals expand to multiple sources)
@@ -3108,6 +3152,21 @@ fn build_plan_inherits_from_toplevel(toplevel: &Stage1BuildPlan, output: &Stage1
     )
 }
 
+fn merge_action_requirements(build: &mut Stage1Build, requirements: &mut Stage1Requirements) {
+    if !build.action_requirements.inherit.build {
+        requirements.build.clear();
+    }
+    if !build.action_requirements.inherit.host {
+        requirements.host.clear();
+    }
+    requirements
+        .build
+        .extend(std::mem::take(&mut build.action_requirements.build));
+    requirements
+        .host
+        .extend(std::mem::take(&mut build.action_requirements.host));
+}
+
 /// Merge two Stage1 Build configurations
 /// The output build takes precedence, but if output has default/empty values, use top-level
 fn merge_stage1_build(
@@ -3121,6 +3180,12 @@ fn merge_stage1_build(
     // when inheriting a top-level script, matching the historical multi-output
     // behavior. It does not inherit a top-level steps plan because there is no
     // whole-plan `cwd` to apply to steps without silently dropping it.
+    let (action_requirements, action_provenance) =
+        if build_plan_inherits_from_toplevel(&toplevel.plan, &output.plan) {
+            (toplevel.action_requirements, toplevel.action_provenance)
+        } else {
+            (output.action_requirements, output.action_provenance)
+        };
     let plan = if build_plan_inherits_from_toplevel(&toplevel.plan, &output.plan) {
         toplevel.plan
     } else {
@@ -3221,6 +3286,8 @@ fn merge_stage1_build(
     };
 
     stage1::Build {
+        action_requirements,
+        action_provenance,
         plan,
         number,
         string,
@@ -3345,7 +3412,17 @@ fn evaluate_package_output_to_recipe(
     //   (the cache has its own plan, and the output doesn't need one for filtering files)
     let build = if inherits_from_toplevel {
         // Full merge including the build plan
-        let toplevel_build = recipe.build.evaluate(context)?;
+        let mut toplevel_source = recipe.build.clone();
+        let mut toplevel_context = Cow::Borrowed(context);
+        if !output.build.plan.is_default()
+            && let Stage0BuildPlan::Steps(steps) = &mut toplevel_source.plan
+        {
+            steps.clear();
+            if context.actions.selected.is_some() {
+                toplevel_context.to_mut().actions.selected = None;
+            }
+        }
+        let toplevel_build = toplevel_source.evaluate(&toplevel_context)?;
         let output_build = output.build.evaluate(context)?;
         merge_stage1_build(toplevel_build, output_build)
     } else {
@@ -3353,13 +3430,16 @@ fn evaluate_package_output_to_recipe(
         // output does not set itself, EXCEPT the build plan (the cache has its
         // own plan; a cache-inheriting output packages the restored files and
         // does not need to re-run the top-level plan).
-        let toplevel_build = recipe.build.evaluate(context)?;
+        let mut toplevel_source = recipe.build.clone();
+        toplevel_source.plan = Stage0BuildPlan::default();
+        let toplevel_build = toplevel_source.evaluate(context)?;
         let output_build = output.build.evaluate(context)?;
         let output_plan = output_build.plan.clone();
         let mut merged = merge_stage1_build(toplevel_build, output_build);
         merged.plan = output_plan;
         merged
     };
+    validate_selected_plan(&build, context)?;
 
     // Multi-output recipes do not auto-discover `build.sh`/`build.bat`: a single
     // shared build script is almost never what each output wants (e.g. noarch
@@ -3393,7 +3473,8 @@ fn evaluate_package_output_to_recipe(
     };
 
     // Evaluate requirements
-    let requirements = output.requirements.evaluate(context)?;
+    let mut requirements = output.requirements.evaluate(context)?;
+    merge_action_requirements(&mut build, &mut requirements);
 
     // Use recipe-level extra (outputs don't have their own extra)
     let extra = recipe.extra.evaluate(context)?;
@@ -3586,16 +3667,7 @@ impl Evaluate for crate::stage0::MultiOutputRecipe {
                 // Evaluate staging output components
                 let mut build = staging_output.build.evaluate(&context_with_vars)?;
                 let mut requirements = staging_output.requirements.evaluate(&context_with_vars)?;
-                if build.plan.steps().is_some() {
-                    let selected = build.plan.select_steps(None).map_err(|error| {
-                        ParseError::invalid_value("staging build.steps", error, Span::new_blank())
-                    })?;
-                    for step in &selected {
-                        requirements.build.extend(step.requirements.build.clone());
-                        requirements.host.extend(step.requirements.host.clone());
-                    }
-                    build.plan = Stage1BuildPlan::Steps(selected);
-                }
+                merge_action_requirements(&mut build, &mut requirements);
 
                 // Staging outputs inherit top-level sources (prepend), then add their own
                 // (conditionals expand to multiple sources)
@@ -6399,13 +6471,13 @@ package:
     }
 
     fn run_step(cmd: &str) -> Stage0Step {
-        Stage0Step::Run(Stage0RunStep {
+        Stage0Step::Run(Box::new(Stage0RunStep {
             run: ConditionalList::new(vec![Item::Value(Value::new_concrete(
                 cmd.to_string(),
                 None,
             ))]),
             ..Default::default()
-        })
+        }))
     }
 
     fn step_condition(expr: &str) -> JinjaExpression {
@@ -6432,14 +6504,14 @@ package:
 
     #[test]
     fn test_evaluate_steps_if_filters_step() {
-        let win_step = Stage0Step::Run(Stage0RunStep {
+        let win_step = Stage0Step::Run(Box::new(Stage0RunStep {
             run: ConditionalList::new(vec![Item::Value(Value::new_concrete(
                 "echo windows".to_string(),
                 None,
             ))]),
             condition: Some(step_condition("win")),
             ..Default::default()
-        });
+        }));
         let steps = vec![run_step("echo always"), win_step];
 
         let mut ctx = EvaluationContext::new();
@@ -6457,14 +6529,14 @@ package:
 
     #[test]
     fn test_evaluate_steps_if_tracks_accessed_variables() {
-        let gated_step = Stage0Step::Run(Stage0RunStep {
+        let gated_step = Stage0Step::Run(Box::new(Stage0RunStep {
             run: ConditionalList::new(vec![Item::Value(Value::new_concrete(
                 "echo enabled".to_string(),
                 None,
             ))]),
             condition: Some(step_condition("enable_feature")),
             ..Default::default()
-        });
+        }));
         let mut ctx = EvaluationContext::new();
         ctx.insert("enable_feature".to_string(), Variable::from(true));
 
@@ -6479,14 +6551,14 @@ package:
 
     #[test]
     fn test_evaluate_steps_if_undefined_variable_errors() {
-        let undefined_step = Stage0Step::Run(Stage0RunStep {
+        let undefined_step = Stage0Step::Run(Box::new(Stage0RunStep {
             run: ConditionalList::new(vec![Item::Value(Value::new_concrete(
                 "echo undefined".to_string(),
                 None,
             ))]),
             condition: Some(step_condition("undefined_feature")),
             ..Default::default()
-        });
+        }));
         let ctx = EvaluationContext::new();
 
         let err = evaluate_steps(&[undefined_step], &ctx).unwrap_err();
@@ -6499,14 +6571,14 @@ package:
 
     #[test]
     fn test_evaluate_steps_tracks_filtered_out_step_variables() {
-        let step = Stage0Step::Run(Stage0RunStep {
+        let step = Stage0Step::Run(Box::new(Stage0RunStep {
             run: ConditionalList::new(vec![Item::Value(Value::new_template(
                 JinjaTemplate::new("echo ${{ flavor }}".to_string()).unwrap(),
                 None,
             ))]),
             condition: Some(step_condition("win")),
             ..Default::default()
-        });
+        }));
         let mut ctx = EvaluationContext::new();
         ctx.insert("win".to_string(), Variable::from(false));
         ctx.insert("flavor".to_string(), Variable::from("vanilla"));
@@ -6519,14 +6591,14 @@ package:
 
     #[test]
     fn test_evaluate_steps_if_expression_compares_target_platform() {
-        let step = Stage0Step::Run(Stage0RunStep {
+        let step = Stage0Step::Run(Box::new(Stage0RunStep {
             run: ConditionalList::new(vec![Item::Value(Value::new_concrete(
                 "echo gated".to_string(),
                 None,
             ))]),
             condition: Some(step_condition("target_platform == 'win-64'")),
             ..Default::default()
-        });
+        }));
         let mut linux_ctx = EvaluationContext::new();
         linux_ctx.insert("target_platform".to_string(), Variable::from("linux-64"));
 
@@ -6546,7 +6618,7 @@ package:
 
     /// A run step that sets an explicit interpreter and step-local env.
     fn run_step_with(cmd: &str, interpreter: &str, env: &[(&str, &str)]) -> Stage0Step {
-        Stage0Step::Run(Stage0RunStep {
+        Stage0Step::Run(Box::new(Stage0RunStep {
             run: ConditionalList::new(vec![Item::Value(Value::new_concrete(
                 cmd.to_string(),
                 None,
@@ -6557,7 +6629,7 @@ package:
                 .map(|(k, v)| (k.to_string(), Value::new_concrete(v.to_string(), None)))
                 .collect(),
             ..Default::default()
-        })
+        }))
     }
 
     #[test]
@@ -6624,14 +6696,14 @@ package:
 
     #[test]
     fn test_evaluate_steps_carries_cwd() {
-        let step = Stage0Step::Run(Stage0RunStep {
+        let step = Stage0Step::Run(Box::new(Stage0RunStep {
             run: ConditionalList::new(vec![Item::Value(Value::new_concrete(
                 "make install".to_string(),
                 None,
             ))]),
             cwd: Some(Value::new_concrete("subdir".to_string(), None)),
             ..Default::default()
-        });
+        }));
         let ctx = EvaluationContext::new();
 
         let scripts = evaluate_steps(&[step], &ctx).unwrap();
@@ -6702,14 +6774,14 @@ package:
 
     #[test]
     fn test_build_evaluate_preserves_steps_mode_when_all_steps_filter_out() {
-        let false_step = Stage0Step::Run(Stage0RunStep {
+        let false_step = Stage0Step::Run(Box::new(Stage0RunStep {
             run: ConditionalList::new(vec![Item::Value(Value::new_concrete(
                 "echo filtered".to_string(),
                 None,
             ))]),
             condition: Some(step_condition("win")),
             ..Default::default()
-        });
+        }));
         let build = Stage0Build {
             plan: Stage0BuildPlan::Steps(vec![false_step]),
             ..Default::default()
