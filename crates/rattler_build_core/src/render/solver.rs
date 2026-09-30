@@ -9,7 +9,7 @@ use itertools::Itertools;
 use miette::{IntoDiagnostic, WrapErr};
 use rattler::install::{DefaultProgressFormatter, IndicatifReporter, Installer};
 use rattler_conda_types::{
-    Channel, ChannelNoticeLevel, ChannelUrl, MatchSpec, Subdir, PrefixRecord, RepoDataRecord,
+    Channel, ChannelNoticeLevel, ChannelUrl, MatchSpec, PrefixRecord, RepoDataRecord, Subdir,
 };
 use rattler_repodata_gateway::ChannelNoticeResult;
 use rattler_solve::{
@@ -202,11 +202,7 @@ pub async fn load_repodatas(
 
     let result = tool_configuration
         .repodata_gateway
-        .query(
-            channels,
-            [target_platform, Subdir::NoArch],
-            specs.to_vec(),
-        )
+        .query(channels, [target_platform, Subdir::NoArch], specs.to_vec())
         .channel_notices(true)
         .with_reporter(
             GatewayReporter::builder()

@@ -14,7 +14,7 @@ use crate::{
 
 use crate::render::resolved_dependencies::RunExportDependency;
 use globset::{Glob, GlobBuilder, GlobSet, GlobSetBuilder};
-use rattler_conda_types::{PackageName, Subdir, PrefixRecord};
+use rattler_conda_types::{PackageName, PrefixRecord, Subdir};
 use text_stub_library::TbdVersionedRecord;
 use walkdir::WalkDir;
 
@@ -823,9 +823,7 @@ mod tests {
 
         // File exists but targets a different subdir → no match
         assert!(
-            load_dsolists(tmp.path(), &Subdir::Win64)
-                .unwrap()
-                .is_none(),
+            load_dsolists(tmp.path(), &Subdir::Win64).unwrap().is_none(),
             "should return None when no files match the subdir"
         );
     }
@@ -853,9 +851,7 @@ mod tests {
     fn test_load_dsolists_no_directory() {
         let tmp = tempfile::tempdir().unwrap();
         assert!(
-            load_dsolists(tmp.path(), &Subdir::Win64)
-                .unwrap()
-                .is_none(),
+            load_dsolists(tmp.path(), &Subdir::Win64).unwrap().is_none(),
             "should return None when directory does not exist"
         );
     }

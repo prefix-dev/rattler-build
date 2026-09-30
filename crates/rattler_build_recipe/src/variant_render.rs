@@ -3089,8 +3089,7 @@ openssl:
         let variant_config = VariantConfig::from_yaml_str(variant_yaml).unwrap();
 
         // Use linux platform to ensure `unix` is true
-        let config =
-            RenderConfig::new().with_target_platform(rattler_conda_types::Subdir::Linux64);
+        let config = RenderConfig::new().with_target_platform(rattler_conda_types::Subdir::Linux64);
 
         let rendered =
             render_recipe_with_variant_config(&stage0_recipe, &variant_config, config).unwrap();
@@ -3668,8 +3667,7 @@ build:
         let stage0 = Stage0Recipe::SingleOutput(Box::new(stage0_recipe));
 
         let variant_config = VariantConfig::default();
-        let config =
-            RenderConfig::new().with_target_platform(rattler_conda_types::Subdir::Linux64);
+        let config = RenderConfig::new().with_target_platform(rattler_conda_types::Subdir::Linux64);
 
         let rendered = render_recipe_with_variant_config(&stage0, &variant_config, config).unwrap();
 

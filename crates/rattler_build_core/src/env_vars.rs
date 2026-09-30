@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use rattler_build_jinja::Variable;
 use rattler_build_script::{EnvironmentIsolation, RuntimeEnv};
 use rattler_build_types::NormalizedKey;
-use rattler_conda_types::{Subdir, RepoDataRecord};
+use rattler_conda_types::{RepoDataRecord, Subdir};
 use std::collections::BTreeMap;
 
 use crate::android;
@@ -608,12 +608,7 @@ mod test {
     fn test_vars_set_src_dir_to_the_test_work_dir() {
         let work_dir = Path::new("/some/test/work");
 
-        let vars = test_vars(
-            Subdir::Linux64,
-            Subdir::Linux64,
-            Subdir::Linux64,
-            work_dir,
-        );
+        let vars = test_vars(Subdir::Linux64, Subdir::Linux64, Subdir::Linux64, work_dir);
 
         assert_eq!(
             vars.get("SRC_DIR").and_then(|value| value.as_deref()),

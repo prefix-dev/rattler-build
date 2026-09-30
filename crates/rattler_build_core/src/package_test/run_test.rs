@@ -18,8 +18,8 @@ use rattler_build_script::{
 };
 use rattler_build_types::NormalizedKey;
 use rattler_conda_types::{
-    Channel, ChannelUrl, MatchSpec, PackageName, PackageNameMatcher, ParseStrictness, Subdir,
-    RepoDataRecord, StringMatcher, Version, VersionSpec,
+    Channel, ChannelUrl, MatchSpec, PackageName, PackageNameMatcher, ParseStrictness,
+    RepoDataRecord, StringMatcher, Subdir, Version, VersionSpec,
     compression_level::CompressionLevel,
     package::{ArchiveIdentifier, CondaArchiveIdentifier, IndexJson, PackageFile},
     version_spec::EqualityOperator,

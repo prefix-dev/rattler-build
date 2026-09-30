@@ -15,7 +15,7 @@ use fs_err::File;
 use itertools::Itertools;
 use rattler_build_recipe::stage1::build::PrefixDetection;
 use rattler_conda_types::{
-    ChannelUrl, NoArchType, Subdir, RepodataRevision,
+    ChannelUrl, NoArchType, RepodataRevision, Subdir,
     package::{
         AboutJson, FileMode, IndexJson, LinkJson, NoArchLinks, PackageFile, PathType, PathsEntry,
         PathsJson, PrefixPlaceholder, PythonEntryPoints, RunExportsJson,
@@ -637,7 +637,7 @@ impl Output {
 #[cfg(test)]
 mod test {
     use content_inspector::ContentType;
-    use rattler_conda_types::{ChannelUrl, Subdir, RepodataRevision};
+    use rattler_conda_types::{ChannelUrl, RepodataRevision, Subdir};
     use url::Url;
 
     #[cfg(unix)]

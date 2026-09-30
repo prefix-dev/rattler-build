@@ -761,9 +761,7 @@ mod test {
         let binary_path = prefix.join("zlink");
 
         assert!(!SharedObject::new_for_platform(&binary_path, Subdir::LinuxAarch64)?.use_runpath);
-        assert!(
-            SharedObject::new_for_platform(&binary_path, Subdir::AndroidAarch64)?.use_runpath
-        );
+        assert!(SharedObject::new_for_platform(&binary_path, Subdir::AndroidAarch64)?.use_runpath);
 
         Ok(())
     }

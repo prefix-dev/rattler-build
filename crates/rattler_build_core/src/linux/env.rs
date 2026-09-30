@@ -132,8 +132,7 @@ mod tests {
     #[test]
     fn ld_run_path_env_preserved() {
         let tmp_prefix = tempfile::tempdir().unwrap();
-        let runtime =
-            RuntimeEnv::for_test(Subdir::Linux64).with_var("LD_RUN_PATH", "/custom/lib");
+        let runtime = RuntimeEnv::for_test(Subdir::Linux64).with_var("LD_RUN_PATH", "/custom/lib");
 
         let vars = default_env_vars_target(
             tmp_prefix.path(),

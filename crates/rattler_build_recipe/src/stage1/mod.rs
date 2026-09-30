@@ -13,7 +13,7 @@ use std::{
 };
 
 use rattler_build_jinja::{Jinja, JinjaConfig, Variable};
-use rattler_conda_types::{Subdir, RepodataRevision};
+use rattler_conda_types::{RepodataRevision, Subdir};
 
 pub mod about;
 pub mod build;

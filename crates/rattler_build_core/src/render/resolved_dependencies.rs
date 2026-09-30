@@ -11,7 +11,7 @@ use rattler_build_recipe::stage1::{Dependency, Requirements};
 use rattler_build_types::{PinArgs, PinError};
 use rattler_conda_types::{
     ChannelUrl, MatchSpec, NamelessMatchSpec, PackageName, PackageNameMatcher, PackageRecord,
-    Subdir, RepoDataRecord, package::RunExportsJson,
+    RepoDataRecord, Subdir, package::RunExportsJson,
 };
 use rattler_repodata_gateway::{Gateway, RunExportExtractorError, RunExportsReporter};
 use serde::{Deserialize, Serialize};

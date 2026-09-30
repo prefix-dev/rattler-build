@@ -294,10 +294,7 @@ endlocal & if %RB_SECTION_ERRORLEVEL% neq 0 exit /b %RB_SECTION_ERRORLEVEL%
         assert_eq!(shell_dialect(Subdir::OsxArm64).shell().extension(), "sh");
 
         assert_eq!(shell_dialect(Subdir::Win64).default_interpreter(), "cmd");
-        assert_eq!(
-            shell_dialect(Subdir::Linux64).default_interpreter(),
-            "bash"
-        );
+        assert_eq!(shell_dialect(Subdir::Linux64).default_interpreter(), "bash");
     }
 
     #[test]

@@ -4,7 +4,7 @@ use rattler_build_jinja::Variable;
 use rattler_build_recipe::{Stage1Recipe, stage1::Source};
 use rattler_build_types::NormalizedKey;
 use rattler_conda_types::{
-    PackageName, Subdir, RepoDataRecord, VersionWithSource,
+    PackageName, RepoDataRecord, Subdir, VersionWithSource,
     package::{PathType, PathsEntry, PathsJson},
 };
 use serde::{Deserialize, Serialize};

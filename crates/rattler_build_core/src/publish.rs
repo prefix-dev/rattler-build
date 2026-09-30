@@ -1,9 +1,7 @@
 //! Functions for publishing conda packages to various backends (local filesystem, S3, Quetz, etc.)
 
 use miette::{Context, IntoDiagnostic};
-use rattler_conda_types::{
-    Channel, ChannelUrl, MatchSpec, NamedChannelOrUrl, PackageName, Subdir,
-};
+use rattler_conda_types::{Channel, ChannelUrl, MatchSpec, NamedChannelOrUrl, PackageName, Subdir};
 use rattler_index::{IndexFsConfig, index_fs};
 use rattler_repodata_gateway::{CacheClearMode, Gateway, SubdirSelection};
 use std::collections::HashMap;

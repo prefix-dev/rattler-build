@@ -11,7 +11,7 @@ use async_zip::base::read::seek::ZipFileReader;
 use futures::StreamExt;
 use http::HeaderMap;
 use miette::{Context as _, IntoDiagnostic};
-use rattler_conda_types::{Channel, MatchSpec, ParseStrictness, Subdir, RepoDataRecord};
+use rattler_conda_types::{Channel, MatchSpec, ParseStrictness, RepoDataRecord, Subdir};
 use rattler_networking::LazyClient;
 use rattler_repodata_gateway::{
     Gateway, fetch,

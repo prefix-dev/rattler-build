@@ -15,7 +15,7 @@ use rattler_build_recipe_generator::{
     generate_r_recipe_string,
 };
 use rattler_build_variant_config::{VariantConfig, parse_conda_build_config};
-use rattler_conda_types::{Subdir, RepodataRevision};
+use rattler_conda_types::{RepodataRevision, Subdir};
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
 

@@ -58,7 +58,7 @@ use rattler_build_core::consts;
 use rattler_build_recipe::stage0;
 use rattler_build_variant_config::VariantConfig;
 use rattler_conda_types::{
-    NamedChannelOrUrl, NoArchType, Subdir, RepodataRevision, compression_level::CompressionLevel,
+    NamedChannelOrUrl, NoArchType, RepodataRevision, Subdir, compression_level::CompressionLevel,
     package::CondaArchiveType,
 };
 use rattler_config::config::build::PackageFormatAndCompression;
@@ -278,9 +278,7 @@ pub async fn get_build_output(
         output_dir = canonicalize(&output_dir).into_diagnostic()?;
     }
 
-    if build_data.target_platform == Subdir::NoArch
-        || build_data.build_platform == Subdir::NoArch
-    {
+    if build_data.target_platform == Subdir::NoArch || build_data.build_platform == Subdir::NoArch {
         return Err(miette::miette!(
             "target-platform / build-platform cannot be `noarch` - that should be defined in the recipe"
         ));
