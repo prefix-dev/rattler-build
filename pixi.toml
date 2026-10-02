@@ -80,9 +80,6 @@ rattler-build = { path = "." }
 
 [activation.env]
 RUSTC_WRAPPER = "sccache"
-# Use cmake to build aws-lc-sys, because conda's CFLAGS inject -O2 which
-# overrides the -O0 required by jitterentropy-base.c, causing a build failure.
-AWS_LC_SYS_CMAKE_BUILDER = "1"
 PYTHONIOENCODING = "utf-8"
 
 [target.linux.activation]
@@ -289,6 +286,3 @@ cmake = ">=4.3.0,<5"
 
 [package.build.config]
 compilers = ["rust", "c"]
-# Use cmake to build aws-lc-sys, because conda's CFLAGS inject -O2 which
-# overrides the -O0 required by jitterentropy-base.c, causing a build failure.
-env = { AWS_LC_SYS_CMAKE_BUILDER = "1" }
