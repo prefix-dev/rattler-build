@@ -4903,6 +4903,7 @@ dependencies = [
  "miette",
  "rattler_conda_types",
  "rattler_digest",
+ "rattler_repodata_gateway",
  "regex",
  "reqwest",
  "serde",
