@@ -149,7 +149,7 @@ jobs:
           target: ${{ matrix.platform.target }}
           manylinux: "2_28"
           args: --release --out dist --no-default-features --features rustls
-      - uses: uraimo/run-on-arch-action@460cb8e6d9f726a588fc9b5e681c8a6cab09ae41 # v3.2.0
+      - uses: uraimo/run-on-arch-action@fa1f3e7de95534497266c7265950b5188355fbfb # v3.2.1
         if: matrix.platform.arch != 'ppc64'
         name: Test wheel
         with:
@@ -244,7 +244,7 @@ jobs:
           target: ${{ matrix.platform.target }}
           manylinux: musllinux_1_2
           args: --release --out dist --no-default-features --features rustls
-      - uses: uraimo/run-on-arch-action@460cb8e6d9f726a588fc9b5e681c8a6cab09ae41 # v3.2.0
+      - uses: uraimo/run-on-arch-action@fa1f3e7de95534497266c7265950b5188355fbfb # v3.2.1
         name: Test wheel
         with:
           arch: ${{ matrix.platform.arch }}
