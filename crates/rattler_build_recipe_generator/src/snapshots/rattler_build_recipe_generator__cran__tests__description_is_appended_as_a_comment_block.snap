@@ -1,0 +1,13 @@
+---
+source: crates/rattler_build_recipe_generator/src/cran.rs
+expression: "append_description_comment(recipe, description)"
+---
+package:
+  name: r-tinkr
+
+# The original CRAN metadata for this package was:
+
+# Package: tinkr
+# Title: Cast '(R)Markdown' Files
+#     to 'XML'
+# License: GPL-3
