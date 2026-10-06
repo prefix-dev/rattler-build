@@ -56,7 +56,7 @@ solve-group = "default"
 
 [environments.lint.dependencies]
 # we need rust for cargo-fmt and clippy
-rust = ">=1.98.0,<2"
+rust = ">=1.98.1,<1.99"
 ruff = ">=0.16.6,<0.17"
 
 [environments.lint.tasks]

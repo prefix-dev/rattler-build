@@ -7,7 +7,7 @@ preview = ['pixi-build']
 name = "rattler-build"
 
 [workspace.build-variants]
-rust_compiler_version = [">=1.97,<1.98"]
+rust_compiler_version = [">=1.98.1,<1.99"]
 
 [workspace.target.osx.build-variants]
 c_compiler_version = ["19"]
@@ -37,7 +37,7 @@ check-native-tls = "python scripts/check-native-tls.py"
 # Playground tasks are in the "playground" environment (see below)
 
 [dependencies]
-rust-src = ">=1.97.1,<2"
+rust-src = ">=1.98.1,<1.99"
 sccache = ">=0.17.0,<0.18"
 libssh2 = ">=1.11.1,<2"
 pkg-config = ">=0.29.2,<0.30"
