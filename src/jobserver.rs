@@ -13,6 +13,7 @@
 /// The jobserver of a parallel build. Advertised to build scripts through
 /// `MAKEFLAGS` until dropped.
 pub(crate) struct Jobserver {
+    #[cfg(unix)]
     jobs: usize,
     #[cfg(unix)]
     pool: unix::Pool,
