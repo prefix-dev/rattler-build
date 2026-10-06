@@ -68,7 +68,7 @@ impl<'a> ParallelBuilds<'a> {
     pub(crate) fn start_ready(&mut self, queue: &mut OutputBuildQueue) -> miette::Result<()> {
         while self.jobs.len() < self.max_jobs {
             let Some(output) = queue
-                .next_ready_parallel(self.jobs.len())
+                .next_ready_parallel(self.jobs.len(), self.max_jobs > 1)
                 .into_diagnostic()?
             else {
                 break;

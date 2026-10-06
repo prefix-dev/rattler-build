@@ -8,7 +8,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use rattler_build_recipe::stage1::{Dependency, TestType};
 use rattler_build_types::PinError;
 use rattler_conda_types::{
-    MatchSpec, ParseMatchSpecError, ParseMatchSpecOptions, RepodataRevision,
+    MatchSpec, PackageName, ParseMatchSpecError, ParseMatchSpecOptions, RepodataRevision,
 };
 use thiserror::Error;
 
@@ -459,6 +459,26 @@ impl<T> BuildQueue<T> {
         }
     }
 
+    /// Finds and removes the ready item with the highest `score`, keeping
+    /// the order of all other items. Ties go to the earliest item.
+    pub(crate) fn best_ready<E>(
+        &mut self,
+        mut is_ready: impl FnMut(&T) -> Result<bool, E>,
+        score: impl Fn(&T) -> usize,
+    ) -> Result<Option<T>, E> {
+        let mut best: Option<(usize, usize)> = None;
+        for (index, item) in self.pending.iter().enumerate() {
+            let item_score = score(item);
+            if best.is_some_and(|(_, best_score)| item_score <= best_score) {
+                continue;
+            }
+            if is_ready(item)? {
+                best = Some((index, item_score));
+            }
+        }
+        Ok(best.and_then(|(index, _)| self.pending.remove(index)))
+    }
+
     /// Removes the first item without checking readiness.
     fn pop_front(&mut self) -> Option<T> {
         self.pending.pop_front()
@@ -473,6 +493,9 @@ pub(crate) struct OutputBuildQueue {
     planned_outputs: Vec<PackageIdentifier>,
     /// Attempted outputs used to determine which local artifacts are available.
     processed_outputs: Vec<Output>,
+    /// For every planned package, how many other planned outputs need it,
+    /// directly or transitively (through build, host or run requirements).
+    dependents: HashMap<PackageName, usize>,
 }
 
 impl OutputBuildQueue {
@@ -486,10 +509,23 @@ impl OutputBuildQueue {
                 build_string: output.build_string().into_owned(),
             })
             .collect();
+        let dependents = count_dependents(outputs.iter().map(|output| {
+            let requirements = output.recipe.requirements();
+            let needs = requirements
+                .build
+                .iter()
+                .chain(&requirements.host)
+                .chain(&requirements.run)
+                .filter_map(dependency_name)
+                .cloned()
+                .collect();
+            (output.name().clone(), needs)
+        }));
         Self {
             queue: BuildQueue::new(outputs),
             planned_outputs,
             processed_outputs: Vec::new(),
+            dependents,
         }
     }
 
@@ -518,10 +554,26 @@ impl OutputBuildQueue {
     /// when nothing is in flight, so the outputs that are attempted, and what
     /// the solver may pick from the configured channels, are the same as in a
     /// serial build.
+    ///
+    /// With `prioritize`, the ready output that the most other planned outputs
+    /// need (directly or transitively) is started first, so that long chains
+    /// of dependent builds start early. Used only for parallel builds; a
+    /// serial build keeps the queue order.
     pub(crate) fn next_ready_parallel(
         &mut self,
         in_flight: usize,
+        prioritize: bool,
     ) -> Result<Option<Output>, BuildQueueError> {
+        if prioritize {
+            let readiness = BuildReadiness::new(&self.planned_outputs, &self.processed_outputs);
+            let dependents = &self.dependents;
+            if let Some(output) = self.queue.best_ready(
+                |output| readiness.can_build(output),
+                |output| dependents.get(output.name()).copied().unwrap_or(0),
+            )? {
+                return Ok(Some(output));
+            }
+        }
         if in_flight == 0 {
             return self.next_ready();
         }
@@ -558,11 +610,60 @@ impl OutputBuildQueue {
     }
 }
 
+/// The package name a recipe dependency refers to, if it is known before
+/// solving.
+fn dependency_name(dependency: &Dependency) -> Option<&PackageName> {
+    match dependency {
+        Dependency::Spec(spec) => spec.name.as_exact(),
+        Dependency::PinSubpackage(pin) => Some(&pin.pin_subpackage.name),
+        Dependency::PinCompatible(_) => None,
+    }
+}
+
+/// For every planned package, counts the other planned packages that need it
+/// directly or transitively. `needs` yields each planned package with the
+/// names it depends on; names that are not planned are ignored.
+fn count_dependents(
+    needs: impl IntoIterator<Item = (PackageName, Vec<PackageName>)>,
+) -> HashMap<PackageName, usize> {
+    let needs: Vec<(PackageName, Vec<PackageName>)> = needs.into_iter().collect();
+    let planned: HashSet<&PackageName> = needs.iter().map(|(name, _)| name).collect();
+    let mut users: HashMap<&PackageName, HashSet<&PackageName>> = HashMap::new();
+    for (name, deps) in &needs {
+        for dep in deps {
+            if dep != name && planned.contains(dep) {
+                users.entry(dep).or_default().insert(name);
+            }
+        }
+    }
+    planned
+        .iter()
+        .map(|&name| {
+            let mut seen = HashSet::new();
+            let mut stack = vec![name];
+            while let Some(current) = stack.pop() {
+                for &user in users.get(current).into_iter().flatten() {
+                    if user != name && seen.insert(user) {
+                        stack.push(user);
+                    }
+                }
+            }
+            (name.clone(), seen.len())
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use std::convert::Infallible;
 
-    use super::{BuildQueue, NextReady};
+    use rattler_conda_types::PackageName;
+
+    use super::{BuildQueue, NextReady, count_dependents};
+
+    fn name(name: &str) -> PackageName {
+        PackageName::new_unchecked(name)
+    }
 
     #[test]
     fn ready_items_preserve_rotated_order() {
@@ -616,5 +717,55 @@ mod tests {
             queue.next_ready(|_| Ok::<_, ReadinessError>(true)),
             Ok(NextReady::Ready(1))
         );
+    }
+
+    #[test]
+    fn best_ready_picks_the_highest_score_among_ready_items() {
+        let mut queue = BuildQueue::new([1, 2, 3, 4]);
+
+        // 4 has the highest score but is not ready; 2 and 3 tie, 2 is earlier.
+        let best = queue.best_ready(
+            |n| Ok::<_, Infallible>(*n != 4),
+            |n| if *n == 1 { 1 } else { 5 },
+        );
+
+        assert_eq!(best, Ok(Some(2)));
+        assert_eq!(
+            queue.next_ready(|_| Ok::<_, Infallible>(true)),
+            Ok(NextReady::Ready(1))
+        );
+        assert_eq!(queue.len(), 2);
+    }
+
+    #[test]
+    fn best_ready_returns_none_when_nothing_is_ready() {
+        let mut queue = BuildQueue::new([1, 2]);
+
+        assert_eq!(
+            queue.best_ready(|_| Ok::<_, Infallible>(false), |_| 1),
+            Ok(None)
+        );
+        assert_eq!(queue.len(), 2);
+    }
+
+    #[test]
+    fn count_dependents_is_transitive_and_ignores_unplanned_names() {
+        // base <- lib <- app; tool needs nothing planned; cycle a <-> b.
+        let counts = count_dependents([
+            (name("base"), vec![name("external")]),
+            (name("lib"), vec![name("base")]),
+            (name("app"), vec![name("lib"), name("base")]),
+            (name("tool"), vec![name("external")]),
+            (name("a"), vec![name("b")]),
+            (name("b"), vec![name("a")]),
+        ]);
+
+        assert_eq!(counts[&name("base")], 2);
+        assert_eq!(counts[&name("lib")], 1);
+        assert_eq!(counts[&name("app")], 0);
+        assert_eq!(counts[&name("tool")], 0);
+        assert_eq!(counts[&name("a")], 1);
+        assert_eq!(counts[&name("b")], 1);
+        assert!(!counts.contains_key(&name("external")));
     }
 }
