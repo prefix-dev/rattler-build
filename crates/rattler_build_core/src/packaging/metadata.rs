@@ -222,6 +222,7 @@ pub fn create_prefix_placeholder(
     Ok(has_prefix.map(|placeholder| PrefixPlaceholder {
         file_mode,
         placeholder,
+        experimental_offsets: None,
     }))
 }
 
