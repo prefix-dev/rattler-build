@@ -261,7 +261,7 @@ environments:
       - conda: https://prefix.dev/conda-forge/osx-64/rust_osx-64-1.97.1-hb98ad99_0.conda
       - conda: https://prefix.dev/conda-forge/osx-64/sccache-0.17.0-h19f9e61_0.conda
       - conda: https://prefix.dev/conda-forge/osx-64/sigtool-codesign-0.1.3-h8c25ef7_1.conda
-      - conda: https://prefix.dev/conda-forge/osx-64/tapi-1600.0.11.8-h44950e2_3.conda
+      - conda: https://prefix.dev/conda-forge/osx-64/tapi-1600.0.11.8-h44950e2_4.conda
       - conda: https://prefix.dev/conda-forge/osx-64/tk-8.6.13-hb794df6_3.conda
       - conda: https://prefix.dev/conda-forge/osx-64/yaml-0.2.5-h4132b18_3.conda
       - conda: https://prefix.dev/conda-forge/osx-64/zstandard-0.25.0-py314h17af80e_3.conda
@@ -375,7 +375,7 @@ environments:
       - conda: https://prefix.dev/conda-forge/osx-arm64/rust_osx-arm64-1.97.1-h3e48229_0.conda
       - conda: https://prefix.dev/conda-forge/osx-arm64/sccache-0.17.0-h6fdd925_0.conda
       - conda: https://prefix.dev/conda-forge/osx-arm64/sigtool-codesign-0.1.3-h98dc951_1.conda
-      - conda: https://prefix.dev/conda-forge/osx-arm64/tapi-1600.0.11.8-hb561403_3.conda
+      - conda: https://prefix.dev/conda-forge/osx-arm64/tapi-1600.0.11.8-hb561403_4.conda
       - conda: https://prefix.dev/conda-forge/osx-arm64/tk-8.6.13-hd3d0363_3.conda
       - conda: https://prefix.dev/conda-forge/osx-arm64/yaml-0.2.5-h925e9cb_3.conda
       - conda: https://prefix.dev/conda-forge/osx-arm64/zstandard-0.25.0-py314hd98292b_3.conda
@@ -1169,7 +1169,7 @@ environments:
       - conda: https://prefix.dev/conda-forge/osx-64/sccache-0.17.0-h19f9e61_0.conda
       - conda: https://prefix.dev/conda-forge/osx-64/shellcheck-0.11.0-h7dd6a17_1.conda
       - conda: https://prefix.dev/conda-forge/osx-64/sigtool-codesign-0.1.3-h8c25ef7_1.conda
-      - conda: https://prefix.dev/conda-forge/osx-64/tapi-1600.0.11.8-h44950e2_3.conda
+      - conda: https://prefix.dev/conda-forge/osx-64/tapi-1600.0.11.8-h44950e2_4.conda
       - conda: https://prefix.dev/conda-forge/osx-64/taplo-0.10.0-h651e3a3_2.conda
       - conda: https://prefix.dev/conda-forge/osx-64/tk-8.6.13-hb794df6_3.conda
       - conda: https://prefix.dev/conda-forge/osx-64/typos-1.50.1-he704061_0.conda
@@ -1293,7 +1293,7 @@ environments:
       - conda: https://prefix.dev/conda-forge/osx-arm64/sccache-0.17.0-h6fdd925_0.conda
       - conda: https://prefix.dev/conda-forge/osx-arm64/shellcheck-0.11.0-hecfb573_1.conda
       - conda: https://prefix.dev/conda-forge/osx-arm64/sigtool-codesign-0.1.3-h98dc951_1.conda
-      - conda: https://prefix.dev/conda-forge/osx-arm64/tapi-1600.0.11.8-hb561403_3.conda
+      - conda: https://prefix.dev/conda-forge/osx-arm64/tapi-1600.0.11.8-hb561403_4.conda
       - conda: https://prefix.dev/conda-forge/osx-arm64/taplo-0.10.0-h17e24d4_2.conda
       - conda: https://prefix.dev/conda-forge/osx-arm64/tk-8.6.13-hd3d0363_3.conda
       - conda: https://prefix.dev/conda-forge/osx-arm64/typos-1.50.1-hc2d82ec_0.conda
@@ -1595,7 +1595,7 @@ environments:
       - conda: https://prefix.dev/conda-forge/osx-64/readline-8.3-h68b038d_0.conda
       - conda: https://prefix.dev/conda-forge/osx-64/rust-1.98.0-h5655b98_0.conda
       - conda: https://prefix.dev/conda-forge/osx-64/sigtool-codesign-0.1.3-h8c25ef7_1.conda
-      - conda: https://prefix.dev/conda-forge/osx-64/tapi-1600.0.11.8-h44950e2_3.conda
+      - conda: https://prefix.dev/conda-forge/osx-64/tapi-1600.0.11.8-h44950e2_4.conda
       - conda: https://prefix.dev/conda-forge/osx-64/tk-8.6.13-hb794df6_3.conda
       - conda: https://prefix.dev/conda-forge/osx-64/tornado-6.5.8-py314h217eccc_0.conda
       - conda: https://prefix.dev/conda-forge/osx-64/wasm-pack-0.15.0-h19f9e61_0.conda
@@ -1644,7 +1644,7 @@ environments:
       - conda: https://prefix.dev/conda-forge/osx-arm64/readline-8.3-h46df422_0.conda
       - conda: https://prefix.dev/conda-forge/osx-arm64/rust-1.98.0-h4ff7c5d_0.conda
       - conda: https://prefix.dev/conda-forge/osx-arm64/sigtool-codesign-0.1.3-h98dc951_1.conda
-      - conda: https://prefix.dev/conda-forge/osx-arm64/tapi-1600.0.11.8-hb561403_3.conda
+      - conda: https://prefix.dev/conda-forge/osx-arm64/tapi-1600.0.11.8-hb561403_4.conda
       - conda: https://prefix.dev/conda-forge/osx-arm64/tk-8.6.13-hd3d0363_3.conda
       - conda: https://prefix.dev/conda-forge/osx-arm64/tornado-6.5.8-py314h6c2aa35_0.conda
       - conda: https://prefix.dev/conda-forge/osx-arm64/wasm-pack-0.15.0-h6fdd925_0.conda
@@ -8008,28 +8008,17 @@ packages:
   run_exports: {}
   size: 123083
   timestamp: 1767045007433
-- conda: https://prefix.dev/conda-forge/osx-64/tapi-1600.0.11.8-h44950e2_3.conda
-  sha256: ec381e40cf1caf8496265bbf14ca0d2cb947495cd3e9069947e2fa75f7de7b3b
-  md5: 9b80c76b01a3a3a78d188d5055ad47a4
+- conda: https://prefix.dev/conda-forge/osx-64/tapi-1600.0.11.8-h44950e2_4.conda
+  sha256: 045e62838ec78ad75974552ebeeccbee5a4a843272da47c7a67e99fd9cc25d8d
+  md5: a70697fe1077cb11e33b11d6f6610314
   depends:
   - libcxx >=19.0.0.a0
   - __osx >=11.0
   - ncurses >=6.6,<7.0a0
   license: NCSA
   run_exports: {}
-  size: 214093
-  timestamp: 1785906287768
-- conda: https://prefix.dev/conda-forge/osx-64/tapi-1600.0.11.8-h8d8e812_2.conda
-  sha256: 0e814730160c8e214eadd7905e3659d8f52af86fd37d85fd287060748948a2b8
-  md5: 524528dee57e42d77b1af677137de5a5
-  depends:
-  - libcxx >=19.0.0.a0
-  - __osx >=10.13
-  - ncurses >=6.5,<7.0a0
-  license: NCSA
-  run_exports: {}
-  size: 213790
-  timestamp: 1775657389876
+  size: 216045
+  timestamp: 1789668322695
 - conda: https://prefix.dev/conda-forge/osx-64/taplo-0.10.0-h651e3a3_2.conda
   sha256: 8d0d5ca037061e4d08df26860466f95ed7b7d044cc8a6d2812fc522a6bcef38c
   md5: d0ca306378b3e170395e31aef18cca83
@@ -10052,28 +10041,17 @@ packages:
   run_exports: {}
   size: 114653
   timestamp: 1786115093248
-- conda: https://prefix.dev/conda-forge/osx-arm64/tapi-1600.0.11.8-h997e182_2.conda
-  sha256: de6893e53664e769c1b1c4103a666d436e3d307c0eb6a09a164e749d116e80f7
-  md5: 555070ad1e18b72de36e9ee7ed3236b3
-  depends:
-  - libcxx >=19.0.0.a0
-  - __osx >=11.0
-  - ncurses >=6.5,<7.0a0
-  license: NCSA
-  run_exports: {}
-  size: 200192
-  timestamp: 1775657222120
-- conda: https://prefix.dev/conda-forge/osx-arm64/tapi-1600.0.11.8-hb561403_3.conda
-  sha256: 9f1cc109e6e57861110e9de6e03beca7fd2b7fbdb46124cccc07990b0844d88a
-  md5: 0676b8719dd1e9bb1003e59a481c6c3e
+- conda: https://prefix.dev/conda-forge/osx-arm64/tapi-1600.0.11.8-hb561403_4.conda
+  sha256: 6effea9587f049e702c838e8e57d98ac92b89ca1f3f1edd51c78dd252d24e83b
+  md5: fdb31cc6c306f60e194f29f17397a63c
   depends:
   - libcxx >=19.0.0.a0
   - __osx >=11.0
   - ncurses >=6.6,<7.0a0
   license: NCSA
   run_exports: {}
-  size: 200397
-  timestamp: 1785906507697
+  size: 202107
+  timestamp: 1789668272580
 - conda: https://prefix.dev/conda-forge/osx-arm64/taplo-0.10.0-h17e24d4_2.conda
   sha256: 7cd99a6af769a497ab50d44d6697bb0cb50b20153153679aee1baef687963209
   md5: 8ee9613094590d6b7cbb2e98e5a75314
@@ -11790,7 +11768,6 @@ packages:
   - conda: https://prefix.dev/conda-forge/osx-arm64/rust-1.97.1-h4ff7c5d_0.conda
   - conda: https://prefix.dev/conda-forge/osx-arm64/rust_osx-arm64-1.97.1-h3e48229_0.conda
   - conda: https://prefix.dev/conda-forge/osx-arm64/sigtool-codesign-0.1.3-h98dc951_0.conda
-  - conda: https://prefix.dev/conda-forge/osx-arm64/tapi-1600.0.11.8-h997e182_2.conda
   - conda: https://prefix.dev/conda-forge/osx-arm64/zstd-1.5.7-hbf9d68e_6.conda
   host_packages:
   - conda: https://prefix.dev/conda-forge/noarch/ca-certificates-2026.7.22-hbd8a1cb_0.conda
@@ -11858,7 +11835,6 @@ packages:
   - conda: https://prefix.dev/conda-forge/osx-64/rust-1.97.1-h5655b98_0.conda
   - conda: https://prefix.dev/conda-forge/osx-64/rust_osx-64-1.97.1-hb98ad99_0.conda
   - conda: https://prefix.dev/conda-forge/osx-64/sigtool-codesign-0.1.3-hc0f2934_0.conda
-  - conda: https://prefix.dev/conda-forge/osx-64/tapi-1600.0.11.8-h8d8e812_2.conda
   - conda: https://prefix.dev/conda-forge/osx-64/zstd-1.5.7-h3eecb57_6.conda
   host_packages:
   - conda: https://prefix.dev/conda-forge/noarch/ca-certificates-2026.7.22-hbd8a1cb_0.conda
