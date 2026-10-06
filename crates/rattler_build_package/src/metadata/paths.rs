@@ -196,6 +196,7 @@ impl PathsJsonBuilder {
                     return Ok(Some(PrefixPlaceholder {
                         file_mode: FileMode::Text,
                         placeholder,
+                        experimental_offsets: None,
                     }));
                 }
                 None => FileMode::Text,
@@ -215,6 +216,7 @@ impl PathsJsonBuilder {
                 return Ok(Some(PrefixPlaceholder {
                     file_mode: FileMode::Binary,
                     placeholder: self.prefix.to_string_lossy().to_string(),
+                    experimental_offsets: None,
                 }));
             }
         }
