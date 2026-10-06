@@ -276,6 +276,9 @@ rattler_build_recipe = { workspace = true, features = ["variant-config"] }
 rattler_build_script = { workspace = true, features = ["execution"] }
 rattler_build_allocator = { workspace = true, optional = true }
 
+[target.'cfg(unix)'.dependencies]
+libc = { workspace = true }
+
 # cc >= 1.5.0 passes `-Tp` as a separate argument for `.cc` sources on MSVC (https://github.com/rust-lang/cc-rs/pull/1930), which sccache does not support and breaks the mimalloc build (https://github.com/mozilla/sccache/issues/2062).
 [target.'cfg(windows)'.dependencies]
 cc = "=1.4.7"

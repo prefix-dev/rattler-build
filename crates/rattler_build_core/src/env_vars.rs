@@ -209,6 +209,19 @@ pub fn language_vars(output: &Output) -> HashMap<String, Option<String>> {
     result
 }
 
+/// `MAKEFLAGS` advertising the GNU make jobserver shared by builds that run in
+/// parallel, if one is active. Owned by rattler-build, so it is passed to build
+/// scripts under every environment isolation mode.
+static JOBSERVER_MAKEFLAGS: std::sync::RwLock<Option<String>> = std::sync::RwLock::new(None);
+
+/// Sets (or clears) the `MAKEFLAGS` of the jobserver shared by parallel
+/// builds. Build scripts started afterwards receive it.
+pub fn set_jobserver_makeflags(makeflags: Option<String>) {
+    *JOBSERVER_MAKEFLAGS
+        .write()
+        .unwrap_or_else(|poisoned| poisoned.into_inner()) = makeflags;
+}
+
 /// Returns a map of environment variables that are used in the build process.
 /// Also adds platform-specific variables.
 ///
@@ -273,6 +286,13 @@ pub fn os_vars(
                 runtime.var("MAKEFLAGS").map(str::to_owned),
             );
         }
+    }
+    if let Some(makeflags) = JOBSERVER_MAKEFLAGS
+        .read()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .clone()
+    {
+        vars.insert("MAKEFLAGS".to_string(), Some(makeflags));
     }
 
     insert!(
