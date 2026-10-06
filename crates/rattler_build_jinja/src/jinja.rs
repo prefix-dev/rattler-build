@@ -999,6 +999,8 @@ mod tests {
 [user]
 	name = John Doe
 	email = johndoe@example.ne
+[tag]
+	gpgSign = false
 "#;
         fs::write(path.join(".git/config"), git_config)?;
         Ok(())
