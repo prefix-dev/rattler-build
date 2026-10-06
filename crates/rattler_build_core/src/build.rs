@@ -231,11 +231,14 @@ pub async fn run_build(
         }
     }
 
-    // Package all the new files
+    // Package all the new files. The archive is written into the shared output
+    // channel, so hold its lock while writing (see `OUTPUT_DIR_LOCK`).
+    let output_dir_guard = crate::types::OUTPUT_DIR_LOCK.lock().await;
     let (result, paths_json) = output
         .create_package(tool_configuration, install_added_files.as_ref())
         .await
         .into_diagnostic()?;
+    drop(output_dir_guard);
 
     // Check for binary prefix if configured
     if tool_configuration.error_prefix_in_binary {

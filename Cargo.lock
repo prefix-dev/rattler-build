@@ -4889,6 +4889,7 @@ dependencies = [
  "indexmap 2.14.2",
  "insta",
  "jiff",
+ "libc",
  "memmap2",
  "miette",
  "minijinja",

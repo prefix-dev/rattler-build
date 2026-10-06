@@ -65,6 +65,10 @@ rattler-build build [OPTIONS]
 <br>May be provided more than once.
 - <a id="arg---continue-on-failure" href="#arg---continue-on-failure">`--continue-on-failure`</a>
 :  Continue building even if (one) of the packages fails to build. This is useful when building many packages with `--recipe-dir`.`
+- <a id="arg---max-parallel-builds" href="#arg---max-parallel-builds">`--max-parallel-builds <MAX_PARALLEL_BUILDS>`</a>
+:  Build up to this many outputs at the same time, as soon as their dependencies are available (default: 1). With more than one, a shared GNU make jobserver limits the total number of jobs (on unix)
+- <a id="arg---parallel-build-jobs" href="#arg---parallel-build-jobs">`--parallel-build-jobs <PARALLEL_BUILD_JOBS>`</a>
+:  The total number of jobs shared by parallel builds through the jobserver; honoured by make >= 4.4 and ninja >= 1.13 (default: the number of CPUs)
 
 ## Modifying result
 - <a id="arg---build-num" href="#arg---build-num">`--build-num <BUILD_NUM>`</a>
