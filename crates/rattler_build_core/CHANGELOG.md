@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.16](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.15...rattler_build_core-v0.2.16) - 2026-10-06
+
+### Other
+
+- update rattler to 0.52 ([#2844](https://github.com/prefix-dev/rattler-build/pull/2844))
+
 ## [0.2.15](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.14...rattler_build_core-v0.2.15) - 2026-09-30
 
 ### Added
