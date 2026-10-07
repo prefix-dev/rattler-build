@@ -88,8 +88,9 @@ build:
     assert (source / "checked.txt").read_text().strip() == "checked"
 
 
+@pytest.mark.parametrize("metadata", [False, True])
 def test_run_refuses_changed_sources_without_discarding_edits(
-    rattler_build: RattlerBuild, tmp_path: Path
+    rattler_build: RattlerBuild, tmp_path: Path, metadata: bool
 ):
     for name in ["first", "second"]:
         source = tmp_path / name
@@ -100,6 +101,11 @@ def test_run_refuses_changed_sources_without_discarding_edits(
         "source": {"path": "first"},
         "build": {"steps": [{"name": "check", "run": "echo ran >> runs.txt"}]},
     }
+    if metadata:
+        output_file = '"%OUTPUT_FILE%"' if os.name == "nt" else '"$OUTPUT_FILE"'
+        recipe["build"]["metadata"] = {
+            "run": f"echo about.summary generated > {output_file}"
+        }
     recipe_path = tmp_path / "recipe.yaml"
     recipe_path.write_text(yaml.safe_dump(recipe))
     args = [
@@ -126,6 +132,7 @@ def test_run_refuses_changed_sources_without_discarding_edits(
     assert result.returncode != 0
     assert "prepared sources" in result.stderr
     assert "do not match" in result.stderr
+    assert "Running pre-solve metadata step" not in result.stderr
     assert (work / "input.txt").read_text() == "local edit"
     assert len((work / "runs.txt").read_text().splitlines()) == 2
 

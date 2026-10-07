@@ -1,0 +1,22 @@
+inputs:
+  backend_args:
+    type: list
+    items: string
+    default: []
+
+requirements:
+  build: [python >=3.11, packaging, python-rattler-build-steps ==0.2.0]
+
+steps:
+  - name: python-metadata
+    interpreter: python
+    env:
+      RATTLER_BUILD_PROVIDER_VERSION: "0.2.0"
+      RATTLER_BUILD_BACKEND_ARGS: ${{ inputs.backend_args | join(' ') }}
+    run: |
+      import os
+      from pathlib import Path
+      import runpy
+
+      backend = Path(os.environ["BUILD_PREFIX"]) / "etc" / "rattler-build" / "steps" / "python" / "python_metadata_backend.py"
+      runpy.run_path(backend, run_name="__main__")
