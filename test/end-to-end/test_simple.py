@@ -3520,6 +3520,26 @@ def test_overlinking_host_not_run(
 
 
 @pytest.mark.skipif(platform.system() != "Linux", reason="Linux-only test")
+def test_linking_symlinked_soname(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Regression test for https://github.com/prefix-dev/rattler-build/issues/2830
+
+    `libgomp.so.1` is a symlink owned by `_openmp_mutex` (the run export of
+    `libgomp`) that points to `libgomp.so.1.0.0` owned by `libgomp`. The link
+    check must attribute the library to the owner of the SONAME symlink
+    instead of the owner of the resolved target.
+    """
+    args = rattler_build.build_args(
+        recipes / "linking-symlinked-soname",
+        tmp_path,
+        extra_args=["--target-platform", "linux-64"],
+    )
+    output = rattler_build(*args, stderr=STDOUT)
+    assert "lib/libgomp.so.1 (_openmp_mutex)" in output
+
+
+@pytest.mark.skipif(platform.system() != "Linux", reason="Linux-only test")
 def test_allow_missing_dso(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     args = rattler_build.build_args(
         recipes / "allow_missing_dso",

@@ -157,7 +157,12 @@ impl Relinker for SharedObject {
                 for rpath in resolved_rpaths.iter().chain(resolved_runpaths.iter()) {
                     let candidate = rpath.join(library_path);
                     if candidate.exists() {
-                        resolved_library_path = Some(candidate.canonicalize().unwrap_or(candidate));
+                        // Do not canonicalize: the SONAME is usually a symlink
+                        // (e.g. `libgomp.so.1` -> `libgomp.so.1.0.0`) and the
+                        // symlink may be owned by a different package than its
+                        // target. The linking checks need the path the loader
+                        // actually looks up.
+                        resolved_library_path = Some(candidate);
                         break;
                     }
                 }
