@@ -656,13 +656,18 @@ fn package_info_to_recipe(
     }
 
     // `URL:` lists one or more URLs separated by commas and/or whitespace; the
-    // first one is the package's home page by convention.
-    if let Some(url) = info.URL.as_deref().and_then(|urls| {
+    // first one is the package's home page by convention. Without one, a CRAN
+    // package falls back to its CRAN page, as `conda skeleton cran` does:
+    // conda-forge's linter requires a home page.
+    let homepage = info.URL.as_deref().and_then(|urls| {
         urls.split(|c: char| c == ',' || c.is_whitespace())
             .find(|url| !url.is_empty())
-    }) {
-        recipe.about.homepage = Some(url.to_string());
-    }
+            .map(str::to_string)
+    });
+    recipe.about.homepage = homepage.or_else(|| {
+        (info._user == "cran")
+            .then(|| format!("https://CRAN.R-project.org/package={}", info.Package))
+    });
 
     recipe.about.summary = Some(info.Title.clone());
     // Trailing whitespace would force the description into a quoted scalar
@@ -1039,7 +1044,24 @@ mod tests {
                 "{urls:?}"
             );
         }
-        info.URL = None;
+    }
+
+    /// conda-forge's linter requires a home page, so a CRAN package without a
+    /// usable `URL:` field gets its CRAN page. A package of another universe
+    /// need not be on CRAN, and gets none.
+    #[test]
+    fn homepage_falls_back_to_the_cran_page_for_cran_packages() {
+        let mut info = fixture("tinkr");
+        for urls in [None, Some(String::new()), Some(" ,\n".to_string())] {
+            info.URL = urls.clone();
+            let (recipe, _) = package_info_to_recipe(&info, None, &RecipeOptions::default());
+            assert_eq!(
+                recipe.about.homepage.as_deref(),
+                Some("https://CRAN.R-project.org/package=tinkr"),
+                "{urls:?}"
+            );
+        }
+        info._user = "ropensci".to_string();
         let (recipe, _) = package_info_to_recipe(&info, None, &RecipeOptions::default());
         assert_eq!(recipe.about.homepage, None);
     }
