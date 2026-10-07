@@ -146,6 +146,13 @@ pub struct Configuration {
     /// Whether to continue building on failure of a package or stop the build
     pub continue_on_failure: ContinueOnFailure,
 
+    /// The maximum number of outputs built at the same time (at least 1).
+    pub max_parallel_builds: usize,
+
+    /// With more than one parallel build, the total number of jobs shared by
+    /// all builds through a jobserver (default: the number of CPUs).
+    pub parallel_build_jobs: Option<usize>,
+
     /// Whether to error if the host prefix is detected in binary files
     pub error_prefix_in_binary: bool,
 
@@ -222,6 +229,8 @@ pub struct ConfigurationBuilder {
     channel_priority: ChannelPriority,
     allow_insecure_host: Option<Vec<String>>,
     continue_on_failure: ContinueOnFailure,
+    max_parallel_builds: usize,
+    parallel_build_jobs: Option<usize>,
     error_prefix_in_binary: bool,
     error_overlapping_files: bool,
     error_unused_staging_files: bool,
@@ -259,6 +268,8 @@ impl ConfigurationBuilder {
             channel_priority: ChannelPriority::Strict,
             allow_insecure_host: None,
             continue_on_failure: ContinueOnFailure::No,
+            max_parallel_builds: 1,
+            parallel_build_jobs: None,
             error_prefix_in_binary: false,
             error_overlapping_files: false,
             error_unused_staging_files: false,
@@ -281,6 +292,22 @@ impl ConfigurationBuilder {
     pub fn with_continue_on_failure(self, continue_on_failure: ContinueOnFailure) -> Self {
         Self {
             continue_on_failure,
+            ..self
+        }
+    }
+
+    /// The maximum number of outputs built at the same time
+    pub fn with_max_parallel_builds(self, max_parallel_builds: usize) -> Self {
+        Self {
+            max_parallel_builds: max_parallel_builds.max(1),
+            ..self
+        }
+    }
+
+    /// The total number of jobs shared by parallel builds through a jobserver
+    pub fn with_parallel_build_jobs(self, parallel_build_jobs: Option<usize>) -> Self {
+        Self {
+            parallel_build_jobs,
             ..self
         }
     }
@@ -533,6 +560,8 @@ impl ConfigurationBuilder {
             channel_priority: self.channel_priority,
             allow_insecure_host: self.allow_insecure_host,
             continue_on_failure: self.continue_on_failure,
+            max_parallel_builds: self.max_parallel_builds,
+            parallel_build_jobs: self.parallel_build_jobs,
             error_prefix_in_binary: self.error_prefix_in_binary,
             error_overlapping_files: self.error_overlapping_files,
             error_unused_staging_files: self.error_unused_staging_files,
