@@ -349,11 +349,12 @@ fn compiled_build_script() -> Script {
 }
 
 /// `cross-r-base` is required to cross-compile; `r_base` is the conda-forge
-/// variant key pinning the R version.
+/// variant key pinning the R version. The variant names a `major.minor`
+/// series (e.g. `4.5`), so `.*` is needed to match its patch releases.
 fn cross_r_base_requirement() -> Requirement {
     Requirement::Conditional {
         condition: "build_platform != target_platform".to_string(),
-        then: vec!["cross-r-base ${{ r_base }}".to_string()],
+        then: vec!["cross-r-base ${{ r_base }}.*".to_string()],
     }
 }
 
