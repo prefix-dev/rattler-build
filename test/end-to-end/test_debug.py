@@ -32,6 +32,26 @@ def test_debug_basic(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path,
         assert (work_dir / "conda_build.sh").exists()
 
 
+def test_debug_test_selection(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, capfd
+):
+    rattler_build(
+        "debug",
+        "setup",
+        "--recipe",
+        str(recipes / "test-execution" / "recipe-test-succeed.yaml"),
+        "--output-dir",
+        str(tmp_path),
+        "--test",
+        "1",
+    )
+
+    _out, err = capfd.readouterr()
+    assert "Running test 1 of 3" in err
+    assert "Test 1 passed!" in err
+    assert next(tmp_path.glob("**/test_debug_1")).is_dir()
+
+
 def test_debug_multiple_outputs(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, capfd
 ):
