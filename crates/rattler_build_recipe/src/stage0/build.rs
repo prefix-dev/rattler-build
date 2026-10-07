@@ -29,13 +29,34 @@ pub struct VariantKeyUsage {
 
 /// A single build step.
 ///
-/// Steps are an ordered, GitHub-Actions-style alternative to a monolithic
-/// `build.script`. A step is an inline `run` script.
+/// Source steps are inline scripts or action invocations compiled into
+/// executable steps.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(untagged)]
 pub enum Step {
     /// An inline script step.
-    Run(RunStep),
+    Run(Box<RunStep>),
+    /// A render-time action invocation, never an executable step.
+    Uses(Box<UsesStep>),
+}
+
+/// Source-only action invocation.
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct UsesStep {
+    pub uses: Value<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub optional: bool,
+    #[serde(default)]
+    pub depends_on: Vec<String>,
+    #[serde(default, rename = "if", skip_serializing_if = "Option::is_none")]
+    pub condition: Option<JinjaExpression>,
+    #[serde(skip)]
+    pub condition_span: Option<Span>,
+    #[serde(default, rename = "with")]
+    pub inputs: indexmap::IndexMap<String, crate::actions::ActionValue>,
 }
 
 /// Dependencies added to the selected step solve group.
@@ -176,6 +197,16 @@ impl Step {
     pub fn used_variables(&self) -> Vec<String> {
         match self {
             Step::Run(run) => run.used_variables(),
+            Step::Uses(action) => {
+                let mut vars = action.uses.used_variables();
+                if let Some(condition) = &action.condition {
+                    vars.extend(condition.used_variables().iter().cloned());
+                }
+                for value in action.inputs.values() {
+                    vars.extend(value.used_variables());
+                }
+                vars
+            }
         }
     }
 }
