@@ -75,7 +75,7 @@ pub trait PackageContentsTestExt {
         &self,
         section: Section,
         exists: bool,
-        target_platform: &Subdir,
+        host_platform: &Subdir,
         version_independent: bool,
     ) -> Result<Vec<(String, GlobSet)>, globset::Error>;
 
@@ -84,7 +84,7 @@ pub trait PackageContentsTestExt {
         &self,
         section: Section,
         exists: bool,
-        target_platform: &Subdir,
+        host_platform: &Subdir,
         version_independent: bool,
     ) -> Result<Vec<(String, GlobSet)>, globset::Error>;
 
@@ -193,7 +193,7 @@ impl PackageContentsTestExt for PackageContentsTest {
         &self,
         section: Section,
         exists: bool,
-        target_platform: &Subdir,
+        host_platform: &Subdir,
         version_independent: bool,
     ) -> Result<Vec<(String, GlobSet)>, globset::Error> {
         match section {
@@ -204,7 +204,7 @@ impl PackageContentsTestExt for PackageContentsTest {
                     self.include.not_exists.include_globs()
                 };
                 Self::match_files(raws, |source| {
-                    let pattern = if target_platform.is_windows() {
+                    let pattern = if host_platform.is_windows() {
                         format!("Library/include/{}", source)
                     } else {
                         format!("include/{}", source)
@@ -219,7 +219,7 @@ impl PackageContentsTestExt for PackageContentsTest {
                     self.bin.not_exists.include_globs()
                 };
                 Self::match_files(raws, |bin_raw| {
-                    let patterns = if target_platform.is_windows() {
+                    let patterns = if host_platform.is_windows() {
                         let ext = "{,.exe,.bat,.cmd,.com,.ps1}";
                         vec![
                             format!("Library/bin/{bin_raw}{ext}"),
@@ -229,7 +229,7 @@ impl PackageContentsTestExt for PackageContentsTest {
                             format!("Library/usr/bin/{bin_raw}{ext}"),
                             format!("{bin_raw}{ext}"),
                         ]
-                    } else if matches!(target_platform, &Subdir::EmscriptenWasm32) {
+                    } else if matches!(host_platform, &Subdir::EmscriptenWasm32) {
                         vec![format!("bin/{bin_raw}.js"), format!("bin/{bin_raw}.wasm")]
                     } else {
                         vec![format!("bin/{bin_raw}")]
@@ -243,7 +243,7 @@ impl PackageContentsTestExt for PackageContentsTest {
                 } else {
                     self.lib.not_exists.include_globs()
                 };
-                if target_platform.is_windows() {
+                if host_platform.is_windows() {
                     Self::match_files(raws, |raw| {
                         let mut res = Vec::new();
                         if raw.ends_with(".dll") {
@@ -258,7 +258,7 @@ impl PackageContentsTestExt for PackageContentsTest {
                     })
                 } else {
                     Self::match_files(raws, |raw| {
-                        let patterns = if target_platform.is_osx() || target_platform.is_ios() {
+                        let patterns = if host_platform.is_osx() || host_platform.is_ios() {
                             if raw.ends_with(".dylib") || raw.ends_with(".a") {
                                 vec![format!("lib/{raw}")]
                             } else {
@@ -291,7 +291,7 @@ impl PackageContentsTestExt for PackageContentsTest {
                 Self::match_files(raws, |source| {
                     let base = if version_independent {
                         "site-packages"
-                    } else if target_platform.is_windows() {
+                    } else if host_platform.is_windows() {
                         // Python <= 3.14 uses `Lib/site-packages`, Python >= 3.15
                         // uses `lib/python/site-packages` on Windows
                         "{Lib,lib/python}/site-packages"
@@ -333,10 +333,10 @@ impl PackageContentsTestExt for PackageContentsTest {
         &self,
         section: Section,
         exists: bool,
-        target_platform: &Subdir,
+        host_platform: &Subdir,
         version_independent: bool,
     ) -> Result<Vec<(String, GlobSet)>, globset::Error> {
-        self.build_section_globs(section, exists, target_platform, version_independent)
+        self.build_section_globs(section, exists, host_platform, version_independent)
     }
 
     /// Get include globs that should exist
@@ -397,7 +397,9 @@ impl PackageContentsTestExt for PackageContentsTest {
     fn run_test(&self, paths: &PathsJson, output: &Output) -> Result<(), TestError> {
         let span = tracing::info_span!("Package content test");
         let _enter = span.enter();
-        let target_platform = output.target_platform();
+        // Use the host platform rather than the target platform so that noarch
+        // packages built for Windows are checked against the `Library/` layout.
+        let host_platform = &output.host_platform().platform;
         let paths: Vec<&PathBuf> = paths.paths.iter().map(|p| &p.relative_path).collect();
 
         let mut collected_issues = Vec::new();
@@ -418,7 +420,7 @@ impl PackageContentsTestExt for PackageContentsTest {
             let globs = self.get_globs_for_section(
                 section.clone(),
                 true,
-                target_platform,
+                host_platform,
                 version_independent_override,
             )?;
             Self::check_globs(
@@ -434,7 +436,7 @@ impl PackageContentsTestExt for PackageContentsTest {
             let globs = self.get_globs_for_section(
                 section,
                 false,
-                target_platform,
+                host_platform,
                 version_independent_override,
             )?;
             Self::check_globs(
@@ -503,13 +505,17 @@ impl PackageContentsTestExt for PackageContentsTest {
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
+    use std::path::{Path, PathBuf};
 
     use super::{PackageContentsTestExt, Section};
+    use crate::types::{Output, PlatformWithVirtualPackages};
     use globset::GlobSet;
     use rattler_build_recipe::stage1::tests::{PackageContentsCheckFiles, PackageContentsTest};
     use rattler_build_types::GlobVec;
-    use rattler_conda_types::Subdir;
+    use rattler_conda_types::{
+        Subdir,
+        package::{PathType, PathsEntry, PathsJson},
+    };
     use serde::Deserialize;
 
     #[derive(Debug)]
@@ -772,5 +778,62 @@ mod tests {
             ..Default::default()
         };
         assert!(!non_strict_contents.strict);
+    }
+
+    /// Load a rendered noarch output and override its host platform.
+    fn noarch_output_for_host(host_platform: Subdir) -> Output {
+        let recipe_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/rendered_recipes/rich_recipe.yaml");
+        let recipe = fs_err::read_to_string(recipe_path).unwrap();
+        let mut output: Output = serde_yaml::from_str(&recipe).unwrap();
+        assert_eq!(output.target_platform(), &Subdir::NoArch);
+        output.build_configuration.host_platform = PlatformWithVirtualPackages {
+            platform: host_platform,
+            virtual_packages: vec![],
+        };
+        output
+    }
+
+    fn make_paths_json(paths: &[&str]) -> PathsJson {
+        PathsJson {
+            paths: paths
+                .iter()
+                .map(|p| PathsEntry {
+                    relative_path: PathBuf::from(p),
+                    no_link: false,
+                    path_type: PathType::HardLink,
+                    prefix_placeholder: None,
+                    sha256: None,
+                    size_in_bytes: None,
+                })
+                .collect(),
+            paths_version: 1,
+        }
+    }
+
+    #[test]
+    fn test_noarch_uses_host_platform() {
+        let package_contents = PackageContentsTest {
+            include: make_check_files(vec!["foo.h"], None),
+            ..Default::default()
+        };
+
+        // A noarch package built for Windows is checked against `Library/`
+        let win_output = noarch_output_for_host(Subdir::Win64);
+        package_contents
+            .run_test(&make_paths_json(&["Library/include/foo.h"]), &win_output)
+            .unwrap();
+        package_contents
+            .run_test(&make_paths_json(&["include/foo.h"]), &win_output)
+            .unwrap_err();
+
+        // A noarch package built for Linux is checked against the unix layout
+        let linux_output = noarch_output_for_host(Subdir::Linux64);
+        package_contents
+            .run_test(&make_paths_json(&["include/foo.h"]), &linux_output)
+            .unwrap();
+        package_contents
+            .run_test(&make_paths_json(&["Library/include/foo.h"]), &linux_output)
+            .unwrap_err();
     }
 }
