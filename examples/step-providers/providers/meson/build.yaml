@@ -1,0 +1,29 @@
+schema_version: 1
+
+inputs:
+  build_type:
+    type: string
+    default: release
+  extra_args:
+    type: list
+    items: string
+    default: []
+  compile_args:
+    type: list
+    items: string
+    default: []
+  install:
+    type: boolean
+    default: true
+steps:
+  - name: meson-setup
+    requirements:
+      build: [meson, ninja, pkg-config]
+    run: meson setup "$BUILD_DIR/meson" "$SRC_DIR" --buildtype=${{ inputs.build_type }} --prefix="$PREFIX" --libdir=lib ${{ inputs.extra_args | join(' ') }}
+  - name: meson-compile
+    depends_on: [meson-setup]
+    run: meson compile -C "$BUILD_DIR/meson" ${{ inputs.compile_args | join(' ') }} ${MESON_COMPILE_ARGS:-}
+  - name: meson-install
+    if: inputs.install
+    depends_on: [meson-compile]
+    run: meson install -C "$BUILD_DIR/meson" ${MESON_INSTALL_ARGS:-}

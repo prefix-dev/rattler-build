@@ -1,0 +1,28 @@
+schema_version: 1
+
+package:
+  name: cmake-rattler-build-steps
+  version: 0.4.0
+
+source:
+  path: build.yaml
+
+build:
+  noarch: generic
+  script:
+    interpreter: python
+    content: |
+      import os
+      from pathlib import Path
+      import shutil
+
+      target = Path(os.environ["PREFIX"]) / "etc/rattler-build/steps/cmake"
+      target.mkdir(parents=True, exist_ok=True)
+      shutil.copy2(Path(os.environ["SRC_DIR"]) / "build.yaml", target / "build.yaml")
+
+requirements:
+  build: [python]
+
+about:
+  license: BSD-3-Clause
+  summary: Experimental CMake build action for rattler-build
