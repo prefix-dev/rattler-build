@@ -18,12 +18,13 @@ pub struct PyVariantConfig {
 
 #[pymethods]
 impl PyVariantConfig {
-    /// Create a new VariantConfig with optional variants and zip_keys
+    /// Create a new VariantConfig with optional variants, zip_keys, and force_use_keys
     #[new]
-    #[pyo3(signature = (variants=None, zip_keys=None))]
+    #[pyo3(signature = (variants=None, zip_keys=None, force_use_keys=None))]
     fn new(
         variants: Option<Bound<'_, PyDict>>,
         zip_keys: Option<Vec<Vec<String>>>,
+        force_use_keys: Option<Vec<String>>,
     ) -> PyResult<Self> {
         let mut inner = VariantConfig {
             zip_keys: zip_keys.map(|zk| {
@@ -31,6 +32,8 @@ impl PyVariantConfig {
                     .map(|group| group.into_iter().map(NormalizedKey::from).collect())
                     .collect()
             }),
+            force_use_keys: force_use_keys
+                .map(|keys| keys.into_iter().map(NormalizedKey::from).collect()),
             ..Default::default()
         };
 
@@ -174,6 +177,15 @@ impl PyVariantConfig {
                 .map(|group| group.iter().map(|k| k.normalize()).collect())
                 .collect()
         })
+    }
+
+    /// Get keys that are included in every build
+    #[getter]
+    fn force_use_keys(&self) -> Option<Vec<String>> {
+        self.inner
+            .force_use_keys
+            .as_ref()
+            .map(|keys| keys.iter().map(NormalizedKey::normalize).collect())
     }
 
     /// Get values for a specific variant key
