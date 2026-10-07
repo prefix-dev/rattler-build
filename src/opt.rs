@@ -715,6 +715,13 @@ pub struct BuildOpts {
     #[clap(long)]
     pub continue_on_failure: bool,
 
+    /// With `--continue-on-failure`, skip every package that needs a package
+    /// whose build failed in this run (as a build or host dependency, or
+    /// through their run dependencies), instead of building it later against
+    /// the configured channels.
+    #[clap(long, requires = "continue_on_failure")]
+    pub skip_dependents_of_failed: bool,
+
     /// Error if the host prefix is detected in any binary files
     #[arg(long, help_heading = "Modifying result")]
     pub error_prefix_in_binary: bool,
@@ -928,6 +935,7 @@ pub struct BuildData {
     pub extra_meta: Option<Vec<(String, Value)>>,
     pub sandbox_configuration: Option<SandboxConfiguration>,
     pub continue_on_failure: ContinueOnFailure,
+    pub skip_dependents_of_failed: bool,
     pub error_prefix_in_binary: bool,
     pub allow_symlinks_on_windows: bool,
     pub error_overlapping_files: bool,
@@ -1015,6 +1023,7 @@ impl BuildData {
             extra_meta,
             sandbox_configuration,
             continue_on_failure,
+            skip_dependents_of_failed: false,
             error_prefix_in_binary,
             allow_symlinks_on_windows,
             error_overlapping_files,
@@ -1081,6 +1090,7 @@ impl BuildData {
             opts.markdown_summary,
         );
         build_data.channels_from_config = !explicit_channels && build_data.channels.is_some();
+        build_data.skip_dependents_of_failed = opts.skip_dependents_of_failed;
         build_data
     }
 }

@@ -146,6 +146,11 @@ pub struct Configuration {
     /// Whether to continue building on failure of a package or stop the build
     pub continue_on_failure: ContinueOnFailure,
 
+    /// With `continue_on_failure`, skip the outputs that need an output whose
+    /// build failed, instead of attempting them against the configured
+    /// channels.
+    pub skip_dependents_of_failed: bool,
+
     /// Whether to error if the host prefix is detected in binary files
     pub error_prefix_in_binary: bool,
 
@@ -222,6 +227,7 @@ pub struct ConfigurationBuilder {
     channel_priority: ChannelPriority,
     allow_insecure_host: Option<Vec<String>>,
     continue_on_failure: ContinueOnFailure,
+    skip_dependents_of_failed: bool,
     error_prefix_in_binary: bool,
     error_overlapping_files: bool,
     error_unused_staging_files: bool,
@@ -259,6 +265,7 @@ impl ConfigurationBuilder {
             channel_priority: ChannelPriority::Strict,
             allow_insecure_host: None,
             continue_on_failure: ContinueOnFailure::No,
+            skip_dependents_of_failed: false,
             error_prefix_in_binary: false,
             error_overlapping_files: false,
             error_unused_staging_files: false,
@@ -281,6 +288,15 @@ impl ConfigurationBuilder {
     pub fn with_continue_on_failure(self, continue_on_failure: ContinueOnFailure) -> Self {
         Self {
             continue_on_failure,
+            ..self
+        }
+    }
+
+    /// With `continue_on_failure`, whether to skip the outputs that need an
+    /// output whose build failed
+    pub fn with_skip_dependents_of_failed(self, skip_dependents_of_failed: bool) -> Self {
+        Self {
+            skip_dependents_of_failed,
             ..self
         }
     }
@@ -533,6 +549,7 @@ impl ConfigurationBuilder {
             channel_priority: self.channel_priority,
             allow_insecure_host: self.allow_insecure_host,
             continue_on_failure: self.continue_on_failure,
+            skip_dependents_of_failed: self.skip_dependents_of_failed,
             error_prefix_in_binary: self.error_prefix_in_binary,
             error_overlapping_files: self.error_overlapping_files,
             error_unused_staging_files: self.error_unused_staging_files,
