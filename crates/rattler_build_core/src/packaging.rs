@@ -21,7 +21,7 @@ use unicode_normalization::UnicodeNormalization;
 
 mod file_finder;
 pub(crate) mod file_mapper;
-mod metadata;
+pub(crate) mod metadata;
 pub use file_finder::{Files, TempFiles, content_type, read_package_files_list, record_files};
 pub use metadata::{contains_prefix_binary, contains_prefix_text, create_prefix_placeholder};
 use tempfile::NamedTempFile;
@@ -368,7 +368,7 @@ fn copy_license_files(
 }
 
 fn write_recipe_folder(
-    output: &Output,
+    mut output: Output,
     tmp_dir_path: &Path,
 ) -> Result<Vec<PathBuf>, PackagingError> {
     let recipe_folder = tmp_dir_path.join("info/recipe/");
@@ -414,9 +414,8 @@ fn write_recipe_folder(
         .write_all(serde_yaml::to_string(&output.build_configuration.variant)?.as_bytes())?;
     files.push(variant_config_file);
 
-    let mut output_clean = output.clone();
     // clean URLs of any secrets or tokens
-    output_clean.build_configuration.channels = output_clean
+    output.build_configuration.channels = output
         .build_configuration
         .channels
         .iter()
@@ -428,7 +427,7 @@ fn write_recipe_folder(
     // replaced with their values)
     let rendered_recipe_file = recipe_folder.join("rendered_recipe.yaml");
     let mut rendered_recipe = File::create(&rendered_recipe_file)?;
-    rendered_recipe.write_all(serde_yaml::to_string(&output_clean)?.as_bytes())?;
+    rendered_recipe.write_all(serde_yaml::to_string(&output)?.as_bytes())?;
     files.push(rendered_recipe_file);
 
     Ok(files)
@@ -834,6 +833,7 @@ fn print_enhanced_file_listing(
 /// The `local_channel_dir` is the path to the local channel / output directory.
 pub fn package_conda(
     output: &Output,
+    rebuild_output: Output,
     tool_configuration: &tool_configuration::Configuration,
     files: &Files,
 ) -> Result<(PathBuf, PathsJson), PackagingError> {
@@ -882,7 +882,7 @@ pub fn package_conda(
 
     tracing::info!("Copying recipe files");
     if output.build_configuration.store_recipe {
-        let recipe_files = write_recipe_folder(output, tmp.temp_dir.path())?;
+        let recipe_files = write_recipe_folder(rebuild_output, tmp.temp_dir.path())?;
         tmp.add_files(recipe_files);
     }
 
@@ -1016,10 +1016,15 @@ impl Output {
     /// Create a conda package from any new files in the host prefix. Note: the
     /// previous stages should have been completed before calling this
     /// function.
+    ///
+    /// `rebuild_output` is the finalized execution input before build-step
+    /// outputs were applied. Only the embedded recipe uses this baseline;
+    /// package metadata and post-processing use `self`.
     pub async fn create_package(
         &self,
         tool_configuration: &tool_configuration::Configuration,
         post_install_files: Option<&HashSet<PathBuf>>,
+        rebuild_output: Output,
     ) -> Result<(PathBuf, PathsJson), PackagingError> {
         let span = tracing::info_span!("Packaging new files");
         let _enter = span.enter();
@@ -1052,7 +1057,7 @@ impl Output {
             )?,
         };
 
-        package_conda(self, tool_configuration, &files_after)
+        package_conda(self, rebuild_output, tool_configuration, &files_after)
     }
 }
 
