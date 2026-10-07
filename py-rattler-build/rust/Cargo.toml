@@ -37,7 +37,7 @@ tokio = { version = "1.53.1", features = [
 ] }
 rattler_conda_types = "0.56.1"
 rattler_config = "0.9.0"
-rattler_networking = { version = "0.32.1" }
+rattler_networking = { version = "0.33" }
 rattler_redaction = { version = "0.2.7", default-features = false }
 rattler_solve = "11.1"
 rattler_virtual_packages = "8.1"
@@ -45,7 +45,7 @@ clap = "4.6.6"
 url = "2.5.8"
 jiff = "0.2.35"
 hex = "0.4.3"
-rattler_upload = "0.12.2"
+rattler_upload = "0.13"
 rattler_package_streaming = { version = "0.27.10", default-features = false }
 miette = "7.6.0"
 tempfile = "3.27.0"
