@@ -1,6 +1,6 @@
 [package]
 name = "rattler_build_recipe"
-version = "0.1.17"
+version = "0.1.18"
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
