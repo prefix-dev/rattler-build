@@ -510,6 +510,31 @@ impl OutputBuildQueue {
         BuildReadiness::new(&self.planned_outputs, &self.processed_outputs).can_test(output)
     }
 
+    /// Like [`Self::next_ready`], for a build loop with `in_flight` builds
+    /// running.
+    ///
+    /// Returns `Ok(None)` while no output is buildable but a running build may
+    /// still unblock one. The fallback to the first blocked output is only used
+    /// when nothing is in flight, so the outputs that are attempted, and what
+    /// the solver may pick from the configured channels, are the same as in a
+    /// serial build.
+    pub(crate) fn next_ready_parallel(
+        &mut self,
+        in_flight: usize,
+    ) -> Result<Option<Output>, BuildQueueError> {
+        if in_flight == 0 {
+            return self.next_ready();
+        }
+        let readiness = BuildReadiness::new(&self.planned_outputs, &self.processed_outputs);
+        match self
+            .queue
+            .next_ready(|output| readiness.can_build(output))?
+        {
+            NextReady::Ready(output) => Ok(Some(output)),
+            NextReady::Empty | NextReady::Blocked => Ok(None),
+        }
+    }
+
     /// Removes the next buildable output, or the first blocked output as a fallback.
     pub(crate) fn next_ready(&mut self) -> Result<Option<Output>, BuildQueueError> {
         let readiness = BuildReadiness::new(&self.planned_outputs, &self.processed_outputs);

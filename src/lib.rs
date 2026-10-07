@@ -26,7 +26,9 @@ pub use rattler_build_core::utils;
 
 mod build_queue;
 pub mod config;
+mod jobserver;
 pub mod opt;
+mod parallel_builds;
 
 // Re-export recipe generator
 #[cfg(feature = "recipe-generation")]
@@ -50,10 +52,10 @@ use build_queue::OutputBuildQueue;
 use console_utils::LoggingOutputHandler;
 use dunce::canonicalize;
 use fs_err as fs;
-use futures::FutureExt;
 use miette::{Context, IntoDiagnostic};
 use opt::*;
 use package_test::TestConfiguration;
+use parallel_builds::{Finished, ParallelBuilds};
 use rattler_build_core::consts;
 use rattler_build_recipe::stage0;
 use rattler_build_variant_config::VariantConfig;
@@ -245,6 +247,8 @@ pub fn get_tool_config(
         .with_test_strategy(build_data.test)
         .with_skip_existing(build_data.skip_existing)
         .with_continue_on_failure(build_data.continue_on_failure)
+        .with_max_parallel_builds(build_data.max_parallel_builds)
+        .with_parallel_build_jobs(build_data.parallel_build_jobs)
         .with_noarch_build_platform(build_data.noarch_build_platform)
         .with_channel_priority(build_data.common.channel_priority)
         .with_allow_insecure_host(build_data.common.allow_insecure_host.clone())
@@ -733,16 +737,29 @@ pub async fn run_build_from_args(
     let outputs_to_build = skip_existing(build_output, &tool_configuration).await?;
     let mut build_queue = OutputBuildQueue::new(outputs_to_build);
 
-    tracing::info!("Starting build of {} outputs", build_queue.len());
-    while let Some(output_to_build) = build_queue.next_ready().into_diagnostic()? {
-        let (output, archive) = match run_build(
-            output_to_build.clone(),
-            &tool_configuration,
-            WorkingDirectoryBehavior::Cleanup,
-        )
-        .boxed_local()
-        .await
-        {
+    tracing::info!(
+        "Starting build of {} outputs ({} at a time)",
+        build_queue.len(),
+        tool_configuration.max_parallel_builds.max(1)
+    );
+    let mut builds = ParallelBuilds::new(&tool_configuration);
+    loop {
+        if let Err(e) = builds.start_ready(&mut build_queue) {
+            builds.finish_running().await;
+            return Err(e);
+        }
+        let (output_to_build, result) = match builds.next().await {
+            None => break,
+            Some(Finished::Task(result)) => {
+                if let Err(e) = result {
+                    builds.finish_running().await;
+                    return Err(e);
+                }
+                continue;
+            }
+            Some(Finished::Build { output, result }) => (*output, *result),
+        };
+        let (output, archive) = match result {
             Ok((output, archive)) => {
                 output.record_build_end();
                 (output, archive)
@@ -754,6 +771,7 @@ pub async fn run_build_from_args(
                     build_queue.record_processed(output_to_build);
                     continue;
                 }
+                builds.finish_running().await;
                 return Err(e);
             }
         };
@@ -789,26 +807,43 @@ pub async fn run_build_from_args(
         };
         if skip_test {
             tracing::info!("Skipping tests because {}", skip_test_reason);
-            build_reindexed_channels(&output.build_configuration, &tool_configuration)
-                .await
-                .into_diagnostic()
-                .context("failed to reindex output channel")?;
+            let tool_configuration = &tool_configuration;
+            let build_configuration = output.build_configuration.clone();
+            builds.spawn(async move {
+                build_reindexed_channels(&build_configuration, tool_configuration)
+                    .await
+                    .map(|_| ())
+                    .into_diagnostic()
+                    .context("failed to reindex output channel")
+            });
         } else {
             test_queue.push((output, archive));
 
             let mut to_test = Vec::new();
             let mut deferred_tests = Vec::new();
             for queued_test in test_queue {
-                if build_queue.can_test(&queued_test.0).into_diagnostic()? {
+                let can_test = match build_queue.can_test(&queued_test.0).into_diagnostic() {
+                    Ok(can_test) => can_test,
+                    Err(e) => {
+                        builds.finish_running().await;
+                        return Err(e);
+                    }
+                };
+                if can_test {
                     to_test.push(queued_test);
                 } else {
                     deferred_tests.push(queued_test);
                 }
             }
             test_queue = deferred_tests;
-            run_queued_tests(&to_test, &tool_configuration).await?;
+            if !to_test.is_empty() {
+                let tool_configuration = &tool_configuration;
+                builds.spawn(async move { run_queued_tests(&to_test, tool_configuration).await });
+            }
         }
     }
+
+    drop(builds);
 
     // A failed or test-skipped final build can leave earlier tests deferred.
     // At this point no additional sibling can become available, so run them and
@@ -1317,16 +1352,25 @@ async fn build_and_collect_packages(
     let all_outputs = build_output.clone();
     let outputs_to_build = skip_existing(build_output, tool_configuration).await?;
     let mut build_queue = OutputBuildQueue::new(outputs_to_build);
+    let mut builds = ParallelBuilds::new(tool_configuration);
 
-    while let Some(output_to_build) = build_queue.next_ready().into_diagnostic()? {
-        let (output, archive) = match run_build(
-            output_to_build.clone(),
-            tool_configuration,
-            WorkingDirectoryBehavior::Cleanup,
-        )
-        .boxed_local()
-        .await
-        {
+    loop {
+        if let Err(e) = builds.start_ready(&mut build_queue) {
+            builds.finish_running().await;
+            return Err(e);
+        }
+        let (output_to_build, result) = match builds.next().await {
+            None => break,
+            Some(Finished::Task(result)) => {
+                if let Err(e) = result {
+                    builds.finish_running().await;
+                    return Err(e);
+                }
+                continue;
+            }
+            Some(Finished::Build { output, result }) => (*output, *result),
+        };
+        let (output, archive) = match result {
             Ok((output, archive)) => {
                 output.record_build_end();
                 (output, archive)
@@ -1337,6 +1381,7 @@ async fn build_and_collect_packages(
                     build_queue.record_processed(output_to_build);
                     continue;
                 }
+                builds.finish_running().await;
                 return Err(e);
             }
         };
@@ -1602,6 +1647,8 @@ pub async fn debug_recipe(
         extra_meta: None,
         sandbox_configuration: None,
         continue_on_failure: ContinueOnFailure::No,
+        max_parallel_builds: 1,
+        parallel_build_jobs: None,
         error_prefix_in_binary: false,
         allow_symlinks_on_windows: false,
         error_overlapping_files: false,
