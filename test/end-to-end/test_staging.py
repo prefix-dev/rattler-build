@@ -53,6 +53,43 @@ def test_staging_build_steps(
     assert content2 == content1
 
 
+def test_run_inherits_staging_build_steps(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    recipe_data = yaml.safe_load((recipes / "staging/build-steps.yaml").read_text())
+    recipe_data["outputs"] = recipe_data["outputs"][:2]
+    recipe_data["outputs"][1]["build"]["steps"] = [
+        {
+            "name": "check",
+            "run": (
+                'copy "%PREFIX%\\staging-steps.txt" checked.txt'
+                if os.name == "nt"
+                else 'cp "$PREFIX/staging-steps.txt" checked.txt'
+            ),
+        }
+    ]
+    recipe = tmp_path / "recipe.yaml"
+    recipe.write_text(yaml.safe_dump(recipe_data))
+    source = tmp_path / "source"
+    source.mkdir()
+
+    result = rattler_build(
+        "run",
+        "check",
+        "--recipe",
+        recipe,
+        "--source-dir",
+        source,
+        "--output-dir",
+        tmp_path / "output",
+        "--experimental",
+        capture_output=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert (source / "checked.txt").read_text().splitlines() == ["one", "two"]
+
+
 @pytest.mark.skipif(os.name == "nt", reason="symlinks not fully supported on Windows")
 def test_staging_symlinks(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     """Test that symlinks are properly cached and restored in staging outputs."""
