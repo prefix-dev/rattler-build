@@ -1,0 +1,23 @@
+context:
+  version: "1.0.0"
+
+recipe:
+  name: repro-blocked
+  version: ${{ version }}
+
+outputs:
+  - package:
+      name: repro-blocked-consumer
+    build:
+      script: echo "consumer built"
+    requirements:
+      host:
+        - repro-blocked-provider ==${{ version }}
+
+  - package:
+      name: repro-blocked-provider
+    build:
+      script: echo "provider built"
+    requirements:
+      run:
+        - repro-blocked-consumer ==${{ version }}

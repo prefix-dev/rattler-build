@@ -18,8 +18,8 @@ use rattler_build_script::{
 };
 use rattler_build_types::NormalizedKey;
 use rattler_conda_types::{
-    Channel, ChannelUrl, MatchSpec, PackageName, PackageNameMatcher, ParseStrictness, Platform,
-    StringMatcher, Version, VersionSpec,
+    Channel, ChannelUrl, MatchSpec, PackageName, PackageNameMatcher, ParseStrictness,
+    RepoDataRecord, StringMatcher, Subdir, Version, VersionSpec,
     compression_level::CompressionLevel,
     package::{ArchiveIdentifier, CondaArchiveIdentifier, IndexJson, PackageFile},
     version_spec::EqualityOperator,
@@ -30,7 +30,7 @@ use rattler_shell::{
     activation::ActivationError,
     shell::{Shell, ShellEnum},
 };
-use rattler_solve::{ChannelPriority, SolveStrategy};
+use rattler_solve::{ChannelPriority, ExcludeNewer, SolveStrategy};
 use std::collections::BTreeMap;
 use std::fmt::Write;
 use std::{
@@ -47,7 +47,7 @@ use rattler_cache::validation::ValidationMode;
 
 use crate::{
     env_vars, metadata::PlatformWithVirtualPackages, render::solver::create_environment,
-    source::copy_dir::CopyDir, tool_configuration,
+    source::copy_dir::CopyDir, tool_configuration, utils::remove_dir_all_force,
 };
 
 /// Builds a `MatchSpec` that exactly matches the just-built artifact from its
@@ -203,19 +203,13 @@ impl Tests {
         &self,
         environment: &Path,
         cwd: &Path,
-        pkg_vars: &HashMap<String, String>,
-        resolved_records: &[rattler_conda_types::RepoDataRecord],
+        package_folder: &Path,
+        resolved_records: &[RepoDataRecord],
         config: &TestConfiguration,
     ) -> Result<(), TestError> {
         tracing::info!("Testing commands:");
 
-        let target_platform = config.target_platform.unwrap_or(Platform::current());
-        let build_platform = config.current_platform.platform;
-        let host_platform = config
-            .host_platform
-            .as_ref()
-            .map(|p| p.platform)
-            .unwrap_or(target_platform);
+        let (_, _, host_platform) = configured_test_platforms(config);
 
         let tmp_dir = tempfile::tempdir()?;
 
@@ -228,33 +222,13 @@ impl Tests {
             )))
         })?;
 
-        let mut env_vars = env_vars::os_vars(
+        let env_vars = test_env_vars(
             environment,
-            &target_platform,
-            &host_platform,
-            &build_platform,
-            config.env_isolation,
             tmp_dir.path(),
-            &RuntimeEnv::current(),
-        );
-        if config.env_isolation == EnvironmentIsolation::None {
-            env_vars.retain(|key, _| key != ShellEnum::default().path_var(&build_platform));
-        }
-        env_vars.extend(env_vars::test_vars(
-            target_platform,
-            build_platform,
-            host_platform,
-        ));
-        env_vars.extend(env_vars::python_vars_from_records(
+            package_folder,
             resolved_records,
-            environment,
-            host_platform,
-        ));
-        env_vars.extend(pkg_vars.iter().map(|(k, v)| (k.clone(), Some(v.clone()))));
-        env_vars.insert(
-            "PREFIX".to_string(),
-            Some(environment.to_string_lossy().to_string()),
-        );
+            config,
+        )?;
 
         let context = shared_test_context(environment, host_platform);
 
@@ -303,7 +277,10 @@ impl Tests {
     }
 }
 
-async fn legacy_tests_from_folder(pkg: &Path) -> Result<(PathBuf, Vec<Tests>), std::io::Error> {
+async fn legacy_tests_from_folder(
+    pkg: &Path,
+    build_platform: Subdir,
+) -> Result<(PathBuf, Vec<Tests>), std::io::Error> {
     let mut tests = Vec::new();
 
     let test_folder = pkg.join("info/test");
@@ -312,6 +289,11 @@ async fn legacy_tests_from_folder(pkg: &Path) -> Result<(PathBuf, Vec<Tests>), s
         return Ok((test_folder, tests));
     }
 
+    let command_test = if build_platform.is_windows() {
+        "run_test.bat"
+    } else {
+        "run_test.sh"
+    };
     let mut read_dir = tokio::fs::read_dir(&test_folder).await?;
 
     while let Some(entry) = read_dir.next_entry().await? {
@@ -322,7 +304,7 @@ async fn legacy_tests_from_folder(pkg: &Path) -> Result<(PathBuf, Vec<Tests>), s
         let Some(file_name) = path.file_name() else {
             continue;
         };
-        if file_name.eq("run_test.sh") || file_name.eq("run_test.bat") {
+        if file_name.eq(command_test) {
             tracing::info!("test {}", file_name.to_string_lossy());
             tests.push(Tests::Commands(path));
         } else if file_name.eq("run_test.py") {
@@ -341,7 +323,7 @@ pub struct TestConfiguration {
     pub test_prefix: PathBuf,
     /// The target platform. If not set it will be discovered from the
     /// index.json metadata.
-    pub target_platform: Option<Platform>,
+    pub target_platform: Option<Subdir>,
     /// The host platform for run-time dependencies. If not set it will be
     /// discovered from the index.json metadata.
     pub host_platform: Option<PlatformWithVirtualPackages>,
@@ -362,14 +344,16 @@ pub struct TestConfiguration {
     pub tool_configuration: tool_configuration::Configuration,
     /// The output directory to create the test prefixes in (will be `output_dir/test`)
     pub output_dir: PathBuf,
-    /// Exclude packages newer than this date from the solver
-    pub exclude_newer: Option<jiff::Timestamp>,
+    /// Exclude packages according to global, channel, and package cutoff dates.
+    pub exclude_newer: Option<ExcludeNewer>,
     /// The environment isolation mode for test scripts
     pub env_isolation: EnvironmentIsolation,
 }
 
-fn configured_test_platforms(config: &TestConfiguration) -> (Platform, Platform, Platform) {
-    let target_platform = config.target_platform.unwrap_or(Platform::current());
+fn configured_test_platforms(config: &TestConfiguration) -> (Subdir, Subdir, Subdir) {
+    let target_platform = config
+        .target_platform
+        .unwrap_or(config.current_platform.platform);
     let build_platform = config.current_platform.platform;
     let host_platform = config
         .host_platform
@@ -381,7 +365,7 @@ fn configured_test_platforms(config: &TestConfiguration) -> (Platform, Platform,
 
 /// Tests without a separate build environment execute programs from the test
 /// prefix, so their wrapper architecture must match the package host platform.
-fn shared_test_context(prefix: &Path, host_platform: Platform) -> ExecutionContext {
+fn shared_test_context(prefix: &Path, host_platform: Subdir) -> ExecutionContext {
     ExecutionContext::shared(RuntimeEnv::current(), prefix, host_platform, host_platform)
 }
 
@@ -404,6 +388,66 @@ fn env_vars_from_package(index_json: &IndexJson) -> HashMap<String, String> {
     );
 
     res
+}
+
+/// Assemble the environment shared by legacy, script, and language tests.
+fn test_env_vars(
+    prefix: &Path,
+    cwd: &Path,
+    package_folder: &Path,
+    resolved_records: &[RepoDataRecord],
+    config: &TestConfiguration,
+) -> Result<HashMap<String, Option<String>>, TestError> {
+    let (target_platform, build_platform, host_platform) = configured_test_platforms(config);
+    let mut vars = env_vars::os_vars(
+        prefix,
+        &target_platform,
+        &host_platform,
+        &build_platform,
+        config.env_isolation,
+        cwd,
+        &RuntimeEnv::current(),
+    );
+    if config.env_isolation == EnvironmentIsolation::None {
+        vars.retain(|key, _| key != ShellEnum::default().path_var(&build_platform));
+    }
+    vars.extend(env_vars::test_vars(
+        target_platform,
+        build_platform,
+        host_platform,
+        cwd,
+    ));
+    vars.extend(env_vars::python_vars_from_records(
+        resolved_records,
+        prefix,
+        host_platform,
+    ));
+    let index_json = IndexJson::from_package_directory(package_folder)?;
+    vars.extend(
+        env_vars_from_package(&index_json)
+            .into_iter()
+            .map(|(k, v)| (k, Some(v))),
+    );
+    vars.extend(env_vars_from_hash_input(package_folder));
+    vars.insert(
+        "PREFIX".to_string(),
+        Some(prefix.to_string_lossy().into_owned()),
+    );
+
+    // The package is already extracted for reading its tests; reuse that metadata.
+    for (key, file) in [("PATHS_JSON", "paths.json"), ("INDEX_JSON", "index.json")] {
+        vars.insert(
+            key.to_string(),
+            Some(
+                package_folder
+                    .join("info")
+                    .join(file)
+                    .to_string_lossy()
+                    .into_owned(),
+            ),
+        );
+    }
+    Ok(vars)
 }
 
 /// Read variant environment variables from `info/hash_input.json` in the
@@ -479,7 +523,7 @@ pub async fn run_test(
         let subdir = index_json
             .subdir
             .ok_or(TestError::CouldNotDetermineTargetPlatform)?;
-        Platform::from_str(&subdir).map_err(|_| TestError::CouldNotDetermineTargetPlatform)?
+        Subdir::from_str(&subdir).map_err(|_| TestError::CouldNotDetermineTargetPlatform)?
     };
 
     let subdir = tmp_repo.path().join(target_platform.to_string());
@@ -553,16 +597,19 @@ pub async fn run_test(
         .map_err(|e| TestError::TestFailed(format!("failed to cache package: {e}")))?;
     let package_folder = cache_metadata.path().to_path_buf();
 
+    let test_channel = Channel::try_from_directory(tmp_repo.path())
+        .expect("could not create channel from directory")
+        .base_url;
+    let exclude_newer = config.exclude_newer.clone().map(|policy| {
+        // Only the artifacts explicitly copied into this temporary channel
+        // bypass the global cutoff. Package overrides retain precedence.
+        policy.with_channel_cutoff(test_channel.url().as_str(), jiff::Timestamp::MAX)
+    });
     let mut channels = config.channels.clone();
-    channels.insert(
-        0,
-        Channel::try_from_directory(tmp_repo.path())
-            .expect("could not create channel from directory")
-            .base_url,
-    );
+    channels.insert(0, test_channel);
 
     let host_platform = config.host_platform.clone().unwrap_or_else(|| {
-        if target_platform == Platform::NoArch {
+        if target_platform == Subdir::NoArch {
             config.current_platform.clone()
         } else {
             PlatformWithVirtualPackages {
@@ -576,6 +623,7 @@ pub async fn run_test(
         target_platform: Some(target_platform),
         host_platform: Some(host_platform.clone()),
         channels,
+        exclude_newer,
         tool_configuration: tool_configuration::Configuration {
             package_cache: temp_package_cache,
             ..config.tool_configuration.clone()
@@ -584,14 +632,6 @@ pub async fn run_test(
     };
 
     tracing::info!("Collecting tests from '{}'", package_folder.display());
-
-    let index_json = IndexJson::from_package_directory(&package_folder)?;
-    let mut env = env_vars_from_package(&index_json);
-    env.extend(
-        env_vars_from_hash_input(&package_folder)
-            .into_iter()
-            .filter_map(|(k, v)| v.map(|v| (k, v))),
-    );
 
     let has_legacy_tests = package_folder.join("info/test").exists();
     let has_modern_tests = package_folder.join("info/tests/tests.yaml").exists();
@@ -628,18 +668,25 @@ pub async fn run_test(
             &config.tool_configuration,
             config.channel_priority,
             config.solve_strategy,
-            config.exclude_newer,
+            config.exclude_newer.clone(),
         )
         .await
         .wrap_err("failed to setup test environment")
         .map_err(TestError::TestEnvironmentSetup)?;
 
         // These are the legacy tests
-        let (test_folder, tests) = legacy_tests_from_folder(&package_folder).await?;
+        let (test_folder, tests) =
+            legacy_tests_from_folder(&package_folder, config.current_platform.platform).await?;
 
         for test in tests {
-            test.run(&prefix, &test_folder, &env, &resolved_records, &config)
-                .await?;
+            test.run(
+                &prefix,
+                &test_folder,
+                &package_folder,
+                &resolved_records,
+                &config,
+            )
+            .await?;
         }
 
         tracing::info!(
@@ -680,8 +727,7 @@ pub async fn run_test(
             .keep();
             match test {
                 TestType::Commands(c) => {
-                    run_commands_test(&c, &pkg, &package_folder, &test_prefix, &config, &env)
-                        .await?
+                    run_commands_test(&c, &pkg, &package_folder, &test_prefix, &config).await?
                 }
                 TestType::Python { python } => {
                     // A downstream package's Python test matrix describes the Python
@@ -722,7 +768,7 @@ pub async fn run_test(
             }
 
             if !config.keep_test_prefix {
-                fs::remove_dir_all(test_prefix)?;
+                remove_dir_all_force(&test_prefix)?;
             }
         }
 
@@ -830,7 +876,7 @@ async fn run_python_test_inner(
     let _guard = span.enter();
 
     let test_prefix = prefix.join("test_env");
-    create_environment(
+    let resolved_records = create_environment(
         "test",
         &dependencies,
         config
@@ -842,7 +888,7 @@ async fn run_python_test_inner(
         &config.tool_configuration,
         config.channel_priority,
         config.solve_strategy,
-        config.exclude_newer,
+        config.exclude_newer.clone(),
     )
     .await
     .wrap_err("failed to setup test environment")
@@ -859,18 +905,10 @@ async fn run_python_test_inner(
         ..Script::default()
     };
 
-    let (target_platform, build_platform, host_platform) = configured_test_platforms(config);
+    let (_, _, host_platform) = configured_test_platforms(config);
     let test_dir = prefix.join("test");
     fs::create_dir_all(&test_dir)?;
-    let test_env_vars = env_vars::os_vars(
-        &test_prefix,
-        &target_platform,
-        &host_platform,
-        &build_platform,
-        config.env_isolation,
-        &test_dir,
-        &RuntimeEnv::current(),
-    );
+    let test_env_vars = test_env_vars(&test_prefix, &test_dir, path, &resolved_records, config)?;
 
     let context = shared_test_context(&test_prefix, host_platform);
 
@@ -938,7 +976,7 @@ async fn run_perl_test(
     let dependencies = vec!["perl".parse().unwrap(), match_spec];
 
     let test_prefix = prefix.join("test_env");
-    create_environment(
+    let resolved_records = create_environment(
         "test",
         &dependencies,
         config
@@ -950,7 +988,7 @@ async fn run_perl_test(
         &config.tool_configuration,
         config.channel_priority,
         config.solve_strategy,
-        config.exclude_newer,
+        config.exclude_newer.clone(),
     )
     .await
     .wrap_err("failed to setup test environment")
@@ -974,16 +1012,8 @@ async fn run_perl_test(
     let test_folder = prefix.join("test_files");
     fs::create_dir_all(&test_folder)?;
 
-    let (target_platform, build_platform, host_platform) = configured_test_platforms(config);
-    let test_env_vars = env_vars::os_vars(
-        &test_prefix,
-        &target_platform,
-        &host_platform,
-        &build_platform,
-        config.env_isolation,
-        &test_folder,
-        &RuntimeEnv::current(),
-    );
+    let (_, _, host_platform) = configured_test_platforms(config);
+    let test_env_vars = test_env_vars(&test_prefix, &test_folder, path, &resolved_records, config)?;
     let context = shared_test_context(&test_prefix, host_platform);
 
     script
@@ -1009,7 +1039,6 @@ async fn run_commands_test(
     path: &Path,
     test_directory: &Path,
     config: &TestConfiguration,
-    pkg_vars: &HashMap<String, String>,
 ) -> Result<(), TestError> {
     let deps = commands_test.requirements.clone();
 
@@ -1036,7 +1065,7 @@ async fn run_commands_test(
             &config.tool_configuration,
             config.channel_priority,
             config.solve_strategy,
-            config.exclude_newer,
+            config.exclude_newer.clone(),
         )
         .await
         .wrap_err("failed to setup test environment")
@@ -1067,19 +1096,13 @@ async fn run_commands_test(
         &config.tool_configuration,
         config.channel_priority,
         config.solve_strategy,
-        config.exclude_newer,
+        config.exclude_newer.clone(),
     )
     .await
     .wrap_err("failed to setup test environment")
     .map_err(TestError::TestEnvironmentSetup)?;
 
-    let target_platform = config.target_platform.unwrap_or(Platform::current());
-    let build_platform = config.current_platform.platform;
-    let host_platform = config
-        .host_platform
-        .as_ref()
-        .map(|p| p.platform)
-        .unwrap_or(target_platform);
+    let (_, build_platform, host_platform) = configured_test_platforms(config);
 
     // copy all test files to a temporary directory and set it as the working
     // directory
@@ -1091,33 +1114,7 @@ async fn run_commands_test(
         )))
     })?;
 
-    let mut env_vars = env_vars::os_vars(
-        &run_prefix,
-        &target_platform,
-        &host_platform,
-        &build_platform,
-        config.env_isolation,
-        &test_dir,
-        &RuntimeEnv::current(),
-    );
-    if config.env_isolation == EnvironmentIsolation::None {
-        env_vars.retain(|key, _| key != ShellEnum::default().path_var(&build_platform));
-    }
-    env_vars.extend(env_vars::test_vars(
-        target_platform,
-        build_platform,
-        host_platform,
-    ));
-    env_vars.extend(env_vars::python_vars_from_records(
-        &resolved_records,
-        &run_prefix,
-        host_platform,
-    ));
-    env_vars.extend(pkg_vars.iter().map(|(k, v)| (k.clone(), Some(v.clone()))));
-    env_vars.insert(
-        "PREFIX".to_string(),
-        Some(run_prefix.to_string_lossy().to_string()),
-    );
+    let env_vars = test_env_vars(&run_prefix, &test_dir, path, &resolved_records, config)?;
 
     let context = if let Some(build_prefix) = build_prefix {
         ExecutionContext::separate(
@@ -1186,7 +1183,7 @@ async fn run_downstream_test(
         &config.tool_configuration,
         config.channel_priority,
         config.solve_strategy,
-        config.exclude_newer,
+        config.exclude_newer.clone(),
     )
     .await;
 
@@ -1268,7 +1265,7 @@ async fn run_r_test(
 
     let dependencies = vec!["r-base".parse().unwrap(), match_spec];
     let test_prefix = prefix.join("test_env");
-    create_environment(
+    let resolved_records = create_environment(
         "test",
         &dependencies,
         config
@@ -1280,7 +1277,7 @@ async fn run_r_test(
         &config.tool_configuration,
         config.channel_priority,
         config.solve_strategy,
-        config.exclude_newer,
+        config.exclude_newer.clone(),
     )
     .await
     .wrap_err("failed to setup test environment")
@@ -1304,16 +1301,8 @@ async fn run_r_test(
     let test_folder = prefix.join("test_files");
     fs::create_dir_all(&test_folder)?;
 
-    let (target_platform, build_platform, host_platform) = configured_test_platforms(config);
-    let test_env_vars = env_vars::os_vars(
-        &test_prefix,
-        &target_platform,
-        &host_platform,
-        &build_platform,
-        config.env_isolation,
-        &test_folder,
-        &RuntimeEnv::current(),
-    );
+    let (_, _, host_platform) = configured_test_platforms(config);
+    let test_env_vars = test_env_vars(&test_prefix, &test_folder, path, &resolved_records, config)?;
     let context = shared_test_context(&test_prefix, host_platform);
 
     script
@@ -1352,7 +1341,7 @@ async fn run_ruby_test(
     let dependencies = vec!["ruby".parse().unwrap(), match_spec];
 
     let test_prefix = prefix.join("test_env");
-    create_environment(
+    let resolved_records = create_environment(
         "test",
         &dependencies,
         config
@@ -1364,7 +1353,7 @@ async fn run_ruby_test(
         &config.tool_configuration,
         config.channel_priority,
         config.solve_strategy,
-        config.exclude_newer,
+        config.exclude_newer.clone(),
     )
     .await
     .wrap_err("failed to setup test environment")
@@ -1388,16 +1377,8 @@ async fn run_ruby_test(
     let test_folder = prefix.join("test_files");
     fs::create_dir_all(&test_folder)?;
 
-    let (target_platform, build_platform, host_platform) = configured_test_platforms(config);
-    let test_env_vars = env_vars::os_vars(
-        &test_prefix,
-        &target_platform,
-        &host_platform,
-        &build_platform,
-        config.env_isolation,
-        &test_folder,
-        &RuntimeEnv::current(),
-    );
+    let (_, _, host_platform) = configured_test_platforms(config);
+    let test_env_vars = test_env_vars(&test_prefix, &test_folder, path, &resolved_records, config)?;
     let context = shared_test_context(&test_prefix, host_platform);
 
     script
@@ -1420,13 +1401,112 @@ async fn run_ruby_test(
 mod tests {
     use super::*;
 
+    #[tokio::test]
+    #[allow(deprecated)]
+    async fn exclude_newer_allows_the_test_artifact_and_preserves_package_overrides() {
+        let package = tempfile::tempdir().unwrap();
+        fs::create_dir_all(package.path().join("info/test")).unwrap();
+        fs::write(
+            package.path().join("info/index.json"),
+            serde_json::to_vec(&serde_json::json!({
+                "name": "cutoff-test-artifact",
+                "version": "1.0",
+                "build": "0",
+                "build_number": 0,
+                "subdir": Subdir::current().unwrap().to_string(),
+                "depends": [],
+                "timestamp": 1735689600000i64,
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        fs::write(
+            package.path().join("info/paths.json"),
+            r#"{"paths_version":1,"paths":[]}"#,
+        )
+        .unwrap();
+        fs::write(package.path().join("info/files"), "").unwrap();
+        fs::write(
+            package.path().join("info/test/test_time_dependencies.json"),
+            "[]",
+        )
+        .unwrap();
+
+        let test_dir = tempfile::tempdir().unwrap();
+        let cache_dir = tempfile::tempdir().unwrap();
+        let cutoff: jiff::Timestamp = "2020-01-01T00:00:00Z".parse().unwrap();
+        let mut config = TestConfiguration {
+            test_prefix: test_dir.path().join("test"),
+            target_platform: None,
+            host_platform: None,
+            current_platform: PlatformWithVirtualPackages {
+                platform: Subdir::current().unwrap(),
+                virtual_packages: Vec::new(),
+            },
+            keep_test_prefix: false,
+            test_index: None,
+            channels: Vec::new(),
+            channel_priority: ChannelPriority::Strict,
+            solve_strategy: SolveStrategy::Highest,
+            tool_configuration: tool_configuration::Configuration::builder()
+                .with_cache_dir(cache_dir.path().to_path_buf())
+                .finish(),
+            output_dir: test_dir.path().to_path_buf(),
+            exclude_newer: Some(cutoff.into()),
+            env_isolation: EnvironmentIsolation::default(),
+        };
+
+        run_test(package.path(), &config, None).await.unwrap();
+
+        config.exclude_newer = Some(
+            ExcludeNewer::from_datetime(cutoff)
+                .with_package_cutoff("cutoff-test-artifact".parse().unwrap(), cutoff),
+        );
+        assert!(matches!(
+            run_test(package.path(), &config, None).await,
+            Err(TestError::TestEnvironmentSetup(_))
+        ));
+    }
+
+    #[tokio::test]
+    async fn legacy_tests_use_build_platform_scripts() {
+        let package = tempfile::tempdir().unwrap();
+        let test_folder = package.path().join("info/test");
+        fs::create_dir_all(&test_folder).unwrap();
+        for file in ["run_test.sh", "run_test.bat", "run_test.py"] {
+            fs::write(test_folder.join(file), "").unwrap();
+        }
+
+        for (platform, command_test) in [
+            (Subdir::Linux64, "run_test.sh"),
+            (Subdir::Win64, "run_test.bat"),
+        ] {
+            let (_, tests) = legacy_tests_from_folder(package.path(), platform)
+                .await
+                .unwrap();
+            let mut test_files = tests
+                .into_iter()
+                .map(|test| match test {
+                    Tests::Commands(path) | Tests::Python(path) => {
+                        path.file_name().unwrap().to_string_lossy().into_owned()
+                    }
+                })
+                .collect::<Vec<_>>();
+            test_files.sort();
+
+            let mut expected = vec![command_test.to_string(), "run_test.py".to_string()];
+            expected.sort();
+            assert_eq!(test_files, expected);
+        }
+    }
+
     #[test]
     fn shared_test_context_executes_the_host_prefix_platform() {
-        let context = shared_test_context(Path::new("test-prefix"), Platform::WinArm64);
+        let context = shared_test_context(Path::new("test-prefix"), Subdir::WinArm64);
         assert_eq!(context.build().path(), Path::new("test-prefix"));
         assert_eq!(context.host().path(), Path::new("test-prefix"));
-        assert_eq!(context.build().platform(), Platform::WinArm64);
-        assert_eq!(context.host().platform(), Platform::WinArm64);
+        assert_eq!(context.build().platform(), Subdir::WinArm64);
+        assert_eq!(context.host().platform(), Subdir::WinArm64);
     }
 
     /// Verifies that a trailing-underscore version (the openssl ordering

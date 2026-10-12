@@ -23,6 +23,14 @@ outputs:
           - echo "test ran"
 
   - package:
+      name: repro-consumer
+    build:
+      script: echo "consumer built"
+    requirements:
+      host:
+        - repro-wrapper ==${{ version }}
+
+  - package:
       name: repro-runtime
     build:
       script: echo "runtime built"

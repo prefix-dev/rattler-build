@@ -1,0 +1,29 @@
+context:
+  version: "1.0.0"
+
+recipe:
+  name: run-export-order
+  version: ${{ version }}
+
+outputs:
+  - package:
+      name: repro-exporter
+    build:
+      script: echo "exporter built"
+    requirements:
+      run_exports:
+        strong:
+          - repro-exported-runtime ==${{ version }}
+
+  - package:
+      name: repro-export-consumer
+    build:
+      script: echo "consumer built"
+    requirements:
+      build:
+        - repro-exporter ==${{ version }}
+
+  - package:
+      name: repro-exported-runtime
+    build:
+      script: echo "runtime built"

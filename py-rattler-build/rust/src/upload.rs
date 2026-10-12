@@ -12,18 +12,19 @@ use url::Url;
 use crate::{error::RattlerBuildError, run_async_task};
 
 #[pyfunction]
-#[pyo3(signature = (package_files, url, channels, api_key, auth_file))]
+#[pyo3(signature = (package_files, url, channels, api_key, auth_file, force=false))]
 pub fn upload_package_to_quetz_py(
     package_files: Vec<PathBuf>,
     url: String,
     channels: String,
     api_key: Option<String>,
     auth_file: Option<PathBuf>,
+    force: bool,
 ) -> PyResult<()> {
     let store = tool_configuration::get_auth_store(auth_file).map_err(RattlerBuildError::Auth)?;
 
     let url = Url::parse(&url).map_err(RattlerBuildError::from)?;
-    let quetz_data = QuetzData::new(url, channels, api_key);
+    let quetz_data = QuetzData::new(url, channels, api_key, ForceOverwrite(force));
 
     run_async_task(async {
         upload::upload_package_to_quetz(&store, &package_files, quetz_data).await?;

@@ -30,7 +30,7 @@ def test_data_dir() -> Path:
 
 def test_render_config_with_platforms() -> None:
     """Test RenderConfig with custom platforms."""
-    platform_config = PlatformConfig(target_platform="linux-64")
+    platform_config = PlatformConfig(target_platform="linux-64", build_platform="linux-64")
     config = RenderConfig(platform=platform_config)
     assert config.target_platform == "linux-64"
     assert config.build_platform == "linux-64"
@@ -213,7 +213,7 @@ outputs:
 
 def test_render_invalid_platform() -> None:
     """Test that invalid platform raises PlatformParseError."""
-    with pytest.raises(PlatformParseError, match="'invalid-platform' is not a known platform."):
+    with pytest.raises(PlatformParseError, match="'invalid-platform' is not a known subdir."):
         platform_config = PlatformConfig(target_platform="invalid-platform")
         RenderConfig(platform=platform_config)
 
@@ -307,8 +307,9 @@ python:
     assert python_versions == {"3.9", "3.10"}
 
 
-def test_run_build_exclude_newer_datetime_conversion(tmp_path: Path) -> None:
-    """Test that Python datetime converts correctly to Rust chrono::DateTime<Utc>."""
+@pytest.mark.parametrize("entrypoint", ["recipe", "variant", "variants"])
+def test_run_build_exclude_newer_datetime_conversion(tmp_path: Path, entrypoint: str) -> None:
+    """Existing build APIs still accept a datetime for the global cutoff."""
     from datetime import datetime, timezone
 
     recipe_yaml = """
@@ -325,10 +326,16 @@ build:
     variant_config = VariantConfig()
     rendered = recipe.render(variant_config)
 
-    # Create a timezone-aware datetime (required for chrono::DateTime<Utc>)
     exclude_newer = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
 
-    result = rendered[0].run_build(output_dir=tmp_path, exclude_newer=exclude_newer)
+    if entrypoint == "recipe":
+        result = recipe.run_build(output_dir=tmp_path, exclude_newer=exclude_newer)[0]
+    elif entrypoint == "variant":
+        result = rendered[0].run_build(output_dir=tmp_path, exclude_newer=exclude_newer)
+    else:
+        from rattler_build.render import build_rendered_variants
+
+        result = build_rendered_variants(rendered, output_dir=tmp_path, exclude_newer=exclude_newer)[0]
     assert result.name == "datetime-test"
 
 
@@ -376,3 +383,39 @@ outputs:
     for variant in rendered:
         result = variant.run_build(output_dir=tmp_path)
         assert result.name in ("my-pkg-base", "my-pkg")
+
+
+def test_render_prefers_plain_run_dependency_order() -> None:
+    """Render sibling runtime providers before consumers when possible."""
+    recipe = Stage0Recipe.from_yaml(
+        """
+schema_version: 1
+
+recipe:
+  version: "1.0.0"
+
+outputs:
+  - package:
+      name: runtime-wrapper
+    requirements:
+      run:
+        - runtime-provider
+
+  - package:
+      name: runtime-consumer
+    requirements:
+      host:
+        - runtime-wrapper
+
+  - package:
+      name: runtime-provider
+"""
+    )
+
+    rendered = recipe.render(VariantConfig())
+
+    assert [variant.recipe.package.name for variant in rendered] == [
+        "runtime-provider",
+        "runtime-wrapper",
+        "runtime-consumer",
+    ]

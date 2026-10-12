@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 from subprocess import STDOUT, CalledProcessError, check_output, run
-from typing import Any, List, Optional
+from typing import Any
 
 from conda_package_handling.api import extract
 
@@ -25,7 +25,7 @@ class RattlerBuild:
             if "text" not in kwds_copy:
                 kwds_copy["text"] = True
 
-            result = run([str(self.path), *args], **kwds_copy)
+            result = run([str(self.path), *args], check=False, **kwds_copy)
             return result
         else:
             try:
@@ -58,14 +58,14 @@ class RattlerBuild:
                     print("STDERR:")
                     print(e.stderr)
                 print("=" * 80 + "\n")
-                raise e
+                raise
 
     def build_args(
         self,
         recipe_folder: Path,
         output_folder: Path,
-        variant_config: Optional[Path] = None,
-        custom_channels: Optional[list[str]] = None,
+        variant_config: Path | None = None,
+        custom_channels: list[str] | None = None,
         extra_args: list[str] | None = None,
         extra_meta: dict[str, Any] | None = None,
     ):
@@ -75,7 +75,7 @@ class RattlerBuild:
         if variant_config is not None:
             args += ["--variant-config", str(variant_config)]
         args += ["--output-dir", str(output_folder)]
-        args += ["--package-format", str("tar.bz2")]
+        args += ["--package-format", "tar.bz2"]
         if extra_meta:
             args += [
                 item
@@ -93,8 +93,8 @@ class RattlerBuild:
         self,
         recipe_folder: Path,
         output_folder: Path,
-        variant_config: Optional[Path] = None,
-        custom_channels: Optional[list[str]] = None,
+        variant_config: Path | None = None,
+        custom_channels: list[str] | None = None,
         extra_args: list[str] | None = None,
         extra_meta: dict[str, Any] | None = None,
     ):
@@ -116,10 +116,10 @@ class RattlerBuild:
         recipe_folder: Path,
         output_folder: Path,
         with_solve: bool = False,
-        variant_config: Optional[Path] = None,
-        custom_channels: Optional[list[str]] = None,
-        extra_args: list[str] = None,
-        extra_meta: dict[str, Any] = None,
+        variant_config: Path | None = None,
+        custom_channels: list[str] | None = None,
+        extra_args: list[str] | None = None,
+        extra_meta: dict[str, Any] | None = None,
         raw: bool = False,
         **kwargs: Any,
     ) -> Any:
@@ -173,12 +173,12 @@ def get_extracted_package(folder: Path, glob="*.tar.bz2"):
 def setup_patch_test_environment(
     tmp_path: Path,
     test_name: str,
-    cache_files: Optional[dict[str, str]] = None,
-    work_files: Optional[dict[str, str]] = None,
+    cache_files: dict[str, str] | None = None,
+    work_files: dict[str, str] | None = None,
     recipe_content: str = "package:\n  name: dummy\n",
     source_url: str = "https://example.com/example.tar.gz",
     source_sha256: str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-    patches: Optional[List[str]] = None,
+    patches: list[str] | None = None,
 ) -> dict[str, Path]:
     cache_dir = tmp_path / test_name / "cache"
     work_dir = tmp_path / test_name / "work"

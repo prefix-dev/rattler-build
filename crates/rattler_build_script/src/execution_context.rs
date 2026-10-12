@@ -2,7 +2,7 @@
 
 use std::path::{Path, PathBuf};
 
-use rattler_conda_types::Platform;
+use rattler_conda_types::Subdir;
 
 use crate::RuntimeEnv;
 
@@ -10,12 +10,12 @@ use crate::RuntimeEnv;
 #[derive(Debug, Clone)]
 pub struct PrefixWithPlatform {
     path: PathBuf,
-    platform: Platform,
+    platform: Subdir,
 }
 
 impl PrefixWithPlatform {
     /// Creates a prefix execution descriptor.
-    pub fn new(path: impl Into<PathBuf>, platform: Platform) -> Self {
+    pub fn new(path: impl Into<PathBuf>, platform: Subdir) -> Self {
         Self {
             path: path.into(),
             platform,
@@ -28,7 +28,7 @@ impl PrefixWithPlatform {
     }
 
     /// The platform of the environment installed in this prefix.
-    pub fn platform(&self) -> Platform {
+    pub fn platform(&self) -> Subdir {
         self.platform
     }
 }
@@ -56,9 +56,9 @@ impl ExecutionContext {
     pub fn separate(
         runtime: RuntimeEnv,
         build_path: impl Into<PathBuf>,
-        build_platform: Platform,
+        build_platform: Subdir,
         host_path: impl Into<PathBuf>,
-        host_platform: Platform,
+        host_platform: Subdir,
     ) -> Self {
         Self {
             runtime,
@@ -72,8 +72,8 @@ impl ExecutionContext {
     pub fn shared(
         runtime: RuntimeEnv,
         path: impl Into<PathBuf>,
-        build_platform: Platform,
-        host_platform: Platform,
+        build_platform: Subdir,
+        host_platform: Subdir,
     ) -> Self {
         let path = path.into();
         Self {
@@ -154,33 +154,33 @@ mod tests {
     #[test]
     fn separate_context_retains_both_prefixes() {
         let context = ExecutionContext::separate(
-            RuntimeEnv::for_test(Platform::Win64),
+            RuntimeEnv::for_test(Subdir::Win64),
             "build",
-            Platform::Win64,
+            Subdir::Win64,
             "host",
-            Platform::WinArm64,
+            Subdir::WinArm64,
         );
 
         assert_eq!(context.layout(), PrefixLayout::Separate);
         assert_eq!(context.build().path(), Path::new("build"));
-        assert_eq!(context.build().platform(), Platform::Win64);
+        assert_eq!(context.build().platform(), Subdir::Win64);
         assert_eq!(context.host().path(), Path::new("host"));
-        assert_eq!(context.host().platform(), Platform::WinArm64);
+        assert_eq!(context.host().platform(), Subdir::WinArm64);
     }
 
     #[test]
     fn shared_context_uses_one_path_with_both_platforms() {
         let context = ExecutionContext::shared(
-            RuntimeEnv::for_test(Platform::Win64),
+            RuntimeEnv::for_test(Subdir::Win64),
             "prefix",
-            Platform::Win64,
-            Platform::WinArm64,
+            Subdir::Win64,
+            Subdir::WinArm64,
         );
 
         assert_eq!(context.layout(), PrefixLayout::Shared);
         assert_eq!(context.build().path(), Path::new("prefix"));
         assert_eq!(context.host().path(), Path::new("prefix"));
-        assert_eq!(context.build().platform(), Platform::Win64);
-        assert_eq!(context.host().platform(), Platform::WinArm64);
+        assert_eq!(context.build().platform(), Subdir::Win64);
+        assert_eq!(context.host().platform(), Subdir::WinArm64);
     }
 }

@@ -1,8 +1,19 @@
 import os
+from unittest.mock import patch
 
 import pytest
 
 import rattler_build
+
+
+@pytest.mark.parametrize("force", [None, False, True])
+def test_upload_to_quetz_force(force: bool | None) -> None:
+    with patch("rattler_build.upload.upload_package_to_quetz_py") as upload:
+        if force is None:
+            rattler_build.upload_package_to_quetz([], "https://quetz.io", "channel")
+        else:
+            rattler_build.upload_package_to_quetz([], "https://quetz.io", "channel", force=force)
+        upload.assert_called_once_with([], "https://quetz.io", "channel", None, None, bool(force))
 
 
 @pytest.mark.skipif(not os.getenv("CI"), reason="Only run on CI")

@@ -1,0 +1,25 @@
+context:
+  version: "1.0.0"
+
+recipe:
+  name: repro-test-pin
+  version: ${{ version }}
+
+outputs:
+  - package:
+      name: repro-test-pin-early
+    build:
+      noarch: generic
+      script: echo "early built"
+    tests:
+      - script:
+          - echo "test ran"
+        requirements:
+          run:
+            - ${{ pin_subpackage('repro-test-pin-late', exact=True) }}
+
+  - package:
+      name: repro-test-pin-late
+    build:
+      noarch: generic
+      script: echo "late built"

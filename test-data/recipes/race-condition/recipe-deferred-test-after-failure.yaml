@@ -1,0 +1,32 @@
+context:
+  version: "1.0.0"
+
+recipe:
+  name: repro-deferred
+  version: ${{ version }}
+
+outputs:
+  - package:
+      name: repro-failing-base
+    build:
+      script: exit 1
+
+  - package:
+      name: repro-failing-consumer
+    build:
+      script: echo "consumer built"
+    requirements:
+      host:
+        - repro-failing-base ==${{ version }}
+
+  - package:
+      name: repro-deferred-test
+    build:
+      noarch: generic
+      script: echo "deferred test package built"
+    tests:
+      - script:
+          - echo "deferred test ran"
+        requirements:
+          run:
+            - repro-failing-consumer ==${{ version }}

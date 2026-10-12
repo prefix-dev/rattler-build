@@ -1,0 +1,1 @@
+lint.per-file-ignores = { "test-data/shebang/*.py" = ["EXE001", "UP009"] }

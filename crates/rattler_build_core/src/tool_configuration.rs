@@ -1,11 +1,16 @@
 //! Configuration for the Rattler-Build tool
 //! This is useful when using Rattler-Build as a library
 
-use std::{collections::HashMap, path::PathBuf, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    path::PathBuf,
+    sync::{Arc, Mutex},
+};
 
 use clap::ValueEnum;
 use rattler::package_cache::PackageCache;
-use rattler_conda_types::{ChannelConfig, Platform};
+use rattler_build_script::runner::{LocalRunner, Runner};
+use rattler_conda_types::{ChannelConfig, Subdir};
 #[cfg(feature = "s3")]
 use rattler_networking::s3_middleware;
 use rattler_networking::{
@@ -83,6 +88,9 @@ pub struct Configuration {
     /// The source cache for downloading and caching source code
     pub source_cache: Option<Arc<rattler_build_source_cache::SourceCache>>,
 
+    /// The runner that executes build, staging, and test scripts
+    pub runner: Arc<dyn Runner>,
+
     /// Set this to true if you want to keep the build directory after the build
     /// is done
     pub no_clean: bool,
@@ -103,7 +111,7 @@ pub struct Configuration {
     pub skip_existing: SkipExisting,
 
     /// The noarch platform to use (noarch builds are skipped on other platforms)
-    pub noarch_build_platform: Option<Platform>,
+    pub noarch_build_platform: Option<Subdir>,
 
     /// The channel configuration to use when parsing channels.
     pub channel_config: ChannelConfig,
@@ -122,6 +130,13 @@ pub struct Configuration {
     /// The repodata gateway to use for querying repodata
     pub repodata_gateway: Gateway,
 
+    /// CEP-6 notices already displayed during this invocation.
+    ///
+    /// A build can solve several environments against the same channel. Sharing
+    /// this set between cloned configurations prevents repeating a notice for
+    /// every solve.
+    pub(crate) displayed_channel_notices: Arc<Mutex<HashSet<(String, String)>>>,
+
     /// What channel priority to use in solving
     pub channel_priority: ChannelPriority,
 
@@ -133,6 +148,13 @@ pub struct Configuration {
 
     /// Whether to error if the host prefix is detected in binary files
     pub error_prefix_in_binary: bool,
+
+    /// Whether outputs of one recipe packaging the same file is an error (defaults to a warning)
+    pub error_overlapping_files: bool,
+
+    /// Whether staging cache files not packaged by any inheriting output are an error
+    /// (defaults to a warning)
+    pub error_unused_staging_files: bool,
 
     /// Whether to allow symlinks in packages on Windows (defaults to false)
     pub allow_symlinks_on_windows: bool,
@@ -185,6 +207,7 @@ pub struct ConfigurationBuilder {
     cache_dir: Option<PathBuf>,
     fancy_log_handler: Option<LoggingOutputHandler>,
     client: Option<rattler_build_networking::BaseClient>,
+    runner: Option<Arc<dyn Runner>>,
     no_clean: bool,
     no_test: bool,
     test_strategy: TestStrategy,
@@ -192,7 +215,7 @@ pub struct ConfigurationBuilder {
     use_bz2: bool,
     use_sharded: bool,
     skip_existing: SkipExisting,
-    noarch_build_platform: Option<Platform>,
+    noarch_build_platform: Option<Subdir>,
     channel_config: Option<ChannelConfig>,
     compression_threads: Option<u32>,
     io_concurrency_limit: Option<usize>,
@@ -200,6 +223,8 @@ pub struct ConfigurationBuilder {
     allow_insecure_host: Option<Vec<String>>,
     continue_on_failure: ContinueOnFailure,
     error_prefix_in_binary: bool,
+    error_overlapping_files: bool,
+    error_unused_staging_files: bool,
     allow_symlinks_on_windows: bool,
     allow_absolute_license_paths: bool,
     environments_externally_managed: bool,
@@ -219,6 +244,7 @@ impl ConfigurationBuilder {
             cache_dir: None,
             fancy_log_handler: None,
             client: None,
+            runner: None,
             no_clean: false,
             no_test: false,
             test_strategy: TestStrategy::default(),
@@ -234,6 +260,8 @@ impl ConfigurationBuilder {
             allow_insecure_host: None,
             continue_on_failure: ContinueOnFailure::No,
             error_prefix_in_binary: false,
+            error_overlapping_files: false,
+            error_unused_staging_files: false,
             allow_symlinks_on_windows: false,
             allow_absolute_license_paths: false,
             environments_externally_managed: false,
@@ -261,6 +289,22 @@ impl ConfigurationBuilder {
     pub fn with_error_prefix_in_binary(self, error_prefix_in_binary: bool) -> Self {
         Self {
             error_prefix_in_binary,
+            ..self
+        }
+    }
+
+    /// Whether outputs of one recipe packaging the same file is an error
+    pub fn with_error_overlapping_files(self, error_overlapping_files: bool) -> Self {
+        Self {
+            error_overlapping_files,
+            ..self
+        }
+    }
+
+    /// Whether staging cache files not packaged by any inheriting output are an error
+    pub fn with_error_unused_staging_files(self, error_unused_staging_files: bool) -> Self {
+        Self {
+            error_unused_staging_files,
             ..self
         }
     }
@@ -346,6 +390,14 @@ impl ConfigurationBuilder {
         }
     }
 
+    /// Sets the runner used to execute build, staging, and test scripts.
+    pub fn with_runner(self, runner: Arc<dyn Runner>) -> Self {
+        Self {
+            runner: Some(runner),
+            ..self
+        }
+    }
+
     /// Sets whether tests should be executed.
     pub fn with_testing(self, testing_enabled: bool) -> Self {
         Self {
@@ -387,7 +439,7 @@ impl ConfigurationBuilder {
     }
 
     /// Define the noarch platform
-    pub fn with_noarch_build_platform(self, noarch_build_platform: Option<Platform>) -> Self {
+    pub fn with_noarch_build_platform(self, noarch_build_platform: Option<Subdir>) -> Self {
         Self {
             noarch_build_platform,
             ..self
@@ -462,6 +514,9 @@ impl ConfigurationBuilder {
             fancy_log_handler: self.fancy_log_handler.unwrap_or_default(),
             client,
             source_cache: None, // Built lazily on first use
+            runner: self
+                .runner
+                .unwrap_or_else(|| Arc::new(LocalRunner::default())),
             no_clean: self.no_clean,
             test_strategy,
             use_zstd: self.use_zstd,
@@ -474,10 +529,13 @@ impl ConfigurationBuilder {
             io_concurrency_limit: self.io_concurrency_limit,
             package_cache,
             repodata_gateway,
+            displayed_channel_notices: Arc::new(Mutex::new(HashSet::new())),
             channel_priority: self.channel_priority,
             allow_insecure_host: self.allow_insecure_host,
             continue_on_failure: self.continue_on_failure,
             error_prefix_in_binary: self.error_prefix_in_binary,
+            error_overlapping_files: self.error_overlapping_files,
+            error_unused_staging_files: self.error_unused_staging_files,
             allow_symlinks_on_windows: self.allow_symlinks_on_windows,
             allow_absolute_license_paths: self.allow_absolute_license_paths,
             environments_externally_managed: self.environments_externally_managed,
@@ -522,7 +580,7 @@ pub async fn resolve_s3_credentials(
     s3_config: &HashMap<String, s3_middleware::S3Config>,
     auth_file: Option<PathBuf>,
     bucket_url: &Url,
-) -> Result<rattler_s3::ResolvedS3Credentials, S3CredentialError> {
+) -> Result<rattler_s3::S3CredentialSource, S3CredentialError> {
     let bucket_name = bucket_url.host_str().unwrap_or_default();
 
     // Check if we have custom S3 config for this bucket
@@ -530,18 +588,15 @@ pub async fn resolve_s3_credentials(
         && let s3_middleware::S3Config::Custom {
             endpoint_url,
             region,
-            force_path_style,
+            addressing_style,
+            ..
         } = config
     {
         // Create S3Credentials from the config
         let s3_creds = rattler_s3::S3Credentials {
             endpoint_url: endpoint_url.clone(),
             region: region.clone(),
-            addressing_style: if *force_path_style {
-                rattler_s3::S3AddressingStyle::Path
-            } else {
-                rattler_s3::S3AddressingStyle::VirtualHost
-            },
+            addressing_style: *addressing_style,
             access_key_id: None,
             secret_access_key: None,
             session_token: None,
@@ -554,7 +609,7 @@ pub async fn resolve_s3_credentials(
                 "Resolved S3 credentials for bucket '{}' from config + auth storage",
                 bucket_name
             );
-            return Ok(resolved);
+            return Ok(resolved.into());
         }
     }
 
@@ -563,6 +618,6 @@ pub async fn resolve_s3_credentials(
         "Using AWS SDK default credential chain for bucket '{}'",
         bucket_name
     );
-    let resolved = rattler_s3::ResolvedS3Credentials::from_sdk().await?;
-    Ok(resolved)
+    let source = rattler_s3::S3CredentialSource::from_sdk().await?;
+    Ok(source)
 }

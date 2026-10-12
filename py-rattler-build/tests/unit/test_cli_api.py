@@ -1,6 +1,7 @@
 import shutil
 import warnings
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 import tomli as tomllib
@@ -20,6 +21,14 @@ def test_version_match_local_cargo() -> None:
     assert rattler_build.rattler_build_version() == local_version
 
 
+@pytest.mark.parametrize("strict", [False, True])
+def test_build_recipes_output_check_flags(strict: bool) -> None:
+    options = {"error_overlapping_files": True, "error_unused_staging_files": True} if strict else {}
+    with patch("rattler_build.cli_api.build_recipes_py") as build, pytest.warns(DeprecationWarning):
+        rattler_build.build_recipes([], **options)
+    assert build.call_args.args[-2:] == (strict, strict)
+
+
 def test_test_package_deprecation_warning(tmp_path: Path, recipes_dir: Path) -> None:
     recipe_name = "recipe.yaml"
     recipe_path = tmp_path.joinpath(recipe_name)
@@ -28,7 +37,13 @@ def test_test_package_deprecation_warning(tmp_path: Path, recipes_dir: Path) -> 
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", DeprecationWarning)
-        rattler_build.build_recipes([recipe_path], output_dir=output_dir, test="skip")
+        rattler_build.build_recipes(
+            [recipe_path],
+            output_dir=output_dir,
+            test="skip",
+            error_overlapping_files=True,
+            error_unused_staging_files=True,
+        )
 
     for conda_file in output_dir.glob("**/*.conda"):
         with pytest.warns(DeprecationWarning, match="test_package is deprecated"):

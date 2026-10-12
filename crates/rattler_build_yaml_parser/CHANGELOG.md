@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.18](https://github.com/prefix-dev/rattler-build/compare/rattler_build_yaml_parser-v0.1.17...rattler_build_yaml_parser-v0.1.18) - 2026-10-07
+
+### Other
+
+- updated the following local packages: rattler_build_jinja
+
+## [0.1.17](https://github.com/prefix-dev/rattler-build/compare/rattler_build_yaml_parser-v0.1.16...rattler_build_yaml_parser-v0.1.17) - 2026-10-06
+
+### Other
+
+- updated the following local packages: rattler_build_jinja
+
+## [0.1.16](https://github.com/prefix-dev/rattler-build/compare/rattler_build_yaml_parser-v0.1.15...rattler_build_yaml_parser-v0.1.16) - 2026-09-30
+
+### Other
+
+- updated the following local packages: rattler_build_jinja
+
+## [0.1.15](https://github.com/prefix-dev/rattler-build/compare/rattler_build_yaml_parser-v0.1.14...rattler_build_yaml_parser-v0.1.15) - 2026-09-14
+
+### Other
+
+- update Cargo.toml dependencies
+
+## [0.1.14](https://github.com/prefix-dev/rattler-build/compare/rattler_build_yaml_parser-v0.1.13...rattler_build_yaml_parser-v0.1.14) - 2026-08-27
+
+### Other
+
+- updated the following local packages: rattler_build_jinja
+
+## [0.1.13](https://github.com/prefix-dev/rattler-build/compare/rattler_build_yaml_parser-v0.1.12...rattler_build_yaml_parser-v0.1.13) - 2026-08-21
+
+### Other
+
+- updated the following local packages: rattler_build_jinja
+
+## [0.1.12](https://github.com/prefix-dev/rattler-build/compare/rattler_build_yaml_parser-v0.1.11...rattler_build_yaml_parser-v0.1.12) - 2026-08-17
+
+### Added
+
+- add experimental build steps ([#2646](https://github.com/prefix-dev/rattler-build/pull/2646))
+
 ## [0.1.11](https://github.com/prefix-dev/rattler-build/compare/rattler_build_yaml_parser-v0.1.10...rattler_build_yaml_parser-v0.1.11) - 2026-07-25
 
 ### Other

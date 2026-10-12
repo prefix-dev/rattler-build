@@ -13,7 +13,7 @@ for recipe_path in sorted(recipes_dir.glob("*.yaml")):
         recipe = Stage0Recipe.from_file(recipe_path)
         recipe.render()
         print(f"  OK:   {recipe_path}")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - report every invalid recipe
         failed.append((recipe_path, str(e)))
         print(f"  FAIL: {recipe_path}")
 

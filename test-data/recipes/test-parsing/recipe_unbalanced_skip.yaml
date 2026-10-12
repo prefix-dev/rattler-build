@@ -1,0 +1,9 @@
+# Regression test for https://github.com/prefix-dev/rattler-build/issues/2780
+# The `skip` expression below is missing its opening bracket, which used to be
+# silently ignored (the output was built despite the intended skip).
+package:
+  name: unbalanced-skip
+  version: 0.1.0
+
+build:
+  skip: target_platform == "win-arm64" or cross_target_platform == "win-arm64") and target_platform != cross_target_platform

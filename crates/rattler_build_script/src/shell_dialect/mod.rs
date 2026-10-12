@@ -10,7 +10,7 @@ mod cmd_exe;
 use std::path::Path;
 
 use indexmap::IndexMap;
-use rattler_conda_types::Platform;
+use rattler_conda_types::Subdir;
 use rattler_shell::shell::{Shell, ShellEnum};
 
 use crate::ExecutionContext;
@@ -87,7 +87,7 @@ pub(crate) trait ShellDialect: Send + Sync {
 /// Selects the native wrapper shell for the given platform: `cmd.exe` on
 /// Windows, `bash` elsewhere. The script runs on the host, so callers pass the
 /// runtime platform (which equals the host).
-pub(crate) fn shell_dialect(platform: Platform) -> Box<dyn ShellDialect> {
+pub(crate) fn shell_dialect(platform: Subdir) -> Box<dyn ShellDialect> {
     if platform.is_windows() {
         Box::new(cmd_exe::CmdExeDialect)
     } else {
@@ -173,7 +173,7 @@ mod tests {
         windows_machine::{WindowsMachine, windows_machine_transition},
     };
     use indexmap::IndexMap;
-    use rattler_conda_types::Platform;
+    use rattler_conda_types::Subdir;
     use rattler_shell::shell::{self, Shell};
 
     /// bash scopes a section in a bare subshell, emits the label comment, and
@@ -181,7 +181,7 @@ mod tests {
     /// from the preamble handles failure.
     #[test]
     fn bash_scope_section_subshell_env_and_label() {
-        let dialect = shell_dialect(Platform::Linux64);
+        let dialect = shell_dialect(Subdir::Linux64);
         let mut env = IndexMap::new();
         env.insert("FOO".to_string(), "a b".to_string());
         let out = dialect
@@ -199,7 +199,7 @@ echo hi
     /// No label and empty env => just `( body )`.
     #[test]
     fn bash_scope_section_minimal() {
-        let dialect = shell_dialect(Platform::Linux64);
+        let dialect = shell_dialect(Subdir::Linux64);
         let out = dialect
             .scope_section(None, &IndexMap::new(), None, "echo hi")
             .unwrap();
@@ -214,7 +214,7 @@ echo hi
     /// appends an errorlevel guard (required even for the last section).
     #[test]
     fn cmd_scope_section_setlocal_env_and_guard() {
-        let dialect = shell_dialect(Platform::Win64);
+        let dialect = shell_dialect(Subdir::Win64);
         let mut env = IndexMap::new();
         env.insert("FOO".to_string(), "bar".to_string());
         let out = dialect
@@ -235,7 +235,7 @@ endlocal & if %RB_SECTION_ERRORLEVEL% neq 0 exit /b %RB_SECTION_ERRORLEVEL%
 
     #[test]
     fn cmd_scope_section_pushd_uses_cwd() {
-        let dialect = shell_dialect(Platform::Win64);
+        let dialect = shell_dialect(Subdir::Win64);
         let out = dialect
             .scope_section(
                 Some("step 1"),
@@ -259,7 +259,7 @@ endlocal & if %RB_SECTION_ERRORLEVEL% neq 0 exit /b %RB_SECTION_ERRORLEVEL%
 
     #[test]
     fn scope_section_rejects_invalid_env_names() {
-        let dialect = shell_dialect(Platform::Linux64);
+        let dialect = shell_dialect(Subdir::Linux64);
         let mut env = IndexMap::new();
         env.insert("BAD-NAME".to_string(), "value".to_string());
 
@@ -275,7 +275,7 @@ endlocal & if %RB_SECTION_ERRORLEVEL% neq 0 exit /b %RB_SECTION_ERRORLEVEL%
 
     #[test]
     fn cmd_scope_section_rejects_newline_env_values() {
-        let dialect = shell_dialect(Platform::Win64);
+        let dialect = shell_dialect(Subdir::Win64);
         let mut env = IndexMap::new();
         env.insert("FOO".to_string(), "safe\necho injected".to_string());
 
@@ -289,27 +289,24 @@ endlocal & if %RB_SECTION_ERRORLEVEL% neq 0 exit /b %RB_SECTION_ERRORLEVEL%
     #[test]
     fn shell_dialect_follows_the_platform() {
         // Independent of the host this test runs on.
-        assert_eq!(shell_dialect(Platform::Win64).shell().extension(), "bat");
-        assert_eq!(shell_dialect(Platform::Linux64).shell().extension(), "sh");
-        assert_eq!(shell_dialect(Platform::OsxArm64).shell().extension(), "sh");
+        assert_eq!(shell_dialect(Subdir::Win64).shell().extension(), "bat");
+        assert_eq!(shell_dialect(Subdir::Linux64).shell().extension(), "sh");
+        assert_eq!(shell_dialect(Subdir::OsxArm64).shell().extension(), "sh");
 
-        assert_eq!(shell_dialect(Platform::Win64).default_interpreter(), "cmd");
-        assert_eq!(
-            shell_dialect(Platform::Linux64).default_interpreter(),
-            "bash"
-        );
+        assert_eq!(shell_dialect(Subdir::Win64).default_interpreter(), "cmd");
+        assert_eq!(shell_dialect(Subdir::Linux64).default_interpreter(), "bash");
     }
 
     #[test]
     fn cmd_switches_between_supported_windows_architectures() {
         let script = std::path::Path::new("work/conda_build.bat");
-        let dialect = shell_dialect(Platform::Win64);
+        let dialect = shell_dialect(Subdir::Win64);
 
         let x64_to_arm = ExecutionContext::shared(
-            RuntimeEnv::for_test(Platform::Win64),
+            RuntimeEnv::for_test(Subdir::Win64),
             "prefix",
-            Platform::WinArm64,
-            Platform::WinArm64,
+            Subdir::WinArm64,
+            Subdir::WinArm64,
         );
         let arm_command = dialect.command_to_run_script(script, &x64_to_arm);
         assert_eq!(arm_command.program, "cmd.exe");
@@ -327,19 +324,19 @@ endlocal & if %RB_SECTION_ERRORLEVEL% neq 0 exit /b %RB_SECTION_ERRORLEVEL%
         );
 
         let arm_to_x64 = ExecutionContext::shared(
-            RuntimeEnv::for_test(Platform::WinArm64),
+            RuntimeEnv::for_test(Subdir::WinArm64),
             "prefix",
-            Platform::Win64,
-            Platform::Win64,
+            Subdir::Win64,
+            Subdir::Win64,
         );
         let x64_command = dialect.command_to_run_script(script, &arm_to_x64);
         assert!(x64_command.args[3].contains("/machine amd64"));
 
         let x64_to_x86 = ExecutionContext::shared(
-            RuntimeEnv::for_test(Platform::Win64),
+            RuntimeEnv::for_test(Subdir::Win64),
             "prefix",
-            Platform::Win32,
-            Platform::Win32,
+            Subdir::Win32,
+            Subdir::Win32,
         );
         let x86_command = dialect.command_to_run_script(script, &x64_to_x86);
         assert!(x86_command.args[3].contains("/machine x86"));
@@ -350,25 +347,25 @@ endlocal & if %RB_SECTION_ERRORLEVEL% neq 0 exit /b %RB_SECTION_ERRORLEVEL%
         );
 
         let same_arch = ExecutionContext::shared(
-            RuntimeEnv::for_test(Platform::Win64),
+            RuntimeEnv::for_test(Subdir::Win64),
             "prefix",
-            Platform::Win64,
-            Platform::Win64,
+            Subdir::Win64,
+            Subdir::Win64,
         );
         assert_eq!(
             dialect.command_to_run_script(script, &same_arch).args,
             ["/d", "/c", "work/conda_build.bat"]
         );
         assert_eq!(
-            windows_machine_transition(Platform::Win64, Platform::Win32),
+            windows_machine_transition(Subdir::Win64, Subdir::Win32),
             Some(WindowsMachine::X86)
         );
         assert_eq!(
-            windows_machine_transition(Platform::Win32, Platform::Win64),
+            windows_machine_transition(Subdir::Win32, Subdir::Win64),
             None
         );
         assert_eq!(
-            windows_machine_transition(Platform::Win32, Platform::WinArm64),
+            windows_machine_transition(Subdir::Win32, Subdir::WinArm64),
             None
         );
         assert_eq!(WindowsMachine::X86.wow64_processor_architecture(), None);
@@ -381,11 +378,11 @@ endlocal & if %RB_SECTION_ERRORLEVEL% neq 0 exit /b %RB_SECTION_ERRORLEVEL%
             Some("ARM64")
         );
         assert_eq!(
-            windows_machine_transition(Platform::Win32, Platform::Win32),
+            windows_machine_transition(Subdir::Win32, Subdir::Win32),
             None
         );
         assert_eq!(
-            windows_machine_transition(Platform::Linux64, Platform::Win32),
+            windows_machine_transition(Subdir::Linux64, Subdir::Win32),
             None
         );
     }
@@ -393,7 +390,7 @@ endlocal & if %RB_SECTION_ERRORLEVEL% neq 0 exit /b %RB_SECTION_ERRORLEVEL%
     #[test]
     fn bash_preamble_enables_tracing_after_activation() {
         let preamble =
-            shell_dialect(Platform::Linux64).preamble(std::path::Path::new("build_env.sh"));
+            shell_dialect(Subdir::Linux64).preamble(std::path::Path::new("build_env.sh"));
         let activation = preamble
             .find("source")
             .expect("preamble sources activation");

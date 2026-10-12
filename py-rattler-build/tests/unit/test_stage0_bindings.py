@@ -3,8 +3,12 @@
 import pytest
 from inline_snapshot import snapshot
 
-from rattler_build import MultiOutputRecipe, SingleOutputRecipe, Stage0Recipe
-
+from rattler_build import (
+    MultiOutputRecipe,
+    RattlerBuildError,
+    SingleOutputRecipe,
+    Stage0Recipe,
+)
 
 # Sample YAML recipes for testing
 SIMPLE_RECIPE_YAML = """
@@ -97,7 +101,6 @@ def test_recipe_to_dict_snapshot() -> None:
                 "always_copy_files": [],
                 "always_include_files": [],
                 "merge_build_and_host_envs": False,
-                "files": [],
                 "dynamic_linking": {
                     "rpaths": [],
                     "binary_relocation": True,
@@ -158,7 +161,6 @@ def test_single_output_recipe_to_dict_snapshot() -> None:
                 "always_copy_files": [],
                 "always_include_files": [],
                 "merge_build_and_host_envs": False,
-                "files": [],
                 "dynamic_linking": {
                     "rpaths": [],
                     "binary_relocation": True,
@@ -220,7 +222,6 @@ def test_multi_output_recipe_to_dict_snapshot() -> None:
                 "always_copy_files": [],
                 "always_include_files": [],
                 "merge_build_and_host_envs": False,
-                "files": [],
                 "dynamic_linking": {
                     "rpaths": [],
                     "binary_relocation": True,
@@ -249,7 +250,6 @@ def test_multi_output_recipe_to_dict_snapshot() -> None:
                         "always_copy_files": [],
                         "always_include_files": [],
                         "merge_build_and_host_envs": False,
-                        "files": [],
                         "dynamic_linking": {
                             "rpaths": [],
                             "binary_relocation": True,
@@ -277,7 +277,6 @@ def test_multi_output_recipe_to_dict_snapshot() -> None:
                         "always_copy_files": [],
                         "always_include_files": [],
                         "merge_build_and_host_envs": False,
-                        "files": [],
                         "dynamic_linking": {
                             "rpaths": [],
                             "binary_relocation": True,
@@ -338,7 +337,6 @@ def test_build_to_dict_snapshot() -> None:
             "always_copy_files": [],
             "always_include_files": [],
             "merge_build_and_host_envs": False,
-            "files": [],
             "dynamic_linking": {
                 "rpaths": [],
                 "binary_relocation": True,
@@ -405,7 +403,7 @@ def test_invalid_yaml() -> None:
     this is not: [valid yaml
     """
 
-    with pytest.raises(Exception):  # Should raise some parsing error
+    with pytest.raises(RattlerBuildError):
         Stage0Recipe.from_yaml(invalid_yaml)
 
 
@@ -442,7 +440,6 @@ def test_multi_output_outputs_snapshot() -> None:
                     "always_copy_files": [],
                     "always_include_files": [],
                     "merge_build_and_host_envs": False,
-                    "files": [],
                     "dynamic_linking": {
                         "rpaths": [],
                         "binary_relocation": True,
@@ -470,7 +467,6 @@ def test_multi_output_outputs_snapshot() -> None:
                     "always_copy_files": [],
                     "always_include_files": [],
                     "merge_build_and_host_envs": False,
-                    "files": [],
                     "dynamic_linking": {
                         "rpaths": [],
                         "binary_relocation": True,

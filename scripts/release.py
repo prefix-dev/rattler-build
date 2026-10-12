@@ -22,10 +22,10 @@ import re
 import shutil
 import subprocess
 import sys
-import tomllib
 from pathlib import Path
 
 import questionary
+import tomllib
 
 ROOT = Path(__file__).resolve().parent.parent
 REPO = "prefix-dev/rattler-build"
@@ -41,7 +41,7 @@ def run(cmd: list[str], *, cwd: Path = ROOT, env: dict[str, str] | None = None) 
 
 def git_out(*args: str) -> str:
     return subprocess.run(
-        ["git", *args], cwd=ROOT, text=True, capture_output=True
+        ["git", *args], cwd=ROOT, text=True, capture_output=True, check=True
     ).stdout.strip()
 
 
@@ -102,7 +102,7 @@ def fetched_version(main_ref: str) -> Version:
 def gh_token() -> str:
     """A GitHub token from gh CLI auth, used to enrich git-cliff output."""
     return subprocess.run(
-        ["gh", "auth", "token"], cwd=ROOT, text=True, capture_output=True
+        ["gh", "auth", "token"], cwd=ROOT, text=True, capture_output=True, check=True
     ).stdout.strip()
 
 
@@ -129,6 +129,7 @@ def cliff_preview(tag: str, main_ref: str) -> str:
         cwd=ROOT,
         text=True,
         stdout=subprocess.PIPE,
+        check=False,
     )
     if result.returncode != 0:
         fail(f"git-cliff failed with exit code {result.returncode}")

@@ -10,15 +10,16 @@ use pyo3::prelude::*;
 use rattler_build_recipe::stage1::HashInfo;
 use rattler_build_script::EnvironmentIsolation;
 use rattler_build_types::NormalizedKey;
-use rattler_conda_types::{ChannelUrl, NamedChannelOrUrl, Platform};
+use rattler_conda_types::{ChannelUrl, NamedChannelOrUrl, Subdir};
 use rattler_config::config::build::PackageFormatAndCompression;
-use rattler_solve::SolveStrategy;
+use rattler_solve::{ExcludeNewer, SolveStrategy};
 use std::{
     collections::BTreeMap,
     sync::{Arc, Mutex},
 };
 
 use crate::error::RattlerBuildError;
+use crate::exclude_newer::PyExcludeNewer;
 use crate::render;
 use crate::repodata_revision::PyRepodataRevision;
 use crate::run_async_task;
@@ -120,7 +121,7 @@ pub(crate) fn output_from_rendered_variant(
     package_format: Option<&PackageFormatAndCompression>,
     no_include_recipe: bool,
     recipe_path: Option<&Path>,
-    exclude_newer: Option<jiff::Timestamp>,
+    exclude_newer: Option<ExcludeNewer>,
     env_isolation: EnvironmentIsolation,
     repodata_revision: PyRepodataRevision,
     extra_subpackages: BTreeMap<rattler_conda_types::PackageName, PackageIdentifier>,
@@ -157,18 +158,21 @@ pub(crate) fn output_from_rendered_variant(
 
     let target_platform = variant
         .get(&NormalizedKey("target_platform".to_string()))
-        .and_then(|v| v.to_string().parse::<Platform>().ok())
-        .unwrap_or_else(Platform::current);
+        .and_then(|v| v.to_string().parse::<Subdir>().ok())
+        .or_else(Subdir::current)
+        .ok_or_else(|| RattlerBuildError::Other("unsupported build platform".into()))?;
 
     let build_platform = variant
         .get(&NormalizedKey("build_platform".to_string()))
-        .and_then(|v| v.to_string().parse::<Platform>().ok())
-        .unwrap_or_else(Platform::current);
+        .and_then(|v| v.to_string().parse::<Subdir>().ok())
+        .or_else(Subdir::current)
+        .ok_or_else(|| RattlerBuildError::Other("unsupported build platform".into()))?;
 
     let host_platform = variant
         .get(&NormalizedKey("host_platform".to_string()))
-        .and_then(|v| v.to_string().parse::<Platform>().ok())
-        .unwrap_or_else(Platform::current);
+        .and_then(|v| v.to_string().parse::<Subdir>().ok())
+        .or_else(Subdir::current)
+        .ok_or_else(|| RattlerBuildError::Other("unsupported build platform".into()))?;
 
     let channels_urls: Vec<ChannelUrl> = channels
         .iter()
@@ -204,7 +208,8 @@ pub(crate) fn output_from_rendered_variant(
                 &safe_recipe_path,
                 output_dir,
                 &timestamp,
-                Platform::current(),
+                Subdir::current()
+                    .ok_or_else(|| RattlerBuildError::Other("unsupported build platform".into()))?,
             )
             .no_build_id(no_build_id)
             .build()
@@ -261,12 +266,13 @@ pub fn build_rendered_variant_py(
     no_build_id: bool,
     package_format: Option<String>,
     no_include_recipe: bool,
-    exclude_newer: Option<jiff::Timestamp>,
+    exclude_newer: Option<PyExcludeNewer>,
     env_isolation: PyEnvironmentIsolation,
     sibling_variants: Vec<render::PyRenderedVariant>,
     repodata_revision: Option<PyRepodataRevision>,
 ) -> PyResult<BuildResultPy> {
     let tool_config = tool_config.inner;
+    let exclude_newer = exclude_newer.and_then(|policy| policy.inner);
 
     let package_format = package_format
         .map(|p| PackageFormatAndCompression::from_str(&p))

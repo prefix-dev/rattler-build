@@ -25,8 +25,12 @@ directory with the timestamp, you need to use the `--no-build-id` flag. This
 will disable the time stamp in the build directory and allow `ccache` and
 `sccache` to cache the build.
 
+Furthermore, unless this variables are defined in the build script,
+you also need to pass the `--env-isolation none` flag, to ensure that the
+system environment variables are visible in the build phase.
+
 ```sh
-rattler-build build --no-build-id --recipe ./path/to/recipe.yaml
+rattler-build build --no-build-id --env-isolation none --recipe ./path/to/recipe.yaml
 ```
 
 ## Building your own "forge"

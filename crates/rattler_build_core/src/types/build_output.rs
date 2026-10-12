@@ -4,17 +4,17 @@ use rattler_build_jinja::Variable;
 use rattler_build_recipe::{Stage1Recipe, stage1::Source};
 use rattler_build_types::NormalizedKey;
 use rattler_conda_types::{
-    PackageName, Platform, RepoDataRecord, VersionWithSource,
+    PackageName, RepoDataRecord, Subdir, VersionWithSource,
     package::{PathType, PathsEntry, PathsJson},
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{
     borrow::Cow,
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     fmt::{self, Display, Formatter},
     io::Write,
-    path::Path,
+    path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
 
@@ -116,6 +116,20 @@ impl BuildOutput {
         summary.paths = Some(paths.clone());
     }
 
+    /// Record the prefix-relative files selected for packaging.
+    pub fn record_packaged_prefix_files(&self, files: BTreeSet<PathBuf>) {
+        self.build_summary.lock().unwrap().packaged_prefix_files = Some(files);
+    }
+
+    /// Return the selected prefix-relative files after packaging.
+    pub fn packaged_prefix_files(&self) -> Option<BTreeSet<PathBuf>> {
+        self.build_summary
+            .lock()
+            .unwrap()
+            .packaged_prefix_files
+            .clone()
+    }
+
     /// Record the end of the build
     pub fn record_build_end(&self) {
         let mut summary = self.build_summary.lock().unwrap();
@@ -138,7 +152,7 @@ impl BuildOutput {
     }
 
     /// Shorthand to retrieve the target platform for this output
-    pub fn target_platform(&self) -> &Platform {
+    pub fn target_platform(&self) -> &Subdir {
         &self.build_configuration.target_platform
     }
 
@@ -319,17 +333,15 @@ impl BuildOutput {
     fn format_table_with_option(
         &self,
         f: &mut impl fmt::Write,
-        table_format: &str,
+        table_format: comfy_table::TableStyle,
         long: bool,
     ) -> std::fmt::Result {
         let template = || -> comfy_table::Table {
             let mut table = comfy_table::Table::new();
             if table_format == comfy_table::presets::UTF8_FULL {
-                table
-                    .load_preset(comfy_table::presets::UTF8_FULL_CONDENSED)
-                    .apply_modifier(comfy_table::modifiers::UTF8_ROUND_CORNERS);
+                table.load_style(comfy_table::presets::UTF8_FULL_CONDENSED.with_rounded_corners());
             } else {
-                table.load_preset(table_format);
+                table.load_style(table_format);
             }
             table
         };

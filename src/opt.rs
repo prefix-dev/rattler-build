@@ -8,7 +8,7 @@ use clap_complete_nushell::Nushell;
 use clap_verbosity_flag::{InfoLevel, Verbosity};
 use rattler_build_script::{SandboxArguments, SandboxConfiguration};
 use rattler_conda_types::{
-    NamedChannelOrUrl, Platform, compression_level::CompressionLevel, package::CondaArchiveType,
+    NamedChannelOrUrl, Subdir, compression_level::CompressionLevel, package::CondaArchiveType,
 };
 use rattler_config::config::build::PackageFormatAndCompression;
 use rattler_networking::mirror_middleware;
@@ -181,15 +181,15 @@ pub struct DebugSetupOpts {
 
     /// The target platform to build for
     #[arg(long)]
-    pub target_platform: Option<Platform>,
+    pub target_platform: Option<Subdir>,
 
     /// The host platform to build for (defaults to target_platform)
     #[arg(long)]
-    pub host_platform: Option<Platform>,
+    pub host_platform: Option<Subdir>,
 
     /// The build platform to build for (defaults to current platform)
     #[arg(long)]
-    pub build_platform: Option<Platform>,
+    pub build_platform: Option<Subdir>,
 
     /// Channels to use when building
     #[arg(short = 'c', long = "channel")]
@@ -586,23 +586,24 @@ pub struct BuildOpts {
     #[arg(long, value_parser = is_dir, conflicts_with = "recipes")]
     pub recipe_dir: Option<PathBuf>,
 
-    /// Build recipes up to the specified package.
+    /// Build only the specified package and outputs needed to build it. Runtime
+    /// and explicit test dependencies are also included unless tests are skipped.
     #[arg(long)]
     pub up_to: Option<String>,
 
     /// The build platform to use for the build (e.g. for building with
     /// emulation, or rendering).
     #[arg(long)]
-    pub build_platform: Option<Platform>,
+    pub build_platform: Option<Subdir>,
 
     /// The target platform for the build.
     #[arg(long)]
-    pub target_platform: Option<Platform>,
+    pub target_platform: Option<Subdir>,
 
     /// The host platform for the build. If set, it will be used to determine
     /// also the target_platform (as long as it is not noarch).
     #[arg(long)]
-    pub host_platform: Option<Platform>,
+    pub host_platform: Option<Subdir>,
 
     /// Add a channel to search for dependencies in.
     #[arg(short = 'c', long = "channel")]
@@ -694,7 +695,7 @@ pub struct BuildOpts {
     /// Define a "noarch platform" for which the noarch packages will be built
     /// for. The noarch builds will be skipped on the other platforms.
     #[arg(long, help_heading = "Modifying result")]
-    pub noarch_build_platform: Option<Platform>,
+    pub noarch_build_platform: Option<Subdir>,
 
     /// Extra metadata to include in about.json
     #[arg(long, value_parser = parse_key_val)]
@@ -721,6 +722,15 @@ pub struct BuildOpts {
     /// Allow symlinks in packages on Windows (defaults to false - symlinks are forbidden on Windows)
     #[arg(long, help_heading = "Modifying result")]
     pub allow_symlinks_on_windows: bool,
+
+    /// Error instead of warn when outputs of one recipe package the same file
+    #[arg(long, help_heading = "Modifying result")]
+    pub error_overlapping_files: bool,
+
+    /// Error instead of warn when files from a staging cache are not included in any
+    /// output that inherits from it
+    #[arg(long, help_heading = "Modifying result")]
+    pub error_unused_staging_files: bool,
 
     /// Allow absolute paths in license_file entries (defaults to false)
     #[arg(long, hide = true, help_heading = "Modifying result")]
@@ -889,9 +899,9 @@ impl PublishData {
 #[derive(Clone, Debug)]
 pub struct BuildData {
     pub up_to: Option<String>,
-    pub build_platform: Platform,
-    pub target_platform: Platform,
-    pub host_platform: Platform,
+    pub build_platform: Subdir,
+    pub target_platform: Subdir,
+    pub host_platform: Subdir,
     pub channels: Option<Vec<NamedChannelOrUrl>>,
     /// Whether `channels` was filled from the configuration file's
     /// `default-channels` rather than passed explicitly. Config channels are a
@@ -914,12 +924,14 @@ pub struct BuildData {
     pub env_isolation: rattler_build_script::EnvironmentIsolation,
     pub common: CommonData,
     pub skip_existing: SkipExisting,
-    pub noarch_build_platform: Option<Platform>,
+    pub noarch_build_platform: Option<Subdir>,
     pub extra_meta: Option<Vec<(String, Value)>>,
     pub sandbox_configuration: Option<SandboxConfiguration>,
     pub continue_on_failure: ContinueOnFailure,
     pub error_prefix_in_binary: bool,
     pub allow_symlinks_on_windows: bool,
+    pub error_overlapping_files: bool,
+    pub error_unused_staging_files: bool,
     pub allow_absolute_license_paths: bool,
     pub exclude_newer: Option<jiff::Timestamp>,
     pub build_num_override: Option<u64>,
@@ -932,9 +944,9 @@ impl BuildData {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         up_to: Option<String>,
-        build_platform: Option<Platform>,
-        target_platform: Option<Platform>,
-        host_platform: Option<Platform>,
+        build_platform: Option<Subdir>,
+        target_platform: Option<Subdir>,
+        host_platform: Option<Subdir>,
         channels: Option<Vec<NamedChannelOrUrl>>,
         variant_config: Option<Vec<PathBuf>>,
         variant_overrides: HashMap<String, Vec<String>>,
@@ -950,13 +962,15 @@ impl BuildData {
         test: Option<TestStrategy>,
         common: CommonData,
         skip_existing: Option<SkipExisting>,
-        noarch_build_platform: Option<Platform>,
+        noarch_build_platform: Option<Subdir>,
         extra_meta: Option<Vec<(String, Value)>>,
         sandbox_configuration: Option<SandboxConfiguration>,
         env_isolation: rattler_build_script::EnvironmentIsolation,
         continue_on_failure: ContinueOnFailure,
         error_prefix_in_binary: bool,
         allow_symlinks_on_windows: bool,
+        error_overlapping_files: bool,
+        error_unused_staging_files: bool,
         allow_absolute_license_paths: bool,
         exclude_newer: Option<jiff::Timestamp>,
         build_num_override: Option<u64>,
@@ -965,13 +979,17 @@ impl BuildData {
     ) -> Self {
         Self {
             up_to,
-            build_platform: build_platform.unwrap_or(Platform::current()),
+            build_platform: build_platform
+                .or_else(Subdir::current)
+                .expect("unsupported build platform"),
             target_platform: target_platform
                 .or(host_platform)
-                .unwrap_or(Platform::current()),
+                .or_else(Subdir::current)
+                .expect("unsupported build platform"),
             host_platform: host_platform
                 .or(target_platform)
-                .unwrap_or(Platform::current()),
+                .or_else(Subdir::current)
+                .expect("unsupported build platform"),
             channels,
             channels_from_config: false,
             variant_config: variant_config.unwrap_or_default(),
@@ -999,6 +1017,8 @@ impl BuildData {
             continue_on_failure,
             error_prefix_in_binary,
             allow_symlinks_on_windows,
+            error_overlapping_files,
+            error_unused_staging_files,
             allow_absolute_license_paths,
             exclude_newer,
             build_num_override,
@@ -1052,6 +1072,8 @@ impl BuildData {
             opts.continue_on_failure.into(),
             opts.error_prefix_in_binary,
             opts.allow_symlinks_on_windows,
+            opts.error_overlapping_files,
+            opts.error_unused_staging_files,
             opts.allow_absolute_license_paths,
             opts.exclude_newer,
             None, // build_num_override — set by caller (BuildOnlyOpts or PublishOpts)
@@ -1136,6 +1158,7 @@ pub struct TestData {
     pub compression_threads: Option<u32>,
     pub common: CommonData,
     pub test_index: Option<usize>,
+    pub exclude_newer: Option<rattler_solve::ExcludeNewer>,
 }
 
 impl TestData {
@@ -1165,6 +1188,7 @@ impl TestData {
             compression_threads,
             test_index,
             common,
+            exclude_newer: None,
         }
     }
 }
@@ -1248,11 +1272,11 @@ pub struct DebugData {
     /// Directory where build artifacts will be stored
     pub output_dir: PathBuf,
     /// Platform where the build is being executed
-    pub build_platform: Platform,
+    pub build_platform: Subdir,
     /// Target platform for the build
-    pub target_platform: Platform,
+    pub target_platform: Subdir,
     /// Host platform for runtime dependencies
-    pub host_platform: Platform,
+    pub host_platform: Subdir,
     /// List of channels to search for dependencies
     pub channels: Option<Vec<NamedChannelOrUrl>>,
     /// Common configuration options
@@ -1278,11 +1302,19 @@ impl DebugData {
                 .output_dir
                 .clone()
                 .unwrap_or_else(|| PathBuf::from("./output")),
-            build_platform: opts.build_platform.unwrap_or(Platform::current()),
-            target_platform: opts.target_platform.unwrap_or(Platform::current()),
+            build_platform: opts
+                .build_platform
+                .or_else(Subdir::current)
+                .expect("unsupported build platform"),
+            target_platform: opts
+                .target_platform
+                .or_else(Subdir::current)
+                .expect("unsupported build platform"),
             host_platform: opts
                 .host_platform
-                .unwrap_or_else(|| opts.target_platform.unwrap_or(Platform::current())),
+                .or(opts.target_platform)
+                .or_else(Subdir::current)
+                .expect("unsupported build platform"),
             channels: opts.channels,
             common: CommonData::from_opts_and_config(opts.common, config.unwrap_or_default()),
             output_name: opts.output_name,

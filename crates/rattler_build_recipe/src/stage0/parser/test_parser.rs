@@ -1,7 +1,7 @@
 use marked_yaml::Node;
 use rattler_build_yaml_parser::{
-    BoolConverter, parse_conditional_list, parse_conditional_list_or_item, parse_value,
-    parse_value_with_converter,
+    BoolConverter, parse_conditional_list, parse_conditional_list_or_item,
+    parse_conditional_list_with_converter, parse_value, parse_value_with_converter,
 };
 
 use crate::{
@@ -19,11 +19,14 @@ use crate::{
     },
 };
 
-use super::helpers::validate_mapping_fields;
+use super::{ParseConfig, helpers::validate_mapping_fields, requirements::MatchSpecConverter};
 
 /// Parse tests section from YAML (expects a sequence)
 /// Returns a ConditionalList<TestType> which supports if/then/else conditionals
-pub fn parse_tests(node: &Node) -> Result<ConditionalList<TestType>, ParseError> {
+pub fn parse_tests(
+    node: &Node,
+    config: ParseConfig,
+) -> Result<ConditionalList<TestType>, ParseError> {
     let seq = node.as_sequence().ok_or_else(|| {
         ParseError::expected_type("sequence", "non-sequence", get_span(node))
             .with_message("Expected 'tests' to be a sequence")
@@ -31,29 +34,30 @@ pub fn parse_tests(node: &Node) -> Result<ConditionalList<TestType>, ParseError>
 
     let mut items = Vec::new();
     for item in seq.iter() {
-        items.push(parse_test_item(item)?);
+        items.push(parse_test_item(item, config)?);
     }
     Ok(ConditionalList::new(items))
 }
 
 /// Parse a single test item which can be either a TestType or a conditional
 /// TODO: Refactor to reduce code duplication with other conditional parsers
-fn parse_test_item(node: &Node) -> Result<Item<TestType>, ParseError> {
+fn parse_test_item(node: &Node, config: ParseConfig) -> Result<Item<TestType>, ParseError> {
     // Check if it's a conditional (mapping with "if" key)
     if let Some(mapping) = node.as_mapping()
         && mapping.get("if").is_some()
     {
-        return parse_conditional_test_item(mapping);
+        return parse_conditional_test_item(mapping, config);
     }
 
     // Not a conditional - parse as a regular TestType
-    let test = parse_single_test(node)?;
+    let test = parse_single_test(node, config)?;
     Ok(Item::Value(Value::new_concrete(test, None)))
 }
 
 /// Parse a conditional test item with if/then/else branches
 fn parse_conditional_test_item(
     mapping: &marked_yaml::types::MarkedMappingNode,
+    config: ParseConfig,
 ) -> Result<Item<TestType>, ParseError> {
     let if_node = mapping
         .get("if")
@@ -72,10 +76,10 @@ fn parse_conditional_test_item(
         .get("then")
         .ok_or_else(|| ParseError::missing_field("then", *mapping.span()))?;
 
-    let then_tests = parse_test_list_as_values(then_node)?;
+    let then_tests = parse_test_list_as_values(then_node, config)?;
 
     let else_tests = if let Some(else_node) = mapping.get("else") {
-        Some(parse_test_list_as_values(else_node)?)
+        Some(parse_test_list_as_values(else_node, config)?)
     } else {
         None
     };
@@ -90,17 +94,20 @@ fn parse_conditional_test_item(
 
 /// Parse a test list from a sequence node (or a single test mapping)
 /// Supports nested if/then/else conditionals
-fn parse_test_list_as_values(node: &Node) -> Result<NestedItemList<TestType>, ParseError> {
+fn parse_test_list_as_values(
+    node: &Node,
+    config: ParseConfig,
+) -> Result<NestedItemList<TestType>, ParseError> {
     // If it's a sequence, parse each item as a test or conditional
     if let Some(seq) = node.as_sequence() {
         let mut items = Vec::new();
         for item_node in seq.iter() {
-            items.push(parse_test_item(item_node)?);
+            items.push(parse_test_item(item_node, config)?);
         }
         Ok(NestedItemList::new(items))
     } else if node.as_mapping().is_some() {
         // Single test mapping - could be a test or a nested conditional
-        let item = parse_test_item(node)?;
+        let item = parse_test_item(node, config)?;
         Ok(NestedItemList::single(item))
     } else {
         Err(ParseError::expected_type(
@@ -112,7 +119,7 @@ fn parse_test_list_as_values(node: &Node) -> Result<NestedItemList<TestType>, Pa
     }
 }
 
-fn parse_single_test(node: &Node) -> Result<TestType, ParseError> {
+fn parse_single_test(node: &Node, config: ParseConfig) -> Result<TestType, ParseError> {
     let mapping = node.as_mapping().ok_or_else(|| {
         ParseError::expected_type("mapping", "non-mapping", get_span(node))
             .with_message("Each test must be a mapping")
@@ -144,7 +151,7 @@ fn parse_single_test(node: &Node) -> Result<TestType, ParseError> {
         })?)?;
         Ok(TestType::Ruby { ruby })
     } else if mapping.get("script").is_some() {
-        Ok(TestType::Commands(parse_commands_test(mapping)?))
+        Ok(TestType::Commands(parse_commands_test(mapping, config)?))
     } else if mapping.get("downstream").is_some() {
         Ok(TestType::Downstream(parse_downstream_test(mapping)?))
     } else if mapping.get("package_contents").is_some() {
@@ -278,6 +285,7 @@ fn parse_ruby_test(
 
 fn parse_commands_test(
     mapping: &marked_yaml::types::MarkedMappingNode,
+    config: ParseConfig,
 ) -> Result<CommandsTest, ParseError> {
     let mut script = Script::default();
     let mut requirements = None;
@@ -295,6 +303,7 @@ fn parse_commands_test(
                     value_node.as_mapping().ok_or_else(|| {
                         ParseError::expected_type("mapping", "non-mapping", get_span(value_node))
                     })?,
+                    config,
                 )?);
             }
             "files" => {
@@ -324,7 +333,11 @@ fn parse_commands_test(
 
 fn parse_commands_test_requirements(
     mapping: &marked_yaml::types::MarkedMappingNode,
+    config: ParseConfig,
 ) -> Result<CommandsTestRequirements, ParseError> {
+    let converter = MatchSpecConverter {
+        repodata_revision: config.repodata_revision,
+    };
     let mut run = ConditionalList::default();
     let mut build = ConditionalList::default();
 
@@ -332,10 +345,10 @@ fn parse_commands_test_requirements(
         let key = key_node.as_str();
         match key {
             "run" => {
-                run = parse_conditional_list(value_node)?;
+                run = parse_conditional_list_with_converter(value_node, &converter)?;
             }
             "build" => {
-                build = parse_conditional_list(value_node)?;
+                build = parse_conditional_list_with_converter(value_node, &converter)?;
             }
             _ => {
                 return Err(ParseError::invalid_value(

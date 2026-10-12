@@ -14,6 +14,13 @@ pub enum CacheError {
     #[error("Failed to download from URL: {0}")]
     DownloadMiddleware(#[from] reqwest_middleware::Error),
 
+    #[error("Download from {url} ended early after {downloaded} bytes: {reason}")]
+    IncompleteDownload {
+        url: String,
+        downloaded: u64,
+        reason: String,
+    },
+
     #[error("URL does not point to a file: {0}")]
     UrlNotFile(url::Url),
 

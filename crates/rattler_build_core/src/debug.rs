@@ -467,6 +467,7 @@ pub async fn add_packages_to_prefix(
     specs: &[String],
     channels: &[ChannelUrl],
     tool_config: &Configuration,
+    exclude_newer: Option<rattler_solve::ExcludeNewer>,
 ) -> miette::Result<()> {
     use miette::IntoDiagnostic;
 
@@ -518,7 +519,7 @@ pub async fn add_packages_to_prefix(
         tool_config,
         rattler_solve::ChannelPriority::Strict,
         rattler_solve::SolveStrategy::default(),
-        None,
+        exclude_newer,
     )
     .await?;
 

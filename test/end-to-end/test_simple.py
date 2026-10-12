@@ -6,10 +6,10 @@ import re
 import shutil
 import subprocess
 import uuid
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
 from subprocess import DEVNULL, STDOUT, CalledProcessError, check_output
-from typing import Iterator
 
 import boto3
 import pytest
@@ -398,7 +398,11 @@ def host_subdir():
 
 def variant_hash(variant):
     hash_length = 7
-    m = hashlib.sha1()
+    # Mirrors conda's variant hash, which is defined by the ecosystem to be
+    # SHA1. This is a build-identity fingerprint used to assert that a built
+    # package is named correctly -- not a security control -- so it is marked
+    # usedforsecurity=False. That also keeps it working under FIPS.
+    m = hashlib.sha1(usedforsecurity=False)
     m.update(json.dumps(variant, sort_keys=True).encode())
     return f"h{m.hexdigest()[:hash_length]}"
 
@@ -448,6 +452,7 @@ def test_strict_mode_many_files(
         text=True,
         encoding="utf-8",
         errors="replace",
+        check=False,
     )
     assert result.returncode != 0
 
@@ -758,16 +763,16 @@ def test_crazy_characters(rattler_build: RattlerBuild, recipes: Path, tmp_path: 
     assert (pkg / "info/paths.json").exists()
 
     file_1 = pkg / "files" / "File(Glob …).tmSnippet"
-    assert file_1.read_text() == file_1.name
+    assert file_1.read_text(encoding="utf-8") == file_1.name
 
     file_2 = (
         pkg / "files" / "a $random_crazy file name with spaces and (parentheses).txt"
     )
-    assert file_2.read_text() == file_2.name
+    assert file_2.read_text(encoding="utf-8") == file_2.name
 
     # limit on Windows is 260 chars
     file_3 = pkg / "files" / ("a_really_long_" + ("a" * 200) + ".txt")
-    assert file_3.read_text() == file_3.name
+    assert file_3.read_text(encoding="utf-8") == file_3.name
 
 
 def test_variant_config(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
@@ -865,9 +870,10 @@ def test_prefix_detection(rattler_build: RattlerBuild, recipes: Path, tmp_path: 
                 check_path(p, None)
         elif path == "is_text/file_with_prefix":
             check_path(p, "text")
-        elif path == "is_binary/file_without_prefix":
-            check_path(p, None)
-        elif path == "is_text/file_without_prefix":
+        elif (
+            path == "is_binary/file_without_prefix"
+            or path == "is_text/file_without_prefix"
+        ):
             check_path(p, None)
         elif path == "force_text/file_with_prefix":
             if not win:
@@ -886,11 +892,11 @@ def test_prefix_detection(rattler_build: RattlerBuild, recipes: Path, tmp_path: 
                 # and we also don't do any prefix replacement
                 check_path(p, None)
 
-        elif path == "force_binary/file_without_prefix":
-            check_path(p, None)
-        elif path == "ignore/file_with_prefix":
-            check_path(p, None)
-        elif path == "ignore/text_with_prefix":
+        elif (
+            path == "force_binary/file_without_prefix"
+            or path == "ignore/file_with_prefix"
+            or path == "ignore/text_with_prefix"
+        ):
             check_path(p, None)
         elif path == "is_text/file_with_forwardslash_prefix":
             assert "\\" not in p["prefix_placeholder"]
@@ -1234,7 +1240,7 @@ def test_regex_post_process(rattler_build: RattlerBuild, recipes: Path, tmp_path
 
     text_cmake = (pkg / "test.cmake").read_text()
     assert text_cmake.startswith(
-        'target_compile_definitions(test PRIVATE "some_path;$ENV{CONDA_BUILD_SYSROOT}/and/more;some_other_path;$ENV{CONDA_BUILD_SYSROOT}/and/more")'  # noqa: E501
+        'target_compile_definitions(test PRIVATE "some_path;$ENV{CONDA_BUILD_SYSROOT}/and/more;some_other_path;$ENV{CONDA_BUILD_SYSROOT}/and/more")'
     )
 
 
@@ -1375,7 +1381,7 @@ def test_channel_specific(rattler_build: RattlerBuild, recipes: Path, tmp_path: 
     rattler_build.build(
         recipes / "channel_specific/recipe.yaml",
         tmp_path,
-        extra_args="-c conda-forge -c quantstack".split(),
+        extra_args=["-c", "conda-forge", "-c", "quantstack"],
     )
     pkg = get_extracted_package(tmp_path, "channel_specific")
 
@@ -1767,6 +1773,20 @@ def test_missing_pin_subpackage(
     assert "missing output: test1" in stdout
 
 
+def test_unbalanced_bracket_in_skip(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    # Issue #2780: a mismatched bracket in a `skip` expression used to be ignored,
+    # silently building an output the recipe meant to skip.
+    with pytest.raises(CalledProcessError) as e:
+        rattler_build.render(
+            recipes / "test-parsing" / "recipe_unbalanced_skip.yaml",
+            tmp_path,
+            stderr=STDOUT,
+        )
+    assert "skip" in e.value.output
+
+
 def test_cycle_detection(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     # make sure that tests are ran in the right order and that the packages are built correctly
     with pytest.raises(CalledProcessError) as e:
@@ -1797,15 +1817,272 @@ def test_non_exact_run_constraint_no_cycle(
 def test_sibling_run_dep_ordering(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
-    """Test that outputs with plain run deps on sibling outputs are built in the right order.
+    """Prefer a sibling runtime dependency before consumers that install it."""
+    recipe = recipes / "race-condition" / "recipe-sibling-run-dep.yaml"
+    rendered = rattler_build.render(recipe, tmp_path)
+    assert [output["recipe"]["package"]["name"] for output in rendered] == [
+        "repro-runtime",
+        "repro-wrapper",
+        "repro-consumer",
+    ]
+    rattler_build.build(recipe, tmp_path)
 
-    repro-wrapper has a run dep on repro-runtime but is listed first in the recipe.
-    The build should succeed because repro-runtime must be built before repro-wrapper's
-    test environment is solved.
-    """
-    rattler_build.build(
-        recipes / "race-condition" / "recipe-sibling-run-dep.yaml", tmp_path
+
+def test_sibling_run_dep_up_to_skips_target_runtime_when_tests_are_skipped(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Do not build a target's runtime dependencies when its tests are skipped."""
+    rendered = rattler_build.render(
+        recipes / "race-condition" / "recipe-sibling-run-dep.yaml",
+        tmp_path,
+        extra_args=["--test=skip", "--up-to", "repro-wrapper"],
     )
+    assert [output["recipe"]["package"]["name"] for output in rendered] == [
+        "repro-wrapper"
+    ]
+
+
+def test_up_to_includes_explicit_test_requirements(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Select sibling requirements needed by tests of the requested output."""
+    recipe = recipes / "race-condition" / "recipe.yaml"
+    rendered = rattler_build.render(
+        recipe,
+        tmp_path,
+        extra_args=["--up-to", "my-package-a"],
+    )
+    assert [output["recipe"]["package"]["name"] for output in rendered] == [
+        "my-package-a",
+        "my-package",
+    ]
+
+    rendered_without_tests = rattler_build.render(
+        recipe,
+        tmp_path,
+        extra_args=["--test=skip", "--up-to", "my-package-a"],
+    )
+    assert [
+        output["recipe"]["package"]["name"] for output in rendered_without_tests
+    ] == ["my-package-a"]
+
+
+def test_sibling_run_dep_with_skipped_local_output(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Treat a skipped local sibling as an external dependency."""
+    recipe = recipes / "race-condition" / "recipe-sibling-run-dep.yaml"
+    rattler_build.build(
+        recipe,
+        tmp_path,
+        extra_args=["--test=skip", "--up-to", "repro-runtime"],
+    )
+    rattler_build.build(
+        recipe,
+        tmp_path,
+        extra_args=["--test=skip", "--skip-existing", "local"],
+    )
+
+
+def test_sibling_strong_run_export_up_to(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Include sibling targets exported by a selected build dependency."""
+    rattler_build.build(
+        recipes / "race-condition" / "recipe-sibling-run-export.yaml",
+        tmp_path,
+        extra_args=["--test=skip", "--up-to", "repro-export-consumer"],
+    )
+
+
+def test_up_to_does_not_select_target_run_exports(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Do not select run exports emitted by the target itself."""
+    rendered = rattler_build.render(
+        recipes / "race-condition" / "recipe-sibling-run-export.yaml",
+        tmp_path,
+        extra_args=["--up-to", "repro-exporter"],
+    )
+    assert [output["recipe"]["package"]["name"] for output in rendered] == [
+        "repro-exporter"
+    ]
+
+
+def test_sibling_strong_run_export_ordering(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Delay a consumer until a build dependency's strong run export exists."""
+    rattler_build.build(
+        recipes / "race-condition" / "recipe-sibling-run-export.yaml",
+        tmp_path,
+        extra_args=["--test=skip"],
+    )
+
+
+def test_ignored_sibling_strong_run_export(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Exports ignored by provider or target name do not block consumers."""
+    recipe = recipes / "race-condition" / "recipe-sibling-run-export-ignored.yaml"
+    rendered = rattler_build.render(
+        recipe,
+        tmp_path,
+        extra_args=["--up-to", "repro-name-ignored-consumer"],
+    )
+    assert [output["recipe"]["package"]["name"] for output in rendered] == [
+        "repro-name-ignored-exporter",
+        "repro-name-ignored-consumer",
+    ]
+    rattler_build.build(recipe, tmp_path, extra_args=["--test=skip"])
+
+
+def test_merged_environment_ignores_build_run_exports(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Merged build dependencies do not contribute strong run exports."""
+    recipe = recipes / "race-condition" / "recipe-sibling-run-export-merged.yaml"
+    rendered = rattler_build.render(
+        recipe,
+        tmp_path,
+        extra_args=["--up-to", "repro-merged-consumer"],
+    )
+    assert [output["recipe"]["package"]["name"] for output in rendered] == [
+        "repro-merged-exporter",
+        "repro-merged-consumer",
+    ]
+    rattler_build.build(recipe, tmp_path, extra_args=["--test=skip"])
+
+
+def test_transitive_sibling_strong_run_export(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Only direct build dependencies contribute strong run exports."""
+    rattler_build.build(
+        recipes / "race-condition" / "recipe-transitive-run-export.yaml",
+        tmp_path,
+        extra_args=["--test=skip"],
+    )
+
+
+def test_sibling_run_dependency_cycle(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Runtime cycles do not impose an order on package builds."""
+    rattler_build.build(
+        recipes / "race-condition" / "recipe-sibling-run-cycle.yaml",
+        tmp_path,
+        extra_args=["--test=skip"],
+    )
+
+
+def test_sibling_exact_pin_uses_matching_variant(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Resolve each exact sibling pin against the matching provider variant."""
+    rendered = rattler_build.render(
+        recipes / "race-condition" / "recipe-sibling-pin-variant.yaml",
+        tmp_path,
+        variant_config=recipes / "race-condition" / "variant-sibling-pin.yaml",
+        extra_args=["--test=skip"],
+    )
+    core_builds = {
+        output["build_configuration"]["variant"]["flavor"]: output["recipe"]["build"][
+            "string"
+        ]
+        for output in rendered
+        if output["recipe"]["package"]["name"] == "repro-variant-core"
+    }
+    assert set(core_builds) == {"a", "b"}
+
+    consumers = [
+        output
+        for output in rendered
+        if output["recipe"]["package"]["name"] == "repro-variant-consumer"
+    ]
+    assert len(consumers) == 2
+    for consumer in consumers:
+        flavor = consumer["build_configuration"]["variant"]["flavor"]
+        pinned_core = consumer["build_configuration"]["subpackages"][
+            "repro-variant-core"
+        ]
+        assert pinned_core["build_string"] == core_builds[flavor]
+
+
+def test_later_sibling_pin_in_test_requirements_is_deferred(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Defer a test pin until its later sibling has been built."""
+    rattler_build.build(
+        recipes / "race-condition" / "recipe-sibling-test-pin-late.yaml",
+        tmp_path,
+    )
+
+
+def test_channel_package_can_satisfy_sibling_runtime_dependency(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Let the solver use an older channel package instead of blocking locally."""
+    recipe_directory = recipes / "race-condition"
+    rattler_build.build(
+        recipe_directory / "recipe-sibling-channel-fallback-seed.yaml",
+        tmp_path,
+        extra_args=["--test=skip"],
+    )
+    rattler_build.build(
+        recipe_directory / "recipe-sibling-channel-fallback.yaml",
+        tmp_path,
+        extra_args=["--test=skip"],
+    )
+
+
+@pytest.mark.skipif(
+    os.name == "nt",
+    reason="Unix CI covers this platform-independent scheduler performance regression",
+)
+def test_variant_closure_failure_is_memoized(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Report an unsatisfied deep variant closure without exponential traversal."""
+    args = rattler_build.build_args(
+        recipes / "race-condition" / "recipe-sibling-variant-closure.yaml",
+        tmp_path,
+        variant_config=recipes / "race-condition" / "variant-sibling-closure.yaml",
+        extra_args=["--test=skip"],
+    )
+    with pytest.raises(CalledProcessError) as error:
+        rattler_build(*args, stderr=STDOUT, timeout=30)
+    assert "Cannot solve the request because of" in error.value.output
+
+
+def test_sibling_deferred_tests_run_after_final_failure(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Deferred tests are drained after the final build attempt fails."""
+    rattler_build.build(
+        recipes / "race-condition" / "recipe-deferred-test-after-failure.yaml",
+        tmp_path,
+        extra_args=["--continue-on-failure"],
+    )
+    assert list((tmp_path / "broken").glob("repro-deferred-test-*"))
+
+
+def test_sibling_blocked_cycle_reports_solver_error(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Let the solver identify the dependency edge that cannot be satisfied."""
+    args = rattler_build.build_args(
+        recipes / "race-condition" / "recipe-sibling-blocked-cycle.yaml",
+        tmp_path,
+        extra_args=["--test=skip"],
+    )
+    with pytest.raises(CalledProcessError) as error:
+        rattler_build(*args, stderr=STDOUT)
+    assert (
+        "Cannot solve the request because of: repro-blocked-provider"
+        in error.value.output
+    )
+    assert "repro-blocked-consumer ==1.0.0" in error.value.output
 
 
 def test_python_min_render(
@@ -2831,6 +3108,7 @@ about:
         cwd=cached_repo,
         capture_output=True,
         env={**os.environ, "GIT_CEILING_DIRECTORIES": str(cached_repo.parent)},
+        check=False,
     )
     assert result.returncode != 0, "Git command should fail on corrupted cache"
 
@@ -2874,6 +3152,7 @@ about:
             ["git", "rev-parse", "--git-dir"],
             cwd=repo,
             capture_output=True,
+            check=False,
         )
         if result.returncode == 0:
             # Found a valid repo, test passed
@@ -2907,6 +3186,7 @@ def test_topological_sort_with_variants(
         capture_output=True,
         text=True,
         encoding="utf-8",
+        check=False,
     )
 
     # The JSON is on stdout, debug messages are on stderr
@@ -3159,6 +3439,46 @@ def test_overlinking_check(rattler_build: RattlerBuild, recipes: Path, tmp_path:
         pytest.fail("Expected build to fail with overlinking error")
     except CalledProcessError as e:
         assert "linking check error: Overlinking against" in e.output
+
+
+@pytest.mark.skipif(
+    platform.system() not in ("Linux", "Windows"),
+    reason="Link checking fixture supports Linux and Windows",
+)
+def test_overlinking_check_without_binary_relocation(
+    rattler_build: RattlerBuild,
+    recipes: Path,
+    tmp_path: Path,
+    clean_path_on_win32,
+):
+    target_platform = "win-64" if platform.system() == "Windows" else "linux-64"
+    args = rattler_build.build_args(
+        recipes / "link-check-no-relocation-undeclared",
+        tmp_path,
+        extra_args=["--target-platform", target_platform],
+    )
+    with pytest.raises(CalledProcessError) as exc_info:
+        rattler_build(*args, stderr=STDOUT)
+
+    assert "linking check error: Overlinking against" in exc_info.value.output
+
+
+@pytest.mark.skipif(platform.system() != "Linux", reason="Linux-only hash fixture")
+def test_declared_link_without_binary_relocation_is_not_modified(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    rattler_build.build(
+        recipes / "link-check-no-relocation-declared",
+        tmp_path,
+        extra_args=["--target-platform", "linux-64"],
+    )
+    package = get_extracted_package(tmp_path, "link-check-no-relocation-declared")
+    binary = package / "bin/zlink"
+    expected_hash = (
+        (package / "share/link-check-no-relocation/zlink.sha256").read_text().strip()
+    )
+
+    assert hashlib.sha256(binary.read_bytes()).hexdigest() == expected_hash
 
 
 @pytest.mark.skipif(platform.system() != "Linux", reason="Linux-only test")

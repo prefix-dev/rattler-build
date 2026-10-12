@@ -7,6 +7,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.18](https://github.com/prefix-dev/rattler-build/compare/rattler_build_recipe-v0.1.17...rattler_build_recipe-v0.1.18) - 2026-10-07
+
+### Other
+
+- updated the following local packages: rattler_build_jinja, rattler_build_yaml_parser, rattler_build_variant_config
+
+## [0.1.17](https://github.com/prefix-dev/rattler-build/compare/rattler_build_recipe-v0.1.16...rattler_build_recipe-v0.1.17) - 2026-10-06
+
+### Other
+
+- update Cargo.toml dependencies
+
+## [0.1.16](https://github.com/prefix-dev/rattler-build/compare/rattler_build_recipe-v0.1.15...rattler_build_recipe-v0.1.16) - 2026-09-30
+
+### Other
+
+- update rattler and sigstore crates ([#2834](https://github.com/prefix-dev/rattler-build/pull/2834))
+- *(deps)* update cargo dependencies and rattler ([#2829](https://github.com/prefix-dev/rattler-build/pull/2829))
+
+## [0.1.15](https://github.com/prefix-dev/rattler-build/compare/rattler_build_recipe-v0.1.14...rattler_build_recipe-v0.1.15) - 2026-09-14
+
+### Fixed
+
+- always use CROSSCOMPILING_EMULATOR variant ([#2810](https://github.com/prefix-dev/rattler-build/pull/2810))
+- allow extras in test section ([#2813](https://github.com/prefix-dev/rattler-build/pull/2813))
+- allow v3 matchspecs in legacy extras ([#2812](https://github.com/prefix-dev/rattler-build/pull/2812))
+- preserve inherited variant priority and staging cache inputs ([#2804](https://github.com/prefix-dev/rattler-build/pull/2804))
+- document `ignore_keys` and propagate top-level `use_keys` / `ignore_keys` ([#2802](https://github.com/prefix-dev/rattler-build/pull/2802))
+- diagnose malformed `skip` expressions instead of ignoring them ([#2783](https://github.com/prefix-dev/rattler-build/pull/2783))
+- schedule sibling outputs when their dependencies are ready ([#2796](https://github.com/prefix-dev/rattler-build/pull/2796))
+- emit canonical MatchSpecs for v3 packages ([#2758](https://github.com/prefix-dev/rattler-build/pull/2758))
+- `files: []` packages nothing instead of everything ([#2784](https://github.com/prefix-dev/rattler-build/pull/2784))
+
+## [0.1.14](https://github.com/prefix-dev/rattler-build/compare/rattler_build_recipe-v0.1.13...rattler_build_recipe-v0.1.14) - 2026-08-27
+
+### Fixed
+
+- allow legacy-compatible optional dependencies ([#2768](https://github.com/prefix-dev/rattler-build/pull/2768))
+
+## [0.1.13](https://github.com/prefix-dev/rattler-build/compare/rattler_build_recipe-v0.1.12...rattler_build_recipe-v0.1.13) - 2026-08-21
+
+### Other
+
+- update Cargo.toml dependencies
+
+## [0.1.12](https://github.com/prefix-dev/rattler-build/compare/rattler_build_recipe-v0.1.11...rattler_build_recipe-v0.1.12) - 2026-08-17
+
+### Added
+
+- *(build-steps)* support steps in staging outputs ([#2647](https://github.com/prefix-dev/rattler-build/pull/2647))
+- Allow $schema top-level field in recipe.yaml ([#2645](https://github.com/prefix-dev/rattler-build/pull/2645))
+- add experimental build steps ([#2646](https://github.com/prefix-dev/rattler-build/pull/2646))
+
+### Fixed
+
+- inherit all top-level build settings for cache outputs ([#2641](https://github.com/prefix-dev/rattler-build/pull/2641))
+
+### Other
+
+- update the cargo dependency group ([#2732](https://github.com/prefix-dev/rattler-build/pull/2732))
+
 ## [0.1.11](https://github.com/prefix-dev/rattler-build/compare/rattler_build_recipe-v0.1.10...rattler_build_recipe-v0.1.11) - 2026-07-25
 
 ### Other

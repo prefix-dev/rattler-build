@@ -7,6 +7,7 @@ mod build;
 mod cli_api;
 mod debug;
 mod error;
+mod exclude_newer;
 mod jinja_config;
 mod package;
 mod package_assembler;
@@ -23,6 +24,7 @@ mod variant_config;
 
 use build::{BuildResultPy, PyEnvironmentIsolation};
 use error::RattlerBuildError;
+use exclude_newer::PyExcludeNewer;
 use jinja_config::PyJinjaConfig;
 use repodata_revision::PyRepodataRevision;
 
@@ -68,6 +70,7 @@ fn rattler_build<'py>(_py: Python<'py>, m: Bound<'py, PyModule>) -> PyResult<()>
     m.add_function(wrap_pyfunction!(upload::upload_package_to_cloudsmith_py, &m).unwrap())?;
     m.add_function(wrap_pyfunction!(upload::upload_packages_to_conda_forge_py, &m).unwrap())?;
     m.add_class::<PyJinjaConfig>()?;
+    m.add_class::<PyExcludeNewer>()?;
     m.add_class::<BuildResultPy>()?;
     m.add_class::<PyEnvironmentIsolation>()?;
     m.add_class::<PyRepodataRevision>()?;

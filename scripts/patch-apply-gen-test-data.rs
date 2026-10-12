@@ -11,7 +11,7 @@ use async_zip::base::read::seek::ZipFileReader;
 use futures::StreamExt;
 use http::HeaderMap;
 use miette::{Context as _, IntoDiagnostic};
-use rattler_conda_types::{Channel, MatchSpec, ParseStrictness, Platform, RepoDataRecord};
+use rattler_conda_types::{Channel, MatchSpec, ParseStrictness, RepoDataRecord, Subdir};
 use rattler_networking::LazyClient;
 use rattler_repodata_gateway::{
     Gateway, fetch,
@@ -63,7 +63,7 @@ async fn main() {
     let repo_path = result.repo_data_json_path.clone();
 
     let channel = Channel::from_url(Url::parse("https://conda.anaconda.org/conda-forge/").unwrap());
-    let platform = Platform::Linux64;
+    let platform = Subdir::Linux64;
 
     let repo_data =
         SparseRepoData::from_file(channel.clone(), "linux-64".to_string(), repo_path, None)
@@ -185,12 +185,12 @@ async fn fetch_recipe_files_sparse(
         };
 
         if rel == recipe_filename {
-            let size = entry.header().size().into_diagnostic()?;
+            let size = entry.effective_size();
             let mut buf = Vec::with_capacity(size as usize);
             entry.read_to_end(&mut buf).await.into_diagnostic()?;
             recipe = Some(buf);
         } else if rel.extension().and_then(|s| s.to_str()) == Some("patch") {
-            let size = entry.header().size().into_diagnostic()?;
+            let size = entry.effective_size();
             let mut buf = Vec::with_capacity(size as usize);
             entry.read_to_end(&mut buf).await.into_diagnostic()?;
             patches.push((rel.to_path_buf(), buf));

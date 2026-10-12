@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.15](https://github.com/prefix-dev/rattler-build/compare/rattler_build_source_cache-v0.1.14...rattler_build_source_cache-v0.1.15) - 2026-10-07
+
+### Other
+
+- updated the following local packages: rattler_build_networking
+
+## [0.1.14](https://github.com/prefix-dev/rattler-build/compare/rattler_build_source_cache-v0.1.13...rattler_build_source_cache-v0.1.14) - 2026-10-06
+
+### Other
+
+- update Cargo.toml dependencies
+
+## [0.1.13](https://github.com/prefix-dev/rattler-build/compare/rattler_build_source_cache-v0.1.12...rattler_build_source_cache-v0.1.13) - 2026-09-30
+
+### Fixed
+
+- retry source downloads that arrive empty or truncated ([#2823](https://github.com/prefix-dev/rattler-build/pull/2823))
+
+### Other
+
+- update rattler and sigstore crates ([#2834](https://github.com/prefix-dev/rattler-build/pull/2834))
+
+## [0.1.12](https://github.com/prefix-dev/rattler-build/compare/rattler_build_source_cache-v0.1.11...rattler_build_source_cache-v0.1.12) - 2026-09-14
+
+### Fixed
+
+- extract .tbz and .tz2 archives as bzip2 ([#2817](https://github.com/prefix-dev/rattler-build/pull/2817))
+
+## [0.1.11](https://github.com/prefix-dev/rattler-build/compare/rattler_build_source_cache-v0.1.10...rattler_build_source_cache-v0.1.11) - 2026-08-17
+
+### Added
+
+- read the shared config layer instead of pixi's config files ([#2724](https://github.com/prefix-dev/rattler-build/pull/2724))
+
 ## [0.1.10](https://github.com/prefix-dev/rattler-build/compare/rattler_build_source_cache-v0.1.9...rattler_build_source_cache-v0.1.10) - 2026-07-25
 
 ### Added

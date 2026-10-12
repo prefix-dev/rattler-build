@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use rattler_build_jinja::Variable;
 use rattler_build_script::{EnvironmentIsolation, RuntimeEnv};
 use rattler_build_types::NormalizedKey;
-use rattler_conda_types::{Platform, RepoDataRecord};
+use rattler_conda_types::{RepoDataRecord, Subdir};
 use std::collections::BTreeMap;
 
 use crate::android;
@@ -23,7 +23,7 @@ macro_rules! insert {
     };
 }
 
-fn get_stdlib_dir(prefix: &Path, platform: Platform, py_ver: &str) -> PathBuf {
+fn get_stdlib_dir(prefix: &Path, platform: Subdir, py_ver: &str) -> PathBuf {
     if platform.is_windows() {
         prefix.join("Lib")
     } else {
@@ -34,13 +34,13 @@ fn get_stdlib_dir(prefix: &Path, platform: Platform, py_ver: &str) -> PathBuf {
 
 fn get_sitepackages_dir(
     prefix: &Path,
-    platform: Platform,
+    platform: Subdir,
     py_ver: &str,
     python_site_packages_path: Option<&str>,
 ) -> PathBuf {
     python_site_packages_path.map_or_else(
         || get_stdlib_dir(prefix, platform, py_ver).join("site-packages"),
-        |path| prefix.join(path),
+        |path| prefix.join(path.replace('/', std::path::MAIN_SEPARATOR_STR)),
     )
 }
 
@@ -119,7 +119,7 @@ pub fn python_vars(output: &Output) -> HashMap<String, Option<String>> {
 pub fn python_vars_from_records(
     records: &[RepoDataRecord],
     prefix: &Path,
-    platform: Platform,
+    platform: Subdir,
 ) -> HashMap<String, Option<String>> {
     let mut result = HashMap::new();
 
@@ -220,11 +220,12 @@ pub fn language_vars(output: &Output) -> HashMap<String, Option<String>> {
 ///
 /// Forwards the following environment variables:
 /// - PATH: Path where executables are found
+/// - CROSSCOMPILING_EMULATOR: Emulator used to run cross-compiled binaries
 pub fn os_vars(
     prefix: &Path,
-    target_platform: &Platform,
-    host_platform: &Platform,
-    build_platform: &Platform,
+    target_platform: &Subdir,
+    host_platform: &Subdir,
+    build_platform: &Subdir,
     env_isolation: EnvironmentIsolation,
     work_dir: &Path,
     runtime: &RuntimeEnv,
@@ -233,7 +234,7 @@ pub fn os_vars(
 
     // For `noarch` outputs, fall back to the host platform so Windows target
     // vars (e.g. `LIBRARY_PREFIX`) are still emitted. See issue #2475.
-    let os_platform = if *target_platform == Platform::NoArch {
+    let os_platform = if *target_platform == Subdir::NoArch {
         host_platform
     } else {
         target_platform
@@ -282,6 +283,10 @@ pub fn os_vars(
     vars.insert(
         path_var.to_string(),
         runtime.var(path_var).map(str::to_owned),
+    );
+    vars.insert(
+        "CROSSCOMPILING_EMULATOR".to_string(),
+        runtime.var("CROSSCOMPILING_EMULATOR").map(str::to_owned),
     );
 
     if os_platform.is_windows() {
@@ -495,15 +500,21 @@ pub fn vars(output: &Output, build_state: &str) -> HashMap<String, Option<String
 /// Return environment variables that should be set during the test process.
 ///
 /// This is a minimal subset of [`vars`] appropriate for test scripts — it does
-/// not include build-time paths (`RECIPE_DIR`, `SRC_DIR`, …) or pip settings.
+/// not include build-time paths (`RECIPE_DIR`, …) or pip settings. `SRC_DIR`
+/// points at the test working directory, matching conda-build's behavior of
+/// setting it to the directory the test runs in (conda-forge's compiler
+/// activation scripts interpolate `${SRC_DIR}` into compiler flags whenever
+/// `CONDA_BUILD` is set).
 pub fn test_vars(
-    target_platform: Platform,
-    build_platform: Platform,
-    host_platform: Platform,
+    target_platform: Subdir,
+    build_platform: Subdir,
+    host_platform: Subdir,
+    work_dir: &Path,
 ) -> HashMap<String, Option<String>> {
     let mut vars = HashMap::new();
 
     insert!(vars, "CONDA_BUILD_STATE", "TEST");
+    insert!(vars, "SRC_DIR", work_dir.to_string_lossy());
     insert!(vars, "SUBDIR", target_platform.to_string());
     insert!(vars, "target_platform", target_platform.to_string());
     insert!(vars, "build_platform", build_platform.to_string());
@@ -555,40 +566,72 @@ mod test {
         use std::str::FromStr;
         use url::Url;
 
-        let mut package_record = PackageRecord::new(
-            PackageName::from_str("python").unwrap(),
-            "3.13.1".parse::<VersionWithSource>().unwrap(),
-            "cp313t".to_string(),
-        );
-        package_record.python_site_packages_path =
-            Some("lib/python3.13t/site-packages".to_string());
-        let record = RepoDataRecord {
-            package_record,
-            identifier: "python-3.13.1-cp313t.conda".parse().unwrap(),
-            url: Url::parse("https://example.com/python-3.13.1-cp313t.conda").unwrap(),
-            channel: None,
-        };
+        fn make_record(site_packages_path: &str) -> RepoDataRecord {
+            let mut package_record = PackageRecord::new(
+                PackageName::from_str("python").unwrap(),
+                "3.13.1".parse::<VersionWithSource>().unwrap(),
+                "cp313t".to_string(),
+            );
+            package_record.python_site_packages_path = Some(site_packages_path.to_string());
+            RepoDataRecord {
+                package_record,
+                identifier: "python-3.13.1-cp313t.conda".parse().unwrap(),
+                url: Url::parse("https://example.com/python-3.13.1-cp313t.conda").unwrap(),
+                channel: None,
+            }
+        }
 
         let prefix = Path::new("prefix");
-        let vars = python_vars_from_records(&[record], prefix, Platform::Linux64);
 
+        let record_linux = make_record("lib/python3.13t/site-packages");
+        let vars_linux = python_vars_from_records(&[record_linux], prefix, Subdir::Linux64);
         assert_eq!(
-            vars.get("SP_DIR")
+            vars_linux
+                .get("SP_DIR")
                 .and_then(|value| value.as_deref())
                 .map(Path::new),
             Some(prefix.join("lib/python3.13t/site-packages").as_path())
+        );
+
+        let record_win = make_record("Lib/site-packages");
+        let vars_win = python_vars_from_records(&[record_win], prefix, Subdir::Win64);
+        let expected_win = prefix.join("Lib").join("site-packages");
+        assert_eq!(
+            vars_win.get("SP_DIR").and_then(|value| value.as_deref()),
+            Some(expected_win.to_string_lossy().as_ref())
+        );
+    }
+
+    /// `SRC_DIR` points at the test working directory during tests, matching
+    /// conda-build (issue #2793).
+    #[test]
+    fn test_vars_set_src_dir_to_the_test_work_dir() {
+        let work_dir = Path::new("/some/test/work");
+
+        let vars = test_vars(Subdir::Linux64, Subdir::Linux64, Subdir::Linux64, work_dir);
+
+        assert_eq!(
+            vars.get("SRC_DIR").and_then(|value| value.as_deref()),
+            Some("/some/test/work")
+        );
+        assert_eq!(
+            vars.get("CONDA_BUILD_STATE")
+                .and_then(|value| value.as_deref()),
+            Some("TEST")
         );
     }
 
     #[test]
     fn os_vars_uses_the_injected_runtime_environment() {
-        let runtime = RuntimeEnv::for_test(Platform::Linux64).with_var("PATH", "/injected/bin");
+        let runtime = RuntimeEnv::for_test(Subdir::Linux64)
+            .with_var("PATH", "/injected/bin")
+            .with_var("CROSSCOMPILING_EMULATOR", "qemu-aarch64");
 
         let vars = os_vars(
             Path::new("/some/prefix"),
-            &Platform::Linux64,
-            &Platform::Linux64,
-            &Platform::Linux64,
+            &Subdir::Linux64,
+            &Subdir::Linux64,
+            &Subdir::Linux64,
             EnvironmentIsolation::CondaBuild,
             Path::new("/some/work"),
             &runtime,
@@ -599,6 +642,11 @@ mod test {
             Some("/injected/bin")
         );
         assert_eq!(vars.get("LANG"), Some(&None));
+        assert_eq!(
+            vars.get("CROSSCOMPILING_EMULATOR")
+                .and_then(|value| value.as_deref()),
+            Some("qemu-aarch64")
+        );
     }
 
     /// noarch on a Windows host still emits Windows target vars (issue #2475).
@@ -609,12 +657,12 @@ mod test {
 
         let vars = os_vars(
             prefix,
-            &Platform::NoArch,
-            &Platform::Win64,
-            &Platform::Win64,
+            &Subdir::NoArch,
+            &Subdir::Win64,
+            &Subdir::Win64,
             EnvironmentIsolation::Strict,
             work_dir,
-            &RuntimeEnv::for_test(Platform::Win64),
+            &RuntimeEnv::for_test(Subdir::Win64),
         );
 
         assert!(vars.contains_key("LIBRARY_PREFIX"));
@@ -631,12 +679,12 @@ mod test {
     fn build_vars_follow_configured_build_platform() {
         let vars = os_vars(
             Path::new("/some/prefix"),
-            &Platform::WinArm64,
-            &Platform::WinArm64,
-            &Platform::WinArm64,
+            &Subdir::WinArm64,
+            &Subdir::WinArm64,
+            &Subdir::WinArm64,
             EnvironmentIsolation::Strict,
             Path::new("/some/work"),
-            &RuntimeEnv::for_test(Platform::WinArm64),
+            &RuntimeEnv::for_test(Subdir::WinArm64),
         );
 
         assert_eq!(
@@ -653,12 +701,12 @@ mod test {
 
         let vars = os_vars(
             prefix,
-            &Platform::NoArch,
-            &Platform::Linux64,
-            &Platform::Linux64,
+            &Subdir::NoArch,
+            &Subdir::Linux64,
+            &Subdir::Linux64,
             EnvironmentIsolation::Strict,
             work_dir,
-            &RuntimeEnv::for_test(Platform::Linux64),
+            &RuntimeEnv::for_test(Subdir::Linux64),
         );
 
         assert!(!vars.contains_key("LIBRARY_PREFIX"));

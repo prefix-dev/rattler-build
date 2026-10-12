@@ -12,7 +12,7 @@ use indicatif::HumanBytes;
 use metadata::clean_url;
 use rattler_build_types::{GlobVec, LateBoundGlobVec};
 use rattler_conda_types::{
-    ChannelUrl, Platform,
+    ChannelUrl, Subdir,
     compression_level::CompressionLevel,
     package::{CondaArchiveType, FileMode, PackageFile, PathType, PathsJson},
 };
@@ -20,7 +20,7 @@ use rattler_package_streaming::write::{write_conda_package, write_tar_bz2_packag
 use unicode_normalization::UnicodeNormalization;
 
 mod file_finder;
-mod file_mapper;
+pub(crate) mod file_mapper;
 mod metadata;
 pub use file_finder::{Files, TempFiles, content_type, read_package_files_list, record_files};
 pub use metadata::{contains_prefix_binary, contains_prefix_text, create_prefix_placeholder};
@@ -94,6 +94,14 @@ pub enum PackagingError {
 
     #[error("Invalid Metadata: {0}")]
     InvalidMetadata(String),
+
+    #[error("could not render {field} MatchSpec `{spec}` canonically: {source}")]
+    CanonicalMatchSpec {
+        field: String,
+        spec: String,
+        #[source]
+        source: rattler_conda_types::CanonicalMatchSpecError,
+    },
 
     #[error("Invalid MenuInst schema file: {0} - {1}")]
     InvalidMenuInstSchema(PathBuf, serde_json::Error),
@@ -925,7 +933,7 @@ pub fn package_conda(
 
     fs::create_dir_all(&output_folder)?;
 
-    if let Platform::NoArch = output.build_configuration.target_platform {
+    if let Subdir::NoArch = output.build_configuration.target_platform {
         create_empty_build_folder(
             local_channel_dir,
             &output.build_configuration.build_platform.platform,
@@ -981,6 +989,8 @@ pub fn package_conda(
     tracing::info!("Archive written to '{}'", final_name.display());
 
     let paths_json = PathsJson::from_path(info_folder.join("paths.json"))?;
+    // Only successful packaging marks a consumer's file usage as known.
+    output.record_packaged_prefix_files(tmp.packaged_prefix_files);
     Ok((final_name, paths_json))
 }
 
@@ -991,7 +1001,7 @@ pub fn package_conda(
 /// https://github.com/conda-forge/conda-forge-ci-setup-feedstock/blob/main/recipe/conda_forge_ci_setup/feedstock_outputs.py#L164
 fn create_empty_build_folder(
     local_channel_dir: &Path,
-    build_platform: &Platform,
+    build_platform: &Subdir,
 ) -> miette::Result<(), PackagingError> {
     let build_output_folder = local_channel_dir.join(build_platform.to_string());
 
@@ -1031,13 +1041,13 @@ impl Output {
                     host_prefix,
                     paths,
                     &self.recipe.build().always_include_files,
-                    &self.recipe.build().files,
+                    self.recipe.build().files.as_ref(),
                 )?
             }
             None => Files::from_prefix(
                 host_prefix,
                 &self.recipe.build().always_include_files,
-                &self.recipe.build().files,
+                self.recipe.build().files.as_ref(),
                 post_install_files,
             )?,
         };

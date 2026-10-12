@@ -1,5 +1,7 @@
-from pathlib import Path
 import platform
+from pathlib import Path
+from subprocess import CalledProcessError
+
 import pytest
 from helpers import RattlerBuild
 
@@ -14,7 +16,7 @@ def test_debug_basic(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path,
         str(tmp_path),
     )
 
-    out, err = capfd.readouterr()
+    _out, err = capfd.readouterr()
     assert "Build and/or host environments created for debugging" in err
     assert "To run the actual build, use:" in err
     assert "rattler-build build --recipe" in err
@@ -34,7 +36,7 @@ def test_debug_multiple_outputs(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, capfd
 ):
     # should fail without --output-name
-    with pytest.raises(Exception):
+    with pytest.raises(CalledProcessError):
         rattler_build(
             "debug",
             "setup",
@@ -104,7 +106,7 @@ def test_debug_multiple_outputs(
             assert "Building output2" in content
 
     # should fail with invalid output name
-    with pytest.raises(Exception):
+    with pytest.raises(CalledProcessError):
         rattler_build(
             "debug",
             "setup",

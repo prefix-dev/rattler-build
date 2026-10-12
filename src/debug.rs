@@ -210,6 +210,7 @@ pub async fn debug_env_add(
         &opts.specs,
         &channels,
         &tool_config,
+        None,
     )
     .await
 }

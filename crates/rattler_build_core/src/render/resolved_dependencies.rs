@@ -11,7 +11,7 @@ use rattler_build_recipe::stage1::{Dependency, Requirements};
 use rattler_build_types::{PinArgs, PinError};
 use rattler_conda_types::{
     ChannelUrl, MatchSpec, NamelessMatchSpec, PackageName, PackageNameMatcher, PackageRecord,
-    Platform, RepoDataRecord, package::RunExportsJson,
+    RepoDataRecord, Subdir, package::RunExportsJson,
 };
 use rattler_repodata_gateway::{Gateway, RunExportExtractorError, RunExportsReporter};
 use serde::{Deserialize, Serialize};
@@ -356,9 +356,7 @@ impl ResolvedDependencies {
 impl Display for ResolvedDependencies {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut table = comfy_table::Table::new();
-        table
-            .load_preset(comfy_table::presets::UTF8_FULL_CONDENSED)
-            .apply_modifier(comfy_table::modifiers::UTF8_ROUND_CORNERS);
+        table.load_style(comfy_table::presets::UTF8_FULL_CONDENSED.with_rounded_corners());
         write!(f, "{}", self.to_table(table, false))
     }
 }
@@ -518,9 +516,7 @@ impl FinalizedRunDependencies {
 impl Display for FinalizedRunDependencies {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut table = comfy_table::Table::new();
-        table
-            .load_preset(comfy_table::presets::UTF8_FULL_CONDENSED)
-            .apply_modifier(comfy_table::modifiers::UTF8_ROUND_CORNERS);
+        table.load_style(comfy_table::presets::UTF8_FULL_CONDENSED.with_rounded_corners());
         write!(f, "{}", self.to_table(table, false))
     }
 }
@@ -869,7 +865,9 @@ pub(crate) async fn resolve_dependencies(
             tool_configuration,
             output.build_configuration.channel_priority,
             output.build_configuration.solve_strategy,
-            output.build_configuration.exclude_newer,
+            output
+                .build_configuration
+                .exclude_newer_with_build_outputs(),
         )
         .await
         .map_err(|e| ResolveError::DependencyResolutionError(e.into()))?;
@@ -958,7 +956,9 @@ pub(crate) async fn resolve_dependencies(
             tool_configuration,
             output.build_configuration.channel_priority,
             output.build_configuration.solve_strategy,
-            output.build_configuration.exclude_newer,
+            output
+                .build_configuration
+                .exclude_newer_with_build_outputs(),
         )
         .await
         .map_err(|e| ResolveError::DependencyResolutionError(e.into()))?;
@@ -1084,7 +1084,7 @@ pub(crate) async fn resolve_dependencies(
     let host_run_exports = filter_run_exports(&ignore_run_exports, &host_run_exports, "host")?;
 
     // add the host run exports to the run dependencies
-    if output.target_platform() == &Platform::NoArch {
+    if output.target_platform() == &Subdir::NoArch {
         // ignore build noarch depends
         depends.extend(host_run_exports.noarch.iter().cloned());
     } else {

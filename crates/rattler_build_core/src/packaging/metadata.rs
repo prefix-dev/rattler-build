@@ -15,7 +15,7 @@ use fs_err::File;
 use itertools::Itertools;
 use rattler_build_recipe::stage1::build::PrefixDetection;
 use rattler_conda_types::{
-    ChannelUrl, NoArchType, Platform, RepodataRevision,
+    ChannelUrl, NoArchType, RepodataRevision, Subdir,
     package::{
         AboutJson, FileMode, IndexJson, LinkJson, NoArchLinks, PackageFile, PathType, PathsEntry,
         PathsJson, PrefixPlaceholder, PythonEntryPoints, RunExportsJson,
@@ -28,6 +28,16 @@ use url::Url;
 use super::{PackagingError, TempFiles};
 use crate::metadata::Output;
 use rattler_build_recipe::stage1::HashInput;
+
+/// Returns whether dependency MatchSpecs are written in the canonical
+/// `name[key="value"]` form.
+///
+/// CEP 48 mandates that form for `depends`, `constrains` and `extra_depends`
+/// in repodata records of revision 3 and up. Writing it into `index.json` too
+/// keeps the package metadata identical to the record indexed from it.
+fn uses_canonical_matchspec_format(revision: Option<RepodataRevision>) -> bool {
+    revision.is_some_and(|revision| revision.as_u64() >= RepodataRevision::V3.as_u64())
+}
 
 /// Safely check if a symlink resolves to a regular file, with basic loop protection
 fn is_symlink_to_file(path: &Path) -> bool {
@@ -124,7 +134,7 @@ pub fn contains_prefix_text(
 /// This function will also search in the file for the prefix and determine if
 /// the file is binary or text.
 pub fn create_prefix_placeholder(
-    target_platform: &Platform,
+    target_platform: &Subdir,
     file_path: &Path,
     prefix: &Path,
     encoded_prefix: &Path,
@@ -212,6 +222,7 @@ pub fn create_prefix_placeholder(
     Ok(has_prefix.map(|placeholder| PrefixPlaceholder {
         file_mode,
         placeholder,
+        experimental_offsets: None,
     }))
 }
 
@@ -361,6 +372,24 @@ impl Output {
             );
         }
 
+        let repodata_revision = match self.build_configuration.repodata_revision {
+            RepodataRevision::Legacy => None,
+            revision => Some(revision),
+        };
+        let uses_canonical_matchspecs = uses_canonical_matchspec_format(repodata_revision);
+        let format_matchspec = |field: &str, spec: &rattler_conda_types::MatchSpec| {
+            if uses_canonical_matchspecs {
+                spec.to_canonical_string()
+                    .map_err(|source| PackagingError::CanonicalMatchSpec {
+                        field: field.to_string(),
+                        spec: spec.to_string(),
+                        source,
+                    })
+            } else {
+                Ok(spec.to_string())
+            }
+        };
+
         Ok(IndexJson {
             name: self
                 .name()
@@ -380,14 +409,18 @@ impl Output {
                 .run
                 .depends
                 .iter()
-                .map(|dep| dep.spec().to_string())
+                .map(|dep| format_matchspec("depends", dep.spec()))
+                .collect::<Result<Vec<_>, _>>()?
+                .into_iter()
                 .unique()
                 .collect(),
             constrains: finalized_dependencies
                 .run
                 .constraints
                 .iter()
-                .map(|dep| dep.spec().to_string())
+                .map(|dep| format_matchspec("constrains", dep.spec()))
+                .collect::<Result<Vec<_>, _>>()?
+                .into_iter()
                 .unique()
                 .collect(),
             extra_depends: finalized_dependencies
@@ -395,25 +428,25 @@ impl Output {
                 .extra_depends
                 .iter()
                 .map(|(name, deps)| {
-                    (
+                    let field = format!("extra_depends.{name}");
+                    Ok((
                         name.clone(),
                         deps.iter()
-                            .map(|dep| dep.spec().to_string())
+                            .map(|dep| format_matchspec(&field, dep.spec()))
+                            .collect::<Result<Vec<_>, _>>()?
+                            .into_iter()
                             .unique()
                             .collect(),
-                    )
+                    ))
                 })
-                .collect(),
+                .collect::<Result<BTreeMap<_, _>, PackagingError>>()?,
             noarch,
             track_features,
             flags: recipe.build().flags.clone(),
             features: None,
             python_site_packages_path: recipe.build().python.site_packages_path.clone(),
             purls: None,
-            repodata_revision: match self.build_configuration.repodata_revision {
-                RepodataRevision::Legacy => None,
-                revision => Some(revision),
-            },
+            repodata_revision,
         })
     }
 
@@ -605,7 +638,7 @@ impl Output {
 #[cfg(test)]
 mod test {
     use content_inspector::ContentType;
-    use rattler_conda_types::{ChannelUrl, Platform};
+    use rattler_conda_types::{ChannelUrl, RepodataRevision, Subdir};
     use url::Url;
 
     #[cfg(unix)]
@@ -615,13 +648,30 @@ mod test {
     use crate::packaging::metadata::clean_url;
 
     #[test]
+    fn test_canonical_matchspec_format_revision_threshold() {
+        assert!(!super::uses_canonical_matchspec_format(None));
+        assert!(!super::uses_canonical_matchspec_format(Some(
+            RepodataRevision::Legacy
+        )));
+        assert!(!super::uses_canonical_matchspec_format(Some(
+            RepodataRevision::Unknown(2)
+        )));
+        assert!(super::uses_canonical_matchspec_format(Some(
+            RepodataRevision::V3
+        )));
+        assert!(super::uses_canonical_matchspec_format(Some(
+            RepodataRevision::Unknown(4)
+        )));
+    }
+
+    #[test]
     fn detect_prefix() {
         let test_data = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../test-data/binary_files/binary_file_fallback");
         let prefix = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
 
         create_prefix_placeholder(
-            &Platform::Linux64,
+            &Subdir::Linux64,
             &test_data,
             prefix,
             prefix,

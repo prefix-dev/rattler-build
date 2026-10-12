@@ -1,4 +1,4 @@
-use rattler_conda_types::Platform;
+use rattler_conda_types::Subdir;
 
 /// Requested Windows child process architecture for a supported transition.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -50,15 +50,15 @@ impl WindowsMachine {
 /// and both can launch x86 build tools; x86 rattler-build processes are not
 /// supported as cross-architecture launchers.
 pub(crate) fn windows_machine_transition(
-    process_platform: Platform,
-    build_platform: Platform,
+    process_platform: Subdir,
+    build_platform: Subdir,
 ) -> Option<WindowsMachine> {
     match (process_platform, build_platform) {
-        (Platform::Win64, Platform::Win32) | (Platform::WinArm64, Platform::Win32) => {
+        (Subdir::Win64, Subdir::Win32) | (Subdir::WinArm64, Subdir::Win32) => {
             Some(WindowsMachine::X86)
         }
-        (Platform::Win64, Platform::WinArm64) => Some(WindowsMachine::Arm64),
-        (Platform::WinArm64, Platform::Win64) => Some(WindowsMachine::Amd64),
+        (Subdir::Win64, Subdir::WinArm64) => Some(WindowsMachine::Arm64),
+        (Subdir::WinArm64, Subdir::Win64) => Some(WindowsMachine::Amd64),
         _ => None,
     }
 }

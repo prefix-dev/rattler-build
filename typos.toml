@@ -18,6 +18,7 @@ ignore-hidden = false
 extend-ignore-re = ['closest_interpreter\("pyton"\)']
 
 [default.extend-identifiers]
+flate2 = "flate2"
 ratatui = "ratatui"
 ND = "ND"
 FreeTakServer = "FreeTakServer"

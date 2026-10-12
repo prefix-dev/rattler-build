@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.18](https://github.com/prefix-dev/rattler-build/compare/rattler_build_package-v0.1.17...rattler_build_package-v0.1.18) - 2026-10-07
+
+### Other
+
+- updated the following local packages: rattler_build_jinja, rattler_build_recipe
+
+## [0.1.17](https://github.com/prefix-dev/rattler-build/compare/rattler_build_package-v0.1.16...rattler_build_package-v0.1.17) - 2026-10-06
+
+### Other
+
+- update rattler to 0.52 ([#2844](https://github.com/prefix-dev/rattler-build/pull/2844))
+
+## [0.1.16](https://github.com/prefix-dev/rattler-build/compare/rattler_build_package-v0.1.15...rattler_build_package-v0.1.16) - 2026-09-30
+
+### Other
+
+- update rattler and sigstore crates ([#2834](https://github.com/prefix-dev/rattler-build/pull/2834))
+
+## [0.1.15](https://github.com/prefix-dev/rattler-build/compare/rattler_build_package-v0.1.14...rattler_build_package-v0.1.15) - 2026-09-14
+
+### Other
+
+- update Cargo.toml dependencies
+
+## [0.1.14](https://github.com/prefix-dev/rattler-build/compare/rattler_build_package-v0.1.13...rattler_build_package-v0.1.14) - 2026-08-27
+
+### Other
+
+- update Cargo.toml dependencies
+
+## [0.1.13](https://github.com/prefix-dev/rattler-build/compare/rattler_build_package-v0.1.12...rattler_build_package-v0.1.13) - 2026-08-21
+
+### Other
+
+- update Cargo.toml dependencies
+
+## [0.1.12](https://github.com/prefix-dev/rattler-build/compare/rattler_build_package-v0.1.11...rattler_build_package-v0.1.12) - 2026-08-17
+
+### Other
+
+- update Cargo.toml dependencies
+
 ## [0.1.11](https://github.com/prefix-dev/rattler-build/compare/rattler_build_package-v0.1.10...rattler_build_package-v0.1.11) - 2026-07-25
 
 ### Other

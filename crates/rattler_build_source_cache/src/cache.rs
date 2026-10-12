@@ -15,6 +15,12 @@ use rattler_build_networking::BaseClient;
 use rattler_git::CheckoutOptions;
 use rattler_git::resolver::GitResolver;
 
+/// How many times a URL source is downloaded before the build fails.
+pub(crate) const MAX_DOWNLOAD_ATTEMPTS: u32 = 3;
+
+/// Delay before the second attempt, doubled for each attempt after that.
+const RETRY_BASE_DELAY: std::time::Duration = std::time::Duration::from_secs(1);
+
 /// Result of fetching a source from the cache
 #[derive(Debug, Clone)]
 pub struct SourceResult {
@@ -105,6 +111,7 @@ impl SourceCache {
             // the smudge filter during checkout; `Some(false)` force-skips the
             // smudge filter so checkouts contain pointer files only.
             lfs: Some(source.lfs),
+            ..Default::default()
         };
 
         let fetch_result = self
@@ -280,22 +287,47 @@ impl SourceCache {
             }
         }
 
-        // Download the file
-        tracing::info!("Downloading from: {}", url);
-        let (cache_path, actual_filename) = self.download_url(url, &key).await?;
+        let mut attempt = 1;
+        let (cache_path, actual_filename) = loop {
+            tracing::info!("Downloading from: {}", url);
 
-        // Validate all checksums
-        for cs in checksums {
-            if let Err(mismatch) = cs.validate(&cache_path) {
-                fs_err::tokio::remove_file(&cache_path).await?;
-                return Err(CacheError::ValidationFailed {
-                    path: cache_path,
-                    expected: mismatch.expected,
-                    actual: mismatch.actual,
-                    kind: mismatch.kind.to_string(),
-                });
+            let (error, retryable) = match self.download_url(url, &key).await {
+                Ok((path, filename, downloaded)) => {
+                    match checksums.iter().find_map(|cs| cs.validate(&path).err()) {
+                        None => break (path, filename),
+                        Some(mismatch) => {
+                            fs_err::tokio::remove_file(&path).await?;
+                            (
+                                CacheError::ValidationFailed {
+                                    path,
+                                    expected: mismatch.expected,
+                                    actual: mismatch.actual,
+                                    kind: mismatch.kind.to_string(),
+                                },
+                                is_empty_response(downloaded),
+                            )
+                        }
+                    }
+                }
+                Err(err) => {
+                    let retryable = matches!(err, CacheError::IncompleteDownload { .. });
+                    (err, retryable)
+                }
+            };
+
+            if !retryable || attempt >= MAX_DOWNLOAD_ATTEMPTS {
+                return Err(error);
             }
-        }
+
+            let backoff = RETRY_BASE_DELAY * 2u32.pow(attempt - 1);
+            tracing::warn!(
+                "Download from {url} did not deliver the expected data ({error}); \
+                 retrying in {backoff:?} (attempt {next} of {MAX_DOWNLOAD_ATTEMPTS})",
+                next = attempt + 1,
+            );
+            tokio::time::sleep(backoff).await;
+            attempt += 1;
+        };
 
         // Perform attestation verification if configured
         if let Some(attestation_config) = attestation {
@@ -352,7 +384,7 @@ impl SourceCache {
         &self,
         url: &url::Url,
         key: &str,
-    ) -> Result<(PathBuf, Option<String>), CacheError> {
+    ) -> Result<(PathBuf, Option<String>, u64), CacheError> {
         // Determine filename
         let filename = url
             .path_segments()
@@ -371,8 +403,8 @@ impl SourceCache {
                 return Err(CacheError::FileNotFound(source_path));
             }
 
-            fs_err::tokio::copy(&source_path, &cache_path).await?;
-            return Ok((cache_path, Some(filename.to_string())));
+            let copied = fs_err::tokio::copy(&source_path, &cache_path).await?;
+            return Ok((cache_path, Some(filename.to_string()), copied));
         }
 
         // Download from HTTP/HTTPS - use the appropriate client based on SSL settings
@@ -416,7 +448,18 @@ impl SourceCache {
 
         use futures::StreamExt;
         while let Some(chunk) = stream.next().await {
-            let chunk = chunk?;
+            // Arrives after the retry middleware returned a success, so it cannot see it.
+            let chunk = match chunk {
+                Ok(chunk) => chunk,
+                Err(err) => {
+                    let _ = fs_err::tokio::remove_file(&cache_path).await;
+                    return Err(CacheError::IncompleteDownload {
+                        url: url.to_string(),
+                        downloaded,
+                        reason: err.to_string(),
+                    });
+                }
+            };
             downloaded += chunk.len() as u64;
             file.write_all(&chunk).await?;
 
@@ -427,6 +470,18 @@ impl SourceCache {
         }
 
         file.flush().await?;
+
+        // Otherwise a short body is reported as a checksum mismatch.
+        if let Some(expected) = total_size
+            && downloaded != expected
+        {
+            fs_err::tokio::remove_file(&cache_path).await?;
+            return Err(CacheError::IncompleteDownload {
+                url: url.to_string(),
+                downloaded,
+                reason: format!("expected {expected} bytes"),
+            });
+        }
 
         // Notify completion
         if let Some(handler) = &self.progress_handler {
@@ -448,7 +503,7 @@ impl SourceCache {
             cache_path
         };
 
-        Ok((final_path, actual_filename))
+        Ok((final_path, actual_filename, downloaded))
     }
 
     /// Check if a file should be extracted based on its filename extension
@@ -604,6 +659,18 @@ pub(crate) fn extract_filename_from_header(header_value: &str) -> Option<String>
     None
 }
 
+/// Whether a failed download looks like a body that never arrived.
+///
+/// GitLab's `/-/archive/` endpoints write the `200` header before generating the tarball,
+/// so a failure during generation still reads as a success with an empty body
+/// (gitlab-org/gitlab#471955) and the HTTP client has nothing to retry.
+///
+/// A complete body with the wrong hash is more likely a stale checksum in the recipe, so
+/// it is not retried.
+pub(crate) fn is_empty_response(downloaded_bytes: u64) -> bool {
+    downloaded_bytes == 0
+}
+
 pub(crate) fn is_archive(name: &str) -> bool {
     is_tarball(name) || name.ends_with(".zip") || name.ends_with(".7z")
 }
@@ -653,7 +720,11 @@ fn extract_tar(archive: &Path, target: &Path) -> Result<(), CacheError> {
         archive
             .unpack(target)
             .map_err(|e| CacheError::ExtractionError(format!("Failed to extract tar.gz: {}", e)))?;
-    } else if name.ends_with(".tar.bz2") || name.ends_with(".tbz2") {
+    } else if name.ends_with(".tar.bz2")
+        || name.ends_with(".tbz")
+        || name.ends_with(".tbz2")
+        || name.ends_with(".tz2")
+    {
         let mut archive = tar::Archive::new(bzip2::read::BzDecoder::new(file));
         archive.unpack(target).map_err(|e| {
             CacheError::ExtractionError(format!("Failed to extract tar.bz2: {}", e))
@@ -763,6 +834,41 @@ mod tests {
             extract_filename_from_header("attachment; filename=\"test.tar.gz\""),
             Some("test.tar.gz".to_string())
         );
+    }
+
+    #[test]
+    fn test_extract_bzip2_tarball_aliases() {
+        for extension in [".tar.bz2", ".tbz", ".tbz2", ".tz2"] {
+            let temp_dir = tempfile::tempdir().unwrap();
+            let archive_path = temp_dir.path().join(format!("test{extension}"));
+            let target_dir = temp_dir.path().join("out");
+
+            let file = fs_err::File::create(&archive_path).unwrap();
+            let encoder = bzip2::write::BzEncoder::new(file, bzip2::Compression::default());
+            let mut builder = tar::Builder::new(encoder);
+
+            let contents = b"hello";
+            let mut header = tar::Header::new_gnu();
+            header.set_size(contents.len() as u64);
+            header.set_mode(0o644);
+            header.set_cksum();
+
+            builder
+                .append_data(&mut header, "hello.txt", &contents[..])
+                .unwrap();
+
+            let encoder = builder.into_inner().unwrap();
+            encoder.finish().unwrap();
+
+            fs_err::create_dir_all(&target_dir).unwrap();
+
+            extract_tar(&archive_path, &target_dir).unwrap();
+
+            assert_eq!(
+                fs_err::read(target_dir.join("hello.txt")).unwrap(),
+                contents
+            );
+        }
     }
 
     #[test]

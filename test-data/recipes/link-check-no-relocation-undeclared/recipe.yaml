@@ -1,0 +1,37 @@
+context:
+  version: "0.1.0"
+
+package:
+  name: link-check-no-relocation-undeclared
+  version: ${{ version }}
+
+source:
+  path: ../../../examples/linking/zlink/
+
+build:
+  script:
+    - if: unix
+      then:
+        - cmake -S . -B build -GNinja -DCMAKE_INSTALL_PREFIX=$PREFIX -DZLIB_ROOT=$PREFIX
+        - cmake --build build
+        - cmake --install build
+    - if: win
+      then:
+        - cmake -S . -B build -GNinja -DCMAKE_INSTALL_PREFIX=%PREFIX% -DZLIB_ROOT=%PREFIX%\Library
+        - cmake --build build
+        - cmake --install build
+  dynamic_linking:
+    binary_relocation: false
+    overdepending_behavior: ignore
+    overlinking_behavior: error
+
+requirements:
+  ignore_run_exports:
+    from_package:
+      - zlib
+  build:
+    - ${{ compiler('c') }}
+    - ninja
+    - cmake
+  host:
+    - zlib

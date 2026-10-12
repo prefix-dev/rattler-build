@@ -19,6 +19,7 @@ from rattler_build._rattler_build import (
 )
 from rattler_build._rattler_build import render as _render
 from rattler_build.build_result import BuildResult
+from rattler_build.exclude_newer import ExcludeNewer
 from rattler_build.tool_config import PlatformConfig, ToolConfiguration
 
 if TYPE_CHECKING:
@@ -354,7 +355,7 @@ class RenderedVariant:
         no_build_id: bool = False,
         package_format: str | None = None,
         no_include_recipe: bool = False,
-        exclude_newer: datetime | None = None,
+        exclude_newer: datetime | ExcludeNewer | None = None,
         env_isolation: EnvironmentIsolation = EnvironmentIsolation.STRICT,
     ) -> BuildResult:
         """Build this rendered variant.
@@ -376,7 +377,7 @@ class RenderedVariant:
             no_build_id: Don't include build ID in output directory.
             package_format: Package format ("conda" or "tar.bz2").
             no_include_recipe: Don't include recipe in the output package.
-            exclude_newer: Exclude packages newer than this timestamp.
+            exclude_newer: Dependency cutoff policy, or a datetime for a global cutoff.
             env_isolation: Environment isolation mode. Defaults to ``EnvironmentIsolation.STRICT``.
 
         Returns:
@@ -409,6 +410,9 @@ class RenderedVariant:
 
         rust_siblings = [v._inner for v in self._siblings]
 
+        if isinstance(exclude_newer, datetime):
+            exclude_newer = ExcludeNewer(exclude_newer)
+
         # Build this single variant
         rust_result = build_rendered_variant_py(
             rendered_variant=self._inner,
@@ -420,7 +424,7 @@ class RenderedVariant:
             no_build_id=no_build_id,
             package_format=package_format,
             no_include_recipe=no_include_recipe,
-            exclude_newer=exclude_newer,
+            exclude_newer=exclude_newer._inner if exclude_newer is not None else None,
             env_isolation=env_isolation,
             sibling_variants=rust_siblings,
             repodata_revision=self._repodata_revision,
@@ -443,7 +447,7 @@ def build_rendered_variants(
     no_build_id: bool = False,
     package_format: str | None = None,
     no_include_recipe: bool = False,
-    exclude_newer: datetime | None = None,
+    exclude_newer: datetime | ExcludeNewer | None = None,
     env_isolation: EnvironmentIsolation = EnvironmentIsolation.STRICT,
 ) -> list[BuildResult]:
     """Build multiple rendered variants.
@@ -463,7 +467,7 @@ def build_rendered_variants(
         no_build_id: Don't include build ID in output directory.
         package_format: Package format ("conda" or "tar.bz2").
         no_include_recipe: Don't include recipe in the output package.
-        exclude_newer: Exclude packages newer than this timestamp.
+        exclude_newer: Dependency cutoff policy, or a datetime for a global cutoff.
         env_isolation: Environment isolation mode. Defaults to ``EnvironmentIsolation.STRICT``.
 
     Returns:

@@ -1,6 +1,6 @@
 //! macOS specific environment variables
 use rattler_build_script::RuntimeEnv;
-use rattler_conda_types::Platform;
+use rattler_conda_types::Subdir;
 use std::{collections::HashMap, path::Path};
 
 use crate::unix;
@@ -8,7 +8,7 @@ use crate::unix;
 /// Get default env vars for macOS
 pub fn default_env_vars_target(
     prefix: &Path,
-    target_platform: &Platform,
+    target_platform: &Subdir,
     runtime: &RuntimeEnv,
 ) -> HashMap<String, Option<String>> {
     let mut vars = unix::env::default_env_vars_target(prefix, runtime);
@@ -30,7 +30,7 @@ pub fn default_env_vars_target(
     vars
 }
 
-pub fn default_env_vars_build(build_platform: &Platform) -> HashMap<String, Option<String>> {
+pub fn default_env_vars_build(build_platform: &Subdir) -> HashMap<String, Option<String>> {
     let mut vars = HashMap::<String, Option<String>>::new();
     let arch = build_platform
         .arch()

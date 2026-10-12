@@ -18,7 +18,7 @@ use miette::Diagnostic;
 use petgraph::graph::{DiGraph, NodeIndex};
 use rattler_build_variant_config::VariantExpandError;
 use rattler_build_yaml_parser::ParseError;
-use rattler_conda_types::{NoArchType, RepodataRevision};
+use rattler_conda_types::{NoArchType, PackageName, RepodataRevision};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -27,7 +27,7 @@ use rattler_build_types::NormalizedKey;
 use rattler_build_variant_config::VariantConfig;
 
 use crate::stage0::evaluate::ALWAYS_INCLUDED_VARS;
-use crate::stage1::{Dependency, HashInfo, build::BuildString};
+use crate::stage1::{Dependency, HashInfo, TestType, build::BuildString};
 use crate::{
     stage0::{self, MultiOutputRecipe, Recipe as Stage0Recipe, SingleOutputRecipe},
     stage1::{Evaluate, EvaluationContext, Recipe as Stage1Recipe},
@@ -98,11 +98,11 @@ pub struct RenderConfig {
     /// Path to the recipe file (for relative path resolution in Jinja functions)
     pub recipe_path: Option<PathBuf>,
     /// Target platform for the build
-    pub target_platform: rattler_conda_types::Platform,
+    pub target_platform: rattler_conda_types::Subdir,
     /// Build platform (where the build runs)
-    pub build_platform: rattler_conda_types::Platform,
+    pub build_platform: rattler_conda_types::Subdir,
     /// Host platform (for cross-compilation)
-    pub host_platform: rattler_conda_types::Platform,
+    pub host_platform: rattler_conda_types::Subdir,
     /// OS environment variable keys that can be overridden by variant configuration.
     /// These are typically derived from `env_vars::os_vars()` and include variables
     /// like `MACOSX_DEPLOYMENT_TARGET` on macOS that have default values but can be
@@ -123,9 +123,12 @@ impl Default for RenderConfig {
             experimental: false,
             repodata_revision: RepodataRevision::Legacy,
             recipe_path: None,
-            target_platform: rattler_conda_types::Platform::current(),
-            build_platform: rattler_conda_types::Platform::current(),
-            host_platform: rattler_conda_types::Platform::current(),
+            target_platform: rattler_conda_types::Subdir::current()
+                .unwrap_or(rattler_conda_types::Subdir::NoArch),
+            build_platform: rattler_conda_types::Subdir::current()
+                .unwrap_or(rattler_conda_types::Subdir::NoArch),
+            host_platform: rattler_conda_types::Subdir::current()
+                .unwrap_or(rattler_conda_types::Subdir::NoArch),
             os_env_var_keys: HashSet::new(),
             build_string_prefix: None,
             build_number_override: None,
@@ -168,20 +171,20 @@ impl RenderConfig {
     /// This also sets `host_platform` to the same value (mirroring the CLI
     /// behavior). Call [`with_host_platform`](Self::with_host_platform) afterwards
     /// if you need a different host platform.
-    pub fn with_target_platform(mut self, platform: rattler_conda_types::Platform) -> Self {
+    pub fn with_target_platform(mut self, platform: rattler_conda_types::Subdir) -> Self {
         self.target_platform = platform;
         self.host_platform = platform;
         self
     }
 
     /// Set the build platform
-    pub fn with_build_platform(mut self, platform: rattler_conda_types::Platform) -> Self {
+    pub fn with_build_platform(mut self, platform: rattler_conda_types::Subdir) -> Self {
         self.build_platform = platform;
         self
     }
 
     /// Set the host platform
-    pub fn with_host_platform(mut self, platform: rattler_conda_types::Platform) -> Self {
+    pub fn with_host_platform(mut self, platform: rattler_conda_types::Subdir) -> Self {
         self.host_platform = platform;
         self
     }
@@ -350,12 +353,13 @@ pub enum TopologicalSortError {
     },
 }
 
-/// Sort rendered variants topologically based on pin_subpackage dependencies
+/// Sort rendered variants by hard build requirements and soft runtime preferences.
 ///
-/// This ensures that when building multi-output packages, outputs are built in the
-/// correct order - base packages before packages that depend on them via pin_subpackage.
+/// Build/host dependencies and subpackage pins must precede their consumers.
+/// Plain runtime dependencies are preferred when possible, but do not create
+/// cycles or override matching-variant interleaving.
 ///
-/// Returns the variants in topological order, or an error if there's a cycle.
+/// Returns the variants in topological order, or an error for a hard cycle.
 pub fn topological_sort_variants(
     variants: Vec<RenderedVariant>,
 ) -> Result<Vec<RenderedVariant>, TopologicalSortError> {
@@ -375,15 +379,17 @@ pub fn topological_sort_variants(
 /// Sort items with [`Stage1Recipe`]s topologically by their dependencies.
 ///
 /// Takes a list of items, a function to extract the [`Stage1Recipe`] from each item,
-/// and an optional `up_to` package name to filter the results.
+/// an optional `up_to` package name, and whether tests will run.
 ///
 /// When `up_to` is `None`, returns all items in topological order (dependencies first).
-/// When `up_to` is `Some(name)`, returns only the items needed to build the named
-/// package (its transitive dependencies plus the package itself).
+/// When `up_to` is `Some(name)`, returns only the named package and outputs needed to
+/// build it. Runtime and explicit test dependencies of the named package are included
+/// only when `include_test_dependencies` is `true`.
 pub fn topological_sort_by_dependencies<T>(
     items: Vec<T>,
     get_recipe: impl Fn(&T) -> &Stage1Recipe,
     up_to: Option<&str>,
+    include_test_dependencies: bool,
 ) -> Result<Vec<T>, TopologicalSortError> {
     if items.is_empty() {
         return Ok(items);
@@ -395,7 +401,15 @@ pub fn topological_sort_by_dependencies<T>(
         build_recipe_dependency_graph(&recipes, &name_to_indices)?;
 
     let sorted_item_indices: Vec<usize> = if let Some(up_to) = up_to {
-        filter_up_to(&graph, &idx_to_node, &name_to_indices, up_to)?
+        filter_up_to(
+            &graph,
+            &idx_to_node,
+            &name_to_indices,
+            &recipes,
+            &toposorted,
+            up_to,
+            include_test_dependencies,
+        )?
     } else {
         toposorted
     };
@@ -448,14 +462,16 @@ fn build_recipe_graph(
     (graph, idx_to_node)
 }
 
-/// Perform a stable topological sort on the dependency graph using Kahn's algorithm.
+/// Performs a stable topological sort on the hard dependency graph.
 ///
-/// Uses a BTreeSet so that items with no dependency relationship preserve
-/// their original order. Detects cycles and reports a package name involved.
+/// Among hard-ready items, plain sibling runtime dependencies are preferred.
+/// If every hard-ready item is soft-blocked, the first one is selected as a
+/// deterministic fallback. Hard cycles still produce an error.
 fn stable_toposort(
     graph: &DiGraph<usize, ()>,
     idx_to_node: &[NodeIndex],
     recipes: &[&Stage1Recipe],
+    name_to_indices: &BTreeMap<rattler_conda_types::PackageName, Vec<usize>>,
 ) -> Result<Vec<usize>, TopologicalSortError> {
     let n = recipes.len();
     let mut in_degree: Vec<usize> = (0..n)
@@ -470,9 +486,19 @@ fn stable_toposort(
         (0..n).filter(|&i| in_degree[i] == 0).collect();
 
     let mut sorted = Vec::with_capacity(n);
-    while let Some(&idx) = ready.iter().next() {
+    let mut added = vec![false; n];
+    while !ready.is_empty() {
+        let Some(idx) = ready
+            .iter()
+            .copied()
+            .find(|&index| soft_dependencies_are_added(index, recipes, name_to_indices, &added))
+            .or_else(|| ready.iter().next().copied())
+        else {
+            break;
+        };
         ready.remove(&idx);
         sorted.push(idx);
+        added[idx] = true;
 
         let neighbors: Vec<_> = graph
             .neighbors_directed(idx_to_node[idx], petgraph::Direction::Outgoing)
@@ -513,7 +539,7 @@ fn build_recipe_dependency_graph(
     name_to_indices: &BTreeMap<rattler_conda_types::PackageName, Vec<usize>>,
 ) -> Result<RecipeDependencyGraph, TopologicalSortError> {
     let (graph, idx_to_node) = build_recipe_graph(recipes, name_to_indices);
-    let sorted = stable_toposort(&graph, &idx_to_node, recipes)?;
+    let sorted = stable_toposort(&graph, &idx_to_node, recipes, name_to_indices)?;
     Ok((graph, idx_to_node, sorted))
 }
 
@@ -523,7 +549,7 @@ fn validate_no_cycles(
     name_to_indices: &BTreeMap<rattler_conda_types::PackageName, Vec<usize>>,
 ) -> Result<(), TopologicalSortError> {
     let (graph, idx_to_node) = build_recipe_graph(recipes, name_to_indices);
-    stable_toposort(&graph, &idx_to_node, recipes)?;
+    stable_toposort(&graph, &idx_to_node, recipes, name_to_indices)?;
     Ok(())
 }
 
@@ -542,15 +568,46 @@ fn build_recipe_name_index(
     name_to_indices
 }
 
-/// Filter the dependency graph to only include items needed to build `up_to` package.
+/// Selects the sibling variant sharing the most rendered variant values.
+fn best_matching_recipe_index(
+    current_index: usize,
+    dependency_name: &PackageName,
+    recipes: &[&Stage1Recipe],
+    name_to_indices: &BTreeMap<PackageName, Vec<usize>>,
+) -> Option<usize> {
+    let dependency_indices = name_to_indices.get(dependency_name)?;
+    if dependency_indices.len() <= 1 {
+        return dependency_indices.first().copied();
+    }
+
+    let current_variant = &recipes[current_index].used_variant;
+    dependency_indices
+        .iter()
+        .max_by_key(|&&dependency_index| {
+            current_variant
+                .iter()
+                .filter(|(key, value)| {
+                    recipes[dependency_index].used_variant.get(*key) == Some(*value)
+                })
+                .count()
+        })
+        .copied()
+}
+
+/// Filters to the outputs needed to build and optionally test `up_to`.
 ///
-/// Performs a DFS post-order traversal from all variants of the target package,
-/// returning only the transitive dependencies and the target itself as item indices.
+/// Build-order dependencies come from `graph`. Their sibling runtime closures
+/// and relevant run exports are followed because the dependencies must be
+/// installable. The target's runtime and explicit test dependencies are included
+/// only when tests will run. These selection edges do not create ordering cycles.
 fn filter_up_to(
     graph: &DiGraph<usize, ()>,
     idx_to_node: &[NodeIndex],
     name_to_indices: &BTreeMap<rattler_conda_types::PackageName, Vec<usize>>,
+    recipes: &[&Stage1Recipe],
+    toposorted: &[usize],
     up_to: &str,
+    include_test_dependencies: bool,
 ) -> Result<Vec<usize>, TopologicalSortError> {
     use std::str::FromStr;
 
@@ -567,96 +624,214 @@ fn filter_up_to(
                 package: up_to.to_string(),
             })?;
 
-    // The graph has edges dep -> dependent. We need to find all deps OF the up_to
-    // package, so reverse the graph and DFS from the target.
-    let reversed = petgraph::visit::Reversed(graph);
+    let requested_indices: HashSet<_> = up_to_indices.iter().copied().collect();
+    let mut pending = up_to_indices.clone();
+    let mut selected = HashSet::new();
+    while let Some(index) = pending.pop() {
+        if !selected.insert(index) {
+            continue;
+        }
 
-    let mut sorted_indices = Vec::new();
-    let mut visited = HashSet::new();
-    for &up_to_idx in up_to_indices {
-        let node = idx_to_node[up_to_idx];
-        let mut dfs = petgraph::visit::DfsPostOrder::new(&reversed, node);
-        while let Some(nx) = dfs.next(&reversed) {
-            if visited.insert(nx) {
-                sorted_indices.push(graph[nx]);
+        let node = idx_to_node[index];
+        let requirements = recipes[index].requirements();
+        for dependency_node in graph.neighbors_directed(node, petgraph::Direction::Incoming) {
+            let dependency_index = graph[dependency_node];
+            pending.push(dependency_index);
+
+            let provider = recipes[dependency_index];
+            let provider_name = &provider.package.name;
+            if requirements
+                .ignore_run_exports
+                .from_package
+                .contains(provider_name)
+            {
+                continue;
+            }
+
+            let mut add_run_export_targets = |dependencies: &[Dependency]| {
+                for dependency in dependencies {
+                    if let Some(name) = dependency.name()
+                        && !requirements.ignore_run_exports.by_name.contains(name)
+                        && let Some(dependency_index) =
+                            best_matching_recipe_index(index, name, recipes, name_to_indices)
+                    {
+                        pending.push(dependency_index);
+                    }
+                }
+            };
+
+            let is_direct_build_dependency = requirements
+                .build
+                .iter()
+                .any(|dependency| dependency.name() == Some(provider_name));
+            if is_direct_build_dependency && !recipes[index].build().merge_build_and_host_envs {
+                add_run_export_targets(&provider.requirements().run_exports.strong);
+            }
+
+            let is_direct_host_dependency = requirements
+                .host
+                .iter()
+                .any(|dependency| dependency.name() == Some(provider_name));
+            if is_direct_host_dependency {
+                if recipes[index].build().noarch.is_some() {
+                    add_run_export_targets(&provider.requirements().run_exports.noarch);
+                } else {
+                    add_run_export_targets(&provider.requirements().run_exports.strong);
+                    add_run_export_targets(&provider.requirements().run_exports.weak);
+                }
+            }
+        }
+
+        if include_test_dependencies || !requested_indices.contains(&index) {
+            for dependency in &requirements.run {
+                if let Some(name) = dependency.name()
+                    && let Some(dependency_index) =
+                        best_matching_recipe_index(index, name, recipes, name_to_indices)
+                {
+                    pending.push(dependency_index);
+                }
+            }
+        }
+
+        if include_test_dependencies {
+            for test in recipes[index].tests() {
+                if let TestType::Commands(command) = test {
+                    for dependency in command
+                        .requirements
+                        .build
+                        .iter()
+                        .chain(command.requirements.run.iter())
+                    {
+                        if let Some(name) = dependency.name()
+                            && let Some(dependency_index) =
+                                best_matching_recipe_index(index, name, recipes, name_to_indices)
+                        {
+                            pending.push(dependency_index);
+                        }
+                    }
+                }
             }
         }
     }
 
-    Ok(sorted_indices)
+    Ok(toposorted
+        .iter()
+        .copied()
+        .filter(|index| selected.contains(index))
+        .collect())
 }
 
-/// Perform a stable topological sort that preserves original order when possible.
+/// Checks whether every soft runtime dependency has already been emitted.
+fn soft_dependencies_are_added(
+    index: usize,
+    recipes: &[&Stage1Recipe],
+    name_to_indices: &BTreeMap<rattler_conda_types::PackageName, Vec<usize>>,
+    added: &[bool],
+) -> bool {
+    let current_name = &recipes[index].package.name;
+    extract_soft_dependency_names(recipes[index])
+        .into_iter()
+        .filter(|name| name != current_name)
+        .all(|name| {
+            name_to_indices
+                .get(&name)
+                .is_none_or(|indices| indices.iter().all(|&index| added[index]))
+        })
+}
+
+/// Checks whether the best matching variant for each dependency was already emitted.
+fn variant_dependencies_are_added(
+    index: usize,
+    variants: &[RenderedVariant],
+    name_to_indices: &BTreeMap<rattler_conda_types::PackageName, Vec<usize>>,
+    added: &[bool],
+    dependency_names: impl IntoIterator<Item = rattler_conda_types::PackageName>,
+) -> bool {
+    let current_name = &variants[index].recipe.package.name;
+    let current_combination = &variants[index].full_combination;
+
+    dependency_names.into_iter().all(|dependency_name| {
+        if &dependency_name == current_name {
+            return true;
+        }
+
+        let Some(dependency_indices) = name_to_indices.get(&dependency_name) else {
+            return true;
+        };
+        let matching_dependency = if dependency_indices.len() <= 1 {
+            dependency_indices.first().copied()
+        } else {
+            dependency_indices
+                .iter()
+                .max_by_key(|&&dependency_index| {
+                    current_combination
+                        .iter()
+                        .filter(|(key, value)| {
+                            variants[dependency_index].full_combination.get(*key) == Some(*value)
+                        })
+                        .count()
+                })
+                .copied()
+        };
+
+        matching_dependency.is_none_or(|dependency_index| added[dependency_index])
+    })
+}
+
+/// Performs a stable, variant-aware topological sort.
 ///
-/// This sort uses `full_combination` to match dependencies: when checking if a dependency
-/// is satisfied, we only require the variant with the **matching** combination to be added,
-/// not ALL variants of that dependency. This preserves the interleaved order:
-/// `pillow(3.10), pillow-tests(3.10), pillow(3.11), pillow-tests(3.11), ...`
+/// Hard and soft dependencies use `full_combination` to select the best matching
+/// provider variant instead of waiting for every variant of that provider. This
+/// preserves interleaved order such as
+/// `pillow(3.10), pillow-tests(3.10), pillow(3.11), pillow-tests(3.11)`.
+/// When every hard-ready variant is waiting on a soft runtime dependency, the
+/// first hard-ready variant is selected to break the runtime cycle.
 fn stable_topological_sort(
     variants: Vec<RenderedVariant>,
     name_to_indices: &BTreeMap<rattler_conda_types::PackageName, Vec<usize>>,
 ) -> Result<Vec<RenderedVariant>, TopologicalSortError> {
-    // Use a stable topological sort that preserves original order when possible
-    // We iterate through variants in their original order and only skip those
-    // that have unsatisfied dependencies
     let mut sorted_variants = Vec::new();
     let mut added = vec![false; variants.len()];
-    let mut changed = true;
 
-    while changed && sorted_variants.len() < variants.len() {
-        changed = false;
-        for idx in 0..variants.len() {
-            if added[idx] {
+    while sorted_variants.len() < variants.len() {
+        let mut changed = false;
+        let mut soft_fallback = None;
+
+        for index in 0..variants.len() {
+            if added[index]
+                || !variant_dependencies_are_added(
+                    index,
+                    &variants,
+                    name_to_indices,
+                    &added,
+                    extract_dependency_names(&variants[index].recipe),
+                )
+            {
                 continue;
             }
 
-            // Check if all dependencies are already added
-            let mut can_add = true;
-            let current_name = &variants[idx].recipe.package.name;
-            let current_combination = &variants[idx].full_combination;
-
-            // Check all dependencies in requirements
-            for dep_name in extract_dependency_names(&variants[idx].recipe) {
-                // Skip self-dependencies
-                if &dep_name == current_name {
-                    continue;
-                }
-
-                if let Some(dep_indices) = name_to_indices.get(&dep_name) {
-                    // Find the matching dependency variant based on full_combination.
-                    // We only require the variant with the most matching keys to be added,
-                    // not ALL variants of this dependency.
-                    let matching_dep_idx = if dep_indices.len() <= 1 {
-                        dep_indices.first().copied()
-                    } else {
-                        dep_indices
-                            .iter()
-                            .max_by_key(|&&dep_idx| {
-                                // Count matching keys between current combination and dep's combination
-                                current_combination
-                                    .iter()
-                                    .filter(|(key, value)| {
-                                        variants[dep_idx].full_combination.get(*key) == Some(*value)
-                                    })
-                                    .count()
-                            })
-                            .copied()
-                    };
-
-                    if let Some(dep_idx) = matching_dep_idx
-                        && !added[dep_idx]
-                    {
-                        can_add = false;
-                        break;
-                    }
-                }
+            soft_fallback.get_or_insert(index);
+            if !variant_dependencies_are_added(
+                index,
+                &variants,
+                name_to_indices,
+                &added,
+                extract_soft_dependency_names(&variants[index].recipe),
+            ) {
+                continue;
             }
 
-            if can_add {
-                sorted_variants.push(variants[idx].clone());
-                added[idx] = true;
-                changed = true;
-            }
+            sorted_variants.push(variants[index].clone());
+            added[index] = true;
+            changed = true;
+        }
+
+        if !changed {
+            let Some(index) = soft_fallback else {
+                break;
+            };
+            sorted_variants.push(variants[index].clone());
+            added[index] = true;
         }
     }
 
@@ -985,8 +1160,8 @@ fn render_with_empty_combinations(
         })
         .collect();
 
-    // Sort variants topologically by pin_subpackage dependencies
-    // This ensures we resolve build strings in the correct order
+    // Sort hard build requirements before consumers and prefer sibling runtime
+    // providers so build strings resolve in an executable order.
     let mut results = topological_sort_variants(results)?;
 
     // Resolve build strings in topological order
@@ -1085,6 +1260,19 @@ fn finalize_build_string_single(
     Ok(())
 }
 
+/// Extracts runtime dependencies used as ordering preferences.
+///
+/// These dependencies improve build order when possible but never participate
+/// in cycle detection.
+fn extract_soft_dependency_names(recipe: &Stage1Recipe) -> Vec<rattler_conda_types::PackageName> {
+    recipe
+        .requirements()
+        .run
+        .iter()
+        .filter_map(|dependency| dependency.name().cloned())
+        .collect()
+}
+
 /// Extract the package names a recipe must be built after.
 ///
 /// Collects build/host deps, pin_subpackage refs from run/run_exports, and
@@ -1101,7 +1289,7 @@ fn extract_dependency_names(recipe: &Stage1Recipe) -> Vec<rattler_conda_types::P
         .filter_map(|dep| dep.name().cloned());
 
     // pin_subpackage refs in run/run_exports must be built first to resolve the
-    // pin. (Plain run deps aren't needed at build time and may form cycles.)
+    // pin. Plain run deps aren't needed at build time and may form cycles.
     let run_pin_subpackages = requirements
         .run
         .iter()
@@ -1143,13 +1331,13 @@ fn create_jinja_config(
     // (e.g., rendering a Windows variant on Linux to check if outputs would be skipped)
     let target_platform = variant
         .get(&"target_platform".into())
-        .and_then(|v| v.to_string().parse::<rattler_conda_types::Platform>().ok())
+        .and_then(|v| v.to_string().parse::<rattler_conda_types::Subdir>().ok())
         .unwrap_or(config.target_platform);
 
     // Similarly for host_platform (defaults to target_platform if not specified)
     let host_platform = variant
         .get(&"host_platform".into())
-        .and_then(|v| v.to_string().parse::<rattler_conda_types::Platform>().ok())
+        .and_then(|v| v.to_string().parse::<rattler_conda_types::Subdir>().ok())
         .unwrap_or_else(|| {
             // If host_platform not in variant, use config.host_platform if it differs from default,
             // otherwise use the (potentially variant-derived) target_platform
@@ -1427,7 +1615,7 @@ fn render_with_variants(
         }
     }
 
-    // Sort variants topologically by pin_subpackage dependencies
+    // Sort hard build requirements first, then prefer sibling runtime providers.
     let mut results = topological_sort_variants(results)?;
 
     // Resolve build strings in topological order
@@ -1501,6 +1689,117 @@ python:
 
         assert!(variants.contains(&"3.9.*".to_string()));
         assert!(variants.contains(&"3.10.*".to_string()));
+    }
+
+    #[test]
+    fn test_top_level_variant_keys_apply_to_package_and_staging_outputs() {
+        let recipe_yaml = r#"
+schema_version: 1
+
+recipe:
+  name: test-project
+  version: "1.0.0"
+
+build:
+  variant:
+    down_prioritize_variant: 3
+    use_keys:
+      - parent_key
+      - ignored_key
+    ignore_keys:
+      - ignored_key
+
+outputs:
+  - staging:
+      name: build-cache
+    build:
+      script: echo $parent_key ${{ ignored_key }}
+
+  - package:
+      name: staged
+    inherit: build-cache
+    build:
+      variant:
+        use_keys:
+          - output_ignored_key
+        ignore_keys:
+          - output_ignored_key
+          - ignored_key
+
+  - package:
+      name: direct
+    inherit: null
+    build:
+      script: echo $parent_key ${{ ignored_key }}
+      variant:
+        down_prioritize_variant: 0
+        use_keys:
+          - output_key
+          - ignored_key
+"#;
+
+        let variant_config = VariantConfig::from_yaml_str(
+            "parent_key: [parent]\noutput_key: [output]\nignored_key: [ignored_a, ignored_b]\noutput_ignored_key: [ignored_a, ignored_b]\n",
+        )
+        .unwrap();
+        let recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let rendered =
+            render_recipe_with_variant_config(&recipe, &variant_config, RenderConfig::new())
+                .unwrap();
+
+        // Rendering retains combinations for expression evaluation and sibling
+        // pin matching. The CLI deduplicates the resulting package identities.
+        assert_eq!(rendered.len(), 8);
+        let identities: HashSet<_> = rendered
+            .iter()
+            .map(|output| {
+                (
+                    output.recipe.package.name.clone(),
+                    output.recipe.build.string.as_resolved().unwrap(),
+                )
+            })
+            .collect();
+        assert_eq!(identities.len(), 2);
+        for output in &rendered {
+            assert_eq!(
+                output.variant.get(&"parent_key".into()),
+                Some(&Variable::from_string("parent"))
+            );
+            assert!(!output.variant.contains_key(&"ignored_key".into()));
+        }
+
+        let staged = rendered
+            .iter()
+            .find(|output| output.recipe.package.name.as_normalized() == "staged")
+            .unwrap();
+        assert_eq!(
+            staged.recipe.staging_caches[0]
+                .used_variant
+                .get(&"parent_key".into()),
+            Some(&Variable::from_string("parent"))
+        );
+
+        assert!(
+            !staged.recipe.staging_caches[0]
+                .used_variant
+                .contains_key(&"ignored_key".into())
+        );
+        assert!(!staged.variant.contains_key(&"output_ignored_key".into()));
+        assert_eq!(staged.recipe.build.variant.down_prioritize_variant, Some(3));
+        assert_eq!(
+            staged.recipe.build.variant.ignore_keys,
+            ["output_ignored_key", "ignored_key"]
+        );
+
+        let direct = rendered
+            .iter()
+            .find(|output| output.recipe.package.name.as_normalized() == "direct")
+            .unwrap();
+        assert_eq!(direct.recipe.build.variant.down_prioritize_variant, Some(0));
+        assert_eq!(
+            direct.variant.get(&"output_key".into()),
+            Some(&Variable::from_string("output"))
+        );
     }
 
     #[test]
@@ -1620,6 +1919,74 @@ requirements:
     }
 
     #[test]
+    fn test_render_v3_matchspec_in_test_requirements() {
+        let recipe_yaml = r#"
+package:
+  name: httpx2
+  version: "1.0"
+
+tests:
+  - script: httpx2 --help
+    requirements:
+      run:
+        - httpx2[extras=cli]
+"#;
+
+        let recipe = stage0::parse_recipe_or_multi_from_source_with_config(
+            recipe_yaml,
+            stage0::ParseConfig {
+                repodata_revision: RepodataRevision::V3,
+            },
+        )
+        .unwrap();
+        let rendered = render_recipe_with_variant_config(
+            &recipe,
+            &VariantConfig::default(),
+            RenderConfig::new().with_repodata_revision(RepodataRevision::V3),
+        )
+        .unwrap();
+
+        let crate::stage1::tests::TestType::Commands(test) = &rendered[0].recipe.tests[0] else {
+            panic!("expected command test");
+        };
+        assert_eq!(test.requirements.run[0].to_string(), "httpx2[extras=[cli]]");
+    }
+
+    #[test]
+    fn test_render_v3_matchspec_in_extras_without_v3_config() {
+        let recipe_yaml = r#"
+package:
+  name: test-pkg
+  version: "1.0.0"
+
+requirements:
+  extras:
+    one:
+      - libcxx
+    two:
+      - 'test-pkg[extras=[one]]'
+      - 'libcxx[when="target_platform == osx-64"]'
+"#;
+
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let rendered = render_recipe_with_variant_config(
+            &stage0_recipe,
+            &VariantConfig::default(),
+            RenderConfig::new(),
+        )
+        .unwrap();
+
+        assert_eq!(
+            rendered[0].recipe.requirements.extras["two"][0].to_string(),
+            "test-pkg[extras=[one]]"
+        );
+        assert_eq!(
+            rendered[0].recipe.requirements.extras["two"][1].to_string(),
+            "libcxx[when=\"target_platform==osx-64\"]"
+        );
+    }
+
+    #[test]
     fn test_render_v3_recipe_fields_require_render_config() {
         let recipe_yaml = r#"
 package:
@@ -1655,6 +2022,58 @@ requirements:
         assert_eq!(
             rendered[0].recipe.requirements.extras["dev"][0].to_string(),
             "pytest"
+        );
+    }
+
+    #[test]
+    fn test_render_future_repodata_revision_supports_v3_features() {
+        let recipe_yaml = r#"
+package:
+  name: test-pkg
+  version: "1.0.0"
+
+build:
+  flags:
+    - cuda
+
+requirements:
+  run:
+    - 'foo[when="python >=3.11"]'
+    - 'bar[flags=[cuda]]'
+  extras:
+    dev:
+      - 'pytest[extras=[test]]'
+"#;
+
+        let revision = RepodataRevision::Unknown(4);
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source_with_config(
+            recipe_yaml,
+            stage0::ParseConfig {
+                repodata_revision: revision,
+            },
+        )
+        .unwrap();
+
+        let rendered = render_recipe_with_variant_config(
+            &stage0_recipe,
+            &VariantConfig::default(),
+            RenderConfig::new().with_repodata_revision(revision),
+        )
+        .unwrap();
+
+        assert_eq!(rendered.len(), 1);
+        assert_eq!(rendered[0].recipe.build.flags[0].as_str(), "cuda");
+        assert_eq!(
+            rendered[0].recipe.requirements.run[0].to_string(),
+            "foo[when=\"python>=3.11\"]"
+        );
+        assert_eq!(
+            rendered[0].recipe.requirements.run[1].to_string(),
+            "bar[flags=[cuda]]"
+        );
+        assert_eq!(
+            rendered[0].recipe.requirements.extras["dev"][0].to_string(),
+            "pytest[extras=[test]]"
         );
     }
 
@@ -1808,7 +2227,11 @@ outputs:
         );
         // Other top-level build settings (e.g. `files`) must be inherited too.
         assert!(
-            !output.build.files.is_empty(),
+            output
+                .build
+                .files
+                .as_ref()
+                .is_some_and(|files| !files.is_empty()),
             "cache-inherited output should inherit the top-level build.files glob"
         );
     }
@@ -2187,6 +2610,93 @@ outputs:
     }
 
     #[test]
+    fn test_plain_run_dependency_is_soft_ordering() {
+        let recipe_yaml = r#"
+schema_version: 1
+
+recipe:
+  name: soft-order
+  version: "1.0.0"
+
+outputs:
+  - package:
+      name: consumer
+    build:
+      noarch: generic
+    requirements:
+      run:
+        - runtime
+
+  - package:
+      name: runtime
+    build:
+      noarch: generic
+"#;
+
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config = VariantConfig::from_yaml_str("{}").unwrap();
+        let rendered =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, RenderConfig::new())
+                .unwrap();
+
+        let sorted = topological_sort_variants(rendered).unwrap();
+        let names: Vec<_> = sorted
+            .iter()
+            .map(|variant| variant.recipe.package.name.as_normalized())
+            .collect();
+        assert_eq!(names, vec!["runtime", "consumer"]);
+    }
+
+    #[test]
+    fn test_plain_run_cycle_has_stable_fallback_order() {
+        let recipe_yaml = r#"
+schema_version: 1
+
+recipe:
+  name: soft-cycle
+  version: "1.0.0"
+
+outputs:
+  - package:
+      name: package-a
+    build:
+      noarch: generic
+    requirements:
+      run:
+        - package-b
+
+  - package:
+      name: package-b
+    build:
+      noarch: generic
+    requirements:
+      run:
+        - package-c
+
+  - package:
+      name: package-c
+    build:
+      noarch: generic
+    requirements:
+      run:
+        - package-a
+"#;
+
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config = VariantConfig::from_yaml_str("{}").unwrap();
+        let rendered =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, RenderConfig::new())
+                .unwrap();
+
+        let sorted = topological_sort_variants(rendered).unwrap();
+        let names: Vec<_> = sorted
+            .iter()
+            .map(|variant| variant.recipe.package.name.as_normalized())
+            .collect();
+        assert_eq!(names, vec!["package-a", "package-c", "package-b"]);
+    }
+
+    #[test]
     fn test_topological_sort_cycle_detection() {
         // This test documents that cycle detection works
         // In practice, this would be caught earlier during recipe parsing/evaluation
@@ -2390,7 +2900,7 @@ outputs:
 
         // --up-to=pkg-b should include pkg-a (dependency) and pkg-b itself, but not pkg-c
         let sorted =
-            topological_sort_by_dependencies(rendered.clone(), |v| &v.recipe, Some("pkg-b"))
+            topological_sort_by_dependencies(rendered.clone(), |v| &v.recipe, Some("pkg-b"), true)
                 .unwrap();
 
         let names: Vec<_> = sorted
@@ -2401,7 +2911,7 @@ outputs:
 
         // --up-to=pkg-a should return only pkg-a (no deps)
         let sorted =
-            topological_sort_by_dependencies(rendered.clone(), |v| &v.recipe, Some("pkg-a"))
+            topological_sort_by_dependencies(rendered.clone(), |v| &v.recipe, Some("pkg-a"), true)
                 .unwrap();
 
         let names: Vec<_> = sorted
@@ -2412,7 +2922,7 @@ outputs:
 
         // --up-to=pkg-c should return all three in dependency order
         let sorted =
-            topological_sort_by_dependencies(rendered.clone(), |v| &v.recipe, Some("pkg-c"))
+            topological_sort_by_dependencies(rendered.clone(), |v| &v.recipe, Some("pkg-c"), true)
                 .unwrap();
 
         let names: Vec<_> = sorted
@@ -2425,7 +2935,8 @@ outputs:
         assert_eq!(names.len(), 3);
 
         // --up-to with nonexistent package should error
-        let result = topological_sort_by_dependencies(rendered, |v| &v.recipe, Some("nonexistent"));
+        let result =
+            topological_sort_by_dependencies(rendered, |v| &v.recipe, Some("nonexistent"), true);
         assert!(matches!(
             result,
             Err(TopologicalSortError::PackageNotFound { .. })
@@ -2476,9 +2987,13 @@ variant:
 
         // --up-to=my-package should include the my-package variants plus
         // the my-package-a and my-package-b variants they depend on via pin_subpackage
-        let sorted =
-            topological_sort_by_dependencies(rendered.clone(), |v| &v.recipe, Some("my-package"))
-                .unwrap();
+        let sorted = topological_sort_by_dependencies(
+            rendered.clone(),
+            |v| &v.recipe,
+            Some("my-package"),
+            true,
+        )
+        .unwrap();
 
         let names: Vec<_> = sorted
             .iter()
@@ -2492,7 +3007,7 @@ variant:
 
         // --up-to=my-package-a should return only my-package-a (no deps)
         let sorted =
-            topological_sort_by_dependencies(rendered, |v| &v.recipe, Some("my-package-a"))
+            topological_sort_by_dependencies(rendered, |v| &v.recipe, Some("my-package-a"), true)
                 .unwrap();
 
         let names: Vec<_> = sorted
@@ -2574,8 +3089,7 @@ openssl:
         let variant_config = VariantConfig::from_yaml_str(variant_yaml).unwrap();
 
         // Use linux platform to ensure `unix` is true
-        let config =
-            RenderConfig::new().with_target_platform(rattler_conda_types::Platform::Linux64);
+        let config = RenderConfig::new().with_target_platform(rattler_conda_types::Subdir::Linux64);
 
         let rendered =
             render_recipe_with_variant_config(&stage0_recipe, &variant_config, config).unwrap();
@@ -2723,7 +3237,7 @@ outputs:
         let variant_config = VariantConfig::default();
 
         // RenderConfig with Windows as target platform
-        let config = RenderConfig::new().with_target_platform(rattler_conda_types::Platform::Win64);
+        let config = RenderConfig::new().with_target_platform(rattler_conda_types::Subdir::Win64);
 
         // The rendering should NOT fail - even though stdlib('c') would fail on Windows,
         // the output is skipped (skip: win) so requirements should not be evaluated
@@ -3153,8 +3667,7 @@ build:
         let stage0 = Stage0Recipe::SingleOutput(Box::new(stage0_recipe));
 
         let variant_config = VariantConfig::default();
-        let config =
-            RenderConfig::new().with_target_platform(rattler_conda_types::Platform::Linux64);
+        let config = RenderConfig::new().with_target_platform(rattler_conda_types::Subdir::Linux64);
 
         let rendered = render_recipe_with_variant_config(&stage0, &variant_config, config).unwrap();
 
@@ -3230,7 +3743,7 @@ python:
         // On Linux: python 3.10 should be skipped entirely (top-level skip),
         // python 3.11 and 3.12 should each produce 2 outputs
         let config_linux =
-            RenderConfig::new().with_target_platform(rattler_conda_types::Platform::Linux64);
+            RenderConfig::new().with_target_platform(rattler_conda_types::Subdir::Linux64);
         let rendered_linux =
             render_recipe_with_variant_config(&stage0_recipe, &variant_config, config_linux)
                 .unwrap();
@@ -3246,7 +3759,7 @@ python:
         // tests output skipped by output-level "win", so only the main package
         // for python 3.11 and 3.12
         let config_win =
-            RenderConfig::new().with_target_platform(rattler_conda_types::Platform::Win64);
+            RenderConfig::new().with_target_platform(rattler_conda_types::Subdir::Win64);
         let rendered_win =
             render_recipe_with_variant_config(&stage0_recipe, &variant_config, config_win).unwrap();
         // 2 python versions * 1 output (tests skipped on win) = 2
@@ -3301,7 +3814,7 @@ outputs:
         // On Windows: top-level skip: win should prevent requirement evaluation
         // for all outputs, avoiding stdlib('c') errors
         let config_win =
-            RenderConfig::new().with_target_platform(rattler_conda_types::Platform::Win64);
+            RenderConfig::new().with_target_platform(rattler_conda_types::Subdir::Win64);
         let result = render_recipe_with_variant_config(&stage0_recipe, &variant_config, config_win);
         assert!(
             result.is_ok(),
@@ -3356,6 +3869,37 @@ postgresql:
             .collect();
         // postgresql 16 should be skipped (<=16), 17 should build
         assert_eq!(skip_flags, vec![("16".into(), true), ("17".into(), false)]);
+    }
+
+    #[test]
+    fn test_crosscompiling_emulator_variant_is_always_used() {
+        let recipe_yaml = r#"
+package:
+  name: test-pkg
+  version: "1.0.0"
+"#;
+        let variant_yaml = r#"
+CROSSCOMPILING_EMULATOR:
+  - qemu-aarch64
+  - qemu-x86_64
+"#;
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config = VariantConfig::from_yaml_str(variant_yaml).unwrap();
+
+        let rendered = render_recipe_with_variant_config(
+            &stage0_recipe,
+            &variant_config,
+            RenderConfig::new()
+                .with_os_env_var_keys(HashSet::from(["CROSSCOMPILING_EMULATOR".to_string()])),
+        )
+        .unwrap();
+
+        assert_eq!(rendered.len(), 2);
+        assert!(
+            rendered
+                .iter()
+                .all(|r| r.variant.contains_key(&"CROSSCOMPILING_EMULATOR".into()))
+        );
     }
 
     #[test]

@@ -7,7 +7,7 @@ from rattler_build import JinjaConfig, PlatformConfig, PlatformParseError
 
 def test_jinja_config_with_platforms() -> None:
     """Test creating a JinjaConfig with specific platforms."""
-    platform = PlatformConfig(target_platform="linux-64")
+    platform = PlatformConfig(target_platform="linux-64", build_platform="linux-64")
     config = JinjaConfig(platform=platform)
 
     assert config.target_platform == "linux-64"
@@ -42,6 +42,6 @@ def test_selector_config_experimental() -> None:
 
 def test_selector_config_invalid_platform() -> None:
     """Test that invalid platforms raise PlatformParseError."""
-    with pytest.raises(PlatformParseError, match="'invalid-platform' is not a known platform."):
+    with pytest.raises(PlatformParseError, match="'invalid-platform' is not a known subdir."):
         platform_config = PlatformConfig(target_platform="invalid-platform")
         JinjaConfig(platform=platform_config)

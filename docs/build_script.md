@@ -427,6 +427,12 @@ noted, no variables are inherited from the shell environment in which you invoke
 : Set to `1` when the build platform and the target platform differ (i.e.
   the package is being cross-compiled), and `0` otherwise.
 
+`CROSSCOMPILING_EMULATOR`
+
+: Forwarded from the user's shell environment when set. It can also be set in
+  variant configuration; configured values override the shell environment and
+  are always included in the build matrix and package hash.
+
 `SUBDIR`
 
 : The target subdirectory (platform) for the package being built, e.g.
@@ -485,6 +491,18 @@ noted, no variables are inherited from the shell environment in which you invoke
 : Represents the hash of the package being built, excluding the
   leading 'h' (e.g. 21422ab).
 
+`PATHS_JSON`
+
+: Only set during the test phase. The path to `info/paths.json` in the
+  extracted package under test. This describes paths in the package archive,
+  which can differ from installed paths (for example, for noarch Python
+  packages).
+
+`INDEX_JSON`
+
+: Only set during the test phase. The path to `info/index.json` in the
+  extracted package under test.
+
 `PYTHON`
 
 : The path to the Python executable in the host prefix. Python is
@@ -533,7 +551,9 @@ noted, no variables are inherited from the shell environment in which you invoke
 
 : The path to where the source code is unpacked or cloned. If the
   source file is not a recognized archive format, this directory contains a copy
-  of the source file.
+  of the source file. During the test phase (`CONDA_BUILD_STATE=TEST`), it
+  points at the test working directory instead, matching conda-build's
+  behavior.
 
 `STDLIB_DIR`
 

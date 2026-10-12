@@ -56,7 +56,7 @@ def check_package(name: str, features: str) -> tuple[bool, str]:
     if features:
         cmd += ["--features", features]
 
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    result = subprocess.run(cmd, capture_output=True, text=True, check=False)
     return result.stdout.startswith(FORBIDDEN_CRATE), result.stdout
 
 

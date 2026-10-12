@@ -8,6 +8,7 @@ Usage:
 """
 
 import argparse
+import hashlib
 import re
 import subprocess
 import sys
@@ -19,6 +20,35 @@ ROOT = Path(__file__).resolve().parent.parent
 def run(cmd: list[str], **kwargs) -> subprocess.CompletedProcess[str]:
     print(f"  → {' '.join(cmd)}")
     return subprocess.run(cmd, check=True, text=True, **kwargs)
+
+
+def sha256(path: Path) -> str:
+    """Compute the SHA-256 digest of a file."""
+    digest = hashlib.sha256()
+    with path.open("rb") as file:
+        for chunk in iter(lambda: file.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def build_source_archive(tag: str, assets_dir: Path) -> None:
+    """Create a source archive and checksum from the tagged tree."""
+    archive = assets_dir / "source.tar.gz"
+    run(
+        [
+            "git",
+            "archive",
+            "--format=tar.gz",
+            f"--prefix=rattler-build-{tag.lstrip('v')}/",
+            "--output",
+            str(archive),
+            tag,
+        ],
+        cwd=ROOT,
+    )
+    (assets_dir / "source.tar.gz.sha256").write_text(
+        f"{sha256(archive)}  {archive.name}\n"
+    )
 
 
 def get_changelog(version: str) -> str:
@@ -48,6 +78,10 @@ def main() -> None:
 
     tag: str = args.tag
     assets_dir: Path = args.assets_dir
+
+    # GitHub's automatically generated source archives are not covered by
+    # immutable release attestations, so publish our own archive from the tag.
+    build_source_archive(tag, assets_dir)
 
     # Aggregate all per-asset .sha256 files into a single sha256.sum
     aggregate = assets_dir / "sha256.sum"

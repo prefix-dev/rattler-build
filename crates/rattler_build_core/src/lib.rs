@@ -9,6 +9,7 @@ pub mod console_utils;
 pub mod debug;
 pub mod metadata;
 pub mod migrate_recipe;
+pub mod output_checks;
 pub mod package_test;
 pub mod packaging;
 pub mod render;
@@ -45,9 +46,9 @@ pub use rattler_build_recipe::variant_render::RenderConfig;
 
 use std::collections::BTreeMap;
 
-use rattler_build_recipe::stage1::HashInfo;
+use rattler_build_recipe::{stage1::HashInfo, variant_render::PinSubpackageInfo};
 use rattler_build_types::NormalizedKey;
-use rattler_conda_types::{NoArchType, Platform};
+use rattler_conda_types::{NoArchType, Subdir};
 
 /// A discovered output from variant expansion
 #[allow(missing_docs)]
@@ -57,10 +58,11 @@ pub struct DiscoveredOutput {
     pub version: String,
     pub build_string: String,
     pub noarch_type: NoArchType,
-    pub target_platform: Platform,
+    pub target_platform: Subdir,
     pub used_vars: BTreeMap<NormalizedKey, Variable>,
     pub recipe: Recipe,
     pub hash: HashInfo,
+    pub pin_subpackages: BTreeMap<NormalizedKey, PinSubpackageInfo>,
 }
 
 impl Eq for DiscoveredOutput {}

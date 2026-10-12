@@ -244,7 +244,7 @@ fn parse_single_output_recipe_with_config(
 
     // Parse optional tests section (can be empty)
     let tests = if let Some(tests_node) = mapping.get("tests") {
-        parse_tests(tests_node)?
+        parse_tests(tests_node, config)?
     } else {
         crate::stage0::ConditionalList::default()
     };

@@ -225,9 +225,10 @@ mod variable_evaluation_tests {
         let value = Value::new_template(true_template, None);
 
         let result = evaluate_value_to_variable(&value, &context).unwrap();
-        // Check it's a boolean
+        // Check it's a boolean. Do not assert on MiniJinja's display format;
+        // recent versions render booleans as `True` for Jinja2 compatibility.
         assert!(result.as_ref().is_true());
-        assert_eq!(result.as_ref().to_string(), "true");
+        assert_eq!(result.as_bool(), Some(true));
     }
 
     #[test]
@@ -794,7 +795,7 @@ fn evaluate_flag_list(
         }
     })?;
 
-    if !flags.is_empty() && context.repodata_revision() != RepodataRevision::V3 {
+    if !flags.is_empty() && !stage0::supports_v3_repodata_features(context.repodata_revision()) {
         return Err(ParseError::invalid_value(
             "build.flags",
             "package flags require the --v3 flag",
@@ -824,7 +825,7 @@ pub fn evaluate_skip_list(
     list: &ConditionalList<String>,
     context: &EvaluationContext,
 ) -> Result<bool, ParseError> {
-    let conditions: Vec<String> =
+    let conditions: Vec<(String, Option<Span>)> =
         evaluate_conditional_list(list.as_slice(), context, |value, ctx| {
             // Skip expressions are Jinja boolean expressions, not templates
             // We need to render them through Jinja to track accessed variables,
@@ -832,11 +833,15 @@ pub fn evaluate_skip_list(
             if let Some(expr_str) = value.as_concrete() {
                 // Wrap in ${{ }} to render as Jinja expression (for variable tracking)
                 let template = format!("${{{{ {} }}}}", expr_str);
-                // Ignore the result - we just want to trigger variable tracking
+                // Ignore the result - we just want to trigger variable tracking.
+                // A render failure is not fatal here: skip conditions may reference
+                // variant keys that are not part of this combination. Broken
+                // expressions are reported by `eval_skip_conditions` below, and by
+                // the syntax check the parser runs over every concrete skip entry.
                 let _ = render_template(&template, ctx, value.span());
 
                 // Always return the original expression string
-                Ok(Some(expr_str.clone()))
+                Ok(Some((expr_str.clone(), value.span().copied())))
             } else if let Some(template) = value.as_template() {
                 // Already a template, render it
                 let rendered = render_template(template.source(), ctx, value.span())?;
@@ -844,37 +849,71 @@ pub fn evaluate_skip_list(
                 if rendered.is_empty() {
                     Ok(None)
                 } else {
-                    Ok(Some(rendered))
+                    Ok(Some((rendered, value.span().copied())))
                 }
             } else {
                 unreachable!("Value must be either concrete or template")
             }
         })?;
-    Ok(is_skipped(&conditions, context))
+    eval_skip_conditions(&conditions, context)
 }
 
 /// Check if any skip condition in the list evaluates to true
 ///
 /// Skip conditions are Jinja boolean expressions (e.g., "win", "unix", "platform == 'osx-64'").
 /// Returns true if ANY condition evaluates to true (OR logic).
-pub fn is_skipped(skip_conditions: &[String], context: &EvaluationContext) -> bool {
-    for condition in skip_conditions {
+///
+/// A condition that does not *parse* (for example one with unbalanced brackets) is a
+/// hard error: silently treating it as "not skipped" builds outputs the recipe author
+/// meant to exclude. Conditions that parse but fail to evaluate are tolerated, see
+/// [`eval_skip_conditions`].
+pub fn is_skipped(
+    skip_conditions: &[String],
+    context: &EvaluationContext,
+) -> Result<bool, ParseError> {
+    let conditions: Vec<(String, Option<Span>)> = skip_conditions
+        .iter()
+        .map(|condition| (condition.clone(), None))
+        .collect();
+    eval_skip_conditions(&conditions, context)
+}
+
+/// Evaluate skip conditions, reporting failures against the span of the entry they came from.
+///
+/// Only syntax errors are fatal. Under [`minijinja::UndefinedBehavior::Strict`] an
+/// undefined variable makes most operators fail (`python == "3.12"` errors outright when
+/// `python` is not part of the variant), and skip conditions are legitimately evaluated
+/// against incomplete variant combinations during variant discovery, so a condition that
+/// parses but cannot be evaluated keeps counting as "not skipped". A syntax error can
+/// never be caused by a missing variable, so it always indicates a broken recipe.
+fn eval_skip_conditions(
+    skip_conditions: &[(String, Option<Span>)],
+    context: &EvaluationContext,
+) -> Result<bool, ParseError> {
+    for (condition, span) in skip_conditions {
         let jinja = context.to_jinja();
 
         // Evaluate the skip condition as a boolean expression
         match jinja.eval(condition) {
             Ok(value) => {
                 if value.is_true() {
-                    return true;
+                    return Ok(true);
                 }
             }
+            Err(err) if err.kind() == minijinja::ErrorKind::SyntaxError => {
+                return Err(ParseError::jinja_error(
+                    format!("invalid skip condition '{}': {}", condition, err),
+                    span.unwrap_or_else(Span::new_blank),
+                ));
+            }
             Err(_) => {
-                // If evaluation fails, we can't determine if it's skipped
-                // Continue to check other conditions
+                // Evaluation failed for a reason that a missing variant value can explain
+                // (undefined variables, operations on them). Keep the previous behaviour
+                // and continue to check the other conditions.
             }
         }
     }
-    false
+    Ok(false)
 }
 
 /// Evaluate a string list, preserving templates with undefined variables
@@ -1170,10 +1209,18 @@ pub fn evaluate_dependency_list(
     list: &crate::stage0::types::ConditionalList<crate::stage0::SerializableMatchSpec>,
     context: &EvaluationContext,
 ) -> Result<Vec<crate::stage1::Dependency>, ParseError> {
+    evaluate_dependency_list_with_revision(list, context, context.repodata_revision())
+}
+
+fn evaluate_dependency_list_with_revision(
+    list: &crate::stage0::types::ConditionalList<crate::stage0::SerializableMatchSpec>,
+    context: &EvaluationContext,
+    repodata_revision: RepodataRevision,
+) -> Result<Vec<crate::stage1::Dependency>, ParseError> {
     evaluate_conditional_list(list.as_slice(), context, |value, ctx| {
         match value.inner() {
             ValueInner::Concrete(match_spec) => {
-                ensure_matchspec_v3_allowed(&match_spec.0, ctx, value.span())?;
+                ensure_matchspec_v3_allowed(&match_spec.0, repodata_revision, value.span())?;
                 Ok(Some(Dependency::Spec(Box::new(match_spec.0.clone()))))
             }
             ValueInner::Template(template) => {
@@ -1185,7 +1232,7 @@ pub fn evaluate_dependency_list(
                 }
 
                 let span_opt = value.span().copied();
-                let dep = parse_dependency_string(&s, &span_opt, ctx.repodata_revision())?;
+                let dep = parse_dependency_string(&s, &span_opt, repodata_revision)?;
                 Ok(Some(dep))
             }
         }
@@ -1194,10 +1241,10 @@ pub fn evaluate_dependency_list(
 
 fn ensure_matchspec_v3_allowed(
     spec: &MatchSpec,
-    context: &EvaluationContext,
+    repodata_revision: RepodataRevision,
     span: Option<&Span>,
 ) -> Result<(), ParseError> {
-    if context.repodata_revision() != RepodataRevision::V3
+    if !stage0::supports_v3_repodata_features(repodata_revision)
         && spec.required_repodata_revision() == RepodataRevision::V3
     {
         return Err(ParseError::invalid_value(
@@ -1803,19 +1850,15 @@ impl Evaluate for Stage0Requirements {
     type Output = Stage1Requirements;
 
     fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
-        if !self.extras.is_empty() && context.repodata_revision() != RepodataRevision::V3 {
-            return Err(ParseError::invalid_value(
-                "requirements.extras",
-                "optional dependency groups require the --v3 flag",
-                Span::new_blank(),
-            )
-            .with_suggestion("Enable --v3 to use requirements.extras."));
-        }
-
         let extras = self
             .extras
             .iter()
-            .map(|(name, deps)| Ok((name.clone(), evaluate_dependency_list(deps, context)?)))
+            .map(|(name, deps)| {
+                Ok((
+                    name.clone(),
+                    evaluate_dependency_list_with_revision(deps, context, RepodataRevision::V3)?,
+                ))
+            })
             .collect::<Result<_, ParseError>>()?;
 
         Ok(Stage1Requirements {
@@ -2221,8 +2264,13 @@ impl Evaluate for Stage0Build {
         let always_copy_files = evaluate_glob_vec_simple(&self.always_copy_files, context)?;
         let always_include_files = evaluate_glob_vec_simple(&self.always_include_files, context)?;
 
-        // Evaluate files (handle both list and include/exclude variants)
-        let files = evaluate_glob_vec(&self.files, context)?;
+        // Keep `None` (key absent, packages everything) distinct from `Some(empty)`
+        // (`files: []`, packages nothing).
+        let files = self
+            .files
+            .as_ref()
+            .map(|files| evaluate_glob_vec(files, context))
+            .transpose()?;
 
         // Evaluate dynamic linking
         let dynamic_linking = self.dynamic_linking.evaluate(context)?;
@@ -3114,12 +3162,9 @@ fn merge_stage1_build(
     let merge_build_and_host_envs =
         output.merge_build_and_host_envs || toplevel.merge_build_and_host_envs;
 
-    // Files: use output if not empty, otherwise inherit from top-level
-    let files = if output.files.is_empty() {
-        toplevel.files
-    } else {
-        output.files
-    };
+    // Files: an explicit `files: []` is an override, not an absence, so only a
+    // missing key falls back to the top-level globs.
+    let files = output.files.or(toplevel.files);
 
     // Dynamic linking: use output if not default, otherwise inherit from top-level
     let dynamic_linking = if output.dynamic_linking.is_default() {
@@ -3128,11 +3173,25 @@ fn merge_stage1_build(
         output.dynamic_linking
     };
 
-    // Variant: use output if not default, otherwise inherit from top-level
+    // Variant: use output if not default, but always inherit top-level use_keys and ignore_keys.
     let variant = if output.variant.is_default() {
         toplevel.variant
     } else {
-        output.variant
+        let mut variant = output.variant;
+        variant.down_prioritize_variant = variant
+            .down_prioritize_variant
+            .or(toplevel.variant.down_prioritize_variant);
+        for key in toplevel.variant.use_keys {
+            if !variant.use_keys.contains(&key) {
+                variant.use_keys.push(key);
+            }
+        }
+        for key in toplevel.variant.ignore_keys {
+            if !variant.ignore_keys.contains(&key) {
+                variant.ignore_keys.push(key);
+            }
+        }
+        variant
     };
 
     // Prefix detection: use output if not default, otherwise inherit from top-level
@@ -3497,6 +3556,9 @@ impl Evaluate for crate::stage0::MultiOutputRecipe {
             .cloned()
             .collect();
 
+        // Top-level use_keys and ignore_keys apply to every build unit, including staging builds.
+        let top_level_variant = self.build.variant.evaluate(&context_with_vars)?;
+
         // First pass: Evaluate all staging outputs and collect them
         let mut staging_caches = IndexMap::new();
         for output in &self.outputs {
@@ -3532,7 +3594,7 @@ impl Evaluate for crate::stage0::MultiOutputRecipe {
                     &["target_platform", "channel_targets", "channel_sources"];
 
                 let os_env_var_keys = context_with_vars.os_env_var_keys();
-                let actual_variant: BTreeMap<NormalizedKey, Variable> = context_with_vars
+                let mut actual_variant: BTreeMap<NormalizedKey, Variable> = context_with_vars
                     .variables()
                     .iter()
                     .filter(|(k, _)| {
@@ -3552,6 +3614,18 @@ impl Evaluate for crate::stage0::MultiOutputRecipe {
                     })
                     .map(|(k, v)| (NormalizedKey::from(k.as_str()), v.clone()))
                     .collect();
+
+                for key in &top_level_variant.use_keys {
+                    let key = NormalizedKey::from(key.as_str());
+                    if let Some(value) = context_with_vars.variables().get(&key.0) {
+                        actual_variant.insert(key, value.clone());
+                    }
+                }
+
+                // Ignore wins over both detected and explicitly included keys.
+                for key in &top_level_variant.ignore_keys {
+                    actual_variant.remove(&NormalizedKey::from(key.as_str()));
+                }
 
                 let staging_cache = StagingCache::new(
                     staging_name.clone(),
@@ -3872,9 +3946,9 @@ mod tests {
         // Create JinjaConfig with the variant and target_platform
         let jinja_config = JinjaConfig {
             variant: variant.clone(),
-            target_platform: rattler_conda_types::Platform::Linux64,
-            build_platform: rattler_conda_types::Platform::Linux64,
-            host_platform: rattler_conda_types::Platform::Linux64,
+            target_platform: rattler_conda_types::Subdir::Linux64,
+            build_platform: rattler_conda_types::Subdir::Linux64,
+            host_platform: rattler_conda_types::Subdir::Linux64,
             ..Default::default()
         };
 
@@ -4318,7 +4392,7 @@ outputs:
 
         match parsed {
             stage0::Recipe::MultiOutput(multi) => {
-                let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
+                let ctx = EvaluationContext::for_platform(rattler_conda_types::Subdir::Linux64);
 
                 let recipes = multi.evaluate(&ctx).unwrap();
 
@@ -4403,7 +4477,7 @@ outputs:
 
         match parsed {
             stage0::Recipe::MultiOutput(multi) => {
-                let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
+                let ctx = EvaluationContext::for_platform(rattler_conda_types::Subdir::Linux64);
                 let err = multi.evaluate(&ctx).unwrap_err();
                 assert!(err.to_string().contains("experimental"), "{err}");
             }
@@ -4446,9 +4520,9 @@ outputs:
                 let ctx = EvaluationContext::with_variables_and_config(
                     variables,
                     JinjaConfig {
-                        target_platform: rattler_conda_types::Platform::Linux64,
-                        host_platform: rattler_conda_types::Platform::Linux64,
-                        build_platform: rattler_conda_types::Platform::Linux64,
+                        target_platform: rattler_conda_types::Subdir::Linux64,
+                        host_platform: rattler_conda_types::Subdir::Linux64,
+                        build_platform: rattler_conda_types::Subdir::Linux64,
                         experimental: true,
                         ..Default::default()
                     },
@@ -4532,9 +4606,9 @@ outputs:
                     .map(|(k, v)| (NormalizedKey::from(k.as_str()), v.clone()))
                     .collect();
                 let jinja_config = JinjaConfig {
-                    target_platform: rattler_conda_types::Platform::Linux64,
-                    build_platform: rattler_conda_types::Platform::Linux64,
-                    host_platform: rattler_conda_types::Platform::Linux64,
+                    target_platform: rattler_conda_types::Subdir::Linux64,
+                    build_platform: rattler_conda_types::Subdir::Linux64,
+                    host_platform: rattler_conda_types::Subdir::Linux64,
                     variant: jinja_variant,
                     ..Default::default()
                 };
@@ -4608,7 +4682,7 @@ outputs:
 
         match parsed {
             stage0::Recipe::MultiOutput(multi) => {
-                let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
+                let ctx = EvaluationContext::for_platform(rattler_conda_types::Subdir::Linux64);
 
                 let recipes = multi.evaluate(&ctx).unwrap();
 
@@ -4660,7 +4734,7 @@ outputs:
 
         match parsed {
             stage0::Recipe::MultiOutput(multi) => {
-                let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
+                let ctx = EvaluationContext::for_platform(rattler_conda_types::Subdir::Linux64);
 
                 let recipes = multi.evaluate(&ctx).unwrap();
                 println!("{:#?}", recipes);
@@ -4737,7 +4811,7 @@ outputs:
 
         match parsed {
             stage0::Recipe::MultiOutput(multi) => {
-                let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
+                let ctx = EvaluationContext::for_platform(rattler_conda_types::Subdir::Linux64);
 
                 let recipes = multi.evaluate(&ctx).unwrap();
                 assert_eq!(recipes.len(), 2);
@@ -4799,7 +4873,7 @@ outputs:
 
         match parsed {
             stage0::Recipe::MultiOutput(multi) => {
-                let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
+                let ctx = EvaluationContext::for_platform(rattler_conda_types::Subdir::Linux64);
 
                 let recipes = multi.evaluate(&ctx).unwrap();
                 assert_eq!(recipes.len(), 2); // Only package outputs
@@ -4883,7 +4957,7 @@ outputs:
 
         match parsed {
             stage0::Recipe::MultiOutput(multi) => {
-                let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
+                let ctx = EvaluationContext::for_platform(rattler_conda_types::Subdir::Linux64);
 
                 let recipes = multi.evaluate(&ctx).unwrap();
                 assert_eq!(recipes.len(), 2);
@@ -4978,7 +5052,7 @@ outputs:
 
         match parsed {
             stage0::Recipe::MultiOutput(multi) => {
-                let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
+                let ctx = EvaluationContext::for_platform(rattler_conda_types::Subdir::Linux64);
 
                 let recipes = multi.evaluate(&ctx).unwrap();
                 assert_eq!(recipes.len(), 2);
@@ -5035,7 +5109,7 @@ outputs:
 
         match parsed {
             stage0::Recipe::MultiOutput(multi) => {
-                let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
+                let ctx = EvaluationContext::for_platform(rattler_conda_types::Subdir::Linux64);
 
                 let recipes = multi.evaluate(&ctx).unwrap();
                 assert_eq!(recipes.len(), 2);
@@ -5077,6 +5151,77 @@ outputs:
     }
 
     #[test]
+    fn test_output_can_override_files_with_empty_list() {
+        use crate::stage0::parser::parse_recipe_or_multi_from_source;
+
+        // Regression test for https://github.com/prefix-dev/rattler-build/issues/2753
+        // `files: []` means "package nothing"; an absent key inherits the top-level globs.
+        let recipe_yaml = r#"
+schema_version: 1
+
+recipe:
+  name: myproject
+  version: 1.0.0
+
+build:
+  files:
+    - lib/**
+
+outputs:
+  - package:
+      name: output-packages-nothing
+      version: 1.0.0
+    build:
+      files: []
+
+  - package:
+      name: output-inherits-files
+      version: 1.0.0
+
+  - package:
+      name: output-conditional-misses
+      version: 1.0.0
+    build:
+      files:
+        - if: win
+          then: lib/only-on-windows.dll
+"#;
+
+        let parsed = parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let stage0::Recipe::MultiOutput(multi) = parsed else {
+            panic!("Expected MultiOutputRecipe");
+        };
+
+        let ctx = EvaluationContext::for_platform(rattler_conda_types::Subdir::Linux64);
+        let recipes = multi.evaluate(&ctx).unwrap();
+        assert_eq!(recipes.len(), 3);
+
+        // An override, not an absence: must stay `Some(empty)`, not inherit `lib/**`.
+        let cleared = recipes[0].build.files.as_ref();
+        assert!(
+            cleared.is_some_and(|files| files.is_empty()),
+            "explicit empty `files` should be preserved as Some(empty), got {:?}",
+            cleared
+        );
+
+        // No `files` key at all: inherit the top-level globs.
+        let inherited = recipes[1]
+            .build
+            .files
+            .as_ref()
+            .expect("`files` should be inherited from top-level");
+        assert!(!inherited.is_empty());
+
+        // No branch matches, but the key is still present, so it selects nothing.
+        let conditional = recipes[2].build.files.as_ref();
+        assert!(
+            conditional.is_some_and(|files| files.is_empty()),
+            "`files` with no matching branch should be Some(empty), got {:?}",
+            conditional
+        );
+    }
+
+    #[test]
     fn test_output_can_override_license_file_with_empty_list() {
         use crate::stage0::parser::parse_recipe_or_multi_from_source;
 
@@ -5110,7 +5255,7 @@ outputs:
 
         match parsed {
             stage0::Recipe::MultiOutput(multi) => {
-                let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
+                let ctx = EvaluationContext::for_platform(rattler_conda_types::Subdir::Linux64);
 
                 let recipes = multi.evaluate(&ctx).unwrap();
                 assert_eq!(recipes.len(), 2);
@@ -5197,7 +5342,7 @@ outputs:
 
         match parsed {
             stage0::Recipe::MultiOutput(multi) => {
-                let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
+                let ctx = EvaluationContext::for_platform(rattler_conda_types::Subdir::Linux64);
 
                 let recipes = multi.evaluate(&ctx).unwrap();
                 assert_eq!(recipes.len(), 2); // Only package outputs, not staging
@@ -5289,7 +5434,7 @@ outputs:
 
         match parsed {
             stage0::Recipe::MultiOutput(multi) => {
-                let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
+                let ctx = EvaluationContext::for_platform(rattler_conda_types::Subdir::Linux64);
                 let recipes = multi.evaluate(&ctx).unwrap();
                 assert_eq!(recipes.len(), 1);
 
@@ -5330,9 +5475,9 @@ outputs:
         match parsed {
             stage0::Recipe::MultiOutput(multi) => {
                 let jinja_config = JinjaConfig {
-                    target_platform: rattler_conda_types::Platform::Linux64,
-                    build_platform: rattler_conda_types::Platform::Linux64,
-                    host_platform: rattler_conda_types::Platform::Linux64,
+                    target_platform: rattler_conda_types::Subdir::Linux64,
+                    build_platform: rattler_conda_types::Subdir::Linux64,
+                    host_platform: rattler_conda_types::Subdir::Linux64,
                     experimental: true,
                     ..Default::default()
                 };
@@ -5373,7 +5518,7 @@ outputs:
         let parsed = parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
         match parsed {
             stage0::Recipe::MultiOutput(multi) => {
-                let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
+                let ctx = EvaluationContext::for_platform(rattler_conda_types::Subdir::Linux64);
                 let recipes = multi.evaluate(&ctx).unwrap();
                 assert_eq!(recipes.len(), 2);
                 for recipe in &recipes {
@@ -5411,7 +5556,7 @@ requirements:
         let parsed = parse_recipe_from_source(recipe_yaml).unwrap();
 
         // Create context with both build_platform and target_platform
-        let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
+        let ctx = EvaluationContext::for_platform(rattler_conda_types::Subdir::Linux64);
 
         // Evaluate the recipe
         let result = parsed.evaluate(&ctx);
@@ -5450,7 +5595,7 @@ build:
 
         // Create context with all required variables
         // Using python=3.8 and python_min=3.8 so that match() succeeds and is_abi3 is evaluated
-        let mut ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
+        let mut ctx = EvaluationContext::for_platform(rattler_conda_types::Subdir::Linux64);
         ctx.insert("python".to_string(), Variable::from_string("3.8"));
         ctx.insert("python_min".to_string(), Variable::from_string("3.8"));
         ctx.insert("is_abi3".to_string(), Variable::from(true));
@@ -5707,9 +5852,9 @@ outputs:
             stage0::Recipe::MultiOutput(multi) => {
                 // Test on Windows - the output should be skipped and not fail
                 let jinja_config = JinjaConfig {
-                    target_platform: rattler_conda_types::Platform::Win64,
-                    build_platform: rattler_conda_types::Platform::Win64,
-                    host_platform: rattler_conda_types::Platform::Win64,
+                    target_platform: rattler_conda_types::Subdir::Win64,
+                    build_platform: rattler_conda_types::Subdir::Win64,
+                    host_platform: rattler_conda_types::Subdir::Win64,
                     // Note: no c_stdlib in variant - stdlib('c') would fail on Windows
                     variant: std::collections::BTreeMap::new(),
                     ..Default::default()
@@ -5780,9 +5925,9 @@ outputs:
                 variant.insert("cxx_compiler_version".into(), Variable::from_string("12"));
 
                 let jinja_config = JinjaConfig {
-                    target_platform: rattler_conda_types::Platform::Linux64,
-                    build_platform: rattler_conda_types::Platform::Linux64,
-                    host_platform: rattler_conda_types::Platform::Linux64,
+                    target_platform: rattler_conda_types::Subdir::Linux64,
+                    build_platform: rattler_conda_types::Subdir::Linux64,
+                    host_platform: rattler_conda_types::Subdir::Linux64,
                     variant,
                     ..Default::default()
                 };
@@ -5843,7 +5988,7 @@ build:
         let parsed = parse_recipe_from_source(recipe_yaml).unwrap();
 
         // Test with unix=true, win=false
-        let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
+        let ctx = EvaluationContext::for_platform(rattler_conda_types::Subdir::Linux64);
 
         let result = parsed.evaluate(&ctx).unwrap();
 
@@ -5857,7 +6002,7 @@ build:
         assert_eq!(result.build.post_process[1].regex.as_str(), "always");
 
         // Test with unix=false, win=true
-        let ctx2 = EvaluationContext::for_platform(rattler_conda_types::Platform::Win64);
+        let ctx2 = EvaluationContext::for_platform(rattler_conda_types::Subdir::Win64);
 
         let result2 = parsed.evaluate(&ctx2).unwrap();
 
@@ -5891,7 +6036,7 @@ build:
         let parsed = parse_recipe_from_source(recipe_yaml).unwrap();
 
         // Create a minimal evaluation context
-        let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Linux64);
+        let ctx = EvaluationContext::for_platform(rattler_conda_types::Subdir::Linux64);
 
         // Evaluate the recipe - it should be skipped
         let result = parsed.evaluate(&ctx);
@@ -5911,6 +6056,80 @@ build:
     }
 
     #[test]
+    fn test_is_skipped_errors_on_malformed_expression() {
+        // Regression test for #2780: an expression that cannot be evaluated must not be
+        // silently treated as "not skipped".
+        let ctx = EvaluationContext::new();
+
+        let skip_conditions = vec![
+            "target_platform == \"win-arm64\") and target_platform != cross_target_platform"
+                .to_string(),
+        ];
+        let err = is_skipped(&skip_conditions, &ctx)
+            .expect_err("malformed skip condition should be an error");
+        assert!(
+            err.to_string().contains("skip condition"),
+            "unexpected error: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn test_skip_template_rendering_to_malformed_expression_errors() {
+        use crate::stage0::parser::parse_recipe_from_source;
+
+        // A template can only be checked once rendered, so this one gets caught during
+        // evaluation rather than at parse time.
+        let recipe_yaml = r#"
+schema_version: 1
+context:
+  condition: 'unix and (osx'
+package:
+  name: test
+  version: 1.0.0
+build:
+  skip: ${{ condition }}
+"#;
+
+        let parsed = parse_recipe_from_source(recipe_yaml).unwrap();
+        let ctx = EvaluationContext::for_platform(rattler_conda_types::Subdir::Linux64);
+        let err = parsed
+            .evaluate(&ctx)
+            .expect_err("malformed rendered skip condition should be an error");
+        assert!(
+            err.to_string().contains("skip condition"),
+            "unexpected error: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn test_is_skipped_tolerates_undefined_variables() {
+        // Undefined variables must not become build failures: under strict undefined
+        // behaviour most operators error out when a variant key is missing, and skip
+        // conditions are evaluated against incomplete combinations during variant
+        // discovery. Only genuinely broken expressions are errors.
+        let ctx = EvaluationContext::for_platform(rattler_conda_types::Subdir::Linux64);
+
+        for condition in [
+            "is_abi3",
+            "not is_abi3",
+            "python == \"3.12\"",
+            "unix and py < 310",
+            "undefined_thing | length",
+            "undefined_thing()",
+        ] {
+            let conditions = vec![condition.to_string()];
+            assert_eq!(
+                is_skipped(&conditions, &ctx).ok(),
+                Some(false),
+                "skip condition '{}' with undefined variables should not skip and should not error",
+                condition
+            );
+        }
+    }
+
+    #[test]
     fn test_is_skipped_with_literal_true() {
         // Direct test of is_skipped function with the string "true"
         let ctx = EvaluationContext::new();
@@ -5918,14 +6137,14 @@ build:
         // The string "true" should evaluate to boolean true in Jinja
         let skip_conditions = vec!["true".to_string()];
         assert!(
-            is_skipped(&skip_conditions, &ctx),
+            is_skipped(&skip_conditions, &ctx).unwrap(),
             "is_skipped should return true for skip condition 'true'"
         );
 
         // Also test "false" - should NOT skip
         let skip_conditions_false = vec!["false".to_string()];
         assert!(
-            !is_skipped(&skip_conditions_false, &ctx),
+            !is_skipped(&skip_conditions_false, &ctx).unwrap(),
             "is_skipped should return false for skip condition 'false'"
         );
     }
@@ -6022,7 +6241,7 @@ package:
 
         match parsed {
             stage0::Recipe::SingleOutput(recipe) => {
-                let ctx = EvaluationContext::for_platform(rattler_conda_types::Platform::Win64);
+                let ctx = EvaluationContext::for_platform(rattler_conda_types::Subdir::Win64);
                 let result = recipe.evaluate(&ctx);
 
                 assert!(

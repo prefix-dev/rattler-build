@@ -32,7 +32,7 @@ def main() -> None:
     if repo_url:
         cmd += ["--repo-url", repo_url]
 
-    result = subprocess.run(cmd, cwd=ROOT)
+    result = subprocess.run(cmd, cwd=ROOT, check=False)
     sys.exit(result.returncode)
 
 

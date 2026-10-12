@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from typing import Literal, Protocol, runtime_checkable
 
+from typing_extensions import Self
+
 
 class DownloadStartEvent:
     """Event fired when a download starts."""
@@ -241,7 +243,7 @@ class RichProgressCallback(ProgressCallback):
         self.current_operation: TaskID | None = None
         self.step_task: TaskID | None = None
 
-    def __enter__(self) -> RichProgressCallback:
+    def __enter__(self) -> Self:
         """Context manager entry."""
         self.progress.start()
         return self
@@ -314,9 +316,7 @@ class RichProgressCallback(ProgressCallback):
                 self._complete_operation()
                 self.current_operation = self.progress.add_task("🔍 Resolving dependencies", total=100)
             # Advance progress as we see different stages
-            if "Platform:" in msg:
-                self.progress.update(self.current_operation, advance=20)
-            elif "Specs:" in msg:
+            if "Platform:" in msg or "Specs:" in msg:
                 self.progress.update(self.current_operation, advance=20)
 
         elif "get_or_create_subdir" in span and "sharded repodata" in msg:
@@ -346,9 +346,7 @@ class RichProgressCallback(ProgressCallback):
                 self.current_operation = self.progress.add_task("📦 Packaging", total=100)
 
             # Update progress based on packaging steps
-            if "Copying done" in msg:
-                self.progress.update(self.current_operation, advance=30)
-            elif "Post-processing done" in msg:
+            if "Copying done" in msg or "Post-processing done" in msg:
                 self.progress.update(self.current_operation, advance=30)
             elif "Writing test files" in msg:
                 self.progress.update(self.current_operation, advance=10)

@@ -47,7 +47,7 @@ impl Runner for LocalRunner {
         "local"
     }
 
-    fn execution_platform(&self) -> rattler_conda_types::Platform {
+    fn execution_platform(&self) -> rattler_conda_types::Subdir {
         self.runtime.process_platform()
     }
 
@@ -156,7 +156,7 @@ impl Session for LocalSession {
     }
 }
 
-fn is_executable_file(path: &Path, _platform: rattler_conda_types::Platform) -> bool {
+fn is_executable_file(path: &Path, _platform: rattler_conda_types::Subdir) -> bool {
     if !path.is_file() {
         return false;
     }
@@ -180,7 +180,7 @@ mod tests {
     use std::sync::Arc;
 
     use indexmap::IndexMap;
-    use rattler_conda_types::Platform;
+    use rattler_conda_types::Subdir;
 
     use super::*;
     use crate::runner::{Mount, OutputSink, SessionSpec};
@@ -196,7 +196,7 @@ mod tests {
 
     fn session_spec(work_dir: &Path) -> SessionSpec {
         SessionSpec {
-            platform: Platform::current(),
+            platform: Subdir::current().unwrap(),
             mounts: Vec::<Mount>::new(),
             image: None,
             work_dir: GuestPath(work_dir.to_path_buf()),
@@ -267,9 +267,9 @@ mod tests {
     async fn strict_isolation_applies_resolved_env() {
         let temp_dir = tempfile::tempdir().unwrap();
         let platform = if cfg!(windows) {
-            Platform::Win64
+            Subdir::Win64
         } else {
-            Platform::Linux64
+            Subdir::Linux64
         };
         let runner = LocalRunner::new(EnvironmentIsolation::Strict).with_runtime(
             RuntimeEnv::for_test(platform)
@@ -315,9 +315,12 @@ mod tests {
         );
     }
 
+    /// Non-UTF-8 output — Windows tools writing in the active code page, or a
+    /// build printing raw bytes — must not abort output capture for the rest of
+    /// the script.
     #[cfg(unix)]
     #[tokio::test]
-    async fn output_decode_error_preserves_exit_status() {
+    async fn invalid_utf8_output_is_decoded_lossily() {
         let temp_dir = tempfile::tempdir().unwrap();
         let runner = LocalRunner::new(EnvironmentIsolation::None);
         let mut session = start_local_session(&runner, temp_dir.path()).await;
@@ -327,7 +330,7 @@ mod tests {
             std::time::Duration::from_secs(10),
             session.exec(
                 ExecSpec {
-                    argv: shell_command("printf '\\377\\n'; head -c 1048576 /dev/zero"),
+                    argv: shell_command("printf 'before\\n\\377\\nafter\\n'; exit 7"),
                     cwd: GuestPath(temp_dir.path().to_path_buf()),
                     env: IndexMap::new(),
                 },
@@ -335,11 +338,17 @@ mod tests {
             ),
         )
         .await
-        .expect("draining invalid output must not hang")
+        .expect("reading invalid output must not hang")
         .unwrap();
 
-        assert!(status.success());
-        assert!(sink.0.is_empty());
+        assert_eq!(status.code, Some(7));
+        let stdout = sink
+            .0
+            .iter()
+            .filter(|(stream, _)| *stream == OutputStream::Stdout)
+            .map(|(_, line)| line.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(stdout, vec!["before", "\u{FFFD}", "after"]);
     }
 
     #[tokio::test]
@@ -371,7 +380,7 @@ mod tests {
         let names = vec!["tool".to_string()];
 
         let windows_runner = LocalRunner::new(EnvironmentIsolation::Strict)
-            .with_runtime(RuntimeEnv::for_test(Platform::Win64));
+            .with_runtime(RuntimeEnv::for_test(Subdir::Win64));
         let mut windows_session = start_local_session(&windows_runner, directory).await;
         assert_eq!(
             windows_session
@@ -382,7 +391,7 @@ mod tests {
         );
 
         let linux_runner = LocalRunner::new(EnvironmentIsolation::Strict)
-            .with_runtime(RuntimeEnv::for_test(Platform::Linux64));
+            .with_runtime(RuntimeEnv::for_test(Subdir::Linux64));
         let mut linux_session = start_local_session(&linux_runner, directory).await;
         assert_eq!(
             linux_session

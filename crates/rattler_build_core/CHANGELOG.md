@@ -7,6 +7,92 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.17](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.16...rattler_build_core-v0.2.17) - 2026-10-07
+
+### Other
+
+- update Cargo.toml dependencies
+
+## [0.2.16](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.15...rattler_build_core-v0.2.16) - 2026-10-06
+
+### Other
+
+- update rattler to 0.52 ([#2844](https://github.com/prefix-dev/rattler-build/pull/2844))
+
+## [0.2.15](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.14...rattler_build_core-v0.2.15) - 2026-09-30
+
+### Added
+
+- expose exclude-newer policies for Python builds, tests, and debug sessions ([#2801](https://github.com/prefix-dev/rattler-build/pull/2801))
+
+### Other
+
+- update rattler and sigstore crates ([#2834](https://github.com/prefix-dev/rattler-build/pull/2834))
+- *(deps)* update cargo dependencies and rattler ([#2829](https://github.com/prefix-dev/rattler-build/pull/2829))
+
+## [0.2.14](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.13...rattler_build_core-v0.2.14) - 2026-09-14
+
+### Added
+
+- Add `PATHS_JSON`/`INDEX_JSON` env vars at test-time ([#2620](https://github.com/prefix-dev/rattler-build/pull/2620))
+- warn on overlapping output files and unused staging files ([#2790](https://github.com/prefix-dev/rattler-build/pull/2790))
+
+### Fixed
+
+- always use CROSSCOMPILING_EMULATOR variant ([#2810](https://github.com/prefix-dev/rattler-build/pull/2810))
+- accept new Python 3.15 site-packages layout on Windows in package_contents tests ([#2819](https://github.com/prefix-dev/rattler-build/pull/2819))
+- preserve inherited variant priority and staging cache inputs ([#2804](https://github.com/prefix-dev/rattler-build/pull/2804))
+- use backslashes in Windows SP_DIR path ([#2779](https://github.com/prefix-dev/rattler-build/pull/2779))
+- run link checks when relocation is disabled ([#2787](https://github.com/prefix-dev/rattler-build/pull/2787))
+- Set SRC_PATH in tests ([#2795](https://github.com/prefix-dev/rattler-build/pull/2795))
+- schedule sibling outputs when their dependencies are ready ([#2796](https://github.com/prefix-dev/rattler-build/pull/2796))
+- emit canonical MatchSpecs for v3 packages ([#2758](https://github.com/prefix-dev/rattler-build/pull/2758))
+- `files: []` packages nothing instead of everything ([#2784](https://github.com/prefix-dev/rattler-build/pull/2784))
+
+## [0.2.13](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.12...rattler_build_core-v0.2.13) - 2026-08-27
+
+### Other
+
+- update flickzeug to 0.6.0 ([#2772](https://github.com/prefix-dev/rattler-build/pull/2772))
+
+## [0.2.12](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.11...rattler_build_core-v0.2.12) - 2026-08-21
+
+### Added
+
+- display CEP-6 channel notices ([#2749](https://github.com/prefix-dev/rattler-build/pull/2749))
+
+### Fixed
+
+- select platform-appropriate legacy test scripts ([#2751](https://github.com/prefix-dev/rattler-build/pull/2751))
+
+## [0.2.11](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.10...rattler_build_core-v0.2.11) - 2026-08-17
+
+### Added
+
+- wasm64 - skip link checks for wasm64 ([#2745](https://github.com/prefix-dev/rattler-build/pull/2745))
+- add runner to build configuration ([#2702](https://github.com/prefix-dev/rattler-build/pull/2702))
+- read the shared config layer instead of pixi's config files ([#2724](https://github.com/prefix-dev/rattler-build/pull/2724))
+- *(build-steps)* support steps in staging outputs ([#2647](https://github.com/prefix-dev/rattler-build/pull/2647))
+- add experimental build steps ([#2646](https://github.com/prefix-dev/rattler-build/pull/2646))
+
+### Fixed
+
+- preserve namespaced Prefix channel paths ([#2743](https://github.com/prefix-dev/rattler-build/pull/2743))
+- use `remove_dir_all_force` helper in `run_test.rs` ([#2729](https://github.com/prefix-dev/rattler-build/pull/2729))
+- select compatible Python for downstream tests ([#2725](https://github.com/prefix-dev/rattler-build/pull/2725))
+- preserve executable-relative macOS rpaths ([#2718](https://github.com/prefix-dev/rattler-build/pull/2718))
+- Handle copy_metadata errors for reflinked files ([#2703](https://github.com/prefix-dev/rattler-build/pull/2703))
+- use DT_RUNPATH instead of DT_RPATH on Android ([#2699](https://github.com/prefix-dev/rattler-build/pull/2699))
+- use CEP-17 path for SP_DIR ([#2700](https://github.com/prefix-dev/rattler-build/pull/2700))
+- deletion-only patches misdetected as already applied ([#2695](https://github.com/prefix-dev/rattler-build/pull/2695))
+- stop wrapping solver errors ([#2687](https://github.com/prefix-dev/rattler-build/pull/2687))
+
+### Other
+
+- update the cargo dependency group ([#2732](https://github.com/prefix-dev/rattler-build/pull/2732))
+- inject RuntimeEnv into script environment generation ([#2691](https://github.com/prefix-dev/rattler-build/pull/2691))
+- add an execution view for Directories ([#2694](https://github.com/prefix-dev/rattler-build/pull/2694))
+
 ## [0.2.10](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.9...rattler_build_core-v0.2.10) - 2026-07-25
 
 ### Added

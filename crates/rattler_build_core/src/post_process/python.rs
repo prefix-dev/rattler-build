@@ -7,7 +7,7 @@
 use fs_err as fs;
 use rattler::install::{PythonInfo, get_windows_launcher, python_entry_point_template};
 use rattler_build_recipe::stage1::GlobVec;
-use rattler_conda_types::Platform;
+use rattler_conda_types::Subdir;
 use std::collections::HashSet;
 use std::io::{self, BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
@@ -17,7 +17,7 @@ use crate::metadata::Output;
 use crate::packaging::{PackagingError, TempFiles};
 use crate::utils::to_forward_slash_lossy;
 
-pub fn python_bin(prefix: &Path, target_platform: &Platform) -> PathBuf {
+pub fn python_bin(prefix: &Path, target_platform: &Subdir) -> PathBuf {
     if target_platform.is_windows() {
         prefix.join("python.exe")
     } else {

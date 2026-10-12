@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use rattler_conda_types::Platform;
+use rattler_conda_types::Subdir;
 
 use super::{InterpreterInvocation, InterpreterSearchScope};
 use crate::ExecutionContext;
@@ -8,11 +8,11 @@ use crate::ExecutionContext;
 pub struct CmdExeInvocation;
 
 impl InterpreterInvocation for CmdExeInvocation {
-    fn executable_names(&self, _build_platform: &Platform) -> &'static [&'static str] {
+    fn executable_names(&self, _build_platform: &Subdir) -> &'static [&'static str] {
         &["cmd"]
     }
 
-    fn search_scope(&self, build_platform: &Platform) -> InterpreterSearchScope {
+    fn search_scope(&self, build_platform: &Subdir) -> InterpreterSearchScope {
         if build_platform.is_windows() {
             InterpreterSearchScope::build_and_host_with_system_fallback()
         } else {

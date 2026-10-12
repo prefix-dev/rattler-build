@@ -14,7 +14,7 @@ use ::rattler_build::{
 use clap::ValueEnum;
 use pyo3::prelude::*;
 use rattler_build_script::EnvironmentIsolation;
-use rattler_conda_types::{NamedChannelOrUrl, Platform};
+use rattler_conda_types::{NamedChannelOrUrl, Subdir};
 use rattler_config::config::build::PackageFormatAndCompression;
 
 use crate::error::RattlerBuildError;
@@ -22,7 +22,7 @@ use crate::repodata_revision::PyRepodataRevision;
 use crate::run_async_task;
 
 #[pyfunction]
-#[pyo3(signature = (recipes, up_to, build_platform, target_platform, host_platform, channel, variant_config, variant_overrides=None, ignore_recipe_variants=false, render_only=false, with_solve=false, keep_build=false, no_build_id=false, package_format=None, compression_threads=None, io_concurrency_limit=None, no_include_recipe=false, test=None, output_dir=None, auth_file=None, channel_priority=None, skip_existing=None, noarch_build_platform=None, allow_insecure_host=None, continue_on_failure=false, error_prefix_in_binary=false, allow_symlinks_on_windows=false, allow_absolute_license_paths=false, exclude_newer=None, build_num=None, build_string_prefix=None, use_bz2=true, use_zstd=true, use_sharded=true, repodata_revision=None))]
+#[pyo3(signature = (recipes, up_to, build_platform, target_platform, host_platform, channel, variant_config, variant_overrides=None, ignore_recipe_variants=false, render_only=false, with_solve=false, keep_build=false, no_build_id=false, package_format=None, compression_threads=None, io_concurrency_limit=None, no_include_recipe=false, test=None, output_dir=None, auth_file=None, channel_priority=None, skip_existing=None, noarch_build_platform=None, allow_insecure_host=None, continue_on_failure=false, error_prefix_in_binary=false, allow_symlinks_on_windows=false, allow_absolute_license_paths=false, exclude_newer=None, build_num=None, build_string_prefix=None, use_bz2=true, use_zstd=true, use_sharded=true, repodata_revision=None, error_overlapping_files=false, error_unused_staging_files=false))]
 #[allow(clippy::too_many_arguments)]
 pub fn build_recipes_py(
     recipes: Vec<PathBuf>,
@@ -60,6 +60,8 @@ pub fn build_recipes_py(
     use_zstd: bool,
     use_sharded: bool,
     repodata_revision: Option<PyRepodataRevision>,
+    error_overlapping_files: bool,
+    error_unused_staging_files: bool,
 ) -> PyResult<()> {
     let channel_priority = channel_priority
         .map(|c| ChannelPriorityWrapper::from_str(&c).map(|c| c.value))
@@ -83,15 +85,15 @@ pub fn build_recipes_py(
         use_sharded,
     );
     let build_platform = build_platform
-        .map(|p| Platform::from_str(&p))
+        .map(|p| Subdir::from_str(&p))
         .transpose()
         .map_err(RattlerBuildError::from)?;
     let target_platform = target_platform
-        .map(|p| Platform::from_str(&p))
+        .map(|p| Subdir::from_str(&p))
         .transpose()
         .map_err(RattlerBuildError::from)?;
     let host_platform = host_platform
-        .map(|p| Platform::from_str(&p))
+        .map(|p| Subdir::from_str(&p))
         .transpose()
         .map_err(RattlerBuildError::from)?;
     let package_format = package_format
@@ -101,7 +103,7 @@ pub fn build_recipes_py(
     let test = test.map(|t| TestStrategy::from_str(&t, false).unwrap());
     let skip_existing = skip_existing.map(|s| SkipExisting::from_str(&s, false).unwrap());
     let noarch_build_platform = noarch_build_platform
-        .map(|p| Platform::from_str(&p))
+        .map(|p| Subdir::from_str(&p))
         .transpose()
         .map_err(RattlerBuildError::from)?;
     let channel = match channel {
@@ -145,6 +147,8 @@ pub fn build_recipes_py(
         ContinueOnFailure::from(continue_on_failure),
         error_prefix_in_binary,
         allow_symlinks_on_windows,
+        error_overlapping_files,
+        error_unused_staging_files,
         allow_absolute_license_paths,
         exclude_newer,
         build_num,

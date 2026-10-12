@@ -1,0 +1,7 @@
+package:
+  name: repro-fallback-consumer
+  version: "1.0.0"
+
+build:
+  noarch: generic
+  script: echo "seed consumer built"

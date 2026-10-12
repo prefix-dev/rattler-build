@@ -166,6 +166,13 @@ outputs:
         - share/**
 ```
 
+Package outputs always inherit top-level build settings and `about` metadata,
+even with `inherit: cache-name`. The exceptions are the top-level build plan and
+tests: these are inherited only with `inherit: null` (or an omitted `inherit`).
+Staging builds themselves inherit top-level sources, context, and variant key
+lists, not the other top-level build settings. Staging inheritance passes build
+artifacts and dependency information, not an arbitrary recipe configuration.
+
 ### Multiple staging caches
 
 A recipe can define multiple independent staging outputs. Each staging output is
@@ -229,8 +236,11 @@ outputs:
 ### Variants and staging
 
 Staging caches interact with [variant configuration](variants.md). The cache
-key includes only the variant variables that are referenced in the staging
-output's requirements. This means:
+key includes the staging build's used variant values, including variables used
+in expressions, unconstrained dependencies, and top-level `build.variant.use_keys`.
+Top-level `build.variant.ignore_keys` removes keys from that used-variant map;
+ignored values can still change the cache key if they change the rendered build
+plan, sources, or requirements. This means:
 
 - Different variants produce different staging caches
 - The staging build is only rerun when its relevant variant keys change
@@ -243,13 +253,27 @@ package that additionally depends on `python` expands the matrix further (one
 package per `libfoo` × `python` combination), but the staging cache is reused
 across `python` variants.
 
+### Consistency checks
+
+After all outputs are built, rattler-build warns when
+
+- two outputs of the same recipe package the same file (installing both would
+  clobber it), or
+- files from a staging cache were not included in any output that inherits
+  from it.
+
+`--error-overlapping-files` and `--error-unused-staging-files` turn these
+warnings into hard errors.
+
 ### How caching works
 
 The staging cache is keyed by a SHA256 hash over:
 
-- The staging output's resolved requirements (build and host dependencies)
-- Relevant variant variables (only those referenced in the staging requirements)
+- The staging output's rendered configuration (build plan, sources, and requirements)
+- The staging build's used variant values, including top-level `use_keys`
+- Unconstrained staging dependency variant values from the package output
 - `host_platform` and `build_platform` (always included)
+- The destination prefix
 
 Staging caches are stored under `output/build_cache/staging_<hash>/`. Each
 cache directory contains:

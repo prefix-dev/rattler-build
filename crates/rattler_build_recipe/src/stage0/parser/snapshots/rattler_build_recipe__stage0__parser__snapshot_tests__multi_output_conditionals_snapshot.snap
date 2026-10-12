@@ -1,6 +1,5 @@
 ---
 source: crates/rattler_build_recipe/src/stage0/parser/snapshot_tests.rs
-assertion_line: 128
 expression: "serde_yaml::to_string(&recipe).unwrap()"
 ---
 schema_version: 1
@@ -17,7 +16,6 @@ build:
   always_copy_files: []
   always_include_files: []
   merge_build_and_host_envs: false
-  files: []
   dynamic_linking:
     rpaths: []
     binary_relocation: true
@@ -81,7 +79,6 @@ outputs:
     always_copy_files: []
     always_include_files: []
     merge_build_and_host_envs: false
-    files: []
     dynamic_linking:
       rpaths: []
       binary_relocation: true

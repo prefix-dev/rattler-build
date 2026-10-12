@@ -1,10 +1,10 @@
 //! Common types used throughout Rattler-Build
 //! All the metadata that makes up a recipe file
-use std::{iter, path::PathBuf, str::FromStr};
+use std::{collections::BTreeSet, iter, path::PathBuf, str::FromStr};
 
 use jiff::Timestamp;
 use rattler_conda_types::{
-    Channel, ChannelUrl, GenericVirtualPackage, PackageName, Platform, VersionWithSource,
+    Channel, ChannelUrl, GenericVirtualPackage, PackageName, Subdir, VersionWithSource,
     compression_level::CompressionLevel,
     package::{CondaArchiveType, PathsJson},
 };
@@ -56,7 +56,7 @@ impl PackagingSettings {
 #[derive(Debug, Clone, Serialize)]
 pub struct PlatformWithVirtualPackages {
     /// The platform
-    pub platform: Platform,
+    pub platform: Subdir,
 
     /// The virtual packages for the platform
     pub virtual_packages: Vec<GenericVirtualPackage>,
@@ -66,16 +66,16 @@ impl PlatformWithVirtualPackages {
     /// Returns the current platform and the virtual packages available on the
     /// current system.
     pub fn detect(overrides: &VirtualPackageOverrides) -> Result<Self, DetectVirtualPackageError> {
-        let platform = Platform::current();
+        let platform = Subdir::current().expect("unsupported build platform");
         Self::detect_for_platform(platform, overrides)
     }
 
     /// Detect the virtual packages for the given platform, filling in defaults where appropriate
     pub fn detect_for_platform(
-        platform: Platform,
+        platform: Subdir,
         overrides: &VirtualPackageOverrides,
     ) -> Result<Self, DetectVirtualPackageError> {
-        let virtual_packages = VirtualPackages::detect_for_platform(platform, overrides)?
+        let virtual_packages = VirtualPackages::detect_for_platform(platform, overrides, None)?
             .into_generic_virtual_packages()
             .collect();
         Ok(Self {
@@ -92,14 +92,14 @@ impl<'de> Deserialize<'de> for PlatformWithVirtualPackages {
     {
         #[derive(Deserialize)]
         pub struct Object {
-            pub platform: Platform,
+            pub platform: Subdir,
             pub virtual_packages: Vec<GenericVirtualPackage>,
         }
 
         serde_untagged::UntaggedEnumVisitor::new()
             .string(|s| {
                 Ok(Self {
-                    platform: Platform::from_str(s).map_err(serde::de::Error::custom)?,
+                    platform: Subdir::from_str(s).map_err(serde::de::Error::custom)?,
                     virtual_packages: vec![],
                 })
             })
@@ -139,6 +139,9 @@ pub struct BuildSummary {
     pub warnings: Vec<String>,
     /// The paths that are packaged in the artifact
     pub paths: Option<PathsJson>,
+    /// The prefix-relative files that were selected for packaging (before any
+    /// noarch path remapping)
+    pub packaged_prefix_files: Option<BTreeSet<PathBuf>>,
     ///  Whether the build was successful or not
     pub failed: bool,
 }

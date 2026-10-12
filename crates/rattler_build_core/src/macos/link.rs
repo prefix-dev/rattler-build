@@ -374,7 +374,7 @@ fn codesign_subprocess(path: &Path, system_tools: &SystemTools) -> Result<(), Re
     cmd.args(["-f", "-s", "-"]);
 
     if is_system_codesign {
-        cmd.arg("--preserve-metadata=entitlements,requirements");
+        cmd.arg("--preserve-metadata=identifier,entitlements,requirements");
     }
     cmd.arg(path);
 

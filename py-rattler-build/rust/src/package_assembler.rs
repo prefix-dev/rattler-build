@@ -9,7 +9,7 @@ use jiff::Timestamp;
 use pyo3::prelude::*;
 use rattler_build_package::{ArchiveType, FileCollector, FileEntry, PackageBuilder, PackageConfig};
 use rattler_conda_types::package::IndexJson;
-use rattler_conda_types::{NoArchType, PackageName, Platform, VersionWithSource};
+use rattler_conda_types::{NoArchType, PackageName, Subdir, VersionWithSource};
 
 use crate::error::RattlerBuildError;
 
@@ -277,10 +277,10 @@ pub fn assemble_package_py(
                 RattlerBuildError::Other(format!("Invalid version: {}", e))
             })?;
 
-    let platform: Platform =
+    let platform: Subdir =
         target_platform
             .parse()
-            .map_err(|e: rattler_conda_types::ParsePlatformError| {
+            .map_err(|e: rattler_conda_types::ParseSubdirError| {
                 RattlerBuildError::Other(format!("Invalid platform: {}", e))
             })?;
 

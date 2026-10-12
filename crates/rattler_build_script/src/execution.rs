@@ -10,7 +10,7 @@ use crate::{
     execution_context::ExecutionContext, runner::resolve_process_env, runtime::RuntimeEnv,
 };
 use fs_err as fs;
-use futures::TryStreamExt;
+use futures::{StreamExt, TryStreamExt};
 use indexmap::IndexMap;
 use rattler_shell::shell::Shell;
 use serde::{Deserialize, Serialize};
@@ -21,8 +21,8 @@ use std::fmt;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
-use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWriteExt};
-use tokio_util::bytes::BytesMut;
+use tokio::io::{AsyncRead, AsyncWriteExt};
+use tokio_util::bytes::{Buf, BytesMut};
 use tokio_util::codec::{Decoder, FramedRead};
 use tokio_util::compat::FuturesAsyncReadCompatExt;
 
@@ -386,7 +386,7 @@ pub(crate) struct OutputLine {
     pub(crate) is_stderr: bool,
 }
 
-type NormalizedLines = tokio::io::Lines<tokio::io::BufReader<Box<dyn AsyncRead + Send + Unpin>>>;
+type NormalizedLines = FramedRead<Box<dyn AsyncRead + Send + Unpin>, LossyLineDecoder>;
 
 /// A spawned script process streaming CRLF-normalized output lines.
 pub(crate) struct SpawnedProcess {
@@ -429,8 +429,8 @@ pub(crate) fn spawn_process(
 
     Ok(SpawnedProcess {
         child,
-        stdout: tokio::io::BufReader::new(stdout).lines(),
-        stderr: tokio::io::BufReader::new(stderr).lines(),
+        stdout: FramedRead::new(stdout, LossyLineDecoder),
+        stderr: FramedRead::new(stderr, LossyLineDecoder),
         stdout_closed: false,
         stderr_closed: false,
     })
@@ -441,15 +441,15 @@ impl SpawnedProcess {
     pub(crate) async fn next_line(&mut self) -> Option<io::Result<OutputLine>> {
         loop {
             tokio::select! {
-                line = self.stdout.next_line(), if !self.stdout_closed => match line {
-                    Ok(Some(text)) => return Some(Ok(OutputLine { text, is_stderr: false })),
-                    Ok(None) => self.stdout_closed = true,
-                    Err(error) => return Some(Err(error)),
+                line = self.stdout.next(), if !self.stdout_closed => match line {
+                    Some(Ok(text)) => return Some(Ok(OutputLine { text, is_stderr: false })),
+                    None => self.stdout_closed = true,
+                    Some(Err(error)) => return Some(Err(error)),
                 },
-                line = self.stderr.next_line(), if !self.stderr_closed => match line {
-                    Ok(Some(text)) => return Some(Ok(OutputLine { text, is_stderr: true })),
-                    Ok(None) => self.stderr_closed = true,
-                    Err(error) => return Some(Err(error)),
+                line = self.stderr.next(), if !self.stderr_closed => match line {
+                    Some(Ok(text)) => return Some(Ok(OutputLine { text, is_stderr: true })),
+                    None => self.stderr_closed = true,
+                    Some(Err(error)) => return Some(Err(error)),
                 },
                 else => return None,
             }
@@ -474,6 +474,63 @@ impl SpawnedProcess {
     /// Waits for the process to exit. Call after draining its output.
     pub(crate) async fn wait(&mut self) -> io::Result<std::process::ExitStatus> {
         self.child.wait().await
+    }
+}
+
+/// Upper bound on a single output line, in bytes.
+///
+/// A build step that writes a binary blob (or a very long line) to stdout would
+/// otherwise buffer the whole thing in memory before a newline shows up. Past
+/// this many bytes the pending buffer is emitted as a line of its own.
+const MAX_LINE_LENGTH: usize = 1024 * 1024;
+
+/// Codec that splits CRLF-normalized output into lines.
+///
+/// Build scripts are not obliged to write UTF-8: on Windows compilers and other
+/// tools emit diagnostics in the active code page, and a build can print raw
+/// bytes on purpose. Decoding is therefore lossy — invalid sequences become
+/// U+FFFD instead of failing the read, which used to abort output capture for
+/// the rest of the build with `stream did not contain valid UTF-8`.
+pub(crate) struct LossyLineDecoder;
+
+impl LossyLineDecoder {
+    /// Removes the first `length` bytes from `src` and decodes them lossily.
+    fn take_line(src: &mut BytesMut, length: usize) -> String {
+        let line = src.split_to(length);
+        String::from_utf8_lossy(&line).into_owned()
+    }
+}
+
+impl Decoder for LossyLineDecoder {
+    type Item = String;
+    type Error = io::Error;
+
+    fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+        if let Some(index) = src.iter().position(|byte| *byte == b'\n') {
+            let line = Self::take_line(src, index);
+            // Discard the newline itself.
+            src.advance(1);
+            return Ok(Some(line));
+        }
+
+        if src.len() >= MAX_LINE_LENGTH {
+            return Ok(Some(Self::take_line(src, MAX_LINE_LENGTH)));
+        }
+
+        Ok(None)
+    }
+
+    fn decode_eof(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+        if let Some(line) = self.decode(src)? {
+            return Ok(Some(line));
+        }
+
+        // Trailing bytes without a final newline still form a line.
+        if src.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(Self::take_line(src, src.len())))
+        }
     }
 }
 
@@ -928,6 +985,11 @@ pub(crate) async fn run_process_with_replacements(
             }
             Err(e) => {
                 tracing::warn!("Error reading output: {:?}", e);
+                // Drain what is left so the child does not block writing into a
+                // full pipe while we wait for it to exit.
+                if let Err(e) = process.drain_output().await {
+                    tracing::warn!("Error draining output: {:?}", e);
+                }
                 break;
             }
         }
@@ -951,7 +1013,7 @@ pub(crate) async fn run_process_with_replacements(
 mod tests {
     use super::*;
     use crate::ExecutionContext;
-    use rattler_conda_types::Platform;
+    use rattler_conda_types::Subdir;
     use tokio_util::bytes::BytesMut;
 
     /// `CONDA_BUILD=1` must live inside the sourced activation script so that
@@ -969,10 +1031,10 @@ mod tests {
             env_vars: IndexMap::new(),
             secrets: IndexMap::new(),
             context: ExecutionContext::shared(
-                RuntimeEnv::for_test(Platform::current()),
+                RuntimeEnv::for_test(Subdir::current().unwrap()),
                 prefix,
-                Platform::current(),
-                Platform::current(),
+                Subdir::current().unwrap(),
+                Subdir::current().unwrap(),
             ),
             work_dir: tmp.path().to_path_buf(),
             sandbox_config: None,
@@ -997,7 +1059,7 @@ mod tests {
             EnvironmentIsolation::None,
             &env_vars,
             &secrets,
-            &RuntimeEnv::for_test(Platform::current()),
+            &RuntimeEnv::for_test(Subdir::current().unwrap()),
         );
 
         assert!(
@@ -1082,10 +1144,10 @@ mod tests {
             env_vars: IndexMap::new(),
             secrets: IndexMap::new(),
             context: ExecutionContext::shared(
-                RuntimeEnv::for_test(Platform::Win64),
+                RuntimeEnv::for_test(Subdir::Win64),
                 prefix,
-                Platform::Win64,
-                Platform::Win64,
+                Subdir::Win64,
+                Subdir::Win64,
             ),
             work_dir: tmp.path().to_path_buf(),
             sandbox_config: None,
@@ -1101,6 +1163,50 @@ mod tests {
             script.contains("if %errorlevel% neq 0 exit /b %errorlevel%"),
             "cmd section script must propagate errors between commands, got:\n{script}"
         );
+    }
+
+    /// Build tools are not obliged to write UTF-8. A single invalid byte must
+    /// not fail the read — that used to abort output capture for the remainder
+    /// of the build with `stream did not contain valid UTF-8`.
+    #[test]
+    fn test_lossy_line_decoder_replaces_invalid_utf8() {
+        let mut decoder = LossyLineDecoder;
+        // `Fehler: ung\xFCltig` — an umlaut in Windows' cp1252, invalid UTF-8.
+        let mut buffer = BytesMut::from(&b"Fehler: ung\xFCltig\nnext line\n"[..]);
+
+        assert_eq!(
+            decoder.decode(&mut buffer).unwrap().unwrap(),
+            "Fehler: ung\u{FFFD}ltig"
+        );
+        // Output after the undecodable line keeps flowing.
+        assert_eq!(decoder.decode(&mut buffer).unwrap().unwrap(), "next line");
+        assert!(decoder.decode(&mut buffer).unwrap().is_none());
+    }
+
+    #[test]
+    fn test_lossy_line_decoder_splits_lines() {
+        let mut decoder = LossyLineDecoder;
+        let mut buffer = BytesMut::from("line1\n\nline2");
+
+        assert_eq!(decoder.decode(&mut buffer).unwrap().unwrap(), "line1");
+        assert_eq!(decoder.decode(&mut buffer).unwrap().unwrap(), "");
+        // No newline yet, so `line2` is still pending.
+        assert!(decoder.decode(&mut buffer).unwrap().is_none());
+        // ... and is flushed as a line of its own at EOF.
+        assert_eq!(decoder.decode_eof(&mut buffer).unwrap().unwrap(), "line2");
+        assert!(decoder.decode_eof(&mut buffer).unwrap().is_none());
+    }
+
+    /// A process writing a binary blob without newlines must not buffer
+    /// unboundedly.
+    #[test]
+    fn test_lossy_line_decoder_caps_line_length() {
+        let mut decoder = LossyLineDecoder;
+        let mut buffer = BytesMut::from(vec![b'a'; MAX_LINE_LENGTH + 8].as_slice());
+
+        let line = decoder.decode(&mut buffer).unwrap().unwrap();
+        assert_eq!(line.len(), MAX_LINE_LENGTH);
+        assert_eq!(buffer.len(), 8);
     }
 
     #[test]
@@ -1291,7 +1397,7 @@ mod tests {
     /// the prefix's bin directory and returns its path.
     fn create_fake_executable(prefix: &Path, name: &str) -> PathBuf {
         let exe_name = format!("{}{}", name, std::env::consts::EXE_SUFFIX);
-        let bin_dir = prefix_path_entries(prefix, &Platform::current())
+        let bin_dir = prefix_path_entries(prefix, &Subdir::current().unwrap())
             .into_iter()
             .next()
             .expect("prefix has executable path entries");
@@ -1325,8 +1431,8 @@ mod tests {
             context: ExecutionContext::shared(
                 RuntimeEnv::current(),
                 run_prefix,
-                Platform::current(),
-                Platform::current(),
+                Subdir::current().unwrap(),
+                Subdir::current().unwrap(),
             ),
             work_dir,
             sandbox_config: None,
@@ -1340,7 +1446,7 @@ mod tests {
     /// test does not touch the real process environment.
     #[test]
     fn test_strict_env_clear_and_passthrough_whitelist() {
-        let runtime = RuntimeEnv::for_test(Platform::current())
+        let runtime = RuntimeEnv::for_test(Subdir::current().unwrap())
             .with_var("RB_TEST_RANDOM_VAR", "should-not-leak")
             .with_var("SSL_CERT_FILE", "/host/cacert.pem");
 
@@ -1383,7 +1489,7 @@ mod tests {
 
     #[test]
     fn test_none_env_uses_injected_runtime_with_explicit_overrides() {
-        let runtime = RuntimeEnv::for_test(Platform::Linux64)
+        let runtime = RuntimeEnv::for_test(Subdir::Linux64)
             .with_var("RUNTIME_ONLY", "runtime")
             .with_var("OVERLAY", "runtime");
         let mut env_vars = IndexMap::new();
@@ -1417,7 +1523,7 @@ mod tests {
     fn test_platform_passthrough_follows_runtime_platform() {
         let env_vars = IndexMap::new();
         let secrets = IndexMap::new();
-        let runtime = RuntimeEnv::for_test(Platform::Win64).with_var("SYSTEMROOT", "C:\\Windows");
+        let runtime = RuntimeEnv::for_test(Subdir::Win64).with_var("SYSTEMROOT", "C:\\Windows");
 
         let windows_env =
             resolve_process_env(EnvironmentIsolation::Strict, &env_vars, &secrets, &runtime);
@@ -1430,7 +1536,7 @@ mod tests {
             EnvironmentIsolation::Strict,
             &env_vars,
             &secrets,
-            &runtime.with_process_platform(Platform::Linux64),
+            &runtime.with_process_platform(Subdir::Linux64),
         );
         assert!(!linux_env.contains_key("SYSTEMROOT"));
     }
@@ -1566,7 +1672,7 @@ mod tests {
             &replacements,
             &process_env,
             None,
-            &RuntimeEnv::for_test(Platform::current()),
+            &RuntimeEnv::for_test(Subdir::current().unwrap()),
         )
         .await
         .unwrap();
@@ -1771,7 +1877,7 @@ mod tests {
         let args = ExecutionArgs {
             context: args
                 .context
-                .with_runtime(RuntimeEnv::for_test(Platform::Linux64)),
+                .with_runtime(RuntimeEnv::for_test(Subdir::Linux64)),
             ..args
         };
         generate_build_script(&args).await.unwrap();
@@ -1798,7 +1904,7 @@ echo hi
         let args = ExecutionArgs {
             context: args
                 .context
-                .with_runtime(RuntimeEnv::for_test(Platform::Linux64)),
+                .with_runtime(RuntimeEnv::for_test(Subdir::Linux64)),
             ..args
         };
         generate_build_script(&args).await.unwrap();
@@ -1822,7 +1928,7 @@ echo hi
         let args = ExecutionArgs {
             context: args
                 .context
-                .with_runtime(RuntimeEnv::for_test(Platform::Win64)),
+                .with_runtime(RuntimeEnv::for_test(Subdir::Win64)),
             ..args
         };
         generate_build_script(&args).await.unwrap();
@@ -1855,10 +1961,10 @@ endlocal & if %RB_SECTION_ERRORLEVEL% neq 0 exit /b %RB_SECTION_ERRORLEVEL%
 
         let args = ExecutionArgs {
             context: ExecutionContext::shared(
-                RuntimeEnv::for_test(Platform::Win64),
+                RuntimeEnv::for_test(Subdir::Win64),
                 base.context.host().path(),
-                Platform::Win64,
-                Platform::Win64,
+                Subdir::Win64,
+                Subdir::Win64,
             ),
             sections: vec![
                 BuildScriptSection {
@@ -1915,10 +2021,10 @@ endlocal & if %RB_SECTION_ERRORLEVEL% neq 0 exit /b %RB_SECTION_ERRORLEVEL%
         );
         let args = ExecutionArgs {
             context: ExecutionContext::shared(
-                RuntimeEnv::for_test(Platform::Win64),
+                RuntimeEnv::for_test(Subdir::Win64),
                 args.context.host().path(),
-                Platform::Win64,
-                Platform::Win64,
+                Subdir::Win64,
+                Subdir::Win64,
             ),
             ..args
         };
@@ -1951,10 +2057,10 @@ endlocal & if %RB_SECTION_ERRORLEVEL% neq 0 exit /b %RB_SECTION_ERRORLEVEL%
 
         let args = ExecutionArgs {
             context: ExecutionContext::shared(
-                RuntimeEnv::for_test(Platform::Win64),
+                RuntimeEnv::for_test(Subdir::Win64),
                 base.context.host().path(),
-                Platform::Win64,
-                Platform::Win64,
+                Subdir::Win64,
+                Subdir::Win64,
             ),
             sections: vec![
                 BuildScriptSection {
@@ -2001,10 +2107,10 @@ endlocal & if %RB_SECTION_ERRORLEVEL% neq 0 exit /b %RB_SECTION_ERRORLEVEL%
 
         let args = ExecutionArgs {
             context: ExecutionContext::shared(
-                RuntimeEnv::for_test(Platform::Linux64),
+                RuntimeEnv::for_test(Subdir::Linux64),
                 base.context.host().path(),
-                Platform::Linux64,
-                Platform::Linux64,
+                Subdir::Linux64,
+                Subdir::Linux64,
             ),
             sections: vec![
                 BuildScriptSection {

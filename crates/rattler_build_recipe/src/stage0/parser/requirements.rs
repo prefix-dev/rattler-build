@@ -13,11 +13,12 @@ use crate::{
         parser::ParseConfig,
         parser::helpers::get_span,
         requirements::{IgnoreRunExports, Requirements, RunExports},
+        supports_v3_repodata_features,
     },
 };
 
-struct MatchSpecConverter {
-    repodata_revision: RepodataRevision,
+pub(super) struct MatchSpecConverter {
+    pub(super) repodata_revision: RepodataRevision,
 }
 
 impl NodeConverter<SerializableMatchSpec> for MatchSpecConverter {
@@ -38,7 +39,7 @@ impl NodeConverter<SerializableMatchSpec> for MatchSpecConverter {
         .map_err(|e| {
             let reason = e.to_string();
             let err = ParseError::invalid_value(field_name, &reason, *scalar.span());
-            if self.repodata_revision != RepodataRevision::V3
+            if !supports_v3_repodata_features(self.repodata_revision)
                 && reason.contains("invalid bracket key")
             {
                 err.with_suggestion(
@@ -120,7 +121,12 @@ pub(crate) fn parse_requirements_with_config(
         .ok_or_else(|| ParseError::expected_type("mapping", "non-mapping", get_span(yaml)))?;
 
     if let Some(extras) = mapping.get("extras") {
-        requirements.extras = parse_extras(extras, &matchspec_converter)?;
+        requirements.extras = parse_extras(
+            extras,
+            &MatchSpecConverter {
+                repodata_revision: RepodataRevision::V3,
+            },
+        )?;
     }
 
     if let Some(run_exports) = mapping.get("run_exports") {

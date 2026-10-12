@@ -5,6 +5,141 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.76.1] - 2026-09-14
+### ✨ Highlights
+
+This patch release forwards `CROSSCOMPILING_EMULATOR` reliably, improves legacy and v3 test metadata compatibility, supports Python 3.15's Windows package layout, and recognizes additional bzip2 archive extensions.
+
+
+### Fixed
+
+- Allow v3 matchspecs in legacy extras by @wolfv in [#2812](https://github.com/prefix-dev/rattler-build/pull/2812)
+- Allow extras in test section by @pavelzw in [#2813](https://github.com/prefix-dev/rattler-build/pull/2813)
+- Accept new Python 3.15 site-packages layout on Windows in package_contents tests by @wolfv in [#2819](https://github.com/prefix-dev/rattler-build/pull/2819)
+- Extract .tbz and .tz2 archives as bzip2 by @ManuelLerchner in [#2817](https://github.com/prefix-dev/rattler-build/pull/2817)
+- Always use CROSSCOMPILING_EMULATOR variant by @wolfv in [#2810](https://github.com/prefix-dev/rattler-build/pull/2810)
+
+
+### New Contributors
+* @ManuelLerchner made their first contribution in [#2817](https://github.com/prefix-dev/rattler-build/pull/2817)
+
+## [0.76.0] - 2026-09-08
+### ✨ Highlights
+
+Test scripts can now inspect package metadata through `PATHS_JSON` and `INDEX_JSON`. Multi-output builds warn about overlapping output files and unused staging files, and fixes improve sibling-output scheduling, inherited variant priority, and staging cache inputs. Empty `files: []` lists now package nothing, malformed `skip` expressions produce errors, and link checks run even when relocation is disabled.
+
+
+### Added
+
+- Set `__glibc` to 2.39 on `linux-riscv64` by @pavelzw in [#2775](https://github.com/prefix-dev/rattler-build/pull/2775)
+- Warn on overlapping output files and unused staging files by @wolfv in [#2790](https://github.com/prefix-dev/rattler-build/pull/2790)
+- Add `PATHS_JSON`/`INDEX_JSON` env vars at test-time by @pb01ka in [#2620](https://github.com/prefix-dev/rattler-build/pull/2620)
+
+
+### Changed
+
+- Bump flate2, indexmap, and lzma-rust2 by @dependabot[bot] in [#2797](https://github.com/prefix-dev/rattler-build/pull/2797)
+
+
+### Documentation
+
+- Recommend brush for cross-platform scripts by @wolfv in [#2786](https://github.com/prefix-dev/rattler-build/pull/2786)
+- Document glob syntax by @wolfv in [#2785](https://github.com/prefix-dev/rattler-build/pull/2785)
+- Use JSON Pointer (RFC 6901) syntax by @salim-b in [#2800](https://github.com/prefix-dev/rattler-build/pull/2800)
+- Consolidate recipe references by @wolfv in [#2788](https://github.com/prefix-dev/rattler-build/pull/2788)
+
+
+### Fixed
+
+- `files: []` packages nothing instead of everything by @wolfv in [#2784](https://github.com/prefix-dev/rattler-build/pull/2784)
+- Emit canonical MatchSpecs for v3 packages by @baszalmstra in [#2758](https://github.com/prefix-dev/rattler-build/pull/2758)
+- Schedule sibling outputs when their dependencies are ready by @baszalmstra in [#2796](https://github.com/prefix-dev/rattler-build/pull/2796)
+- Set `SRC_DIR` to the test working directory by @pavelzw in [#2795](https://github.com/prefix-dev/rattler-build/pull/2795)
+- Run link checks when relocation is disabled by @rootsec1 in [#2787](https://github.com/prefix-dev/rattler-build/pull/2787)
+- Diagnose malformed `skip` expressions instead of ignoring them by @wolfv in [#2783](https://github.com/prefix-dev/rattler-build/pull/2783)
+- Use backslashes in Windows `SP_DIR` path by @acosmicflamingo in [#2779](https://github.com/prefix-dev/rattler-build/pull/2779)
+- Document `ignore_keys` and propagate top-level `use_keys` / `ignore_keys` by @wolfv in [#2802](https://github.com/prefix-dev/rattler-build/pull/2802)
+- Preserve inherited variant priority and staging cache inputs by @wolfv in [#2804](https://github.com/prefix-dev/rattler-build/pull/2804)
+
+
+### New Contributors
+* @acosmicflamingo made their first contribution in [#2779](https://github.com/prefix-dev/rattler-build/pull/2779)
+* @rootsec1 made their first contribution in [#2787](https://github.com/prefix-dev/rattler-build/pull/2787)
+
+## [0.75.0] - 2026-08-26
+### ✨ Highlights
+
+This release features CEP-6 channel notices and various bug fixes.
+
+
+### Added
+
+- Display CEP-6 channel notices by @wolfv in [#2749](https://github.com/prefix-dev/rattler-build/pull/2749)
+
+
+### Fixed
+
+- Select platform-appropriate legacy test scripts by @jezdez in [#2751](https://github.com/prefix-dev/rattler-build/pull/2751)
+- Allow legacy-compatible optional dependencies by @baszalmstra in [#2768](https://github.com/prefix-dev/rattler-build/pull/2768)
+
+
+### New Contributors
+* @jezdez made their first contribution in [#2751](https://github.com/prefix-dev/rattler-build/pull/2751)
+
+## [0.74.0] - 2026-08-17
+### ✨ Highlights
+
+This release adds shared configuration discovery across rattler-based tools, configurable build execution runners, and initial `emscripten-wasm64` support. It also preserves namespaced prefix.dev channel paths and tolerates non-UTF-8 build output. Updated Rattler dependencies improve solver candidate selection, virtual-package defaults, package-cache filtering, OCI registry interoperability, repodata caching, and shell environment escaping.
+
+### Added
+
+- Read the shared config layer instead of pixi's config files by @Hofer-Julian in [#2724](https://github.com/prefix-dev/rattler-build/pull/2724)
+- Add runner to build configuration by @baszalmstra in [#2702](https://github.com/prefix-dev/rattler-build/pull/2702)
+- Wasm64 - skip link checks for wasm64 by @DerThorsten in [#2745](https://github.com/prefix-dev/rattler-build/pull/2745)
+
+
+### Changed
+
+- Update the cargo dependency group by @dependabot[bot] in [#2732](https://github.com/prefix-dev/rattler-build/pull/2732)
+
+### Rattler dependency updates
+
+The dependency update includes the following user-visible changes inherited from [conda/rattler](https://github.com/conda/rattler):
+
+- Add `emscripten-wasm64` to the platform model ([rattler#2680](https://github.com/conda/rattler/pull/2680)).
+- Introduce default versions for virtual packages and speed up CUDA virtual-package detection ([rattler#2646](https://github.com/conda/rattler/pull/2646), [rattler#2568](https://github.com/conda/rattler/pull/2568)).
+- Prefer candidates using their most restrictive requirement during solving ([rattler#2649](https://github.com/conda/rattler/pull/2649)).
+- Add package-cache layer filtering ([rattler#2652](https://github.com/conda/rattler/pull/2652)).
+- Follow OCI registry authentication challenges, report missing manifests as 404s, and retry digest-addressed blob misses through the manifest ([rattler#2628](https://github.com/conda/rattler/pull/2628), [rattler#2651](https://github.com/conda/rattler/pull/2651), [rattler#2653](https://github.com/conda/rattler/pull/2653)).
+- Honor HTTP `max-age` for repodata without requiring a public-cache directive ([rattler#2664](https://github.com/conda/rattler/pull/2664)).
+- Correctly escape environment-variable values in generated activation scripts ([rattler#2621](https://github.com/conda/rattler/pull/2621)).
+
+### Fixed
+
+- Preserve namespaced Prefix channel paths by @wolfv in [#2743](https://github.com/prefix-dev/rattler-build/pull/2743)
+- Decode build output lossily instead of failing on non-UTF-8 by @wolfv in [#2737](https://github.com/prefix-dev/rattler-build/pull/2737)
+
+
+
+## [0.73.0] - 2026-08-13
+### ✨ Highlights
+
+This release improves downstream-test reliability by selecting compatible Python builds, preserves executable-relative macOS rpaths, and makes test cleanup more robust. It also migrates the documentation toolchain from MkDocs to Zensical and corrects a documented target package name.
+
+### Documentation
+
+- Switch from mkdocs to zensical by @Hofer-Julian in [#2720](https://github.com/prefix-dev/rattler-build/pull/2720)
+- Correct target package name by @matthewfeickert in [#2726](https://github.com/prefix-dev/rattler-build/pull/2726)
+
+
+### Fixed
+
+- Preserve executable-relative macOS rpaths by @wolfv in [#2718](https://github.com/prefix-dev/rattler-build/pull/2718)
+- Select compatible Python for downstream tests by @wolfv in [#2725](https://github.com/prefix-dev/rattler-build/pull/2725)
+- Use `remove_dir_all_force` helper in `run_test.rs` by @lucascolley in [#2729](https://github.com/prefix-dev/rattler-build/pull/2729)
+
+
+
 ## [0.72.2] - 2026-07-31
 ### ✨ Highlights
 

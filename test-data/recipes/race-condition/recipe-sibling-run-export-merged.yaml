@@ -1,0 +1,33 @@
+context:
+  version: "1.0.0"
+
+recipe:
+  name: merged-run-export-order
+  version: ${{ version }}
+
+outputs:
+  - package:
+      name: repro-merged-exporter
+    build:
+      script: echo "exporter built"
+    requirements:
+      run_exports:
+        strong:
+          - repro-merged-runtime ==${{ version }}
+
+  - package:
+      name: repro-merged-consumer
+    build:
+      merge_build_and_host_envs: true
+      script: echo "consumer built"
+    requirements:
+      build:
+        - repro-merged-exporter ==${{ version }}
+
+  - package:
+      name: repro-merged-runtime
+    build:
+      script: echo "runtime built"
+    requirements:
+      host:
+        - repro-merged-consumer ==${{ version }}

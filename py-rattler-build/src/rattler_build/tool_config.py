@@ -19,7 +19,7 @@ class PlatformConfig:
         target_platform: Target platform (e.g., "linux-64", "osx-arm64").
             If not specified, defaults to the current platform.
         build_platform: Build platform (where the build runs).
-            If not specified, defaults to the target platform.
+            If not specified, defaults to the current platform.
         host_platform: Host platform (for cross-compilation).
             If not specified, defaults to the target platform.
         experimental: Enable experimental features
@@ -29,7 +29,7 @@ class PlatformConfig:
         # Create with default (current) platform
         config = PlatformConfig()
 
-        # Create for a specific platform (build and host will default to target)
+        # Host defaults to target, while build defaults to the current platform
         config = PlatformConfig(target_platform="linux-64")
 
         # Create with different platforms for cross-compilation

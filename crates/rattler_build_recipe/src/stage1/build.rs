@@ -472,8 +472,11 @@ pub struct Build {
     pub merge_build_and_host_envs: bool,
 
     /// Files to include in the package (validated glob patterns)
-    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
-    pub files: GlobVec,
+    ///
+    /// `None` means the key was absent (packages every new file); `Some` lets the
+    /// globs decide, so `files: []` packages nothing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub files: Option<GlobVec>,
 
     /// Dynamic linking configuration
     #[serde(default, skip_serializing_if = "DynamicLinking::is_default")]
@@ -545,7 +548,7 @@ struct BuildDeserialize {
     #[serde(default)]
     merge_build_and_host_envs: bool,
     #[serde(default)]
-    files: GlobVec,
+    files: Option<GlobVec>,
     #[serde(default)]
     dynamic_linking: DynamicLinking,
     #[serde(default)]
@@ -743,7 +746,7 @@ impl Build {
             && self.always_copy_files.is_empty()
             && self.always_include_files.is_empty()
             && !self.merge_build_and_host_envs
-            && self.files.is_empty()
+            && self.files.is_none()
             && self.dynamic_linking.is_default()
             && self.variant.is_default()
             && self.prefix_detection.is_default()

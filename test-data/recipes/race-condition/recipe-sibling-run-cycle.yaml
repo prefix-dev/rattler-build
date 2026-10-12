@@ -1,0 +1,23 @@
+context:
+  version: "1.0.0"
+
+recipe:
+  name: runtime-cycle
+  version: ${{ version }}
+
+outputs:
+  - package:
+      name: repro-cycle-a
+    build:
+      script: echo "cycle a built"
+    requirements:
+      run:
+        - repro-cycle-b ==${{ version }}
+
+  - package:
+      name: repro-cycle-b
+    build:
+      script: echo "cycle b built"
+    requirements:
+      run:
+        - repro-cycle-a ==${{ version }}

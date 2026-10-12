@@ -18,12 +18,11 @@
 //! implicitly. They must construct a [`Config`] themselves (e.g.
 //! [`Config::default`] or [`ConfigBase::load_from_files`]) and pass it in.
 //! This keeps library use free of surprising reads of the user's global
-//! pixi/rattler-build configuration; the embedding application stays in full
-//! control of where configuration comes from.
-
-use std::path::PathBuf;
+//! shared/rattler-build configuration; the embedding application stays in
+//! full control of where configuration comes from.
 
 use rattler_config::config::{ConfigBase, LoadError, MergeError};
+use rattler_config::locations::ConfigLocation;
 
 /// rattler-build specific configuration keys.
 /// Extend this struct to add configuration that only makes sense for
@@ -45,31 +44,32 @@ impl rattler_config::config::Config for RattlerBuildConfig {
 /// other rattler based tools, extended with rattler-build specific keys.
 pub type Config = ConfigBase<RattlerBuildConfig>;
 
-/// The tools whose configuration `rattler-build` reads, in ascending order of
-/// precedence: pixi's configuration is picked up automatically and can be
-/// overridden by rattler-build specific files.
-const CONFIG_TOOLS: &[&str] = &["pixi", "rattler-build"];
-
 /// All default configuration file locations, in ascending order of precedence
 /// (values from later files override values from earlier files).
 ///
 /// This is a thin wrapper around
 /// [`rattler_config::locations::config_search_paths`], the shared discovery
-/// logic used by all rattler based tools. For the tools
-/// `["pixi", "rattler-build"]` it yields, lowest precedence first:
+/// logic used by all rattler based tools. It yields, lowest precedence first:
 ///
-/// 1. the system-wide configuration of every tool
-///    (`/etc/pixi/config.toml`, `/etc/rattler-build/config.toml`, or the
-///    `C:\ProgramData\<tool>\config.toml` equivalents on Windows),
-/// 2. the per-user configuration of every tool: the platform config directory
-///    (`$XDG_CONFIG_HOME/<tool>/config.toml`) followed by the tool home
-///    (`$PIXI_HOME` / `$RATTLER_BUILD_HOME`, defaulting to `~/.pixi` /
+/// 1. the system-wide shared configuration (`/etc/rattler/config.toml`, or
+///    the `C:\ProgramData\rattler\config.toml` equivalent on Windows),
+/// 2. the system-wide rattler-build configuration
+///    (`/etc/rattler-build/config.toml`),
+/// 3. the per-user shared configuration
+///    (`$XDG_CONFIG_HOME/rattler/config.toml`, plus
+///    `$RATTLER_HOME/config.toml` when the variable is set),
+/// 4. the per-user rattler-build configuration: the platform config
+///    directory (`$XDG_CONFIG_HOME/rattler-build/config.toml`) followed by
+///    the tool home (`$RATTLER_BUILD_HOME`, defaulting to
 ///    `~/.rattler-build`).
 ///
-/// Within each group the tools are ordered as listed, so rattler-build's
-/// configuration overrides pixi's.
-pub fn default_config_paths() -> Vec<PathBuf> {
-    rattler_config::locations::config_search_paths(CONFIG_TOOLS)
+/// Shared files may only contain the keys shared by all rattler based tools;
+/// tool-specific keys in them are ignored with a warning. rattler-build's
+/// own files accept the shared keys plus the [`RattlerBuildConfig`] keys.
+/// Configuration in pixi's own files (`~/.pixi/config.toml`, …) is no longer
+/// read: settings meant for every tool belong in the shared files.
+pub fn default_config_paths() -> Vec<ConfigLocation> {
+    rattler_config::locations::config_search_paths("rattler-build")
 }
 
 /// Load the configuration from the default locations (see
@@ -91,17 +91,17 @@ pub fn load_default_config() -> Result<Option<Config>, LoadError> {
     let candidates = default_config_paths();
     tracing::debug!("Configuration search paths (lowest precedence first): {candidates:?}");
 
-    let paths = candidates
+    let locations = candidates
         .into_iter()
-        .filter(|p| p.is_file())
+        .filter(|location| location.path.is_file())
         .collect::<Vec<_>>();
 
-    if paths.is_empty() {
+    if locations.is_empty() {
         tracing::debug!("No configuration file found in any default location");
         return Ok(None);
     }
 
-    Config::load_from_files(&paths).map(Some)
+    Config::load_from_locations(locations).map(Some)
 }
 
 #[cfg(test)]
@@ -111,48 +111,52 @@ mod tests {
     use std::str::FromStr;
 
     /// The `default_config_paths` wrapper must preserve the precedence
-    /// guaranteed by the shared `locations` helper (lowest precedence first):
-    /// all system-wide files come before all per-user files, and within each
-    /// group pixi's file is overridden by rattler-build's. We assert on the
-    /// positions of the paths reported by the upstream helpers rather than
-    /// depending on the real home directory.
+    /// guaranteed by the shared `locations` helper (lowest precedence
+    /// first): system shared, system rattler-build, user shared, user
+    /// rattler-build. We assert on the positions of the paths reported by
+    /// the upstream helpers rather than depending on the real home
+    /// directory.
     #[test]
     fn test_default_config_paths_ordering() {
-        use rattler_config::locations::{system_config_path, user_config_paths};
+        use rattler_config::locations::{
+            shared_system_config_path, shared_user_config_paths, system_config_path,
+            user_config_paths,
+        };
 
         let paths = default_config_paths();
-        let position = |needle: &std::path::Path| paths.iter().position(|p| p == needle);
+        let position =
+            |needle: &std::path::Path| paths.iter().position(|location| location.path == needle);
 
-        let system_pixi = system_config_path("pixi");
-        let system_rb = system_config_path("rattler-build");
-        let pos_system_pixi = position(&system_pixi).expect("system pixi config present");
-        let pos_system_rb = position(&system_rb).expect("system rattler-build config present");
+        let pos_system_shared =
+            position(&shared_system_config_path()).expect("system shared config present");
+        let pos_system_rb = position(&system_config_path("rattler-build"))
+            .expect("system rattler-build config present");
 
-        // Within the system group, rattler-build overrides pixi.
+        // Within the system group, rattler-build overrides the shared file.
         assert!(
-            pos_system_pixi < pos_system_rb,
-            "system rattler-build config must override system pixi config"
+            pos_system_shared < pos_system_rb,
+            "system rattler-build config must override system shared config"
         );
 
-        // All system-wide files come before all per-user files.
-        if let Some(first_user) = user_config_paths("pixi").first().and_then(|p| position(p)) {
+        // The per-user shared files come after all system files…
+        if let Some(first_user_shared) =
+            shared_user_config_paths().first().and_then(|p| position(p))
+        {
             assert!(
-                pos_system_rb < first_user,
-                "system configs must come before per-user configs"
+                pos_system_rb < first_user_shared,
+                "per-user shared config must override system configs"
             );
-        }
 
-        // Within the per-user group, rattler-build overrides pixi.
-        if let (Some(last_user_pixi), Some(first_user_rb)) = (
-            user_config_paths("pixi").last().and_then(|p| position(p)),
-            user_config_paths("rattler-build")
+            // …and rattler-build's own per-user files override them.
+            if let Some(first_user_rb) = user_config_paths("rattler-build")
                 .first()
-                .and_then(|p| position(p)),
-        ) {
-            assert!(
-                last_user_pixi < first_user_rb,
-                "per-user rattler-build config must override per-user pixi config"
-            );
+                .and_then(|p| position(p))
+            {
+                assert!(
+                    first_user_shared < first_user_rb,
+                    "per-user rattler-build config must override per-user shared config"
+                );
+            }
         }
     }
 

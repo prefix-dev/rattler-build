@@ -1,0 +1,31 @@
+context:
+  version: "1.0.0"
+
+recipe:
+  name: repro-variant-pin
+  version: ${{ version }}
+
+build:
+  number: 0
+
+outputs:
+  - package:
+      name: repro-variant-core
+    build:
+      script: echo "core built for ${{ flavor }}"
+
+  - package:
+      name: repro-variant-consumer
+    build:
+      script: echo "consumer built for ${{ flavor }}"
+    requirements:
+      host:
+        - ${{ pin_subpackage('repro-variant-core', exact=True) }}
+      run:
+        - repro-variant-data
+
+  - package:
+      name: repro-variant-data
+    build:
+      noarch: generic
+      script: echo "data built"

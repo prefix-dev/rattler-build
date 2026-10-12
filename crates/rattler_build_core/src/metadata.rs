@@ -32,6 +32,8 @@ mod test {
             resolved: vec![RepoDataRecord {
                 package_record: PackageRecord {
                     arch: Some("x86_64".into()),
+                    attestations_sha256: None,
+                    indexed_timestamp: None,
                     build: "h123".into(),
                     build_number: 0,
                     constrains: vec![],

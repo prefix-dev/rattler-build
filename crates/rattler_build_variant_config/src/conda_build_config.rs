@@ -184,7 +184,7 @@ pub fn load_conda_build_config(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rattler_conda_types::Platform;
+    use rattler_conda_types::Subdir;
     use rstest::rstest;
     use serial_test::serial;
     use std::path::PathBuf;
@@ -217,8 +217,8 @@ mod tests {
     #[test]
     fn test_selector_context() {
         let config = JinjaConfig {
-            target_platform: Platform::Linux64,
-            host_platform: Platform::Linux64,
+            target_platform: Subdir::Linux64,
+            host_platform: Subdir::Linux64,
             ..Default::default()
         };
         let jinja = conda_build_config_jinja(&config);
@@ -242,8 +242,8 @@ mod tests {
 
         // fix the platform for the snapshots
         let jinja_config = JinjaConfig {
-            target_platform: Platform::OsxArm64,
-            host_platform: Platform::OsxArm64,
+            target_platform: Subdir::OsxArm64,
+            host_platform: Subdir::OsxArm64,
             ..Default::default()
         };
 
