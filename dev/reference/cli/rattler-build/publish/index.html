@@ -4202,8 +4202,9 @@
 </li>
 <li>
 <dl>
-<dt><a id="arg---continue-on-failure" href="#arg---continue-on-failure"><code>--continue-on-failure</code></a></dt>
-<dd>Continue building even if (one) of the packages fails to build. This is useful when building many packages with <code>--recipe-dir</code>.`</dd>
+<dt><a id="arg---continue-on-failure" href="#arg---continue-on-failure"><code>--continue-on-failure=&lt;MODE&gt;</code></a></dt>
+<dd>Continue building even if (one) of the packages fails to build. This is useful when building many packages with <code>--recipe-dir</code>. With <code>=skip-dependents</code>, also skip every package that needs a package whose build failed in this run (as a build or host dependency, or through their run dependencies), instead of building it later against the configured channels
+<br><strong>options</strong>: <code>yes</code>, <code>skip-dependents</code></dd>
 </dl>
 </li>
 </ul>
