@@ -56,13 +56,25 @@ pub enum TestStrategy {
 
 /// Whether we want to continue building on failure of a package or stop the build
 /// entirely
-#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum ContinueOnFailure {
     /// Continue building on failure of a package
     Yes,
+    /// Continue building on failure of a package, but skip the outputs that
+    /// need an output whose build failed, instead of attempting them against
+    /// the configured channels
+    SkipDependents,
     /// Stop the build entirely on failure of a package
     #[default]
+    #[value(skip)]
     No,
+}
+
+impl ContinueOnFailure {
+    /// Whether to continue building after a package failed to build
+    pub fn continues(self) -> bool {
+        !matches!(self, ContinueOnFailure::No)
+    }
 }
 
 // This is the key part - implement From<bool> for your type

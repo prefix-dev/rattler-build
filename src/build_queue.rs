@@ -8,7 +8,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use rattler_build_recipe::stage1::{Dependency, TestType};
 use rattler_build_types::PinError;
 use rattler_conda_types::{
-    MatchSpec, ParseMatchSpecError, ParseMatchSpecOptions, RepodataRevision,
+    MatchSpec, PackageName, ParseMatchSpecError, ParseMatchSpecOptions, RepodataRevision,
 };
 use thiserror::Error;
 
@@ -459,6 +459,15 @@ impl<T> BuildQueue<T> {
         }
     }
 
+    /// Removes and returns all items matching `predicate`, keeping the order
+    /// of the remaining items.
+    pub(crate) fn take_where(&mut self, mut predicate: impl FnMut(&T) -> bool) -> Vec<T> {
+        let (taken, kept): (VecDeque<T>, VecDeque<T>) =
+            self.pending.drain(..).partition(|item| predicate(item));
+        self.pending = kept;
+        taken.into()
+    }
+
     /// Removes the first item without checking readiness.
     fn pop_front(&mut self) -> Option<T> {
         self.pending.pop_front()
@@ -473,6 +482,12 @@ pub(crate) struct OutputBuildQueue {
     planned_outputs: Vec<PackageIdentifier>,
     /// Attempted outputs used to determine which local artifacts are available.
     processed_outputs: Vec<Output>,
+    /// For every planned output, the planned packages that must be built
+    /// before it can build: its build and host dependencies plus their run
+    /// dependency closure.
+    required_planned: HashMap<PackageName, HashSet<PackageName>>,
+    /// Planned packages that failed to build or were skipped.
+    failed: HashSet<PackageName>,
 }
 
 impl OutputBuildQueue {
@@ -486,10 +501,13 @@ impl OutputBuildQueue {
                 build_string: output.build_string().into_owned(),
             })
             .collect();
+        let required_planned = required_planned_packages(&outputs);
         Self {
             queue: BuildQueue::new(outputs),
             planned_outputs,
             processed_outputs: Vec::new(),
+            required_planned,
+            failed: HashSet::new(),
         }
     }
 
@@ -503,6 +521,24 @@ impl OutputBuildQueue {
     /// Only outputs with finalized dependencies are considered installable.
     pub(crate) fn record_processed(&mut self, output: Output) {
         self.processed_outputs.push(output);
+    }
+
+    /// Records that `failed` did not build and removes every waiting output
+    /// that needs it, directly, through the run dependencies of a build or
+    /// host dependency, or through another removed output.
+    ///
+    /// Returns each removed output together with the failed package it needs.
+    /// The caller decides how to report them; they are not built or attempted
+    /// against the configured channels.
+    pub(crate) fn skip_dependents_of_failed(
+        &mut self,
+        failed: &Output,
+    ) -> Vec<(Output, PackageName)> {
+        self.failed.insert(failed.name().clone());
+        let required_planned = &self.required_planned;
+        skip_blocked(&mut self.queue, &mut self.failed, |output| {
+            (output.name(), required_planned.get(output.name()))
+        })
     }
 
     /// Checks whether an output and its command-test dependencies are installable.
@@ -533,11 +569,123 @@ impl OutputBuildQueue {
     }
 }
 
+/// Removes every queued item that requires a failed package, recursively:
+/// a removed item counts as failed for the items that require it.
+///
+/// `describe` returns an item's package name and the planned packages it
+/// requires. Returns the removed items, each with the (alphabetically first)
+/// failed package it requires.
+fn skip_blocked<'a, T: 'a>(
+    queue: &mut BuildQueue<T>,
+    failed: &mut HashSet<PackageName>,
+    describe: impl Fn(&T) -> (&PackageName, Option<&'a HashSet<PackageName>>),
+) -> Vec<(T, PackageName)> {
+    let mut skipped = Vec::new();
+    loop {
+        let blocked_by = |item: &T| {
+            describe(item)
+                .1
+                .into_iter()
+                .flatten()
+                .filter(|name| failed.contains(*name))
+                .min()
+                .cloned()
+        };
+        let newly: Vec<(T, PackageName)> = queue
+            .take_where(|item| blocked_by(item).is_some())
+            .into_iter()
+            .map(|item| {
+                let cause = blocked_by(&item).expect("taken because it is blocked");
+                (item, cause)
+            })
+            .collect();
+        if newly.is_empty() {
+            return skipped;
+        }
+        for (item, _) in &newly {
+            failed.insert(describe(item).0.clone());
+        }
+        skipped.extend(newly);
+    }
+}
+
+/// The package name a recipe dependency refers to, if it is known before
+/// solving.
+fn dependency_name(dependency: &Dependency) -> Option<&PackageName> {
+    match dependency {
+        Dependency::Spec(spec) => spec.name.as_exact(),
+        Dependency::PinSubpackage(pin) => Some(&pin.pin_subpackage.name),
+        Dependency::PinCompatible(_) => None,
+    }
+}
+
+/// For every planned output, the planned packages that must be built before
+/// it can build: its build and host dependencies plus their run dependency
+/// closure. This follows the rule of [`BuildReadiness::can_build`], but
+/// matches packages by name only; variants that share a name are merged.
+fn required_planned_packages(outputs: &[Output]) -> HashMap<PackageName, HashSet<PackageName>> {
+    let planned: HashSet<&PackageName> = outputs.iter().map(|output| output.name()).collect();
+    let planned_only = |dependencies: &[Dependency]| -> Vec<PackageName> {
+        dependencies
+            .iter()
+            .filter_map(dependency_name)
+            .filter(|name| planned.contains(name))
+            .cloned()
+            .collect()
+    };
+    let mut run: HashMap<PackageName, Vec<PackageName>> = HashMap::new();
+    for output in outputs {
+        run.entry(output.name().clone())
+            .or_default()
+            .extend(planned_only(&output.recipe.requirements().run));
+    }
+    let mut required: HashMap<PackageName, HashSet<PackageName>> = HashMap::new();
+    for output in outputs {
+        let requirements = output.recipe.requirements();
+        let mut direct = planned_only(&requirements.build);
+        direct.extend(planned_only(&requirements.host));
+        required
+            .entry(output.name().clone())
+            .or_default()
+            .extend(closure_without(direct, &run, output.name()));
+    }
+    required
+}
+
+/// All packages reachable from `start` through `run`, except `own_name`.
+fn closure_without(
+    start: Vec<PackageName>,
+    run: &HashMap<PackageName, Vec<PackageName>>,
+    own_name: &PackageName,
+) -> HashSet<PackageName> {
+    let mut reached = HashSet::new();
+    let mut stack = start;
+    while let Some(name) = stack.pop() {
+        if &name != own_name && reached.insert(name.clone()) {
+            stack.extend(run.get(&name).into_iter().flatten().cloned());
+        }
+    }
+    reached
+}
+
 #[cfg(test)]
 mod tests {
-    use std::convert::Infallible;
+    use std::{
+        collections::{HashMap, HashSet},
+        convert::Infallible,
+    };
 
-    use super::{BuildQueue, NextReady};
+    use rattler_conda_types::PackageName;
+
+    use super::{BuildQueue, NextReady, closure_without, skip_blocked};
+
+    fn name(name: &str) -> PackageName {
+        PackageName::new_unchecked(name)
+    }
+
+    fn names(list: &[&str]) -> HashSet<PackageName> {
+        list.iter().map(|n| name(n)).collect()
+    }
 
     #[test]
     fn ready_items_preserve_rotated_order() {
@@ -591,5 +739,63 @@ mod tests {
             queue.next_ready(|_| Ok::<_, ReadinessError>(true)),
             Ok(NextReady::Ready(1))
         );
+    }
+
+    #[test]
+    fn take_where_keeps_the_order_of_the_rest() {
+        let mut queue = BuildQueue::new([1, 2, 3, 4, 5]);
+
+        assert_eq!(queue.take_where(|n| n % 2 == 0), vec![2, 4]);
+        assert_eq!(
+            queue.next_ready(|_| Ok::<_, Infallible>(true)),
+            Ok(NextReady::Ready(1))
+        );
+        assert_eq!(queue.len(), 2);
+    }
+
+    #[test]
+    fn skip_blocked_cascades_and_keeps_independent_items() {
+        // a failed; b needs a; c needs b; d needs x (not failed); e needs d.
+        let required = HashMap::from([
+            (name("b"), names(&["a"])),
+            (name("c"), names(&["b"])),
+            (name("d"), names(&["x"])),
+            (name("e"), names(&["d"])),
+        ]);
+        let mut queue = BuildQueue::new(["b", "c", "d", "e"].map(name));
+        let mut failed = names(&["a"]);
+
+        let skipped = skip_blocked(&mut queue, &mut failed, |n| (n, required.get(n)));
+
+        assert_eq!(
+            skipped,
+            vec![(name("b"), name("a")), (name("c"), name("b"))]
+        );
+        assert_eq!(failed, names(&["a", "b", "c"]));
+        assert_eq!(queue.len(), 2);
+    }
+
+    #[test]
+    fn skip_blocked_reports_the_alphabetically_first_cause() {
+        let required = HashMap::from([(name("c"), names(&["b", "a"]))]);
+        let mut queue = BuildQueue::new([name("c")]);
+        let mut failed = names(&["a", "b"]);
+
+        let skipped = skip_blocked(&mut queue, &mut failed, |n| (n, required.get(n)));
+
+        assert_eq!(skipped, vec![(name("c"), name("a"))]);
+    }
+
+    #[test]
+    fn closure_follows_run_dependencies_and_excludes_itself() {
+        // pkg needs lib at build time; lib runs with util; util runs with lib and pkg.
+        let run = HashMap::from([
+            (name("lib"), vec![name("util")]),
+            (name("util"), vec![name("lib"), name("pkg")]),
+        ]);
+
+        let closure = closure_without(vec![name("lib")], &run, &name("pkg"));
+
+        assert_eq!(closure, names(&["lib", "util"]));
     }
 }

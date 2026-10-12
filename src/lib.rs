@@ -633,6 +633,30 @@ pub async fn get_build_output(
     Ok(outputs)
 }
 
+/// With `--continue-on-failure=skip-dependents`, removes every queued output that needs
+/// `failed` (see [`OutputBuildQueue::skip_dependents_of_failed`]) and reports
+/// it, instead of attempting it later against the configured channels.
+fn skip_dependents_of_failed(
+    build_queue: &mut OutputBuildQueue,
+    failed: &Output,
+    tool_configuration: &Configuration,
+) {
+    if tool_configuration.continue_on_failure != ContinueOnFailure::SkipDependents {
+        return;
+    }
+    for (skipped, cause) in build_queue.skip_dependents_of_failed(failed) {
+        tracing::error!(
+            "Skipping {} because its dependency {} failed to build",
+            skipped.identifier(),
+            cause.as_normalized()
+        );
+        skipped.record_warning(&format!(
+            "Skipped because its dependency {} failed to build",
+            cause.as_normalized()
+        ));
+    }
+}
+
 /// Runs package tests that were released from the deferred test queue.
 async fn run_queued_tests(
     tests: &[(Output, PathBuf)],
@@ -695,7 +719,7 @@ async fn run_queued_tests(
                 }
 
                 let report = error.into_report();
-                if tool_configuration.continue_on_failure == ContinueOnFailure::Yes {
+                if tool_configuration.continue_on_failure.continues() {
                     tracing::error!("Test failed for {}: {:?}", output.identifier(), report);
                     output.record_warning(&format!("Test failed: {report:?}"));
                 } else {
@@ -748,9 +772,14 @@ pub async fn run_build_from_args(
                 (output, archive)
             }
             Err(e) => {
-                if tool_configuration.continue_on_failure == ContinueOnFailure::Yes {
+                if tool_configuration.continue_on_failure.continues() {
                     tracing::error!("Build failed for {}: {}", output_to_build.identifier(), e);
                     output_to_build.record_warning(&format!("Build failed: {}", e));
+                    skip_dependents_of_failed(
+                        &mut build_queue,
+                        &output_to_build,
+                        &tool_configuration,
+                    );
                     build_queue.record_processed(output_to_build);
                     continue;
                 }
@@ -1332,8 +1361,13 @@ async fn build_and_collect_packages(
                 (output, archive)
             }
             Err(e) => {
-                if tool_configuration.continue_on_failure == ContinueOnFailure::Yes {
+                if tool_configuration.continue_on_failure.continues() {
                     tracing::error!("Build failed for {}: {}", output_to_build.identifier(), e);
+                    skip_dependents_of_failed(
+                        &mut build_queue,
+                        &output_to_build,
+                        tool_configuration,
+                    );
                     build_queue.record_processed(output_to_build);
                     continue;
                 }
