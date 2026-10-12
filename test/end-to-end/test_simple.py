@@ -763,16 +763,16 @@ def test_crazy_characters(rattler_build: RattlerBuild, recipes: Path, tmp_path: 
     assert (pkg / "info/paths.json").exists()
 
     file_1 = pkg / "files" / "File(Glob …).tmSnippet"
-    assert file_1.read_text() == file_1.name
+    assert file_1.read_text(encoding="utf-8") == file_1.name
 
     file_2 = (
         pkg / "files" / "a $random_crazy file name with spaces and (parentheses).txt"
     )
-    assert file_2.read_text() == file_2.name
+    assert file_2.read_text(encoding="utf-8") == file_2.name
 
     # limit on Windows is 260 chars
     file_3 = pkg / "files" / ("a_really_long_" + ("a" * 200) + ".txt")
-    assert file_3.read_text() == file_3.name
+    assert file_3.read_text(encoding="utf-8") == file_3.name
 
 
 def test_variant_config(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
