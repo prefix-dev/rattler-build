@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.18](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.17...rattler_build_core-v0.2.18) - 2026-10-12
+
+### Added
+
+- add --continue-on-failure=skip-dependents ([#2842](https://github.com/prefix-dev/rattler-build/pull/2842))
+
+### Fixed
+
+- preserve code signing identifier when re-signing on macOS ([#2854](https://github.com/prefix-dev/rattler-build/pull/2854))
+
+### Other
+
+- run packaging on the blocking thread pool ([#2857](https://github.com/prefix-dev/rattler-build/pull/2857))
+- *(deps)* update Rattler crates to latest releases ([#2855](https://github.com/prefix-dev/rattler-build/pull/2855))
+
 ## [0.2.17](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.16...rattler_build_core-v0.2.17) - 2026-10-07
 
 ### Other
