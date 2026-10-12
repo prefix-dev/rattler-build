@@ -48,6 +48,7 @@ fn exclude_newer_policy(
         } else {
             TimestampPolicy::RequireTimestamp
         });
+    #[allow(deprecated)]
     for (name, cutoff) in packages {
         let package = PackageName::from_str(&name).map_err(|err| {
             PyValueError::new_err(format!("invalid ExcludeNewer package name {name:?}: {err}"))
