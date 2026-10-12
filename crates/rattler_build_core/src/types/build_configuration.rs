@@ -143,6 +143,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn exclude_newer_exempts_only_the_build_output_channel() {
         let output_dir = tempfile::tempdir().unwrap();
         let dependency_dir = tempfile::tempdir().unwrap();

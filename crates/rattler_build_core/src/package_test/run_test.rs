@@ -1402,6 +1402,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
+    #[allow(deprecated)]
     async fn exclude_newer_allows_the_test_artifact_and_preserves_package_overrides() {
         let package = tempfile::tempdir().unwrap();
         fs::create_dir_all(package.path().join("info/test")).unwrap();
