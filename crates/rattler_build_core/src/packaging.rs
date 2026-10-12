@@ -1016,14 +1016,38 @@ impl Output {
     /// Create a conda package from any new files in the host prefix. Note: the
     /// previous stages should have been completed before calling this
     /// function.
+    ///
+    /// Collecting the files, post-processing and compressing are blocking work,
+    /// so they run on tokio's blocking thread pool instead of the async task
+    /// that called this function.
     pub async fn create_package(
         &self,
         tool_configuration: &tool_configuration::Configuration,
         post_install_files: Option<&HashSet<PathBuf>>,
     ) -> Result<(PathBuf, PathsJson), PackagingError> {
+        let output = self.clone();
+        let tool_configuration = tool_configuration.clone();
+        let post_install_files = post_install_files.cloned();
         let span = tracing::info_span!("Packaging new files");
-        let _enter = span.enter();
 
+        let result = tokio::task::spawn_blocking(move || {
+            let _enter = span.enter();
+            output.create_package_blocking(&tool_configuration, post_install_files.as_ref())
+        })
+        .await;
+
+        match result {
+            Ok(result) => result,
+            Err(e) if e.is_panic() => std::panic::resume_unwind(e.into_panic()),
+            Err(e) => Err(PackagingError::IoError(std::io::Error::other(e))),
+        }
+    }
+
+    fn create_package_blocking(
+        &self,
+        tool_configuration: &tool_configuration::Configuration,
+        post_install_files: Option<&HashSet<PathBuf>>,
+    ) -> Result<(PathBuf, PathsJson), PackagingError> {
         let host_prefix = &self.build_configuration.directories.host_prefix;
         let package_files_list = self
             .build_configuration
