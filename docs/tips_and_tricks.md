@@ -65,6 +65,20 @@ To note: the build string changes if the variant configuration changes! So if
 you update a package in the variant configuration, the packages that need
 rebuilding should be rebuilt.
 
+By default, the first failing build stops the whole run. Pass
+`--continue-on-failure` to keep building the remaining packages. Packages that
+depend on a failed one are then still attempted later, and the solver may pick
+an older version of the failed package from the configured channels. If you are
+rebuilding everything (for example after bumping the build number), use
+`--continue-on-failure=skip-dependents` instead: every package that needs a
+failed package (as a build or host dependency, or through their run
+dependencies) is skipped and reported in the log, so nothing gets built against
+a stale copy.
+
+```sh
+rattler-build build --recipe-dir . --continue-on-failure=skip-dependents
+```
+
 !!!note
 
     You can generate recipes for different ecosystems with the `rattler-build generate-recipe` command.
