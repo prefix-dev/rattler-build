@@ -8,10 +8,13 @@ updates:
     labels:
       - "dependencies"
     commit-message:
-      prefix: "bump"
+      prefix: "chore(deps)"
     open-pull-requests-limit: 10
     ignore:
       - dependency-name: "rattler*"
+      # Pinned to =1.4.7 in Cargo.toml until sccache handles `-Tp` on MSVC
+      # (https://github.com/mozilla/sccache/issues/2062)
+      - dependency-name: "cc"
     groups:
       cargo-dependencies:
         patterns:
