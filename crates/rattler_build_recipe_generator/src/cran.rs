@@ -5,8 +5,15 @@ use std::{collections::HashMap, collections::HashSet};
 #[cfg(feature = "cli")]
 use clap::Parser;
 use itertools::Itertools;
+#[cfg(not(target_arch = "wasm32"))]
+use miette::Context;
 use miette::IntoDiagnostic;
+use rattler_conda_types::NamedChannelOrUrl;
+#[cfg(not(target_arch = "wasm32"))]
+use rattler_conda_types::{Channel, ChannelConfig, PackageName, Subdir};
 use rattler_digest::{Sha256Hash, compute_bytes_digest};
+#[cfg(not(target_arch = "wasm32"))]
+use rattler_repodata_gateway::{Gateway, RepoData};
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use url::Url;
@@ -71,9 +78,20 @@ pub struct CranOpts {
     #[cfg_attr(feature = "cli", arg(short, long))]
     pub universe: Option<String>,
 
-    /// Whether to create recipes for the whole dependency tree or not
+    /// Also create recipes for the dependencies that are not available in the
+    /// `--check-available` channels (default: conda-forge)
     #[cfg_attr(feature = "cli", arg(short, long))]
     pub tree: bool,
+
+    /// With `--tree`, create recipes for every dependency, without checking
+    /// whether it is already available
+    #[cfg_attr(feature = "cli", arg(long, requires = "tree"))]
+    pub all: bool,
+
+    /// Check dependencies against this channel (can be repeated) and warn
+    /// about the ones it doesn't have
+    #[cfg_attr(feature = "cli", arg(long, value_name = "CHANNEL"))]
+    pub check_available: Vec<NamedChannelOrUrl>,
 
     /// Name of the package to generate
     pub package: String,
@@ -246,6 +264,79 @@ pub async fn fetch_package_sha256sum(url: &Url) -> Result<Sha256Hash, miette::Er
     let response = client.get(url.clone()).send().await.into_diagnostic()?;
     let bytes = response.bytes().await.into_diagnostic()?;
     Ok(compute_bytes_digest::<Sha256>(&bytes))
+}
+
+/// Checks which dependencies already exist in the `--check-available`
+/// channels. CRAN package `foo` is packaged as `r-foo` by convention, so no
+/// name mapping is needed.
+#[cfg(not(target_arch = "wasm32"))]
+struct AvailableChannels {
+    gateway: Gateway,
+    channels: Vec<Channel>,
+    display: String,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl AvailableChannels {
+    fn new(channels: &[NamedChannelOrUrl]) -> miette::Result<Option<Self>> {
+        if channels.is_empty() {
+            return Ok(None);
+        }
+        let channel_config =
+            ChannelConfig::default_with_root_dir(std::env::current_dir().into_diagnostic()?);
+        Ok(Some(Self {
+            gateway: Gateway::new(),
+            channels: channels
+                .iter()
+                .map(|channel| channel.clone().into_channel(&channel_config))
+                .collect::<Result<_, _>>()
+                .into_diagnostic()?,
+            display: channels.iter().join(", "),
+        }))
+    }
+
+    /// Returns the dependencies that none of the channels provide, sorted.
+    async fn missing(&self, deps: &HashSet<String>) -> miette::Result<Vec<String>> {
+        let mut missing = Vec::new();
+        let mut names = HashMap::new();
+        for dep in deps {
+            match format_r_package(dep, None).parse::<PackageName>() {
+                Ok(name) => {
+                    names.insert(name, dep);
+                }
+                // Not a valid conda package name, so no channel can have it.
+                Err(_) => missing.push(dep.clone()),
+            }
+        }
+
+        if !names.is_empty() {
+            let repodata = self
+                .gateway
+                .query(
+                    self.channels.clone(),
+                    Subdir::current().into_iter().chain([Subdir::NoArch]),
+                    names.keys().cloned(),
+                )
+                .recursive(false)
+                .await
+                .into_diagnostic()
+                .with_context(|| format!("failed to query {}", self.display))?;
+            let available: HashSet<&PackageName> = repodata
+                .iter()
+                .flat_map(RepoData::iter)
+                .map(|record| &record.package_record.name)
+                .collect();
+            missing.extend(
+                names
+                    .iter()
+                    .filter(|(name, _)| !available.contains(name))
+                    .map(|(_, dep)| (*dep).clone()),
+            );
+        }
+
+        missing.sort();
+        Ok(missing)
+    }
 }
 
 // Found when running `installed.packages()` in an `r-base` environment
@@ -513,14 +604,30 @@ pub async fn generate_r_recipe_string(
     Ok(format_cran_recipe_with_suggests(&recipe))
 }
 
-#[cfg(not(target_arch = "wasm32"))]
-#[async_recursion::async_recursion]
 /// Generate a CRAN recipe using `CranOpts` and either print it or write it to disk.
 ///
 /// If `opts.write` is true, the recipe is written to a folder named after the
 /// package. Otherwise, the YAML is printed to stdout. When `tree` is enabled,
-/// dependencies are recursively generated if they don't already exist locally.
+/// dependencies that don't already exist locally are generated recursively:
+/// those missing from the `check_available` channels (conda-forge if none are
+/// given), or every dependency with `all`.
+#[cfg(not(target_arch = "wasm32"))]
 pub async fn generate_r_recipe(opts: &CranOpts) -> miette::Result<()> {
+    let channels = if opts.check_available.is_empty() && opts.tree && !opts.all {
+        vec![NamedChannelOrUrl::Name("conda-forge".to_string())]
+    } else {
+        opts.check_available.clone()
+    };
+    let available = AvailableChannels::new(&channels)?;
+    generate_r_recipe_recursive(opts, available.as_ref()).await
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[async_recursion::async_recursion]
+async fn generate_r_recipe_recursive(
+    opts: &CranOpts,
+    available: Option<&AvailableChannels>,
+) -> miette::Result<()> {
     let (recipe, remaining_deps) =
         build_cran_recipe_and_deps(&opts.package, opts.universe.as_deref()).await?;
 
@@ -532,16 +639,34 @@ pub async fn generate_r_recipe(opts: &CranOpts) -> miette::Result<()> {
         print!("{}", final_recipe);
     }
 
-    if opts.tree {
-        for dep in remaining_deps {
-            let r_package = format_r_package(&dep, None);
+    let missing = match available {
+        Some(available) => {
+            let missing = available.missing(&remaining_deps).await?;
+            for dep in &missing {
+                tracing::warn!(
+                    "Dependency '{}' is not available in {} (as '{}'), it needs a recipe as well",
+                    dep,
+                    available.display,
+                    format_r_package(dep, None)
+                );
+            }
+            Some(missing)
+        }
+        None => None,
+    };
+    let deps = match missing {
+        Some(missing) if !opts.all => missing,
+        _ => remaining_deps.into_iter().sorted().collect(),
+    };
 
-            if !PathBuf::from(r_package).exists() {
+    if opts.tree {
+        for dep in deps {
+            if !PathBuf::from(format_r_package(&dep, None)).exists() {
                 let opts = CranOpts {
                     package: dep,
                     ..opts.clone()
                 };
-                generate_r_recipe(&opts).await?;
+                generate_r_recipe_recursive(&opts, available).await?;
             }
         }
     }
@@ -649,5 +774,48 @@ mod tests {
             );
             assert_eq!(license_files, expected_files, "Failed for input: {}", input);
         }
+    }
+
+    /// A local channel with `r-jsonlite` in `noarch`.
+    fn local_channel() -> tempfile::TempDir {
+        let dir = tempfile::tempdir().unwrap();
+        for (subdir, packages) in [
+            (
+                Subdir::NoArch,
+                r#"{"r-jsonlite-1.8.8-r44_0.conda": {"name": "r-jsonlite", "version": "1.8.8", "build": "r44_0", "build_number": 0, "depends": [], "subdir": "noarch"}}"#,
+            ),
+            (Subdir::current().unwrap(), "{}"),
+        ] {
+            let subdir = subdir.as_str();
+            let path = dir.path().join(subdir);
+            fs_err::create_dir_all(&path).unwrap();
+            fs_err::write(
+                path.join("repodata.json"),
+                format!(
+                    r#"{{"info": {{"subdir": "{subdir}"}}, "packages": {{}}, "packages.conda": {packages}}}"#
+                ),
+            )
+            .unwrap();
+        }
+        dir
+    }
+
+    #[test]
+    fn test_no_channels_means_no_check() {
+        assert!(AvailableChannels::new(&[]).unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn test_missing_deps_in_local_channel() {
+        let channel = local_channel();
+        let available =
+            AvailableChannels::new(&[channel.path().display().to_string().parse().unwrap()])
+                .unwrap()
+                .unwrap();
+        let deps = HashSet::from(["jsonlite".to_string(), "not_packaged".to_string()]);
+
+        let missing = available.missing(&deps).await.unwrap();
+
+        assert_eq!(missing, vec!["not_packaged".to_string()]);
     }
 }
