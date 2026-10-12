@@ -4009,7 +4009,20 @@
 <li>
 <dl>
 <dt><a id="arg---tree" href="#arg---tree"><code>--tree (-t)</code></a></dt>
-<dd>Whether to create recipes for the whole dependency tree or not</dd>
+<dd>Also create recipes for the dependencies that are not available in the <code>--check-available</code> channels (default: conda-forge)</dd>
+</dl>
+</li>
+<li>
+<dl>
+<dt><a id="arg---all" href="#arg---all"><code>--all</code></a></dt>
+<dd>With <code>--tree</code>, create recipes for every dependency, without checking whether it is already available</dd>
+</dl>
+</li>
+<li>
+<dl>
+<dt><a id="arg---check-available" href="#arg---check-available"><code>--check-available &lt;CHANNEL&gt;</code></a></dt>
+<dd>Check dependencies against this channel (can be repeated) and warn about the ones it doesn't have
+<br>May be provided more than once.</dd>
 </dl>
 </li>
 <li>
