@@ -711,16 +711,19 @@ pub struct BuildOpts {
     pub markdown_summary: Option<PathBuf>,
 
     /// Continue building even if (one) of the packages fails to build.
-    /// This is useful when building many packages with `--recipe-dir`.`
-    #[clap(long)]
-    pub continue_on_failure: bool,
-
-    /// With `--continue-on-failure`, skip every package that needs a package
+    /// This is useful when building many packages with `--recipe-dir`.
+    /// With `=skip-dependents`, also skip every package that needs a package
     /// whose build failed in this run (as a build or host dependency, or
     /// through their run dependencies), instead of building it later against
     /// the configured channels.
-    #[clap(long, requires = "continue_on_failure")]
-    pub skip_dependents_of_failed: bool,
+    #[clap(
+        long,
+        num_args = 0..=1,
+        require_equals = true,
+        default_missing_value = "yes",
+        value_name = "MODE"
+    )]
+    pub continue_on_failure: Option<ContinueOnFailure>,
 
     /// Error if the host prefix is detected in any binary files
     #[arg(long, help_heading = "Modifying result")]
@@ -935,7 +938,6 @@ pub struct BuildData {
     pub extra_meta: Option<Vec<(String, Value)>>,
     pub sandbox_configuration: Option<SandboxConfiguration>,
     pub continue_on_failure: ContinueOnFailure,
-    pub skip_dependents_of_failed: bool,
     pub error_prefix_in_binary: bool,
     pub allow_symlinks_on_windows: bool,
     pub error_overlapping_files: bool,
@@ -1023,7 +1025,6 @@ impl BuildData {
             extra_meta,
             sandbox_configuration,
             continue_on_failure,
-            skip_dependents_of_failed: false,
             error_prefix_in_binary,
             allow_symlinks_on_windows,
             error_overlapping_files,
@@ -1078,7 +1079,7 @@ impl BuildData {
             opts.extra_meta,
             opts.sandbox_arguments.into(),
             opts.env_isolation,
-            opts.continue_on_failure.into(),
+            opts.continue_on_failure.unwrap_or_default(),
             opts.error_prefix_in_binary,
             opts.allow_symlinks_on_windows,
             opts.error_overlapping_files,
@@ -1090,7 +1091,6 @@ impl BuildData {
             opts.markdown_summary,
         );
         build_data.channels_from_config = !explicit_channels && build_data.channels.is_some();
-        build_data.skip_dependents_of_failed = opts.skip_dependents_of_failed;
         build_data
     }
 }

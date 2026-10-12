@@ -69,10 +69,9 @@ rattler-build publish [OPTIONS] --to <TO> [PACKAGE_OR_RECIPE]...
 - <a id="arg---extra-meta" href="#arg---extra-meta">`--extra-meta <EXTRA_META>`</a>
 :  Extra metadata to include in about.json
 <br>May be provided more than once.
-- <a id="arg---continue-on-failure" href="#arg---continue-on-failure">`--continue-on-failure`</a>
-:  Continue building even if (one) of the packages fails to build. This is useful when building many packages with `--recipe-dir`.`
-- <a id="arg---skip-dependents-of-failed" href="#arg---skip-dependents-of-failed">`--skip-dependents-of-failed`</a>
-:  With `--continue-on-failure`, skip every package that needs a package whose build failed in this run (as a build or host dependency, or through their run dependencies), instead of building it later against the configured channels
+- <a id="arg---continue-on-failure" href="#arg---continue-on-failure">`--continue-on-failure=<MODE>`</a>
+:  Continue building even if (one) of the packages fails to build. This is useful when building many packages with `--recipe-dir`. With `=skip-dependents`, also skip every package that needs a package whose build failed in this run (as a build or host dependency, or through their run dependencies), instead of building it later against the configured channels
+<br>**options**: `yes`, `skip-dependents`
 
 ## Modifying result
 - <a id="arg---package-format" href="#arg---package-format">`--package-format <PACKAGE_FORMAT>`</a>

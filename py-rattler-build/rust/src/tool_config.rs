@@ -144,7 +144,7 @@ impl PyToolConfiguration {
     /// Whether to continue building on failure
     #[getter]
     fn continue_on_failure(&self) -> bool {
-        matches!(self.inner.continue_on_failure, ContinueOnFailure::Yes)
+        self.inner.continue_on_failure.continues()
     }
 
     /// The channel priority to use in solving
@@ -207,7 +207,7 @@ impl PyToolConfiguration {
             self.inner.no_clean,
             self.inner.test_strategy,
             self.inner.skip_existing,
-            matches!(self.inner.continue_on_failure, ContinueOnFailure::Yes),
+            self.inner.continue_on_failure.continues(),
             self.inner.channel_priority
         )
     }
