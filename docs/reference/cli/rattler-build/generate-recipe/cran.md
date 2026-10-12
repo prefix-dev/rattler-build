@@ -20,9 +20,11 @@ rattler-build generate-recipe cran [OPTIONS] <PACKAGE>
 - <a id="arg---universe" href="#arg---universe">`--universe (-u) <UNIVERSE>`</a>
 :  The R Universe to fetch the package from (defaults to `cran`)
 - <a id="arg---tree" href="#arg---tree">`--tree (-t)`</a>
-:  Whether to create recipes for the whole dependency tree or not
-- <a id="arg---skip-available" href="#arg---skip-available">`--skip-available <CHANNEL>`</a>
-:  Check dependencies against this channel (can be repeated). Missing dependencies are reported, and with `--tree` only those get a recipe
+:  Also create recipes for the dependencies that are not available in the `--check-available` channels (default: conda-forge)
+- <a id="arg---all" href="#arg---all">`--all`</a>
+:  With `--tree`, create recipes for every dependency, without checking whether it is already available
+- <a id="arg---check-available" href="#arg---check-available">`--check-available <CHANNEL>`</a>
+:  Check dependencies against this channel (can be repeated) and warn about the ones it doesn't have
 <br>May be provided more than once.
 - <a id="arg---write" href="#arg---write">`--write (-w)`</a>
 :  Whether to write the recipe to a folder

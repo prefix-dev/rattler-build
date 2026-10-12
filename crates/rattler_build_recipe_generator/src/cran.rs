@@ -78,14 +78,20 @@ pub struct CranOpts {
     #[cfg_attr(feature = "cli", arg(short, long))]
     pub universe: Option<String>,
 
-    /// Whether to create recipes for the whole dependency tree or not
+    /// Also create recipes for the dependencies that are not available in the
+    /// `--check-available` channels (default: conda-forge)
     #[cfg_attr(feature = "cli", arg(short, long))]
     pub tree: bool,
 
-    /// Check dependencies against this channel (can be repeated). Missing
-    /// dependencies are reported, and with `--tree` only those get a recipe.
+    /// With `--tree`, create recipes for every dependency, without checking
+    /// whether it is already available
+    #[cfg_attr(feature = "cli", arg(long, requires = "tree"))]
+    pub all: bool,
+
+    /// Check dependencies against this channel (can be repeated) and warn
+    /// about the ones it doesn't have
     #[cfg_attr(feature = "cli", arg(long, value_name = "CHANNEL"))]
-    pub skip_available: Vec<NamedChannelOrUrl>,
+    pub check_available: Vec<NamedChannelOrUrl>,
 
     /// Name of the package to generate
     pub package: String,
@@ -260,7 +266,7 @@ pub async fn fetch_package_sha256sum(url: &Url) -> Result<Sha256Hash, miette::Er
     Ok(compute_bytes_digest::<Sha256>(&bytes))
 }
 
-/// Checks which dependencies already exist in the `--skip-available`
+/// Checks which dependencies already exist in the `--check-available`
 /// channels. CRAN package `foo` is packaged as `r-foo` by convention, so no
 /// name mapping is needed.
 #[cfg(not(target_arch = "wasm32"))]
@@ -602,11 +608,17 @@ pub async fn generate_r_recipe_string(
 ///
 /// If `opts.write` is true, the recipe is written to a folder named after the
 /// package. Otherwise, the YAML is printed to stdout. When `tree` is enabled,
-/// dependencies are recursively generated if they don't already exist locally
-/// and, with `skip_available`, are not available in any of those channels.
+/// dependencies that don't already exist locally are generated recursively:
+/// those missing from the `check_available` channels (conda-forge if none are
+/// given), or every dependency with `all`.
 #[cfg(not(target_arch = "wasm32"))]
 pub async fn generate_r_recipe(opts: &CranOpts) -> miette::Result<()> {
-    let available = AvailableChannels::new(&opts.skip_available)?;
+    let channels = if opts.check_available.is_empty() && opts.tree && !opts.all {
+        vec![NamedChannelOrUrl::Name("conda-forge".to_string())]
+    } else {
+        opts.check_available.clone()
+    };
+    let available = AvailableChannels::new(&channels)?;
     generate_r_recipe_recursive(opts, available.as_ref()).await
 }
 
@@ -627,7 +639,7 @@ async fn generate_r_recipe_recursive(
         print!("{}", final_recipe);
     }
 
-    let deps = match available {
+    let missing = match available {
         Some(available) => {
             let missing = available.missing(&remaining_deps).await?;
             for dep in &missing {
@@ -638,9 +650,13 @@ async fn generate_r_recipe_recursive(
                     format_r_package(dep, None)
                 );
             }
-            missing
+            Some(missing)
         }
-        None => remaining_deps.into_iter().sorted().collect(),
+        None => None,
+    };
+    let deps = match missing {
+        Some(missing) if !opts.all => missing,
+        _ => remaining_deps.into_iter().sorted().collect(),
     };
 
     if opts.tree {
@@ -785,7 +801,7 @@ mod tests {
     }
 
     #[test]
-    fn test_no_skip_available_channels_means_no_check() {
+    fn test_no_channels_means_no_check() {
         assert!(AvailableChannels::new(&[]).unwrap().is_none());
     }
 
