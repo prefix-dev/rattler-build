@@ -31,6 +31,8 @@ mod linux;
 mod macos;
 pub mod package_info;
 mod post_process;
+/// Relinking of ELF / Mach-O / PE files, used to make packaged binaries relocatable.
+pub use post_process::relink::{RelinkError, Relinker, get_relinker};
 pub mod publish;
 pub mod rebuild;
 mod unix;
