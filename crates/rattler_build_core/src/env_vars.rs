@@ -221,11 +221,30 @@ pub fn append_jobserver_makeflags(
     let Some(makeflags) = makeflags else {
         return;
     };
-    let value = match env_vars.get("MAKEFLAGS").map(|v| v.trim()) {
+    let value = with_jobserver_makeflags(env_vars.get("MAKEFLAGS").map(String::as_str), makeflags);
+    env_vars.insert("MAKEFLAGS".to_string(), value);
+}
+
+/// `existing` `MAKEFLAGS` (if any) followed by the jobserver's.
+fn with_jobserver_makeflags(existing: Option<&str>, makeflags: &str) -> String {
+    match existing.map(str::trim) {
         Some(existing) if !existing.is_empty() => format!("{existing} {makeflags}"),
         _ => makeflags.to_string(),
+    }
+}
+
+/// Like [`append_jobserver_makeflags`], for an environment whose values may
+/// be unset.
+pub fn append_jobserver_makeflags_to_vars(
+    vars: &mut HashMap<String, Option<String>>,
+    makeflags: Option<&str>,
+) {
+    let Some(makeflags) = makeflags else {
+        return;
     };
-    env_vars.insert("MAKEFLAGS".to_string(), value);
+    let existing = vars.get("MAKEFLAGS").and_then(|v| v.as_deref());
+    let value = with_jobserver_makeflags(existing, makeflags);
+    vars.insert("MAKEFLAGS".to_string(), Some(value));
 }
 
 /// Returns a map of environment variables that are used in the build process.

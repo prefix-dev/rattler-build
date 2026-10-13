@@ -41,7 +41,9 @@ pub(crate) struct ParallelBuilds<'a> {
     /// one is active.
     configuration: Arc<Configuration>,
     max_jobs: usize,
-    jobs: FuturesUnordered<LocalBoxFuture<'a, Finished>>,
+    /// Each job, with whether it holds a jobserver slot (builds and tests).
+    jobs: FuturesUnordered<LocalBoxFuture<'a, (Finished, bool)>>,
+    /// Running builds and test runs. Each holds one implicit jobserver token.
     running_builds: usize,
     jobserver: Option<Jobserver>,
 }
@@ -77,8 +79,7 @@ impl<'a> ParallelBuilds<'a> {
             else {
                 break;
             };
-            self.running_builds += 1;
-            self.resize_jobserver();
+            self.hold_slot();
             let configuration = self.configuration.clone();
             self.jobs.push(
                 async move {
@@ -88,10 +89,11 @@ impl<'a> ParallelBuilds<'a> {
                         WorkingDirectoryBehavior::Cleanup,
                     )
                     .await;
-                    Finished::Build {
+                    let finished = Finished::Build {
                         output: Box::new(output),
                         result: Box::new(result),
-                    }
+                    };
+                    (finished, true)
                 }
                 .boxed_local(),
             );
@@ -101,13 +103,32 @@ impl<'a> ParallelBuilds<'a> {
 
     /// Runs `task` as a job; it counts against the maximum like a build.
     pub(crate) fn spawn(&mut self, task: impl Future<Output = miette::Result<()>> + 'a) {
-        self.jobs.push(task.map(Finished::Task).boxed_local());
+        self.jobs.push(
+            task.map(|result| (Finished::Task(result), false))
+                .boxed_local(),
+        );
+    }
+
+    /// Runs tests as a job. Like a build, it holds a jobserver slot while it
+    /// runs, since tests can compile too.
+    pub(crate) fn spawn_tests(&mut self, task: impl Future<Output = miette::Result<()>> + 'a) {
+        self.hold_slot();
+        self.jobs.push(
+            task.map(|result| (Finished::Task(result), true))
+                .boxed_local(),
+        );
+    }
+
+    /// The configuration of the builds; tests that run as jobs should use it
+    /// too, so they see the jobserver.
+    pub(crate) fn configuration(&self) -> Arc<Configuration> {
+        self.configuration.clone()
     }
 
     /// Waits for the next job to finish; `None` when no job is in flight.
     pub(crate) async fn next(&mut self) -> Option<Finished> {
-        let finished = self.jobs.next().await?;
-        if matches!(finished, Finished::Build { .. }) {
+        let (finished, held_slot) = self.jobs.next().await?;
+        if held_slot {
             self.running_builds -= 1;
             self.resize_jobserver();
         }
@@ -125,6 +146,11 @@ impl<'a> ParallelBuilds<'a> {
             );
         }
         while self.next().await.is_some() {}
+    }
+
+    fn hold_slot(&mut self) {
+        self.running_builds += 1;
+        self.resize_jobserver();
     }
 
     fn resize_jobserver(&mut self) {

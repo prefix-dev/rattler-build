@@ -865,8 +865,8 @@ pub async fn run_build_from_args(
             }
             test_queue = deferred_tests;
             if !to_test.is_empty() {
-                let tool_configuration = &tool_configuration;
-                builds.spawn(async move { run_queued_tests(&to_test, tool_configuration).await });
+                let configuration = builds.configuration();
+                builds.spawn_tests(async move { run_queued_tests(&to_test, &configuration).await });
             }
         }
     }
