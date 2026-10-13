@@ -232,9 +232,9 @@ impl Output {
         }
 
         let mut exec_args = self.prepare_build_script().await?;
-        env_vars::append_jobserver_makeflags(
+        env_vars::apply_jobserver(
             &mut exec_args.env_vars,
-            tool_configuration.jobserver_makeflags.as_deref(),
+            tool_configuration.jobserver.as_ref(),
         );
         rattler_build_script::run_script(exec_args).await?;
 

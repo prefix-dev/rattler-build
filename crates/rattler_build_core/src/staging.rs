@@ -350,9 +350,9 @@ impl Output {
             self.build_configuration.experimental,
         )
         .into_diagnostic()?;
-        env_vars::append_jobserver_makeflags(
+        env_vars::apply_jobserver(
             &mut exec_args.env_vars,
-            tool_configuration.jobserver_makeflags.as_deref(),
+            tool_configuration.jobserver.as_ref(),
         );
         rattler_build_script::run_script(exec_args)
             .await

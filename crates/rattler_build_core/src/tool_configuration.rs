@@ -142,6 +142,17 @@ impl fmt::Display for ParallelBuilds {
     }
 }
 
+/// How an active jobserver is presented to build and test scripts.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct JobserverEnv {
+    /// `MAKEFLAGS` advertising the jobserver, appended to the script's own.
+    pub makeflags: String,
+    /// The `CPU_COUNT` for scripts: each build's share of the job slots, for
+    /// recipes that pass `-j${CPU_COUNT}` and so bypass the jobserver. `None`
+    /// keeps `CPU_COUNT` as it is (for example when the user set it).
+    pub cpu_count: Option<usize>,
+}
+
 /// Global configuration for the build
 #[derive(Clone)]
 pub struct Configuration {
@@ -215,10 +226,9 @@ pub struct Configuration {
     /// How many outputs are built at the same time
     pub parallel_builds: ParallelBuilds,
 
-    /// The `MAKEFLAGS` advertising the active jobserver, if any. Set by the
-    /// build loop while builds share a jobserver; appended to the `MAKEFLAGS`
-    /// of build scripts.
-    pub jobserver_makeflags: Option<String>,
+    /// The jobserver shared by parallel builds, if one is active. Set by the
+    /// build loop; applied to build and test script environments.
+    pub jobserver: Option<JobserverEnv>,
 
     /// Serialises reindexing the output channel, so that builds running in
     /// parallel never write its `repodata.json` concurrently. Shared by all
@@ -624,7 +634,7 @@ impl ConfigurationBuilder {
             allow_insecure_host: self.allow_insecure_host,
             continue_on_failure: self.continue_on_failure,
             parallel_builds: self.parallel_builds,
-            jobserver_makeflags: None,
+            jobserver: None,
             output_dir_lock: Arc::default(),
             error_prefix_in_binary: self.error_prefix_in_binary,
             error_overlapping_files: self.error_overlapping_files,

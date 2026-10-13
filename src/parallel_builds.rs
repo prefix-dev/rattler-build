@@ -19,7 +19,7 @@ use miette::IntoDiagnostic;
 use rattler_build_core::{
     build::{WorkingDirectoryBehavior, run_build},
     metadata::Output,
-    tool_configuration::Configuration,
+    tool_configuration::{Configuration, JobserverEnv},
 };
 
 use crate::{build_queue::OutputBuildQueue, jobserver::Jobserver};
@@ -57,8 +57,23 @@ impl<'a> ParallelBuilds<'a> {
         let mut configuration = configuration.clone();
         if let Some(jobserver) = &jobserver {
             let makeflags = jobserver.makeflags();
-            tracing::info!("Using a jobserver: MAKEFLAGS='{makeflags}'");
-            configuration.jobserver_makeflags = Some(makeflags);
+            // Recipes that pass `-j${CPU_COUNT}` bypass the jobserver; give
+            // each build its share of the job slots, unless the user set
+            // CPU_COUNT (which build scripts receive as before).
+            let cpu_count = std::env::var_os("CPU_COUNT").is_none().then(|| {
+                cpu_count_share(
+                    parallel_builds.jobserver_jobs.map_or(1, |jobs| jobs.get()),
+                    parallel_builds.max_builds.get(),
+                )
+            });
+            tracing::info!(
+                "Using a jobserver: MAKEFLAGS='{makeflags}'{}",
+                cpu_count.map_or(String::new(), |n| format!(", CPU_COUNT={n}"))
+            );
+            configuration.jobserver = Some(JobserverEnv {
+                makeflags,
+                cpu_count,
+            });
         }
         Self {
             configuration: Arc::new(configuration),
@@ -157,5 +172,23 @@ impl<'a> ParallelBuilds<'a> {
         if let Some(jobserver) = &mut self.jobserver {
             jobserver.set_running_builds(self.running_builds);
         }
+    }
+}
+
+/// Each build's share of `jobs` job slots when `builds` run at the same time.
+fn cpu_count_share(jobs: usize, builds: usize) -> usize {
+    (jobs / builds.max(1)).max(1)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::cpu_count_share;
+
+    #[test]
+    fn cpu_count_is_the_share_per_build_and_at_least_one() {
+        assert_eq!(cpu_count_share(20, 4), 5);
+        assert_eq!(cpu_count_share(20, 6), 3);
+        assert_eq!(cpu_count_share(20, 1), 20);
+        assert_eq!(cpu_count_share(2, 4), 1);
     }
 }

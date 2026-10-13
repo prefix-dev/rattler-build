@@ -16,6 +16,7 @@ use crate::ios;
 use crate::linux;
 use crate::macos;
 use crate::metadata::Output;
+use crate::tool_configuration::JobserverEnv;
 use crate::windows;
 
 macro_rules! insert {
@@ -210,19 +211,41 @@ pub fn language_vars(output: &Output) -> HashMap<String, Option<String>> {
     result
 }
 
-/// Appends the `MAKEFLAGS` of an active jobserver (see
-/// [`Configuration::jobserver_makeflags`](crate::tool_configuration::Configuration::jobserver_makeflags))
-/// to a build script environment. Flags already in `MAKEFLAGS` are kept; the
+/// Applies an active jobserver (see
+/// [`Configuration::jobserver`](crate::tool_configuration::Configuration::jobserver))
+/// to a build script environment.
+///
+/// Its `MAKEFLAGS` are appended: flags already in `MAKEFLAGS` are kept, and the
 /// jobserver's `-j` and `--jobserver-auth` come last, so they take precedence.
-pub fn append_jobserver_makeflags(
-    env_vars: &mut IndexMap<String, String>,
-    makeflags: Option<&str>,
-) {
-    let Some(makeflags) = makeflags else {
+/// `CPU_COUNT` is set to the jobserver's share per build, if one is given.
+pub fn apply_jobserver(env_vars: &mut IndexMap<String, String>, jobserver: Option<&JobserverEnv>) {
+    let Some(jobserver) = jobserver else {
         return;
     };
-    let value = with_jobserver_makeflags(env_vars.get("MAKEFLAGS").map(String::as_str), makeflags);
-    env_vars.insert("MAKEFLAGS".to_string(), value);
+    let makeflags = with_jobserver_makeflags(
+        env_vars.get("MAKEFLAGS").map(String::as_str),
+        &jobserver.makeflags,
+    );
+    env_vars.insert("MAKEFLAGS".to_string(), makeflags);
+    if let Some(cpu_count) = jobserver.cpu_count {
+        env_vars.insert("CPU_COUNT".to_string(), cpu_count.to_string());
+    }
+}
+
+/// Like [`apply_jobserver`], for an environment whose values may be unset.
+pub fn apply_jobserver_to_vars(
+    vars: &mut HashMap<String, Option<String>>,
+    jobserver: Option<&JobserverEnv>,
+) {
+    let Some(jobserver) = jobserver else {
+        return;
+    };
+    let existing = vars.get("MAKEFLAGS").and_then(|v| v.as_deref());
+    let makeflags = with_jobserver_makeflags(existing, &jobserver.makeflags);
+    vars.insert("MAKEFLAGS".to_string(), Some(makeflags));
+    if let Some(cpu_count) = jobserver.cpu_count {
+        vars.insert("CPU_COUNT".to_string(), Some(cpu_count.to_string()));
+    }
 }
 
 /// `existing` `MAKEFLAGS` (if any) followed by the jobserver's.
@@ -231,20 +254,6 @@ fn with_jobserver_makeflags(existing: Option<&str>, makeflags: &str) -> String {
         Some(existing) if !existing.is_empty() => format!("{existing} {makeflags}"),
         _ => makeflags.to_string(),
     }
-}
-
-/// Like [`append_jobserver_makeflags`], for an environment whose values may
-/// be unset.
-pub fn append_jobserver_makeflags_to_vars(
-    vars: &mut HashMap<String, Option<String>>,
-    makeflags: Option<&str>,
-) {
-    let Some(makeflags) = makeflags else {
-        return;
-    };
-    let existing = vars.get("MAKEFLAGS").and_then(|v| v.as_deref());
-    let value = with_jobserver_makeflags(existing, makeflags);
-    vars.insert("MAKEFLAGS".to_string(), Some(value));
 }
 
 /// Returns a map of environment variables that are used in the build process.
@@ -751,27 +760,50 @@ mod test {
         assert!(vars.contains_key("PATH"));
     }
 
-    #[test]
-    fn jobserver_makeflags_are_appended_after_existing_makeflags() {
-        let jobserver = "-j8 --jobserver-auth=fifo:/tmp/fifo";
-
-        let mut env = IndexMap::from([("MAKEFLAGS".to_string(), "-k V=1".to_string())]);
-        append_jobserver_makeflags(&mut env, Some(jobserver));
-        assert_eq!(env["MAKEFLAGS"], format!("-k V=1 {jobserver}"));
-
-        let mut env = IndexMap::new();
-        append_jobserver_makeflags(&mut env, Some(jobserver));
-        assert_eq!(env["MAKEFLAGS"], jobserver);
+    fn jobserver(cpu_count: Option<usize>) -> JobserverEnv {
+        JobserverEnv {
+            makeflags: "-j8 --jobserver-auth=fifo:/tmp/fifo".to_string(),
+            cpu_count,
+        }
     }
 
     #[test]
-    fn no_jobserver_leaves_makeflags_untouched() {
-        let mut env = IndexMap::from([("MAKEFLAGS".to_string(), "-j4".to_string())]);
-        append_jobserver_makeflags(&mut env, None);
-        assert_eq!(env["MAKEFLAGS"], "-j4");
+    fn jobserver_makeflags_are_appended_after_existing_makeflags() {
+        let jobserver = jobserver(None);
+        let makeflags = &jobserver.makeflags;
+
+        let mut env = IndexMap::from([("MAKEFLAGS".to_string(), "-k V=1".to_string())]);
+        apply_jobserver(&mut env, Some(&jobserver));
+        assert_eq!(env["MAKEFLAGS"], format!("-k V=1 {makeflags}"));
 
         let mut env = IndexMap::new();
-        append_jobserver_makeflags(&mut env, None);
-        assert!(!env.contains_key("MAKEFLAGS"));
+        apply_jobserver(&mut env, Some(&jobserver));
+        assert_eq!(&env["MAKEFLAGS"], makeflags);
+    }
+
+    #[test]
+    fn jobserver_sets_cpu_count_only_when_given() {
+        let mut env = IndexMap::from([("CPU_COUNT".to_string(), "20".to_string())]);
+        apply_jobserver(&mut env, Some(&jobserver(Some(5))));
+        assert_eq!(env["CPU_COUNT"], "5");
+
+        let mut env = IndexMap::from([("CPU_COUNT".to_string(), "20".to_string())]);
+        apply_jobserver(&mut env, Some(&jobserver(None)));
+        assert_eq!(env["CPU_COUNT"], "20");
+
+        let mut vars = HashMap::from([("CPU_COUNT".to_string(), Some("20".to_string()))]);
+        apply_jobserver_to_vars(&mut vars, Some(&jobserver(Some(5))));
+        assert_eq!(vars["CPU_COUNT"].as_deref(), Some("5"));
+    }
+
+    #[test]
+    fn no_jobserver_leaves_the_environment_untouched() {
+        let mut env = IndexMap::from([
+            ("MAKEFLAGS".to_string(), "-j4".to_string()),
+            ("CPU_COUNT".to_string(), "20".to_string()),
+        ]);
+        let before = env.clone();
+        apply_jobserver(&mut env, None);
+        assert_eq!(env, before);
     }
 }

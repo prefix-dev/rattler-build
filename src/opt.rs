@@ -728,7 +728,8 @@ pub struct BuildOpts {
     /// Build up to BUILDS outputs at the same time, as soon as their
     /// dependencies are available (default: 1). With `:JOBS`, the builds also
     /// share a GNU make jobserver with JOBS job slots (unix only), honoured by
-    /// make >= 4.4 and ninja >= 1.13 when the build does not pass its own `-j`.
+    /// make >= 4.4 and ninja >= 1.13 when the build does not pass its own `-j`;
+    /// `CPU_COUNT` is then set to JOBS / BUILDS unless already set.
     #[clap(long, value_name = "BUILDS[:JOBS]")]
     pub parallel_builds: Option<ParallelBuilds>,
 

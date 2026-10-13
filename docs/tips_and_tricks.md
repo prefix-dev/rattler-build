@@ -79,6 +79,23 @@ a stale copy.
 rattler-build build --recipe-dir . --continue-on-failure=skip-dependents
 ```
 
+To build independent packages at the same time, use `--parallel-builds`.
+With `BUILDS:JOBS`, the builds also share a GNU make jobserver with `JOBS` job
+slots, so `BUILDS` builds together run about `JOBS` compile jobs instead of
+`BUILDS` times the number of CPUs (unix only):
+
+```sh
+rattler-build build --recipe-dir . --parallel-builds 4:16
+```
+
+The jobserver reaches build tools through `MAKEFLAGS`. make >= 4.4 and
+ninja >= 1.13 use it, but only when the recipe does not pass its own job count:
+an explicit `-j` (for example `make -j${CPU_COUNT}`, `ninja -j${CPU_COUNT}` or
+`cmake --build . --parallel ${CPU_COUNT}`) bypasses it. So with these build
+tools, prefer leaving out `-j` in recipes. For recipes that do pass it,
+`CPU_COUNT` is set to each build's share, `JOBS / BUILDS` (at least 1), while
+a jobserver is active, unless you set `CPU_COUNT` yourself.
+
 !!!note
 
     You can generate recipes for different ecosystems with the `rattler-build generate-recipe` command.

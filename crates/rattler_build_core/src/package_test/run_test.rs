@@ -411,10 +411,7 @@ fn test_env_vars(
     if config.env_isolation == EnvironmentIsolation::None {
         vars.retain(|key, _| key != ShellEnum::default().path_var(&build_platform));
     }
-    env_vars::append_jobserver_makeflags_to_vars(
-        &mut vars,
-        config.tool_configuration.jobserver_makeflags.as_deref(),
-    );
+    env_vars::apply_jobserver_to_vars(&mut vars, config.tool_configuration.jobserver.as_ref());
     vars.extend(env_vars::test_vars(
         target_platform,
         build_platform,
