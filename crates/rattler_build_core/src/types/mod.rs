@@ -146,9 +146,9 @@ pub struct BuildSummary {
     pub failed: bool,
 }
 
-/// Serialises writing packages into, and reindexing, the shared output
-/// channel, so that builds running in parallel never index a partially written
-/// package or write `repodata.json` concurrently.
+/// Serialises reindexing the shared output channel, so that builds running in
+/// parallel never write `repodata.json` concurrently. Packages need no lock:
+/// they are written to a temporary file and renamed into place.
 pub static OUTPUT_DIR_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 /// Builds the channel list and reindexes the output channel.
