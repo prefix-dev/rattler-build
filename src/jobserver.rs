@@ -7,11 +7,11 @@
 //! pool holds `jobs - running builds` tokens and is resized as builds start
 //! and finish.
 //!
-//! Only implemented on unix (named pipe); on other platforms no jobserver is
-//! created and every build uses its own job count, as before.
+//! Only created when requested (`--parallel-builds BUILDS:JOBS`), and only
+//! implemented on unix (named pipe); elsewhere no jobserver is created and
+//! every build uses its own job count, as before.
 
-/// The jobserver of a parallel build. Advertised to build scripts through
-/// `MAKEFLAGS` until dropped.
+/// The jobserver of a parallel build. Removed when dropped.
 pub(crate) struct Jobserver {
     #[cfg(unix)]
     jobs: usize,
@@ -20,19 +20,13 @@ pub(crate) struct Jobserver {
 }
 
 impl Jobserver {
-    /// Creates a jobserver for `jobs` concurrent jobs and advertises it to
-    /// build scripts. Returns `None` (with a warning) if that is not possible.
+    /// Creates a jobserver for `jobs` concurrent jobs. Returns `None` (with a
+    /// warning) if that is not possible.
     pub(crate) fn new(jobs: usize) -> Option<Self> {
         #[cfg(unix)]
         {
             match unix::Pool::new() {
-                Ok(pool) => {
-                    let makeflags =
-                        format!("-j{jobs} --jobserver-auth=fifo:{}", pool.path().display());
-                    tracing::info!("Using a jobserver for {jobs} jobs: MAKEFLAGS='{makeflags}'");
-                    rattler_build_core::env_vars::set_jobserver_makeflags(Some(makeflags));
-                    Some(Self { jobs, pool })
-                }
+                Ok(pool) => Some(Self { jobs, pool }),
                 Err(e) => {
                     tracing::warn!(
                         "Could not create a jobserver, builds will not share a job limit: {e}"
@@ -51,18 +45,26 @@ impl Jobserver {
         }
     }
 
+    /// The `MAKEFLAGS` that advertise this jobserver to build tools.
+    pub(crate) fn makeflags(&self) -> String {
+        #[cfg(unix)]
+        {
+            format!(
+                "-j{} --jobserver-auth=fifo:{}",
+                self.jobs,
+                self.pool.path().display()
+            )
+        }
+        #[cfg(not(unix))]
+        unreachable!("no jobserver is created on this platform")
+    }
+
     /// Sizes the token pool for `running` builds in flight.
     pub(crate) fn set_running_builds(&mut self, running: usize) {
         #[cfg(unix)]
         self.pool.resize(self.jobs.saturating_sub(running.max(1)));
         #[cfg(not(unix))]
         let _ = running;
-    }
-}
-
-impl Drop for Jobserver {
-    fn drop(&mut self) {
-        rattler_build_core::env_vars::set_jobserver_makeflags(None);
     }
 }
 

@@ -211,7 +211,10 @@ impl Output {
     /// - The script file cannot be read or found
     /// - The script execution fails
     /// - The interpreter is not supported or not available
-    pub async fn run_build_script(&self) -> Result<(), InterpreterError> {
+    pub async fn run_build_script(
+        &self,
+        tool_configuration: &crate::tool_configuration::Configuration,
+    ) -> Result<(), InterpreterError> {
         let span = tracing::info_span!("Running build script");
         let _enter = span.enter();
 
@@ -228,7 +231,11 @@ impl Output {
             Err(err) => return Err(err.into()),
         }
 
-        let exec_args = self.prepare_build_script().await?;
+        let mut exec_args = self.prepare_build_script().await?;
+        env_vars::append_jobserver_makeflags(
+            &mut exec_args.env_vars,
+            tool_configuration.jobserver_makeflags.as_deref(),
+        );
         rattler_build_script::run_script(exec_args).await?;
 
         Ok(())

@@ -146,11 +146,6 @@ pub struct BuildSummary {
     pub failed: bool,
 }
 
-/// Serialises reindexing the shared output channel, so that builds running in
-/// parallel never write `repodata.json` concurrently. Packages need no lock:
-/// they are written to a temporary file and renamed into place.
-pub static OUTPUT_DIR_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
-
 /// Builds the channel list and reindexes the output channel.
 pub async fn build_reindexed_channels(
     build_configuration: &BuildConfiguration,
@@ -169,7 +164,9 @@ pub async fn build_reindexed_channels(
         return Ok(build_configuration.channels.clone());
     }
 
-    let _output_dir_guard = OUTPUT_DIR_LOCK.lock().await;
+    // Packages need no lock: they are written to a temporary file and renamed
+    // into place, so only reindexing is serialised.
+    let _output_dir_guard = tool_configuration.output_dir_lock.lock().await;
     let output_channel =
         Channel::try_from_directory(output_dir).expect("could not create channel from directory");
 

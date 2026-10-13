@@ -1,17 +1,18 @@
 //! Runs queued builds, and the work that follows them (tests, reindexing the
-//! output channel), with up to `--max-parallel-builds` jobs in flight.
+//! output channel), with up to `--parallel-builds` jobs in flight.
 //!
 //! With the default of one job this reproduces the serial order exactly: a
 //! build, then its tests or reindex, then the next build. With more, builds
-//! whose dependencies are available run side by side; a shared jobserver
-//! (see [`crate::jobserver`]) bounds the total number of compile jobs.
+//! whose dependencies are available run side by side. If requested, a shared
+//! jobserver (see [`crate::jobserver`]) bounds the total number of compile
+//! jobs.
 //!
 //! All jobs are futures polled by the calling task. The build loop must never
 //! await anything else that could wait on a lock held by one of these jobs
 //! (for example the output channel lock), or both would wait forever; that is
 //! why tests and reindexing run as jobs too.
 
-use std::{future::Future, path::PathBuf};
+use std::{future::Future, path::PathBuf, sync::Arc};
 
 use futures::{FutureExt, StreamExt, future::LocalBoxFuture, stream::FuturesUnordered};
 use miette::IntoDiagnostic;
@@ -36,7 +37,9 @@ pub(crate) enum Finished {
 
 /// The jobs in flight.
 pub(crate) struct ParallelBuilds<'a> {
-    configuration: &'a Configuration,
+    /// The configuration of the builds, with the jobserver's `MAKEFLAGS` if
+    /// one is active.
+    configuration: Arc<Configuration>,
     max_jobs: usize,
     jobs: FuturesUnordered<LocalBoxFuture<'a, Finished>>,
     running_builds: usize,
@@ -44,22 +47,23 @@ pub(crate) struct ParallelBuilds<'a> {
 }
 
 impl<'a> ParallelBuilds<'a> {
-    pub(crate) fn new(configuration: &'a Configuration) -> Self {
-        let max_jobs = configuration.max_parallel_builds.max(1);
-        let jobserver = (max_jobs > 1).then(|| {
-            Jobserver::new(
-                configuration
-                    .parallel_build_jobs
-                    .unwrap_or_else(num_cpus::get)
-                    .max(1),
-            )
-        });
+    pub(crate) fn new(configuration: &Configuration) -> Self {
+        let parallel_builds = configuration.parallel_builds;
+        let jobserver = parallel_builds
+            .jobserver_jobs
+            .and_then(|jobs| Jobserver::new(jobs.get()));
+        let mut configuration = configuration.clone();
+        if let Some(jobserver) = &jobserver {
+            let makeflags = jobserver.makeflags();
+            tracing::info!("Using a jobserver: MAKEFLAGS='{makeflags}'");
+            configuration.jobserver_makeflags = Some(makeflags);
+        }
         Self {
-            configuration,
-            max_jobs,
+            configuration: Arc::new(configuration),
+            max_jobs: parallel_builds.max_builds.get(),
             jobs: FuturesUnordered::new(),
             running_builds: 0,
-            jobserver: jobserver.flatten(),
+            jobserver,
         }
     }
 
@@ -75,12 +79,12 @@ impl<'a> ParallelBuilds<'a> {
             };
             self.running_builds += 1;
             self.resize_jobserver();
-            let configuration = self.configuration;
+            let configuration = self.configuration.clone();
             self.jobs.push(
                 async move {
                     let result = run_build(
                         output.clone(),
-                        configuration,
+                        &configuration,
                         WorkingDirectoryBehavior::Cleanup,
                     )
                     .await;

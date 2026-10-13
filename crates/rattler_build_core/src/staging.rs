@@ -337,7 +337,7 @@ impl Output {
             )
         };
 
-        let exec_args = prepare_build_plan_execution_args(
+        let mut exec_args = prepare_build_plan_execution_args(
             &staging.build.plan,
             self.recipe.context(),
             self.build_configuration.selector_config(),
@@ -350,6 +350,10 @@ impl Output {
             self.build_configuration.experimental,
         )
         .into_diagnostic()?;
+        env_vars::append_jobserver_makeflags(
+            &mut exec_args.env_vars,
+            tool_configuration.jobserver_makeflags.as_deref(),
+        );
         rattler_build_script::run_script(exec_args)
             .await
             .into_diagnostic()?;

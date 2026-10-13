@@ -190,7 +190,7 @@ pub async fn run_build(
         "build.script.interpreter"
     };
 
-    match output.run_build_script().await {
+    match output.run_build_script(tool_configuration).await {
         Ok(_) => {}
         Err(InterpreterError::ExecutionFailed(err))
             if err.kind() == std::io::ErrorKind::InvalidInput =>

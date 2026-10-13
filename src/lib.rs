@@ -247,8 +247,7 @@ pub fn get_tool_config(
         .with_test_strategy(build_data.test)
         .with_skip_existing(build_data.skip_existing)
         .with_continue_on_failure(build_data.continue_on_failure)
-        .with_max_parallel_builds(build_data.max_parallel_builds)
-        .with_parallel_build_jobs(build_data.parallel_build_jobs)
+        .with_parallel_builds(build_data.parallel_builds)
         .with_noarch_build_platform(build_data.noarch_build_platform)
         .with_channel_priority(build_data.common.channel_priority)
         .with_allow_insecure_host(build_data.common.allow_insecure_host.clone())
@@ -764,7 +763,7 @@ pub async fn run_build_from_args(
     tracing::info!(
         "Starting build of {} outputs ({} at a time)",
         build_queue.len(),
-        tool_configuration.max_parallel_builds.max(1)
+        tool_configuration.parallel_builds.max_builds
     );
     let mut builds = ParallelBuilds::new(&tool_configuration);
     loop {
@@ -1681,8 +1680,7 @@ pub async fn debug_recipe(
         extra_meta: None,
         sandbox_configuration: None,
         continue_on_failure: ContinueOnFailure::No,
-        max_parallel_builds: 1,
-        parallel_build_jobs: None,
+        parallel_builds: Default::default(),
         error_prefix_in_binary: false,
         allow_symlinks_on_windows: false,
         error_overlapping_files: false,

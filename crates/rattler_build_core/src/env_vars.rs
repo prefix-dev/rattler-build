@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
+use indexmap::IndexMap;
 use rattler_build_jinja::Variable;
 use rattler_build_script::{EnvironmentIsolation, RuntimeEnv};
 use rattler_build_types::NormalizedKey;
@@ -209,17 +210,22 @@ pub fn language_vars(output: &Output) -> HashMap<String, Option<String>> {
     result
 }
 
-/// `MAKEFLAGS` advertising the GNU make jobserver shared by builds that run in
-/// parallel, if one is active. Owned by rattler-build, so it is passed to build
-/// scripts under every environment isolation mode.
-static JOBSERVER_MAKEFLAGS: std::sync::RwLock<Option<String>> = std::sync::RwLock::new(None);
-
-/// Sets (or clears) the `MAKEFLAGS` of the jobserver shared by parallel
-/// builds. Build scripts started afterwards receive it.
-pub fn set_jobserver_makeflags(makeflags: Option<String>) {
-    *JOBSERVER_MAKEFLAGS
-        .write()
-        .unwrap_or_else(|poisoned| poisoned.into_inner()) = makeflags;
+/// Appends the `MAKEFLAGS` of an active jobserver (see
+/// [`Configuration::jobserver_makeflags`](crate::tool_configuration::Configuration::jobserver_makeflags))
+/// to a build script environment. Flags already in `MAKEFLAGS` are kept; the
+/// jobserver's `-j` and `--jobserver-auth` come last, so they take precedence.
+pub fn append_jobserver_makeflags(
+    env_vars: &mut IndexMap<String, String>,
+    makeflags: Option<&str>,
+) {
+    let Some(makeflags) = makeflags else {
+        return;
+    };
+    let value = match env_vars.get("MAKEFLAGS").map(|v| v.trim()) {
+        Some(existing) if !existing.is_empty() => format!("{existing} {makeflags}"),
+        _ => makeflags.to_string(),
+    };
+    env_vars.insert("MAKEFLAGS".to_string(), value);
 }
 
 /// Returns a map of environment variables that are used in the build process.
@@ -286,13 +292,6 @@ pub fn os_vars(
                 runtime.var("MAKEFLAGS").map(str::to_owned),
             );
         }
-    }
-    if let Some(makeflags) = JOBSERVER_MAKEFLAGS
-        .read()
-        .unwrap_or_else(|poisoned| poisoned.into_inner())
-        .clone()
-    {
-        vars.insert("MAKEFLAGS".to_string(), Some(makeflags));
     }
 
     insert!(
@@ -731,5 +730,29 @@ mod test {
 
         assert!(!vars.contains_key("LIBRARY_PREFIX"));
         assert!(vars.contains_key("PATH"));
+    }
+
+    #[test]
+    fn jobserver_makeflags_are_appended_after_existing_makeflags() {
+        let jobserver = "-j8 --jobserver-auth=fifo:/tmp/fifo";
+
+        let mut env = IndexMap::from([("MAKEFLAGS".to_string(), "-k V=1".to_string())]);
+        append_jobserver_makeflags(&mut env, Some(jobserver));
+        assert_eq!(env["MAKEFLAGS"], format!("-k V=1 {jobserver}"));
+
+        let mut env = IndexMap::new();
+        append_jobserver_makeflags(&mut env, Some(jobserver));
+        assert_eq!(env["MAKEFLAGS"], jobserver);
+    }
+
+    #[test]
+    fn no_jobserver_leaves_makeflags_untouched() {
+        let mut env = IndexMap::from([("MAKEFLAGS".to_string(), "-j4".to_string())]);
+        append_jobserver_makeflags(&mut env, None);
+        assert_eq!(env["MAKEFLAGS"], "-j4");
+
+        let mut env = IndexMap::new();
+        append_jobserver_makeflags(&mut env, None);
+        assert!(!env.contains_key("MAKEFLAGS"));
     }
 }

@@ -22,7 +22,7 @@ use url::Url;
 use crate::{
     config::Config,
     console_utils::{Color, LogStyle},
-    tool_configuration::{ContinueOnFailure, SkipExisting, TestStrategy},
+    tool_configuration::{ContinueOnFailure, ParallelBuilds, SkipExisting, TestStrategy},
 };
 #[cfg(feature = "recipe-generation")]
 use rattler_build_recipe_generator::GenerateRecipeOpts;
@@ -725,17 +725,12 @@ pub struct BuildOpts {
     )]
     pub continue_on_failure: Option<ContinueOnFailure>,
 
-    /// Build up to this many outputs at the same time, as soon as their
-    /// dependencies are available (default: 1). With more than one, a shared
-    /// GNU make jobserver limits the total number of jobs (on unix).
-    #[clap(long, value_parser = clap::value_parser!(u32).range(1..))]
-    pub max_parallel_builds: Option<u32>,
-
-    /// The total number of jobs shared by parallel builds through the
-    /// jobserver; honoured by make >= 4.4 and ninja >= 1.13 (default: the
-    /// number of CPUs).
-    #[clap(long, requires = "max_parallel_builds", value_parser = clap::value_parser!(u32).range(1..))]
-    pub parallel_build_jobs: Option<u32>,
+    /// Build up to BUILDS outputs at the same time, as soon as their
+    /// dependencies are available (default: 1). With `:JOBS`, the builds also
+    /// share a GNU make jobserver with JOBS job slots (unix only), honoured by
+    /// make >= 4.4 and ninja >= 1.13 when the build does not pass its own `-j`.
+    #[clap(long, value_name = "BUILDS[:JOBS]")]
+    pub parallel_builds: Option<ParallelBuilds>,
 
     /// Error if the host prefix is detected in any binary files
     #[arg(long, help_heading = "Modifying result")]
@@ -950,8 +945,7 @@ pub struct BuildData {
     pub extra_meta: Option<Vec<(String, Value)>>,
     pub sandbox_configuration: Option<SandboxConfiguration>,
     pub continue_on_failure: ContinueOnFailure,
-    pub max_parallel_builds: usize,
-    pub parallel_build_jobs: Option<usize>,
+    pub parallel_builds: ParallelBuilds,
     pub error_prefix_in_binary: bool,
     pub allow_symlinks_on_windows: bool,
     pub error_overlapping_files: bool,
@@ -1039,8 +1033,7 @@ impl BuildData {
             extra_meta,
             sandbox_configuration,
             continue_on_failure,
-            max_parallel_builds: 1,
-            parallel_build_jobs: None,
+            parallel_builds: ParallelBuilds::default(),
             error_prefix_in_binary,
             allow_symlinks_on_windows,
             error_overlapping_files,
@@ -1107,8 +1100,7 @@ impl BuildData {
             opts.markdown_summary,
         );
         build_data.channels_from_config = !explicit_channels && build_data.channels.is_some();
-        build_data.max_parallel_builds = opts.max_parallel_builds.map_or(1, |n| n as usize);
-        build_data.parallel_build_jobs = opts.parallel_build_jobs.map(|n| n as usize);
+        build_data.parallel_builds = opts.parallel_builds.unwrap_or_default();
         build_data
     }
 }
