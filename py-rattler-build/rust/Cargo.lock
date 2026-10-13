@@ -4678,6 +4678,7 @@ dependencies = [
  "ignore",
  "indexmap 2.14.2",
  "jiff",
+ "libc",
  "memmap2",
  "miette",
  "minijinja",
