@@ -163,7 +163,7 @@ mod tests {
                 ..PackageRecord::new(
                     package.clone(),
                     "1.0".parse::<Version>().unwrap(),
-                    "0".into(),
+                    "0".parse().unwrap(),
                 )
             },
             identifier: "fresh-output-1.0-0.conda".parse().unwrap(),

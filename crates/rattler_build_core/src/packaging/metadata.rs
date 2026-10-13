@@ -17,8 +17,8 @@ use rattler_build_recipe::stage1::build::PrefixDetection;
 use rattler_conda_types::{
     ChannelUrl, NoArchType, RepodataRevision, Subdir,
     package::{
-        AboutJson, FileMode, IndexJson, LinkJson, NoArchLinks, PackageFile, PathType, PathsEntry,
-        PathsJson, PrefixPlaceholder, PythonEntryPoints, RunExportsJson,
+        AboutJson, BuildString, FileMode, IndexJson, LinkJson, NoArchLinks, PackageFile, PathType,
+        PathsEntry, PathsJson, PrefixPlaceholder, PythonEntryPoints, RunExportsJson,
     },
 };
 use rattler_digest::{compute_bytes_digest, compute_file_digest};
@@ -397,7 +397,7 @@ impl Output {
                 .parse()
                 .expect("Should always be valid"),
             version: self.version().clone(),
-            build: self.build_string().into_owned(),
+            build: BuildString::new_unchecked(self.build_string()),
             build_number: recipe.build().number.unwrap_or(0),
             arch,
             platform,

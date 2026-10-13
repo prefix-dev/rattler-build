@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use jiff::Timestamp;
 use pyo3::prelude::*;
 use rattler_build_package::{ArchiveType, FileCollector, FileEntry, PackageBuilder, PackageConfig};
-use rattler_conda_types::package::IndexJson;
+use rattler_conda_types::package::{BuildString, IndexJson};
 use rattler_conda_types::{NoArchType, PackageName, Subdir, VersionWithSource};
 
 use crate::error::RattlerBuildError;
@@ -353,7 +353,7 @@ pub fn assemble_package_py(
     let index = IndexJson {
         name: pkg_name,
         version: pkg_version,
-        build: build_string.to_string(),
+        build: BuildString::new_unchecked(build_string),
         build_number,
         arch: platform.arch().map(|a| a.to_string()),
         platform: platform.only_platform().map(|p| p.to_string()),
