@@ -230,9 +230,11 @@ pub struct Configuration {
     /// build loop; applied to build and test script environments.
     pub jobserver: Option<JobserverEnv>,
 
-    /// Serialises reindexing the output channel, so that builds running in
-    /// parallel never write its `repodata.json` concurrently. Shared by all
-    /// clones of this configuration.
+    /// Serialises reindexing the output channel and renaming finished packages
+    /// into it, so that builds running in parallel never write its
+    /// `repodata.json` concurrently or replace a package being indexed.
+    /// Compressing a package does not hold it. Shared by all clones of this
+    /// configuration.
     pub output_dir_lock: Arc<tokio::sync::Mutex<()>>,
 
     /// Whether to error if the host prefix is detected in binary files

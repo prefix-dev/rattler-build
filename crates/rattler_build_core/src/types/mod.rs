@@ -164,8 +164,6 @@ pub async fn build_reindexed_channels(
         return Ok(build_configuration.channels.clone());
     }
 
-    // Packages need no lock: they are written to a temporary file and renamed
-    // into place, so only reindexing is serialised.
     let _output_dir_guard = tool_configuration.output_dir_lock.lock().await;
     let output_channel =
         Channel::try_from_directory(output_dir).expect("could not create channel from directory");

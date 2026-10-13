@@ -231,9 +231,8 @@ pub async fn run_build(
         }
     }
 
-    // Package all the new files. The archive is written to a temporary file and
-    // renamed into the output channel, so a concurrent reindex never sees a
-    // partially written package and no lock is needed here.
+    // Package all the new files. The archive is compressed into a temporary
+    // file and only the final rename into the output channel takes its lock.
     let (result, paths_json) = output
         .create_package(tool_configuration, install_added_files.as_ref())
         .await
