@@ -3,6 +3,7 @@ use std::{
     ffi::OsStr,
     path::{Path, PathBuf, StripPrefixError},
 };
+use tracing::Instrument;
 
 use crate::{
     system_tools::ToolError,
@@ -563,23 +564,25 @@ impl Output {
         apply_patch: impl Fn(&Path, &Path) -> Result<(), SourceError> + Copy,
     ) -> Result<Self, SourceError> {
         let span = tracing::info_span!("Fetching source code");
-        let _enter = span.enter();
+        async {
+            let rendered_sources = fetch_sources(
+                &self.recipe.source,
+                // self.finalized_sources
+                //     .as_deref()
+                //     .unwrap_or(self.recipe.source),
+                &self.build_configuration.directories,
+                &self.system_tools,
+                tool_configuration,
+                apply_patch,
+            )
+            .await?;
 
-        let rendered_sources = fetch_sources(
-            &self.recipe.source,
-            // self.finalized_sources
-            //     .as_deref()
-            //     .unwrap_or(self.recipe.source),
-            &self.build_configuration.directories,
-            &self.system_tools,
-            tool_configuration,
-            apply_patch,
-        )
-        .await?;
-
-        Ok(Output {
-            finalized_sources: Some(rendered_sources),
-            ..self
-        })
+            Ok(Output {
+                finalized_sources: Some(rendered_sources),
+                ..self
+            })
+        }
+        .instrument(span)
+        .await
     }
 }

@@ -1,4 +1,5 @@
 use std::{future::IntoFuture, path::Path};
+use tracing::Instrument;
 
 use crate::{metadata::PlatformWithVirtualPackages, packaging::Files, tool_configuration};
 use comfy_table::Table;
@@ -69,62 +70,64 @@ pub async fn solve_environment(
 ) -> miette::Result<Vec<RepoDataRecord>> {
     let span_msg = format!("Resolving {name} environment");
     let span = tracing::info_span!("", message = %span_msg);
-    let _enter = span.enter();
+    async {
+        let vp_string = format!("[{}]", target_platform.virtual_packages.iter().format(", "));
 
-    let vp_string = format!("[{}]", target_platform.virtual_packages.iter().format(", "));
-
-    tracing::info!(
-        "  Platform: {} {}",
-        target_platform.platform,
-        style(vp_string).dim()
-    );
-    tracing::info!("  Channels: ");
-    for channel in channels {
         tracing::info!(
-            "   - {}",
-            tool_configuration
-                .channel_config
-                .canonical_name(channel.url())
+            "  Platform: {} {}",
+            target_platform.platform,
+            style(vp_string).dim()
         );
+        tracing::info!("  Channels: ");
+        for channel in channels {
+            tracing::info!(
+                "   - {}",
+                tool_configuration
+                    .channel_config
+                    .canonical_name(channel.url())
+            );
+        }
+        tracing::info!("  Specs:");
+        for spec in specs {
+            tracing::info!("   - {}", spec);
+        }
+
+        let repo_data = load_repodatas(
+            channels,
+            target_platform.platform,
+            specs,
+            tool_configuration,
+        )
+        .await?;
+
+        // Now that we parsed and downloaded all information, construct the packaging
+        // problem that we need to solve. We do this by constructing a
+        // `SolverProblem`. This encapsulates all the information required to be
+        // able to solve the problem.
+        let solver_task = SolverTask {
+            virtual_packages: target_platform.virtual_packages.clone(),
+            specs: specs.to_vec(),
+            channel_priority,
+            strategy: solve_strategy,
+            exclude_newer,
+            ..SolverTask::from_iter(&repo_data)
+        };
+
+        // Next, use a solver to solve this specific problem. This provides us with all
+        // the operations we need to apply to our environment to bring it up to
+        // date.
+        let solver_result = tool_configuration
+            .fancy_log_handler
+            .wrap_in_progress("solving", move || Solver.solve(solver_task))
+            .into_diagnostic()?;
+
+        // Print the result as a table
+        print_as_table(&solver_result.records);
+
+        Ok(solver_result.records)
     }
-    tracing::info!("  Specs:");
-    for spec in specs {
-        tracing::info!("   - {}", spec);
-    }
-
-    let repo_data = load_repodatas(
-        channels,
-        target_platform.platform,
-        specs,
-        tool_configuration,
-    )
-    .await?;
-
-    // Now that we parsed and downloaded all information, construct the packaging
-    // problem that we need to solve. We do this by constructing a
-    // `SolverProblem`. This encapsulates all the information required to be
-    // able to solve the problem.
-    let solver_task = SolverTask {
-        virtual_packages: target_platform.virtual_packages.clone(),
-        specs: specs.to_vec(),
-        channel_priority,
-        strategy: solve_strategy,
-        exclude_newer,
-        ..SolverTask::from_iter(&repo_data)
-    };
-
-    // Next, use a solver to solve this specific problem. This provides us with all
-    // the operations we need to apply to our environment to bring it up to
-    // date.
-    let solver_result = tool_configuration
-        .fancy_log_handler
-        .wrap_in_progress("solving", move || Solver.solve(solver_task))
-        .into_diagnostic()?;
-
-    // Print the result as a table
-    print_as_table(&solver_result.records);
-
-    Ok(solver_result.records)
+    .instrument(span)
+    .await
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -253,78 +256,83 @@ pub async fn install_packages(
 ) -> miette::Result<()> {
     let span_msg = format!("Installing {name} environment");
     let span = tracing::info_span!("", message = %span_msg);
-    let _enter = span.enter();
-    // Trigger the lazy span header so it prints before indicatif progress bars.
-    // Empty string produces no visible output ("".lines() yields nothing).
-    tracing::info!("");
+    async {
+        // Trigger the lazy span header so it prints before indicatif progress bars.
+        // Empty string produces no visible output ("".lines() yields nothing).
+        tracing::info!("");
 
-    // Make sure the target prefix exists, regardless of whether we'll actually
-    // install anything in there.
-    let prefix = rattler_conda_types::prefix::Prefix::create(target_prefix)
-        .into_diagnostic()
-        .wrap_err_with(|| {
-            format!(
-                "failed to create target prefix: {}",
-                target_prefix.display()
-            )
-        })?;
+        // Make sure the target prefix exists, regardless of whether we'll actually
+        // install anything in there.
+        let prefix = rattler_conda_types::prefix::Prefix::create(target_prefix)
+            .into_diagnostic()
+            .wrap_err_with(|| {
+                format!(
+                    "failed to create target prefix: {}",
+                    target_prefix.display()
+                )
+            })?;
 
-    if !prefix.path().join("conda-meta/history").exists() {
-        // Create an empty history file if it doesn't exist
-        fs_err::create_dir_all(prefix.path().join("conda-meta")).into_diagnostic()?;
-        fs_err::File::create(prefix.path().join("conda-meta/history")).into_diagnostic()?;
-    }
+        if !prefix.path().join("conda-meta/history").exists() {
+            // Create an empty history file if it doesn't exist
+            fs_err::create_dir_all(prefix.path().join("conda-meta")).into_diagnostic()?;
+            fs_err::File::create(prefix.path().join("conda-meta/history")).into_diagnostic()?;
+        }
 
-    let installed_packages = PrefixRecord::collect_from_prefix(target_prefix).into_diagnostic()?;
+        let installed_packages =
+            PrefixRecord::collect_from_prefix(target_prefix).into_diagnostic()?;
 
-    if !installed_packages.is_empty() && name.starts_with("host") {
-        // we have to clean up extra files in the prefix
-        let extra_files =
-            Files::from_prefix(target_prefix, &Default::default(), None, None).into_diagnostic()?;
+        if !installed_packages.is_empty() && name.starts_with("host") {
+            // we have to clean up extra files in the prefix
+            let extra_files = Files::from_prefix(target_prefix, &Default::default(), None, None)
+                .into_diagnostic()?;
 
-        tracing::info!(
-            "Cleaning up {} files in the prefix from a previous build.",
-            extra_files.new_files.len()
-        );
+            tracing::info!(
+                "Cleaning up {} files in the prefix from a previous build.",
+                extra_files.new_files.len()
+            );
 
-        for f in extra_files.new_files {
-            if !f.is_dir() {
-                fs_err::remove_file(target_prefix.join(f)).into_diagnostic()?;
+            for f in extra_files.new_files {
+                if !f.is_dir() {
+                    fs_err::remove_file(target_prefix.join(f)).into_diagnostic()?;
+                }
             }
         }
+
+        Installer::new()
+            .with_download_client(tool_configuration.client.get_client().clone())
+            .with_target_platform(target_platform)
+            .with_execute_link_scripts(true)
+            .with_package_cache(tool_configuration.package_cache.clone())
+            .with_installed_packages(installed_packages)
+            .with_io_concurrency_limit(tool_configuration.io_concurrency_limit.unwrap_or_default())
+            .with_reporter(
+                IndicatifReporter::builder()
+                    .with_multi_progress(
+                        tool_configuration
+                            .fancy_log_handler
+                            .multi_progress()
+                            .clone(),
+                    )
+                    .with_formatter(
+                        DefaultProgressFormatter::default().with_prefix(
+                            tool_configuration.fancy_log_handler.with_indent_levels(""),
+                        ),
+                    )
+                    .finish(),
+            )
+            .install(&target_prefix, required_packages.to_owned())
+            .await
+            .into_diagnostic()?;
+
+        tracing::info!(
+            "{} Successfully updated the {name} environment",
+            console::style(console::Emoji("✔", "")).green(),
+        );
+
+        Ok(())
     }
-
-    Installer::new()
-        .with_download_client(tool_configuration.client.get_client().clone())
-        .with_target_platform(target_platform)
-        .with_execute_link_scripts(true)
-        .with_package_cache(tool_configuration.package_cache.clone())
-        .with_installed_packages(installed_packages)
-        .with_io_concurrency_limit(tool_configuration.io_concurrency_limit.unwrap_or_default())
-        .with_reporter(
-            IndicatifReporter::builder()
-                .with_multi_progress(
-                    tool_configuration
-                        .fancy_log_handler
-                        .multi_progress()
-                        .clone(),
-                )
-                .with_formatter(
-                    DefaultProgressFormatter::default()
-                        .with_prefix(tool_configuration.fancy_log_handler.with_indent_levels("")),
-                )
-                .finish(),
-        )
-        .install(&target_prefix, required_packages.to_owned())
-        .await
-        .into_diagnostic()?;
-
-    tracing::info!(
-        "{} Successfully updated the {name} environment",
-        console::style(console::Emoji("✔", "")).green(),
-    );
-
-    Ok(())
+    .instrument(span)
+    .await
 }
 
 #[cfg(test)]

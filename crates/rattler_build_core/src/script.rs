@@ -7,6 +7,7 @@ use std::{
     collections::HashMap,
     path::{Path, PathBuf},
 };
+use tracing::Instrument;
 
 use indexmap::IndexMap;
 use minijinja::Value;
@@ -216,29 +217,31 @@ impl Output {
         tool_configuration: &crate::tool_configuration::Configuration,
     ) -> Result<(), InterpreterError> {
         let span = tracing::info_span!("Running build script");
-        let _enter = span.enter();
+        async {
+            // Reset the package files override list before running the build
+            // script. This ensures that we do not pick up paths from a previous
+            // run if the script does not write to the file this time.
+            let package_files_path = self
+                .build_configuration
+                .directories
+                .package_files_list_path();
+            match fs_err::remove_file(&package_files_path) {
+                Ok(()) => {}
+                Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+                Err(err) => return Err(err.into()),
+            }
 
-        // Reset the package files override list before running the build
-        // script. This ensures that we do not pick up paths from a previous
-        // run if the script does not write to the file this time.
-        let package_files_path = self
-            .build_configuration
-            .directories
-            .package_files_list_path();
-        match fs_err::remove_file(&package_files_path) {
-            Ok(()) => {}
-            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
-            Err(err) => return Err(err.into()),
+            let mut exec_args = self.prepare_build_script().await?;
+            env_vars::apply_jobserver(
+                &mut exec_args.env_vars,
+                tool_configuration.jobserver.as_ref(),
+            );
+            rattler_build_script::run_script(exec_args).await?;
+
+            Ok(())
         }
-
-        let mut exec_args = self.prepare_build_script().await?;
-        env_vars::apply_jobserver(
-            &mut exec_args.env_vars,
-            tool_configuration.jobserver.as_ref(),
-        );
-        rattler_build_script::run_script(exec_args).await?;
-
-        Ok(())
+        .instrument(span)
+        .await
     }
 
     /// Create the build script files without executing them.
@@ -258,9 +261,11 @@ impl Output {
     /// - The script files cannot be written to the working directory
     pub async fn create_build_script(&self) -> Result<(), std::io::Error> {
         let span = tracing::info_span!("Creating build script");
-        let _enter = span.enter();
-
-        let exec_args = self.prepare_build_script().await?;
-        rattler_build_script::create_build_script(exec_args).await
+        async {
+            let exec_args = self.prepare_build_script().await?;
+            rattler_build_script::create_build_script(exec_args).await
+        }
+        .instrument(span)
+        .await
     }
 }

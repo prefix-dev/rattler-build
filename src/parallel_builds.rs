@@ -7,7 +7,9 @@
 //! jobserver (see [`crate::jobserver`]) bounds the total number of compile
 //! jobs.
 //!
-//! All jobs are futures polled by the calling task. The build loop must never
+//! Each build runs on its own tokio task, so a busy build never delays reading
+//! another build's script output. The other jobs, and the handles of the build
+//! tasks, are futures polled by the calling task. The build loop must never
 //! await anything else that could wait on a lock held by one of these jobs
 //! (for example the output channel lock), or both would wait forever; that is
 //! why tests and reindexing run as jobs too.
@@ -96,19 +98,25 @@ impl<'a> ParallelBuilds<'a> {
             };
             self.hold_slot();
             let configuration = self.configuration.clone();
+            let build = tokio::spawn(async move {
+                let result = run_build(
+                    output.clone(),
+                    &configuration,
+                    WorkingDirectoryBehavior::Cleanup,
+                )
+                .await;
+                Finished::Build {
+                    output: Box::new(output),
+                    result: Box::new(result),
+                }
+            });
             self.jobs.push(
                 async move {
-                    let result = run_build(
-                        output.clone(),
-                        &configuration,
-                        WorkingDirectoryBehavior::Cleanup,
-                    )
-                    .await;
-                    let finished = Finished::Build {
-                        output: Box::new(output),
-                        result: Box::new(result),
-                    };
-                    (finished, true)
+                    match build.await {
+                        Ok(finished) => (finished, true),
+                        Err(e) if e.is_panic() => std::panic::resume_unwind(e.into_panic()),
+                        Err(e) => panic!("build task was cancelled: {e}"),
+                    }
                 }
                 .boxed_local(),
             );

@@ -8,6 +8,7 @@ use std::{
     collections::BTreeMap,
     path::{Path, PathBuf},
 };
+use tracing::Instrument;
 
 use fs_err as fs;
 use miette::{Context, IntoDiagnostic};
@@ -173,7 +174,7 @@ impl Output {
         miette::Error,
     > {
         let span = tracing::info_span!("Building or restoring staging cache", cache = staging.name);
-        let _enter = span.enter();
+        async {
 
         let cache_key = self
             .staging_cache_key(staging)
@@ -223,6 +224,9 @@ impl Output {
         // Build new cache
         self.build_staging_cache(staging, &cache_dir, tool_configuration)
             .await
+        }
+        .instrument(span)
+        .await
     }
 
     /// Build a new staging cache from scratch
