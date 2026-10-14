@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.17](https://github.com/prefix-dev/rattler-build/compare/rattler_build_recipe_generator-v0.1.16...rattler_build_recipe_generator-v0.1.17) - 2026-10-14
+
+### Added
+
+- check R dependencies against channels, only generate missing ones with --tree ([#2622](https://github.com/prefix-dev/rattler-build/pull/2622))
+
 ## [0.1.16](https://github.com/prefix-dev/rattler-build/compare/rattler_build_recipe_generator-v0.1.15...rattler_build_recipe_generator-v0.1.16) - 2026-10-12
 
 ### Other
