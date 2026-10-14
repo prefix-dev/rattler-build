@@ -156,7 +156,12 @@ impl IndexJsonBuilder {
         Ok(IndexJson {
             name: self.name,
             version: self.version,
-            build: BuildString::new_unchecked(self.build),
+            build: self.build.parse::<BuildString>().map_err(|e| {
+                crate::PackageError::InvalidMetadata(format!(
+                    "invalid build string '{}': {e}",
+                    self.build
+                ))
+            })?,
             build_number: self.build_number,
             arch: self.arch,
             platform: self.platform,

@@ -415,8 +415,15 @@ the package prefix.
 ### Build number and string
 
 The build number should be incremented for new builds of the same version. The
-number defaults to `0`. The build string cannot contain "`-`". The string defaults
-to the default Rattler-Build build string plus the build number.
+number defaults to `0`. The string defaults to the default Rattler-Build build
+string plus the build number.
+
+The build string can be a template (e.g. `cuda_${{ hash }}_${{ build_number }}`).
+After rendering, surrounding whitespace is removed and the result must be a valid
+build string as defined by
+[CEP 26](https://github.com/conda/ceps/blob/main/cep-0026.md): it must not be
+empty, can be at most 64 characters long and may only contain ASCII letters,
+digits, `_`, `.` and `+`.
 
 ```yaml
 build:

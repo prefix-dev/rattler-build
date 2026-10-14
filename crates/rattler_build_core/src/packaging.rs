@@ -95,6 +95,13 @@ pub enum PackagingError {
     #[error("Invalid Metadata: {0}")]
     InvalidMetadata(String),
 
+    #[error("invalid build string `{build_string}`: {source}")]
+    InvalidBuildString {
+        build_string: String,
+        #[source]
+        source: rattler_conda_types::package::BuildStringError,
+    },
+
     #[error("could not render {field} MatchSpec `{spec}` canonically: {source}")]
     CanonicalMatchSpec {
         field: String,

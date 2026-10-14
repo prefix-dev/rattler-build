@@ -680,7 +680,7 @@ package:
 
 build:
   number: ${{ build_number }}
-  string: custom_${{ hash }}_build_${{ target_platform }}_${{ foobar }}_${{ build_number }}
+  string: custom_${{ hash }}_build_${{ target_platform | replace("-", "_") }}_${{ foobar }}_${{ build_number }}
 "#;
         let mut variant = IndexMap::new();
         variant.insert("target_platform".to_string(), Variable::from("osx-arm64"));
@@ -699,7 +699,7 @@ build:
                 .string
                 .as_str()
                 .expect("build string should be resolved"),
-            "custom_bf59cf5_build_osx-arm64_baz_12"
+            "custom_bf59cf5_build_osx_arm64_baz_12"
         );
     }
 
