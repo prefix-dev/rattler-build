@@ -58,6 +58,7 @@ nav = [
   ] },
   { "Package" = [
     { "Package specification" = "package_spec.md" },
+    { "Creating packages from files" = "package_create.md" },
     { "Package scripts" = "special_files.md" },
     { "Package Internals" = "internals.md" },
     { "System integration" = "system_integration.md" },
@@ -134,6 +135,7 @@ nav = [
         "reference/cli/rattler-build/package/index.md",
         { "inspect" = "reference/cli/rattler-build/package/inspect.md" },
         { "extract" = "reference/cli/rattler-build/package/extract.md" },
+        { "create" = "reference/cli/rattler-build/package/create.md" },
       ] },
       { "bump-recipe" = "reference/cli/rattler-build/bump-recipe.md" },
       { "migrate-recipe" = "reference/cli/rattler-build/migrate-recipe.md" },

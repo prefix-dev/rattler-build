@@ -16,4 +16,5 @@ rattler-build package <COMMAND>
 |---------|-------------|
 | [`inspect`](inspect.md) | Inspect and display information about a built package |
 | [`extract`](extract.md) | Extract a conda package to a directory |
+| [`create`](create.md) | Create a conda package from a JSON manifest (files + metadata), e.g. as produced by a Bazel rule. Binaries are relinked to be relocatable |
 

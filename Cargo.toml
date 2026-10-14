@@ -176,6 +176,7 @@ rattler_build_recipe = { path = "crates/rattler_build_recipe", version = "=0.1.1
 rattler_build_recipe_generator = { path = "crates/rattler_build_recipe_generator", version = "=0.1.16", default-features = false }
 rattler_build_script = { path = "crates/rattler_build_script", version = "=0.2.14", default-features = false }
 rattler_build_source_cache = { path = "crates/rattler_build_source_cache", version = "=0.1.16", default-features = false }
+rattler_build_package = { path = "crates/rattler_build_package", version = "=0.1.19", default-features = false }
 rattler_build_types = { path = "crates/rattler_build_types", version = "=0.1.17" }
 rattler_build_variant_config = { path = "crates/rattler_build_variant_config", version = "=0.1.19" }
 rattler_build_yaml_parser = { path = "crates/rattler_build_yaml_parser", version = "=0.1.19" }
@@ -271,6 +272,9 @@ rattler_build_recipe_generator = { workspace = true, optional = true, features =
   "cli",
 ] }
 rattler_build_types = { workspace = true }
+rattler_build_package = { workspace = true }
+goblin = { workspace = true }
+pathdiff = { workspace = true }
 rattler_build_variant_config = { workspace = true, features = ["parser"] }
 rattler_build_recipe = { workspace = true, features = ["variant-config"] }
 rattler_build_script = { workspace = true, features = ["execution"] }

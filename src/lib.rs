@@ -27,6 +27,7 @@ pub use rattler_build_core::utils;
 mod build_queue;
 pub mod config;
 pub mod opt;
+pub mod package_create;
 
 // Re-export recipe generator
 #[cfg(feature = "recipe-generation")]

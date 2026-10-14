@@ -293,6 +293,9 @@ pub enum PackageCommands {
     Inspect(InspectOpts),
     /// Extract a conda package to a directory
     Extract(ExtractOpts),
+    /// Create a conda package from a JSON manifest (files + metadata), e.g.
+    /// as produced by a Bazel rule. Binaries are relinked to be relocatable.
+    Create(crate::package_create::CreateOpts),
 }
 
 /// Shell completion options.
