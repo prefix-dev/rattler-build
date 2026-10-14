@@ -72,18 +72,21 @@ pub(crate) fn prepare_build_plan_execution_args(
         env_vars.extend(script.env().clone());
     }
 
-    let scripts: Vec<(Script, Option<usize>)> = match plan {
+    let scripts: Vec<_> = match plan {
         BuildPlan::Steps(steps) => steps
             .iter()
             .enumerate()
-            .map(|(index, step)| (step.to_script(), Some(index)))
+            .map(|(index, step)| {
+                let label = step.name.clone().unwrap_or_else(|| format!("step {index}"));
+                (step.to_script(), Some(label))
+            })
             .collect(),
         BuildPlan::Script(script) => vec![(script.clone(), None)],
     };
 
     let mut secrets = IndexMap::new();
     let mut sections = Vec::with_capacity(scripts.len());
-    for (script, step_index) in scripts {
+    for (script, step_label) in scripts {
         let mut section_jinja = Jinja::new(selector_config.clone()).with_context(recipe_context);
         for (key, value) in env_vars.iter().chain(script.env()) {
             section_jinja
@@ -116,13 +119,13 @@ pub(crate) fn prepare_build_plan_execution_args(
         sections.push(BuildScriptSection {
             interpreter: script.interpreter.clone(),
             content,
-            env: if step_index.is_some() {
+            env: if step_label.is_some() {
                 script.env().clone()
             } else {
                 Default::default()
             },
             cwd,
-            label: step_index.map(|index| format!("step {index}")),
+            label: step_label,
         });
     }
 
@@ -185,7 +188,7 @@ impl Output {
             context.runtime(),
         ));
         env_vars.extend(env_vars::env_vars_from_variant(self.variant()));
-        prepare_build_plan_execution_args(
+        let mut args = prepare_build_plan_execution_args(
             &build.plan,
             &self.recipe.context,
             self.build_configuration.selector_config(),
@@ -196,7 +199,15 @@ impl Output {
             self.build_configuration.sandbox_config().cloned(),
             env_isolation,
             self.build_configuration.experimental,
-        )
+        )?;
+        if let Some(source_dir) = &self.build_configuration.directories.source_dir {
+            for section in &mut args.sections {
+                if section.cwd.is_none() {
+                    section.cwd = Some(source_dir.clone());
+                }
+            }
+        }
+        Ok(args)
     }
 
     /// Run the build script for the output as defined in the recipe's build section.

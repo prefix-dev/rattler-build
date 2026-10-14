@@ -88,6 +88,12 @@ impl Requirements {
     /// These are also used as "variants" in the build system.
     /// Note: since this is before rendering, we consider both branches of conditionals (then and else)
     pub fn free_specs(&self) -> Vec<PackageName> {
+        Self::free_specs_from_lists([&self.build, &self.host])
+    }
+
+    pub(crate) fn free_specs_from_lists<'a>(
+        lists: impl IntoIterator<Item = &'a ConditionalList<SerializableMatchSpec>>,
+    ) -> Vec<PackageName> {
         use rattler_conda_types::PackageNameMatcher;
 
         let mut specs = Vec::new();
@@ -150,7 +156,7 @@ impl Requirements {
             }
         }
 
-        for item in self.build.iter().chain(self.host.iter()) {
+        for item in lists.into_iter().flat_map(|list| list.iter()) {
             process_item(item, &mut specs, extract_name);
         }
 
