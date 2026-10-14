@@ -1,0 +1,33 @@
+schema_version: 1
+
+inputs:
+  build_type:
+    type: string
+    default: Release
+  extra_args:
+    type: list
+    items: string
+    default: []
+  build_args:
+    type: list
+    items: string
+    default: []
+  install_args:
+    type: list
+    items: string
+    default: []
+  install:
+    type: boolean
+    default: true
+steps:
+  - name: cmake-configure
+    requirements:
+      build: [cmake, ninja]
+    run: cmake -S "$SRC_DIR" -B "$BUILD_DIR/cmake" -G Ninja -DCMAKE_BUILD_TYPE=${{ inputs.build_type }} -DCMAKE_INSTALL_PREFIX="$PREFIX" ${{ inputs.extra_args | join(' ') }} ${CMAKE_ARGS:-}
+  - name: cmake-build
+    depends_on: [cmake-configure]
+    run: cmake --build "$BUILD_DIR/cmake" --parallel ${{ inputs.build_args | join(' ') }} ${CMAKE_BUILD_ARGS:-}
+  - name: cmake-install
+    if: inputs.install
+    depends_on: [cmake-build]
+    run: cmake --install "$BUILD_DIR/cmake" ${{ inputs.install_args | join(' ') }} ${CMAKE_INSTALL_ARGS:-}

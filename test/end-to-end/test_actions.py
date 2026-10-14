@@ -41,6 +41,34 @@ def run_action(rattler_build: RattlerBuild, project: Path, output: Path, name="t
     )
 
 
+@pytest.mark.parametrize("provider", ["cmake", "meson", "rust", "go"])
+@pytest.mark.parametrize("enabled", [False, True])
+def test_example_providers_use_typed_actions_and_step_conditions(
+    rattler_build: RattlerBuild,
+    recipes: Path,
+    tmp_path: Path,
+    provider: str,
+    enabled: bool,
+):
+    source = recipes.parents[1] / "examples" / "step-providers" / "providers" / provider
+    flag = "collect_licenses" if provider == "go" else "install"
+    project = action_project(
+        tmp_path,
+        yaml.safe_load((source / "build.yaml").read_text()),
+        arguments={flag: enabled},
+    )
+    rendered = rattler_build.render(
+        project, tmp_path / "output", extra_args=["--experimental"]
+    )
+    steps = rendered[0]["recipe"]["build"]["steps"]
+    optional_step = (
+        "go-licenses"
+        if provider == "go"
+        else f"{'cargo' if provider == 'rust' else provider}-install"
+    )
+    assert any(step["name"].endswith("/" + optional_step) for step in steps) == enabled
+
+
 def test_nested_action_selection_and_relative_resolution(
     rattler_build: RattlerBuild, tmp_path: Path
 ):
