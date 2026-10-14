@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.19](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.18...rattler_build_core-v0.2.19) - 2026-10-14
+
+### Fixed
+
+- use host platform for package_contents checks on noarch ([#2851](https://github.com/prefix-dev/rattler-build/pull/2851))
+
+### Other
+
+- bump rattler crates, check build string ([#2863](https://github.com/prefix-dev/rattler-build/pull/2863))
+
 ## [0.2.18](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.17...rattler_build_core-v0.2.18) - 2026-10-12
 
 ### Added
