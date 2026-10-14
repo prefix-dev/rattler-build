@@ -24,7 +24,10 @@ use rattler_build_core::{
     tool_configuration::{Configuration, JobserverEnv},
 };
 
-use crate::{build_queue::OutputBuildQueue, jobserver::Jobserver};
+use crate::{
+    build_queue::OutputBuildQueue,
+    jobserver::{Jobserver, Token},
+};
 
 /// A finished job.
 pub(crate) enum Finished {
@@ -35,6 +38,9 @@ pub(crate) enum Finished {
     },
     /// Other work started with [`ParallelBuilds::spawn`].
     Task(miette::Result<()>),
+    /// Not a finished job: a build that was waiting for a jobserver token got
+    /// one and started. More ready outputs may be startable now.
+    BuildStarted,
 }
 
 /// The jobs in flight.
@@ -45,9 +51,12 @@ pub(crate) struct ParallelBuilds<'a> {
     max_jobs: usize,
     /// Each job, with whether it holds a jobserver slot (builds and tests).
     jobs: FuturesUnordered<LocalBoxFuture<'a, (Finished, bool)>>,
-    /// Running builds and test runs. Each holds one implicit jobserver token.
+    /// Running builds and test runs. With a jobserver, each holds a token for
+    /// the implicit job slot of its top-level make or ninja.
     running_builds: usize,
     jobserver: Option<Jobserver>,
+    /// A ready output whose build waits for a jobserver token.
+    waiting: Option<Output>,
 }
 
 impl<'a> ParallelBuilds<'a> {
@@ -83,45 +92,75 @@ impl<'a> ParallelBuilds<'a> {
             jobs: FuturesUnordered::new(),
             running_builds: 0,
             jobserver,
+            waiting: None,
         }
     }
 
     /// Starts the builds of ready outputs while fewer than the maximum number
-    /// of jobs are in flight.
+    /// of jobs are in flight. With a jobserver, each build takes a token first;
+    /// if none is free, the output waits (see [`Self::next`]).
     pub(crate) fn start_ready(&mut self, queue: &mut OutputBuildQueue) -> miette::Result<()> {
         while self.jobs.len() < self.max_jobs {
-            let Some(output) = queue
-                .next_ready_parallel(self.jobs.len())
-                .into_diagnostic()?
-            else {
-                break;
+            let output = match self.waiting.take() {
+                Some(output) => output,
+                None => match queue
+                    .next_ready_parallel(self.jobs.len())
+                    .into_diagnostic()?
+                {
+                    Some(output) => output,
+                    None => break,
+                },
             };
-            self.hold_slot();
-            let configuration = self.configuration.clone();
-            let build = tokio::spawn(async move {
-                let result = run_build(
-                    output.clone(),
-                    &configuration,
-                    WorkingDirectoryBehavior::Cleanup,
-                )
-                .await;
-                Finished::Build {
-                    output: Box::new(output),
-                    result: Box::new(result),
-                }
-            });
-            self.jobs.push(
-                async move {
-                    match build.await {
-                        Ok(finished) => (finished, true),
-                        Err(e) if e.is_panic() => std::panic::resume_unwind(e.into_panic()),
-                        Err(e) => panic!("build task was cancelled: {e}"),
+            let token = match &self.jobserver {
+                None => None,
+                Some(jobserver) => match jobserver.try_acquire() {
+                    Some(token) => Some(token),
+                    // Nothing is running that could return a token. Each
+                    // build's own token comes back when it ends, so this is
+                    // only a safety net against waiting forever.
+                    None if self.running_builds == 0 => {
+                        tracing::debug!("No jobserver token is free; starting a build without one");
+                        None
                     }
-                }
-                .boxed_local(),
-            );
+                    None => {
+                        self.waiting = Some(output);
+                        break;
+                    }
+                },
+            };
+            self.start_build(output, token);
         }
         Ok(())
+    }
+
+    fn start_build(&mut self, output: Output, token: Option<Token>) {
+        self.running_builds += 1;
+        let configuration = self.configuration.clone();
+        let build = tokio::spawn(async move {
+            let result = run_build(
+                output.clone(),
+                &configuration,
+                WorkingDirectoryBehavior::Cleanup,
+            )
+            .await;
+            Finished::Build {
+                output: Box::new(output),
+                result: Box::new(result),
+            }
+        });
+        self.jobs.push(
+            async move {
+                let finished = match build.await {
+                    Ok(finished) => finished,
+                    Err(e) if e.is_panic() => std::panic::resume_unwind(e.into_panic()),
+                    Err(e) => panic!("build task was cancelled: {e}"),
+                };
+                // Return the token as soon as the build is done.
+                drop(token);
+                (finished, true)
+            }
+            .boxed_local(),
+        );
     }
 
     /// Runs `task` as a job; it counts against the maximum like a build.
@@ -132,13 +171,18 @@ impl<'a> ParallelBuilds<'a> {
         );
     }
 
-    /// Runs tests as a job. Like a build, it holds a jobserver slot while it
-    /// runs, since tests can compile too.
+    /// Runs tests as a job. Since tests can compile too, it takes a
+    /// jobserver token like a build if one is free; it does not wait for one.
     pub(crate) fn spawn_tests(&mut self, task: impl Future<Output = miette::Result<()>> + 'a) {
-        self.hold_slot();
+        self.running_builds += 1;
+        let token = self.jobserver.as_ref().and_then(Jobserver::try_acquire);
         self.jobs.push(
-            task.map(|result| (Finished::Task(result), true))
-                .boxed_local(),
+            async move {
+                let result = task.await;
+                drop(token);
+                (Finished::Task(result), true)
+            }
+            .boxed_local(),
         );
     }
 
@@ -149,11 +193,41 @@ impl<'a> ParallelBuilds<'a> {
     }
 
     /// Waits for the next job to finish; `None` when no job is in flight.
+    ///
+    /// While a build waits for a jobserver token, this also waits for a token
+    /// (without blocking the thread) and returns [`Finished::BuildStarted`]
+    /// once that build started.
     pub(crate) async fn next(&mut self) -> Option<Finished> {
-        let (finished, held_slot) = self.jobs.next().await?;
+        let finished = match (&mut self.jobserver, self.waiting.is_some()) {
+            (Some(jobserver), true) => {
+                tokio::select! {
+                    token = jobserver.acquire() => Err(token),
+                    finished = self.jobs.next() => Ok(finished),
+                }
+            }
+            _ => Ok(self.jobs.next().await),
+        };
+        let finished = match finished {
+            Ok(Some(finished)) => finished,
+            // A token is free, or nothing else is running: start the build.
+            Err(_) | Ok(None) if self.waiting.is_some() => {
+                let token = match finished {
+                    Err(Ok(token)) => Some(token),
+                    Err(Err(e)) => {
+                        tracing::warn!("Could not take a jobserver token: {e}");
+                        None
+                    }
+                    _ => None,
+                };
+                let output = self.waiting.take().expect("checked above");
+                self.start_build(output, token);
+                return Some(Finished::BuildStarted);
+            }
+            Ok(None) | Err(_) => return None,
+        };
+        let (finished, held_slot) = finished;
         if held_slot {
             self.running_builds -= 1;
-            self.resize_jobserver();
         }
         Some(finished)
     }
@@ -162,6 +236,8 @@ impl<'a> ParallelBuilds<'a> {
     /// before returning an error, so that no build keeps running after
     /// rattler-build exits (like make's "waiting for unfinished jobs").
     pub(crate) async fn finish_running(&mut self) {
+        // Do not start a build that waits for a token.
+        self.waiting = None;
         if !self.jobs.is_empty() {
             tracing::warn!(
                 "Waiting for {} running job(s) to finish before stopping",
@@ -169,17 +245,6 @@ impl<'a> ParallelBuilds<'a> {
             );
         }
         while self.next().await.is_some() {}
-    }
-
-    fn hold_slot(&mut self) {
-        self.running_builds += 1;
-        self.resize_jobserver();
-    }
-
-    fn resize_jobserver(&mut self) {
-        if let Some(jobserver) = &mut self.jobserver {
-            jobserver.set_running_builds(self.running_builds);
-        }
     }
 }
 

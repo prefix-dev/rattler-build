@@ -773,6 +773,7 @@ pub async fn run_build_from_args(
         }
         let (output_to_build, result) = match builds.next().await {
             None => break,
+            Some(Finished::BuildStarted) => continue,
             Some(Finished::Task(result)) => {
                 if let Err(e) = result {
                     builds.finish_running().await;
@@ -1389,6 +1390,7 @@ async fn build_and_collect_packages(
         }
         let (output_to_build, result) = match builds.next().await {
             None => break,
+            Some(Finished::BuildStarted) => continue,
             Some(Finished::Task(result)) => {
                 if let Err(e) = result {
                     builds.finish_running().await;

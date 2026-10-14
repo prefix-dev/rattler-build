@@ -224,6 +224,9 @@ tokio = { workspace = true, features = [
   "macros",
   "rt-multi-thread",
   "process",
+  "net",
+  "io-util",
+  "time",
 ] }
 url = { workspace = true }
 tracing = { workspace = true }
