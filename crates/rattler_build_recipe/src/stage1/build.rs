@@ -91,6 +91,8 @@ impl BuildString {
     }
 
     /// Resolve the build string by rendering the template with the hash value and build number
+    ///
+    /// The rendered value must be a valid build string according to CEP26.
     pub fn resolve(
         &mut self,
         hash_info: &HashInfo,
@@ -101,6 +103,7 @@ impl BuildString {
             BuildString::Default => {
                 // Generate default build string: <prefix>h<hash>_<build_number>
                 let rendered = format!("{}h{}_{}", hash_info.prefix, hash_info.hash, build_number);
+                validate_build_string(&rendered, None)?;
                 *self = BuildString::Resolved(rendered);
             }
             BuildString::Unresolved(template, span) => {
@@ -126,6 +129,10 @@ impl BuildString {
                             .into_boxed_str(),
                         span: span.unwrap_or(crate::Span::new_blank()).into(),
                     })?;
+                // Surrounding whitespace (e.g. from a multi-line `{% if %}`
+                // block) is never meant to be part of the build string.
+                let rendered = rendered.trim().to_string();
+                validate_build_string(&rendered, *span)?;
                 *self = BuildString::Resolved(rendered);
             }
             BuildString::Resolved(_) => {
@@ -135,6 +142,19 @@ impl BuildString {
 
         Ok(())
     }
+}
+
+/// Checks that a rendered build string is valid according to CEP26.
+fn validate_build_string(value: &str, span: Option<crate::Span>) -> Result<(), ParseError> {
+    value
+        .parse::<rattler_conda_types::package::BuildString>()
+        .map(|_| ())
+        .map_err(|e| ParseError::InvalidValue {
+            field: "build.string".into(),
+            reason: format!("'{value}': {e}").into_boxed_str(),
+            span: span.unwrap_or(crate::Span::new_blank()).into(),
+            suggestion: None,
+        })
 }
 
 impl From<String> for BuildString {
@@ -757,6 +777,58 @@ impl Build {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn resolve_build_string(build_string: BuildString, prefix: &str) -> Result<String, ParseError> {
+        let mut build_string = build_string;
+        let hash_info = HashInfo {
+            hash: "abc1234".to_string(),
+            prefix: prefix.to_string(),
+        };
+        let context = super::super::EvaluationContext::from_variables(IndexMap::from([(
+            "target_platform".to_string(),
+            Variable::from("linux-64"),
+        )]));
+        build_string.resolve(&hash_info, 3, &context)?;
+        Ok(build_string.as_str().unwrap().to_string())
+    }
+
+    fn template(template: &str) -> BuildString {
+        BuildString::unresolved(template.to_string(), None)
+    }
+
+    #[test]
+    fn test_build_string_is_validated() {
+        assert_eq!(
+            resolve_build_string(BuildString::Default, "py312").unwrap(),
+            "py312habc1234_3"
+        );
+        assert_eq!(
+            resolve_build_string(template("cuda_${{ hash }}_${{ build_number }}"), "").unwrap(),
+            "cuda_abc1234_3"
+        );
+        // Whitespace around the rendered value (e.g. from a multi-line block) is trimmed
+        assert_eq!(
+            resolve_build_string(template("\n  {% if true %}foo{% endif %}\n"), "").unwrap(),
+            "foo"
+        );
+
+        let err = resolve_build_string(template("h${{ hash }}_${{ target_platform }}"), "")
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("invalid character '-'"), "{err}");
+        let err = resolve_build_string(template("${{ 'bs' if false }}"), "")
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("empty"), "{err}");
+        let err = resolve_build_string(template("${{ hash }}_${{ 'x' * 64 }}"), "")
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("too long"), "{err}");
+        let err = resolve_build_string(BuildString::Default, "my-prefix_")
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("invalid character '-'"), "{err}");
+    }
 
     #[test]
     fn test_build_creation() {

@@ -1,7 +1,7 @@
 //! IndexJson builder
 
 use jiff::Timestamp;
-use rattler_conda_types::package::IndexJson;
+use rattler_conda_types::package::{BuildString, IndexJson};
 use rattler_conda_types::utils::TimestampMs;
 use rattler_conda_types::{NoArchType, PackageName, Subdir, VersionWithSource};
 
@@ -156,7 +156,12 @@ impl IndexJsonBuilder {
         Ok(IndexJson {
             name: self.name,
             version: self.version,
-            build: self.build,
+            build: self.build.parse::<BuildString>().map_err(|e| {
+                crate::PackageError::InvalidMetadata(format!(
+                    "invalid build string '{}': {e}",
+                    self.build
+                ))
+            })?,
             build_number: self.build_number,
             arch: self.arch,
             platform: self.platform,

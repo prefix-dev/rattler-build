@@ -46,7 +46,7 @@ fn print_as_table(packages: &[RepoDataRecord]) {
         table.add_row([
             package.package_record.name.as_normalized().to_string(),
             package.package_record.version.to_string(),
-            package.package_record.build.clone(),
+            package.package_record.build.to_string(),
             channel_short,
             HumanBytes(package.package_record.size.unwrap_or(0)).to_string(),
             // package.package_record.license.clone().unwrap_or_else(|| "".to_string()),

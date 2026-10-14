@@ -36,7 +36,7 @@ pub struct BuildOnlyOpts {
 
     /// Prefix to prepend to the auto-generated build string
     /// (e.g. `--build-string-prefix my_prefix` produces `my_prefix_h1234_0`)
-    #[arg(long, help_heading = "Modifying result")]
+    #[arg(long, help_heading = "Modifying result", value_parser = parse_build_string_prefix)]
     pub build_string_prefix: Option<String>,
 
     #[allow(missing_docs)]
@@ -788,7 +788,7 @@ pub struct PublishOpts {
 
     /// Prefix to prepend to the auto-generated build string
     /// (e.g. `--build-string-prefix my_prefix` produces `my_prefix_h1234_0`)
-    #[arg(long, help_heading = "Publishing")]
+    #[arg(long, help_heading = "Publishing", value_parser = parse_build_string_prefix)]
     pub build_string_prefix: Option<String>,
 
     /// Force upload even if the package already exists (not recommended - may break lockfiles).
@@ -1124,6 +1124,14 @@ fn parse_variant_override(
 
     let values: Vec<String> = value.split(',').map(|v| v.trim().to_string()).collect();
     Ok((key.to_string(), values))
+}
+
+/// The prefix becomes part of the build string, so it must only contain
+/// characters that CEP26 allows in a build string.
+fn parse_build_string_prefix(s: &str) -> Result<String, String> {
+    s.parse::<rattler_conda_types::package::BuildString>()
+        .map(String::from)
+        .map_err(|e| e.to_string())
 }
 
 /// Parse a datetime string in RFC3339 format

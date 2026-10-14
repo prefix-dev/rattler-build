@@ -377,7 +377,7 @@ fn env_vars_from_package(index_json: &IndexJson) -> HashMap<String, String> {
         index_json.name.as_normalized().to_string(),
     );
     res.insert("PKG_VERSION".to_string(), index_json.version.to_string());
-    res.insert("PKG_BUILD_STRING".to_string(), index_json.build.clone());
+    res.insert("PKG_BUILD_STRING".to_string(), index_json.build.to_string());
     res.insert(
         "PKG_BUILDNUM".to_string(),
         index_json.build_number.to_string(),

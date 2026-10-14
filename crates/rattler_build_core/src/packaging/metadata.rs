@@ -397,7 +397,12 @@ impl Output {
                 .parse()
                 .expect("Should always be valid"),
             version: self.version().clone(),
-            build: self.build_string().into_owned(),
+            build: self.build_string().parse().map_err(|source| {
+                PackagingError::InvalidBuildString {
+                    build_string: self.build_string().into_owned(),
+                    source,
+                }
+            })?,
             build_number: recipe.build().number.unwrap_or(0),
             arch,
             platform,

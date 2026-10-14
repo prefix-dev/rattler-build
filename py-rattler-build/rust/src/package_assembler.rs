@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use jiff::Timestamp;
 use pyo3::prelude::*;
 use rattler_build_package::{ArchiveType, FileCollector, FileEntry, PackageBuilder, PackageConfig};
-use rattler_conda_types::package::IndexJson;
+use rattler_conda_types::package::{BuildString, IndexJson};
 use rattler_conda_types::{NoArchType, PackageName, Subdir, VersionWithSource};
 
 use crate::error::RattlerBuildError;
@@ -284,6 +284,10 @@ pub fn assemble_package_py(
                 RattlerBuildError::Other(format!("Invalid platform: {}", e))
             })?;
 
+    let build_string: BuildString = build_string
+        .parse()
+        .map_err(|e| RattlerBuildError::Other(format!("Invalid build string: {}", e)))?;
+
     // Build config
     let config = PackageConfig {
         compression_level,
@@ -300,7 +304,7 @@ pub fn assemble_package_py(
 
     // Create the builder
     let mut builder = PackageBuilder::new(pkg_name.clone(), pkg_version.clone(), platform, config)
-        .with_build_string(build_string);
+        .with_build_string(build_string.as_str());
 
     // Add files from directory
     if let Some(dir) = files_dir {
@@ -353,7 +357,7 @@ pub fn assemble_package_py(
     let index = IndexJson {
         name: pkg_name,
         version: pkg_version,
-        build: build_string.to_string(),
+        build: build_string,
         build_number,
         arch: platform.arch().map(|a| a.to_string()),
         platform: platform.only_platform().map(|p| p.to_string()),

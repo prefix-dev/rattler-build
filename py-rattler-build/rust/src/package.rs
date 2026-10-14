@@ -92,7 +92,7 @@ impl PyPackage {
     /// Build string (e.g., "py312_0")
     #[getter]
     fn build_string(&self) -> &str {
-        &self.index.build
+        self.index.build.as_str()
     }
 
     /// Build number

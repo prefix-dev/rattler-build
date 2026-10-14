@@ -244,7 +244,7 @@ fn output_human_readable(
 
     table.add_row(vec!["Name", &index_json.name.as_normalized()]);
     table.add_row(vec!["Version", &index_json.version.to_string()]);
-    table.add_row(vec!["Build", &index_json.build]);
+    table.add_row(vec!["Build", index_json.build.as_str()]);
     table.add_row(vec!["Build number", &index_json.build_number.to_string()]);
 
     if let Some(ref subdir) = index_json.subdir {

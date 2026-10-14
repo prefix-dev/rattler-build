@@ -570,7 +570,7 @@ mod test {
             let mut package_record = PackageRecord::new(
                 PackageName::from_str("python").unwrap(),
                 "3.13.1".parse::<VersionWithSource>().unwrap(),
-                "cp313t".to_string(),
+                "cp313t".parse().unwrap(),
             );
             package_record.python_site_packages_path = Some(site_packages_path.to_string());
             RepoDataRecord {
