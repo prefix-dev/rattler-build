@@ -5543,8 +5543,14 @@ you actually need to build:</p>
 the package prefix.</p>
 <h3 id="build-number-and-string">Build number and string<a class="headerlink" href="#build-number-and-string" title="Permanent link">#</a></h3>
 <p>The build number should be incremented for new builds of the same version. The
-number defaults to <code>0</code>. The build string cannot contain "<code>-</code>". The string defaults
-to the default Rattler-Build build string plus the build number.</p>
+number defaults to <code>0</code>. The string defaults to the default Rattler-Build build
+string plus the build number.</p>
+<p>The build string can be a template (e.g. <code>cuda_${{ hash }}_${{ build_number }}</code>).
+After rendering, surrounding whitespace is removed and the result must be a valid
+build string as defined by
+<a href="https://github.com/conda/ceps/blob/main/cep-0026.md">CEP 26</a>: it must not be
+empty, can be at most 64 characters long and may only contain ASCII letters,
+digits, <code>_</code>, <code>.</code> and <code>+</code>.</p>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-25-1"><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="nt">build</span><span class="p">:</span>
 </span><span id="__span-25-2"><a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a><span class="w">  </span><span class="nt">number</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
 </span><span id="__span-25-3"><a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a><span class="w">  </span><span class="nt">string</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">abc</span>
