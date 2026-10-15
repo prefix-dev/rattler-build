@@ -357,6 +357,7 @@ impl Output {
         env_vars::apply_jobserver(
             &mut exec_args.env_vars,
             tool_configuration.jobserver.as_ref(),
+            crate::script::plan_script_env(&staging.build.plan),
         );
         rattler_build_script::run_script(exec_args)
             .await

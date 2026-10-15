@@ -27,6 +27,16 @@ pub use rattler_build_script::{
 use crate::{env_vars, metadata::Output};
 use rattler_build_recipe::stage1::build::BuildPlan;
 
+/// The `env` of a plan's `build.script`, which is merged into the script
+/// environment. `build.steps` set their `env` per step instead, which already
+/// takes precedence.
+pub(crate) fn plan_script_env(plan: &BuildPlan) -> Option<&IndexMap<String, String>> {
+    match plan {
+        BuildPlan::Script(script) => Some(script.env()),
+        BuildPlan::Steps(_) => None,
+    }
+}
+
 /// Prepare execution arguments for a stage1 build plan.
 ///
 /// Package outputs and staging outputs intentionally share this implementation
@@ -235,6 +245,7 @@ impl Output {
             env_vars::apply_jobserver(
                 &mut exec_args.env_vars,
                 tool_configuration.jobserver.as_ref(),
+                plan_script_env(&self.recipe.build().plan),
             );
             rattler_build_script::run_script(exec_args).await?;
 

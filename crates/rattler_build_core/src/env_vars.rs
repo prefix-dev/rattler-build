@@ -217,8 +217,14 @@ pub fn language_vars(output: &Output) -> HashMap<String, Option<String>> {
 ///
 /// Its `MAKEFLAGS` are appended: flags already in `MAKEFLAGS` are kept, and the
 /// jobserver's `-j` and `--jobserver-auth` come last, so they take precedence.
-/// `CPU_COUNT` is set to the jobserver's share per build, if one is given.
-pub fn apply_jobserver(env_vars: &mut IndexMap<String, String>, jobserver: Option<&JobserverEnv>) {
+/// `CPU_COUNT` is set to the jobserver's share per build, if one is given,
+/// unless the recipe's own script `env` (`recipe_env`) sets it: recipes set
+/// `CPU_COUNT: 1` to keep a build serial.
+pub fn apply_jobserver(
+    env_vars: &mut IndexMap<String, String>,
+    jobserver: Option<&JobserverEnv>,
+    recipe_env: Option<&IndexMap<String, String>>,
+) {
     let Some(jobserver) = jobserver else {
         return;
     };
@@ -227,7 +233,10 @@ pub fn apply_jobserver(env_vars: &mut IndexMap<String, String>, jobserver: Optio
         &jobserver.makeflags,
     );
     env_vars.insert("MAKEFLAGS".to_string(), makeflags);
-    if let Some(cpu_count) = jobserver.cpu_count {
+    let recipe_sets_cpu_count = recipe_env.is_some_and(|env| env.contains_key("CPU_COUNT"));
+    if let Some(cpu_count) = jobserver.cpu_count
+        && !recipe_sets_cpu_count
+    {
         env_vars.insert("CPU_COUNT".to_string(), cpu_count.to_string());
     }
 }
@@ -773,23 +782,30 @@ mod test {
         let makeflags = &jobserver.makeflags;
 
         let mut env = IndexMap::from([("MAKEFLAGS".to_string(), "-k V=1".to_string())]);
-        apply_jobserver(&mut env, Some(&jobserver));
+        apply_jobserver(&mut env, Some(&jobserver), None);
         assert_eq!(env["MAKEFLAGS"], format!("-k V=1 {makeflags}"));
 
         let mut env = IndexMap::new();
-        apply_jobserver(&mut env, Some(&jobserver));
+        apply_jobserver(&mut env, Some(&jobserver), None);
         assert_eq!(&env["MAKEFLAGS"], makeflags);
     }
 
     #[test]
     fn jobserver_sets_cpu_count_only_when_given() {
         let mut env = IndexMap::from([("CPU_COUNT".to_string(), "20".to_string())]);
-        apply_jobserver(&mut env, Some(&jobserver(Some(5))));
+        apply_jobserver(&mut env, Some(&jobserver(Some(5))), None);
         assert_eq!(env["CPU_COUNT"], "5");
 
         let mut env = IndexMap::from([("CPU_COUNT".to_string(), "20".to_string())]);
-        apply_jobserver(&mut env, Some(&jobserver(None)));
+        apply_jobserver(&mut env, Some(&jobserver(None)), None);
         assert_eq!(env["CPU_COUNT"], "20");
+
+        // A recipe's own CPU_COUNT (already merged into the environment) wins.
+        let recipe_env = IndexMap::from([("CPU_COUNT".to_string(), "1".to_string())]);
+        let mut env = recipe_env.clone();
+        apply_jobserver(&mut env, Some(&jobserver(Some(5))), Some(&recipe_env));
+        assert_eq!(env["CPU_COUNT"], "1");
+        assert!(env["MAKEFLAGS"].contains("--jobserver-auth=fifo:"));
 
         let mut vars = HashMap::from([("CPU_COUNT".to_string(), Some("20".to_string()))]);
         apply_jobserver_to_vars(&mut vars, Some(&jobserver(Some(5))));
@@ -803,7 +819,7 @@ mod test {
             ("CPU_COUNT".to_string(), "20".to_string()),
         ]);
         let before = env.clone();
-        apply_jobserver(&mut env, None);
+        apply_jobserver(&mut env, None, None);
         assert_eq!(env, before);
     }
 }
