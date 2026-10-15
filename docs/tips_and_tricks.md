@@ -94,7 +94,25 @@ an explicit `-j` (for example `make -j${CPU_COUNT}`, `ninja -j${CPU_COUNT}` or
 `cmake --build . --parallel ${CPU_COUNT}`) bypasses it. So with these build
 tools, prefer leaving out `-j` in recipes. For recipes that do pass it,
 `CPU_COUNT` is set to each build's share, `JOBS / BUILDS` (at least 1), while
-a jobserver is active, unless you set `CPU_COUNT` yourself.
+a jobserver is active, unless you set `CPU_COUNT` yourself or the recipe sets
+it in its script `env`.
+
+Each build holds one job slot for its whole run, including solving, fetching
+sources and packaging, and that slot backs the first job of its make or
+ninja. So at most `JOBS` builds run at the same time: with `4:2`, at most 2.
+
+An older GNU make (before 4.4) does not understand the jobserver and stops with
+`invalid --jobserver-auth string 'fifo:…'`. Having make >= 4.4 in the build
+requirements is not always enough: CMake's Makefile generator looks for `gmake`
+before `make`, and finds a system `gmake` (for example make 4.3 on Ubuntu 24.04)
+if the environment has none. For such recipes, point CMake at the environment's
+make:
+
+```sh
+cmake -DCMAKE_MAKE_PROGRAM=$BUILD_PREFIX/bin/make ...
+```
+
+Recipes that use the Ninja generator are not affected.
 
 !!!note
 
