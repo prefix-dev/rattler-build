@@ -30,8 +30,8 @@ use crate::{
     jobserver::{Jobserver, Token},
 };
 
-/// A finished job.
-pub(crate) enum Finished {
+/// What happened in the build loop: a job finished, or a waiting build started.
+pub(crate) enum Event {
     /// A build of `output`, with its result (boxed: an `Output` is large).
     Build {
         output: Box<Output>,
@@ -39,8 +39,8 @@ pub(crate) enum Finished {
     },
     /// Other work started with [`ParallelBuilds::spawn`].
     Task(miette::Result<()>),
-    /// Not a finished job: a build that was waiting for a jobserver token got
-    /// one and started. More ready outputs may be startable now.
+    /// A build that was waiting for a jobserver token got one and started.
+    /// More ready outputs may be startable now.
     BuildStarted,
 }
 
@@ -51,7 +51,7 @@ pub(crate) struct ParallelBuilds<'a> {
     configuration: Arc<Configuration>,
     max_jobs: usize,
     /// Each job, with whether it holds a jobserver slot (builds and tests).
-    jobs: FuturesUnordered<LocalBoxFuture<'a, (Finished, bool)>>,
+    jobs: FuturesUnordered<LocalBoxFuture<'a, (Event, bool)>>,
     /// Running builds and test runs. With a jobserver, each holds a token for
     /// the implicit job slot of its top-level make or ninja.
     running_builds: usize,
@@ -144,13 +144,16 @@ impl<'a> ParallelBuilds<'a> {
                 WorkingDirectoryBehavior::Cleanup,
             )
             .await;
-            Finished::Build {
+            Event::Build {
                 output: Box::new(output),
                 result: Box::new(result),
             }
         });
+        // Stops the build task if the build loop drops it unfinished.
+        let abort = AbortOnDrop(build.abort_handle());
         self.jobs.push(
             async move {
+                let _abort = abort;
                 let finished = match build.await {
                     Ok(finished) => finished,
                     Err(e) if e.is_panic() => std::panic::resume_unwind(e.into_panic()),
@@ -167,7 +170,7 @@ impl<'a> ParallelBuilds<'a> {
     /// Runs `task` as a job; it counts against the maximum like a build.
     pub(crate) fn spawn(&mut self, task: impl Future<Output = miette::Result<()>> + 'a) {
         self.jobs.push(
-            task.map(|result| (Finished::Task(result), false))
+            task.map(|result| (Event::Task(result), false))
                 .boxed_local(),
         );
     }
@@ -181,7 +184,7 @@ impl<'a> ParallelBuilds<'a> {
             async move {
                 let result = task.await;
                 drop(token);
-                (Finished::Task(result), true)
+                (Event::Task(result), true)
             }
             .boxed_local(),
         );
@@ -196,9 +199,9 @@ impl<'a> ParallelBuilds<'a> {
     /// Waits for the next job to finish; `None` when no job is in flight.
     ///
     /// While a build waits for a jobserver token, this also waits for a token
-    /// (without blocking the thread) and returns [`Finished::BuildStarted`]
+    /// (without blocking the thread) and returns [`Event::BuildStarted`]
     /// once that build started.
-    pub(crate) async fn next(&mut self) -> Option<Finished> {
+    pub(crate) async fn next(&mut self) -> Option<Event> {
         let finished = match (&mut self.jobserver, self.waiting.is_some()) {
             (Some(jobserver), true) => {
                 tokio::select! {
@@ -222,7 +225,7 @@ impl<'a> ParallelBuilds<'a> {
                 };
                 let output = self.waiting.take().expect("checked above");
                 self.start_build(output, token);
-                return Some(Finished::BuildStarted);
+                return Some(Event::BuildStarted);
             }
             Ok(None) | Err(_) => return None,
         };
@@ -249,6 +252,21 @@ impl<'a> ParallelBuilds<'a> {
     }
 }
 
+/// Aborts a spawned build when dropped. Dropping a `JoinHandle` only detaches
+/// its task, so without this, dropping the build loop (for example when a
+/// py-rattler-build caller cancels) would leave builds running in the
+/// background. Aborting stops rattler-build's own work for the build; a build
+/// script process that is already running is not killed (as before builds ran
+/// on their own tasks), since script processes are not spawned with
+/// `kill_on_drop`.
+struct AbortOnDrop(tokio::task::AbortHandle);
+
+impl Drop for AbortOnDrop {
+    fn drop(&mut self) {
+        self.0.abort();
+    }
+}
+
 /// Spawns a build on its own tokio task. The task keeps the caller's tracing
 /// subscriber: library users such as py-rattler-build capture the build log
 /// with a thread-local subscriber, which a worker thread would not see.
@@ -272,7 +290,7 @@ mod tests {
         sync::{Arc, Mutex},
     };
 
-    use super::{cpu_count_share, spawn_build};
+    use super::{AbortOnDrop, cpu_count_share, spawn_build};
 
     /// A log writer that keeps everything written to it.
     #[derive(Clone, Default)]
@@ -318,5 +336,18 @@ mod tests {
         assert_eq!(cpu_count_share(20, 6), 3);
         assert_eq!(cpu_count_share(20, 1), 20);
         assert_eq!(cpu_count_share(2, 4), 1);
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn dropping_the_guard_aborts_an_unfinished_build() {
+        let build = spawn_build(std::future::pending::<()>());
+        let guard = AbortOnDrop(build.abort_handle());
+
+        drop(guard);
+
+        let result = tokio::time::timeout(std::time::Duration::from_secs(5), build)
+            .await
+            .expect("the build task ends after the guard is dropped");
+        assert!(result.unwrap_err().is_cancelled());
     }
 }
