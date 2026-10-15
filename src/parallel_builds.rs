@@ -23,6 +23,7 @@ use rattler_build_core::{
     metadata::Output,
     tool_configuration::{Configuration, JobserverEnv},
 };
+use tracing::instrument::WithSubscriber;
 
 use crate::{
     build_queue::OutputBuildQueue,
@@ -136,7 +137,7 @@ impl<'a> ParallelBuilds<'a> {
     fn start_build(&mut self, output: Output, token: Option<Token>) {
         self.running_builds += 1;
         let configuration = self.configuration.clone();
-        let build = tokio::spawn(async move {
+        let build = spawn_build(async move {
             let result = run_build(
                 output.clone(),
                 &configuration,
@@ -248,6 +249,17 @@ impl<'a> ParallelBuilds<'a> {
     }
 }
 
+/// Spawns a build on its own tokio task. The task keeps the caller's tracing
+/// subscriber: library users such as py-rattler-build capture the build log
+/// with a thread-local subscriber, which a worker thread would not see.
+fn spawn_build<F>(build: F) -> tokio::task::JoinHandle<F::Output>
+where
+    F: Future + Send + 'static,
+    F::Output: Send + 'static,
+{
+    tokio::spawn(build.with_current_subscriber())
+}
+
 /// Each build's share of `jobs` job slots when `builds` run at the same time.
 fn cpu_count_share(jobs: usize, builds: usize) -> usize {
     (jobs / builds.max(1)).max(1)
@@ -255,7 +267,50 @@ fn cpu_count_share(jobs: usize, builds: usize) -> usize {
 
 #[cfg(test)]
 mod tests {
-    use super::cpu_count_share;
+    use std::{
+        io::Write,
+        sync::{Arc, Mutex},
+    };
+
+    use super::{cpu_count_share, spawn_build};
+
+    /// A log writer that keeps everything written to it.
+    #[derive(Clone, Default)]
+    struct Captured(Arc<Mutex<Vec<u8>>>);
+
+    impl Write for Captured {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            self.0.lock().unwrap().extend_from_slice(buf);
+            Ok(buf.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    /// Library users (for example py-rattler-build) capture logs with a
+    /// thread-local subscriber (`tracing::subscriber::with_default`). A build
+    /// spawned on a worker thread must still log to it.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn spawned_builds_log_to_the_callers_subscriber() {
+        let captured = Captured::default();
+        let writer = captured.clone();
+        let subscriber = tracing_subscriber::fmt()
+            .with_writer(move || writer.clone())
+            .with_ansi(false)
+            .finish();
+        let _guard = tracing::subscriber::set_default(subscriber);
+
+        spawn_build(async { tracing::info!("logged from the build task") })
+            .await
+            .unwrap();
+
+        let logs = String::from_utf8(captured.0.lock().unwrap().clone()).unwrap();
+        assert!(
+            logs.contains("logged from the build task"),
+            "captured: {logs:?}"
+        );
+    }
 
     #[test]
     fn cpu_count_is_the_share_per_build_and_at_least_one() {
