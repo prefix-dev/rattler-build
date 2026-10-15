@@ -102,15 +102,11 @@ sources and packaging, and that slot backs the first job of its make or
 ninja. So at most `JOBS` builds run at the same time: with `4:2`, at most 2.
 
 An older GNU make (before 4.4) does not understand the jobserver and stops with
-`invalid --jobserver-auth string 'fifo:…'`. Having make >= 4.4 in the build
-requirements is not always enough: CMake's Makefile generator looks for `gmake`
-before `make`, and finds a system `gmake` (for example make 4.3 on Ubuntu 24.04)
-if the environment has none. For such recipes, point CMake at the environment's
-make:
-
-```sh
-cmake -DCMAKE_MAKE_PROGRAM=$BUILD_PREFIX/bin/make ...
-```
+`invalid --jobserver-auth string 'fifo:…'`. rattler-build does not install
+make itself, so a recipe that runs make without listing it in its build
+requirements uses the system make, which may be older (for example make 4.3 on
+Ubuntu 24.04). Recipes that use make with a jobserver should list `make >=4.4`
+in their build requirements.
 
 Recipes that use the Ninja generator are not affected.
 
