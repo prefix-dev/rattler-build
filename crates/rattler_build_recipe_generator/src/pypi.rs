@@ -108,7 +108,10 @@ async fn extract_wheel_info(url: &str, client: &reqwest::Client) -> miette::Resu
     let metadata_file = (0..archive.len()).find(|&i| {
         archive
             .by_index(i)
-            .map(|file| file.name().ends_with(".dist-info/METADATA"))
+            .map(|file| {
+                file.name()
+                    .is_ok_and(|name| name.ends_with(".dist-info/METADATA"))
+            })
             .unwrap_or(false)
     });
 
@@ -129,7 +132,10 @@ async fn extract_wheel_info(url: &str, client: &reqwest::Client) -> miette::Resu
     let entry_points_file = (0..archive.len()).find(|&i| {
         archive
             .by_index(i)
-            .map(|file| file.name().ends_with(".dist-info/entry_points.txt"))
+            .map(|file| {
+                file.name()
+                    .is_ok_and(|name| name.ends_with(".dist-info/entry_points.txt"))
+            })
             .unwrap_or(false)
     });
 

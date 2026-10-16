@@ -1,6 +1,6 @@
 [package]
 name = "rattler-build"
-version = "0.76.1"
+version = "0.77.0"
 authors = ["rattler-build contributors <hi@prefix.dev>"]
 repository = "https://github.com/prefix-dev/rattler-build"
 edition = "2024"
@@ -93,7 +93,7 @@ urlencoding = "2.1"
 walkdir = "2.5.0"
 which = "8.0.6"
 windows-sys = "0.61"
-zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
+zip = { version = "9.0.4", default-features = false, features = ["deflate"] }
 zstd = "0.14.0"
 spdx = "0.13.5"
 pathdiff = "0.2.3"
@@ -212,7 +212,7 @@ anyhow = { workspace = true }
 reqwest = { workspace = true, features = ["multipart"] }
 reqwest-middleware = { workspace = true }
 async_http_range_reader = { package = "astral_async_http_range_reader", version = "0.12.0" }
-async_zip = { package = "astral_async_zip", version = "0.0.21", features = [
+async_zip = { package = "astral_async_zip", version = "0.0.22", features = [
   "tokio",
   "zstd",
 ] }
