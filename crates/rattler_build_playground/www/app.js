@@ -77,7 +77,7 @@ source:
 
 build:
   noarch: python
-  script: python -m pip install . -vv --no-deps
+  script: python -m pip install . -vv
 
 requirements:
   host:

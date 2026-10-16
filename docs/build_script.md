@@ -72,7 +72,7 @@ build:
     - if: win
       run: copy %RECIPE_DIR%\my_script_with_recipe.bat %LIBRARY_BIN%\super-cool-script.bat
 
-    - run: python -m pip install . --no-deps
+    - run: python -m pip install .
       env:
         SETUPTOOLS_SCM_PRETEND_VERSION: ${{ version }}
 ```

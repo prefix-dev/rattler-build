@@ -11,7 +11,7 @@ source:
 
 build:
   noarch: python # (1)!
-  script: pip install . -v
+  script: pip install . -v #(2)!
 
 requirements:
   # note that there is no build section
@@ -31,7 +31,7 @@ requirements:
 tests:
   - python:
       imports:
-        - ipywidgets # (2)!
+        - ipywidgets # (3)!
 
 about:
   homepage: https://github.com/ipython/ipywidgets

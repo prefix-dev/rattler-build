@@ -578,7 +578,7 @@ with the following fields (all optional):
 build:
   script:
     content:
-      - python -m pip install . -vv --no-deps --no-build-isolation
+      - python -m pip install . -vv
     env:
       # Hard-coded value
       USE_SYSTEM_DEPS: "on"
@@ -644,7 +644,7 @@ build:
         - mkdir -p "$PREFIX/bin"
         - cp "$RECIPE_DIR/tool" "$PREFIX/bin/tool"
 
-    - run: python -m pip install . --no-deps
+    - run: python -m pip install .
       env:
         SETUPTOOLS_SCM_PRETEND_VERSION: ${{ version }}
 ```

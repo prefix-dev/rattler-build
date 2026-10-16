@@ -30,8 +30,16 @@ Additionally, `noarch: python` packages work with a range of Python versions (co
 1. The `noarch: python` line tells Rattler-Build that this package is pure
    Python and can be one-size-fits-all. `noarch` packages can be installed on any
    platform without modification which is very handy.
-2. The `imports` section in the tests is used to check that the package is
+2. It's a common pattern to use `pip install . -v` as build command. This delegates the responsibility to
+   collect all necessary files and put them in the right places of the host environment.  
+   *Note:* Rattler-Build configures pip through the `PIP_*`
+   [environment variables](../build_script.md#default-environment-variables-set-during-the-build-process)
+   so that `pip install` basically only collects and copies the project files. For example, it suppresses
+   the installation of dependencies through `PIP_NO_DEPENDENCIES`.
+3. The `imports` section in the tests is used to check that the package is
    installed correctly and can be imported.
+
+#
 
 ### Running the recipe
 
