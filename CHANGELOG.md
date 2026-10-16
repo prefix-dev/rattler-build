@@ -5,6 +5,67 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.77.0] - 2026-10-16
+### ✨ Highlights
+
+The new `--parallel-builds BUILDS[:JOBS]` option builds independent outputs side by side, optionally sharing a GNU make jobserver (unix only) so parallel builds don't oversubscribe the machine; the default stays at one build at a time. `--continue-on-failure=skip-dependents` skips every queued output that depends on a failed build instead of building it against a stale published package. The Python bindings gain an `ExcludeNewer` policy for builds, tests and debug sessions.
+
+**Behavior change:** `generate-recipe cran --tree` now only generates recipes for dependencies missing from conda-forge (or the channels given with `--check-available`); pass `--all` for the old behavior.
+
+Fixes cover linking checks for symlinked SONAME libraries, macOS code-signing identifiers, `package_contents` checks on noarch packages, and retrying truncated source downloads.
+
+
+### Features
+
+- Expose exclude-newer policies for Python builds, tests, and debug sessions by @jezdez in [#2801](https://github.com/prefix-dev/rattler-build/pull/2801)
+- Add --continue-on-failure=skip-dependents by @mini-1235 in [#2842](https://github.com/prefix-dev/rattler-build/pull/2842)
+- Check R dependencies against channels, only generate missing ones with --tree by @pb01ka in [#2622](https://github.com/prefix-dev/rattler-build/pull/2622)
+- Build independent outputs in parallel with a shared jobserver by @mini-1235 in [#2843](https://github.com/prefix-dev/rattler-build/pull/2843)
+
+
+### Fixes
+
+- Make Python platform tests independent of the build machine by @jezdez in [#2826](https://github.com/prefix-dev/rattler-build/pull/2826)
+- Retry source downloads that arrive empty or truncated by @chrisburr in [#2823](https://github.com/prefix-dev/rattler-build/pull/2823)
+- Preserve code signing identifier when re-signing on macOS by @haecker-felix in [#2854](https://github.com/prefix-dev/rattler-build/pull/2854)
+- Use host platform for package_contents checks on noarch by @isuruf in [#2851](https://github.com/prefix-dev/rattler-build/pull/2851)
+- deps: Bump rustls and aws-smithy-json by @wolfv in [#2868](https://github.com/prefix-dev/rattler-build/pull/2868)
+- Linking checks for symlinked SONAME libraries by @wolfv in [#2831](https://github.com/prefix-dev/rattler-build/pull/2831)
+- ci: Handle Python 3.15 abi3 suffix in test and surface release-plz errors by @wolfv in [#2871](https://github.com/prefix-dev/rattler-build/pull/2871)
+
+
+### Performance
+
+- Run packaging on the blocking thread pool by @wolfv in [#2857](https://github.com/prefix-dev/rattler-build/pull/2857)
+
+
+### Documentation
+
+- Document that  --env-isolation none is needed in sccache tips by @traversaro in [#2825](https://github.com/prefix-dev/rattler-build/pull/2825)
+- Clarify `compiler()` Jinja fn values by @salim-b in [#2832](https://github.com/prefix-dev/rattler-build/pull/2832)
+- Better document that rattler-build manages pip options for script execution by @timhoffm in [#2870](https://github.com/prefix-dev/rattler-build/pull/2870)
+
+
+### Maintenance
+
+- Update rattler and sigstore crates by @baszalmstra in [#2834](https://github.com/prefix-dev/rattler-build/pull/2834)
+- Pin cc to 1.4.7 by @baszalmstra in [#2835](https://github.com/prefix-dev/rattler-build/pull/2835)
+- Remove old aws-lc-sys cmake workaround by @lucascolley in [#2838](https://github.com/prefix-dev/rattler-build/pull/2838)
+- Update rattler to 0.52 by @Hofer-Julian in [#2844](https://github.com/prefix-dev/rattler-build/pull/2844)
+- Update rust to 1.98.1 by @lucascolley in [#2846](https://github.com/prefix-dev/rattler-build/pull/2846)
+- Bump rattler to 0.53 by @pavelzw in [#2849](https://github.com/prefix-dev/rattler-build/pull/2849)
+- Turn off gpg signing in git tests by @lucascolley in [#2847](https://github.com/prefix-dev/rattler-build/pull/2847)
+- deps: Update Rattler crates to latest releases by @nichmor in [#2855](https://github.com/prefix-dev/rattler-build/pull/2855)
+- Read and write crazy_characters files as UTF-8 by @wolfv in [#2856](https://github.com/prefix-dev/rattler-build/pull/2856)
+- ci: Stop dependabot from bumping the pinned cc crate by @wolfv in [#2858](https://github.com/prefix-dev/rattler-build/pull/2858)
+- Bump rattler crates, check build string by @pavelzw in [#2863](https://github.com/prefix-dev/rattler-build/pull/2863)
+- release: Simplify and improve changelog PR grouping by @lucascolley in [#2869](https://github.com/prefix-dev/rattler-build/pull/2869)
+
+
+### New Contributors
+* @timhoffm made their first contribution in [#2870](https://github.com/prefix-dev/rattler-build/pull/2870)
+* @mini-1235 made their first contribution in [#2843](https://github.com/prefix-dev/rattler-build/pull/2843)
+
 ## [0.76.1] - 2026-09-14
 ### ✨ Highlights
 
