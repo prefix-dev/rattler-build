@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use rattler_conda_types::PackageName;
+use rattler_conda_types::{Flag, PackageName};
 use serde::{Deserialize, Serialize};
 
 use crate::stage0::SerializableMatchSpec;
@@ -41,6 +41,15 @@ pub struct Requirements {
     /// Ignore run-exports configuration
     #[serde(default, skip_serializing_if = "IgnoreRunExports::is_empty")]
     pub ignore_run_exports: IgnoreRunExports,
+
+    /// Flags added to any package that has this package as a direct build or
+    /// host dependency (V3 only)
+    #[serde(default, skip_serializing_if = "ConditionalList::is_empty")]
+    pub flag_exports: ConditionalList<Flag>,
+
+    /// Ignore flag-exports configuration
+    #[serde(default, skip_serializing_if = "IgnoreFlagExports::is_empty")]
+    pub ignore_flag_exports: IgnoreFlagExports,
 }
 
 impl Requirements {
@@ -53,6 +62,8 @@ impl Requirements {
             && self.extras.is_empty()
             && self.run_exports.is_empty()
             && self.ignore_run_exports.is_empty()
+            && self.flag_exports.is_empty()
+            && self.ignore_flag_exports.is_empty()
     }
 
     /// Collect all variables used in requirements
@@ -65,6 +76,8 @@ impl Requirements {
             extras,
             run_exports,
             ignore_run_exports,
+            flag_exports,
+            ignore_flag_exports,
         } = self;
 
         let mut vars = Vec::new();
@@ -78,6 +91,8 @@ impl Requirements {
         }
         vars.extend(run_exports.used_variables());
         vars.extend(ignore_run_exports.used_variables());
+        vars.extend(flag_exports.used_variables());
+        vars.extend(ignore_flag_exports.used_variables());
 
         vars.sort();
         vars.dedup();
@@ -239,6 +254,42 @@ impl IgnoreRunExports {
     /// Collect all variables used in ignore configuration
     pub fn used_variables(&self) -> Vec<String> {
         let IgnoreRunExports {
+            by_name,
+            from_package,
+        } = self;
+
+        let mut vars = Vec::new();
+
+        vars.extend(by_name.used_variables());
+        vars.extend(from_package.used_variables());
+
+        vars.sort();
+        vars.dedup();
+        vars
+    }
+}
+
+/// Configuration for ignoring flag-exports (before rendering)
+#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
+pub struct IgnoreFlagExports {
+    /// Flags to ignore (can contain templates/conditionals)
+    #[serde(default, skip_serializing_if = "ConditionalList::is_empty")]
+    pub by_name: ConditionalList<Flag>,
+
+    /// Packages whose flag exports to ignore (can contain templates/conditionals)
+    #[serde(default, skip_serializing_if = "ConditionalList::is_empty")]
+    pub from_package: ConditionalList<PackageName>,
+}
+
+impl IgnoreFlagExports {
+    /// Check if both fields are empty
+    pub fn is_empty(&self) -> bool {
+        self.by_name.is_empty() && self.from_package.is_empty()
+    }
+
+    /// Collect all variables used in ignore configuration
+    pub fn used_variables(&self) -> Vec<String> {
+        let IgnoreFlagExports {
             by_name,
             from_package,
         } = self;

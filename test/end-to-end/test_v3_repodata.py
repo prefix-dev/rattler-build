@@ -298,3 +298,89 @@ def test_v3_fields_are_rejected_without_opt_in(
 
     assert expected in str(exc_info.value.output)
     assert hint in str(exc_info.value.output)
+
+
+def test_v3_flag_exports(rattler_build: RattlerBuild, tmp_path: Path):
+    output_dir = tmp_path / "output"
+
+    rattler_build.build(
+        V3_RECIPES / "flag-exports",
+        output_dir,
+        extra_args=["--v3", "--test=skip"],
+    )
+
+    def read_info(name: str, file: str) -> dict[str, Any]:
+        # Anchor on the version: `flag-consumer*` would also match its siblings.
+        path = get_extracted_package(output_dir, f"{name}-1.0.0-") / "info" / file
+        return json.loads(path.read_text()) if path.exists() else {}
+
+    # The exporting package records its flag exports in run_exports.json but
+    # does not carry them itself.
+    assert read_info("debug-toolchain", "run_exports.json") == {
+        "flags": ["debug", "sanitizers"]
+    }
+    assert read_info("debug-toolchain", "index.json")["flags"] == ["toolchain"]
+
+    # Exported flags are appended to the consumer's own flags.
+    assert read_info("flag-consumer", "index.json")["flags"] == [
+        "cuda",
+        "debug",
+        "sanitizers",
+    ]
+    assert read_info("flag-consumer-ignore-by-name", "index.json")["flags"] == ["debug"]
+    assert "flags" not in read_info("flag-consumer-ignore-from-package", "index.json")
+
+    # The rendered recipe records where each exported flag came from.
+    rendered = (
+        get_extracted_package(output_dir, "flag-consumer-1.0.0-")
+        / "info/recipe/rendered_recipe.yaml"
+    ).read_text()
+    assert "exported_flags" in rendered
+    assert "from: debug-toolchain" in rendered
+
+
+def test_flag_exports_ignored_for_legacy_consumers(
+    rattler_build: RattlerBuild, tmp_path: Path
+):
+    output_dir = tmp_path / "output"
+    rattler_build.build(
+        V3_RECIPES / "flag-exports",
+        output_dir,
+        extra_args=["--v3", "--test=skip"],
+    )
+
+    recipe = tmp_path / "legacy-consumer"
+    recipe.mkdir()
+    (recipe / "recipe.yaml").write_text(
+        "package:\n"
+        "  name: legacy-consumer\n"
+        "  version: 1.0.0\n"
+        "build:\n"
+        "  noarch: generic\n"
+        "requirements:\n"
+        "  build:\n"
+        "    - debug-toolchain\n"
+    )
+    rattler_build.build(recipe, output_dir, extra_args=["--test=skip"])
+
+    extracted = get_extracted_package(output_dir, "legacy-consumer")
+    index_json = json.loads((extracted / "info/index.json").read_text())
+    assert "flags" not in index_json
+
+
+def test_flag_exports_inherited_from_staging_cache(
+    rattler_build: RattlerBuild, tmp_path: Path
+):
+    output_dir = tmp_path / "output"
+    rattler_build.build(
+        V3_RECIPES / "flag-exports-staging",
+        output_dir,
+        extra_args=["--v3", "--test=skip"],
+    )
+
+    def index_json(name: str) -> dict[str, Any]:
+        extracted = get_extracted_package(output_dir, f"{name}-1.0.0-")
+        return json.loads((extracted / "info/index.json").read_text())
+
+    assert index_json("stage-consumer")["flags"] == ["debug"]
+    assert "flags" not in index_json("stage-consumer-ignore")

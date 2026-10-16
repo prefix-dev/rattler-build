@@ -7,11 +7,11 @@ use std::{
 
 use indicatif::{HumanBytes, MultiProgress, ProgressBar, ProgressStyle};
 use rattler::install::Placement;
-use rattler_build_recipe::stage1::{Dependency, Requirements};
+use rattler_build_recipe::stage1::{Dependency, Requirements, requirements::IgnoreFlagExports};
 use rattler_build_types::{PinArgs, PinError};
 use rattler_conda_types::{
-    ChannelUrl, MatchSpec, NamelessMatchSpec, PackageName, PackageNameMatcher, PackageRecord,
-    RepoDataRecord, Subdir, package::RunExportsJson,
+    ChannelUrl, Flag, MatchSpec, NamelessMatchSpec, PackageName, PackageNameMatcher, PackageRecord,
+    RepoDataRecord, RepodataRevision, Subdir, package::RunExportsJson,
 };
 use rattler_repodata_gateway::{Gateway, RunExportExtractorError, RunExportsReporter};
 use serde::{Deserialize, Serialize};
@@ -352,6 +352,64 @@ impl ResolvedDependencies {
         }
         result
     }
+
+    /// Collect the flags exported by the direct dependencies of this
+    /// environment, plus the records named in `extra_direct` (the build
+    /// requirements when build and host environments are merged).
+    fn exported_flags(
+        &self,
+        env: &str,
+        extra_direct: &[DependencyInfo],
+        ignore: &IgnoreFlagExports,
+    ) -> Vec<ExportedFlag> {
+        let is_direct = |name: &PackageName| {
+            self.specs
+                .iter()
+                .chain(extra_direct)
+                // Run export dependencies are not direct dependencies
+                .filter(|s| !matches!(s, DependencyInfo::RunExport(_)))
+                .any(|s| s.spec().name.as_exact() == Some(name))
+        };
+
+        let mut result = Vec::new();
+        for record in &self.resolved {
+            let name = &record.package_record.name;
+            let Some(run_exports) = &record.package_record.run_exports else {
+                continue;
+            };
+            if run_exports.flags.is_empty()
+                || !is_direct(name)
+                || ignore.from_package.contains(name)
+            {
+                continue;
+            }
+            result.extend(
+                run_exports
+                    .flags
+                    .iter()
+                    .filter(|flag| !ignore.by_name.contains(flag))
+                    .map(|flag| ExportedFlag {
+                        flag: flag.clone(),
+                        from: name.clone(),
+                        env: env.to_string(),
+                    }),
+            );
+        }
+        result
+    }
+}
+
+/// A flag exported by a build or host dependency through the `flags` key of
+/// its `run_exports.json`. Exported flags are added to the flags of the
+/// package being built.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ExportedFlag {
+    /// The exported flag
+    pub flag: Flag,
+    /// The package that exported the flag
+    pub from: PackageName,
+    /// The environment the exporting package is in (`build` or `host`)
+    pub env: String,
 }
 impl Display for ResolvedDependencies {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -526,6 +584,21 @@ pub struct FinalizedDependencies {
     pub build: Option<ResolvedDependencies>,
     pub host: Option<ResolvedDependencies>,
     pub run: FinalizedRunDependencies,
+    /// Flags exported by build and host dependencies (and inherited from a
+    /// staging cache), added to the package's flags.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub exported_flags: Vec<ExportedFlag>,
+}
+
+impl FinalizedDependencies {
+    /// The unique exported flags, in order of appearance.
+    pub fn unique_exported_flags(&self) -> impl Iterator<Item = &Flag> {
+        let mut seen = std::collections::HashSet::new();
+        self.exported_flags
+            .iter()
+            .map(|exported| &exported.flag)
+            .filter(move |flag| seen.insert(*flag))
+    }
 }
 
 #[derive(Error, Debug)]
@@ -781,14 +854,16 @@ fn render_run_exports(
     };
 
     let run_exports = &output.recipe.requirements().run_exports;
+    let flag_exports = &output.recipe.requirements().flag_exports;
 
-    if !run_exports.is_empty() {
+    if !run_exports.is_empty() || !flag_exports.is_empty() {
         Ok(RunExportsJson {
             strong: render_run_exports(&run_exports.strong)?,
             weak: render_run_exports(&run_exports.weak)?,
             noarch: render_run_exports(&run_exports.noarch)?,
             strong_constrains: render_run_exports(&run_exports.strong_constraints)?,
             weak_constrains: render_run_exports(&run_exports.weak_constraints)?,
+            flags: flag_exports.clone(),
         })
     } else {
         Ok(RunExportsJson::default())
@@ -936,15 +1011,16 @@ pub(crate) async fn resolve_dependencies(
         .iter()
         .map(|s| s.spec().clone())
         .collect::<Vec<_>>();
+    let mut merged_build_specs = Vec::new();
     if merge_build_host {
         // add the requirements of build to host
-        let specs = apply_variant(
+        merged_build_specs = apply_variant(
             &requirements.build,
             &output.build_configuration,
             &compatibility_specs,
             true,
         )?;
-        match_specs.extend(specs.iter().map(|s| s.spec().clone()));
+        match_specs.extend(merged_build_specs.iter().map(|s| s.spec().clone()));
     }
 
     let host_env = if !match_specs.is_empty() {
@@ -1104,6 +1180,14 @@ pub(crate) async fn resolve_dependencies(
         run_exports: rendered_run_exports,
     };
 
+    let exported_flags = collect_exported_flags(
+        output,
+        requirements,
+        build_env.as_ref(),
+        host_env.as_ref(),
+        &merged_build_specs,
+    );
+
     // log a table of the rendered run dependencies
     if run_specs.depends.is_empty() && run_specs.constraints.is_empty() {
         tracing::info!("\nFinalized run dependencies: this output has no run dependencies");
@@ -1119,7 +1203,64 @@ pub(crate) async fn resolve_dependencies(
         build: build_env,
         host: host_env,
         run: run_specs,
+        exported_flags,
     })
+}
+
+/// Collect the flags exported by the direct build and host dependencies and
+/// inherited from the staging cache, filtered by `ignore_flag_exports`.
+fn collect_exported_flags(
+    output: &Output,
+    requirements: &Requirements,
+    build_env: Option<&ResolvedDependencies>,
+    host_env: Option<&ResolvedDependencies>,
+    merged_build_specs: &[DependencyInfo],
+) -> Vec<ExportedFlag> {
+    let ignore = &requirements.ignore_flag_exports;
+
+    let mut exported_flags = Vec::new();
+    if let Some(cache) = &output.finalized_cache_dependencies {
+        exported_flags.extend(
+            cache
+                .exported_flags
+                .iter()
+                .filter(|exported| {
+                    !ignore.by_name.contains(&exported.flag)
+                        && !ignore.from_package.contains(&exported.from)
+                })
+                .cloned(),
+        );
+    }
+    if let Some(build_env) = build_env {
+        exported_flags.extend(build_env.exported_flags("build", &[], ignore));
+    }
+    if let Some(host_env) = host_env {
+        exported_flags.extend(host_env.exported_flags("host", merged_build_specs, ignore));
+    }
+
+    if exported_flags.is_empty() {
+        return exported_flags;
+    }
+
+    if output.build_configuration.repodata_revision == RepodataRevision::Legacy {
+        let flags = exported_flags
+            .iter()
+            .map(|exported| format!("{} (from {})", exported.flag, exported.from.as_source()))
+            .collect::<Vec<_>>();
+        tracing::warn!(
+            "Ignoring flags exported by dependencies because package flags require --v3: {}",
+            flags.join(", ")
+        );
+        return Vec::new();
+    }
+
+    let flags = exported_flags
+        .iter()
+        .map(|exported| format!("{} (from {})", exported.flag, exported.from.as_source()))
+        .collect::<Vec<_>>();
+    tracing::info!("Exported flags: {}", flags.join(", "));
+
+    exported_flags
 }
 
 impl Output {

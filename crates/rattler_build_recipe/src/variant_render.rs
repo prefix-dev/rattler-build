@@ -2026,6 +2026,55 @@ requirements:
     }
 
     #[test]
+    fn test_render_flag_exports() {
+        let recipe_yaml = r#"
+package:
+  name: debug-compiler
+  version: "1.0.0"
+
+requirements:
+  flag_exports:
+    - debug
+    - ${{ "asan" if unix }}
+  ignore_flag_exports:
+    by_name:
+      - cuda
+    from_package:
+      - other-compiler
+"#;
+
+        let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+        let variant_config = VariantConfig::default();
+
+        let err =
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, RenderConfig::new())
+                .unwrap_err();
+        assert!(err.to_string().contains("--v3"));
+
+        let rendered = render_recipe_with_variant_config(
+            &stage0_recipe,
+            &variant_config,
+            RenderConfig::new()
+                .with_repodata_revision(RepodataRevision::V3)
+                .with_target_platform(rattler_conda_types::Subdir::Linux64),
+        )
+        .unwrap();
+        assert_eq!(rendered.len(), 1);
+        let requirements = &rendered[0].recipe.requirements;
+        let flags = requirements
+            .flag_exports
+            .iter()
+            .map(|flag| flag.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(flags, vec!["debug", "asan"]);
+        assert_eq!(requirements.ignore_flag_exports.by_name[0].as_str(), "cuda");
+        assert_eq!(
+            requirements.ignore_flag_exports.from_package[0].as_normalized(),
+            "other-compiler"
+        );
+    }
+
+    #[test]
     fn test_render_future_repodata_revision_supports_v3_features() {
         let recipe_yaml = r#"
 package:

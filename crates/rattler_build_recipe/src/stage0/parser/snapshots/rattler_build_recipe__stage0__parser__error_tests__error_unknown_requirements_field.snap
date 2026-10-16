@@ -11,4 +11,4 @@ expression: error_with_source
  9 │     - python
    ╰────
   help: valid fields are: build, host, run, run_constraints, extras,
-        run_exports, ignore_run_exports
+        run_exports, ignore_run_exports, flag_exports, ignore_flag_exports

@@ -1,0 +1,46 @@
+schema_version: 1
+
+recipe:
+  name: flag-exports
+  version: 1.0.0
+
+build:
+  noarch: generic
+
+outputs:
+  - package:
+      name: debug-toolchain
+    build:
+      flags:
+        - toolchain
+    requirements:
+      flag_exports:
+        - debug
+        - sanitizers
+
+  - package:
+      name: flag-consumer
+    build:
+      flags:
+        - cuda
+    requirements:
+      build:
+        - debug-toolchain
+
+  - package:
+      name: flag-consumer-ignore-by-name
+    requirements:
+      build:
+        - debug-toolchain
+      ignore_flag_exports:
+        by_name:
+          - sanitizers
+
+  - package:
+      name: flag-consumer-ignore-from-package
+    requirements:
+      host:
+        - debug-toolchain
+      ignore_flag_exports:
+        from_package:
+          - debug-toolchain

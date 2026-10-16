@@ -49,6 +49,7 @@ use crate::{
         },
         match_spec::matchspec_parse_options,
         requirements::{
+            IgnoreFlagExports as Stage0IgnoreFlagExports,
             IgnoreRunExports as Stage0IgnoreRunExports, RunExports as Stage0RunExports,
         },
         source::{
@@ -79,6 +80,7 @@ use crate::{
             VariantKeyUsage as Stage1VariantKeyUsage,
         },
         requirements::{
+            IgnoreFlagExports as Stage1IgnoreFlagExports,
             IgnoreRunExports as Stage1IgnoreRunExports, RunExports as Stage1RunExports,
         },
         source::{
@@ -769,9 +771,10 @@ pub fn evaluate_string_list(
     evaluate_string_list_items(list.as_slice(), context)
 }
 
-/// Evaluate V3 package flags.
+/// Evaluate V3 package flags. `field` names the recipe field in errors.
 fn evaluate_flag_list(
     list: &ConditionalList<rattler_conda_types::Flag>,
+    field: &str,
     context: &EvaluationContext,
 ) -> Result<Vec<rattler_conda_types::Flag>, ParseError> {
     let flags = evaluate_conditional_list(list.as_slice(), context, |value, ctx| {
@@ -797,7 +800,7 @@ fn evaluate_flag_list(
 
     if !flags.is_empty() && !stage0::supports_v3_repodata_features(context.repodata_revision()) {
         return Err(ParseError::invalid_value(
-            "build.flags",
+            field,
             "package flags require the --v3 flag",
             list.as_slice()
                 .first()
@@ -805,7 +808,7 @@ fn evaluate_flag_list(
                 .and_then(|value| value.span().copied())
                 .unwrap_or_else(Span::new_blank),
         )
-        .with_suggestion("Enable --v3 to use build.flags."));
+        .with_suggestion(format!("Enable --v3 to use {field}.")));
     }
 
     Ok(flags)
@@ -1846,6 +1849,17 @@ impl Evaluate for Stage0IgnoreRunExports {
     }
 }
 
+impl Evaluate for Stage0IgnoreFlagExports {
+    type Output = Stage1IgnoreFlagExports;
+
+    fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
+        Ok(Stage1IgnoreFlagExports {
+            by_name: evaluate_flag_list(&self.by_name, "ignore_flag_exports.by_name", context)?,
+            from_package: evaluate_package_name_list(&self.from_package, context)?,
+        })
+    }
+}
+
 impl Evaluate for Stage0Requirements {
     type Output = Stage1Requirements;
 
@@ -1869,6 +1883,12 @@ impl Evaluate for Stage0Requirements {
             extras,
             run_exports: self.run_exports.evaluate(context)?,
             ignore_run_exports: self.ignore_run_exports.evaluate(context)?,
+            flag_exports: evaluate_flag_list(
+                &self.flag_exports,
+                "requirements.flag_exports",
+                context,
+            )?,
+            ignore_flag_exports: self.ignore_flag_exports.evaluate(context)?,
         })
     }
 }
@@ -2255,7 +2275,7 @@ impl Evaluate for Stage0Build {
         let skip = evaluate_skip_list(&self.skip, context)?;
 
         // Evaluate V3 package flags.
-        let flags = evaluate_flag_list(&self.flags, context)?;
+        let flags = evaluate_flag_list(&self.flags, "build.flags", context)?;
 
         // Evaluate python configuration
         let python = self.python.evaluate(context)?;
