@@ -2149,7 +2149,11 @@ def test_abi3(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     if os.name == "nt":
         assert "site-packages\\spam.dll" in actual_paths
     else:
-        assert "site-packages/spam.abi3.so" in actual_paths
+        # Python >= 3.15 adds a platform tag, e.g. `spam.abi3-x86_64-linux-gnu.so`
+        assert any(
+            re.fullmatch(r"site-packages/spam\.abi3(-[\w-]+)?\.so", p)
+            for p in actual_paths
+        ), actual_paths
 
     # load index.json
     index = json.loads((pkg / "info/index.json").read_text())
