@@ -577,10 +577,25 @@ pub fn perform_linking_checks(
                         }
 
                         let lib = resolved.as_ref().unwrap_or(lib);
-                        if let Ok(libpath) = lib.strip_prefix(host_prefix)
-                            && let Some(package) = prefix_info
-                                .path_to_package
-                                .get(&libpath.to_path_buf().into())
+                        let Ok(libpath) = lib.strip_prefix(host_prefix) else {
+                            continue;
+                        };
+                        // Look up the package that owns the library path as the
+                        // loader sees it (usually a SONAME symlink). If no package
+                        // owns that path, fall back to the fully resolved path
+                        // (e.g. when a directory in the path is a symlink).
+                        let package = prefix_info
+                            .path_to_package
+                            .get(&libpath.to_path_buf().into())
+                            .or_else(|| {
+                                let canonical_prefix = dunce::canonicalize(host_prefix).ok()?;
+                                let canonical = dunce::canonicalize(lib).ok()?;
+                                let canonical = canonical.strip_prefix(&canonical_prefix).ok()?;
+                                prefix_info
+                                    .path_to_package
+                                    .get(&canonical.to_path_buf().into())
+                            });
+                        if let Some(package) = package
                             && let Some(nature) = prefix_info.package_to_nature.get(package)
                         {
                             // Accept any package that provides shared objects (DSO libraries,

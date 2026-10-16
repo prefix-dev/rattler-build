@@ -1,0 +1,27 @@
+package:
+  name: linking-symlinked-soname
+  version: 0.1.0
+
+build:
+  script: |
+    mkdir -p "$PREFIX/lib"
+    cat > omp.c <<'EOC'
+    double demo_sum(const double *x, int n)
+    {
+        double s = 0.0;
+        _Pragma("omp parallel for reduction(+ : s)")
+        for (int i = 0; i < n; ++i)
+            s += x[i];
+        return s;
+    }
+    EOC
+    $CC $CFLAGS -fopenmp -fPIC -shared omp.c -o "$PREFIX/lib/libompdemo.so" $LDFLAGS
+  dynamic_linking:
+    overlinking_behavior: error
+    overdepending_behavior: error
+
+requirements:
+  build:
+    - ${{ compiler("c") }}
+  host:
+    - libgomp
