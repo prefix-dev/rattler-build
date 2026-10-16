@@ -1485,8 +1485,16 @@ Additionally, `noarch: python` packages work with a range of Python versions (co
 1. The `noarch: python` line tells Rattler-Build that this package is pure
    Python and can be one-size-fits-all. `noarch` packages can be installed on any
    platform without modification which is very handy.
-2. The `imports` section in the tests is used to check that the package is
+2. It's a common pattern to use `pip install . -v` as build command. This delegates the responsibility to
+   collect all necessary files and put them in the right places of the host environment.  
+   *Note:* Rattler-Build configures pip through the `PIP_*`
+   [environment variables](../build_script.md#default-environment-variables-set-during-the-build-process)
+   so that `pip install` basically only collects and copies the project files. For example, it suppresses
+   the installation of dependencies through `PIP_NO_DEPENDENCIES`.
+3. The `imports` section in the tests is used to check that the package is
    installed correctly and can be imported.
+
+#
 
 ### Running the recipe
 
@@ -2606,7 +2614,7 @@ build:
     - if: win
       run: copy %RECIPE_DIR%\my_script_with_recipe.bat %LIBRARY_BIN%\super-cool-script.bat
 
-    - run: python -m pip install . --no-deps
+    - run: python -m pip install .
       env:
         SETUPTOOLS_SCM_PRETEND_VERSION: ${{ version }}
 ```
@@ -8433,7 +8441,7 @@ session = DebugSession.create(
 print(f"Work directory:  {session.work_dir}")
 ```
 
-    Work directory:  /tmp/rattler_build_5d9b147e4c7bcbcf/output/bld/rattler-build_debug-demo/work
+    Work directory:  /tmp/rattler_build_d339f49ab4c8e286/output/bld/rattler-build_debug-demo/work
 
 
 ## Read the Build Script
@@ -8455,7 +8463,7 @@ for p in sorted(session.work_dir.iterdir()):
     set -e
     ## Start of bash preamble
     if [ -z ${CONDA_BUILD+x} ]; then
-        source "/tmp/rattler_build_5d9b147e4c7bcbcf/output/bld/rattler-build_debug-demo/work/build_env.sh"
+        source "/tmp/rattler_build_d339f49ab4c8e286/output/bld/rattler-build_debug-demo/work/build_env.sh"
     fi
     ## End of preamble
     # Trace each command as it runs so a failing line is visible (see #2264).
@@ -8500,7 +8508,7 @@ if result.stderr:
     + '[' -z x ']'
     + set -x
     + echo 'Hello from the build script!'
-    + mkdir -p /tmp/rattler_build_5d9b147e4c7bcbcf/output/bld/rattler-build_debug-demo/host_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_plac/bin
+    + mkdir -p /tmp/rattler_build_d339f49ab4c8e286/output/bld/rattler-build_debug-demo/host_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_plac/bin
     + echo 'hello from debug-demo'
     
 
@@ -8673,7 +8681,7 @@ print(f"Built: {built_package_path}")
     Version: 1.0.0
     
     Building package...
-    Built: /tmp/rattler_build_2kc8v1vu/output/noarch/test-demo-package-1.0.0-pyh4616a5c_0.conda
+    Built: /tmp/rattler_build_z82bmd7v/output/noarch/test-demo-package-1.0.0-pyh4616a5c_0.conda
 
 
 ## Step 2: Loading a Package
@@ -8694,7 +8702,7 @@ print(f"\nString representation: {pkg!r}")
 
     Package Loaded Successfully!
     ============================================================
-    Path: /tmp/rattler_build_2kc8v1vu/output/noarch/test-demo-package-1.0.0-pyh4616a5c_0.conda
+    Path: /tmp/rattler_build_z82bmd7v/output/noarch/test-demo-package-1.0.0-pyh4616a5c_0.conda
     Type: Package
     
     String representation: Package(test-demo-package-1.0.0-pyh4616a5c_0)
@@ -8749,7 +8757,7 @@ else:
     License:        MIT
     Arch:           None
     Platform:       None
-    Timestamp:      2026-10-16 07:53:14.586000+00:00
+    Timestamp:      2026-10-16 08:58:45.707000+00:00
     
     Archive Information
     ----------------------------------------
@@ -8791,10 +8799,10 @@ print(json.dumps(metadata_dict, indent=2, default=str))
       "constrains": [],
       "license": "MIT",
       "license_family": null,
-      "timestamp": "2026-10-16 07:53:14.586000+00:00",
+      "timestamp": "2026-10-16 08:58:45.707000+00:00",
       "arch": null,
       "platform": null,
-      "path": "/tmp/rattler_build_2kc8v1vu/output/noarch/test-demo-package-1.0.0-pyh4616a5c_0.conda",
+      "path": "/tmp/rattler_build_z82bmd7v/output/noarch/test-demo-package-1.0.0-pyh4616a5c_0.conda",
       "archive_type": "conda",
       "filename": "test-demo-package-1.0.0-pyh4616a5c_0.conda"
     }
@@ -9008,6 +9016,8 @@ for result in all_results:
 
     Running All Tests at Once
     ============================================================
+
+
     
     Total tests: 1
     Passed: 1
@@ -9159,11 +9169,11 @@ print(f"Identical (reproducible): {rebuild_result.is_identical}")
 
     Rebuilding Package
     ============================================================
-    Original package: /tmp/rattler_build_2kc8v1vu/output/noarch/test-demo-package-1.0.0-pyh4616a5c_0.conda
-    Rebuilt package:  output/test-demo-package-1.0.0-pyh4616a5c_0-rebuilt-20261016-075320.conda
+    Original package: /tmp/rattler_build_z82bmd7v/output/noarch/test-demo-package-1.0.0-pyh4616a5c_0.conda
+    Rebuilt package:  output/test-demo-package-1.0.0-pyh4616a5c_0-rebuilt-20261016-085850.conda
     
-    Original SHA256:  191b7c9a0a5dd462b61a42f62d469b607e0f603ed19ef1ae5020fb1e4facec00
-    Rebuilt SHA256:   191b7c9a0a5dd462b61a42f62d469b607e0f603ed19ef1ae5020fb1e4facec00
+    Original SHA256:  b27e12a436606f0cb351a7c8b21adecab60934e15832eaceccf5821840cd47eb
+    Rebuilt SHA256:   b27e12a436606f0cb351a7c8b21adecab60934e15832eaceccf5821840cd47eb
     
     Identical (reproducible): True
 
@@ -9189,7 +9199,7 @@ print(f"Files:        {len(rebuilt_pkg.files)} files")
     Name:         test-demo-package
     Version:      1.0.0
     Build string: pyh4616a5c_0
-    Path:         output/test-demo-package-1.0.0-pyh4616a5c_0-rebuilt-20261016-075320.conda
+    Path:         output/test-demo-package-1.0.0-pyh4616a5c_0-rebuilt-20261016-085850.conda
     Files:        1 files
 
 
@@ -9385,14 +9395,14 @@ print(f"\nBuilt packages are available in: {result.output_dir}")
 
     Building Example 1 packages...
     ============================================================
-    Recipe path: /tmp/rattler_build_o8yds1zg/recipe.yaml
+    Recipe path: /tmp/rattler_build_j6dzre04/recipe.yaml
     
     Building variant 1/2
       Package: myproject-lib
       Version: 2.0.0
       Build string: hb0f4dca_0
-      Build complete in 0.81s!
-      Package: /tmp/rattler_build_o8yds1zg/output/linux-64/myproject-lib-2.0.0-hb0f4dca_0.conda
+      Build complete in 0.69s!
+      Package: /tmp/rattler_build_j6dzre04/output/linux-64/myproject-lib-2.0.0-hb0f4dca_0.conda
       Variant: {'target_platform': 'linux-64'}
       Build log: 34 messages captured
     
@@ -9400,17 +9410,15 @@ print(f"\nBuilt packages are available in: {result.output_dir}")
       Package: myproject-tools
       Version: 2.0.0
       Build string: hb0f4dca_0
-
-
-      Build complete in 0.37s!
-      Package: /tmp/rattler_build_o8yds1zg/output/linux-64/myproject-tools-2.0.0-hb0f4dca_0.conda
+      Build complete in 0.31s!
+      Package: /tmp/rattler_build_j6dzre04/output/linux-64/myproject-tools-2.0.0-hb0f4dca_0.conda
       Variant: {'target_platform': 'linux-64'}
       Build log: 43 messages captured
     
     ============================================================
     Example 1 builds completed successfully!
     
-    Built packages are available in: /tmp/rattler_build_o8yds1zg/output
+    Built packages are available in: /tmp/rattler_build_j6dzre04/output
 
 
 ## Example 2: Staging Outputs - Shared Build Artifacts
@@ -9597,15 +9605,15 @@ print(f"\nBuilt packages are available in: {result.output_dir}")
 
     Building Example 2 packages (with staging)...
     ============================================================
-    Recipe path: /tmp/rattler_build_uj1r_fdx/recipe.yaml
+    Recipe path: /tmp/rattler_build__mcingmr/recipe.yaml
     
     Building variant 1/2
       Package: compiled-project-python
       Version: 1.5.0
       Build string: hb0f4dca_0
       Staging caches: ['shared-build']
-      Build complete in 0.47s!
-      Package: /tmp/rattler_build_uj1r_fdx/output/linux-64/compiled-project-python-1.5.0-hb0f4dca_0.conda
+      Build complete in 0.38s!
+      Package: /tmp/rattler_build__mcingmr/output/linux-64/compiled-project-python-1.5.0-hb0f4dca_0.conda
       Variant: {'target_platform': 'linux-64'}
       Build log: 56 messages captured
     
@@ -9614,15 +9622,17 @@ print(f"\nBuilt packages are available in: {result.output_dir}")
       Version: 1.5.0
       Build string: hb0f4dca_0
       Staging caches: ['shared-build']
-      Build complete in 0.49s!
-      Package: /tmp/rattler_build_uj1r_fdx/output/linux-64/compiled-project-cli-1.5.0-hb0f4dca_0.conda
+
+
+      Build complete in 0.42s!
+      Package: /tmp/rattler_build__mcingmr/output/linux-64/compiled-project-cli-1.5.0-hb0f4dca_0.conda
       Variant: {'target_platform': 'linux-64'}
       Build log: 61 messages captured
     
     ============================================================
     Example 2 builds completed successfully!
     
-    Built packages are available in: /tmp/rattler_build_uj1r_fdx/output
+    Built packages are available in: /tmp/rattler_build__mcingmr/output
 
 
 ## Summary
@@ -10363,15 +10373,17 @@ print(f"\nBuilt packages are available in: {result.output_dir}")
 
     Building packages...
     ============================================================
-    Recipe path: /tmp/rattler_build_yizm3jpt/recipe.yaml
+    Recipe path: /tmp/rattler_build_n31ph_t1/recipe.yaml
     
     Building variant 1/3
       Package: my-simple-package
       Version: 1.0.0
       Build string: np121py39h13fef27_0
-      Build complete in 2.72s!
-      Package: /tmp/rattler_build_yizm3jpt/output/linux-64/my-simple-package-1.0.0-np121py39h13fef27_0.conda
-      Variant: {'target_platform': 'linux-64', 'python': '3.9', 'numpy': '1.21'}
+
+
+      Build complete in 1.18s!
+      Package: /tmp/rattler_build_n31ph_t1/output/linux-64/my-simple-package-1.0.0-np121py39h13fef27_0.conda
+      Variant: {'numpy': '1.21', 'target_platform': 'linux-64', 'python': '3.9'}
       Build log: 35 messages captured
     
       Build log details:
@@ -10382,31 +10394,31 @@ print(f"\nBuilt packages are available in: {result.output_dir}")
         Adding 0 packages to subdir noarch.
         Successfully added 0 packages to subdir noarch.
         Writing repodata to noarch/repodata.json
-          Platform: linux-64 [2m[__unix=0=0, __linux=6.17.0=0, __glibc=2.39=0, __archspec=1=zen2][0m
+          Platform: linux-64 [2m[__unix=0=0, __linux=6.17.0=0, __glibc=2.39=0, __archspec=1=x86_64_v4][0m
           Channels: 
-           - file:///tmp/rattler_build_yizm3jpt/output/
+           - file:///tmp/rattler_build_n31ph_t1/output/
         ... and 25 more messages
     
     Building variant 2/3
       Package: my-simple-package
       Version: 1.0.0
       Build string: np122py310h27bf20f_0
-      Build complete in 1.41s!
-      Package: /tmp/rattler_build_yizm3jpt/output/linux-64/my-simple-package-1.0.0-np122py310h27bf20f_0.conda
-      Variant: {'numpy': '1.22', 'target_platform': 'linux-64', 'python': '3.10'}
+      Build complete in 1.00s!
+      Package: /tmp/rattler_build_n31ph_t1/output/linux-64/my-simple-package-1.0.0-np122py310h27bf20f_0.conda
+      Variant: {'numpy': '1.22', 'python': '3.10', 'target_platform': 'linux-64'}
       Build log: 36 messages captured
     
       Build log details:
         Starting build of 1 outputs (1 at a time)
         No sources to fetch
-        Could not find noarch/repodata_from_packages.json. Creating new one.
-        Adding 0 packages to subdir noarch.
-        Successfully added 0 packages to subdir noarch.
-        Writing repodata to noarch/repodata.json
         Could not find linux-64/repodata_from_packages.json. Creating new one.
         Adding 0 packages to subdir linux-64.
         Successfully added 0 packages to subdir linux-64.
         Writing repodata to linux-64/repodata.json
+        Could not find noarch/repodata_from_packages.json. Creating new one.
+        Adding 0 packages to subdir noarch.
+        Successfully added 0 packages to subdir noarch.
+        Writing repodata to noarch/repodata.json
         ... and 26 more messages
     
     Building variant 3/3
@@ -10415,9 +10427,9 @@ print(f"\nBuilt packages are available in: {result.output_dir}")
       Build string: np123py311hadc6f11_0
 
 
-      Build complete in 0.84s!
-      Package: /tmp/rattler_build_yizm3jpt/output/linux-64/my-simple-package-1.0.0-np123py311hadc6f11_0.conda
-      Variant: {'python': '3.11', 'target_platform': 'linux-64', 'numpy': '1.23'}
+      Build complete in 0.70s!
+      Package: /tmp/rattler_build_n31ph_t1/output/linux-64/my-simple-package-1.0.0-np123py311hadc6f11_0.conda
+      Variant: {'numpy': '1.23', 'target_platform': 'linux-64', 'python': '3.11'}
       Build log: 36 messages captured
     
       Build log details:
@@ -10436,7 +10448,7 @@ print(f"\nBuilt packages are available in: {result.output_dir}")
     ============================================================
     All builds completed successfully!
     
-    Built packages are available in: /tmp/rattler_build_yizm3jpt/output
+    Built packages are available in: /tmp/rattler_build_n31ph_t1/output
 
 
 ## Summary
@@ -11781,7 +11793,7 @@ with the following fields (all optional):
 build:
   script:
     content:
-      - python -m pip install . -vv --no-deps --no-build-isolation
+      - python -m pip install . -vv
     env:
       # Hard-coded value
       USE_SYSTEM_DEPS: "on"
@@ -11847,7 +11859,7 @@ build:
         - mkdir -p "$PREFIX/bin"
         - cp "$RECIPE_DIR/tool" "$PREFIX/bin/tool"
 
-    - run: python -m pip install . --no-deps
+    - run: python -m pip install .
       env:
         SETUPTOOLS_SCM_PRETEND_VERSION: ${{ version }}
 ```

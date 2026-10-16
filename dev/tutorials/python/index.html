@@ -516,73 +516,6 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="A Python-only package">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#running-the-recipe" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Running the recipe
-      </span>
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#a-python-package-with-compiled-extensions" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        A Python package with compiled extensions
-      </span>
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="A Python package with compiled extensions">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#running-the-recipe_1" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Running the recipe
-      </span>
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#an-abi3-compatible-package" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        An ABI3-compatible package
-      </span>
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#testing-python-packages" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Testing Python packages
-      </span>
-    </span>
-  </a>
-  
 </li>
       
     </ul>
@@ -3998,73 +3931,6 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="A Python-only package">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#running-the-recipe" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Running the recipe
-      </span>
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#a-python-package-with-compiled-extensions" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        A Python package with compiled extensions
-      </span>
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="A Python package with compiled extensions">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#running-the-recipe_1" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Running the recipe
-      </span>
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#an-abi3-compatible-package" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        An ABI3-compatible package
-      </span>
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#testing-python-packages" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Testing Python packages
-      </span>
-    </span>
-  </a>
-  
 </li>
       
     </ul>
@@ -4118,7 +3984,7 @@ This is very handy for packages that are pure Python and do not contain any comp
 </span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>
 </span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="nt">build</span><span class="p">:</span>
 </span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="w">  </span><span class="nt">noarch</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python</span><span class="w"> </span><span class="c1"># (1)!</span>
-</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="w">  </span><span class="nt">script</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pip install . -v</span>
+</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="w">  </span><span class="nt">script</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pip install . -v</span><span class="w"> </span><span class="c1">#(2)!</span>
 </span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>
 </span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="nt">requirements</span><span class="p">:</span>
 </span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="w">  </span><span class="c1"># note that there is no build section</span>
@@ -4138,7 +4004,7 @@ This is very handy for packages that are pure Python and do not contain any comp
 </span><span id="__span-1-31"><a id="__codelineno-1-31" name="__codelineno-1-31" href="#__codelineno-1-31"></a><span class="nt">tests</span><span class="p">:</span>
 </span><span id="__span-1-32"><a id="__codelineno-1-32" name="__codelineno-1-32" href="#__codelineno-1-32"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">python</span><span class="p">:</span>
 </span><span id="__span-1-33"><a id="__codelineno-1-33" name="__codelineno-1-33" href="#__codelineno-1-33"></a><span class="w">      </span><span class="nt">imports</span><span class="p">:</span>
-</span><span id="__span-1-34"><a id="__codelineno-1-34" name="__codelineno-1-34" href="#__codelineno-1-34"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ipywidgets</span><span class="w"> </span><span class="c1"># (2)!</span>
+</span><span id="__span-1-34"><a id="__codelineno-1-34" name="__codelineno-1-34" href="#__codelineno-1-34"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ipywidgets</span><span class="w"> </span><span class="c1"># (3)!</span>
 </span><span id="__span-1-35"><a id="__codelineno-1-35" name="__codelineno-1-35" href="#__codelineno-1-35"></a>
 </span><span id="__span-1-36"><a id="__codelineno-1-36" name="__codelineno-1-36" href="#__codelineno-1-36"></a><span class="nt">about</span><span class="p">:</span>
 </span><span id="__span-1-37"><a id="__codelineno-1-37" name="__codelineno-1-37" href="#__codelineno-1-37"></a><span class="w">  </span><span class="nt">homepage</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://github.com/ipython/ipywidgets</span>
@@ -4153,9 +4019,16 @@ This is very handy for packages that are pure Python and do not contain any comp
 <li>The <code>noarch: python</code> line tells Rattler-Build that this package is pure
    Python and can be one-size-fits-all. <code>noarch</code> packages can be installed on any
    platform without modification which is very handy.</li>
+<li>It's a common pattern to use <code>pip install . -v</code> as build command. This delegates the responsibility to
+   collect all necessary files and put them in the right places of the host environment.<br />
+<em>Note:</em> Rattler-Build configures pip through the <code>PIP_*</code>
+   <a href="../../build_script/#default-environment-variables-set-during-the-build-process">environment variables</a>
+   so that <code>pip install</code> basically only collects and copies the project files. For example, it suppresses
+   the installation of dependencies through <code>PIP_NO_DEPENDENCIES</code>.</li>
 <li>The <code>imports</code> section in the tests is used to check that the package is
    installed correctly and can be imported.</li>
 </ol>
+<h1 id="_1"><a class="headerlink" href="#_1" title="Permanent link">#</a></h1>
 <h3 id="running-the-recipe">Running the recipe<a class="headerlink" href="#running-the-recipe" title="Permanent link">#</a></h3>
 <p>To build this recipe, simply run:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>rattler-build<span class="w"> </span>build<span class="w"> </span>--recipe<span class="w"> </span>./ipywidgets
