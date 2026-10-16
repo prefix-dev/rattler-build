@@ -108,6 +108,8 @@ jobs:
         with:
           target: ${{ matrix.target }}
           cache: false
+          # Cross's linker wrapper emits shell tracing; RUSTFLAGS still denies compiler warnings.
+          build-warnings: warn
 
       - name: Install musl-gcc
         if: matrix.target == 'x86_64-unknown-linux-musl'
