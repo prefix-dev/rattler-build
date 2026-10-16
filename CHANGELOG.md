@@ -60,6 +60,7 @@ Fixes cover linking checks for symlinked SONAME libraries, macOS code-signing id
 - ci: Stop dependabot from bumping the pinned cc crate by @wolfv in [#2858](https://github.com/prefix-dev/rattler-build/pull/2858)
 - Bump rattler crates, check build string by @pavelzw in [#2863](https://github.com/prefix-dev/rattler-build/pull/2863)
 - release: Simplify and improve changelog PR grouping by @lucascolley in [#2869](https://github.com/prefix-dev/rattler-build/pull/2869)
+- deps: Move to `zip` 9 (all 8.x releases were yanked), align `astral_async_zip` with rattler, and bump `rustls` to 0.23.46 in [#2872](https://github.com/prefix-dev/rattler-build/pull/2872)
 
 
 ### New Contributors
