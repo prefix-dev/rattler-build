@@ -7,6 +7,7 @@ use std::{
     collections::HashMap,
     path::{Path, PathBuf},
 };
+use tracing::Instrument;
 
 use indexmap::IndexMap;
 use minijinja::Value;
@@ -25,6 +26,16 @@ pub use rattler_build_script::{
 
 use crate::{env_vars, metadata::Output};
 use rattler_build_recipe::stage1::build::BuildPlan;
+
+/// The `env` of a plan's `build.script`, which is merged into the script
+/// environment. `build.steps` set their `env` per step instead, which already
+/// takes precedence.
+pub(crate) fn plan_script_env(plan: &BuildPlan) -> Option<&IndexMap<String, String>> {
+    match plan {
+        BuildPlan::Script(script) => Some(script.env()),
+        BuildPlan::Steps(_) => None,
+    }
+}
 
 /// Prepare execution arguments for a stage1 build plan.
 ///
@@ -211,27 +222,37 @@ impl Output {
     /// - The script file cannot be read or found
     /// - The script execution fails
     /// - The interpreter is not supported or not available
-    pub async fn run_build_script(&self) -> Result<(), InterpreterError> {
+    pub async fn run_build_script(
+        &self,
+        tool_configuration: &crate::tool_configuration::Configuration,
+    ) -> Result<(), InterpreterError> {
         let span = tracing::info_span!("Running build script");
-        let _enter = span.enter();
+        async {
+            // Reset the package files override list before running the build
+            // script. This ensures that we do not pick up paths from a previous
+            // run if the script does not write to the file this time.
+            let package_files_path = self
+                .build_configuration
+                .directories
+                .package_files_list_path();
+            match fs_err::remove_file(&package_files_path) {
+                Ok(()) => {}
+                Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+                Err(err) => return Err(err.into()),
+            }
 
-        // Reset the package files override list before running the build
-        // script. This ensures that we do not pick up paths from a previous
-        // run if the script does not write to the file this time.
-        let package_files_path = self
-            .build_configuration
-            .directories
-            .package_files_list_path();
-        match fs_err::remove_file(&package_files_path) {
-            Ok(()) => {}
-            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
-            Err(err) => return Err(err.into()),
+            let mut exec_args = self.prepare_build_script().await?;
+            env_vars::apply_jobserver(
+                &mut exec_args.env_vars,
+                tool_configuration.jobserver.as_ref(),
+                plan_script_env(&self.recipe.build().plan),
+            );
+            rattler_build_script::run_script(exec_args).await?;
+
+            Ok(())
         }
-
-        let exec_args = self.prepare_build_script().await?;
-        rattler_build_script::run_script(exec_args).await?;
-
-        Ok(())
+        .instrument(span)
+        .await
     }
 
     /// Create the build script files without executing them.
@@ -251,9 +272,11 @@ impl Output {
     /// - The script files cannot be written to the working directory
     pub async fn create_build_script(&self) -> Result<(), std::io::Error> {
         let span = tracing::info_span!("Creating build script");
-        let _enter = span.enter();
-
-        let exec_args = self.prepare_build_script().await?;
-        rattler_build_script::create_build_script(exec_args).await
+        async {
+            let exec_args = self.prepare_build_script().await?;
+            rattler_build_script::create_build_script(exec_args).await
+        }
+        .instrument(span)
+        .await
     }
 }

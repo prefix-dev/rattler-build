@@ -3,7 +3,10 @@
 
 use std::{
     collections::{HashMap, HashSet},
+    fmt,
+    num::NonZeroUsize,
     path::PathBuf,
+    str::FromStr,
     sync::{Arc, Mutex},
 };
 
@@ -88,6 +91,68 @@ impl From<bool> for ContinueOnFailure {
     }
 }
 
+/// How many outputs are built at the same time, and whether they share a
+/// jobserver.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ParallelBuilds {
+    /// Outputs built at the same time.
+    pub max_builds: NonZeroUsize,
+    /// If set, a GNU make jobserver with this many job slots is shared by all
+    /// builds (unix only). Without it, build environments are not changed.
+    pub jobserver_jobs: Option<NonZeroUsize>,
+}
+
+impl Default for ParallelBuilds {
+    fn default() -> Self {
+        Self {
+            max_builds: NonZeroUsize::MIN,
+            jobserver_jobs: None,
+        }
+    }
+}
+
+impl FromStr for ParallelBuilds {
+    type Err = String;
+
+    /// Parses `<BUILDS>` or `<BUILDS>:<JOBS>`, both at least 1.
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let parse = |value: &str, what: &str| {
+            value
+                .parse::<NonZeroUsize>()
+                .map_err(|_| format!("{what} must be a number of at least 1, got `{value}`"))
+        };
+        let (builds, jobs) = match s.split_once(':') {
+            Some((builds, jobs)) => (builds, Some(jobs)),
+            None => (s, None),
+        };
+        Ok(Self {
+            max_builds: parse(builds, "BUILDS")?,
+            jobserver_jobs: jobs.map(|jobs| parse(jobs, "JOBS")).transpose()?,
+        })
+    }
+}
+
+impl fmt::Display for ParallelBuilds {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.max_builds)?;
+        if let Some(jobs) = self.jobserver_jobs {
+            write!(f, ":{jobs}")?;
+        }
+        Ok(())
+    }
+}
+
+/// How an active jobserver is presented to build and test scripts.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct JobserverEnv {
+    /// `MAKEFLAGS` advertising the jobserver, appended to the script's own.
+    pub makeflags: String,
+    /// The `CPU_COUNT` for scripts: each build's share of the job slots, for
+    /// recipes that pass `-j${CPU_COUNT}` and so bypass the jobserver. `None`
+    /// keeps `CPU_COUNT` as it is (for example when the user set it).
+    pub cpu_count: Option<usize>,
+}
+
 /// Global configuration for the build
 #[derive(Clone)]
 pub struct Configuration {
@@ -157,6 +222,20 @@ pub struct Configuration {
 
     /// Whether to continue building on failure of a package or stop the build
     pub continue_on_failure: ContinueOnFailure,
+
+    /// How many outputs are built at the same time
+    pub parallel_builds: ParallelBuilds,
+
+    /// The jobserver shared by parallel builds, if one is active. Set by the
+    /// build loop; applied to build and test script environments.
+    pub jobserver: Option<JobserverEnv>,
+
+    /// Serialises reindexing the output channel and renaming finished packages
+    /// into it, so that builds running in parallel never write its
+    /// `repodata.json` concurrently or replace a package being indexed.
+    /// Compressing a package does not hold it. Shared by all clones of this
+    /// configuration.
+    pub output_dir_lock: Arc<tokio::sync::Mutex<()>>,
 
     /// Whether to error if the host prefix is detected in binary files
     pub error_prefix_in_binary: bool,
@@ -234,6 +313,7 @@ pub struct ConfigurationBuilder {
     channel_priority: ChannelPriority,
     allow_insecure_host: Option<Vec<String>>,
     continue_on_failure: ContinueOnFailure,
+    parallel_builds: ParallelBuilds,
     error_prefix_in_binary: bool,
     error_overlapping_files: bool,
     error_unused_staging_files: bool,
@@ -271,6 +351,7 @@ impl ConfigurationBuilder {
             channel_priority: ChannelPriority::Strict,
             allow_insecure_host: None,
             continue_on_failure: ContinueOnFailure::No,
+            parallel_builds: ParallelBuilds::default(),
             error_prefix_in_binary: false,
             error_overlapping_files: false,
             error_unused_staging_files: false,
@@ -293,6 +374,15 @@ impl ConfigurationBuilder {
     pub fn with_continue_on_failure(self, continue_on_failure: ContinueOnFailure) -> Self {
         Self {
             continue_on_failure,
+            ..self
+        }
+    }
+
+    /// How many outputs are built at the same time, and whether they share a
+    /// jobserver
+    pub fn with_parallel_builds(self, parallel_builds: ParallelBuilds) -> Self {
+        Self {
+            parallel_builds,
             ..self
         }
     }
@@ -545,6 +635,9 @@ impl ConfigurationBuilder {
             channel_priority: self.channel_priority,
             allow_insecure_host: self.allow_insecure_host,
             continue_on_failure: self.continue_on_failure,
+            parallel_builds: self.parallel_builds,
+            jobserver: None,
+            output_dir_lock: Arc::default(),
             error_prefix_in_binary: self.error_prefix_in_binary,
             error_overlapping_files: self.error_overlapping_files,
             error_unused_staging_files: self.error_unused_staging_files,
@@ -632,4 +725,48 @@ pub async fn resolve_s3_credentials(
     );
     let source = rattler_s3::S3CredentialSource::from_sdk().await?;
     Ok(source)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::num::NonZeroUsize;
+
+    use super::ParallelBuilds;
+
+    fn n(value: usize) -> NonZeroUsize {
+        NonZeroUsize::new(value).unwrap()
+    }
+
+    #[test]
+    fn parallel_builds_parse_builds_and_optional_jobs() {
+        assert_eq!(
+            "4".parse::<ParallelBuilds>(),
+            Ok(ParallelBuilds {
+                max_builds: n(4),
+                jobserver_jobs: None
+            })
+        );
+        assert_eq!(
+            "4:20".parse::<ParallelBuilds>(),
+            Ok(ParallelBuilds {
+                max_builds: n(4),
+                jobserver_jobs: Some(n(20))
+            })
+        );
+        assert_eq!(
+            "4:20".parse::<ParallelBuilds>().unwrap().to_string(),
+            "4:20"
+        );
+        assert_eq!(ParallelBuilds::default().to_string(), "1");
+    }
+
+    #[test]
+    fn parallel_builds_reject_zero_and_garbage() {
+        for input in ["0", "4:0", "", "4:", ":20", "a", "4:b", "4:20:1"] {
+            assert!(
+                input.parse::<ParallelBuilds>().is_err(),
+                "`{input}` should not parse"
+            );
+        }
+    }
 }

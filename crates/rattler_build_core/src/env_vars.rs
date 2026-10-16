@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
+use indexmap::IndexMap;
 use rattler_build_jinja::Variable;
 use rattler_build_script::{EnvironmentIsolation, RuntimeEnv};
 use rattler_build_types::NormalizedKey;
@@ -15,6 +16,7 @@ use crate::ios;
 use crate::linux;
 use crate::macos;
 use crate::metadata::Output;
+use crate::tool_configuration::JobserverEnv;
 use crate::windows;
 
 macro_rules! insert {
@@ -207,6 +209,60 @@ pub fn language_vars(output: &Output) -> HashMap<String, Option<String>> {
     result.extend(r_vars(output));
 
     result
+}
+
+/// Applies an active jobserver (see
+/// [`Configuration::jobserver`](crate::tool_configuration::Configuration::jobserver))
+/// to a build script environment.
+///
+/// Its `MAKEFLAGS` are appended: flags already in `MAKEFLAGS` are kept, and the
+/// jobserver's `-j` and `--jobserver-auth` come last, so they take precedence.
+/// `CPU_COUNT` is set to the jobserver's share per build, if one is given,
+/// unless the recipe's own script `env` (`recipe_env`) sets it: recipes set
+/// `CPU_COUNT: 1` to keep a build serial.
+pub fn apply_jobserver(
+    env_vars: &mut IndexMap<String, String>,
+    jobserver: Option<&JobserverEnv>,
+    recipe_env: Option<&IndexMap<String, String>>,
+) {
+    let Some(jobserver) = jobserver else {
+        return;
+    };
+    let makeflags = with_jobserver_makeflags(
+        env_vars.get("MAKEFLAGS").map(String::as_str),
+        &jobserver.makeflags,
+    );
+    env_vars.insert("MAKEFLAGS".to_string(), makeflags);
+    let recipe_sets_cpu_count = recipe_env.is_some_and(|env| env.contains_key("CPU_COUNT"));
+    if let Some(cpu_count) = jobserver.cpu_count
+        && !recipe_sets_cpu_count
+    {
+        env_vars.insert("CPU_COUNT".to_string(), cpu_count.to_string());
+    }
+}
+
+/// Like [`apply_jobserver`], for an environment whose values may be unset.
+pub fn apply_jobserver_to_vars(
+    vars: &mut HashMap<String, Option<String>>,
+    jobserver: Option<&JobserverEnv>,
+) {
+    let Some(jobserver) = jobserver else {
+        return;
+    };
+    let existing = vars.get("MAKEFLAGS").and_then(|v| v.as_deref());
+    let makeflags = with_jobserver_makeflags(existing, &jobserver.makeflags);
+    vars.insert("MAKEFLAGS".to_string(), Some(makeflags));
+    if let Some(cpu_count) = jobserver.cpu_count {
+        vars.insert("CPU_COUNT".to_string(), Some(cpu_count.to_string()));
+    }
+}
+
+/// `existing` `MAKEFLAGS` (if any) followed by the jobserver's.
+fn with_jobserver_makeflags(existing: Option<&str>, makeflags: &str) -> String {
+    match existing.map(str::trim) {
+        Some(existing) if !existing.is_empty() => format!("{existing} {makeflags}"),
+        _ => makeflags.to_string(),
+    }
 }
 
 /// Returns a map of environment variables that are used in the build process.
@@ -711,5 +767,59 @@ mod test {
 
         assert!(!vars.contains_key("LIBRARY_PREFIX"));
         assert!(vars.contains_key("PATH"));
+    }
+
+    fn jobserver(cpu_count: Option<usize>) -> JobserverEnv {
+        JobserverEnv {
+            makeflags: "-j8 --jobserver-auth=fifo:/tmp/fifo".to_string(),
+            cpu_count,
+        }
+    }
+
+    #[test]
+    fn jobserver_makeflags_are_appended_after_existing_makeflags() {
+        let jobserver = jobserver(None);
+        let makeflags = &jobserver.makeflags;
+
+        let mut env = IndexMap::from([("MAKEFLAGS".to_string(), "-k V=1".to_string())]);
+        apply_jobserver(&mut env, Some(&jobserver), None);
+        assert_eq!(env["MAKEFLAGS"], format!("-k V=1 {makeflags}"));
+
+        let mut env = IndexMap::new();
+        apply_jobserver(&mut env, Some(&jobserver), None);
+        assert_eq!(&env["MAKEFLAGS"], makeflags);
+    }
+
+    #[test]
+    fn jobserver_sets_cpu_count_only_when_given() {
+        let mut env = IndexMap::from([("CPU_COUNT".to_string(), "20".to_string())]);
+        apply_jobserver(&mut env, Some(&jobserver(Some(5))), None);
+        assert_eq!(env["CPU_COUNT"], "5");
+
+        let mut env = IndexMap::from([("CPU_COUNT".to_string(), "20".to_string())]);
+        apply_jobserver(&mut env, Some(&jobserver(None)), None);
+        assert_eq!(env["CPU_COUNT"], "20");
+
+        // A recipe's own CPU_COUNT (already merged into the environment) wins.
+        let recipe_env = IndexMap::from([("CPU_COUNT".to_string(), "1".to_string())]);
+        let mut env = recipe_env.clone();
+        apply_jobserver(&mut env, Some(&jobserver(Some(5))), Some(&recipe_env));
+        assert_eq!(env["CPU_COUNT"], "1");
+        assert!(env["MAKEFLAGS"].contains("--jobserver-auth=fifo:"));
+
+        let mut vars = HashMap::from([("CPU_COUNT".to_string(), Some("20".to_string()))]);
+        apply_jobserver_to_vars(&mut vars, Some(&jobserver(Some(5))));
+        assert_eq!(vars["CPU_COUNT"].as_deref(), Some("5"));
+    }
+
+    #[test]
+    fn no_jobserver_leaves_the_environment_untouched() {
+        let mut env = IndexMap::from([
+            ("MAKEFLAGS".to_string(), "-j4".to_string()),
+            ("CPU_COUNT".to_string(), "20".to_string()),
+        ]);
+        let before = env.clone();
+        apply_jobserver(&mut env, None, None);
+        assert_eq!(env, before);
     }
 }

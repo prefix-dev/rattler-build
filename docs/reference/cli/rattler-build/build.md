@@ -66,6 +66,8 @@ rattler-build build [OPTIONS]
 - <a id="arg---continue-on-failure" href="#arg---continue-on-failure">`--continue-on-failure=<MODE>`</a>
 :  Continue building even if (one) of the packages fails to build. This is useful when building many packages with `--recipe-dir`. With `=skip-dependents`, also skip every package that needs a package whose build failed in this run (as a build or host dependency, or through their run dependencies), instead of building it later against the configured channels
 <br>**options**: `yes`, `skip-dependents`
+- <a id="arg---parallel-builds" href="#arg---parallel-builds">`--parallel-builds <BUILDS[:JOBS]>`</a>
+:  Build up to BUILDS outputs at the same time, as soon as their dependencies are available (default: 1). With `:JOBS`, the builds also share a GNU make jobserver with JOBS job slots (unix only), honoured by make >= 4.4 and ninja >= 1.13 when the build does not pass its own `-j`; `CPU_COUNT` is then set to JOBS / BUILDS unless already set
 
 ## Modifying result
 - <a id="arg---build-num" href="#arg---build-num">`--build-num <BUILD_NUM>`</a>

@@ -6,6 +6,7 @@ use miette::{Context, IntoDiagnostic};
 use rattler_build_recipe::stage1::TestType;
 use rattler_build_script::InterpreterError;
 use rattler_conda_types::{Channel, MatchSpec, Subdir, package::PathsJson};
+use tracing::Instrument;
 
 use crate::{
     metadata::{Output, build_reindexed_channels},
@@ -109,7 +110,7 @@ pub async fn skip_existing(
 /// dependencies, and execute the build script. Returns the path to the
 /// resulting package.
 pub async fn run_build(
-    mut output: Output,
+    output: Output,
     tool_configuration: &tool_configuration::Configuration,
     working_directory_behavior: WorkingDirectoryBehavior,
 ) -> miette::Result<(Output, PathBuf)> {
@@ -128,7 +129,15 @@ pub async fn run_build(
         recipe = output.identifier(),
         span_color = output.identifier()
     );
-    let _enter = span.enter();
+    run_build_in_span(output, tool_configuration)
+        .instrument(span)
+        .await
+}
+
+async fn run_build_in_span(
+    mut output: Output,
+    tool_configuration: &tool_configuration::Configuration,
+) -> miette::Result<(Output, PathBuf)> {
     output.record_build_start();
 
     let directories = output.build_configuration.directories.clone();
@@ -190,7 +199,7 @@ pub async fn run_build(
         "build.script.interpreter"
     };
 
-    match output.run_build_script().await {
+    match output.run_build_script(tool_configuration).await {
         Ok(_) => {}
         Err(InterpreterError::ExecutionFailed(err))
             if err.kind() == std::io::ErrorKind::InvalidInput =>
@@ -231,7 +240,8 @@ pub async fn run_build(
         }
     }
 
-    // Package all the new files
+    // Package all the new files. The archive is compressed into a temporary
+    // file and only the final rename into the output channel takes its lock.
     let (result, paths_json) = output
         .create_package(tool_configuration, install_added_files.as_ref())
         .await

@@ -989,10 +989,14 @@ pub fn package_conda(
         }
     }
 
-    // Atomically move the file to the final location
+    // Atomically move the file to the final location. Hold the output channel
+    // lock (only for the rename), so that it never replaces a package that a
+    // concurrent reindex has open, which can fail on Windows.
+    let output_dir_guard = tool_configuration.output_dir_lock.blocking_lock();
     tempfile_in_output
         .persist(&final_name)
         .map_err(|e| e.error)?;
+    drop(output_dir_guard);
     tracing::info!("Archive written to '{}'", final_name.display());
 
     let paths_json = PathsJson::from_path(info_folder.join("paths.json"))?;

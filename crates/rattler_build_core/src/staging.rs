@@ -8,6 +8,7 @@ use std::{
     collections::BTreeMap,
     path::{Path, PathBuf},
 };
+use tracing::Instrument;
 
 use fs_err as fs;
 use miette::{Context, IntoDiagnostic};
@@ -173,7 +174,7 @@ impl Output {
         miette::Error,
     > {
         let span = tracing::info_span!("Building or restoring staging cache", cache = staging.name);
-        let _enter = span.enter();
+        async {
 
         let cache_key = self
             .staging_cache_key(staging)
@@ -223,6 +224,9 @@ impl Output {
         // Build new cache
         self.build_staging_cache(staging, &cache_dir, tool_configuration)
             .await
+        }
+        .instrument(span)
+        .await
     }
 
     /// Build a new staging cache from scratch
@@ -337,7 +341,7 @@ impl Output {
             )
         };
 
-        let exec_args = prepare_build_plan_execution_args(
+        let mut exec_args = prepare_build_plan_execution_args(
             &staging.build.plan,
             self.recipe.context(),
             self.build_configuration.selector_config(),
@@ -350,6 +354,11 @@ impl Output {
             self.build_configuration.experimental,
         )
         .into_diagnostic()?;
+        env_vars::apply_jobserver(
+            &mut exec_args.env_vars,
+            tool_configuration.jobserver.as_ref(),
+            crate::script::plan_script_env(&staging.build.plan),
+        );
         rattler_build_script::run_script(exec_args)
             .await
             .into_diagnostic()?;
