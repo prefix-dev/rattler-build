@@ -45,9 +45,7 @@ def release_pr(git_token: str, repo_url: str) -> list[dict]:
         "  → release-plz release-pr --git-token *** --output json"
         + (f" --repo-url {repo_url}" if repo_url else "")
     )
-    result = subprocess.run(
-        cmd, check=False, text=True, cwd=ROOT, capture_output=True
-    )
+    result = subprocess.run(cmd, check=False, text=True, cwd=ROOT, capture_output=True)
 
     if result.stderr:
         print(result.stderr, end="", file=sys.stderr)
