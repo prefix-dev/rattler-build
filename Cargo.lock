@@ -1942,7 +1942,7 @@ dependencies = [
  "libc",
  "option-ext",
  "redox_users",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -2176,7 +2176,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -2235,8 +2235,7 @@ checksum = "28dea519a9695b9977216879a3ebfddf92f1c08c05d984f8996aecd6ecdc811d"
 [[package]]
 name = "file_url"
 version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5e68d9ad067554ef18d79494f0e0bcddaf263f41b0126eb7a937f9e942fcbbd8"
+source = "git+https://github.com/wolfv/rattler?branch=feat%2Frun-exports-flags-on-release#a33500124179e99845ce3e20b6c003979e93163b"
 dependencies = [
  "itertools 0.15.0",
  "percent-encoding",
@@ -3453,7 +3452,7 @@ version = "1.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a1886916523694cd6ea3d175f03a1e5010699a2a4cc13696d83d7bea1d80638"
 dependencies = [
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -3866,7 +3865,7 @@ version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
 dependencies = [
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -4757,7 +4756,7 @@ dependencies = [
  "once_cell",
  "socket2",
  "tracing",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -5408,8 +5407,7 @@ dependencies = [
 [[package]]
 name = "rattler_conda_types"
 version = "0.57.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f309cd92e2cf0f687e598142273fbc1d6870c5124212cc0088a555d50fcbadb"
+source = "git+https://github.com/wolfv/rattler?branch=feat%2Frun-exports-flags-on-release#a33500124179e99845ce3e20b6c003979e93163b"
 dependencies = [
  "ahash",
  "core-foundation 0.10.1",
@@ -5452,8 +5450,7 @@ dependencies = [
 [[package]]
 name = "rattler_conda_version"
 version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ee922b54cd30c198e93c542096a0d671cefba1a97600768b2ec4af3c11c44f55"
+source = "git+https://github.com/wolfv/rattler?branch=feat%2Frun-exports-flags-on-release#a33500124179e99845ce3e20b6c003979e93163b"
 dependencies = [
  "itertools 0.15.0",
  "nom",
@@ -5484,8 +5481,7 @@ dependencies = [
 [[package]]
 name = "rattler_digest"
 version = "2.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5bda554663860e074665f838a4d9a89fbf671f576eaf288d29525114b345adc9"
+source = "git+https://github.com/wolfv/rattler?branch=feat%2Frun-exports-flags-on-release#a33500124179e99845ce3e20b6c003979e93163b"
 dependencies = [
  "blake2",
  "digest 0.11.3",
@@ -5566,8 +5562,7 @@ dependencies = [
 [[package]]
 name = "rattler_macros"
 version = "1.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5411dbe875bed62113e04eb4006d78b4570dac1038a009186eb7ccfc14e0006a"
+source = "git+https://github.com/wolfv/rattler?branch=feat%2Frun-exports-flags-on-release#a33500124179e99845ce3e20b6c003979e93163b"
 dependencies = [
  "quote",
  "syn 2.0.119",
@@ -5712,8 +5707,7 @@ dependencies = [
 [[package]]
 name = "rattler_redaction"
 version = "0.2.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "67b5ee47d0375643b037205a4fe238b90c518ca3fc83c7c240d82c49ba87d61c"
+source = "git+https://github.com/wolfv/rattler?branch=feat%2Frun-exports-flags-on-release#a33500124179e99845ce3e20b6c003979e93163b"
 dependencies = [
  "astral-reqwest-middleware",
  "reqwest",
@@ -6347,7 +6341,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.12.1",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -6404,7 +6398,7 @@ dependencies = [
  "security-framework",
  "security-framework-sys",
  "webpki-root-certs",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -7467,10 +7461,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.3.4",
+ "getrandom 0.4.3",
  "once_cell",
  "rustix 1.1.5",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -7480,7 +7474,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "230a1b821ccbd75b185820a1f1ff7b14d21da1e442e22c0863ea5f08771a8874"
 dependencies = [
  "rustix 1.1.5",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -8333,7 +8327,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

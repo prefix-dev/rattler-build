@@ -447,7 +447,14 @@ impl Output {
                 .collect::<Result<BTreeMap<_, _>, PackagingError>>()?,
             noarch,
             track_features,
-            flags: recipe.build().flags.clone(),
+            flags: recipe
+                .build()
+                .flags
+                .iter()
+                .chain(finalized_dependencies.unique_exported_flags())
+                .unique()
+                .cloned()
+                .collect(),
             features: None,
             python_site_packages_path: recipe.build().python.site_packages_path.clone(),
             purls: None,

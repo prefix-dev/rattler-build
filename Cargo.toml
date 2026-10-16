@@ -299,3 +299,11 @@ pretty_assertions = { workspace = true }
 [[bench]]
 name = "parse_file"
 harness = false
+
+# TODO: remove once conda/rattler#2956 (flags in run_exports.json) is released.
+# The branch is the released rattler_conda_types 0.57.0 plus that PR's commit.
+[patch.crates-io]
+rattler_conda_types = { git = "https://github.com/wolfv/rattler", branch = "feat/run-exports-flags-on-release" }
+rattler_digest = { git = "https://github.com/wolfv/rattler", branch = "feat/run-exports-flags-on-release" }
+file_url = { git = "https://github.com/wolfv/rattler", branch = "feat/run-exports-flags-on-release" }
+rattler_redaction = { git = "https://github.com/wolfv/rattler", branch = "feat/run-exports-flags-on-release" }

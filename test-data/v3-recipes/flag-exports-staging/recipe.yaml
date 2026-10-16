@@ -1,0 +1,35 @@
+schema_version: 1
+
+outputs:
+  - package:
+      name: stage-toolchain
+      version: "1.0.0"
+    build:
+      noarch: generic
+    requirements:
+      flag_exports:
+        - debug
+
+  - staging:
+      name: build-stage
+    requirements:
+      build:
+        - stage-toolchain
+
+  - package:
+      name: stage-consumer
+      version: "1.0.0"
+    build:
+      noarch: generic
+    inherit: build-stage
+
+  - package:
+      name: stage-consumer-ignore
+      version: "1.0.0"
+    build:
+      noarch: generic
+    inherit: build-stage
+    requirements:
+      ignore_flag_exports:
+        by_name:
+          - debug

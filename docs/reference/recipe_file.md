@@ -1266,6 +1266,62 @@ Using a runtime dependency name:
 !!! note
     `ignore_run_exports` only applies to runtime dependencies coming from an upstream package.
 
+### Flag exports (V3, beta)
+
+!!! warning "Beta — opt in with `--v3`"
+    Flag exports produce [package variant flags](#package-variant-flags-v3-beta)
+    and are only accepted when Rattler-Build is invoked with `--v3`.
+
+A package can export [flags](#package-variant-flags-v3-beta) to the packages
+built with it, the same way it exports run dependencies. Every package that
+has it as a direct `build` or `host` dependency gets the exported flags added
+to its own `flags` in `index.json`. For example, a debug compiler package can
+tag everything compiled with it as `debug`:
+
+```yaml
+requirements:
+  flag_exports:
+    - debug
+```
+
+The list is conditional and templated like `build.flags`. The flags are
+written to a `flags` key in `info/run_exports.json`, so they are available
+from repodata without downloading the package:
+
+```json
+{
+  "flags": ["debug"]
+}
+```
+
+A package that is built with the debug compiler and declares `build.flags:
+[cuda]` ends up with `flags: ["cuda", "debug"]`. Like run exports, only
+direct dependencies count; flags exported by transitive dependencies are not
+applied. Flags exported to a [staging cache](../multiple_output_cache.md)
+are passed on to the outputs that inherit from it. The rendered recipe records
+which package exported which flag under `exported_flags`.
+
+Exported flags are not part of the build hash. To build both a debug and a
+release variant of a package, make the compiler a variant (for example via
+`c_compiler`) so each variant gets its own hash.
+
+If the package being built does not use V3 (no `--v3`), exported flags can't
+be stored in its `index.json`; Rattler-Build then ignores them with a warning.
+
+#### Ignore flag exports
+
+You can ignore exported flags by flag name, or ignore all flags exported by a
+package:
+
+```yaml
+requirements:
+  ignore_flag_exports:
+    by_name:
+      - sanitizers
+    from_package:
+      - debug-compiler
+```
+
 ## Tests section
 
 Rattler-Build supports four different types of tests. The "script test" installs

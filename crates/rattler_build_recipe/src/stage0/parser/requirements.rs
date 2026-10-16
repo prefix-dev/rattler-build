@@ -2,7 +2,7 @@
 
 use marked_yaml::Node as MarkedNode;
 use rattler_build_yaml_parser::{
-    NodeConverter, ParseMapping, parse_conditional_list_with_converter,
+    NodeConverter, ParseMapping, parse_conditional_list, parse_conditional_list_with_converter,
 };
 use rattler_conda_types::{MatchSpec, PackageName, ParseStrictness, RepodataRevision};
 
@@ -12,7 +12,7 @@ use crate::{
         SerializableMatchSpec,
         parser::ParseConfig,
         parser::helpers::get_span,
-        requirements::{IgnoreRunExports, Requirements, RunExports},
+        requirements::{IgnoreFlagExports, IgnoreRunExports, Requirements, RunExports},
         supports_v3_repodata_features,
     },
 };
@@ -89,6 +89,8 @@ pub(crate) fn parse_requirements_with_config(
             "extras",
             "run_exports",
             "ignore_run_exports",
+            "flag_exports",
+            "ignore_flag_exports",
         ],
     )?;
 
@@ -135,6 +137,14 @@ pub(crate) fn parse_requirements_with_config(
 
     if let Some(ignore_run_exports) = mapping.get("ignore_run_exports") {
         requirements.ignore_run_exports = parse_ignore_run_exports(ignore_run_exports)?;
+    }
+
+    if let Some(flag_exports) = mapping.get("flag_exports") {
+        requirements.flag_exports = parse_conditional_list(flag_exports)?;
+    }
+
+    if let Some(ignore_flag_exports) = mapping.get("ignore_flag_exports") {
+        requirements.ignore_flag_exports = parse_ignore_flag_exports(ignore_flag_exports)?;
     }
 
     Ok(requirements)
@@ -274,6 +284,28 @@ pub(crate) fn parse_ignore_run_exports(yaml: &MarkedNode) -> ParseResult<IgnoreR
     Ok(ignore)
 }
 
+/// Parse an IgnoreFlagExports section
+fn parse_ignore_flag_exports(yaml: &MarkedNode) -> ParseResult<IgnoreFlagExports> {
+    yaml.validate_keys("ignore_flag_exports", &["by_name", "from_package"])?;
+
+    let mut ignore = IgnoreFlagExports::default();
+    let mapping = yaml
+        .as_mapping()
+        .ok_or_else(|| ParseError::expected_type("mapping", "non-mapping", get_span(yaml)))?;
+
+    if let Some(by_name) = mapping.get("by_name") {
+        ignore.by_name = parse_conditional_list(by_name)?;
+    }
+
+    if let Some(from_package) =
+        yaml.try_get_conditional_list_with("from_package", &IgnoreListConverter)?
+    {
+        ignore.from_package = from_package;
+    }
+
+    Ok(ignore)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -381,6 +413,42 @@ mod tests {
         assert_eq!(reqs.host.len(), 1);
         assert_eq!(reqs.run.len(), 1);
         assert_eq!(reqs.run_constraints.len(), 1);
+    }
+
+    #[test]
+    fn test_parse_flag_exports() {
+        let yaml_str = r#"
+  flag_exports:
+    - debug
+    - if: unix
+      then: sanitizers
+    - '${{ "lto" if lto }}'
+  ignore_flag_exports:
+    by_name:
+      - cuda
+    from_package:
+      - some-compiler"#;
+        let yaml = parse_yaml_requirements(yaml_str);
+        let reqs = parse_requirements(&yaml).unwrap();
+
+        assert_eq!(reqs.flag_exports.len(), 3);
+        assert_eq!(reqs.ignore_flag_exports.by_name.len(), 1);
+        assert_eq!(reqs.ignore_flag_exports.from_package.len(), 1);
+        assert!(!reqs.is_empty());
+
+        let vars = reqs.used_variables();
+        assert!(vars.contains(&"unix".to_string()));
+        assert!(vars.contains(&"lto".to_string()));
+    }
+
+    #[test]
+    fn test_parse_ignore_flag_exports_rejects_unknown_keys() {
+        let yaml_str = r#"
+  ignore_flag_exports:
+    by_flag:
+      - debug"#;
+        let yaml = parse_yaml_requirements(yaml_str);
+        assert!(parse_requirements(&yaml).is_err());
     }
 
     #[test]

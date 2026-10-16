@@ -3,7 +3,7 @@
 use std::collections::BTreeMap;
 
 use rattler_build_types::Pin;
-use rattler_conda_types::{MatchSpec, PackageName, ParseMatchSpecOptions, RepodataRevision};
+use rattler_conda_types::{Flag, MatchSpec, PackageName, ParseMatchSpecOptions, RepodataRevision};
 use serde::{Deserialize, Serialize};
 
 use crate::stage0::evaluate::is_free_matchspec;
@@ -233,6 +233,25 @@ impl IgnoreRunExports {
     }
 }
 
+/// Ignore flag exports configuration
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct IgnoreFlagExports {
+    /// Flags to ignore
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub by_name: Vec<Flag>,
+
+    /// Packages whose flag exports to ignore
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub from_package: Vec<PackageName>,
+}
+
+impl IgnoreFlagExports {
+    /// Check if empty
+    pub fn is_empty(&self) -> bool {
+        self.by_name.is_empty() && self.from_package.is_empty()
+    }
+}
+
 /// Evaluated requirements with all templates and conditionals resolved
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct Requirements {
@@ -263,6 +282,15 @@ pub struct Requirements {
     /// Ignore run exports from specific packages
     #[serde(default, skip_serializing_if = "IgnoreRunExports::is_empty")]
     pub ignore_run_exports: IgnoreRunExports,
+
+    /// Flags added to any package that has this package as a direct build or
+    /// host dependency
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub flag_exports: Vec<Flag>,
+
+    /// Ignore flag exports by flag or from specific packages
+    #[serde(default, skip_serializing_if = "IgnoreFlagExports::is_empty")]
+    pub ignore_flag_exports: IgnoreFlagExports,
 }
 
 impl Requirements {
@@ -280,6 +308,8 @@ impl Requirements {
             && self.extras.is_empty()
             && self.run_exports.is_empty()
             && self.ignore_run_exports.is_empty()
+            && self.flag_exports.is_empty()
+            && self.ignore_flag_exports.is_empty()
     }
 
     /// Return all dependencies including any constraints, run exports
