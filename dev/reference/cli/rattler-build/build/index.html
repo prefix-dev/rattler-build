@@ -4152,6 +4152,12 @@
 <br><strong>options</strong>: <code>yes</code>, <code>skip-dependents</code></dd>
 </dl>
 </li>
+<li>
+<dl>
+<dt><a id="arg---parallel-builds" href="#arg---parallel-builds"><code>--parallel-builds &lt;BUILDS[:JOBS]&gt;</code></a></dt>
+<dd>Build up to BUILDS outputs at the same time, as soon as their dependencies are available (default: 1). With <code>:JOBS</code>, the builds also share a GNU make jobserver with JOBS job slots (unix only), honoured by make &gt;= 4.4 and ninja &gt;= 1.13 when the build does not pass its own <code>-j</code>; <code>CPU_COUNT</code> is then set to JOBS / BUILDS unless already set</dd>
+</dl>
+</li>
 </ul>
 <h2 id="modifying-result">Modifying result<a class="headerlink" href="#modifying-result" title="Permanent link">#</a></h2>
 <ul>
