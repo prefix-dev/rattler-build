@@ -61,10 +61,13 @@ libc = "0.2"
 md-5 = "0.11"
 lazy_static = "1.5.0"
 miette = "7.6.0"
-minijinja = { version = "2.24.0", features = [
+minijinja = { version = "3.0.1", features = [
   "unstable_machinery",
-  "custom_syntax",
+  "serde",
+  "json"
 ] }
+
+minijinja-contrib = { version = "3.0.1", features=["datetime", "timezone"] }
 regex = "1.13.1"
 reqwest = { version = "0.13.4", default-features = false, features = ["json"] }
 reqwest-middleware = { package = "astral-reqwest-middleware", version = "0.5.1", features = [
