@@ -105,7 +105,7 @@ impl<'a> ParallelBuilds<'a> {
             let output = match self.waiting.take() {
                 Some(output) => output,
                 None => match queue
-                    .next_ready_parallel(self.jobs.len())
+                    .next_ready_parallel(self.jobs.len(), self.max_jobs > 1)
                     .into_diagnostic()?
                 {
                     Some(output) => output,
