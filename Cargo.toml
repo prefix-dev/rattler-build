@@ -64,10 +64,10 @@ miette = "7.6.0"
 minijinja = { version = "3.0.1", features = [
   "unstable_machinery",
   "serde",
-  "json"
+  "json",
 ] }
 
-minijinja-contrib = { version = "3.0.1", features=["datetime", "timezone"] }
+minijinja-contrib = { version = "3.0.1", features = ["datetime", "timezone"] }
 regex = "1.13.1"
 reqwest = { version = "0.13.4", default-features = false, features = ["json"] }
 reqwest-middleware = { package = "astral-reqwest-middleware", version = "0.5.1", features = [
