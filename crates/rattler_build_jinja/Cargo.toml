@@ -18,7 +18,7 @@ serde_with = { workspace = true }
 thiserror = { workspace = true }
 itertools = { workspace = true }
 minijinja = { workspace = true }
-minijinja-contrib = { workspace = true, features=["datetime", "timezone"] }
+minijinja-contrib = { workspace = true, features = ["datetime", "timezone"] }
 rattler_build_types = { workspace = true }
 rattler_conda_types = { workspace = true, default-features = false }
 strum = { workspace = true }
