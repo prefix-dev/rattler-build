@@ -7,6 +7,7 @@ use minijinja::{
     syntax::SyntaxConfig,
     value::{Kwargs, Object},
 };
+
 use rattler_build_types::{NormalizedKey, Pin, PinArgs};
 #[cfg(not(target_arch = "wasm32"))]
 use std::io::Read;
@@ -624,6 +625,12 @@ fn default_filters(env: &mut Environment) {
     env.add_filter("trim", minijinja::filters::trim);
     env.add_filter("unique", minijinja::filters::unique);
     env.add_filter("split", minijinja::filters::split);
+    env.add_filter("tojson", minijinja::filters::tojson);
+
+    // Add the date/time functions
+    env.add_filter("dateformat", minijinja_contrib::filters::dateformat);
+    env.add_filter("datetimeformat", minijinja_contrib::filters::datetimeformat);
+    env.add_filter("timeformat", minijinja_contrib::filters::timeformat);
 }
 
 fn parse_platform(platform: &str) -> Result<Subdir, minijinja::Error> {
@@ -945,6 +952,9 @@ fn set_jinja(
     env.add_function("is_android", |platform: &str| {
         Ok(parse_platform(platform)?.is_android())
     });
+
+    // Add date/time functions
+    env.add_function("now", minijinja_contrib::globals::now);
 
     register_io_functions(&mut env, experimental, recipe_path);
 
@@ -1914,7 +1924,7 @@ mod tests {
             };
 
             jinja
-                .eval(&format!("var | {func} | list"))
+                .eval(&format!("var | {func} | list | tojson"))
                 .unwrap()
                 .to_string()
         };
@@ -1944,11 +1954,17 @@ mod tests {
             "2"
         );
         assert_eq!(
-            jinja.eval("(var | split('.'))[-1:]").unwrap().to_string(),
+            jinja
+                .eval("(var | split('.'))[-1:] | tojson")
+                .unwrap()
+                .to_string(),
             "[\"3\"]"
         );
         assert_eq!(
-            jinja.eval("(var | split('.'))[1:]").unwrap().to_string(),
+            jinja
+                .eval("(var | split('.'))[1:] | tojson")
+                .unwrap()
+                .to_string(),
             "[\"2\", \"3\"]"
         );
         assert_eq!(
@@ -2409,5 +2425,22 @@ mod tests {
         assert!(jinja.eval("is_unix('android-64')").unwrap().is_true());
         assert!(!jinja.eval("is_linux('android-64')").unwrap().is_true());
         assert!(!jinja.eval("is_osx('ios-arm64')").unwrap().is_true());
+    }
+
+    #[test]
+    fn eval_date_functions() {
+        let jinja = Jinja::new(JinjaConfig::default());
+        assert_eq!(
+            jinja
+                .eval("1792153018.1234 | datetimeformat(format='%Y%m%d.%H.%M.%S', tz='UTC')")
+                .unwrap()
+                .to_string(),
+            "20261016.12.16.58",
+            "datatime not formatted as expected"
+        );
+        assert!(
+            jinja.eval("now() < now()").unwrap().is_true(),
+            "unexpected now comparison"
+        );
     }
 }
