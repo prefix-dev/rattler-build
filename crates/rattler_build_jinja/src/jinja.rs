@@ -2438,7 +2438,23 @@ mod tests {
                 .unwrap()
                 .to_string(),
             "20261016.12.16.58",
-            "datatime not formatted as expected"
+            "datetime not formatted as expected"
+        );
+        assert_eq!(
+            jinja
+                .eval("1792153018.1234 | dateformat(format='%Y%m%d', tz='UTC')")
+                .unwrap()
+                .to_string(),
+            "20261016",
+            "date not formatted as expected"
+        );
+        assert_eq!(
+            jinja
+                .eval("1792153018.1234 | timeformat(format='%H.%M.%S', tz='UTC')")
+                .unwrap()
+                .to_string(),
+            "12.16.58",
+            "time not formatted as expected"
         );
         assert!(
             jinja.eval("now() < now()").unwrap().is_true(),
