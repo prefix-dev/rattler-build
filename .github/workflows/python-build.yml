@@ -37,7 +37,7 @@ jobs:
           command: sdist
           args: --out dist
       - name: "Upload sdist"
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: python-wheels-sdist
           path: py-rattler-build/dist
@@ -82,7 +82,7 @@ jobs:
           python -m pip install py-rattler-build/dist/${{ env.PACKAGE_NAME }}-*.whl --force-reinstall
           python -c "import rattler_build; print(rattler_build.rattler_build_version())"
       - name: "Upload wheels"
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: python-wheels-windows-${{ matrix.platform.target }}
           path: py-rattler-build/dist
@@ -118,7 +118,7 @@ jobs:
           pip install py-rattler-build/dist/${{ env.PACKAGE_NAME }}-*.whl --force-reinstall
           python -c "import rattler_build; print(rattler_build.rattler_build_version())"
       - name: "Upload wheels"
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: python-wheels-linux-${{ matrix.target }}
           path: py-rattler-build/dist
@@ -164,7 +164,7 @@ jobs:
             pip3 install ${{ env.PACKAGE_NAME }} --no-index --find-links py-rattler-build/dist/ --force-reinstall
             python3 -c "import rattler_build; print(rattler_build.rattler_build_version())"
       - name: "Upload wheels"
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: python-wheels-linux-${{ matrix.platform.target }}
           path: py-rattler-build/dist
@@ -213,7 +213,7 @@ jobs:
             pip3 install ${{ env.PACKAGE_NAME }} --no-index --find-links /io/py-rattler-build/dist/ --force-reinstall --break-system-packages
             python3 -c "import rattler_build; print(rattler_build.rattler_build_version())"
       - name: "Upload wheels"
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: python-wheels-musllinux-${{ matrix.target }}
           path: py-rattler-build/dist
@@ -256,7 +256,7 @@ jobs:
             pip3 install ${{ env.PACKAGE_NAME }} --no-index --find-links py-rattler-build/dist/ --force-reinstall --break-system-packages
             python3 -c "import rattler_build; print(rattler_build.rattler_build_version())"
       - name: "Upload wheels"
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: python-wheels-musllinux-${{ matrix.platform.target }}
           path: py-rattler-build/dist
@@ -290,7 +290,7 @@ jobs:
           pip install py-rattler-build/dist/${{ env.PACKAGE_NAME }}-*universal2.whl --force-reinstall
           python -c "import rattler_build; print(rattler_build.rattler_build_version())"
       - name: "Upload wheels"
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: python-wheels-macos-universal2
           path: py-rattler-build/dist
