@@ -1,6 +1,6 @@
 //! This module defines the `Variable` type, which represents a variable in a recipe.
 //! Variables can be strings, numbers, booleans, or lists of these types.
-use minijinja::Value;
+use minijinja::value::{Serde, Value};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display};
 
@@ -29,13 +29,13 @@ impl AsRef<Value> for Variable {
 
 impl From<bool> for Variable {
     fn from(value: bool) -> Self {
-        Variable(Value::from_serialize(value))
+        Variable(Value::from(Serde(value)))
     }
 }
 
 impl From<i64> for Variable {
     fn from(value: i64) -> Self {
-        Variable(Value::from_serialize(value))
+        Variable(Value::from(Serde(value)))
     }
 }
 
@@ -53,7 +53,7 @@ impl From<&str> for Variable {
 
 impl From<Vec<Variable>> for Variable {
     fn from(value: Vec<Variable>) -> Self {
-        Variable(Value::from_serialize(value))
+        Variable(Value::from(Serde(value)))
     }
 }
 
