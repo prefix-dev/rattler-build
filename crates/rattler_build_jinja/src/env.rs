@@ -48,7 +48,7 @@ impl Env {
 impl Object for Env {
     fn call_method(
         self: &Arc<Self>,
-        _state: &minijinja::State,
+        _state: &mut minijinja::State,
         name: &str,
         args: &[Value],
     ) -> Result<Value, minijinja::Error> {
