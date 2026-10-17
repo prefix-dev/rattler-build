@@ -32,9 +32,9 @@ With a corresponding variant_configuration:
 
 ```yaml title="variant_configuration.yaml"
 c_compiler:
-- clang
+  - clang
 c_compiler_version:
-- 9.0
+  - 9.0
 ```
 
 The variables shown above would select the `clang` compiler in version `9.0`.
@@ -92,9 +92,9 @@ With a corresponding variant_configuration:
 # these are the values `conda-forge` uses in their pinning file
 # found at https://github.com/conda-forge/conda-forge-pinning-feedstock/blob/main/recipe/conda_build_config.yaml
 c_stdlib:
-- sysroot
+  - sysroot
 c_stdlib_version:
-- 2.17
+  - 2.17
 ```
 
 ### The `pin` functions
@@ -114,7 +114,7 @@ The lower bound and upper bound can either be a "pin expression" (only `x` and
 `.` are allowed) or a hard-coded version string.
 
 A "pin expression" is applied to the version input to create the lower and upper
-bounds. For example, if the version is `3.10.5` with a  `lower_bound="x.x",
+bounds. For example, if the version is `3.10.5` with a `lower_bound="x.x",
 upper_bound="x.x.x"`, the lower bound will be `3.10` and the upper bound will be
 `3.10.6.0a0`. A pin expression for the `upper_bound` will increment the last
 selected segment of the version by `1`, and append `.0a0` to the end to prevent
@@ -147,7 +147,7 @@ To add an build-string matching expression, you can use the `build` argument:
 - `${{ pin_subpackage("other_output", exact=True) }}` creates a pin to another
   output in the recipe with an exact version.
 - `${{ pin_subpackage("other_output", lower_bound="1.2.3", upper_bound="1.2.4")
-  }}` creates a pin to another output in the recipe with a lower bound of
+}}` creates a pin to another output in the recipe with a lower bound of
   `1.2.3` and an upper bound of `1.2.4`. This is equivalent to writing
   `other_output >=1.2.3,<1.2.4`.
 - `${{ pin_subpackage("foo", build="py38*") }}` creates a matchspec like `foo >=3.1,<3.2.0a0 py38*`.
@@ -184,6 +184,7 @@ The `match` function allows you to perform version comparisons using conda's ver
 **Syntax:** `match(version, version_spec)`
 
 **Parameters:**
+
 - `version`: A version string (typically from a variant variable like `python`)
 - `version_spec`: A conda version specification string supporting operators like `==`, `!=`, `<`, `<=`, `>`, `>=`, wildcards (`*`), and comma-separated combinations (e.g., `">=3.8"`, `"3.14.*"`, `">=3.7,<3.9"`)
 
@@ -195,7 +196,7 @@ Using `match` to conditionally skip builds:
 
 ```yaml title="recipe.yaml"
 build:
-  skip: match(python, "<3.8")  # skip builds for Python < 3.8
+  skip: match(python, "<3.8") # skip builds for Python < 3.8
 ```
 
 Using `match` with conditional dependencies:
@@ -208,13 +209,13 @@ requirements:
 ```
 
 !!! note
-    When using `match` for conditional dependencies, these conditions are resolved during package build time, not when the package is installed. The resulting package will have fixed dependencies based on the variant configuration used during the build.
+When using `match` for conditional dependencies, these conditions are resolved during package build time, not when the package is installed. The resulting package will have fixed dependencies based on the variant configuration used during the build.
 
 Checking exact version matches:
 
 ```yaml title="recipe.yaml"
 build:
-  skip: match(root_base, "<6.36")  # skip if root_base is older than 6.36
+  skip: match(root_base, "<6.36") # skip if root_base is older than 6.36
 ```
 
 Using version ranges:
@@ -236,6 +237,10 @@ requirements:
 ```
 
 **Note:** The `match` function follows conda's standard version matching rules, making it more reliable than manual string parsing or comparison operations.
+
+### Date/time Functions
+
+- `now`: return a UNIX timestamp in seconds, up to nanoseconds with (e.g. `${{ now() }}` returns `1792153018.1234`)
 
 ### The `hash` variable
 
@@ -314,8 +319,12 @@ library:
 - `reverse`: reverse a list (e.g. `"${{ [1, 2, 3] | reverse }}"` will return `[3, 2, 1]`)
 - `sort`: sort a list (e.g. `"${{ [3, 1, 2] | sort }}"` will return `[1, 2, 3]`)
 - `trim`: remove leading and trailing whitespace from a string (e.g. `"${{ ' foo ' | trim }}"` will return `"foo"`)
-- `unique`: remove duplicates from a list (e.g. `"${{ [1, 2, 1, 3] | unique }}"` will return `[1, 2, 3]`)
-- `split`: split a string into a list (e.g. `"${{ '1.2.3' | split('.') | list }}"` will return `['1', '2', '3']`). By default, splits on whitespace.
+- `unique`: remove duplicates from a list (e.g. `"${{ [1, 2, 1, 3] | unique }}"` will return `"[1, 2, 3]"`)
+- `split`: split a string into a list (e.g. `"${{ '1.2.3' | split('.') | list }}"` will return `"['1', '2', '3']"`). By default, splits on whitespace.
+- `tojson`: return the JSON string of an input (e.g. `${{ {'foo': [{"bar": '"1"'}]} | tojson }}` will return `{"foo": [{"bar": "\"1\""}]}`)
+- `datetimeformat`: format a UNIX epoch timestamp or ISO-8601 string with `strftime` syntax (e.g. `"${{ 1792153018.1234 | datetimeformat(format='%Y%m%d.%H.%M.%S', tz='UTC') }}"` will return `"20261016.12.16.58"`)
+- `dateformat`: as `datetimeformat`, but discards the time portion
+- `timeformat`: as `datetimeformat`, but discards the date portion
 
 ??? "Removed filters"
 
@@ -338,7 +347,6 @@ library:
     - `safe`
     - `items`
     - `float`
-    - `tojson`
 
 ### Extra filters for recipes
 
@@ -418,7 +426,7 @@ package:
 
 #### Slicing lists
 
-Lists can be spliced using the regular Python `[i:j]` syntax.  Note that when
+Lists can be spliced using the regular Python `[i:j]` syntax. Note that when
 lists are obtained through using filters such as `split`, the whole filter
 expression needs to be parenthesized.
 
