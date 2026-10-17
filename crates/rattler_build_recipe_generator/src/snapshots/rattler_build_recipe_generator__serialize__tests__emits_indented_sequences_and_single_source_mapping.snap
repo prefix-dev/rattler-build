@@ -1,0 +1,62 @@
+---
+source: crates/rattler_build_recipe_generator/src/serialize.rs
+expression: sample_recipe().to_string()
+---
+schema_version: 1
+
+context:
+  version: "1.0"
+  build_number: "0"
+  name: ${{ env.get('NAME') }}
+  mirror: https://example.com
+
+package:
+  name: demo
+  version: ${{ version }}
+
+source:
+  url: https://example.com/demo-${{ version }}.tar.gz
+  sha256: abc
+
+build:
+  number: ${{ build_number }}
+  noarch: generic
+  script: make install
+
+requirements:
+  build:
+    - if: build_platform != target_platform
+      then:
+        - cross-r-base ${{ r_base }}
+    - ${{ compiler('c') }}
+  host:
+    - r-base
+
+tests:
+  - r:
+      libraries:
+        - demo
+  - files:
+      source:
+        - tests/
+    requirements:
+      run:
+        - r-testthat
+    script:
+      - 'Rscript -e "cat(''hi: there'')"'
+
+about:
+  summary: 'A demo: with a colon'
+  description: |-
+    First line.
+
+    Third line, indented:
+      - item
+  # check this
+  license: MIT
+  license_file:
+    - LICENSE
+
+extra:
+  recipe-maintainers:
+    - octocat
