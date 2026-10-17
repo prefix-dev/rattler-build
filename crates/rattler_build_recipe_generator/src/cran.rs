@@ -118,7 +118,8 @@ pub struct CranOpts {
     /// Shape the recipe for a conda-forge staged-recipes submission: download
     /// through conda-forge's `cran_mirror` variant, leave out the `skip` for a
     /// minimum R version, require the C standard library next to the
-    /// compilers and append the package's DESCRIPTION file for reviewers
+    /// compilers, list `conda-forge/r` as a maintainer and append the
+    /// package's DESCRIPTION file for reviewers
     #[cfg_attr(feature = "cli", arg(long))]
     pub staged_recipes: bool,
 }
@@ -464,10 +465,15 @@ pub struct RecipeOptions {
     /// so such a recipe needs a variant config that defines one. Also leaves
     /// out the `skip` for a minimum R version, which the R versions conda-forge
     /// builds for make unnecessary, requires `${{ stdlib("c") }}` next to the
-    /// compilers of a compiled package, as conda-forge's linter demands, and
-    /// appends the package's DESCRIPTION file to the recipe as a comment block.
+    /// compilers of a compiled package, as conda-forge's linter demands, lists
+    /// [`CONDA_FORGE_R_TEAM`] first among the maintainers, and appends the
+    /// package's DESCRIPTION file to the recipe as a comment block.
     pub staged_recipes: bool,
 }
+
+/// The conda-forge team that co-maintains the R feedstocks, so that it can
+/// help keep a newly submitted one up to date.
+const CONDA_FORGE_R_TEAM: &str = "conda-forge/r";
 
 /// Placeholder maintainer when none is given on the command line (the same
 /// convention grayskull uses).
@@ -803,7 +809,13 @@ fn package_info_to_recipe(
         }));
     }
 
-    recipe.extra.recipe_maintainers = options.maintainers.clone();
+    recipe.extra.recipe_maintainers = options
+        .staged_recipes
+        .then(|| CONDA_FORGE_R_TEAM.to_string())
+        .into_iter()
+        .chain(options.maintainers.iter().cloned())
+        .unique()
+        .collect();
 
     (recipe, remaining_deps)
 }
@@ -1182,6 +1194,35 @@ mod tests {
         info._user = "ropensci".to_string();
         let (recipe, _) = package_info_to_recipe(&info, None, &RecipeOptions::default());
         assert_eq!(recipe.about.homepage, None);
+    }
+
+    /// conda-forge's R team co-maintains staged-recipes submissions, ahead of
+    /// the submitter, and is listed once even when given with `-m`.
+    #[test]
+    fn staged_recipes_list_the_r_team_as_maintainer() {
+        let info = fixture("tinkr");
+        let staged_recipe = |given: &[&str]| {
+            let given: Vec<String> = given.iter().map(|handle| handle.to_string()).collect();
+            let options = RecipeOptions {
+                maintainers: cli_maintainers(&given),
+                staged_recipes: true,
+            };
+            package_info_to_recipe(&info, None, &options).0
+        };
+
+        let yaml = staged_recipe(&[]).to_string();
+        assert!(
+            yaml.contains(
+                "extra:\n  recipe-maintainers:\n    - conda-forge/r\n    - AddYourGitHubIdHere\n"
+            ),
+            "{yaml}"
+        );
+        assert_eq!(
+            staged_recipe(&["octocat", CONDA_FORGE_R_TEAM])
+                .extra
+                .recipe_maintainers,
+            [CONDA_FORGE_R_TEAM, "octocat"]
+        );
     }
 
     /// Library callers (py-rattler-build, the playground) get no `extra:`
