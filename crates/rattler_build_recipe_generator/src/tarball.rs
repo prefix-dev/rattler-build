@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 use std::io::Read as _;
-use std::path::{Component, Path};
+use std::path::{Component, Path, PathBuf};
 
 use miette::IntoDiagnostic;
 
@@ -32,15 +32,43 @@ pub fn find_archive_files<'a>(
     tarball: &[u8],
     relatives: &[&'a str],
 ) -> miette::Result<HashMap<&'a str, String>> {
+    Ok(scan_archive(tarball, relatives, None)?.files)
+}
+
+/// What a single decompression pass found in a source archive.
+#[derive(Debug, Default)]
+pub struct ArchiveScan<'a> {
+    /// The requested files, as returned by [`find_archive_files`].
+    pub files: HashMap<&'a str, String>,
+    /// The regular files inside the requested directory, at any depth, as
+    /// paths relative to that directory.
+    pub listed: Vec<PathBuf>,
+}
+
+/// [`find_archive_files`] that, given `list_directory`, also lists the files
+/// inside that directory of the package (see [`archive_directory_entry`]).
+/// Listing reads the whole archive; otherwise reading stops once every
+/// requested file was found.
+pub fn scan_archive<'a>(
+    tarball: &[u8],
+    relatives: &[&'a str],
+    list_directory: Option<&str>,
+) -> miette::Result<ArchiveScan<'a>> {
     let tar = flate2::read::GzDecoder::new(tarball);
     let mut archive = tar::Archive::new(tar);
-    let mut found = HashMap::new();
+    let mut scan = ArchiveScan::default();
     for entry in archive.entries().into_diagnostic()? {
-        if found.len() == relatives.len() {
+        if list_directory.is_none() && scan.files.len() == relatives.len() {
             break;
         }
         let mut entry = entry.into_diagnostic()?;
         let path = entry.path().into_diagnostic()?.into_owned();
+        if let Some(directory) = list_directory
+            && entry.header().entry_type().is_file()
+            && let Some(listed) = archive_directory_entry(&path, directory)
+        {
+            scan.listed.push(listed);
+        }
         let Some(relative) = relatives
             .iter()
             .copied()
@@ -48,30 +76,42 @@ pub fn find_archive_files<'a>(
         else {
             continue;
         };
-        if found.contains_key(relative) {
+        if scan.files.contains_key(relative) {
             continue;
         }
         let mut contents = Vec::new();
         entry.read_to_end(&mut contents).into_diagnostic()?;
-        found.insert(relative, String::from_utf8_lossy(&contents).into_owned());
+        scan.files
+            .insert(relative, String::from_utf8_lossy(&contents).into_owned());
     }
-    Ok(found)
+    Ok(scan)
 }
 
-/// Whether `path` is `<relative>`, either at the archive root or directly
-/// inside the single top-level directory that source archives usually unpack
-/// into. Anything nested deeper (a vendored or test copy) does not match, and
-/// a leading `./` is ignored.
-fn is_archive_file(path: &Path, relative: &str) -> bool {
+/// What follows `<relative>` in `path`, when `path` starts with it either at
+/// the archive root or directly inside the single top-level directory that
+/// source archives usually unpack into. Anything nested deeper (a vendored or
+/// test copy) does not match, and a leading `./` is ignored.
+fn strip_archive_prefix(path: &Path, relative: &str) -> Option<PathBuf> {
     let components: Vec<_> = path
         .components()
         .filter(|component| matches!(component, Component::Normal(_)))
         .collect();
     let wanted: Vec<_> = Path::new(relative).components().collect();
-    match components.len().checked_sub(wanted.len()) {
-        Some(leading @ (0 | 1)) => components[leading..] == wanted[..],
-        _ => false,
-    }
+    (0..=1).find_map(|leading| {
+        let rest = components.get(leading..)?.strip_prefix(&wanted[..])?;
+        Some(rest.iter().collect())
+    })
+}
+
+/// The path of `path` relative to `directory` when `path` lies inside it (see
+/// [`strip_archive_prefix`]).
+fn archive_directory_entry(path: &Path, directory: &str) -> Option<PathBuf> {
+    strip_archive_prefix(path, directory).filter(|inside| !inside.as_os_str().is_empty())
+}
+
+/// Whether `path` is `<relative>` (see [`strip_archive_prefix`]).
+fn is_archive_file(path: &Path, relative: &str) -> bool {
+    strip_archive_prefix(path, relative).is_some_and(|rest| rest.as_os_str().is_empty())
 }
 
 #[cfg(test)]
@@ -117,6 +157,37 @@ mod tests {
         assert_eq!(
             found.get("DESCRIPTION").map(String::as_str),
             Some("Author: Ga\u{FFFD}l\n")
+        );
+    }
+
+    #[test]
+    fn lists_a_directory_in_the_same_pass() {
+        let tarball = tarball_with(&[
+            ("pkg/DESCRIPTION", b"Package: pkg\n"),
+            ("pkg/src/init.c", b""),
+            ("pkg/src/lapack/dgesv.f", b""),
+        ]);
+        let scan = scan_archive(&tarball, &["DESCRIPTION"], Some("src")).unwrap();
+        assert!(scan.files.contains_key("DESCRIPTION"));
+        assert_eq!(
+            scan.listed,
+            [PathBuf::from("init.c"), PathBuf::from("lapack/dgesv.f")]
+        );
+    }
+
+    #[test]
+    fn archive_directory_entry_matching() {
+        let entry = |path: &str| archive_directory_entry(Path::new(path), "src");
+        // Inside the usual top-level directory, and at the archive root.
+        assert_eq!(entry("pkg/src/init.c"), Some(PathBuf::from("init.c")));
+        assert_eq!(entry("./src/a/b.f"), Some(PathBuf::from("a/b.f")));
+        // The directory itself, and one nested deeper.
+        assert_eq!(entry("pkg/src"), None);
+        assert_eq!(entry("pkg/inst/src/unused.f"), None);
+        // A directory of several components.
+        assert_eq!(
+            archive_directory_entry(Path::new("pkg/src/lapack/dgesv.f"), "src/lapack"),
+            Some(PathBuf::from("dgesv.f"))
         );
     }
 

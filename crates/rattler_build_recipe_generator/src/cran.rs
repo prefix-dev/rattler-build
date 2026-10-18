@@ -1,5 +1,5 @@
 #[cfg(not(target_arch = "wasm32"))]
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::{collections::HashMap, collections::HashSet};
 
 #[cfg(feature = "cli")]
@@ -292,6 +292,10 @@ struct CranTarball {
     description: Option<String>,
     /// Whether the package ships the testthat runner, `tests/testthat.R`.
     has_testthat_runner: bool,
+    /// Whether `src/` holds Fortran sources, at any depth: vendored libraries
+    /// in subdirectories are built by the package's own make rules, and also
+    /// need the Fortran compiler.
+    has_fortran_sources: bool,
 }
 
 impl CranTarball {
@@ -299,13 +303,29 @@ impl CranTarball {
         // One decompression pass for everything the tarball can tell us. A
         // failure here means the bytes are not a source archive at all, so
         // nothing about them — the checksum included — can be trusted.
-        let mut files = tarball::find_archive_files(bytes, &["DESCRIPTION", "tests/testthat.R"])?;
+        let mut scan =
+            tarball::scan_archive(bytes, &["DESCRIPTION", "tests/testthat.R"], Some("src"))?;
         Ok(Self {
             sha256: Some(hex::encode(compute_bytes_digest::<Sha256>(bytes))),
-            description: files.remove("DESCRIPTION"),
-            has_testthat_runner: files.contains_key("tests/testthat.R"),
+            description: scan.files.remove("DESCRIPTION"),
+            has_testthat_runner: scan.files.contains_key("tests/testthat.R"),
+            has_fortran_sources: scan.listed.iter().any(|path| is_fortran_source(path)),
         })
     }
+}
+
+/// Whether `path` names a Fortran source file. R compiles `.f`, `.f90` and
+/// `.f95` files itself; the other extensions, and the upper-case forms that
+/// ask for preprocessing, show up in vendored code built by the package's own
+/// make rules.
+fn is_fortran_source(path: &Path) -> bool {
+    path.extension()
+        .and_then(|extension| extension.to_str())
+        .is_some_and(|extension| {
+            ["f", "f90", "f95", "f03", "f08"]
+                .iter()
+                .any(|fortran| extension.eq_ignore_ascii_case(fortran))
+        })
 }
 
 /// Checks which dependencies already exist in the `--check-available`
@@ -733,6 +753,9 @@ fn package_info_to_recipe(
             "${{ compiler(\"c\") }}".into(),
             "${{ compiler(\"cxx\") }}".into(),
         ];
+        if tarball.is_some_and(|tarball| tarball.has_fortran_sources) {
+            build.push("${{ compiler(\"fortran\") }}".into());
+        }
         if options.staged_recipes {
             // conda-forge's linter requires the C standard library next to a
             // compiler. rattler-build itself knows no `c_stdlib`, so a plain
@@ -1098,6 +1121,42 @@ mod tests {
         );
         // Pure-R packages have no compiler, so nothing to pair it with.
         assert!(build_of("tinkr", true).is_empty());
+    }
+
+    /// Fortran sources, which only the tarball reveals, add the Fortran
+    /// compiler after the C and C++ ones.
+    #[test]
+    fn fortran_sources_require_the_fortran_compiler() {
+        let tarball = CranTarball {
+            has_fortran_sources: true,
+            ..Default::default()
+        };
+        let options = RecipeOptions {
+            staged_recipes: true,
+            ..Default::default()
+        };
+        let (recipe, _) = package_info_to_recipe(&fixture("gmp"), Some(&tarball), &options);
+        assert_eq!(
+            recipe.requirements.build,
+            vec![
+                cross_r_base_requirement(),
+                "${{ compiler(\"c\") }}".into(),
+                "${{ compiler(\"cxx\") }}".into(),
+                "${{ compiler(\"fortran\") }}".into(),
+                "${{ stdlib(\"c\") }}".into(),
+                "make".into(),
+            ]
+        );
+    }
+
+    #[test]
+    fn fortran_source_extensions() {
+        for fortran in ["dgesv.f", "mod.f90", "old.f95", "new.F90", "lapack/zlarf.F"] {
+            assert!(is_fortran_source(Path::new(fortran)), "{fortran}");
+        }
+        for other in ["init.c", "rcpp.cpp", "Makevars", "shim.for.c", "f90"] {
+            assert!(!is_fortran_source(Path::new(other)), "{other}");
+        }
     }
 
     /// A package may bound R more than once (`ppgm` does); the skip follows
