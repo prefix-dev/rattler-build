@@ -1987,7 +1987,7 @@ requirements:
     }
 
     #[test]
-    fn test_render_v3_recipe_fields_require_render_config() {
+    fn test_render_build_flags_without_v3() {
         let recipe_yaml = r#"
 package:
   name: test-pkg
@@ -2006,23 +2006,21 @@ requirements:
         let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
         let variant_config = VariantConfig::default();
 
-        let err =
-            render_recipe_with_variant_config(&stage0_recipe, &variant_config, RenderConfig::new())
-                .unwrap_err();
-        assert!(err.to_string().contains("--v3"));
-
-        let rendered = render_recipe_with_variant_config(
-            &stage0_recipe,
-            &variant_config,
+        // Package flags survive indexing into legacy repodata, so they are
+        // accepted without opting into V3.
+        for config in [
+            RenderConfig::new(),
             RenderConfig::new().with_repodata_revision(RepodataRevision::V3),
-        )
-        .unwrap();
-        assert_eq!(rendered.len(), 1);
-        assert_eq!(rendered[0].recipe.build.flags[0].as_str(), "cuda");
-        assert_eq!(
-            rendered[0].recipe.requirements.extras["dev"][0].to_string(),
-            "pytest"
-        );
+        ] {
+            let rendered =
+                render_recipe_with_variant_config(&stage0_recipe, &variant_config, config).unwrap();
+            assert_eq!(rendered.len(), 1);
+            assert_eq!(rendered[0].recipe.build.flags[0].as_str(), "cuda");
+            assert_eq!(
+                rendered[0].recipe.requirements.extras["dev"][0].to_string(),
+                "pytest"
+            );
+        }
     }
 
     #[test]
