@@ -1,9 +1,10 @@
 schema_version: 1
 
 package:
-  name: v3-build-flags-rejected
+  name: legacy-build-flags
   version: 1.0.0
 
 build:
   flags:
     - cuda
+    - blas:openblas

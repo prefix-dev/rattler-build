@@ -252,14 +252,41 @@ def test_legacy_build_keeps_legacy_index_json(
     }
 
 
+def test_legacy_build_and_publish_keep_flags(
+    rattler_build: RattlerBuild, tmp_path: Path
+):
+    output_dir = tmp_path / "output"
+    channel_dir = tmp_path / "channel"
+
+    rattler_build(
+        "publish",
+        str(V3_RECIPES / "legacy-build-flags"),
+        "--to",
+        str(channel_dir),
+        "--output-dir",
+        str(output_dir),
+        "--package-format",
+        "tar.bz2",
+        "--test=skip",
+    )
+
+    package = get_package(channel_dir, "legacy-build-flags")
+    extracted = get_extracted_package(channel_dir, "legacy-build-flags")
+    index_json = json.loads((extracted / "info/index.json").read_text())
+    assert "repodata_revision" not in index_json
+    assert index_json["flags"] == ["cuda", "blas:openblas"]
+
+    repodata = json.loads(
+        (channel_dir / index_json["subdir"] / "repodata.json").read_text()
+    )
+    assert not repodata.get("v3")
+    record = repodata["packages"][package.name]
+    assert record["flags"] == ["cuda", "blas:openblas"]
+
+
 @pytest.mark.parametrize(
     ("recipe_name", "expected", "hint"),
     [
-        (
-            "v3-build-flags-rejected",
-            "package flags require the --v3 flag",
-            "Enable --v3 to use build.flags.",
-        ),
         (
             "v3-conditional-matchspec-rejected",
             "invalid bracket key: when",

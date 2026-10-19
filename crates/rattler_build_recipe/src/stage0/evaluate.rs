@@ -769,12 +769,15 @@ pub fn evaluate_string_list(
     evaluate_string_list_items(list.as_slice(), context)
 }
 
-/// Evaluate V3 package flags.
+/// Evaluate package variant flags.
+///
+/// Flags are accepted regardless of the repodata revision: legacy repodata
+/// carries the `flags` array of a package record through indexing as well.
 fn evaluate_flag_list(
     list: &ConditionalList<rattler_conda_types::Flag>,
     context: &EvaluationContext,
 ) -> Result<Vec<rattler_conda_types::Flag>, ParseError> {
-    let flags = evaluate_conditional_list(list.as_slice(), context, |value, ctx| {
+    evaluate_conditional_list(list.as_slice(), context, |value, ctx| {
         if let Some(flag) = value.as_concrete() {
             Ok(Some(flag.clone()))
         } else if let Some(template) = value.as_template() {
@@ -793,22 +796,7 @@ fn evaluate_flag_list(
         } else {
             unreachable!("Value must be either concrete or template")
         }
-    })?;
-
-    if !flags.is_empty() && !stage0::supports_v3_repodata_features(context.repodata_revision()) {
-        return Err(ParseError::invalid_value(
-            "build.flags",
-            "package flags require the --v3 flag",
-            list.as_slice()
-                .first()
-                .and_then(|item| item.as_value())
-                .and_then(|value| value.span().copied())
-                .unwrap_or_else(Span::new_blank),
-        )
-        .with_suggestion("Enable --v3 to use build.flags."));
-    }
-
-    Ok(flags)
+    })
 }
 
 /// Evaluate skip expressions as Jinja boolean expressions
