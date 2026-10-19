@@ -3388,12 +3388,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "memo-map"
-version = "0.3.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "38d1115007560874e373613744c6fba374c17688327a71c1476d1a5954cc857b"
-
-[[package]]
 name = "miette"
 version = "7.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3441,13 +3435,21 @@ dependencies = [
 
 [[package]]
 name = "minijinja"
-version = "2.24.0"
+version = "3.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "86886cf6dbf4e614b19c9a1eec9775f021869d7eadde0fc73921a81b90c9b4c9"
+checksum = "789a6b737c4a13bec43cd3c1b982aa8a8a192ff4bf444e0fb1fd5a324f064fd1"
 dependencies = [
- "aho-corasick",
- "memo-map",
  "serde",
+]
+
+[[package]]
+name = "minijinja-contrib"
+version = "3.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e15d0d31fbf10ce99b313a238406d62dd5913d95a9be5fa081f1232e31292fc7"
+dependencies = [
+ "jiff",
+ "minijinja",
 ]
 
 [[package]]
@@ -4817,6 +4819,7 @@ dependencies = [
  "itertools 0.15.0",
  "lazy_static",
  "minijinja",
+ "minijinja-contrib",
  "rattler_build_types",
  "rattler_conda_types",
  "serde",
