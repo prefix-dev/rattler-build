@@ -4,16 +4,12 @@
 //! [`generate_build_script`], and executes them with [`run_script`]. The
 //! generated wrapper runs inside a [`crate::runner::Session`] of the configured
 //! [`Runner`], with its output streamed through the sinks from [`crate::runner`].
-//! Sandboxed runs are the exception: [`run_process_with_replacements`] spawns
-//! `rattler-sandbox` on the host directly.
 
+use crate::execution_context::ExecutionContext;
 use crate::runner::{
-    BuildLogSink, ExecSpec, ExecStatus, GuestPath, OutputSink, OutputStream, ReplacingSink, Runner,
-    SessionSpec, resolve_process_env,
+    BuildLogSink, ExecSpec, GuestPath, Mounts, ReplacingSink, Runner, SessionSpec,
 };
-use crate::sandbox::SandboxConfiguration;
 use crate::script::{Script, ScriptContent};
-use crate::{execution_context::ExecutionContext, runtime::RuntimeEnv};
 use fs_err as fs;
 use futures::{StreamExt, TryStreamExt};
 use indexmap::IndexMap;
@@ -21,7 +17,7 @@ use rattler_shell::shell::Shell;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::collections::HashMap;
-use std::ffi::{OsStr, OsString};
+use std::ffi::OsStr;
 use std::fmt;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -95,13 +91,14 @@ pub struct ExecutionArgs {
     /// The working directory (`cwd`) in which the script should execute
     pub work_dir: PathBuf,
 
-    /// The sandbox configuration to use for the script execution
-    pub sandbox_config: Option<SandboxConfiguration>,
+    /// The directories the session must provide to the script: the work
+    /// directory and the prefixes writable, and whatever the script reads.
+    /// They are passed on as [`SessionSpec::mounts`].
+    pub mounts: Mounts,
 
-    /// The environment isolation mode. It is applied where the wrapper's
-    /// process environment is built: by the runner session when the script
-    /// runs through a [`Runner`] (see [`SessionSpec::env_isolation`]), and by
-    /// [`run_process_with_replacements`]' caller when it runs in a sandbox.
+    /// The environment isolation mode. It is applied by the runner session
+    /// when it builds the wrapper's process environment (see
+    /// [`SessionSpec::env_isolation`]).
     pub env_isolation: EnvironmentIsolation,
 }
 
@@ -190,8 +187,8 @@ impl Script {
     /// - Configures the working directory
     /// - Renders Jinja templates if a renderer is provided
     /// - Executes the script in the appropriate interpreter through `runner`,
-    ///   whose session applies `env_isolation` when it builds the process
-    ///   environment
+    ///   whose session provides `mounts` and applies `env_isolation` when it
+    ///   builds the process environment
     #[allow(clippy::too_many_arguments)]
     pub async fn run_script<F>(
         &self,
@@ -200,7 +197,7 @@ impl Script {
         recipe_dir: &Path,
         context: ExecutionContext,
         jinja_renderer: Option<F>,
-        sandbox_config: Option<&SandboxConfiguration>,
+        mounts: Mounts,
         env_isolation: EnvironmentIsolation,
         runner: &dyn Runner,
     ) -> Result<(), crate::InterpreterError>
@@ -253,7 +250,7 @@ impl Script {
             secrets,
             context,
             work_dir,
-            sandbox_config: sandbox_config.cloned(),
+            mounts,
             env_isolation,
         };
 
@@ -843,14 +840,12 @@ async fn build_section_body(
 /// `ExecutionArgs` directly and is used when composing multiple sections.
 ///
 /// The generated wrapper executes in a session started on `runner` with
-/// [`ExecutionArgs::env_isolation`] as the session's isolation mode. The
-/// session receives the build variables followed by the secrets, so a secret
+/// [`ExecutionArgs::mounts`] as the session's mounts and
+/// [`ExecutionArgs::env_isolation`] as its isolation mode. The session
+/// receives the build variables followed by the secrets, so a secret
 /// overrides a build variable of the same name, and applies them on top of the
-/// environment the mode starts from. When a sandbox is configured and the
-/// platform supports it, the wrapper is spawned on the host inside
-/// `rattler-sandbox` instead, with the same isolation mode resolved here.
-/// Either way, output is rewritten by [`ReplacingSink`] and recorded by
-/// [`BuildLogSink`] in `conda_build.log`.
+/// environment the mode starts from. Output is rewritten by [`ReplacingSink`]
+/// and recorded by [`BuildLogSink`] in `conda_build.log`.
 pub async fn run_script(
     exec_args: ExecutionArgs,
     runner: &dyn Runner,
@@ -859,66 +854,40 @@ pub async fn run_script(
         crate::shell_dialect::shell_dialect(exec_args.context.runtime().process_platform());
     let build_script_path = generate_build_script(&exec_args).await?;
     let command_spec = dialect.command_to_run_script(&build_script_path, &exec_args.context);
-    let sandbox_config = if dialect.supports_sandbox() {
-        exec_args.sandbox_config.as_ref()
-    } else {
-        None
-    };
 
-    let status = if let Some(sandbox_config) = sandbox_config {
-        let process_env = resolve_process_env(
-            exec_args.env_isolation,
-            &exec_args.env_vars,
-            &exec_args.secrets,
-            exec_args.context.runtime(),
-        );
+    let mut sink = ReplacingSink::new(
+        exec_args.replacements(dialect.replacements_template()),
+        BuildLogSink::open(&exec_args.work_dir.join("conda_build.log"))?,
+    );
+    let mut session = runner
+        .start_session(SessionSpec {
+            // The wrapper was generated for the process platform of the
+            // execution context, so the session has to provide that one.
+            platform: exec_args.context.runtime().process_platform(),
+            // The wrapper, the prefixes, and the work directory are addressed
+            // as host paths, so every mount mirrors its host path.
+            mounts: exec_args.mounts.clone(),
+            image: None,
+            work_dir: GuestPath(exec_args.work_dir.clone()),
+            env_isolation: exec_args.env_isolation,
+        })
+        .await?;
 
-        let output = crate::execution::run_process_with_replacements(
-            &command_spec,
-            &exec_args.work_dir,
-            exec_args.replacements(dialect.replacements_template()),
-            &process_env,
-            Some(sandbox_config),
-            exec_args.context.runtime(),
+    let mut env = exec_args.env_vars.clone();
+    env.extend(exec_args.secrets.clone());
+    let mut argv = Vec::with_capacity(command_spec.args.len() + 1);
+    argv.push(command_spec.program);
+    argv.extend(command_spec.args);
+    let status = session
+        .exec(
+            ExecSpec {
+                argv,
+                cwd: GuestPath(exec_args.work_dir.clone()),
+                env,
+            },
+            &mut sink,
         )
         .await?;
-        ExecStatus::from(output.status)
-    } else {
-        let mut sink = ReplacingSink::new(
-            exec_args.replacements(dialect.replacements_template()),
-            BuildLogSink::open(&exec_args.work_dir.join("conda_build.log"))?,
-        );
-        let mut session = runner
-            .start_session(SessionSpec {
-                // The wrapper was generated for the process platform of the
-                // execution context, so the session has to provide that one.
-                platform: exec_args.context.runtime().process_platform(),
-                // The execution arguments carry no mount information: the
-                // wrapper, the prefixes, and the work directory are addressed
-                // as host paths.
-                mounts: Vec::new(),
-                image: None,
-                work_dir: GuestPath(exec_args.work_dir.clone()),
-                env_isolation: exec_args.env_isolation,
-            })
-            .await?;
-
-        let mut env = exec_args.env_vars.clone();
-        env.extend(exec_args.secrets.clone());
-        let mut argv = Vec::with_capacity(command_spec.args.len() + 1);
-        argv.push(command_spec.program);
-        argv.extend(command_spec.args);
-        session
-            .exec(
-                ExecSpec {
-                    argv,
-                    cwd: GuestPath(exec_args.work_dir.clone()),
-                    env,
-                },
-                &mut sink,
-            )
-            .await?
-    };
 
     if !status.success() {
         let status_code = status.code.unwrap_or(1);
@@ -959,101 +928,32 @@ pub async fn create_build_script(exec_args: ExecutionArgs) -> Result<(), std::io
                     "unsupported interpreter '{interpreter}'{suggestion}"
                 ))
             }
+            crate::InterpreterError::Runner(error) => match error {
+                crate::runner::RunnerError::Io(error) => error,
+                crate::runner::RunnerError::UnsupportedPlatform { .. }
+                | crate::runner::RunnerError::MissingExecutable { .. }
+                | crate::runner::RunnerError::UnsupportedMount { .. } => {
+                    std::io::Error::other(error.to_string())
+                }
+            },
         })?;
 
     tracing::info!("Build script created at {}", build_script_path.display());
     Ok(())
 }
 
-/// Finds the rattler-sandbox executable on the runtime `PATH`.
-fn find_rattler_sandbox(runtime: &RuntimeEnv) -> Option<PathBuf> {
-    which::which_in_global("rattler-sandbox", Some(runtime.path()))
-        .ok()?
-        .next()
-}
-
-/// Spawns a process and streams its output through a [`ReplacingSink`] into a
-/// [`BuildLogSink`], so the host prefix shows up as `$PREFIX`, the build prefix
-/// as `$BUILD_PREFIX`, and secrets are masked in the log, the tracing output,
-/// and the returned [`std::process::Output`].
-pub(crate) async fn run_process_with_replacements(
-    command_spec: &crate::shell_dialect::CommandSpec,
-    cwd: &Path,
-    replacements: HashMap<String, String>,
-    process_env: &IndexMap<String, String>,
-    sandbox_config: Option<&SandboxConfiguration>,
-    runtime: &RuntimeEnv,
-) -> Result<std::process::Output, std::io::Error> {
-    let log_sink = BuildLogSink::open(&cwd.join("conda_build.log"))?;
-    let mut sink = ReplacingSink::new(replacements, log_sink);
-    let (program, process_args) = if let Some(sandbox_config) = sandbox_config {
-        tracing::info!("{}", sandbox_config);
-
-        // Try to find rattler-sandbox executable
-        if let Some(sandbox_exe) = find_rattler_sandbox(runtime) {
-            let mut sandbox_args = sandbox_config.with_cwd(cwd).to_args();
-
-            // Add the actual command to execute as positional arguments.
-            sandbox_args.push(command_spec.program.clone());
-            sandbox_args.extend(command_spec.args.iter().cloned());
-
-            (sandbox_exe.into_os_string(), sandbox_args)
-        } else {
-            tracing::error!("rattler-sandbox executable not found in PATH");
-            tracing::error!("Please install it by running: pixi global install rattler-sandbox");
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::NotFound,
-                "rattler-sandbox executable not found. Please install it with: pixi global install rattler-sandbox",
-            ));
-        }
-    } else {
-        (
-            OsString::from(&command_spec.program),
-            command_spec.args.clone(),
-        )
-    };
-
-    let mut process = spawn_process(&program, &process_args, cwd, process_env)?;
-
-    while let Some(line) = process.next_line().await {
-        match line {
-            Ok(line) => {
-                let stream = if line.is_stderr {
-                    OutputStream::Stderr
-                } else {
-                    OutputStream::Stdout
-                };
-                sink.line(stream, &line.text);
-            }
-            Err(e) => {
-                tracing::warn!("Error reading output: {:?}", e);
-                // Drain what is left so the child does not block writing into a
-                // full pipe while we wait for it to exit.
-                if let Err(e) = process.drain_output().await {
-                    tracing::warn!("Error draining output: {:?}", e);
-                }
-                break;
-            }
-        }
-    }
-
-    let status = process.wait().await?;
-    let (stdout, stderr) = sink.into_inner().into_captured();
-
-    Ok(std::process::Output {
-        status,
-        stdout: stdout.into_bytes(),
-        stderr: stderr.into_bytes(),
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::ExecutionContext;
-    use crate::runner::{GuestInfo, LocalRunner, RunnerError, Session};
+    use crate::runner::{
+        ExecStatus, GuestInfo, LocalRunner, OutputSink, OutputStream, RunnerError, Session,
+        resolve_process_env,
+    };
+    use crate::runtime::RuntimeEnv;
     use async_trait::async_trait;
     use rattler_conda_types::Subdir;
+    use std::ffi::OsString;
     use std::sync::{Arc, Mutex};
     use tokio_util::bytes::BytesMut;
 
@@ -1078,7 +978,7 @@ mod tests {
                 Subdir::current().unwrap(),
             ),
             work_dir: tmp.path().to_path_buf(),
-            sandbox_config: None,
+            mounts: Mounts::new(),
             env_isolation: EnvironmentIsolation::None,
         };
 
@@ -1191,7 +1091,7 @@ mod tests {
                 Subdir::Win64,
             ),
             work_dir: tmp.path().to_path_buf(),
-            sandbox_config: None,
+            mounts: Mounts::new(),
             env_isolation: EnvironmentIsolation::None,
         };
 
@@ -1476,7 +1376,7 @@ mod tests {
                 Subdir::current().unwrap(),
             ),
             work_dir,
-            sandbox_config: None,
+            mounts: Mounts::new(),
             env_isolation: EnvironmentIsolation::None,
         }
     }
@@ -1574,11 +1474,11 @@ mod tests {
         }
     }
 
-    /// Without a sandbox the wrapper runs in a session of the runner: the
-    /// session is started for the work directory on the wrapper's platform,
-    /// receives the dialect's wrapper command with the build variables and the
-    /// secrets layered on top, and its output reaches the build log with the
-    /// prefix replaced and secrets masked.
+    /// The wrapper runs in a session of the runner: the session is started
+    /// for the work directory on the wrapper's platform with the mounts of
+    /// the execution arguments, receives the dialect's wrapper command with
+    /// the build variables and the secrets layered on top, and its output
+    /// reaches the build log with the prefix replaced and secrets masked.
     #[tokio::test]
     async fn test_run_script_executes_wrapper_through_session() {
         let tmp = tempfile::tempdir().unwrap();
@@ -1592,6 +1492,9 @@ mod tests {
             ResolvedScriptContents::Inline("echo hello".to_string()),
             None,
         );
+        args.mounts = Mounts::new()
+            .writable(tmp.path())
+            .read_only(tmp.path().join("recipe"));
         args.env_vars
             .insert("RB_BUILD_VAR".to_string(), "build-value".to_string());
         args.env_vars
@@ -1619,7 +1522,12 @@ mod tests {
         let session = recorded.session.expect("a session was started");
         assert_eq!(session.platform, context.runtime().process_platform());
         assert_eq!(session.work_dir, GuestPath(work_dir.clone()));
-        assert!(session.mounts.is_empty());
+        assert_eq!(
+            session.mounts,
+            Mounts::new()
+                .writable(tmp.path())
+                .read_only(tmp.path().join("recipe"))
+        );
         assert_eq!(session.image, None);
         assert_eq!(session.env_isolation, EnvironmentIsolation::CondaBuild);
 
@@ -1965,153 +1873,6 @@ mod tests {
                     .is_some_and(|(name, _)| name.eq_ignore_ascii_case("PATH"))
             }),
             "parent PATH must not leak into the child"
-        );
-    }
-
-    #[tokio::test]
-    async fn test_run_process_with_replacements_keeps_output_handling_host_side() {
-        let tmp = tempfile::tempdir().unwrap();
-        let process_env = IndexMap::new();
-        let mut replacements = HashMap::new();
-        replacements.insert("RAW_PREFIX".to_string(), "$PREFIX".to_string());
-        replacements.insert("raw-secret".to_string(), "***".to_string());
-
-        #[cfg(windows)]
-        let command = [
-            "cmd".to_string(),
-            "/d".to_string(),
-            "/c".to_string(),
-            "echo RAW_PREFIX raw-secret & echo RAW_PREFIX raw-secret 1>&2".to_string(),
-        ];
-        #[cfg(not(windows))]
-        let command = [
-            "sh".to_string(),
-            "-c".to_string(),
-            "printf 'RAW_PREFIX raw-secret\\n'; printf 'RAW_PREFIX raw-secret\\n' >&2".to_string(),
-        ];
-        let command_spec = crate::shell_dialect::CommandSpec {
-            program: command[0].clone(),
-            args: command[1..].to_vec(),
-        };
-
-        let output = run_process_with_replacements(
-            &command_spec,
-            tmp.path(),
-            replacements,
-            &process_env,
-            None,
-            &RuntimeEnv::for_test(Subdir::current().unwrap()),
-        )
-        .await
-        .unwrap();
-
-        assert!(output.status.success());
-        let stdout = String::from_utf8(output.stdout).unwrap();
-        let stderr = String::from_utf8(output.stderr).unwrap();
-        let log = fs::read_to_string(tmp.path().join("conda_build.log")).unwrap();
-        for content in [&stdout, &stderr, &log] {
-            assert!(content.contains("$PREFIX ***"), "got:\n{content}");
-            assert!(!content.contains("RAW_PREFIX"), "got:\n{content}");
-            assert!(!content.contains("raw-secret"), "got:\n{content}");
-        }
-    }
-
-    /// A failing script still yields the complete captured output, with the
-    /// line order within each stream preserved, and the log holds both streams.
-    #[tokio::test]
-    async fn test_run_process_with_replacements_keeps_output_on_failure() {
-        let tmp = tempfile::tempdir().unwrap();
-        let process_env = IndexMap::new();
-        let mut replacements = HashMap::new();
-        replacements.insert("raw-secret".to_string(), "***".to_string());
-
-        #[cfg(windows)]
-        let command = [
-            "cmd".to_string(),
-            "/d".to_string(),
-            "/c".to_string(),
-            "echo out1 raw-secret&1>&2 echo err1 raw-secret&echo out2&1>&2 echo err2&exit 7"
-                .to_string(),
-        ];
-        #[cfg(not(windows))]
-        let command = [
-            "sh".to_string(),
-            "-c".to_string(),
-            "printf 'out1 raw-secret\\n'; printf 'err1 raw-secret\\n' >&2; printf 'out2\\n'; printf 'err2\\n' >&2; exit 7"
-                .to_string(),
-        ];
-        let command_spec = crate::shell_dialect::CommandSpec {
-            program: command[0].clone(),
-            args: command[1..].to_vec(),
-        };
-
-        let output = run_process_with_replacements(
-            &command_spec,
-            tmp.path(),
-            replacements,
-            &process_env,
-            None,
-            &RuntimeEnv::for_test(Subdir::current().unwrap()),
-        )
-        .await
-        .unwrap();
-
-        assert_eq!(output.status.code(), Some(7));
-        assert_eq!(
-            String::from_utf8(output.stdout).unwrap(),
-            "out1 ***\nout2\n"
-        );
-        assert_eq!(
-            String::from_utf8(output.stderr).unwrap(),
-            "err1 ***\nerr2\n"
-        );
-        let log = fs::read_to_string(tmp.path().join("conda_build.log")).unwrap();
-        let mut log_lines: Vec<&str> = log.lines().collect();
-        log_lines.sort_unstable();
-        assert_eq!(log_lines, ["err1 ***", "err2", "out1 ***", "out2"]);
-    }
-
-    /// When the build log cannot be opened the call fails before the process
-    /// is spawned.
-    #[tokio::test]
-    async fn test_run_process_with_replacements_fails_before_spawn_without_log() {
-        let tmp = tempfile::tempdir().unwrap();
-        // A directory in the way of the log file makes opening it fail.
-        fs::create_dir(tmp.path().join("conda_build.log")).unwrap();
-        let process_env = IndexMap::new();
-
-        #[cfg(windows)]
-        let command = [
-            "cmd".to_string(),
-            "/d".to_string(),
-            "/c".to_string(),
-            "echo spawned > marker.txt".to_string(),
-        ];
-        #[cfg(not(windows))]
-        let command = [
-            "sh".to_string(),
-            "-c".to_string(),
-            "echo spawned > marker.txt".to_string(),
-        ];
-        let command_spec = crate::shell_dialect::CommandSpec {
-            program: command[0].clone(),
-            args: command[1..].to_vec(),
-        };
-
-        let error = run_process_with_replacements(
-            &command_spec,
-            tmp.path(),
-            HashMap::new(),
-            &process_env,
-            None,
-            &RuntimeEnv::for_test(Subdir::current().unwrap()),
-        )
-        .await
-        .unwrap_err();
-
-        assert!(
-            !tmp.path().join("marker.txt").exists(),
-            "process must not be spawned when the log cannot be opened: {error}"
         );
     }
 

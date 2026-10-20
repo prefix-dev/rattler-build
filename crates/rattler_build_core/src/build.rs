@@ -209,6 +209,9 @@ async fn run_build_in_span(
         Err(InterpreterError::ExecutionFailed(_)) => {
             return Err(miette::miette!("Script failed to execute"));
         }
+        Err(InterpreterError::Runner(error)) => {
+            return Err(miette::Report::from_err(error));
+        }
         Err(InterpreterError::InterpreterNotFound(interpreter)) => {
             return Err(miette::miette!(
                 help = format!(
