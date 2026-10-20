@@ -15,10 +15,9 @@ pub const RATTLER_BUILD_ENABLE_GITHUB_INTEGRATION: &str = "RATTLER_BUILD_ENABLE_
 /// the paths of files that should end up in the final package, one per line.
 /// If the file is non-empty after the build, those paths are used as the
 /// package contents instead of the default "new files in `$PREFIX`" diff.
+///
+/// The variable is a channel of the build-script run (see
+/// [`rattler_build_script::runner::ExecSpec::channels`]): the runner session
+/// creates a fresh, empty file for every run and hands its contents back
+/// afterwards, so the path is not stable and the file is not kept.
 pub const RATTLER_BUILD_PACKAGE_FILES: &str = "RATTLER_BUILD_PACKAGE_FILES";
-
-/// File name used (under the build directory) for the package files override
-/// list pointed at by [`RATTLER_BUILD_PACKAGE_FILES`]. The name is dot-prefixed
-/// and namespaced so that build scripts are extremely unlikely to clobber it
-/// by accident.
-pub const PACKAGE_FILES_LIST_NAME: &str = ".rattler-build-package-files";

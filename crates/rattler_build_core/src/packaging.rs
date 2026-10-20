@@ -22,7 +22,7 @@ use unicode_normalization::UnicodeNormalization;
 mod file_finder;
 pub(crate) mod file_mapper;
 mod metadata;
-pub use file_finder::{Files, TempFiles, content_type, read_package_files_list, record_files};
+pub use file_finder::{Files, TempFiles, content_type, parse_package_files_list, record_files};
 pub use metadata::{contains_prefix_binary, contains_prefix_text, create_prefix_placeholder};
 use tempfile::NamedTempFile;
 
@@ -1024,9 +1024,10 @@ fn create_empty_build_folder(
 }
 
 impl Output {
-    /// Create a conda package from any new files in the host prefix. Note: the
-    /// previous stages should have been completed before calling this
-    /// function.
+    /// Create a conda package from the new files in the host prefix, or from
+    /// `package_files` when the build script listed the files to package
+    /// explicitly (see [`Output::run_build_script`]). Note: the previous
+    /// stages should have been completed before calling this function.
     ///
     /// Collecting the files, post-processing and compressing are blocking work,
     /// so they run on tokio's blocking thread pool instead of the async task
@@ -1035,6 +1036,7 @@ impl Output {
         &self,
         tool_configuration: &tool_configuration::Configuration,
         post_install_files: Option<&HashSet<PathBuf>>,
+        package_files: Option<Vec<PathBuf>>,
     ) -> Result<(PathBuf, PathsJson), PackagingError> {
         let output = self.clone();
         let tool_configuration = tool_configuration.clone();
@@ -1043,7 +1045,11 @@ impl Output {
 
         let result = tokio::task::spawn_blocking(move || {
             let _enter = span.enter();
-            output.create_package_blocking(&tool_configuration, post_install_files.as_ref())
+            output.create_package_blocking(
+                &tool_configuration,
+                post_install_files.as_ref(),
+                package_files,
+            )
         })
         .await;
 
@@ -1058,19 +1064,15 @@ impl Output {
         &self,
         tool_configuration: &tool_configuration::Configuration,
         post_install_files: Option<&HashSet<PathBuf>>,
+        package_files: Option<Vec<PathBuf>>,
     ) -> Result<(PathBuf, PathsJson), PackagingError> {
         let host_prefix = &self.build_configuration.directories.host_prefix;
-        let package_files_list = self
-            .build_configuration
-            .directories
-            .package_files_list_path();
 
-        let files_after = match read_package_files_list(&package_files_list)? {
+        let files_after = match package_files {
             Some(paths) => {
                 tracing::info!(
-                    "Using {} explicit package file(s) from {}",
-                    paths.len(),
-                    package_files_list.display()
+                    "Using {} explicit package file(s) listed by the build script",
+                    paths.len()
                 );
                 Files::from_paths(
                     host_prefix,

@@ -199,8 +199,8 @@ async fn run_build_in_span(
         "build.script.interpreter"
     };
 
-    match output.run_build_script(tool_configuration).await {
-        Ok(_) => {}
+    let package_files = match output.run_build_script(tool_configuration).await {
+        Ok(package_files) => package_files,
         Err(InterpreterError::ExecutionFailed(err))
             if err.kind() == std::io::ErrorKind::InvalidInput =>
         {
@@ -241,12 +241,17 @@ async fn run_build_in_span(
                 },
             );
         }
-    }
+    };
 
-    // Package all the new files. The archive is compressed into a temporary
-    // file and only the final rename into the output channel takes its lock.
+    // Package the new files, or the files the build script listed. The
+    // archive is compressed into a temporary file and only the final rename
+    // into the output channel takes its lock.
     let (result, paths_json) = output
-        .create_package(tool_configuration, install_added_files.as_ref())
+        .create_package(
+            tool_configuration,
+            install_added_files.as_ref(),
+            package_files,
+        )
         .await
         .into_diagnostic()?;
 

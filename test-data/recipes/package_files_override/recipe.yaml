@@ -16,8 +16,8 @@ build:
         - echo "skipped doc" > $PREFIX/share/doc/skip.txt
         # Write absolute and relative paths to exercise both forms,
         # using `>>` across multiple invocations.
-        - echo "$PREFIX/bin/keep.sh" >> $RATTLER_BUILD_PACKAGE_FILES
-        - echo "bin/also-keep.sh" >> $RATTLER_BUILD_PACKAGE_FILES
+        - echo "$PREFIX/bin/keep.sh" >> "$RATTLER_BUILD_PACKAGE_FILES"
+        - echo "bin/also-keep.sh" >> "$RATTLER_BUILD_PACKAGE_FILES"
       else:
         - mkdir %PREFIX%\bin
         - mkdir %PREFIX%\share\doc
@@ -25,5 +25,5 @@ build:
         - echo also kept > %PREFIX%\bin\also-keep.txt
         - echo skipped > %PREFIX%\bin\skip.txt
         - echo skipped doc > %PREFIX%\share\doc\skip.txt
-        - echo %PREFIX%\bin\keep.txt >> %RATTLER_BUILD_PACKAGE_FILES%
-        - echo bin\also-keep.txt >> %RATTLER_BUILD_PACKAGE_FILES%
+        - echo %PREFIX%\bin\keep.txt >> "%RATTLER_BUILD_PACKAGE_FILES%"
+        - echo bin\also-keep.txt >> "%RATTLER_BUILD_PACKAGE_FILES%"

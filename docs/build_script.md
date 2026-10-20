@@ -457,13 +457,19 @@ noted, no variables are inherited from the shell environment in which you invoke
 
 `RATTLER_BUILD_PACKAGE_FILES`
 
-: Path to a writable file. If the build script writes any paths to this file
-  (one per line), those paths are used as the package contents instead of the
-  default "new files in `$PREFIX`" diff. Each line must be either an absolute
-  path under `$PREFIX` or a relative path resolved against `$PREFIX`. The file
-  is appendable across multiple invocations, so
-  `echo path >> $RATTLER_BUILD_PACKAGE_FILES` works as expected. If the file
-  is empty or absent, rattler-build falls back to the default behavior. See
+: Path to a writable file in the build directory, fresh and empty at the
+  start of every build script run, at a path that changes per run, and removed
+  afterwards. If the build script writes any paths to this file (one per
+  line), those paths are used as the package contents instead of the default
+  "new files in `$PREFIX`" diff. Each line must be either an absolute path
+  under `$PREFIX` or a relative path resolved against `$PREFIX`. The file is
+  appendable across multiple invocations, so
+  `echo path >> "$RATTLER_BUILD_PACKAGE_FILES"` (or
+  `echo path >> "%RATTLER_BUILD_PACKAGE_FILES%"` in `cmd.exe`) works as
+  expected; quote the variable, since the build directory may contain spaces.
+  If the script leaves the file empty, rattler-build falls back to the default
+  behavior. The variable is set by rattler-build for the run and is not part
+  of `build_env.sh`/`build_env.bat`. See
   [Override package contents from the build script][override-package-contents]
   in the build options for more details.
 

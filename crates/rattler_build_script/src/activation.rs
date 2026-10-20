@@ -122,8 +122,10 @@ mod tests {
                 Subdir::WinArm64,
             ),
             work_dir: tmp.path().to_path_buf(),
+            scratch_dir: tmp.path().to_path_buf(),
             mounts: crate::runner::Mounts::new(),
             env_isolation: EnvironmentIsolation::Strict,
+            channels: Vec::new(),
         };
 
         let script = super::activation_script(&args, shell::CmdExe).unwrap();
@@ -157,8 +159,10 @@ mod tests {
                 Subdir::current().unwrap(),
             ),
             work_dir: tmp.path().to_path_buf(),
+            scratch_dir: tmp.path().to_path_buf(),
             mounts: crate::runner::Mounts::new(),
             env_isolation: EnvironmentIsolation::None,
+            channels: Vec::new(),
         };
 
         let script = super::activation_script(&args, shell::Bash::default()).unwrap();

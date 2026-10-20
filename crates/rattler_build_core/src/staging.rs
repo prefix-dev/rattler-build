@@ -347,6 +347,7 @@ impl Output {
             self.build_configuration.selector_config(),
             env_vars,
             self.build_configuration.directories.work_dir.clone(),
+            self.build_configuration.directories.build_dir.clone(),
             &self.build_configuration.directories.recipe_dir,
             context,
             self.build_configuration.directories.session_mounts(),
@@ -643,6 +644,7 @@ mod tests {
             &indexmap::IndexMap::new(),
             JinjaConfig::default(),
             std::collections::HashMap::new(),
+            PathBuf::from("."),
             PathBuf::from("."),
             Path::new("."),
             ExecutionContext::shared(

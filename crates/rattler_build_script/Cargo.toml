@@ -24,6 +24,7 @@ execution = [
   "which",
   "minijinja",
   "strsim",
+  "tempfile",
 ]
 
 [dependencies]
@@ -53,6 +54,7 @@ fs-err = { workspace = true, optional = true }
 which = { workspace = true, optional = true }
 minijinja = { workspace = true, optional = true }
 strsim = { workspace = true, optional = true }
+tempfile = { workspace = true, optional = true }
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { workspace = true, features = [
@@ -64,4 +66,3 @@ windows-sys = { workspace = true, features = [
 tokio = { workspace = true, features = ["rt", "macros", "fs", "time"] }
 insta = { workspace = true, features = ["yaml"] }
 serde_yaml = { workspace = true }
-tempfile = { workspace = true }

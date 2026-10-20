@@ -715,9 +715,6 @@ def test_always_include_files(
     assert "Force include new file" in (pkg_force / "hello.txt").read_text()
 
 
-@pytest.mark.skipif(
-    os.name == "nt", reason="recipe does not support execution on windows"
-)
 def test_package_files_override(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
@@ -728,14 +725,15 @@ def test_package_files_override(
         tmp_path,
     )
 
+    extension = "txt" if os.name == "nt" else "sh"
     pkg = get_extracted_package(tmp_path, "package_files_override")
     paths = json.loads((pkg / "info/paths.json").read_text())
     listed = sorted(p["_path"] for p in paths["paths"])
 
-    assert listed == ["bin/also-keep.sh", "bin/keep.sh"]
-    assert (pkg / "bin/keep.sh").exists()
-    assert (pkg / "bin/also-keep.sh").exists()
-    assert not (pkg / "bin/skip.sh").exists()
+    assert listed == [f"bin/also-keep.{extension}", f"bin/keep.{extension}"]
+    assert (pkg / f"bin/keep.{extension}").exists()
+    assert (pkg / f"bin/also-keep.{extension}").exists()
+    assert not (pkg / f"bin/skip.{extension}").exists()
     assert not (pkg / "share/doc/skip.txt").exists()
 
 

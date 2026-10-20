@@ -99,6 +99,11 @@ as the package contents instead of the conda-meta diff. The `build.files` and
 `build.always_include_files` globs still apply on top of that list, so you can
 combine an explicit selection with the usual filtering.
 
+The variable is set for the build script run only: every run starts with a
+fresh, empty file in the build directory, at a path that changes per run, and
+the file is removed once the run ends. Quote the variable, since the build
+directory may contain spaces.
+
 Each line must reference a file rooted in `$PREFIX`:
 
 - an absolute path under `$PREFIX`, or
@@ -106,8 +111,8 @@ Each line must reference a file rooted in `$PREFIX`:
 
 Empty lines are ignored. Paths that escape the prefix or do not exist on disk
 cause the build to fail. The file is appendable, so
-`echo path >> $RATTLER_BUILD_PACKAGE_FILES` works correctly across multiple
-script invocations. If the file is empty or never created, rattler-build
+`echo path >> "$RATTLER_BUILD_PACKAGE_FILES"` works correctly across multiple
+script invocations. If the script leaves the file empty, rattler-build
 falls back to the default behavior.
 
 ```bash title="build.sh"
@@ -116,9 +121,9 @@ echo "hello" > $PREFIX/bin/included.sh
 echo "hello" > $PREFIX/bin/excluded.sh
 
 # Only `included.sh` will end up in the package.
-echo "$PREFIX/bin/included.sh" >> $RATTLER_BUILD_PACKAGE_FILES
+echo "$PREFIX/bin/included.sh" >> "$RATTLER_BUILD_PACKAGE_FILES"
 # Relative paths are also supported (resolved against $PREFIX):
-# echo "bin/included.sh" >> $RATTLER_BUILD_PACKAGE_FILES
+# echo "bin/included.sh" >> "$RATTLER_BUILD_PACKAGE_FILES"
 ```
 
 ```batch title="build.bat"
@@ -127,7 +132,7 @@ echo hello > %PREFIX%\bin\included.txt
 echo hello > %PREFIX%\bin\excluded.txt
 
 @rem Only `included.txt` will end up in the package.
-echo %PREFIX%\bin\included.txt >> %RATTLER_BUILD_PACKAGE_FILES%
+echo %PREFIX%\bin\included.txt >> "%RATTLER_BUILD_PACKAGE_FILES%"
 ```
 
 ## Merge build and host environments

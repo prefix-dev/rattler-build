@@ -113,13 +113,6 @@ pub struct ExecutionDirectories {
     pub recipe_dir: PathBuf,
 }
 
-impl ExecutionDirectories {
-    /// Path to the file a build script may use to override packaged files.
-    pub fn package_files_list_path(&self) -> PathBuf {
-        self.build_dir.join(crate::consts::PACKAGE_FILES_LIST_NAME)
-    }
-}
-
 /// Host prefix directory under `build_dir` for the given platform. Windows
 /// uses the short `h_env`; other platforms pad `host_env` with `_placehold`
 /// repetitions so the absolute prefix path is 255 characters long.
@@ -235,14 +228,6 @@ impl Directories {
         }
 
         Ok(directories)
-    }
-
-    /// Path to the file pointed at by the `RATTLER_BUILD_PACKAGE_FILES`
-    /// environment variable. Build scripts may write paths to this file (one
-    /// per line) to override the default mechanism that determines which files
-    /// end up in the final package.
-    pub fn package_files_list_path(&self) -> PathBuf {
-        self.build_dir.join(crate::consts::PACKAGE_FILES_LIST_NAME)
     }
 
     /// The mounts a build or staging script session needs: the build
@@ -429,10 +414,6 @@ mod tests {
         assert_eq!(execution.work_dir, directories.work_dir);
         assert_eq!(execution.build_dir, directories.build_dir);
         assert_eq!(execution.recipe_dir, directories.recipe_dir);
-        assert_eq!(
-            execution.package_files_list_path(),
-            directories.package_files_list_path()
-        );
     }
 
     /// Every layout keeps the prefixes and the work directory under the build

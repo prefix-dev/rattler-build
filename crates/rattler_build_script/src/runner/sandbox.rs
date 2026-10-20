@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use rattler_conda_types::Subdir;
 
 use super::{
-    ExecSpec, ExecStatus, GuestInfo, GuestPath, LocalRunner, Mounts, OutputSink, Runner,
+    ExecOutcome, ExecSpec, GuestInfo, GuestPath, LocalRunner, Mounts, OutputSink, Runner,
     RunnerError, Session, SessionSpec,
 };
 use crate::{RuntimeEnv, SandboxConfiguration};
@@ -28,7 +28,10 @@ const SANDBOX_INSTALL_HINT: &str = "pixi global install rattler-sandbox";
 /// session's [`Mount`]s: a writable mount grants read, write, and execute
 /// access, a read-only mount grants read access. The sandbox exposes host
 /// paths unchanged, so every mount has to be mirrored (host path equal to
-/// guest path) and is granted by its host path.
+/// guest path) and is granted by its host path. The directory the inner
+/// session keeps its channel files in (see [`ExecSpec::channels`]) is granted
+/// read and write access as well, since the static policy need not cover the
+/// temporary directory.
 ///
 /// Process execution, output streaming, and executable lookup are delegated
 /// to a [`LocalRunner`] with the same [`RuntimeEnv`]. A runner only exists
@@ -90,11 +93,13 @@ fn locate_sandbox(runtime: &RuntimeEnv) -> Result<PathBuf, RunnerError> {
 }
 
 /// The arguments placed in front of every command: the sandbox executable, the
-/// static policy, and the access derived from `mounts`.
+/// static policy, the access derived from `mounts`, and write access to
+/// `channel_dir`.
 fn sandbox_argv_prefix(
     executable: &Path,
     configuration: &SandboxConfiguration,
     mounts: &Mounts,
+    channel_dir: &Path,
 ) -> Vec<String> {
     let mut argv = vec![executable.to_string_lossy().into_owned()];
     argv.extend(configuration.to_args());
@@ -110,6 +115,8 @@ fn sandbox_argv_prefix(
             argv.push(path);
         }
     }
+    argv.push("--fs-write-and-read".to_string());
+    argv.push(channel_dir.to_string_lossy().into_owned());
     argv
 }
 
@@ -134,11 +141,23 @@ impl Runner for SandboxRunner {
 
     async fn start_session(&self, spec: SessionSpec) -> Result<Box<dyn Session>, RunnerError> {
         spec.mounts.require_mirrored(SANDBOX_RUNNER_NAME)?;
-        let argv_prefix = sandbox_argv_prefix(&self.executable, &self.configuration, &spec.mounts);
+        let inner = self.local.start_local_session(spec)?;
+        let argv_prefix = sandbox_argv_prefix(
+            &self.executable,
+            &self.configuration,
+            &inner.spec().mounts,
+            inner.channel_dir(),
+        );
         tracing::info!("{}", self.configuration);
-        tracing::debug!(mounts = ?spec.mounts, "Granting the session mounts to the sandbox");
-        let inner = self.local.start_session(spec).await?;
-        Ok(Box::new(SandboxSession { argv_prefix, inner }))
+        tracing::debug!(
+            mounts = ?inner.spec().mounts,
+            channel_dir = %inner.channel_dir().display(),
+            "Granting the session mounts and the channel directory to the sandbox"
+        );
+        Ok(Box::new(SandboxSession {
+            argv_prefix,
+            inner: Box::new(inner),
+        }))
     }
 }
 
@@ -170,12 +189,12 @@ impl Session for SandboxSession {
         &mut self,
         spec: ExecSpec,
         sink: &mut dyn OutputSink,
-    ) -> Result<ExecStatus, RunnerError> {
+    ) -> Result<ExecOutcome, RunnerError> {
         let spec = self.confine(spec)?;
         self.inner.exec(spec, sink).await
     }
 
-    async fn exec_interactive(&mut self, spec: ExecSpec) -> Result<ExecStatus, RunnerError> {
+    async fn exec_interactive(&mut self, spec: ExecSpec) -> Result<ExecOutcome, RunnerError> {
         let spec = self.confine(spec)?;
         self.inner.exec_interactive(spec).await
     }
@@ -197,8 +216,9 @@ mod tests {
 
     use super::*;
     use crate::execution::{BuildScriptSection, ExecutionArgs, ResolvedScriptContents, run_script};
+    use crate::runner::local::SESSION_DIRECTORY_PREFIX;
     use crate::runner::test_support::VecSink;
-    use crate::runner::{HostPath, Mount, OutputStream};
+    use crate::runner::{ExecStatus, HostPath, Mount, OutputStream};
     use crate::sandbox::SandboxArguments;
     use crate::{EnvironmentIsolation, ExecutionContext, InterpreterError};
 
@@ -227,6 +247,7 @@ mod tests {
             mounts,
             image: None,
             work_dir: GuestPath(PathBuf::from("/builds/pkg/work")),
+            scratch_dir: GuestPath(PathBuf::from("/builds/pkg")),
             env_isolation: EnvironmentIsolation::Strict,
         }
     }
@@ -238,13 +259,36 @@ mod tests {
             argv,
             cwd: GuestPath(PathBuf::from("/builds/pkg/work")),
             env,
+            channels: vec!["RB_SANDBOX_CHANNEL".to_string()],
         }
     }
 
-    /// A [`Session`] that records the specs it receives.
+    /// The channel directory of the inner session in the tests that build
+    /// the argv prefix by hand.
+    fn channel_dir() -> PathBuf {
+        PathBuf::from("/tmp/rattler-build-channels-test")
+    }
+
+    /// A [`Session`] that records the specs it receives and answers every
+    /// declared channel with its name.
     #[derive(Default)]
     struct RecordingSession {
         execs: Arc<Mutex<Vec<ExecSpec>>>,
+    }
+
+    impl RecordingSession {
+        fn outcome(&self, spec: ExecSpec, code: i32) -> ExecOutcome {
+            let channels = spec
+                .channels
+                .iter()
+                .map(|name| (name.clone(), name.clone().into_bytes()))
+                .collect();
+            self.execs.lock().unwrap().push(spec);
+            ExecOutcome {
+                status: ExecStatus { code: Some(code) },
+                channels,
+            }
+        }
     }
 
     #[async_trait]
@@ -253,15 +297,13 @@ mod tests {
             &mut self,
             spec: ExecSpec,
             sink: &mut dyn OutputSink,
-        ) -> Result<ExecStatus, RunnerError> {
-            self.execs.lock().unwrap().push(spec);
+        ) -> Result<ExecOutcome, RunnerError> {
             sink.line(OutputStream::Stdout, "confined");
-            Ok(ExecStatus { code: Some(0) })
+            Ok(self.outcome(spec, 0))
         }
 
-        async fn exec_interactive(&mut self, spec: ExecSpec) -> Result<ExecStatus, RunnerError> {
-            self.execs.lock().unwrap().push(spec);
-            Ok(ExecStatus { code: Some(3) })
+        async fn exec_interactive(&mut self, spec: ExecSpec) -> Result<ExecOutcome, RunnerError> {
+            Ok(self.outcome(spec, 3))
         }
 
         async fn find_executable(
@@ -341,14 +383,17 @@ mod tests {
             secrets: IndexMap::new(),
             context: ExecutionContext::shared(runtime, prefix, Subdir::Linux64, Subdir::Linux64),
             work_dir,
+            scratch_dir: build_dir.to_path_buf(),
             mounts: Mounts::new().writable(build_dir).read_only(recipe_dir),
             env_isolation: EnvironmentIsolation::None,
+            channels: Vec::new(),
         }
     }
 
     /// Every command of the session is prefixed with the sandbox executable,
-    /// the static policy, and the mount grants, in that order; the rest of
-    /// the spec and the output pass through untouched.
+    /// the static policy, the mount grants, and the write grant for the
+    /// channel directory, in that order; the rest of the spec, the output,
+    /// and the channel contents pass through untouched.
     #[tokio::test]
     async fn sandbox_session_confines_every_command() {
         let recording = RecordingSession::default();
@@ -358,24 +403,31 @@ mod tests {
                 Path::new("/usr/bin/rattler-sandbox"),
                 &configuration(),
                 &mounts(),
+                &channel_dir(),
             ),
             inner: Box::new(recording),
         };
         let mut sink = VecSink::default();
         let command = vec!["bash".to_string(), "-c".to_string(), "echo".to_string()];
 
-        let status = session
+        let outcome = session
             .exec(exec_spec(command.clone()), &mut sink)
             .await
             .unwrap();
-        let interactive_status = session
+        let interactive_outcome = session
             .exec_interactive(exec_spec(command.clone()))
             .await
             .unwrap();
 
-        assert!(status.success());
-        assert_eq!(interactive_status.code, Some(3));
+        assert!(outcome.status.success());
+        assert_eq!(interactive_outcome.status.code, Some(3));
         assert_eq!(sink.0, vec![(OutputStream::Stdout, "confined".to_string())]);
+        for outcome in [&outcome, &interactive_outcome] {
+            assert_eq!(
+                outcome.channels.get("RB_SANDBOX_CHANNEL"),
+                Some(&b"RB_SANDBOX_CHANNEL".to_vec())
+            );
+        }
         let mut expected_argv = vec![
             "/usr/bin/rattler-sandbox".to_string(),
             "--network".to_string(),
@@ -387,6 +439,8 @@ mod tests {
             "/builds/pkg".to_string(),
             "--fs-read".to_string(),
             "/recipes/pkg".to_string(),
+            "--fs-write-and-read".to_string(),
+            channel_dir().to_string_lossy().into_owned(),
         ];
         expected_argv.extend(command);
         let execs = execs.lock().unwrap();
@@ -398,6 +452,7 @@ mod tests {
                 exec.env.get("RB_SANDBOX_VAR").map(String::as_str),
                 Some("value")
             );
+            assert_eq!(exec.channels, vec!["RB_SANDBOX_CHANNEL".to_string()]);
         }
     }
 
@@ -408,6 +463,7 @@ mod tests {
                 Path::new("/usr/bin/rattler-sandbox"),
                 &configuration(),
                 &Mounts::new(),
+                &channel_dir(),
             ),
             inner: Box::new(RecordingSession::default()),
         };
@@ -495,7 +551,11 @@ mod tests {
         runner.check_usable().await.unwrap();
         assert_eq!(runner.name(), "sandbox");
         assert_eq!(runner.execution_platform(), Subdir::Linux64);
-        assert!(runner.start_session(session_spec(mounts())).await.is_ok());
+        let spec = SessionSpec {
+            scratch_dir: GuestPath(temp_dir.path().to_path_buf()),
+            ..session_spec(mounts())
+        };
+        assert!(runner.start_session(spec).await.is_ok());
     }
 
     /// The executable is looked up again by `check_usable`, so a sandbox
@@ -549,8 +609,9 @@ mod tests {
 
     /// `run_script` through the runner spawns the sandbox executable found on
     /// the runtime `PATH` with the static policy, the grants of the mounts,
-    /// and the wrapper command, and its output reaches the build log with the
-    /// work directory replaced.
+    /// the write grant for the channel directory of the session, and the
+    /// wrapper command, and its output reaches the build log with the work
+    /// directory replaced.
     #[tokio::test]
     async fn sandbox_runner_confines_the_wrapper_of_run_script() {
         let temp_dir = tempfile::tempdir().unwrap();
@@ -563,21 +624,39 @@ mod tests {
         run_script(args, &runner).await.unwrap();
 
         let log = fs_err::read_to_string(build_dir.join("work").join("conda_build.log")).unwrap();
-        let build_dir = build_dir.to_string_lossy().into_owned();
-        let expected = vec![
+        let lines = log.lines().collect::<Vec<_>>();
+        let expected_grants = vec![
             "--network".to_string(),
             "--fs-read".to_string(),
             "/opt/data".to_string(),
             "--fs-write-and-read".to_string(),
-            build_dir.clone(),
+            build_dir.to_string_lossy().into_owned(),
             "--fs-exec-and-read".to_string(),
-            build_dir,
+            build_dir.to_string_lossy().into_owned(),
             "--fs-read".to_string(),
             recipe_dir.to_string_lossy().into_owned(),
+            "--fs-write-and-read".to_string(),
+        ];
+        let expected_command = vec![
             "bash".to_string(),
             format!("$SRC_DIR{}conda_build.sh", std::path::MAIN_SEPARATOR),
         ];
-        assert_eq!(log.lines().collect::<Vec<_>>(), expected);
+        assert_eq!(
+            lines.len(),
+            expected_grants.len() + 1 + expected_command.len()
+        );
+        assert_eq!(lines[..expected_grants.len()], expected_grants);
+        let channel_dir = Path::new(lines[expected_grants.len()]);
+        assert_eq!(channel_dir.parent(), Some(build_dir.as_path()));
+        assert!(
+            channel_dir
+                .file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.starts_with(SESSION_DIRECTORY_PREFIX)),
+            "unexpected channel directory grant: {}",
+            channel_dir.display()
+        );
+        assert_eq!(lines[expected_grants.len() + 1..], expected_command);
     }
 
     #[test]
