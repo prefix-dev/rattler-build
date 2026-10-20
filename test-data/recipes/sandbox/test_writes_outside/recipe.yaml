@@ -1,0 +1,15 @@
+context:
+  outside: ${{ env.get("RATTLER_BUILD_TEST_OUTSIDE") }}
+
+package:
+  name: sandbox-test-writes-outside
+  version: 1.0.0
+
+build:
+  noarch: generic
+  script:
+    - echo inside > "$PREFIX/inside.txt"
+
+tests:
+  - script:
+      - echo outside > "${{ outside }}/test-marker.txt"
