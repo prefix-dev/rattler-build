@@ -22,6 +22,7 @@ use rattler_conda_types::Subdir;
 use rattler_shell::activation::prefix_path_entries;
 
 use crate::ExecutionContext;
+use crate::runner::RunnerError;
 
 /// Describes interpreter execution and lookup errors.
 #[derive(Debug, thiserror::Error)]
@@ -42,6 +43,16 @@ pub enum InterpreterError {
     /// does not support (e.g. a typo like `brus` instead of `brush`).
     #[error("unsupported interpreter '{0}'")]
     UnsupportedInterpreter(String),
+}
+
+/// A runner failure while starting a session or executing the wrapper is a
+/// failed execution; the script itself was not at fault.
+impl From<RunnerError> for InterpreterError {
+    fn from(error: RunnerError) -> Self {
+        match error {
+            RunnerError::Io(error) => Self::ExecutionFailed(error),
+        }
+    }
 }
 
 /// Constructs the invocation behavior for a supported interpreter.

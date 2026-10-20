@@ -247,7 +247,7 @@ impl Output {
                 tool_configuration.jobserver.as_ref(),
                 plan_script_env(&self.recipe.build().plan),
             );
-            rattler_build_script::run_script(exec_args).await?;
+            rattler_build_script::run_script(exec_args, tool_configuration.runner.as_ref()).await?;
 
             Ok(())
         }

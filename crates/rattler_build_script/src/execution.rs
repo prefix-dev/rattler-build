@@ -1,11 +1,16 @@
 //! Script execution types and utilities.
 //!
 //! This module resolves script contents, generates build scripts with
-//! [`generate_build_script`], and executes them with [`run_script`]. Process
-//! output is streamed by [`run_process_with_replacements`] into the sinks from
-//! [`crate::runner`].
+//! [`generate_build_script`], and executes them with [`run_script`]. The
+//! generated wrapper runs inside a [`crate::runner::Session`] of the configured
+//! [`Runner`], with its output streamed through the sinks from [`crate::runner`].
+//! Sandboxed runs are the exception: [`run_process_with_replacements`] spawns
+//! `rattler-sandbox` on the host directly.
 
-use crate::runner::{BuildLogSink, OutputSink, OutputStream, ReplacingSink, resolve_process_env};
+use crate::runner::{
+    BuildLogSink, ExecSpec, ExecStatus, GuestPath, OutputSink, OutputStream, ReplacingSink, Runner,
+    SessionSpec, resolve_process_env,
+};
 use crate::sandbox::SandboxConfiguration;
 use crate::script::{Script, ScriptContent};
 use crate::{execution_context::ExecutionContext, runtime::RuntimeEnv};
@@ -93,7 +98,10 @@ pub struct ExecutionArgs {
     /// The sandbox configuration to use for the script execution
     pub sandbox_config: Option<SandboxConfiguration>,
 
-    /// The environment isolation mode
+    /// The environment isolation mode. It is applied where the wrapper's
+    /// process environment is built: by the runner session when the script
+    /// runs through a [`Runner`] (see [`SessionSpec::env_isolation`]), and by
+    /// [`run_process_with_replacements`]' caller when it runs in a sandbox.
     pub env_isolation: EnvironmentIsolation,
 }
 
@@ -181,7 +189,9 @@ impl Script {
     /// - Sets up environment variables and secrets
     /// - Configures the working directory
     /// - Renders Jinja templates if a renderer is provided
-    /// - Executes the script in the appropriate interpreter
+    /// - Executes the script in the appropriate interpreter through `runner`,
+    ///   whose session applies `env_isolation` when it builds the process
+    ///   environment
     #[allow(clippy::too_many_arguments)]
     pub async fn run_script<F>(
         &self,
@@ -192,6 +202,7 @@ impl Script {
         jinja_renderer: Option<F>,
         sandbox_config: Option<&SandboxConfiguration>,
         env_isolation: EnvironmentIsolation,
+        runner: &dyn Runner,
     ) -> Result<(), crate::InterpreterError>
     where
         F: Fn(&str) -> Result<String, String>,
@@ -246,7 +257,7 @@ impl Script {
             env_isolation,
         };
 
-        crate::execution::run_script(exec_args).await?;
+        crate::execution::run_script(exec_args, runner).await?;
 
         Ok(())
     }
@@ -825,40 +836,92 @@ async fn build_section_body(
     Ok(body)
 }
 
-/// Runs a script with the given execution arguments.
+/// Runs a script with the given execution arguments through `runner`.
 ///
 /// Most callers use [`Script::run_script`], which builds the [`ExecutionArgs`]
 /// from a single script. This lower-level entry point runs a pre-built
 /// `ExecutionArgs` directly and is used when composing multiple sections.
-pub async fn run_script(exec_args: ExecutionArgs) -> Result<(), crate::InterpreterError> {
+///
+/// The generated wrapper executes in a session started on `runner` with
+/// [`ExecutionArgs::env_isolation`] as the session's isolation mode. The
+/// session receives the build variables followed by the secrets, so a secret
+/// overrides a build variable of the same name, and applies them on top of the
+/// environment the mode starts from. When a sandbox is configured and the
+/// platform supports it, the wrapper is spawned on the host inside
+/// `rattler-sandbox` instead, with the same isolation mode resolved here.
+/// Either way, output is rewritten by [`ReplacingSink`] and recorded by
+/// [`BuildLogSink`] in `conda_build.log`.
+pub async fn run_script(
+    exec_args: ExecutionArgs,
+    runner: &dyn Runner,
+) -> Result<(), crate::InterpreterError> {
     let dialect =
         crate::shell_dialect::shell_dialect(exec_args.context.runtime().process_platform());
     let build_script_path = generate_build_script(&exec_args).await?;
     let command_spec = dialect.command_to_run_script(&build_script_path, &exec_args.context);
+    let sandbox_config = if dialect.supports_sandbox() {
+        exec_args.sandbox_config.as_ref()
+    } else {
+        None
+    };
 
-    let process_env = resolve_process_env(
-        exec_args.env_isolation,
-        &exec_args.env_vars,
-        &exec_args.secrets,
-        exec_args.context.runtime(),
-    );
+    let status = if let Some(sandbox_config) = sandbox_config {
+        let process_env = resolve_process_env(
+            exec_args.env_isolation,
+            &exec_args.env_vars,
+            &exec_args.secrets,
+            exec_args.context.runtime(),
+        );
 
-    let output = crate::execution::run_process_with_replacements(
-        &command_spec,
-        &exec_args.work_dir,
-        exec_args.replacements(dialect.replacements_template()),
-        &process_env,
-        if dialect.supports_sandbox() {
-            exec_args.sandbox_config.as_ref()
-        } else {
-            None
-        },
-        exec_args.context.runtime(),
-    )
-    .await?;
+        let output = crate::execution::run_process_with_replacements(
+            &command_spec,
+            &exec_args.work_dir,
+            exec_args.replacements(dialect.replacements_template()),
+            &process_env,
+            Some(sandbox_config),
+            exec_args.context.runtime(),
+        )
+        .await?;
+        ExecStatus::from(output.status)
+    } else {
+        let mut sink = ReplacingSink::new(
+            exec_args.replacements(dialect.replacements_template()),
+            BuildLogSink::open(&exec_args.work_dir.join("conda_build.log"))?,
+        );
+        let mut session = runner
+            .start_session(SessionSpec {
+                // The wrapper was generated for the process platform of the
+                // execution context, so the session has to provide that one.
+                platform: exec_args.context.runtime().process_platform(),
+                // The execution arguments carry no mount information: the
+                // wrapper, the prefixes, and the work directory are addressed
+                // as host paths.
+                mounts: Vec::new(),
+                image: None,
+                work_dir: GuestPath(exec_args.work_dir.clone()),
+                env_isolation: exec_args.env_isolation,
+            })
+            .await?;
 
-    if !output.status.success() {
-        let status_code = output.status.code().unwrap_or(1);
+        let mut env = exec_args.env_vars.clone();
+        env.extend(exec_args.secrets.clone());
+        let mut argv = Vec::with_capacity(command_spec.args.len() + 1);
+        argv.push(command_spec.program);
+        argv.extend(command_spec.args);
+        session
+            .exec(
+                ExecSpec {
+                    argv,
+                    cwd: GuestPath(exec_args.work_dir.clone()),
+                    env,
+                },
+                &mut sink,
+            )
+            .await?
+    };
+
+    if !status.success() {
+        let status_code = status.code.unwrap_or(1);
         let debug_info = dialect.debug_info(&exec_args.work_dir, &exec_args.context);
         tracing::error!("Script failed with status {}", status_code);
         tracing::error!("{}", debug_info);
@@ -988,7 +1051,10 @@ pub(crate) async fn run_process_with_replacements(
 mod tests {
     use super::*;
     use crate::ExecutionContext;
+    use crate::runner::{GuestInfo, LocalRunner, RunnerError, Session};
+    use async_trait::async_trait;
     use rattler_conda_types::Subdir;
+    use std::sync::{Arc, Mutex};
     use tokio_util::bytes::BytesMut;
 
     /// `CONDA_BUILD=1` must live inside the sourced activation script so that
@@ -1415,6 +1481,284 @@ mod tests {
         }
     }
 
+    /// The specs a [`RecordingRunner`] session received.
+    #[derive(Default, Clone)]
+    struct RecordedSpecs {
+        session: Option<SessionSpec>,
+        exec: Option<ExecSpec>,
+    }
+
+    /// A [`Runner`] whose session records the specs it receives and replays
+    /// fixed output lines into the sink, so the session path of [`run_script`]
+    /// can be observed without spawning a process.
+    struct RecordingRunner {
+        status: ExecStatus,
+        output: Vec<(OutputStream, String)>,
+        recorded: Arc<Mutex<RecordedSpecs>>,
+    }
+
+    impl RecordingRunner {
+        fn new(status: ExecStatus, output: Vec<(OutputStream, String)>) -> Self {
+            Self {
+                status,
+                output,
+                recorded: Arc::default(),
+            }
+        }
+
+        fn recorded(&self) -> RecordedSpecs {
+            self.recorded.lock().unwrap().clone()
+        }
+    }
+
+    #[async_trait]
+    impl Runner for RecordingRunner {
+        fn name(&self) -> &str {
+            "recording"
+        }
+
+        fn execution_platform(&self) -> Subdir {
+            Subdir::current().unwrap()
+        }
+
+        async fn check_usable(&self) -> Result<(), RunnerError> {
+            Ok(())
+        }
+
+        async fn probe(&self) -> Result<GuestInfo, RunnerError> {
+            Ok(GuestInfo {
+                platform: self.execution_platform(),
+            })
+        }
+
+        async fn start_session(&self, spec: SessionSpec) -> Result<Box<dyn Session>, RunnerError> {
+            self.recorded.lock().unwrap().session = Some(spec);
+            Ok(Box::new(RecordingSession {
+                status: self.status,
+                output: self.output.clone(),
+                recorded: Arc::clone(&self.recorded),
+            }))
+        }
+    }
+
+    struct RecordingSession {
+        status: ExecStatus,
+        output: Vec<(OutputStream, String)>,
+        recorded: Arc<Mutex<RecordedSpecs>>,
+    }
+
+    #[async_trait]
+    impl Session for RecordingSession {
+        async fn exec(
+            &mut self,
+            spec: ExecSpec,
+            sink: &mut dyn OutputSink,
+        ) -> Result<ExecStatus, RunnerError> {
+            self.recorded.lock().unwrap().exec = Some(spec);
+            for (stream, line) in &self.output {
+                sink.line(*stream, line);
+            }
+            Ok(self.status)
+        }
+
+        async fn exec_interactive(&mut self, _spec: ExecSpec) -> Result<ExecStatus, RunnerError> {
+            Ok(self.status)
+        }
+
+        async fn find_executable(
+            &mut self,
+            _names: &[String],
+            _search_paths: &[GuestPath],
+        ) -> Result<Option<GuestPath>, RunnerError> {
+            Ok(None)
+        }
+    }
+
+    /// Without a sandbox the wrapper runs in a session of the runner: the
+    /// session is started for the work directory on the wrapper's platform,
+    /// receives the dialect's wrapper command with the build variables and the
+    /// secrets layered on top, and its output reaches the build log with the
+    /// prefix replaced and secrets masked.
+    #[tokio::test]
+    async fn test_run_script_executes_wrapper_through_session() {
+        let tmp = tempfile::tempdir().unwrap();
+        let work_dir = tmp.path().join("work");
+        let prefix = tmp.path().join("prefix");
+        fs::create_dir_all(&work_dir).unwrap();
+        fs::create_dir_all(&prefix).unwrap();
+        let mut args = execution_args(
+            work_dir.clone(),
+            prefix.clone(),
+            ResolvedScriptContents::Inline("echo hello".to_string()),
+            None,
+        );
+        args.env_vars
+            .insert("RB_BUILD_VAR".to_string(), "build-value".to_string());
+        args.env_vars
+            .insert("RB_SHARED".to_string(), "from-build-var".to_string());
+        args.secrets
+            .insert("RB_SHARED".to_string(), "from-secret".to_string());
+        args.secrets
+            .insert("RB_SECRET".to_string(), "hunter2".to_string());
+        args.env_isolation = EnvironmentIsolation::CondaBuild;
+        let context = args.context.clone();
+        let runner = RecordingRunner::new(
+            ExecStatus { code: Some(0) },
+            vec![
+                (
+                    OutputStream::Stdout,
+                    format!("installing into {}", prefix.display()),
+                ),
+                (OutputStream::Stderr, "token hunter2".to_string()),
+            ],
+        );
+
+        run_script(args, &runner).await.unwrap();
+
+        let recorded = runner.recorded();
+        let session = recorded.session.expect("a session was started");
+        assert_eq!(session.platform, context.runtime().process_platform());
+        assert_eq!(session.work_dir, GuestPath(work_dir.clone()));
+        assert!(session.mounts.is_empty());
+        assert_eq!(session.image, None);
+        assert_eq!(session.env_isolation, EnvironmentIsolation::CondaBuild);
+
+        let dialect = crate::shell_dialect::shell_dialect(context.runtime().process_platform());
+        let wrapper = work_dir.join(format!("conda_build.{}", dialect.shell().extension()));
+        let expected_command = dialect.command_to_run_script(&wrapper, &context);
+        let mut expected_argv = vec![expected_command.program];
+        expected_argv.extend(expected_command.args);
+        let exec = recorded.exec.expect("the wrapper was executed");
+        assert_eq!(exec.argv, expected_argv);
+        assert_eq!(exec.cwd, GuestPath(work_dir.clone()));
+        assert_eq!(
+            exec.env.get("RB_BUILD_VAR").map(String::as_str),
+            Some("build-value")
+        );
+        assert_eq!(
+            exec.env.get("RB_SECRET").map(String::as_str),
+            Some("hunter2")
+        );
+        assert_eq!(
+            exec.env.get("RB_SHARED").map(String::as_str),
+            Some("from-secret")
+        );
+
+        let prefix_placeholder = dialect.replacements_template().replace("((var))", "PREFIX");
+        assert_eq!(
+            fs::read_to_string(work_dir.join("conda_build.log")).unwrap(),
+            format!("installing into {prefix_placeholder}\ntoken ********\n")
+        );
+    }
+
+    /// A failing session status is reported like a failing process, and a
+    /// termination without an exit code counts as status 1.
+    #[tokio::test]
+    async fn test_run_script_reports_failing_session_status() {
+        for (code, expected_status) in [(Some(3), 3), (None, 1)] {
+            let tmp = tempfile::tempdir().unwrap();
+            let prefix = tmp.path().join("prefix");
+            fs::create_dir_all(&prefix).unwrap();
+            let args = execution_args(
+                tmp.path().to_path_buf(),
+                prefix,
+                ResolvedScriptContents::Inline("exit 3".to_string()),
+                None,
+            );
+            let runner = RecordingRunner::new(ExecStatus { code }, Vec::new());
+
+            let error = run_script(args, &runner).await.unwrap_err();
+
+            assert!(
+                matches!(error, crate::InterpreterError::ExecutionFailed(_)),
+                "unexpected error: {error:?}"
+            );
+            assert!(
+                error
+                    .to_string()
+                    .contains(&format!("Script failed with status {expected_status}")),
+                "unexpected error: {error}"
+            );
+        }
+    }
+
+    /// When the build log cannot be opened, no session is started.
+    #[tokio::test]
+    async fn test_run_script_fails_before_starting_session_without_log() {
+        let tmp = tempfile::tempdir().unwrap();
+        let prefix = tmp.path().join("prefix");
+        fs::create_dir_all(&prefix).unwrap();
+        // A directory in the way of the log file makes opening it fail.
+        fs::create_dir(tmp.path().join("conda_build.log")).unwrap();
+        let args = execution_args(
+            tmp.path().to_path_buf(),
+            prefix,
+            ResolvedScriptContents::Inline("echo hello".to_string()),
+            None,
+        );
+        let runner = RecordingRunner::new(ExecStatus { code: Some(0) }, Vec::new());
+
+        let error = run_script(args, &runner).await.unwrap_err();
+
+        assert!(
+            matches!(error, crate::InterpreterError::ExecutionFailed(_)),
+            "unexpected error: {error:?}"
+        );
+        assert!(
+            runner.recorded().session.is_none(),
+            "no session must be started when the log cannot be opened"
+        );
+    }
+
+    /// A [`LocalRunner`] session started with the strict isolation of the
+    /// execution arguments: a host variable injected into the runtime does not
+    /// reach the wrapper, while a secret does reach it and is masked in
+    /// `conda_build.log`. The host vars are injected through `RuntimeEnv`, so
+    /// the test does not touch the real process environment; `PATH` is
+    /// forwarded so the shell can be found.
+    #[tokio::test]
+    async fn test_run_script_strict_session_hides_host_env_and_masks_secret() {
+        let tmp = tempfile::tempdir().unwrap();
+        let work_dir = tmp.path().join("work");
+        let prefix = tmp.path().join("prefix");
+        fs::create_dir_all(&work_dir).unwrap();
+        fs::create_dir_all(&prefix).unwrap();
+        let platform = Subdir::current().unwrap();
+        let runtime = RuntimeEnv::for_test(platform)
+            .with_var("PATH", std::env::var("PATH").unwrap_or_default())
+            .with_var("RB_HOST_CANARY", "leak");
+        let script = if platform.is_windows() {
+            "echo CANARY=%RB_HOST_CANARY%\necho SECRET=%RB_SECRET%"
+        } else {
+            "echo \"CANARY=$RB_HOST_CANARY\"\necho \"SECRET=$RB_SECRET\""
+        };
+        let mut args = execution_args(
+            work_dir.clone(),
+            prefix.clone(),
+            ResolvedScriptContents::Inline(script.to_string()),
+            None,
+        );
+        args.context = ExecutionContext::shared(runtime.clone(), prefix, platform, platform);
+        args.env_isolation = EnvironmentIsolation::Strict;
+        args.secrets
+            .insert("RB_SECRET".to_string(), "hunter2".to_string());
+        let runner = LocalRunner::new().with_runtime(runtime);
+
+        run_script(args, &runner).await.unwrap();
+
+        let log = fs::read_to_string(work_dir.join("conda_build.log")).unwrap();
+        assert!(
+            log.lines().any(|line| line == "CANARY="),
+            "host variable must not reach the script in strict mode:\n{log}"
+        );
+        assert!(
+            log.lines().any(|line| line == "SECRET=********"),
+            "secret must reach the script and be masked in the log:\n{log}"
+        );
+        assert!(!log.contains("leak"), "host variable leaked:\n{log}");
+        assert!(!log.contains("hunter2"), "secret value leaked:\n{log}");
+    }
+
     /// In Strict mode the subprocess env is cleared, only the passthrough
     /// whitelist is forwarded from the host, and explicit env_vars + secrets are
     /// applied on top. The host vars are injected through `RuntimeEnv`, so the
@@ -1462,6 +1806,8 @@ mod tests {
         );
     }
 
+    /// None mode starts from the injected runtime environment; explicit build
+    /// variables override it and declared secrets override both.
     #[test]
     fn test_none_env_uses_injected_runtime_with_explicit_overrides() {
         let runtime = RuntimeEnv::for_test(Subdir::Linux64)
@@ -1470,8 +1816,10 @@ mod tests {
         let mut env_vars = IndexMap::new();
         env_vars.insert("OVERLAY".to_string(), "explicit".to_string());
         env_vars.insert("EXPLICIT_ONLY".to_string(), "explicit".to_string());
+        env_vars.insert("SHARED".to_string(), "explicit".to_string());
         let mut secrets = IndexMap::new();
         secrets.insert("SECRET_ONLY".to_string(), "secret".to_string());
+        secrets.insert("SHARED".to_string(), "secret".to_string());
 
         let process_env =
             resolve_process_env(EnvironmentIsolation::None, &env_vars, &secrets, &runtime);
@@ -1488,9 +1836,14 @@ mod tests {
             process_env.get("EXPLICIT_ONLY").map(String::as_str),
             Some("explicit")
         );
-        assert!(
-            !process_env.contains_key("SECRET_ONLY"),
-            "None mode relies on secrets captured in RuntimeEnv"
+        assert_eq!(
+            process_env.get("SECRET_ONLY").map(String::as_str),
+            Some("secret")
+        );
+        assert_eq!(
+            process_env.get("SHARED").map(String::as_str),
+            Some("secret"),
+            "a declared secret wins over a build variable of the same name"
         );
     }
 
@@ -2154,8 +2507,9 @@ endlocal & if %RB_SECTION_ERRORLEVEL% neq 0 exit /b %RB_SECTION_ERRORLEVEL%
             ],
             ..base
         };
+        let runner = LocalRunner::new().with_runtime(RuntimeEnv::for_test(Subdir::Win64));
 
-        run_script(args).await.unwrap();
+        run_script(args, &runner).await.unwrap();
 
         assert!(
             tmp.path().join("marker.txt").exists(),
