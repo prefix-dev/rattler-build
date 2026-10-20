@@ -2,7 +2,7 @@
 // enable only on linux-64, linux-aarch64, and macos
 use std::{
     fmt::{Display, Formatter},
-    path::{Path, PathBuf},
+    path::PathBuf,
 };
 
 use clap::Parser;
@@ -138,28 +138,6 @@ impl SandboxConfiguration {
         Self {
             allow_network: false,
             read: vec!["/".into()],
-            read_execute,
-            read_write,
-        }
-    }
-
-    /// Add the current working directory to the list of allowed paths
-    /// Adds the parent directory of the current working directory to the list of allowed paths
-    /// for read_execute and read_write
-    pub fn with_cwd(&self, cwd: &Path) -> Self {
-        let mut read_execute = self.read_execute.clone();
-        if let Some(parent) = cwd.parent() {
-            read_execute.push(parent.to_path_buf());
-        }
-
-        let mut read_write = self.read_write.clone();
-        if let Some(parent) = cwd.parent() {
-            read_write.push(parent.to_path_buf());
-        }
-
-        Self {
-            allow_network: self.allow_network,
-            read: self.read.clone(),
             read_execute,
             read_write,
         }

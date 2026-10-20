@@ -231,7 +231,6 @@ pub(crate) fn output_from_rendered_variant(
             force_colors: false,
             experimental: rendered_variant.inner.experimental,
             env_isolation,
-            sandbox_config: None,
             exclude_newer,
             repodata_revision: repodata_revision.into(),
         },
