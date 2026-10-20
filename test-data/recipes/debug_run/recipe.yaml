@@ -1,0 +1,17 @@
+package:
+  name: debug-run
+  version: 1.0.0
+
+build:
+  # Prints where it runs, fails with exit code 3 when `$PREFIX/fail` exists,
+  # and otherwise leaves a file in the host prefix.
+  script:
+    - if: unix
+      then:
+        - echo "running in $PWD"
+        - if [ -f "$PREFIX/fail" ]; then exit 3; fi
+        - echo "hello from debug run" > "$PREFIX/hello.txt"
+      else:
+        - echo running in %CD%
+        - if exist "%PREFIX%\fail" exit /b 3
+        - echo hello from debug run > "%PREFIX%\hello.txt"
