@@ -1,0 +1,45 @@
+context:
+  version: "1.34.56"
+
+package:
+  name: botocore
+  version: ${{ version }}
+
+source:
+  url: https://pypi.org/packages/source/b/botocore/botocore-${{ version }}.tar.gz
+  sha256: bffeb71ab21d47d4ecf947d9bdb2fbd1b0bbd0c27742cea7cf0b77b701c41d9f
+
+build:
+  number: 0
+  noarch: python
+  string: ${{ "pyge310" if python_geq_310 else "pyge38" }}_${{ hash }}_${{ build_number }} # (1)!
+  script: python -m pip install . --no-deps --no-build-isolation -vv
+
+requirements:
+  host:
+    - if: python_geq_310 # (2)!
+      then: python >=3.10
+      else: python >=3.8
+    - pip
+  run:
+    - if: python_geq_310
+      then:
+        - python >=3.10
+        - urllib3 >=1.25.4,<2.1 # (3)!
+      else:
+        - python >=3.8
+        - urllib3 >=1.25.4,<1.27
+    - jmespath >=0.7.1,<2.0.0
+    - python-dateutil >=2.1,<3.0.0
+
+tests:
+  - python:
+      imports:
+        - botocore
+      pip_check: true
+
+about:
+  homepage: https://aws.amazon.com/sdk-for-python/
+  summary: Low-level, data-driven core of boto 3
+  license: Apache-2.0
+  license_file: LICENSE.txt

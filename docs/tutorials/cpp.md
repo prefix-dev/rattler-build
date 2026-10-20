@@ -52,6 +52,75 @@ But which the package doesn't depend on itself.
 
     For more information please refer to the [conda-forge documentation](https://conda-forge.org/docs/maintainer/knowledge_base/#how-to-enable-cross-compilation).
 
+## Building a header-only library as `noarch: generic`
+
+The `xtensor` recipe above builds one package per platform, even though a
+header-only library contains no compiled code and the packaged files are
+identical on every architecture. To avoid rebuilding the same headers over and
+over, you can package a header-only library as a single, architecture-independent
+[`noarch: generic`](../reference/recipe_file.md#architecture-independent-packages)
+package instead.
+
+There is one wrinkle: the install layout differs between operating systems.
+On Unix systems, headers live in `$PREFIX/include`, while on Windows they are
+expected in `%PREFIX%\Library\include` (i.e. `%LIBRARY_PREFIX%\include`).
+A single `noarch` package cannot place its files in two different locations,
+so the trick is to build *two* flavors of the `noarch: generic` package:
+
+1. One built on Linux or macOS, with the headers in `include/`.
+2. One built on Windows, with the headers in `Library/include/`.
+
+Both flavors share the same package name and version. To make sure that the
+solver installs the correct flavor on each operating system, each flavor
+depends on a *virtual package*: the Unix flavor requires `__unix`, and the
+Windows flavor requires `__win`. Virtual packages are automatically provided by
+the installer based on the running system, so the Windows flavor is simply not
+installable on Unix systems and vice versa.
+
+The following recipe packages the headers of [`ml_dtypes`](https://github.com/jax-ml/ml_dtypes)
+and is based on conda-forge's [`libml_dtypes-headers` feedstock](https://github.com/conda-forge/libml_dtypes-headers-feedstock):
+
+```yaml title="recipe.yaml"
+--8<-- "docs/snippets/recipes/libml-dtypes-headers.yaml"
+```
+
+1. `noarch: generic` makes this a single architecture-independent package that
+   ends up in the `noarch` subdirectory of the channel and can be installed on
+   any platform.
+2. The `if: unix` selector is evaluated for the platform the package is built
+   on, so the build script copies the headers to the correct location for each
+   flavor.
+3. The virtual package (`__unix` or `__win`) restricts on which operating
+   systems this flavor of the package can be installed.
+4. The `package_contents` test checks the correct (platform-dependent) location
+   of the installed headers.
+
+To create both flavors, run `rattler-build` once on a Unix machine and once on
+a Windows machine (for example, in two CI jobs):
+
+```bash
+rattler-build build --recipe ./recipe.yaml
+```
+
+Even though both flavors have the same name and version, they do not clash:
+the `__unix` / `__win` virtual package requirement becomes part of the build
+variant, so each flavor automatically gets a distinct build string hash:
+
+```txt
+noarch/libml_dtypes-headers-0.5.4-h5600cae_0.conda  (depends on __unix)
+noarch/libml_dtypes-headers-0.5.4-h061c3d5_0.conda  (depends on __win)
+```
+
+!!! note "On conda-forge"
+    On conda-forge, this pattern is enabled by setting `noarch_platforms` in
+    the `conda-forge.yml` of the feedstock:
+
+    ```yaml title="conda-forge.yml"
+    noarch_platforms:
+      - linux_64
+      - win_64
+    ```
+
 ## Building A C++ application
 
 In this example, we'll build `poppler`, a C++ application for manipulating PDF files from the command line.
