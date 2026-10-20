@@ -495,7 +495,10 @@ fn open_debug_shell_exec(work_dir: &Path, directories_json: Option<serde_json::V
 }
 
 /// The command that runs `conda_build.bat` through `cmd.exe`, echoing every
-/// command when `trace` is set.
+/// command when `trace` is set. The script is named with an explicit `.\`
+/// so `cmd.exe` opens it from the work directory instead of searching
+/// `PATH`, which skips the current directory when
+/// `NoDefaultCurrentDirectoryInExePath` is set.
 #[cfg(windows)]
 fn build_script_exec(work_dir: &Path, trace: bool) -> std::io::Result<ExecSpec> {
     require_file(work_dir, "conda_build.bat")?;
@@ -503,9 +506,9 @@ fn build_script_exec(work_dir: &Path, trace: bool) -> std::io::Result<ExecSpec> 
     let comspec = std::env::var("COMSPEC").unwrap_or_else(|_| "cmd.exe".to_string());
 
     let script = if trace {
-        "@echo on && conda_build.bat"
+        r"@echo on && .\conda_build.bat"
     } else {
-        "conda_build.bat"
+        r".\conda_build.bat"
     };
 
     Ok(shell_exec(
@@ -647,10 +650,7 @@ mod tests {
     use std::sync::{Arc, Mutex};
 
     use async_trait::async_trait;
-    use rattler_build_script::{
-        RuntimeEnv,
-        runner::{GuestInfo, LocalRunner, Session},
-    };
+    use rattler_build_script::runner::{GuestInfo, LocalRunner, Session};
     use rattler_conda_types::Subdir;
 
     use super::*;
@@ -833,9 +833,9 @@ mod tests {
     #[cfg(windows)]
     fn expected_build_script_argv(_work_dir: &Path, trace: bool) -> Vec<String> {
         let script = if trace {
-            "@echo on && conda_build.bat"
+            r"@echo on && .\conda_build.bat"
         } else {
-            "conda_build.bat"
+            r".\conda_build.bat"
         };
         vec![
             std::env::var("COMSPEC").unwrap_or_else(|_| "cmd.exe".to_string()),
@@ -998,7 +998,7 @@ mod tests {
         #[cfg(windows)]
         let script = "@echo off\r\necho out\r\n1>&2 echo err\r\nexit /b 3\r\n";
         let work_dir = work_dir_with_scripts(temp_dir.path(), script);
-        let runner = LocalRunner::new().with_runtime(runtime_searching_the_current_directory());
+        let runner = LocalRunner::new();
 
         let result = run_build_script(&runner, &work_dir, false).await.unwrap();
 
@@ -1018,7 +1018,7 @@ mod tests {
         #[cfg(windows)]
         let script = "echo out\r\n";
         let work_dir = work_dir_with_scripts(temp_dir.path(), script);
-        let runner = LocalRunner::new().with_runtime(runtime_searching_the_current_directory());
+        let runner = LocalRunner::new();
 
         let result = run_build_script(&runner, &work_dir, true).await.unwrap();
 
@@ -1046,21 +1046,6 @@ mod tests {
             );
             assert_eq!(result.stderr, "");
         }
-    }
-
-    /// The environment of the current process without
-    /// `NoDefaultCurrentDirectoryInExePath`, which stops `cmd.exe` from
-    /// resolving `conda_build.bat` against the work directory when a user has
-    /// it set.
-    fn runtime_searching_the_current_directory() -> RuntimeEnv {
-        let current = RuntimeEnv::current();
-        current
-            .vars()
-            .filter(|(name, _)| !name.eq_ignore_ascii_case("NoDefaultCurrentDirectoryInExePath"))
-            .fold(
-                RuntimeEnv::for_test(current.process_platform()),
-                |runtime, (name, value)| runtime.with_var(name, value),
-            )
     }
 
     #[tokio::test]
