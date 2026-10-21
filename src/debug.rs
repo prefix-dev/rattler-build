@@ -10,16 +10,20 @@ use rattler_build::{
     opt::{CreatePatchOpts, DebugEnvAddOpts, DebugRunOpts, DebugShellOpts, DebugWorkdirOpts},
     source::create_patch,
 };
+use rattler_build_script::runner::LocalRunner;
 
 /// Open a debug shell from DebugShellOpts.
-pub fn debug_shell(opts: DebugShellOpts) -> std::io::Result<()> {
+///
+/// The shell runs through a [`LocalRunner`] on this machine: the debug
+/// subcommands take no tool configuration that could select another runner.
+pub async fn debug_shell(opts: DebugShellOpts) -> std::io::Result<()> {
     let output_dir = opts
         .common
         .output_dir
         .unwrap_or_else(|| PathBuf::from("./output"));
     let (work_dir, directories_json) =
         core_debug::parse_directories_info(opts.work_dir, &output_dir)?;
-    core_debug::open_debug_shell(work_dir, directories_json)
+    core_debug::open_debug_shell(&LocalRunner::new(), work_dir, directories_json).await
 }
 
 /// Print the work directory path to stdout.
@@ -36,13 +40,15 @@ pub fn debug_workdir(opts: DebugWorkdirOpts) -> std::io::Result<()> {
 /// Re-run the build script in an existing debug environment.
 ///
 /// Returns the exit code of the build script so the caller can propagate it.
-pub fn debug_run(opts: DebugRunOpts) -> std::io::Result<i32> {
+/// The script runs through a [`LocalRunner`] on this machine, like
+/// [`debug_shell`].
+pub async fn debug_run(opts: DebugRunOpts) -> std::io::Result<i32> {
     let output_dir = opts
         .common
         .output_dir
         .unwrap_or_else(|| PathBuf::from("./output"));
     let (work_dir, _) = core_debug::parse_directories_info(opts.work_dir, &output_dir)?;
-    core_debug::run_build_script_interactive(&work_dir, opts.trace)
+    core_debug::run_build_script_interactive(&LocalRunner::new(), &work_dir, opts.trace).await
 }
 
 /// Create a patch from changes in the work directory.

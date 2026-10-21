@@ -281,7 +281,7 @@ async fn async_main() -> miette::Result<()> {
                 let debug_data = DebugData::from_setup_opts_and_config(opts, config);
                 debug_recipe(debug_data, &Some(log_handler)).await
             }
-            DebugSubCommands::Shell(opts) => debug::debug_shell(opts).into_diagnostic(),
+            DebugSubCommands::Shell(opts) => debug::debug_shell(opts).await.into_diagnostic(),
             DebugSubCommands::HostAdd(opts) => {
                 let config = load_config(app.no_config, app.config_file)?;
                 debug::debug_env_add("host", opts, config, &Some(log_handler)).await
@@ -292,7 +292,7 @@ async fn async_main() -> miette::Result<()> {
             }
             DebugSubCommands::Workdir(opts) => debug::debug_workdir(opts).into_diagnostic(),
             DebugSubCommands::Run(opts) => {
-                let exit_code = debug::debug_run(opts).into_diagnostic()?;
+                let exit_code = debug::debug_run(opts).await.into_diagnostic()?;
                 if exit_code != 0 {
                     std::process::exit(exit_code);
                 }
