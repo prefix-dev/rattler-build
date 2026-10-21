@@ -135,7 +135,8 @@ mod tests {
             Err(
                 error @ (RunnerError::Io(_)
                 | RunnerError::UnsupportedPlatform { .. }
-                | RunnerError::MissingExecutable { .. }),
+                | RunnerError::MissingExecutable { .. }
+                | RunnerError::ChannelTooLarge { .. }),
             ) => panic!("unexpected error: {error:?}"),
             Ok(()) => panic!("an unmirrored mount must be rejected"),
         }

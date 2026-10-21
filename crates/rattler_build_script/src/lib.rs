@@ -36,7 +36,7 @@ mod windows_machine;
 
 #[cfg(feature = "execution")]
 pub use execution::{
-    BuildScriptSection, EnvironmentIsolation, ExecutionArgs, ResolvedScriptContents,
+    BuildScriptSection, EnvironmentIsolation, ExecutionArgs, ResolvedScriptContents, ScriptOutcome,
     create_build_script, run_script,
 };
 #[cfg(feature = "execution")]

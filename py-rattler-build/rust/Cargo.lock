@@ -4947,6 +4947,7 @@ dependencies = [
  "rattler_shell",
  "serde",
  "strsim",
+ "tempfile",
  "thiserror 2.0.20",
  "tokio",
  "tokio-util",

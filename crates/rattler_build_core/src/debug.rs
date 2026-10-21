@@ -10,8 +10,8 @@ use indexmap::IndexMap;
 use rattler_build_script::{
     EnvironmentIsolation,
     runner::{
-        ExecSpec, ExecStatus, GuestPath, Mounts, OutputSink, OutputStream, Runner, RunnerError,
-        SessionSpec,
+        ExecResultExt, ExecSpec, ExecStatus, GuestPath, Mounts, OutputSink, OutputStream, Runner,
+        RunnerError, SessionSpec,
     },
 };
 use rattler_conda_types::{ChannelUrl, MatchSpec, ParseStrictness, PrefixRecord};
@@ -219,7 +219,11 @@ pub async fn open_debug_shell(
         .start_session(debug_session_spec(runner, &work_dir)?)
         .await
         .map_err(io_error)?;
-    let status = session.exec_interactive(exec).await.map_err(io_error)?;
+    let status = session
+        .exec_interactive(exec)
+        .await
+        .into_status()
+        .map_err(io_error)?;
 
     if !status.success() {
         return Err(std::io::Error::other(format!(
@@ -248,7 +252,11 @@ pub async fn run_build_script(
         .await
         .map_err(io_error)?;
     let mut output = CapturedOutput::default();
-    let status = session.exec(exec, &mut output).await.map_err(io_error)?;
+    let status = session
+        .exec(exec, &mut output)
+        .await
+        .into_status()
+        .map_err(io_error)?;
 
     Ok(DebugRunResult {
         exit_code: status.code.unwrap_or(1),
@@ -274,7 +282,11 @@ pub async fn run_build_script_interactive(
         .start_session(debug_session_spec(runner, work_dir)?)
         .await
         .map_err(io_error)?;
-    let status = session.exec_interactive(exec).await.map_err(io_error)?;
+    let status = session
+        .exec_interactive(exec)
+        .await
+        .into_status()
+        .map_err(io_error)?;
 
     Ok(status.code.unwrap_or(1))
 }
@@ -323,12 +335,16 @@ fn require_file(work_dir: &Path, name: &str) -> std::io::Result<PathBuf> {
 }
 
 /// A command that runs `argv` in `work_dir` without explicit environment
-/// variables, so the shell sees exactly the session's host environment.
+/// variables, so the shell sees exactly the session's host environment, plus
+/// the `RATTLER_BUILD_PACKAGE_FILES` channel, so a build script that appends
+/// to that file runs the same way it does in a build. The contents are
+/// discarded: debug commands do not package.
 fn shell_exec(argv: Vec<String>, work_dir: &Path) -> ExecSpec {
     ExecSpec {
         argv,
         cwd: GuestPath(work_dir.to_path_buf()),
         env: IndexMap::new(),
+        channels: vec![crate::consts::RATTLER_BUILD_PACKAGE_FILES.to_string()],
     }
 }
 
@@ -337,7 +353,8 @@ fn shell_exec(argv: Vec<String>, work_dir: &Path) -> ExecSpec {
 /// The session mounts only the build directory (the parent of `work_dir`,
 /// which also holds the host and build prefixes), writable, so the shell can
 /// change sources and prefixes in place; `work_dir` is made absolute first so
-/// a relative path still yields that parent. Nothing else, such as the recipe
+/// a relative path still yields that parent. The build directory is also the
+/// session's scratch directory. Nothing else, such as the recipe
 /// directory or the user's home, is mounted: debug sessions are meant for the
 /// local runner, which exposes host paths unchanged. The session applies
 /// [`EnvironmentIsolation::None`]: the debug shell deliberately runs in the
@@ -351,6 +368,7 @@ fn debug_session_spec(runner: &dyn Runner, work_dir: &Path) -> std::io::Result<S
         mounts: Mounts::new().writable(build_dir),
         image: None,
         work_dir: GuestPath(work_dir.clone()),
+        scratch_dir: GuestPath(build_dir.to_path_buf()),
         env_isolation: EnvironmentIsolation::None,
     })
 }
@@ -361,7 +379,8 @@ fn io_error(error: RunnerError) -> std::io::Error {
         RunnerError::Io(error) => error,
         RunnerError::UnsupportedPlatform { .. }
         | RunnerError::MissingExecutable { .. }
-        | RunnerError::UnsupportedMount { .. } => std::io::Error::other(error),
+        | RunnerError::UnsupportedMount { .. }
+        | RunnerError::ChannelTooLarge { .. } => std::io::Error::other(error),
     }
 }
 
@@ -650,7 +669,9 @@ mod tests {
     use std::sync::{Arc, Mutex};
 
     use async_trait::async_trait;
-    use rattler_build_script::runner::{GuestInfo, LocalRunner, Session};
+    use rattler_build_script::runner::{
+        CHANNEL_SIZE_LIMIT, ExecOutcome, GuestInfo, LocalRunner, Session,
+    };
     use rattler_conda_types::Subdir;
 
     use super::*;
@@ -671,11 +692,15 @@ mod tests {
 
     /// A [`Runner`] whose session records the specs it receives and replays
     /// fixed output lines into the sink, so the session path of the debug
-    /// commands can be observed without spawning a process.
+    /// commands can be observed without spawning a process. With
+    /// [`RecordingRunner::with_oversized_channel`] every command fails with
+    /// [`RunnerError::ChannelTooLarge`] for its first channel instead of
+    /// returning an outcome.
     struct RecordingRunner {
         local: LocalRunner,
         status: ExecStatus,
         output: Vec<(OutputStream, String)>,
+        oversized_channel: bool,
         recorded: Arc<Mutex<RecordedSpecs>>,
     }
 
@@ -685,8 +710,14 @@ mod tests {
                 local: LocalRunner::new(),
                 status,
                 output,
+                oversized_channel: false,
                 recorded: Arc::default(),
             }
+        }
+
+        fn with_oversized_channel(mut self) -> Self {
+            self.oversized_channel = true;
+            self
         }
 
         fn recorded(&self) -> RecordedSpecs {
@@ -717,6 +748,7 @@ mod tests {
             Ok(Box::new(RecordingSession {
                 status: self.status,
                 output: self.output.clone(),
+                oversized_channel: self.oversized_channel,
                 recorded: Arc::clone(&self.recorded),
             }))
         }
@@ -725,7 +757,35 @@ mod tests {
     struct RecordingSession {
         status: ExecStatus,
         output: Vec<(OutputStream, String)>,
+        oversized_channel: bool,
         recorded: Arc<Mutex<RecordedSpecs>>,
+    }
+
+    impl RecordingSession {
+        /// Records `spec` as received through `kind` and answers it with the
+        /// fixed status and an empty file per declared channel, or with the
+        /// oversized-channel error carrying that status.
+        fn outcome(&self, kind: ExecKind, spec: ExecSpec) -> Result<ExecOutcome, RunnerError> {
+            let channels: IndexMap<String, Vec<u8>> = spec
+                .channels
+                .iter()
+                .map(|name| (name.clone(), Vec::new()))
+                .collect();
+            self.recorded.lock().unwrap().exec = Some((kind, spec));
+            if self.oversized_channel
+                && let Some(variable) = channels.keys().next()
+            {
+                return Err(RunnerError::ChannelTooLarge {
+                    variable: variable.clone(),
+                    limit: CHANNEL_SIZE_LIMIT,
+                    status: self.status,
+                });
+            }
+            Ok(ExecOutcome {
+                status: self.status,
+                channels,
+            })
+        }
     }
 
     #[async_trait]
@@ -734,17 +794,15 @@ mod tests {
             &mut self,
             spec: ExecSpec,
             sink: &mut dyn OutputSink,
-        ) -> Result<ExecStatus, RunnerError> {
-            self.recorded.lock().unwrap().exec = Some((ExecKind::Captured, spec));
+        ) -> Result<ExecOutcome, RunnerError> {
             for (stream, line) in &self.output {
                 sink.line(*stream, line);
             }
-            Ok(self.status)
+            self.outcome(ExecKind::Captured, spec)
         }
 
-        async fn exec_interactive(&mut self, spec: ExecSpec) -> Result<ExecStatus, RunnerError> {
-            self.recorded.lock().unwrap().exec = Some((ExecKind::Interactive, spec));
-            Ok(self.status)
+        async fn exec_interactive(&mut self, spec: ExecSpec) -> Result<ExecOutcome, RunnerError> {
+            self.outcome(ExecKind::Interactive, spec)
         }
 
         async fn find_executable(
@@ -846,8 +904,8 @@ mod tests {
     }
 
     /// Every debug command starts its session for the work directory on the
-    /// runner's platform, with the build directory mounted writable and
-    /// without environment isolation.
+    /// runner's platform, with the build directory mounted writable and used
+    /// as the scratch directory, and without environment isolation.
     fn assert_debug_session(session: &SessionSpec, work_dir: &Path) {
         assert_eq!(session.platform, Subdir::current().unwrap());
         assert_eq!(
@@ -856,13 +914,52 @@ mod tests {
         );
         assert!(session.image.is_none());
         assert_eq!(session.work_dir, GuestPath(work_dir.to_path_buf()));
+        assert_eq!(
+            session.scratch_dir,
+            GuestPath(work_dir.parent().unwrap().to_path_buf())
+        );
         assert_eq!(session.env_isolation, EnvironmentIsolation::None);
     }
 
+    /// An overfilled channel does not hide how the script exited: the debug
+    /// commands discard channel contents and keep the exit status.
+    #[tokio::test]
+    async fn oversized_channel_keeps_the_exit_status() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let work_dir = work_dir_with_scripts(temp_dir.path(), "");
+        let runner = RecordingRunner::new(
+            ExecStatus { code: Some(5) },
+            vec![(OutputStream::Stdout, "out".to_string())],
+        )
+        .with_oversized_channel();
+
+        let result = run_build_script(&runner, &work_dir, false).await.unwrap();
+        let exit_code = run_build_script_interactive(&runner, &work_dir, false)
+            .await
+            .unwrap();
+        let shell_error = open_debug_shell(&runner, work_dir.clone(), None)
+            .await
+            .unwrap_err();
+
+        assert_eq!(result.exit_code, 5);
+        assert_eq!(result.stdout, "out\n");
+        assert_eq!(exit_code, 5);
+        assert_eq!(
+            shell_error.to_string(),
+            format!("shell exited with status: {EXIT_CODE_LABEL}: 5")
+        );
+    }
+
+    /// Every debug command runs in the work directory without explicit
+    /// variables and with the package-files channel declared.
     fn assert_exec(exec: &ExecSpec, work_dir: &Path, argv: Vec<String>) {
         assert_eq!(exec.argv, argv);
         assert_eq!(exec.cwd, GuestPath(work_dir.to_path_buf()));
         assert!(exec.env.is_empty());
+        assert_eq!(
+            exec.channels,
+            vec![crate::consts::RATTLER_BUILD_PACKAGE_FILES.to_string()]
+        );
     }
 
     #[tokio::test]

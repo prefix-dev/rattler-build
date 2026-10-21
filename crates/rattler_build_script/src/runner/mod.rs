@@ -59,7 +59,23 @@ pub enum RunnerError {
         /// The requested destination path in the guest.
         guest: GuestPath,
     },
+    /// A command left more bytes in a channel file than a session returns
+    /// (see [`ExecSpec::channels`]). The command itself has finished; its
+    /// exit status is carried along for callers that discard the contents.
+    #[error("the channel file of {variable} holds more than the {limit} bytes a session returns")]
+    ChannelTooLarge {
+        /// The environment variable the channel was declared under.
+        variable: String,
+        /// The largest size a session returns.
+        limit: u64,
+        /// How the command exited.
+        status: ExecStatus,
+    },
 }
+
+/// The largest number of bytes a session returns per channel file; a larger
+/// file fails the command with [`RunnerError::ChannelTooLarge`].
+pub const CHANNEL_SIZE_LIMIT: u64 = 16 * 1024 * 1024;
 
 /// A path on the machine rattler-build runs on.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -110,6 +126,15 @@ pub struct SessionSpec {
     pub image: Option<String>,
     /// The session working directory as a guest path.
     pub work_dir: GuestPath,
+    /// A writable directory, as a guest path, for the session's own files.
+    ///
+    /// The directory must exist and be writable in the guest. The session
+    /// creates one uniquely named subdirectory inside it, keeps everything it
+    /// needs during its lifetime (such as the channel files of
+    /// [`ExecSpec::channels`]) in that subdirectory, and removes the
+    /// subdirectory when it is dropped; nothing else in `scratch_dir` is
+    /// touched.
+    pub scratch_dir: GuestPath,
     /// How the session builds the environment of every executed command.
     ///
     /// [`EnvironmentIsolation::Strict`] and [`EnvironmentIsolation::CondaBuild`]
@@ -130,6 +155,32 @@ pub struct ExecSpec {
     pub cwd: GuestPath,
     /// Explicit environment variables for the command.
     pub env: IndexMap<String, String>,
+    /// The environment variables the command receives a channel file under.
+    ///
+    /// A channel file is the command's way of handing data back to the caller
+    /// without going through its output streams. For every name the session
+    /// creates a fresh, empty file at a location of its choosing, unique to
+    /// this execution, and sets the variable to the file's guest path in the
+    /// command's environment, regardless of the session's isolation mode. After
+    /// the command exits the session reads every file back into
+    /// [`ExecOutcome::channels`], keyed by variable name, whether the command
+    /// succeeded or not; a file the command removed reads as empty. A file
+    /// larger than [`CHANNEL_SIZE_LIMIT`] fails the execution with
+    /// [`RunnerError::ChannelTooLarge`]. A name listed twice shares one file.
+    /// The channel variable is set after [`ExecSpec::env`], so it overrides a
+    /// variable of the same name given there. The session only transports the
+    /// bytes; their meaning is the caller's.
+    pub channels: Vec<String>,
+}
+
+/// What a command execution left behind.
+#[derive(Debug, Clone)]
+pub struct ExecOutcome {
+    /// How the command exited.
+    pub status: ExecStatus,
+    /// The contents of the channel files declared in [`ExecSpec::channels`],
+    /// in declaration order, every declared name present.
+    pub channels: IndexMap<String, Vec<u8>>,
 }
 
 /// Exit status of an executed command.
@@ -150,6 +201,45 @@ impl From<std::process::ExitStatus> for ExecStatus {
     fn from(status: std::process::ExitStatus) -> Self {
         Self {
             code: status.code(),
+        }
+    }
+}
+
+/// Methods on the result of [`Session::exec`] and
+/// [`Session::exec_interactive`].
+pub trait ExecResultExt {
+    /// Returns how the command exited and discards the channel files.
+    ///
+    /// A command that finished but left more than the limit in a channel
+    /// file ([`RunnerError::ChannelTooLarge`]) is not a failure for a caller
+    /// that does not read the contents: the overflow is logged as a warning
+    /// and the exit status the error carries is returned. Every other error
+    /// is returned unchanged.
+    fn into_status(self) -> Result<ExecStatus, RunnerError>;
+}
+
+impl ExecResultExt for Result<ExecOutcome, RunnerError> {
+    fn into_status(self) -> Result<ExecStatus, RunnerError> {
+        match self {
+            Ok(outcome) => Ok(outcome.status),
+            Err(RunnerError::ChannelTooLarge {
+                variable,
+                limit,
+                status,
+            }) => {
+                tracing::warn!(
+                    variable,
+                    limit,
+                    "The command wrote more than the limit into a channel file; its contents are discarded"
+                );
+                Ok(status)
+            }
+            Err(
+                error @ (RunnerError::Io(_)
+                | RunnerError::UnsupportedPlatform { .. }
+                | RunnerError::MissingExecutable { .. }
+                | RunnerError::UnsupportedMount { .. }),
+            ) => Err(error),
         }
     }
 }
@@ -199,15 +289,17 @@ pub trait Runner: Send + Sync {
 /// A started execution context.
 #[async_trait]
 pub trait Session: Send {
-    /// Runs a command, streaming raw output lines into `sink`.
+    /// Runs a command, streaming raw output lines into `sink`, and returns
+    /// its exit status together with the channel files of `spec`.
     async fn exec(
         &mut self,
         spec: ExecSpec,
         sink: &mut dyn OutputSink,
-    ) -> Result<ExecStatus, RunnerError>;
+    ) -> Result<ExecOutcome, RunnerError>;
 
-    /// Runs a command with stdio attached to the invoking terminal.
-    async fn exec_interactive(&mut self, spec: ExecSpec) -> Result<ExecStatus, RunnerError>;
+    /// Runs a command with stdio attached to the invoking terminal, and
+    /// returns its exit status together with the channel files of `spec`.
+    async fn exec_interactive(&mut self, spec: ExecSpec) -> Result<ExecOutcome, RunnerError>;
 
     /// Finds the first `names` entry on the given guest search paths.
     async fn find_executable(
@@ -215,4 +307,33 @@ pub trait Session: Send {
         names: &[String],
         search_paths: &[GuestPath],
     ) -> Result<Option<GuestPath>, RunnerError>;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Discarding the channels keeps the exit status of a finished command,
+    /// also when it overfilled a channel, and passes any other error through.
+    #[test]
+    fn into_status_keeps_the_exit_status() {
+        let finished: Result<ExecOutcome, RunnerError> = Ok(ExecOutcome {
+            status: ExecStatus { code: Some(3) },
+            channels: IndexMap::from([("VAR".to_string(), b"ignored".to_vec())]),
+        });
+        let overfilled: Result<ExecOutcome, RunnerError> = Err(RunnerError::ChannelTooLarge {
+            variable: "VAR".to_string(),
+            limit: CHANNEL_SIZE_LIMIT,
+            status: ExecStatus { code: Some(5) },
+        });
+        let failed: Result<ExecOutcome, RunnerError> =
+            Err(RunnerError::Io(std::io::Error::other("spawn failed")));
+
+        assert_eq!(finished.into_status().unwrap().code, Some(3));
+        assert_eq!(overfilled.into_status().unwrap().code, Some(5));
+        assert!(matches!(
+            failed.into_status(),
+            Err(RunnerError::Io(error)) if error.to_string() == "spawn failed"
+        ));
+    }
 }

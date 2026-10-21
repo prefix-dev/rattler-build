@@ -11,7 +11,6 @@ use rattler_conda_types::{RepoDataRecord, Subdir};
 use std::collections::BTreeMap;
 
 use crate::android;
-use crate::consts;
 use crate::ios;
 use crate::linux;
 use crate::macos;
@@ -464,11 +463,6 @@ pub fn vars(output: &Output, build_state: &str) -> HashMap<String, Option<String
     insert!(vars, "RECIPE_DIR", directories.recipe_dir.to_string_lossy());
     insert!(vars, "SRC_DIR", directories.work_dir.to_string_lossy());
     insert!(vars, "BUILD_DIR", directories.build_dir.to_string_lossy());
-    insert!(
-        vars,
-        consts::RATTLER_BUILD_PACKAGE_FILES,
-        directories.package_files_list_path().to_string_lossy()
-    );
 
     // python variables
     // hard-code this because we never want pip's build isolation

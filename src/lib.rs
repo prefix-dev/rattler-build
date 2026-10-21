@@ -251,7 +251,8 @@ fn script_runner(
         Err(
             error @ (RunnerError::Io(_)
             | RunnerError::MissingExecutable { .. }
-            | RunnerError::UnsupportedMount { .. }),
+            | RunnerError::UnsupportedMount { .. }
+            | RunnerError::ChannelTooLarge { .. }),
         ) => Err(error)
             .into_diagnostic()
             .context("cannot run scripts in the sandbox"),

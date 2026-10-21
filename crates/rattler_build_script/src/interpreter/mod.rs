@@ -352,9 +352,11 @@ mod tests {
                 Subdir::current().unwrap(),
                 Subdir::current().unwrap(),
             ),
+            scratch_dir: work_dir.clone(),
             work_dir,
             mounts: crate::runner::Mounts::new(),
             env_isolation: crate::execution::EnvironmentIsolation::None,
+            channels: Vec::new(),
         }
     }
 

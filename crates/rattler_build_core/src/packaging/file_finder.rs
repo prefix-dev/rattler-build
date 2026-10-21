@@ -14,36 +14,26 @@ use crate::metadata::Output;
 use super::{PackagingError, file_mapper, normalize_path_for_comparison};
 use rattler_build_recipe::stage1::GlobVec;
 
-/// Read the list of paths written by the build script into the file pointed at
-/// by the `RATTLER_BUILD_PACKAGE_FILES` environment variable.
+/// Parses the list of paths a build script wrote into the file behind the
+/// `RATTLER_BUILD_PACKAGE_FILES` environment variable, as the runner session
+/// handed it back.
 ///
-/// Returns `Ok(None)` if the file does not exist or contains no non-empty
-/// lines (in which case the caller should fall back to the default file
-/// discovery mechanism). Returns `Ok(Some(paths))` if the file exists and
-/// contains at least one path.
+/// Returns `None` when `contents` holds no non-empty line, in which case the
+/// caller falls back to the default file discovery mechanism, and
+/// `Some(paths)` with at least one path otherwise.
 ///
 /// Lines are trimmed of whitespace; empty lines are skipped to make
 /// `echo path >> $RATTLER_BUILD_PACKAGE_FILES` and similar shell idioms work
-/// reliably.
-pub fn read_package_files_list(path: &Path) -> Result<Option<Vec<PathBuf>>, io::Error> {
-    let contents = match fs::read_to_string(path) {
-        Ok(contents) => contents,
-        Err(err) if err.kind() == io::ErrorKind::NotFound => return Ok(None),
-        Err(err) => return Err(err),
-    };
-
-    let paths: Vec<PathBuf> = contents
+/// reliably. Bytes that are not UTF-8 are replaced.
+pub fn parse_package_files_list(contents: &[u8]) -> Option<Vec<PathBuf>> {
+    let paths: Vec<PathBuf> = String::from_utf8_lossy(contents)
         .lines()
         .map(|line| line.trim())
         .filter(|line| !line.is_empty())
         .map(PathBuf::from)
         .collect();
 
-    if paths.is_empty() {
-        Ok(None)
-    } else {
-        Ok(Some(paths))
-    }
+    if paths.is_empty() { None } else { Some(paths) }
 }
 
 /// A wrapper around PathBuf that implements case-insensitive hashing and equality
@@ -380,7 +370,7 @@ mod test {
     use std::{collections::HashSet, path::PathBuf};
 
     use crate::packaging::file_finder::{
-        Files, check_is_case_sensitive, find_new_files, read_package_files_list,
+        Files, check_is_case_sensitive, find_new_files, parse_package_files_list,
     };
 
     #[test]
@@ -449,26 +439,18 @@ mod test {
     }
 
     #[test]
-    fn test_read_package_files_list_missing() {
-        let tempdir = tempfile::TempDir::new().unwrap();
-        let path = tempdir.path().join("does_not_exist.txt");
-        assert!(read_package_files_list(&path).unwrap().is_none());
+    fn test_parse_package_files_list_untouched() {
+        assert!(parse_package_files_list(b"").is_none());
     }
 
     #[test]
-    fn test_read_package_files_list_empty() {
-        let tempdir = tempfile::TempDir::new().unwrap();
-        let path = tempdir.path().join("package_files.txt");
-        fs_err::write(&path, "\n   \n\n").unwrap();
-        assert!(read_package_files_list(&path).unwrap().is_none());
+    fn test_parse_package_files_list_empty() {
+        assert!(parse_package_files_list(b"\n   \n\n").is_none());
     }
 
     #[test]
-    fn test_read_package_files_list_paths() {
-        let tempdir = tempfile::TempDir::new().unwrap();
-        let path = tempdir.path().join("package_files.txt");
-        fs_err::write(&path, "  bin/foo\n\nbin/bar\n/abs/path  \n").unwrap();
-        let parsed = read_package_files_list(&path).unwrap().unwrap();
+    fn test_parse_package_files_list_paths() {
+        let parsed = parse_package_files_list(b"  bin/foo\r\n\nbin/bar\n/abs/path  \n").unwrap();
         assert_eq!(
             parsed,
             vec![

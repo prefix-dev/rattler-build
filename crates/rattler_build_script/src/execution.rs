@@ -7,7 +7,7 @@
 
 use crate::execution_context::ExecutionContext;
 use crate::runner::{
-    BuildLogSink, ExecSpec, GuestPath, Mounts, ReplacingSink, Runner, SessionSpec,
+    BuildLogSink, ExecSpec, GuestPath, Mounts, ReplacingSink, Runner, RunnerError, SessionSpec,
 };
 use crate::script::{Script, ScriptContent};
 use fs_err as fs;
@@ -91,6 +91,11 @@ pub struct ExecutionArgs {
     /// The working directory (`cwd`) in which the script should execute
     pub work_dir: PathBuf,
 
+    /// A writable directory the session keeps its own files in, passed on as
+    /// [`SessionSpec::scratch_dir`]; the session adds one subdirectory and
+    /// removes it again when the script run is over.
+    pub scratch_dir: PathBuf,
+
     /// The directories the session must provide to the script: the work
     /// directory and the prefixes writable, and whatever the script reads.
     /// They are passed on as [`SessionSpec::mounts`].
@@ -100,6 +105,21 @@ pub struct ExecutionArgs {
     /// when it builds the wrapper's process environment (see
     /// [`SessionSpec::env_isolation`]).
     pub env_isolation: EnvironmentIsolation,
+
+    /// The environment variables the script receives a channel file under,
+    /// passed on as [`ExecSpec::channels`]. The contents the script left in
+    /// them come back in [`ScriptOutcome::channels`].
+    pub channels: Vec<String>,
+}
+
+/// What a script run through [`run_script`] left behind.
+#[derive(Debug, Clone)]
+pub struct ScriptOutcome {
+    /// The contents of the channel files declared in
+    /// [`ExecutionArgs::channels`], keyed by variable name, as the session
+    /// returned them: every declared name is present, untouched channels are
+    /// empty, and nothing is interpreted.
+    pub channels: IndexMap<String, Vec<u8>>,
 }
 
 impl ExecutionArgs {
@@ -189,6 +209,10 @@ impl Script {
     /// - Executes the script in the appropriate interpreter through `runner`,
     ///   whose session provides `mounts` and applies `env_isolation` when it
     ///   builds the process environment
+    ///
+    /// `work_dir` doubles as the session's scratch directory (see
+    /// [`SessionSpec::scratch_dir`]), so it has to be a writable directory of
+    /// the caller's own, such as the temporary directory of a package test.
     #[allow(clippy::too_many_arguments)]
     pub async fn run_script<F>(
         &self,
@@ -249,9 +273,11 @@ impl Script {
             env_vars,
             secrets,
             context,
+            scratch_dir: work_dir.clone(),
             work_dir,
             mounts,
             env_isolation,
+            channels: Vec::new(),
         };
 
         crate::execution::run_script(exec_args, runner).await?;
@@ -844,12 +870,17 @@ async fn build_section_body(
 /// [`ExecutionArgs::env_isolation`] as its isolation mode. The session
 /// receives the build variables followed by the secrets, so a secret
 /// overrides a build variable of the same name, and applies them on top of the
-/// environment the mode starts from. Output is rewritten by [`ReplacingSink`]
-/// and recorded by [`BuildLogSink`] in `conda_build.log`.
+/// environment the mode starts from. The channel files of
+/// [`ExecutionArgs::channels`] are declared on the wrapper command: their
+/// variables are set last and override a build variable or secret of the
+/// same name, and their contents are returned in the [`ScriptOutcome`]; a
+/// failing script is an error, so its channel contents are not returned.
+/// Output is rewritten by [`ReplacingSink`] and recorded by [`BuildLogSink`]
+/// in `conda_build.log`.
 pub async fn run_script(
     exec_args: ExecutionArgs,
     runner: &dyn Runner,
-) -> Result<(), crate::InterpreterError> {
+) -> Result<ScriptOutcome, crate::InterpreterError> {
     let dialect =
         crate::shell_dialect::shell_dialect(exec_args.context.runtime().process_platform());
     let build_script_path = generate_build_script(&exec_args).await?;
@@ -869,6 +900,7 @@ pub async fn run_script(
             mounts: exec_args.mounts.clone(),
             image: None,
             work_dir: GuestPath(exec_args.work_dir.clone()),
+            scratch_dir: GuestPath(exec_args.scratch_dir.clone()),
             env_isolation: exec_args.env_isolation,
         })
         .await?;
@@ -878,19 +910,20 @@ pub async fn run_script(
     let mut argv = Vec::with_capacity(command_spec.args.len() + 1);
     argv.push(command_spec.program);
     argv.extend(command_spec.args);
-    let status = session
+    let outcome = session
         .exec(
             ExecSpec {
                 argv,
                 cwd: GuestPath(exec_args.work_dir.clone()),
                 env,
+                channels: exec_args.channels.clone(),
             },
             &mut sink,
         )
         .await?;
 
-    if !status.success() {
-        let status_code = status.code.unwrap_or(1);
+    if !outcome.status.success() {
+        let status_code = outcome.status.code.unwrap_or(1);
         let debug_info = dialect.debug_info(&exec_args.work_dir, &exec_args.context);
         tracing::error!("Script failed with status {}", status_code);
         tracing::error!("{}", debug_info);
@@ -902,7 +935,9 @@ pub async fn run_script(
         ));
     }
 
-    Ok(())
+    Ok(ScriptOutcome {
+        channels: outcome.channels,
+    })
 }
 
 /// Creates build script files without executing them.
@@ -929,12 +964,11 @@ pub async fn create_build_script(exec_args: ExecutionArgs) -> Result<(), std::io
                 ))
             }
             crate::InterpreterError::Runner(error) => match error {
-                crate::runner::RunnerError::Io(error) => error,
-                crate::runner::RunnerError::UnsupportedPlatform { .. }
-                | crate::runner::RunnerError::MissingExecutable { .. }
-                | crate::runner::RunnerError::UnsupportedMount { .. } => {
-                    std::io::Error::other(error.to_string())
-                }
+                RunnerError::Io(error) => error,
+                RunnerError::UnsupportedPlatform { .. }
+                | RunnerError::MissingExecutable { .. }
+                | RunnerError::UnsupportedMount { .. }
+                | RunnerError::ChannelTooLarge { .. } => std::io::Error::other(error.to_string()),
             },
         })?;
 
@@ -947,7 +981,7 @@ mod tests {
     use super::*;
     use crate::ExecutionContext;
     use crate::runner::{
-        ExecStatus, GuestInfo, LocalRunner, OutputSink, OutputStream, RunnerError, Session,
+        ExecOutcome, ExecStatus, GuestInfo, LocalRunner, OutputSink, OutputStream, Session,
         resolve_process_env,
     };
     use crate::runtime::RuntimeEnv;
@@ -978,8 +1012,10 @@ mod tests {
                 Subdir::current().unwrap(),
             ),
             work_dir: tmp.path().to_path_buf(),
+            scratch_dir: tmp.path().to_path_buf(),
             mounts: Mounts::new(),
             env_isolation: EnvironmentIsolation::None,
+            channels: Vec::new(),
         };
 
         let script = crate::activation::activation_script(&args, shell::Bash::default()).unwrap();
@@ -1091,8 +1127,10 @@ mod tests {
                 Subdir::Win64,
             ),
             work_dir: tmp.path().to_path_buf(),
+            scratch_dir: tmp.path().to_path_buf(),
             mounts: Mounts::new(),
             env_isolation: EnvironmentIsolation::None,
+            channels: Vec::new(),
         };
 
         crate::execution::generate_build_script(&args)
@@ -1375,9 +1413,11 @@ mod tests {
                 Subdir::current().unwrap(),
                 Subdir::current().unwrap(),
             ),
+            scratch_dir: work_dir.clone(),
             work_dir,
             mounts: Mounts::new(),
             env_isolation: EnvironmentIsolation::None,
+            channels: Vec::new(),
         }
     }
 
@@ -1388,9 +1428,10 @@ mod tests {
         exec: Option<ExecSpec>,
     }
 
-    /// A [`Runner`] whose session records the specs it receives and replays
-    /// fixed output lines into the sink, so the session path of [`run_script`]
-    /// can be observed without spawning a process.
+    /// A [`Runner`] whose session records the specs it receives, replays
+    /// fixed output lines into the sink, and answers every declared channel
+    /// with `from <name>`, so the session path of [`run_script`] can be
+    /// observed without spawning a process.
     struct RecordingRunner {
         status: ExecStatus,
         output: Vec<(OutputStream, String)>,
@@ -1453,16 +1494,31 @@ mod tests {
             &mut self,
             spec: ExecSpec,
             sink: &mut dyn OutputSink,
-        ) -> Result<ExecStatus, RunnerError> {
+        ) -> Result<ExecOutcome, RunnerError> {
+            let channels = spec
+                .channels
+                .iter()
+                .map(|name| (name.clone(), format!("from {name}").into_bytes()))
+                .collect();
             self.recorded.lock().unwrap().exec = Some(spec);
             for (stream, line) in &self.output {
                 sink.line(*stream, line);
             }
-            Ok(self.status)
+            Ok(ExecOutcome {
+                status: self.status,
+                channels,
+            })
         }
 
-        async fn exec_interactive(&mut self, _spec: ExecSpec) -> Result<ExecStatus, RunnerError> {
-            Ok(self.status)
+        async fn exec_interactive(&mut self, spec: ExecSpec) -> Result<ExecOutcome, RunnerError> {
+            Ok(ExecOutcome {
+                status: self.status,
+                channels: spec
+                    .channels
+                    .iter()
+                    .map(|name| (name.clone(), Vec::new()))
+                    .collect(),
+            })
         }
 
         async fn find_executable(
@@ -1477,8 +1533,9 @@ mod tests {
     /// The wrapper runs in a session of the runner: the session is started
     /// for the work directory on the wrapper's platform with the mounts of
     /// the execution arguments, receives the dialect's wrapper command with
-    /// the build variables and the secrets layered on top, and its output
-    /// reaches the build log with the prefix replaced and secrets masked.
+    /// the build variables and the secrets layered on top and the channels
+    /// declared, its output reaches the build log with the prefix replaced
+    /// and secrets masked, and the channel contents come back untouched.
     #[tokio::test]
     async fn test_run_script_executes_wrapper_through_session() {
         let tmp = tempfile::tempdir().unwrap();
@@ -1504,6 +1561,7 @@ mod tests {
         args.secrets
             .insert("RB_SECRET".to_string(), "hunter2".to_string());
         args.env_isolation = EnvironmentIsolation::CondaBuild;
+        args.channels = vec!["RB_CHANNEL".to_string()];
         let context = args.context.clone();
         let runner = RecordingRunner::new(
             ExecStatus { code: Some(0) },
@@ -1516,7 +1574,13 @@ mod tests {
             ],
         );
 
-        run_script(args, &runner).await.unwrap();
+        let outcome = run_script(args, &runner).await.unwrap();
+
+        assert_eq!(
+            outcome.channels.get("RB_CHANNEL"),
+            Some(&b"from RB_CHANNEL".to_vec())
+        );
+        assert_eq!(outcome.channels.len(), 1);
 
         let recorded = runner.recorded();
         let session = recorded.session.expect("a session was started");
@@ -1529,6 +1593,7 @@ mod tests {
                 .read_only(tmp.path().join("recipe"))
         );
         assert_eq!(session.image, None);
+        assert_eq!(session.scratch_dir, GuestPath(work_dir.clone()));
         assert_eq!(session.env_isolation, EnvironmentIsolation::CondaBuild);
 
         let dialect = crate::shell_dialect::shell_dialect(context.runtime().process_platform());
@@ -1551,6 +1616,7 @@ mod tests {
             exec.env.get("RB_SHARED").map(String::as_str),
             Some("from-secret")
         );
+        assert_eq!(exec.channels, vec!["RB_CHANNEL".to_string()]);
 
         let prefix_placeholder = dialect.replacements_template().replace("((var))", "PREFIX");
         assert_eq!(
