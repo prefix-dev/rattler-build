@@ -602,9 +602,7 @@ fn default_tests(env: &mut Environment) {
 
 fn default_filters(env: &mut Environment) {
     env.add_filter("version_to_buildstring", |s: String| {
-        // strip build string suffixes (e.g. "3.11.* *_cpython" -> "3.11.*")
-        let s = s.split_whitespace().next().unwrap_or(&s);
-        rattler_build_types::short_version(s, 2)
+        rattler_build_types::short_version(&s, 2)
     });
 
     env.add_filter("replace", minijinja::filters::replace);

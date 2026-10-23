@@ -35,12 +35,21 @@ pub fn shlib_ext(platform: &Subdir) -> &'static str {
 /// Extract the first `length` dot-separated parts of a version string and
 /// concatenate them without separators. For example, `"3.11.2"` with length 2
 /// gives `"311"`.
+///
+/// Only the version part of a match spec is considered: anything after the
+/// first whitespace (e.g. a build string like `*_cpython`) is ignored, and
+/// extraction stops at the first `*` wildcard. For example, `"5.44.* *_perl5"`
+/// with length 3 gives `"544"`.
 pub fn short_version(input: &str, length: u32) -> String {
-    let mut parts = input.split('.');
+    let version = input.split_whitespace().next().unwrap_or_default();
     let mut result = String::new();
-    for _ in 0..length {
-        if let Some(part) = parts.next() {
-            result.push_str(part);
+    for part in version.split('.').take(length as usize) {
+        match part.split_once('*') {
+            Some((before, _)) => {
+                result.push_str(before);
+                break;
+            }
+            None => result.push_str(part),
         }
     }
     result
@@ -49,6 +58,19 @@ pub fn short_version(input: &str, length: u32) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn short_version_strips_wildcards_and_build_strings() {
+        assert_eq!(short_version("3.11.2", 2), "311");
+        assert_eq!(short_version("5.26.2", 3), "5262");
+        assert_eq!(short_version("5.44", 3), "544");
+        assert_eq!(short_version("5.44.*", 3), "544");
+        assert_eq!(short_version("5.44.* *_perl5", 3), "544");
+        assert_eq!(short_version("3.12.* *_cpython", 2), "312");
+        assert_eq!(short_version("2.*", 2), "2");
+        assert_eq!(short_version("2.1*", 2), "21");
+        assert_eq!(short_version("", 2), "");
+    }
 
     #[test]
     fn shlib_ext_follows_object_format() {

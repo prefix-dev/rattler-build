@@ -429,4 +429,15 @@ mod tests {
         assert!(hash_info.prefix.contains("np120")); // numpy: 2 digits
         assert!(hash_info.prefix.contains("pl526")); // perl: 3 digits
     }
+
+    #[test]
+    fn test_perl_wildcard_and_build_string_prefix() {
+        // https://github.com/prefix-dev/rattler-build/issues/2883
+        for value in ["5.44.* *_perl5", "5.44.*", "5.44"] {
+            let mut variant = BTreeMap::new();
+            variant.insert(NormalizedKey::from("perl"), Variable::from(value));
+            let hash_info = HashInfo::from_variant(&variant, &NoArchType::none());
+            assert_eq!(hash_info.prefix, "pl544", "variant value {value:?}");
+        }
+    }
 }
