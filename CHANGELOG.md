@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.78.0] - 2026-10-23
+### ✨ Highlights
+
+This release updates the TLS and signing trust stores for the eMudhra CA incident: sigstore 0.15.1, `rustls-webpki` 0.103.16, `webpki-root-certs` 1.0.11 and the latest rattler crates. The minimum supported Rust version is now 1.98.
+
+`build.flags` no longer requires `--v3`; packages keep the legacy `index.json` shape but carry their `flags`. With `--parallel-builds`, the ready output that the most other outputs depend on is now started first. Variant values containing wildcards or build strings (such as `perl: 5.44.* *_perl5`) now produce valid build-string prefixes.
+
+
+### Features
+
+- Start the ready output with the most dependents first in parallel builds by @mini-1235 in [#2850](https://github.com/prefix-dev/rattler-build/pull/2850)
+- Allow build.flags without --v3 by @wolfv in [#2882](https://github.com/prefix-dev/rattler-build/pull/2882)
+
+
+### Fixes
+
+- Ignore wildcards and build strings when computing variant build-string prefix by @wolfv in [#2893](https://github.com/prefix-dev/rattler-build/pull/2893)
+
+
+### Maintenance
+
+- Bump sigstore, rattler, webpki and CA roots for eMudhra incident by @wolfv in [#2892](https://github.com/prefix-dev/rattler-build/pull/2892)
+
+
+
 ## [0.77.0] - 2026-10-16
 ### ✨ Highlights
 
