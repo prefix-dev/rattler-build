@@ -9,7 +9,7 @@ readme = "README.md"
 description = "A fast CLI tool to build conda packages on Windows, macOS and Linux"
 documentation = "https://prefix-dev.github.io/rattler-build"
 default-run = "rattler-build"
-rust-version = "1.99"
+rust-version = "1.98"
 publish = true
 
 [workspace]

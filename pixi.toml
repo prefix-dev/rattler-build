@@ -7,7 +7,7 @@ preview = ['pixi-build']
 name = "rattler-build"
 
 [workspace.build-variants]
-rust_compiler_version = [">=1.99.0,<1.100"]
+rust_compiler_version = [">=1.98.1,<1.99"]
 
 [workspace.target.osx.build-variants]
 c_compiler_version = ["19"]
@@ -37,7 +37,7 @@ check-native-tls = "python scripts/check-native-tls.py"
 # Playground tasks are in the "playground" environment (see below)
 
 [dependencies]
-rust-src = ">=1.99.0,<1.100"
+rust-src = ">=1.98.1,<1.99"
 sccache = ">=0.17.0,<0.18"
 libssh2 = ">=1.11.1,<2"
 pkg-config = ">=0.29.2,<0.30"
@@ -230,8 +230,8 @@ python = ">=3.14.7,<4"
 clang = ">=22.1.8,<24"
 livereload = ">=2.7.1,<3"
 wasm-pack = ">=0.15.0,<0.16"
-rust = ">=1.99.0,<2"
-rust-std-wasm32-unknown-unknown = ">=1.99.0,<2"
+rust = ">=1.98.0,<2"
+rust-std-wasm32-unknown-unknown = ">=1.98.0,<2"
 
 [environments.playground.tasks]
 playground-build = { cmd = "python scripts/build_playground.py", description = "Build the WASM playground", inputs = [
@@ -252,7 +252,7 @@ no-default-feature = true
 python = ">=3.14.7,<4"
 git-cliff = ">=2.13.1,<3"
 release-plz = ">=0.3.162,<0.4"
-rust = ">=1.99.0,<2"
+rust = ">=1.98.0,<2"
 7zip = ">=26.3,<27"
 httpx = ">=0.28.1,<0.29"
 
