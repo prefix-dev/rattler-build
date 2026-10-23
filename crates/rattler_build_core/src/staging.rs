@@ -359,7 +359,7 @@ impl Output {
             tool_configuration.jobserver.as_ref(),
             crate::script::plan_script_env(&staging.build.plan),
         );
-        rattler_build_script::run_script(exec_args)
+        rattler_build_script::run_script(exec_args, tool_configuration.runner.as_ref())
             .await
             .into_diagnostic()?;
 

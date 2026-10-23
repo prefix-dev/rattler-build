@@ -10,19 +10,20 @@ use super::{
     Session, SessionSpec, resolve_process_env,
 };
 use crate::RuntimeEnv;
-use crate::execution::{EnvironmentIsolation, spawn_process};
+use crate::execution::spawn_process;
 
 /// A runner that executes commands directly on the local machine.
+///
+/// Each session applies the [`SessionSpec::env_isolation`] it was started
+/// with against the runner's captured [`RuntimeEnv`].
 pub struct LocalRunner {
-    isolation: EnvironmentIsolation,
     runtime: RuntimeEnv,
 }
 
 impl LocalRunner {
-    /// Creates a local runner with the given environment isolation mode.
-    pub fn new(isolation: EnvironmentIsolation) -> Self {
+    /// Creates a local runner that captures the current process environment.
+    pub fn new() -> Self {
         Self {
-            isolation,
             runtime: RuntimeEnv::current(),
         }
     }
@@ -37,7 +38,7 @@ impl LocalRunner {
 
 impl Default for LocalRunner {
     fn default() -> Self {
-        Self::new(EnvironmentIsolation::default())
+        Self::new()
     }
 }
 
@@ -63,17 +64,15 @@ impl Runner for LocalRunner {
 
     async fn start_session(&self, spec: SessionSpec) -> Result<Box<dyn Session>, RunnerError> {
         Ok(Box::new(LocalSession {
-            isolation: self.isolation,
             runtime: self.runtime.clone(),
-            _spec: spec,
+            spec,
         }))
     }
 }
 
 struct LocalSession {
-    isolation: EnvironmentIsolation,
     runtime: RuntimeEnv,
-    _spec: SessionSpec,
+    spec: SessionSpec,
 }
 
 #[async_trait]
@@ -89,8 +88,12 @@ impl Session for LocalSession {
                 "cannot execute an empty argv",
             )
         })?;
-        let process_env =
-            resolve_process_env(self.isolation, &spec.env, &IndexMap::new(), &self.runtime);
+        let process_env = resolve_process_env(
+            self.spec.env_isolation,
+            &spec.env,
+            &IndexMap::new(),
+            &self.runtime,
+        );
         let mut process = spawn_process(OsStr::new(program), args, &spec.cwd.0, &process_env)?;
 
         while let Some(line) = process.next_line().await {
@@ -183,20 +186,29 @@ mod tests {
     use rattler_conda_types::Subdir;
 
     use super::*;
+    use crate::EnvironmentIsolation;
     use crate::runner::test_support::VecSink;
     use crate::runner::{Mount, SessionSpec};
 
-    fn session_spec(work_dir: &Path) -> SessionSpec {
+    fn session_spec(work_dir: &Path, env_isolation: EnvironmentIsolation) -> SessionSpec {
         SessionSpec {
             platform: Subdir::current().unwrap(),
             mounts: Vec::<Mount>::new(),
             image: None,
             work_dir: GuestPath(work_dir.to_path_buf()),
+            env_isolation,
         }
     }
 
-    async fn start_local_session(runner: &LocalRunner, work_dir: &Path) -> Box<dyn Session> {
-        runner.start_session(session_spec(work_dir)).await.unwrap()
+    async fn start_local_session(
+        runner: &LocalRunner,
+        work_dir: &Path,
+        env_isolation: EnvironmentIsolation,
+    ) -> Box<dyn Session> {
+        runner
+            .start_session(session_spec(work_dir, env_isolation))
+            .await
+            .unwrap()
     }
 
     #[cfg(unix)]
@@ -217,8 +229,9 @@ mod tests {
     #[tokio::test]
     async fn local_session_execs_and_streams_lines() {
         let temp_dir = tempfile::tempdir().unwrap();
-        let runner = LocalRunner::new(EnvironmentIsolation::None);
-        let mut session = start_local_session(&runner, temp_dir.path()).await;
+        let runner = LocalRunner::new();
+        let mut session =
+            start_local_session(&runner, temp_dir.path(), EnvironmentIsolation::None).await;
         let mut sink = VecSink::default();
 
         #[cfg(unix)]
@@ -263,12 +276,13 @@ mod tests {
         } else {
             Subdir::Linux64
         };
-        let runner = LocalRunner::new(EnvironmentIsolation::Strict).with_runtime(
+        let runner = LocalRunner::new().with_runtime(
             RuntimeEnv::for_test(platform)
                 .with_var("SSL_CERT_FILE", "allowlisted")
                 .with_var("RB_RUNNER_HIDDEN", "hidden"),
         );
-        let mut session = start_local_session(&runner, temp_dir.path()).await;
+        let mut session =
+            start_local_session(&runner, temp_dir.path(), EnvironmentIsolation::Strict).await;
         let mut sink = VecSink::default();
         let mut env = IndexMap::new();
         env.insert("RB_RUNNER_EXPLICIT".to_string(), "visible".to_string());
@@ -314,8 +328,9 @@ mod tests {
     #[tokio::test]
     async fn invalid_utf8_output_is_decoded_lossily() {
         let temp_dir = tempfile::tempdir().unwrap();
-        let runner = LocalRunner::new(EnvironmentIsolation::None);
-        let mut session = start_local_session(&runner, temp_dir.path()).await;
+        let runner = LocalRunner::new();
+        let mut session =
+            start_local_session(&runner, temp_dir.path(), EnvironmentIsolation::None).await;
         let mut sink = VecSink::default();
 
         let status = tokio::time::timeout(
@@ -371,9 +386,9 @@ mod tests {
         let search_paths = vec![GuestPath(directory.to_path_buf())];
         let names = vec!["tool".to_string()];
 
-        let windows_runner = LocalRunner::new(EnvironmentIsolation::Strict)
-            .with_runtime(RuntimeEnv::for_test(Subdir::Win64));
-        let mut windows_session = start_local_session(&windows_runner, directory).await;
+        let windows_runner = LocalRunner::new().with_runtime(RuntimeEnv::for_test(Subdir::Win64));
+        let mut windows_session =
+            start_local_session(&windows_runner, directory, EnvironmentIsolation::Strict).await;
         assert_eq!(
             windows_session
                 .find_executable(&names, &search_paths)
@@ -382,9 +397,9 @@ mod tests {
             Some(GuestPath(directory.join("tool.exe")))
         );
 
-        let linux_runner = LocalRunner::new(EnvironmentIsolation::Strict)
-            .with_runtime(RuntimeEnv::for_test(Subdir::Linux64));
-        let mut linux_session = start_local_session(&linux_runner, directory).await;
+        let linux_runner = LocalRunner::new().with_runtime(RuntimeEnv::for_test(Subdir::Linux64));
+        let mut linux_session =
+            start_local_session(&linux_runner, directory, EnvironmentIsolation::Strict).await;
         assert_eq!(
             linux_session
                 .find_executable(&names, &search_paths)
@@ -410,8 +425,9 @@ mod tests {
     #[tokio::test]
     async fn exec_interactive_reports_exit_status_and_inherits_host_env() {
         let temp_dir = tempfile::tempdir().unwrap();
-        let runner = LocalRunner::new(EnvironmentIsolation::Strict);
-        let mut session = start_local_session(&runner, temp_dir.path()).await;
+        let runner = LocalRunner::new();
+        let mut session =
+            start_local_session(&runner, temp_dir.path(), EnvironmentIsolation::Strict).await;
 
         let status = session
             .exec_interactive(ExecSpec {
