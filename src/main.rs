@@ -240,7 +240,7 @@ async fn async_main() -> miette::Result<()> {
                     tracing::warn!("No recipes found in recipe directory: {:?}", recipe_dir);
                     return Ok(());
                 } else {
-                    miette::bail!("Couldn't find recipe.")
+                    miette::bail!("Couldn't find recipe.");
                 }
             }
 
