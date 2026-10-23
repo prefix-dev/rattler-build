@@ -45,7 +45,7 @@ clap = "4.6.6"
 url = "2.5.8"
 jiff = "0.2.35"
 hex = "0.4.3"
-rattler_upload = "0.13.5"
+rattler_upload = "0.14.0"
 rattler_package_streaming = { version = "0.27.15", default-features = false }
 miette = "7.6.0"
 tempfile = "3.27.0"

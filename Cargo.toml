@@ -9,7 +9,7 @@ readme = "README.md"
 description = "A fast CLI tool to build conda packages on Windows, macOS and Linux"
 documentation = "https://prefix-dev.github.io/rattler-build"
 default-run = "rattler-build"
-rust-version = "1.89.0"
+rust-version = "1.99"
 publish = true
 
 [workspace]
@@ -98,10 +98,10 @@ zstd = "0.14.0"
 spdx = "0.13.5"
 pathdiff = "0.2.3"
 marked-yaml = "0.8.0"
-rstest = "0.27.0"
+rstest = "0.28.0"
 petgraph = { version = "0.8.3", default-features = false }
 sha1 = { version = "0.11.0" }
-lzma-rust2 = { version = "0.21", features = ["xz"] }
+lzma-rust2 = { version = "0.23", features = ["xz"] }
 line-ending = "1.5.1"
 anyhow = "1.0.104"
 content_inspector = "0.2.4"
@@ -147,16 +147,16 @@ rattler_git = { version = "0.3.14" }
 rattler_prefix_guard = { version = "0.1.2" }
 
 rattler_config = { version = "0.9.4" }
-rattler = { version = "0.54.2", default-features = false, features = [
+rattler = { version = "0.55.0", default-features = false, features = [
   "cli-tools",
   "indicatif",
 ] }
 rattler_cache = { version = "0.10.20", default-features = false }
-rattler_index = { version = "0.33.5", default-features = false }
-rattler_upload = { version = "0.13.5", default-features = false }
-rattler_s3 = { version = "0.3.7" }
+rattler_index = { version = "0.34.0", default-features = false }
+rattler_upload = { version = "0.14.0", default-features = false }
+rattler_s3 = { version = "0.4.0" }
 rattler_redaction = { version = "0.2.7", default-features = false }
-rattler_repodata_gateway = { version = "0.36.5", default-features = false, features = [
+rattler_repodata_gateway = { version = "0.36.6", default-features = false, features = [
   "gateway",
 ] }
 rattler_solve = { version = "11.2.3", default-features = false, features = [
