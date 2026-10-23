@@ -14,7 +14,7 @@ use rattler_build_recipe::stage1::{
     tests::{CommandsTest, DownstreamTest, PerlTest, PythonTest, PythonVersion, RTest, RubyTest},
 };
 use rattler_build_script::{
-    EnvironmentIsolation, ExecutionContext, RuntimeEnv, Script, ScriptContent,
+    EnvironmentIsolation, ExecutionContext, RuntimeEnv, Script, ScriptContent, runner::Mounts,
 };
 use rattler_build_types::NormalizedKey;
 use rattler_conda_types::{
@@ -231,6 +231,10 @@ impl Tests {
         )?;
 
         let context = shared_test_context(environment, host_platform);
+        let mounts = Mounts::new()
+            .writable(environment)
+            .writable(tmp_dir.path())
+            .read_only(package_folder);
 
         match self {
             Tests::Commands(path) => {
@@ -246,7 +250,7 @@ impl Tests {
                         cwd,
                         context,
                         None::<fn(&str) -> Result<String, String>>,
-                        None,
+                        mounts.clone(),
                         config.env_isolation,
                         config.tool_configuration.runner.as_ref(),
                     )
@@ -267,7 +271,7 @@ impl Tests {
                         cwd,
                         context,
                         None::<fn(&str) -> Result<String, String>>,
-                        None,
+                        mounts.clone(),
                         config.env_isolation,
                         config.tool_configuration.runner.as_ref(),
                     )
@@ -922,7 +926,10 @@ async fn run_python_test_inner(
             path,
             context.clone(),
             None::<fn(&str) -> Result<String, String>>,
-            None,
+            Mounts::new()
+                .writable(&test_prefix)
+                .writable(&test_dir)
+                .read_only(path),
             config.env_isolation,
             config.tool_configuration.runner.as_ref(),
         )
@@ -939,6 +946,8 @@ async fn run_python_test_inner(
             content: ScriptContent::Command("pip check".into()),
             ..Script::default()
         };
+        // `pip check` runs in the extracted package, where its wrapper and
+        // log are written, so the package is writable for this session.
         script
             .run_script(
                 test_env_vars,
@@ -946,7 +955,7 @@ async fn run_python_test_inner(
                 path,
                 context,
                 None::<fn(&str) -> Result<String, String>>,
-                None,
+                Mounts::new().writable(&test_prefix).writable(path),
                 config.env_isolation,
                 config.tool_configuration.runner.as_ref(),
             )
@@ -1028,7 +1037,10 @@ async fn run_perl_test(
             path,
             context,
             None::<fn(&str) -> Result<String, String>>,
-            None,
+            Mounts::new()
+                .writable(&test_prefix)
+                .writable(&test_folder)
+                .read_only(path),
             config.env_isolation,
             config.tool_configuration.runner.as_ref(),
         )
@@ -1122,7 +1134,13 @@ async fn run_commands_test(
 
     let env_vars = test_env_vars(&run_prefix, &test_dir, path, &resolved_records, config)?;
 
-    let context = if let Some(build_prefix) = build_prefix {
+    let mut mounts = Mounts::new().writable(&run_prefix).writable(&test_dir);
+    if let Some(build_prefix) = &build_prefix {
+        mounts = mounts.writable(build_prefix);
+    }
+    let mounts = mounts.read_only(path);
+
+    let context = if let Some(build_prefix) = &build_prefix {
         ExecutionContext::separate(
             RuntimeEnv::current(),
             build_prefix,
@@ -1143,7 +1161,7 @@ async fn run_commands_test(
             path,
             context,
             None::<fn(&str) -> Result<String, String>>,
-            None,
+            mounts,
             config.env_isolation,
             config.tool_configuration.runner.as_ref(),
         )
@@ -1319,7 +1337,10 @@ async fn run_r_test(
             path,
             context,
             None::<fn(&str) -> Result<String, String>>,
-            None,
+            Mounts::new()
+                .writable(&test_prefix)
+                .writable(&test_folder)
+                .read_only(path),
             config.env_isolation,
             config.tool_configuration.runner.as_ref(),
         )
@@ -1396,7 +1417,10 @@ async fn run_ruby_test(
             path,
             context,
             None::<fn(&str) -> Result<String, String>>,
-            None,
+            Mounts::new()
+                .writable(&test_prefix)
+                .writable(&test_folder)
+                .read_only(path),
             config.env_isolation,
             config.tool_configuration.runner.as_ref(),
         )
