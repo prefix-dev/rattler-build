@@ -148,6 +148,7 @@ rattler_build_script = { workspace = true, features = ["execution"] }
 sha2 = { workspace = true }
 
 [dev-dependencies]
+async-trait = { workspace = true }
 insta = { workspace = true, features = ["yaml", "filters"] }
 rstest = { workspace = true }
 tracing-test = { workspace = true }

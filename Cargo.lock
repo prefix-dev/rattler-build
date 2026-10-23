@@ -5006,6 +5006,7 @@ dependencies = [
  "astral-reqwest-middleware",
  "async-once-cell",
  "async-recursion",
+ "async-trait",
  "clap",
  "clap-verbosity-flag",
  "comfy-table",
