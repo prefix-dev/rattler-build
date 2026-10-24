@@ -524,13 +524,13 @@ pub async fn get_build_output(
         // All outputs share one timestamp, so variants of a package would
         // get the same build directory. Add the variant hash so they can
         // build at the same time (`--parallel-builds`); outputs that inherit
-        // from a staging cache must keep the shared directory (they are
-        // never built at the same time, see `ParallelBuilds`).
+        // from a staging cache must keep the shared directory. Not on Windows,
+        // where the longer paths can exceed MAX_PATH (e.g. CMake's compiler
+        // check). Outputs sharing a directory are never built at the same
+        // time, see `ParallelBuilds`.
         let variant_hash = format!("h{}", discovered_output.hash.hash);
-        let variant_hash = recipe
-            .inherits_from
-            .is_none()
-            .then_some(variant_hash.as_str());
+        let variant_hash =
+            (recipe.inherits_from.is_none() && !cfg!(windows)).then_some(variant_hash.as_str());
 
         let variant_channels = if let Some(channel_sources) = discovered_output
             .used_vars
