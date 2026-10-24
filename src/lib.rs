@@ -521,6 +521,16 @@ pub async fn get_build_output(
         } else {
             recipe.package().name().as_normalized().to_string()
         };
+        // All outputs share one timestamp, so variants of a package would
+        // get the same build directory. Add the variant hash so they can
+        // build at the same time (`--parallel-builds`); outputs that inherit
+        // from a staging cache must keep the shared directory (they are
+        // never built at the same time, see `ParallelBuilds`).
+        let variant_hash = format!("h{}", discovered_output.hash.hash);
+        let variant_hash = recipe
+            .inherits_from
+            .is_none()
+            .then_some(variant_hash.as_str());
 
         let variant_channels = if let Some(channel_sources) = discovered_output
             .used_vars
@@ -592,6 +602,7 @@ pub async fn get_build_output(
                     Subdir::current().expect("unsupported build platform"),
                 )
                 .no_build_id(build_data.no_build_id)
+                .variant_hash(variant_hash)
                 .merge_build_and_host(recipe.build().merge_build_and_host_envs)
                 .skip_directory_creation(build_data.render_only)
                 .build()
