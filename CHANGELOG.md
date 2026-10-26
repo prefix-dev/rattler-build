@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.79.0] - 2026-10-26
+### ✨ Highlights
+
+`generate-recipe cran` emits recipes closer to conda-forge's R feedstock conventions, with `--staged-recipes` for conda-forge submissions. All recipe generators now emit indented YAML with `schema_version: 1`.
+
+Parallel builds no longer run outputs in the same build directory at the same time. Variant hashes distinguish build directories when build IDs are enabled; outputs that still share a directory are serialized.
+
+### Features
+
+- Update recipe format of generate-recipe for CRAN by @matthewfeickert in [#2759](https://github.com/prefix-dev/rattler-build/pull/2759)
+
+
+### Fixes
+
+- Never share a build directory between parallel builds by @Tobias-Fischer in [#2899](https://github.com/prefix-dev/rattler-build/pull/2899)
+
+
+### New Contributors
+* @Tobias-Fischer made their first contribution in [#2899](https://github.com/prefix-dev/rattler-build/pull/2899)
+
 ## [0.78.0] - 2026-10-23
 ### ✨ Highlights
 
