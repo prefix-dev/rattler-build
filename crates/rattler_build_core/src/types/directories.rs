@@ -431,7 +431,7 @@ mod tests {
             .as_os_str()
             .len();
 
-        for (unpadded_length, distinct) in [(246, true), (247, false), (255, false)] {
+        for unpadded_length in [246, 247, 250, 255] {
             let output_dir = tempdir
                 .path()
                 .join("a".repeat(unpadded_length - base_length - 1));
@@ -453,7 +453,7 @@ mod tests {
             let second = directories("h7654321");
             assert_eq!(first.host_prefix.as_os_str().len(), HOST_PREFIX_LENGTH);
             assert_eq!(second.host_prefix.as_os_str().len(), HOST_PREFIX_LENGTH);
-            if distinct {
+            if unpadded_length + "_h1234567".len() <= HOST_PREFIX_LENGTH {
                 assert_ne!(first.build_dir, second.build_dir);
             } else {
                 assert_eq!(first.build_dir, second.build_dir);
