@@ -28,3 +28,8 @@ rattler-build generate-recipe cran [OPTIONS] <PACKAGE>
 <br>May be provided more than once.
 - <a id="arg---write" href="#arg---write">`--write (-w)`</a>
 :  Whether to write the recipe to a folder
+- <a id="arg---maintainer" href="#arg---maintainer">`--maintainer (-m) <GITHUB_ID>`</a>
+:  GitHub handle(s) to list under `extra.recipe-maintainers` (repeatable)
+<br>May be provided more than once.
+- <a id="arg---staged-recipes" href="#arg---staged-recipes">`--staged-recipes`</a>
+:  Shape the recipe for a conda-forge staged-recipes submission: download through conda-forge's `cran_mirror` variant, leave out the `skip` for a minimum R version, require the C standard library next to the compilers, list `conda-forge/r` as a maintainer and append the package's DESCRIPTION file for reviewers
