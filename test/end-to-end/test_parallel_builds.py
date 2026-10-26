@@ -77,10 +77,8 @@ def test_parallel_builds(
         assert makeflags == ""
 
 
-# Two variants of one package. Each claims its work directory with a marker
-# file that must not exist yet and records the directory. With `rendezvous`,
-# each variant waits for the other to have started, so the build only succeeds
-# if they run at the same time; without it, the build fails if they do.
+# Rendezvous requires both variants to run concurrently; the shared marker
+# directory rejects concurrent builds when rendezvous is disabled.
 VARIANTS_RECIPE = """\
 schema_version: 1
 
@@ -133,9 +131,9 @@ def _build_two_variants(
 def test_parallel_builds_of_variants_use_separate_build_dirs(
     rattler_build: RattlerBuild, tmp_path: Path
 ):
-    """Variants of one package rendered together (one timestamp) build side
-    by side in separate build directories (issue #2898)."""
-    work_dirs = _build_two_variants(rattler_build, tmp_path, True, [])
+    work_dirs = _build_two_variants(
+        rattler_build, tmp_path, rendezvous=True, extra_args=[]
+    )
     assert work_dirs["1"] != work_dirs["2"]
 
 
@@ -143,8 +141,8 @@ def test_parallel_builds_of_variants_use_separate_build_dirs(
 def test_parallel_builds_of_variants_sharing_a_build_dir_take_turns(
     rattler_build: RattlerBuild, tmp_path: Path
 ):
-    """With `--no-build-id` the variants share a build directory, so they must
-    not build at the same time; the second one then starts from a clean work
-    directory."""
-    work_dirs = _build_two_variants(rattler_build, tmp_path, False, ["--no-build-id"])
+    """Each variant must start with a clean work directory."""
+    work_dirs = _build_two_variants(
+        rattler_build, tmp_path, rendezvous=False, extra_args=["--no-build-id"]
+    )
     assert work_dirs["1"] == work_dirs["2"]

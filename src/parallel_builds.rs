@@ -58,11 +58,8 @@ pub(crate) struct ParallelBuilds<'a> {
     jobserver: Option<Jobserver>,
     /// A ready output whose build waits for a jobserver token.
     waiting: Option<Output>,
-    /// The build directories of the running builds and of the waiting one.
-    /// Outputs can share a build directory (variants of a package with
-    /// `--no-build-id`, or outputs that inherit a staging cache), and two
-    /// builds in one directory would overwrite each other's sources and
-    /// prefixes, so such outputs never run at the same time.
+    /// Directories reserved by running builds and the waiting build.
+    /// Builds sharing sources and prefixes must not run concurrently.
     busy_build_dirs: HashSet<PathBuf>,
 }
 
@@ -112,19 +109,16 @@ impl<'a> ParallelBuilds<'a> {
             let output = match self.waiting.take() {
                 Some(output) => output,
                 None => {
-                    let busy = &self.busy_build_dirs;
-                    match queue
+                    let Some(output) = queue
                         .next_ready_parallel(self.jobs.len(), self.max_jobs > 1, |output| {
-                            !busy.contains(build_dir(output))
+                            !self.busy_build_dirs.contains(build_dir(output))
                         })
                         .into_diagnostic()?
-                    {
-                        Some(output) => {
-                            self.busy_build_dirs.insert(build_dir(&output).clone());
-                            output
-                        }
-                        None => break,
-                    }
+                    else {
+                        break;
+                    };
+                    self.busy_build_dirs.insert(build_dir(&output).clone());
+                    output
                 }
             };
             let token = match &self.jobserver {
@@ -272,7 +266,6 @@ impl<'a> ParallelBuilds<'a> {
     }
 }
 
-/// The directory an output builds in (sources, prefixes and work directory).
 fn build_dir(output: &Output) -> &PathBuf {
     &output.build_configuration.directories.build_dir
 }

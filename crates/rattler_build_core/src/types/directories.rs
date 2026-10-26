@@ -51,11 +51,9 @@ impl<'a> DirectoriesBuilder<'a> {
         self
     }
 
-    /// The variant hash to add to the build directory name next to the build
-    /// ID, so that variants of a package built at the same time (see
-    /// `--parallel-builds`) do not share a build directory. Omitted when it
-    /// would exceed the padded host-prefix budget, or with
-    /// [`Self::no_build_id`], which keeps build directory paths short.
+    /// Distinguish variants sharing a build timestamp.
+    /// Omitted with [`Self::no_build_id`] or when it would exceed the
+    /// padded host-prefix budget.
     pub fn variant_hash(mut self, variant_hash: Option<&'a str>) -> Self {
         self.variant_hash = variant_hash;
         self

@@ -596,8 +596,7 @@ impl OutputBuildQueue {
     /// of dependent builds start early. Used only for parallel builds; a
     /// serial build keeps the queue order.
     ///
-    /// Outputs for which `can_start` is false (because a running build uses
-    /// their build directory) are left in the queue.
+    /// While jobs are in flight, outputs rejected by `can_start` stay queued.
     pub(crate) fn next_ready_parallel(
         &mut self,
         in_flight: usize,
