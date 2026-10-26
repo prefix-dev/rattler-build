@@ -4679,18 +4679,15 @@ noted, no variables are inherited from the shell environment in which you invoke
 </dd>
 <dt><code>R</code></dt>
 <dd>
-<p>The path to the R executable in the build prefix. R is installed in the
-  build prefix only when it is listed as a build requirement.</p>
+<p>The path to the R executable in the host prefix. Set when <code>r_base</code> is part of the variant configuration or <code>r-base</code> is resolved in the host environment. Test environments do not define it. When cross-compiling, that R cannot run on the build machine: call <code>R</code> (or <code>$R</code>) in the build script, which the activation of <code>cross-r-base</code> points at the R of the build platform, rather than <code>${{ R }}</code>, which is replaced by the host prefix path before the environment is activated. <code>noarch</code> packages are not cross-compiled and can use <code>${{ R }}</code>.</p>
 </dd>
 <dt><code>R_VER</code></dt>
 <dd>
-<p>The R version (<code>major.minor</code>, e.g. <code>4.3</code>). Only set when R is part of the
-  variant configuration.</p>
+<p>The R version reduced to <code>major.minor</code> (e.g. <code>4.3</code>), taken from the <code>r_base</code> variant when configured and from the resolved <code>r-base</code> host package otherwise. Set under the same conditions as <code>R</code>.</p>
 </dd>
 <dt><code>R_USER</code></dt>
 <dd>
-<p>The path to the R user library directory inside the host prefix. Only set
-  when R is part of the variant configuration.</p>
+<p>The path to the R user library directory inside the host prefix. Set under the same conditions as <code>R</code>.</p>
 </dd>
 <dt><code>NPY_VER</code></dt>
 <dd>

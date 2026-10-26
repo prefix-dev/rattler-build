@@ -4031,6 +4031,19 @@
 <dd>Whether to write the recipe to a folder</dd>
 </dl>
 </li>
+<li>
+<dl>
+<dt><a id="arg---maintainer" href="#arg---maintainer"><code>--maintainer (-m) &lt;GITHUB_ID&gt;</code></a></dt>
+<dd>GitHub handle(s) to list under <code>extra.recipe-maintainers</code> (repeatable)
+<br>May be provided more than once.</dd>
+</dl>
+</li>
+<li>
+<dl>
+<dt><a id="arg---staged-recipes" href="#arg---staged-recipes"><code>--staged-recipes</code></a></dt>
+<dd>Shape the recipe for a conda-forge staged-recipes submission: download through conda-forge's <code>cran_mirror</code> variant, leave out the <code>skip</code> for a minimum R version, require the C standard library next to the compilers, list <code>conda-forge/r</code> as a maintainer and append the package's DESCRIPTION file for reviewers</dd>
+</dl>
+</li>
 </ul>
 
 
