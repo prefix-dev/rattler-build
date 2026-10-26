@@ -303,13 +303,16 @@ impl CranTarball {
         // One decompression pass for everything the tarball can tell us. A
         // failure here means the bytes are not a source archive at all, so
         // nothing about them — the checksum included — can be trusted.
-        let mut scan =
-            tarball::scan_archive(bytes, &["DESCRIPTION", "tests/testthat.R"], Some("src"))?;
+        let mut scan = tarball::scan_archive(bytes, &["DESCRIPTION", "tests/testthat.R"])?;
         Ok(Self {
             sha256: Some(hex::encode(compute_bytes_digest::<Sha256>(bytes))),
             description: scan.files.remove("DESCRIPTION"),
             has_testthat_runner: scan.files.contains_key("tests/testthat.R"),
-            has_fortran_sources: scan.listed.iter().any(|path| is_fortran_source(path)),
+            has_fortran_sources: scan
+                .paths
+                .iter()
+                .filter_map(|path| tarball::strip_archive_prefix(path, "src"))
+                .any(|path| is_fortran_source(&path)),
         })
     }
 }
