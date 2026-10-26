@@ -223,8 +223,7 @@ impl Directories {
             && variant_hash.is_some()
             && build_dir.as_os_str().len() + "/host_env".len() > HOST_PREFIX_LENGTH
         {
-            // Keep previously valid long paths usable; the scheduler serializes
-            // outputs sharing this directory when the hash cannot fit.
+            // The scheduler serializes outputs sharing a directory when the hash cannot fit.
             get_build_dir(&output_dir, name, no_build_id, None, timestamp)?
         } else {
             build_dir
@@ -432,7 +431,7 @@ mod tests {
             .as_os_str()
             .len();
 
-        for unpadded_length in [246, 247, 250, 255] {
+        for (unpadded_length, distinct) in [(246, true), (247, false), (255, false)] {
             let output_dir = tempdir
                 .path()
                 .join("a".repeat(unpadded_length - base_length - 1));
@@ -454,7 +453,7 @@ mod tests {
             let second = directories("h7654321");
             assert_eq!(first.host_prefix.as_os_str().len(), HOST_PREFIX_LENGTH);
             assert_eq!(second.host_prefix.as_os_str().len(), HOST_PREFIX_LENGTH);
-            if unpadded_length + "_h1234567".len() <= HOST_PREFIX_LENGTH {
+            if distinct {
                 assert_ne!(first.build_dir, second.build_dir);
             } else {
                 assert_eq!(first.build_dir, second.build_dir);
