@@ -96,23 +96,24 @@ fn is_archive_file(path: &Path, relative: &str) -> bool {
     strip_archive_prefix(path, relative).is_some_and(|rest| rest.as_os_str().is_empty())
 }
 
+/// Build an in-memory `.tar.gz` with the given `(path, contents)` entries.
+#[cfg(test)]
+pub(crate) fn tarball_with(files: &[(&str, &[u8])]) -> Vec<u8> {
+    let encoder = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
+    let mut builder = tar::Builder::new(encoder);
+    for (path, contents) in files {
+        let mut header = tar::Header::new_gnu();
+        header.set_size(contents.len() as u64);
+        header.set_mode(0o644);
+        header.set_cksum();
+        builder.append_data(&mut header, path, *contents).unwrap();
+    }
+    builder.into_inner().unwrap().finish().unwrap()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    /// Build an in-memory `.tar.gz` with the given `(path, contents)` entries.
-    fn tarball_with(files: &[(&str, &[u8])]) -> Vec<u8> {
-        let encoder = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
-        let mut builder = tar::Builder::new(encoder);
-        for (path, contents) in files {
-            let mut header = tar::Header::new_gnu();
-            header.set_size(contents.len() as u64);
-            header.set_mode(0o644);
-            header.set_cksum();
-            builder.append_data(&mut header, path, *contents).unwrap();
-        }
-        builder.into_inner().unwrap().finish().unwrap()
-    }
 
     #[test]
     fn finds_the_requested_files() {
