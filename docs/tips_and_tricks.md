@@ -88,6 +88,11 @@ slots, so `BUILDS` builds together run about `JOBS` compile jobs instead of
 rattler-build build --recipe-dir . --parallel-builds 4:16
 ```
 
+Outputs sharing a build directory run one at a time, even with spare parallel
+slots. This includes variants with `--no-build-id`, variants on Windows, staging
+cache consumers sharing a directory, and variants whose added hash would exceed
+the 255-byte host-prefix budget.
+
 The jobserver reaches build tools through `MAKEFLAGS`. make >= 4.4 and
 ninja >= 1.13 use it, but only when the recipe does not pass its own job count:
 an explicit `-j` (for example `make -j${CPU_COUNT}`, `ninja -j${CPU_COUNT}` or

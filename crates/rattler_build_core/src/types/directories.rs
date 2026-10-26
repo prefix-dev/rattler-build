@@ -53,7 +53,8 @@ impl<'a> DirectoriesBuilder<'a> {
 
     /// The variant hash to add to the build directory name next to the build
     /// ID, so that variants of a package built at the same time (see
-    /// `--parallel-builds`) do not share a build directory. Not used with
+    /// `--parallel-builds`) do not share a build directory. Omitted when it
+    /// would exceed the padded host-prefix budget, or with
     /// [`Self::no_build_id`], which keeps build directory paths short.
     pub fn variant_hash(mut self, variant_hash: Option<&'a str>) -> Self {
         self.variant_hash = variant_hash;
@@ -130,6 +131,8 @@ impl ExecutionDirectories {
     }
 }
 
+const HOST_PREFIX_LENGTH: usize = 255;
+
 /// Host prefix directory under `build_dir` for the given platform. Windows
 /// uses the short `h_env`; other platforms pad `host_env` with `_placehold`
 /// repetitions so the absolute prefix path is 255 characters long.
@@ -139,14 +142,13 @@ pub fn padded_host_prefix(build_dir: &Path, platform: Subdir) -> PathBuf {
     } else {
         let placeholder_template = "_placehold";
         let mut placeholder = String::new();
-        let placeholder_length: usize = 255;
 
-        while placeholder.len() < placeholder_length {
+        while placeholder.len() < HOST_PREFIX_LENGTH {
             placeholder.push_str(placeholder_template);
         }
 
         let placeholder = placeholder
-            [0..placeholder_length - build_dir.join("host_env").as_os_str().len()]
+            [0..HOST_PREFIX_LENGTH - build_dir.join("host_env").as_os_str().len()]
             .to_string();
 
         build_dir.join(format!("host_env{placeholder}"))
@@ -216,6 +218,17 @@ impl Directories {
 
         let build_dir = get_build_dir(&output_dir, name, no_build_id, variant_hash, timestamp)
             .expect("Could not create build directory");
+        let build_dir = if !platform.is_windows()
+            && !no_build_id
+            && variant_hash.is_some()
+            && build_dir.as_os_str().len() + "/host_env".len() > HOST_PREFIX_LENGTH
+        {
+            // Keep previously valid long paths usable; the scheduler serializes
+            // outputs sharing this directory when the hash cannot fit.
+            get_build_dir(&output_dir, name, no_build_id, None, timestamp)?
+        } else {
+            build_dir
+        };
         // TODO move this into build_dir, and keep build_dir consistent.
         let cache_dir = output_dir.join("build_cache");
         let recipe_dir = recipe_path
@@ -407,6 +420,46 @@ mod tests {
                 .eq(format!("rattler-build_name_h1234567_{epoch}").as_str())
         );
         assert_ne!(p3, p4);
+    }
+
+    #[test]
+    fn variant_directories_respect_host_prefix_budget() {
+        let tempdir = tempfile::tempdir().unwrap();
+        let timestamp = Timestamp::now();
+        let base_length = get_build_dir(tempdir.path(), "name", false, None, &timestamp)
+            .unwrap()
+            .join("host_env")
+            .as_os_str()
+            .len();
+
+        for unpadded_length in [246, 247, 250, 255] {
+            let output_dir = tempdir
+                .path()
+                .join("a".repeat(unpadded_length - base_length - 1));
+            let recipe_path = tempdir.path().join("recipe.yaml");
+            let directories = |hash| {
+                Directories::builder(
+                    "name",
+                    &recipe_path,
+                    &output_dir,
+                    &timestamp,
+                    Subdir::Linux64,
+                )
+                .variant_hash(Some(hash))
+                .skip_directory_creation(true)
+                .build()
+                .unwrap()
+            };
+            let first = directories("h1234567");
+            let second = directories("h7654321");
+            assert_eq!(first.host_prefix.as_os_str().len(), HOST_PREFIX_LENGTH);
+            assert_eq!(second.host_prefix.as_os_str().len(), HOST_PREFIX_LENGTH);
+            if unpadded_length + "_h1234567".len() <= HOST_PREFIX_LENGTH {
+                assert_ne!(first.build_dir, second.build_dir);
+            } else {
+                assert_eq!(first.build_dir, second.build_dir);
+            }
+        }
     }
 
     #[test]
