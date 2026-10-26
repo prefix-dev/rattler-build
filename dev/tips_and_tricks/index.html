@@ -4079,6 +4079,10 @@ slots, so <code>BUILDS</code> builds together run about <code>JOBS</code> compil
 <code>BUILDS</code> times the number of CPUs (unix only):</p>
 <div class="language-sh highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>rattler-build<span class="w"> </span>build<span class="w"> </span>--recipe-dir<span class="w"> </span>.<span class="w"> </span>--parallel-builds<span class="w"> </span><span class="m">4</span>:16
 </span></code></pre></div>
+<p>Outputs sharing a build directory run one at a time, even with spare parallel
+slots. This includes variants with <code>--no-build-id</code>, variants on Windows, staging
+cache consumers sharing a directory, and variants whose added hash would exceed
+the 255-byte host-prefix budget.</p>
 <p>The jobserver reaches build tools through <code>MAKEFLAGS</code>. make &gt;= 4.4 and
 ninja &gt;= 1.13 use it, but only when the recipe does not pass its own job count:
 an explicit <code>-j</code> (for example <code>make -j${CPU_COUNT}</code>, <code>ninja -j${CPU_COUNT}</code> or
