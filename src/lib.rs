@@ -521,6 +521,11 @@ pub async fn get_build_output(
         } else {
             recipe.package().name().as_normalized().to_string()
         };
+        // Variants share a timestamp. Staging consumers need a shared directory;
+        // Windows paths must stay short for build tools constrained by MAX_PATH.
+        let variant_hash =
+            (!build_data.no_build_id && recipe.inherits_from.is_none() && !cfg!(windows))
+                .then(|| format!("h{}", discovered_output.hash.hash));
 
         let variant_channels = if let Some(channel_sources) = discovered_output
             .used_vars
@@ -592,6 +597,7 @@ pub async fn get_build_output(
                     Subdir::current().expect("unsupported build platform"),
                 )
                 .no_build_id(build_data.no_build_id)
+                .variant_hash(variant_hash.as_deref())
                 .merge_build_and_host(recipe.build().merge_build_and_host_envs)
                 .skip_directory_creation(build_data.render_only)
                 .build()

@@ -14,7 +14,7 @@
 //! (for example the output channel lock), or both would wait forever; that is
 //! why tests and reindexing run as jobs too.
 
-use std::{future::Future, path::PathBuf, sync::Arc};
+use std::{collections::HashSet, future::Future, path::PathBuf, sync::Arc};
 
 use futures::{FutureExt, StreamExt, future::LocalBoxFuture, stream::FuturesUnordered};
 use miette::IntoDiagnostic;
@@ -58,6 +58,9 @@ pub(crate) struct ParallelBuilds<'a> {
     jobserver: Option<Jobserver>,
     /// A ready output whose build waits for a jobserver token.
     waiting: Option<Output>,
+    /// Directories reserved by running builds and the waiting build.
+    /// Builds sharing sources and prefixes must not run concurrently.
+    busy_build_dirs: HashSet<PathBuf>,
 }
 
 impl<'a> ParallelBuilds<'a> {
@@ -94,6 +97,7 @@ impl<'a> ParallelBuilds<'a> {
             running_builds: 0,
             jobserver,
             waiting: None,
+            busy_build_dirs: HashSet::new(),
         }
     }
 
@@ -104,13 +108,18 @@ impl<'a> ParallelBuilds<'a> {
         while self.jobs.len() < self.max_jobs {
             let output = match self.waiting.take() {
                 Some(output) => output,
-                None => match queue
-                    .next_ready_parallel(self.jobs.len(), self.max_jobs > 1)
-                    .into_diagnostic()?
-                {
-                    Some(output) => output,
-                    None => break,
-                },
+                None => {
+                    let Some(output) = queue
+                        .next_ready_parallel(self.jobs.len(), self.max_jobs > 1, |output| {
+                            !self.busy_build_dirs.contains(build_dir(output))
+                        })
+                        .into_diagnostic()?
+                    else {
+                        break;
+                    };
+                    self.busy_build_dirs.insert(build_dir(&output).clone());
+                    output
+                }
             };
             let token = match &self.jobserver {
                 None => None,
@@ -233,6 +242,9 @@ impl<'a> ParallelBuilds<'a> {
         if held_slot {
             self.running_builds -= 1;
         }
+        if let Event::Build { output, .. } = &finished {
+            self.busy_build_dirs.remove(build_dir(output));
+        }
         Some(finished)
     }
 
@@ -241,7 +253,9 @@ impl<'a> ParallelBuilds<'a> {
     /// rattler-build exits (like make's "waiting for unfinished jobs").
     pub(crate) async fn finish_running(&mut self) {
         // Do not start a build that waits for a token.
-        self.waiting = None;
+        if let Some(output) = self.waiting.take() {
+            self.busy_build_dirs.remove(build_dir(&output));
+        }
         if !self.jobs.is_empty() {
             tracing::warn!(
                 "Waiting for {} running job(s) to finish before stopping",
@@ -250,6 +264,10 @@ impl<'a> ParallelBuilds<'a> {
         }
         while self.next().await.is_some() {}
     }
+}
+
+fn build_dir(output: &Output) -> &PathBuf {
+    &output.build_configuration.directories.build_dir
 }
 
 /// Aborts a spawned build when dropped. Dropping a `JoinHandle` only detaches

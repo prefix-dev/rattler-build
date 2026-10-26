@@ -595,16 +595,19 @@ impl OutputBuildQueue {
     /// need (directly or transitively) is started first, so that long chains
     /// of dependent builds start early. Used only for parallel builds; a
     /// serial build keeps the queue order.
+    ///
+    /// While jobs are in flight, outputs rejected by `can_start` stay queued.
     pub(crate) fn next_ready_parallel(
         &mut self,
         in_flight: usize,
         prioritize: bool,
+        can_start: impl Fn(&Output) -> bool,
     ) -> Result<Option<Output>, BuildQueueError> {
         if prioritize {
             let readiness = BuildReadiness::new(&self.planned_outputs, &self.processed_outputs);
             let dependents = &self.dependents;
             if let Some(output) = self.queue.best_ready(
-                |output| readiness.can_build(output),
+                |output| Ok(can_start(output) && readiness.can_build(output)?),
                 |output| dependents.get(output.name()).copied().unwrap_or(0),
             )? {
                 return Ok(Some(output));
@@ -616,7 +619,7 @@ impl OutputBuildQueue {
         let readiness = BuildReadiness::new(&self.planned_outputs, &self.processed_outputs);
         match self
             .queue
-            .next_ready(|output| readiness.can_build(output))?
+            .next_ready(|output| Ok(can_start(output) && readiness.can_build(output)?))?
         {
             NextReady::Ready(output) => Ok(Some(output)),
             NextReady::Empty | NextReady::Blocked => Ok(None),

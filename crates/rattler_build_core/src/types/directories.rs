@@ -18,6 +18,7 @@ pub struct DirectoriesBuilder<'a> {
     timestamp: &'a Timestamp,
     platform: Subdir,
     no_build_id: bool,
+    variant_hash: Option<&'a str>,
     merge_build_and_host: bool,
     skip_directory_creation: bool,
 }
@@ -38,6 +39,7 @@ impl<'a> DirectoriesBuilder<'a> {
             timestamp,
             platform,
             no_build_id: false,
+            variant_hash: None,
             merge_build_and_host: false,
             skip_directory_creation: false,
         }
@@ -46,6 +48,14 @@ impl<'a> DirectoriesBuilder<'a> {
     /// When true, omit the build ID (timestamp) from the build directory name.
     pub fn no_build_id(mut self, no_build_id: bool) -> Self {
         self.no_build_id = no_build_id;
+        self
+    }
+
+    /// Distinguish variants sharing a build timestamp.
+    /// Omitted with [`Self::no_build_id`] or when it would exceed the
+    /// padded host-prefix budget.
+    pub fn variant_hash(mut self, variant_hash: Option<&'a str>) -> Self {
+        self.variant_hash = variant_hash;
         self
     }
 
@@ -119,6 +129,8 @@ impl ExecutionDirectories {
     }
 }
 
+const HOST_PREFIX_LENGTH: usize = 255;
+
 /// Host prefix directory under `build_dir` for the given platform. Windows
 /// uses the short `h_env`; other platforms pad `host_env` with `_placehold`
 /// repetitions so the absolute prefix path is 255 characters long.
@@ -128,14 +140,13 @@ pub fn padded_host_prefix(build_dir: &Path, platform: Subdir) -> PathBuf {
     } else {
         let placeholder_template = "_placehold";
         let mut placeholder = String::new();
-        let placeholder_length: usize = 255;
 
-        while placeholder.len() < placeholder_length {
+        while placeholder.len() < HOST_PREFIX_LENGTH {
             placeholder.push_str(placeholder_template);
         }
 
         let placeholder = placeholder
-            [0..placeholder_length - build_dir.join("host_env").as_os_str().len()]
+            [0..HOST_PREFIX_LENGTH - build_dir.join("host_env").as_os_str().len()]
             .to_string();
 
         build_dir.join(format!("host_env{placeholder}"))
@@ -146,14 +157,15 @@ fn get_build_dir(
     output_dir: &Path,
     name: &str,
     no_build_id: bool,
+    variant_hash: Option<&str>,
     timestamp: &Timestamp,
 ) -> Result<PathBuf, std::io::Error> {
     let since_the_epoch = timestamp.as_second();
 
-    let dirname = if no_build_id {
-        format!("rattler-build_{}", name)
-    } else {
-        format!("rattler-build_{}_{:?}", name, since_the_epoch)
+    let dirname = match (no_build_id, variant_hash) {
+        (true, _) => format!("rattler-build_{}", name),
+        (false, None) => format!("rattler-build_{}_{:?}", name, since_the_epoch),
+        (false, Some(hash)) => format!("rattler-build_{}_{}_{:?}", name, hash, since_the_epoch),
     };
     Ok(output_dir.join("bld").join(dirname))
 }
@@ -179,6 +191,7 @@ impl Directories {
             timestamp,
             platform,
             no_build_id,
+            variant_hash,
             merge_build_and_host,
             skip_directory_creation,
         } = builder;
@@ -201,8 +214,18 @@ impl Directories {
             canonicalize(output_dir)?
         };
 
-        let build_dir = get_build_dir(&output_dir, name, no_build_id, timestamp)
+        let build_dir = get_build_dir(&output_dir, name, no_build_id, variant_hash, timestamp)
             .expect("Could not create build directory");
+        let build_dir = if !platform.is_windows()
+            && !no_build_id
+            && variant_hash.is_some()
+            && build_dir.as_os_str().len() + "/host_env".len() > HOST_PREFIX_LENGTH
+        {
+            // The scheduler serializes outputs sharing a directory when the hash cannot fit.
+            get_build_dir(&output_dir, name, no_build_id, None, timestamp)?
+        } else {
+            build_dir
+        };
         // TODO move this into build_dir, and keep build_dir consistent.
         let cache_dir = output_dir.join("build_cache");
         let recipe_dir = recipe_path
@@ -362,16 +385,78 @@ mod tests {
     fn setup_build_dir_test() {
         // without build_id (aka timestamp)
         let dir = tempfile::tempdir().unwrap();
-        let p1 = get_build_dir(dir.path(), "name", true, &Timestamp::now()).unwrap();
+        let p1 = get_build_dir(dir.path(), "name", true, None, &Timestamp::now()).unwrap();
         let f1 = p1.file_name().unwrap();
         assert!(f1.eq("rattler-build_name"));
 
+        // without build_id, the variant hash is not used either (short paths)
+        let p1 = get_build_dir(
+            dir.path(),
+            "name",
+            true,
+            Some("h1234567"),
+            &Timestamp::now(),
+        )
+        .unwrap();
+        assert!(p1.file_name().unwrap().eq("rattler-build_name"));
+
         // with build_id (aka timestamp)
         let timestamp = &Timestamp::now();
-        let p2 = get_build_dir(dir.path(), "name", false, timestamp).unwrap();
+        let p2 = get_build_dir(dir.path(), "name", false, None, timestamp).unwrap();
         let f2 = p2.file_name().unwrap();
         let epoch = timestamp.as_second();
         assert!(f2.eq(format!("rattler-build_name_{epoch}").as_str()));
+
+        // with build_id and a variant hash: variants built in the same second
+        // get different build directories
+        let p3 = get_build_dir(dir.path(), "name", false, Some("h1234567"), timestamp).unwrap();
+        let p4 = get_build_dir(dir.path(), "name", false, Some("h7654321"), timestamp).unwrap();
+        assert!(
+            p3.file_name()
+                .unwrap()
+                .eq(format!("rattler-build_name_h1234567_{epoch}").as_str())
+        );
+        assert_ne!(p3, p4);
+    }
+
+    #[test]
+    fn variant_directories_respect_host_prefix_budget() {
+        let tempdir = tempfile::tempdir().unwrap();
+        let timestamp = Timestamp::now();
+        let base_length = get_build_dir(tempdir.path(), "name", false, None, &timestamp)
+            .unwrap()
+            .join("host_env")
+            .as_os_str()
+            .len();
+
+        for unpadded_length in [246, 247, 250, 255] {
+            let output_dir = tempdir
+                .path()
+                .join("a".repeat(unpadded_length - base_length - 1));
+            let recipe_path = tempdir.path().join("recipe.yaml");
+            let directories = |hash| {
+                Directories::builder(
+                    "name",
+                    &recipe_path,
+                    &output_dir,
+                    &timestamp,
+                    Subdir::Linux64,
+                )
+                .variant_hash(Some(hash))
+                .skip_directory_creation(true)
+                .build()
+                .unwrap()
+            };
+            let first = directories("h1234567");
+            let second = directories("h7654321");
+            assert_eq!(first.host_prefix.as_os_str().len(), HOST_PREFIX_LENGTH);
+            assert_eq!(second.host_prefix.as_os_str().len(), HOST_PREFIX_LENGTH);
+            if unpadded_length + "_h1234567".len() <= HOST_PREFIX_LENGTH {
+                assert_ne!(first.build_dir, second.build_dir);
+            } else {
+                assert_eq!(first.build_dir, second.build_dir);
+            }
+        }
     }
 
     #[test]
