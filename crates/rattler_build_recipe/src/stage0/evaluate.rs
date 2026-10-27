@@ -3273,6 +3273,17 @@ fn evaluate_package_output_to_recipe(
     staging_caches: &IndexMap<String, crate::stage1::StagingCache>,
     accessed_during_context: &HashSet<String>,
 ) -> Result<Option<Stage1Recipe>, ParseError> {
+    // Check skip conditions (top-level OR output) before evaluating anything else.
+    // A skipped output acts like an outer `if: ...` conditional: the rest of it may
+    // reference variant keys that don't exist for this platform (e.g.
+    // `files: [bin/${{ TARGET }}-clang]` on an output with `skip: win`), so it must
+    // not be rendered at all.
+    if evaluate_skip_list(&recipe.build.skip, context)?
+        || evaluate_skip_list(&output.build.skip, context)?
+    {
+        return Ok(None);
+    }
+
     // Evaluate package name
     let name_str = evaluate_value_to_string(&output.package.name, context)?;
     let name = PackageName::from_str(&name_str).map_err(|e| {
@@ -3347,14 +3358,6 @@ fn evaluate_package_output_to_recipe(
         && script.content.is_default()
     {
         script.content = ScriptContent::Commands(Vec::new());
-    }
-
-    // Check if this output is skipped (already eagerly evaluated during Build::evaluate).
-    // If skipped, return a minimal recipe early - this is like an outer `if: ...` conditional.
-    // We skip evaluating requirements, tests, sources, etc. to avoid errors from
-    // platform-specific functions (like stdlib('c') on Windows) that would fail.
-    if build.skip {
-        return Ok(None);
     }
 
     // Evaluate about section
@@ -5869,6 +5872,65 @@ outputs:
             }
             _ => panic!("Expected MultiOutputRecipe"),
         }
+    }
+
+    #[test]
+    fn test_skipped_output_does_not_evaluate_build_section() {
+        // A skipped output may reference variant keys in its build section that only
+        // exist for the platforms it is built on. Those must not be rendered when the
+        // output is skipped (https://github.com/prefix-dev/rattler-build/issues/2587).
+        use crate::stage0::parser::parse_recipe_or_multi_from_source;
+
+        let recipe_yaml = r#"
+schema_version: 1
+
+recipe:
+  name: clangdev
+  version: "1.0.0"
+
+outputs:
+  - staging:
+      name: clangdev-stage
+    build:
+      script:
+        - echo hello
+
+  - package:
+      name: clang_impl
+    inherit: clangdev-stage
+    build:
+      skip: win
+      files:
+        - bin/${{ TARGET }}-clang
+
+  - package:
+      name: clangdev
+    inherit: clangdev-stage
+"#;
+
+        let stage0::Recipe::MultiOutput(multi) =
+            parse_recipe_or_multi_from_source(recipe_yaml).unwrap()
+        else {
+            panic!("Expected MultiOutputRecipe");
+        };
+
+        // No `TARGET` in the variant on Windows
+        let jinja_config = JinjaConfig {
+            target_platform: rattler_conda_types::Subdir::Win64,
+            build_platform: rattler_conda_types::Subdir::Win64,
+            host_platform: rattler_conda_types::Subdir::Win64,
+            ..Default::default()
+        };
+        let ctx = EvaluationContext::with_variables_and_config(IndexMap::new(), jinja_config);
+
+        let recipes = multi
+            .evaluate(&ctx)
+            .expect("skipped output must not render its build section");
+        let names: Vec<_> = recipes
+            .iter()
+            .map(|r| r.package.name().as_normalized().to_string())
+            .collect();
+        assert_eq!(names, vec!["clangdev"]);
     }
 
     #[test]
