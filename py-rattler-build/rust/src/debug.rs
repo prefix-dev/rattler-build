@@ -118,8 +118,11 @@ impl PyDebugSession {
     #[pyo3(signature = (trace=false))]
     fn run_script(&self, trace: bool) -> PyResult<(i32, String, String)> {
         let work_dir = &self.output.build_configuration.directories.work_dir;
-        let result =
-            core_debug::run_build_script(work_dir, trace).map_err(RattlerBuildError::Io)?;
+        let runner = self.tool_config.runner.as_ref();
+        let result = run_async_task(async {
+            Ok(core_debug::run_build_script(runner, work_dir, trace).await)
+        })?
+        .map_err(RattlerBuildError::Io)?;
         Ok((result.exit_code, result.stdout, result.stderr))
     }
 

@@ -14,25 +14,35 @@ use crate::execution::spawn_process;
 
 /// A runner that executes commands directly on the local machine.
 ///
-/// Each session applies the [`SessionSpec::env_isolation`] it was started
-/// with against the runner's captured [`RuntimeEnv`].
+/// The process environment is captured when a session starts, not when the
+/// runner is created: a runner held in a long-lived configuration runs every
+/// session against the environment of that moment. Each session applies the
+/// [`SessionSpec::env_isolation`] it was started with against that captured
+/// [`RuntimeEnv`], for streamed and interactive commands alike. A runtime
+/// injected with [`LocalRunner::with_runtime`] replaces the capture for every
+/// session.
 pub struct LocalRunner {
-    runtime: RuntimeEnv,
+    runtime: Option<RuntimeEnv>,
 }
 
 impl LocalRunner {
-    /// Creates a local runner that captures the current process environment.
+    /// Creates a local runner that captures the process environment whenever
+    /// a session starts.
     pub fn new() -> Self {
-        Self {
-            runtime: RuntimeEnv::current(),
-        }
+        Self { runtime: None }
     }
 
-    /// Overrides the captured runtime environment.
+    /// Uses `runtime` for every session instead of capturing the process
+    /// environment.
     #[must_use]
     pub fn with_runtime(mut self, runtime: RuntimeEnv) -> Self {
-        self.runtime = runtime;
+        self.runtime = Some(runtime);
         self
+    }
+
+    /// The runtime a session started now runs against.
+    fn runtime(&self) -> RuntimeEnv {
+        self.runtime.clone().unwrap_or_else(RuntimeEnv::current)
     }
 }
 
@@ -49,7 +59,7 @@ impl Runner for LocalRunner {
     }
 
     fn execution_platform(&self) -> rattler_conda_types::Subdir {
-        self.runtime.process_platform()
+        self.runtime().process_platform()
     }
 
     async fn check_usable(&self) -> Result<(), RunnerError> {
@@ -58,13 +68,13 @@ impl Runner for LocalRunner {
 
     async fn probe(&self) -> Result<GuestInfo, RunnerError> {
         Ok(GuestInfo {
-            platform: self.runtime.process_platform(),
+            platform: self.runtime().process_platform(),
         })
     }
 
     async fn start_session(&self, spec: SessionSpec) -> Result<Box<dyn Session>, RunnerError> {
         Ok(Box::new(LocalSession {
-            runtime: self.runtime.clone(),
+            runtime: self.runtime(),
             spec,
         }))
     }
@@ -126,9 +136,16 @@ impl Session for LocalSession {
                 "cannot execute an empty argv",
             )
         })?;
+        let process_env = resolve_process_env(
+            self.spec.env_isolation,
+            &spec.env,
+            &IndexMap::new(),
+            &self.runtime,
+        );
         let status = tokio::process::Command::new(program)
             .args(args)
-            .envs(&spec.env)
+            .env_clear()
+            .envs(&process_env)
             .current_dir(&spec.cwd.0)
             .stdin(Stdio::inherit())
             .stdout(Stdio::inherit())
@@ -460,19 +477,23 @@ mod tests {
         let _: Arc<dyn Runner> = Arc::new(LocalRunner::default());
     }
 
+    /// Without isolation an interactive command inherits the host
+    /// environment plus the explicit variables, and its exit code is reported.
     #[cfg(unix)]
     #[tokio::test]
     async fn exec_interactive_reports_exit_status_and_inherits_host_env() {
         let temp_dir = tempfile::tempdir().unwrap();
         let runner = LocalRunner::new();
         let mut session =
-            start_local_session(&runner, temp_dir.path(), EnvironmentIsolation::Strict).await;
+            start_local_session(&runner, temp_dir.path(), EnvironmentIsolation::None).await;
+        let mut env = IndexMap::new();
+        env.insert("RB_RUNNER_EXPLICIT".to_string(), "visible".to_string());
 
         let status = session
             .exec_interactive(ExecSpec {
-                argv: shell_command("test -n \"$HOME\""),
+                argv: shell_command("test -n \"$HOME\" && test \"$RB_RUNNER_EXPLICIT\" = visible"),
                 cwd: GuestPath(PathBuf::from(temp_dir.path())),
-                env: IndexMap::new(),
+                env,
             })
             .await
             .unwrap();
@@ -489,5 +510,88 @@ mod tests {
             .unwrap();
 
         assert_eq!(status.code, Some(3));
+    }
+
+    /// Strict isolation applies to interactive commands as well: a host
+    /// variable outside the passthrough allowlist does not reach the command.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn exec_interactive_applies_strict_isolation() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let runner = LocalRunner::new().with_runtime(
+            RuntimeEnv::for_test(Subdir::Linux64)
+                .with_var("SSL_CERT_FILE", "allowlisted")
+                .with_var("RB_RUNNER_HIDDEN", "hidden"),
+        );
+        let mut session =
+            start_local_session(&runner, temp_dir.path(), EnvironmentIsolation::Strict).await;
+
+        let status = session
+            .exec_interactive(ExecSpec {
+                argv: shell_command(
+                    "test -z \"$RB_RUNNER_HIDDEN\" && test -z \"$HOME\" && test \"$SSL_CERT_FILE\" = allowlisted",
+                ),
+                cwd: GuestPath(PathBuf::from(temp_dir.path())),
+                env: IndexMap::new(),
+            })
+            .await
+            .unwrap();
+
+        assert!(status.success());
+    }
+
+    /// A session runs against the runtime the runner holds when the session
+    /// starts, so a runtime set after an earlier session is what later
+    /// sessions see.
+    #[tokio::test]
+    async fn session_captures_the_runtime_at_session_start() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let runner = LocalRunner::new();
+        let mut early_session =
+            start_local_session(&runner, temp_dir.path(), EnvironmentIsolation::None).await;
+        let platform = if cfg!(windows) {
+            Subdir::Win64
+        } else {
+            Subdir::Linux64
+        };
+        let mut late_runtime = RuntimeEnv::for_test(platform).with_var("RB_RUNNER_LATE", "late");
+        if let Ok(system_root) = std::env::var("SYSTEMROOT") {
+            late_runtime = late_runtime.with_var("SYSTEMROOT", system_root);
+        }
+        let runner = runner.with_runtime(late_runtime);
+        let mut late_session =
+            start_local_session(&runner, temp_dir.path(), EnvironmentIsolation::None).await;
+
+        #[cfg(unix)]
+        let argv = vec!["/usr/bin/env".to_string()];
+        #[cfg(windows)]
+        let argv = shell_command("set");
+        let exec = ExecSpec {
+            argv,
+            cwd: GuestPath(temp_dir.path().to_path_buf()),
+            env: IndexMap::new(),
+        };
+        let late_var = |sink: &VecSink| {
+            sink.0.iter().any(|(stream, line)| {
+                *stream == OutputStream::Stdout && line == "RB_RUNNER_LATE=late"
+            })
+        };
+
+        let mut early_sink = VecSink::default();
+        let status = early_session
+            .exec(exec.clone(), &mut early_sink)
+            .await
+            .unwrap();
+        assert!(status.success());
+        assert!(
+            !late_var(&early_sink),
+            "unexpected output: {:?}",
+            early_sink.0
+        );
+
+        let mut late_sink = VecSink::default();
+        let status = late_session.exec(exec, &mut late_sink).await.unwrap();
+        assert!(status.success());
+        assert!(late_var(&late_sink), "unexpected output: {:?}", late_sink.0);
     }
 }

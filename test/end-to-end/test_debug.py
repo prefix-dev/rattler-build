@@ -117,3 +117,36 @@ def test_debug_multiple_outputs(
             "--output-name",
             "invalid_output",
         )
+
+
+def test_debug_run(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build(
+        "debug",
+        "setup",
+        "--recipe",
+        str(recipes / "debug_run"),
+        "--output-dir",
+        str(tmp_path),
+    )
+    work_dir = next(tmp_path.glob("**/work"))
+    if platform.system() == "Windows":
+        host_prefix = next(tmp_path.glob("**/h_env"))
+    else:
+        host_prefix = next(tmp_path.glob("**/host_env_placehold*"))
+
+    # The script runs in the work directory with the build environment set up,
+    # whatever the current directory of the caller is.
+    output = rattler_build("debug", "run", "--work-dir", str(work_dir))
+    script_cwd = next(
+        line.removeprefix("running in ").strip()
+        for line in output.splitlines()
+        if line.startswith("running in ")
+    )
+    assert Path(script_cwd).resolve() == work_dir.resolve()
+    assert (host_prefix / "hello.txt").read_text().strip() == "hello from debug run"
+
+    # The exit code of the script is the exit code of `debug run`.
+    (host_prefix / "fail").touch()
+    with pytest.raises(CalledProcessError) as failure:
+        rattler_build("debug", "run", "--work-dir", str(work_dir))
+    assert failure.value.returncode == 3
