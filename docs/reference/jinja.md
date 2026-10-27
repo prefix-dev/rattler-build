@@ -147,7 +147,7 @@ To add an build-string matching expression, you can use the `build` argument:
 - `${{ pin_subpackage("other_output", exact=True) }}` creates a pin to another
   output in the recipe with an exact version.
 - `${{ pin_subpackage("other_output", lower_bound="1.2.3", upper_bound="1.2.4")
-}}` creates a pin to another output in the recipe with a lower bound of
+  }}` creates a pin to another output in the recipe with a lower bound of
   `1.2.3` and an upper bound of `1.2.4`. This is equivalent to writing
   `other_output >=1.2.3,<1.2.4`.
 - `${{ pin_subpackage("foo", build="py38*") }}` creates a matchspec like `foo >=3.1,<3.2.0a0 py38*`.
@@ -209,7 +209,7 @@ requirements:
 ```
 
 !!! note
-When using `match` for conditional dependencies, these conditions are resolved during package build time, not when the package is installed. The resulting package will have fixed dependencies based on the variant configuration used during the build.
+    When using `match` for conditional dependencies, these conditions are resolved during package build time, not when the package is installed. The resulting package will have fixed dependencies based on the variant configuration used during the build.
 
 Checking exact version matches:
 
@@ -240,7 +240,8 @@ requirements:
 
 ### Date/time Functions
 
-- `now`: return a UNIX timestamp in seconds, up to nanoseconds with (e.g. `${{ now() }}` returns `1792153018.1234`)
+- `now`: return the current UNIX timestamp in seconds as a float with microsecond precision (e.g. `${{ now() }}` returns `1792153018.1234`).
+  Note that using `now()` makes the rendered recipe non-reproducible: it is evaluated separately for each variant and on every build.
 
 ### The `hash` variable
 
