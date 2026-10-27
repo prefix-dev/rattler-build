@@ -327,6 +327,10 @@ library:
 - `dateformat`: as `datetimeformat`, but discards the time portion
 - `timeformat`: as `datetimeformat`, but discards the date portion
 
+The date/time filters default to UTC and a "medium" format (e.g. `Oct 16 2026 12:16`).
+These defaults can be changed by defining `TIMEZONE`, `DATETIME_FORMAT`, `DATE_FORMAT`
+or `TIME_FORMAT` in the recipe `context`.
+
 ??? "Removed filters"
 
     The following filters are removed from the builtins:
@@ -424,6 +428,13 @@ package:
   #}
   version: "1.0"
 ```
+
+#### Lists and dictionaries in strings
+
+When a list, tuple or dictionary is rendered as part of a string, it is
+formatted like a Python `repr`, e.g. `${{ "1.2" | split(".") | list }}` renders
+as `['1', '2']`. Use the `tojson` filter to get JSON output instead
+(`["1", "2"]`).
 
 #### Slicing lists
 
