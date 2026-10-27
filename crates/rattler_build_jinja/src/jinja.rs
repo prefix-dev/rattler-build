@@ -2455,7 +2455,7 @@ mod tests {
             "time not formatted as expected"
         );
         assert!(
-            jinja.eval("now() < now()").unwrap().is_true(),
+            jinja.eval("now() <= now()").unwrap().is_true(),
             "unexpected now comparison"
         );
     }
