@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.20](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.19...rattler_build_core-v0.2.20) - 2026-10-27
+
+### Added
+
+- Update recipe format of generate-recipe for CRAN ([#2759](https://github.com/prefix-dev/rattler-build/pull/2759))
+- build independent outputs in parallel with a shared jobserver ([#2843](https://github.com/prefix-dev/rattler-build/pull/2843))
+
+### Fixed
+
+- never share a build directory between parallel builds ([#2899](https://github.com/prefix-dev/rattler-build/pull/2899))
+- linking checks for symlinked SONAME libraries ([#2831](https://github.com/prefix-dev/rattler-build/pull/2831))
+
 ## [0.2.19](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.18...rattler_build_core-v0.2.19) - 2026-10-14
 
 ### Fixed
