@@ -3,61 +3,61 @@ name = "rattler_build_recipe"
 version = "0.1.22"
 authors.workspace = true
 edition.workspace = true
-license.workspace = true
-repository.workspace = true
-readme = "README.md"
 description = "Recipe data model and parsing for rattler-build, including multi-stage evaluation and variant rendering"
+readme = "README.md"
+repository.workspace = true
+license.workspace = true
 
-[features]
-default = ["variant-config", "script-execution"]
-variant-config = ["dep:rattler_build_variant_config", "dep:petgraph"]
-script-execution = ["rattler_build_script/execution"]
-
-[dependencies]
-rattler_build_types = { workspace = true }
-rattler_build_jinja = { workspace = true }
-rattler_build_script = { workspace = true, default-features = false }
-rattler_build_variant_config = { workspace = true, optional = true }
-rattler_build_yaml_parser = { workspace = true }
-
-serde = { workspace = true }
-serde-value = { workspace = true }
-serde_json = { workspace = true }
-serde_yaml = { workspace = true }
-serde_with = { workspace = true }
-rattler_conda_types = { workspace = true }
-rattler_digest = { workspace = true }
-hex = { workspace = true }
-itertools = { workspace = true }
-indexmap = { workspace = true }
-minijinja = { workspace = true, features = ["unstable_machinery"] }
-marked-yaml = { workspace = true }
-miette = { workspace = true }
-pathdiff = { workspace = true }
-thiserror = { workspace = true }
-url = { workspace = true }
-spdx = { workspace = true }
-globset = { workspace = true }
-fs-err = { workspace = true }
-regex = { workspace = true }
-sha1 = { workspace = true }
-petgraph = { workspace = true, optional = true, default-features = false }
-
-[dev-dependencies]
-insta = { workspace = true, features = ["yaml"] }
-walkdir = { workspace = true }
-clap = { workspace = true }
-
-# Enable fancy miette for tests to demonstrate error messages
-[dev-dependencies.miette]
-workspace = true
-features = ["fancy"]
+[package.metadata.cargo-all-features]
+# Auto-enable features for examples
+always_include_features = ["variant-config"]
 
 # Examples automatically enable required features
 [[example]]
 name = "parse_recipe"
 required-features = ["variant-config"]
 
-[package.metadata.cargo-all-features]
-# Auto-enable features for examples
-always_include_features = ["variant-config"]
+[dependencies]
+rattler_build_jinja = { workspace = true }
+rattler_build_script = { workspace = true, default-features = false }
+rattler_build_types = { workspace = true }
+rattler_build_variant_config = { workspace = true, optional = true }
+rattler_build_yaml_parser = { workspace = true }
+
+fs-err = { workspace = true }
+globset = { workspace = true }
+hex = { workspace = true }
+indexmap = { workspace = true }
+itertools = { workspace = true }
+marked-yaml = { workspace = true }
+miette = { workspace = true }
+minijinja = { workspace = true, features = ["unstable_machinery"] }
+pathdiff = { workspace = true }
+petgraph = { workspace = true, default-features = false, optional = true }
+rattler_conda_types = { workspace = true }
+rattler_digest = { workspace = true }
+regex = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde-value = { workspace = true }
+serde_with = { workspace = true }
+serde_yaml = { workspace = true }
+sha1 = { workspace = true }
+spdx = { workspace = true }
+thiserror = { workspace = true }
+url = { workspace = true }
+
+[dev-dependencies]
+clap = { workspace = true }
+insta = { workspace = true, features = ["yaml"] }
+walkdir = { workspace = true }
+
+# Enable fancy miette for tests to demonstrate error messages
+[dev-dependencies.miette]
+workspace = true
+features = ["fancy"]
+
+[features]
+default = ["script-execution", "variant-config"]
+script-execution = ["rattler_build_script/execution"]
+variant-config = ["dep:petgraph", "dep:rattler_build_variant_config"]

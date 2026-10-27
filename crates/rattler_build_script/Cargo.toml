@@ -3,65 +3,65 @@ name = "rattler_build_script"
 version = "0.2.17"
 authors.workspace = true
 edition.workspace = true
-license.workspace = true
+description = "Script execution and sandbox configuration for rattler-build, supporting bash, cmd, python, and other interpreters"
 readme = "README.md"
 repository.workspace = true
-description = "Script execution and sandbox configuration for rattler-build, supporting bash, cmd, python, and other interpreters"
-
-[features]
-default = ["execution"]
-execution = [
-  "async-trait",
-  "itertools",
-  "thiserror",
-  "tracing",
-  "futures",
-  "tokio",
-  "tokio-util",
-  "rattler_conda_types",
-  "rattler_shell",
-  "fs-err",
-  "which",
-  "minijinja",
-  "strsim",
-]
+license.workspace = true
 
 [dependencies]
 # Core dependencies (always needed)
 indexmap = { workspace = true }
 serde = { workspace = true }
 
+clap = { workspace = true }
 # Sandbox dependencies
 console = { workspace = true }
-clap = { workspace = true }
 
 # Execution dependencies (optional)
 async-trait = { workspace = true, optional = true }
-itertools = { workspace = true, optional = true }
-thiserror = { workspace = true, optional = true }
-tracing = { workspace = true, optional = true }
+fs-err = { workspace = true, optional = true }
 futures = { workspace = true, optional = true }
-tokio = { workspace = true, features = [
-  "process",
-  "io-util",
-  "fs",
-], optional = true }
-tokio-util = { workspace = true, optional = true }
+itertools = { workspace = true, optional = true }
+minijinja = { workspace = true, optional = true }
 rattler_conda_types = { workspace = true, optional = true }
 rattler_shell = { workspace = true, optional = true }
-fs-err = { workspace = true, optional = true }
-which = { workspace = true, optional = true }
-minijinja = { workspace = true, optional = true }
 strsim = { workspace = true, optional = true }
+thiserror = { workspace = true, optional = true }
+tokio = { workspace = true, features = [
+  "fs",
+  "io-util",
+  "process",
+], optional = true }
+tokio-util = { workspace = true, optional = true }
+tracing = { workspace = true, optional = true }
+which = { workspace = true, optional = true }
 
-[target.'cfg(windows)'.dependencies]
+[dev-dependencies]
+insta = { workspace = true, features = ["yaml"] }
+serde_yaml = { workspace = true }
+tempfile = { workspace = true }
+tokio = { workspace = true, features = ["fs", "macros", "rt", "time"] }
+
+[target."cfg(windows)".dependencies]
 windows-sys = { workspace = true, features = [
   "Win32_System_SystemInformation",
   "Win32_System_Threading",
 ] }
 
-[dev-dependencies]
-tokio = { workspace = true, features = ["rt", "macros", "fs", "time"] }
-insta = { workspace = true, features = ["yaml"] }
-serde_yaml = { workspace = true }
-tempfile = { workspace = true }
+[features]
+default = ["execution"]
+execution = [
+  "async-trait",
+  "fs-err",
+  "futures",
+  "itertools",
+  "minijinja",
+  "rattler_conda_types",
+  "rattler_shell",
+  "strsim",
+  "thiserror",
+  "tokio",
+  "tokio-util",
+  "tracing",
+  "which",
+]

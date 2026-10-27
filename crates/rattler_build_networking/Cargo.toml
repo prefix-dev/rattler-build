@@ -1,29 +1,29 @@
 [package]
 name = "rattler_build_networking"
 version = "0.1.17"
-edition.workspace = true
 authors.workspace = true
-license.workspace = true
-repository.workspace = true
-readme = "README.md"
+edition.workspace = true
 description = "Networking utilities for rattler-build, providing shared HTTP client functionality with retry middleware"
-
-[features]
-default = []
-s3 = ["rattler_networking/s3"]
-native-tls = ["reqwest/native-tls", "rattler_networking/native-tls"]
-rustls = [
-  "reqwest/rustls",
-  "reqwest-middleware/rustls",
-  "rattler_networking/rustls",
-]
+readme = "README.md"
+repository.workspace = true
+license.workspace = true
 
 [dependencies]
+rattler_networking = { workspace = true, default-features = false }
 reqwest = { workspace = true, features = ["multipart"] }
 reqwest-middleware = { workspace = true }
 reqwest-retry = { workspace = true }
-rattler_networking = { workspace = true, default-features = false }
 url = { workspace = true, features = ["serde"] }
 
 [dev-dependencies]
-tokio = { workspace = true, features = ["rt", "macros", "test-util"] }
+tokio = { workspace = true, features = ["macros", "rt", "test-util"] }
+
+[features]
+default = []
+native-tls = ["rattler_networking/native-tls", "reqwest/native-tls"]
+rustls = [
+  "rattler_networking/rustls",
+  "reqwest-middleware/rustls",
+  "reqwest/rustls",
+]
+s3 = ["rattler_networking/s3"]

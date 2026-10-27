@@ -64,7 +64,6 @@ rust = ">=1.98.1,<1.99"
 ruff = ">=0.16.6,<0.17"
 
 [environments.lint.tasks]
-
 fmt-rust = "cargo fmt --all --manifest-path rust/Cargo.toml"
 # checks for the CI
 fmt-rust-check = "cargo fmt --all --check --manifest-path rust/Cargo.toml"

@@ -3,23 +3,23 @@ name = "rattler_build_types"
 version = "0.1.20"
 authors.workspace = true
 edition.workspace = true
-license.workspace = true
-repository.workspace = true
-readme = "README.md"
 description = "Common types shared across rattler-build crates, including glob matching, version pinning, and variant configuration keys"
-
-[features]
+readme = "README.md"
+repository.workspace = true
+license.workspace = true
 
 [dependencies]
+globset = { workspace = true }
+itertools = { workspace = true }
+rattler_conda_types = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-serde_yaml = { workspace = true }
 serde_with = { workspace = true }
-rattler_conda_types = { workspace = true }
+serde_yaml = { workspace = true }
 thiserror = { workspace = true }
-itertools = { workspace = true }
-globset = { workspace = true }
 
 [dev-dependencies]
-insta = { workspace = true, features = ["yaml"] }
 fs-err = { workspace = true }
+insta = { workspace = true, features = ["yaml"] }
+
+[features]

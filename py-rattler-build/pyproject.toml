@@ -1,3 +1,4 @@
+#:tombi toml-version = "v1.0.0"
 [build-system]
 requires = ["maturin~=1.14.1"]
 build-backend = "maturin"
@@ -47,4 +48,4 @@ python-version = "3.10"
 include = ["src/rattler_build", "tests", "examples"]
 
 [tool.ty.rules]
-unresolved-import = "ignore" # Ignore until ty can deal with the Rust shared lib
+unresolved-import = "ignore"  # Ignore until ty can deal with the Rust shared lib
