@@ -2460,4 +2460,48 @@ mod tests {
             "unexpected now comparison"
         );
     }
+
+    #[test]
+    fn date_filters_defaults_and_timezones() {
+        let jinja = Jinja::new(JinjaConfig::default());
+        let ev = |s: &str| jinja.eval(s).unwrap().to_string();
+        // no tz => UTC regardless of host TZ
+        assert_eq!(ev("1792153018 | datetimeformat(format='%H')"), "12");
+        assert_eq!(
+            ev("1792153018 | datetimeformat(format='%H %z', tz='America/New_York')"),
+            "08 -0400"
+        );
+        assert_eq!(
+            ev("'2026-10-16T12:16:58Z' | dateformat(format='%Y.%m.%d')"),
+            "2026.10.16"
+        );
+        assert_eq!(
+            ev("1792153018 | datetimeformat(format='iso', tz='UTC')"),
+            "2026-10-16T12:16:58+00:00"
+        );
+        assert!(
+            jinja
+                .eval("1792153018 | datetimeformat(tz='Not/AZone')")
+                .is_err()
+        );
+        assert!(jinja.eval("'garbage' | dateformat").is_err());
+        assert!(jinja.eval("now() > 1700000000").unwrap().is_true());
+    }
+
+    #[test]
+    fn tojson_and_sequence_stringification() {
+        let jinja = Jinja::new(JinjaConfig::default());
+        assert_eq!(
+            jinja.render_str("${{ [1, 'a'] | tojson }}").unwrap(),
+            "[1, \"a\"]"
+        );
+        // minijinja 3 renders sequences in strings with Python repr
+        assert_eq!(
+            jinja
+                .render_str("x=${{ '1.2' | split('.') | list }}")
+                .unwrap(),
+            "x=['1', '2']"
+        );
+        assert_eq!(jinja.render_str("${{ (1, 2) }}").unwrap(), "(1, 2)");
+    }
 }
