@@ -45,6 +45,7 @@ const KNOWN_FUNCTIONS: &[&str] = &[
     "env",
     "cmp",
     "hash",
+    "now",
 ];
 
 /// Configuration for Jinja template rendering in Rattler-Build
