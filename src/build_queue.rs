@@ -3,7 +3,10 @@
 //! [`BuildQueue`] owns stable rotation only. [`OutputBuildQueue`] supplies the
 //! rendered-output dependency policy used by the build and publish loops.
 
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::{
+    cell::{Cell, RefCell},
+    collections::{HashMap, HashSet, VecDeque},
+};
 
 use rattler_build_recipe::stage1::{Dependency, TestType};
 use rattler_build_types::PinError;
@@ -52,14 +55,43 @@ struct BuildReadiness<'a> {
     planned_outputs: &'a [PackageIdentifier],
     /// Outputs already processed by the build loop.
     done_outputs: &'a [Output],
+    /// Outputs not built because they already exist. They are installed from a
+    /// channel, together with their run dependencies, which may be planned.
+    skipped_outputs: &'a [Output],
+    /// Indices into `skipped_outputs` by package name.
+    skipped_by_name: HashMap<&'a PackageName, Vec<usize>>,
+    /// Whether a skipped output is installable, per index. Only results that
+    /// did not depend on the cycle guard are kept.
+    skipped_installable: RefCell<HashMap<usize, bool>>,
+    /// Skipped outputs whose dependencies are being checked (cycle guard).
+    skipped_being_checked: RefCell<HashSet<usize>>,
+    /// Set when the cycle guard answered for an output still being checked.
+    reached_cycle: Cell<bool>,
 }
 
 impl<'a> BuildReadiness<'a> {
-    /// Creates a readiness view over the complete plan and the outputs processed so far.
-    fn new(planned_outputs: &'a [PackageIdentifier], done_outputs: &'a [Output]) -> Self {
+    /// Creates a readiness view over the complete plan, the outputs processed so
+    /// far and the outputs skipped because they already exist.
+    fn new(
+        planned_outputs: &'a [PackageIdentifier],
+        done_outputs: &'a [Output],
+        skipped_outputs: &'a [Output],
+    ) -> Self {
+        let mut skipped_by_name: HashMap<&PackageName, Vec<usize>> = HashMap::new();
+        for (index, output) in skipped_outputs.iter().enumerate() {
+            skipped_by_name
+                .entry(output.name())
+                .or_default()
+                .push(index);
+        }
         Self {
             planned_outputs,
             done_outputs,
+            skipped_outputs,
+            skipped_by_name,
+            skipped_installable: RefCell::new(HashMap::new()),
+            skipped_being_checked: RefCell::new(HashSet::new()),
+            reached_cycle: Cell::new(false),
         }
     }
 
@@ -136,48 +168,62 @@ impl<'a> BuildReadiness<'a> {
         visited: &mut HashSet<usize>,
         availability: &mut HashMap<usize, bool>,
         closure: &mut Vec<usize>,
-    ) -> bool {
+    ) -> Result<bool, BuildQueueError> {
         if !visited.insert(output_index) {
-            return true;
+            return Ok(true);
         }
         if let Some(&available) = availability.get(&output_index) {
             if available {
                 closure.push(output_index);
             }
-            return available;
+            return Ok(available);
         }
 
         let Some(finalized_dependencies) = &self.done_outputs[output_index].finalized_dependencies
         else {
             availability.insert(output_index, false);
-            return false;
+            return Ok(false);
         };
         closure.push(output_index);
 
-        let available = finalized_dependencies.run.depends.iter().all(|dependency| {
-            self.collect_spec_install_closure(dependency.spec(), visited, availability, closure)
-        });
+        let mut available = true;
+        for dependency in &finalized_dependencies.run.depends {
+            if !self.collect_spec_install_closure(
+                dependency.spec(),
+                visited,
+                availability,
+                closure,
+            )? {
+                available = false;
+                break;
+            }
+        }
         availability.insert(output_index, available);
-        available
+        Ok(available)
     }
 
     /// Collects the installable sibling closure for a match specification.
     ///
     /// Specifications without a matching planned sibling are external dependencies
-    /// and therefore do not block local scheduling.
+    /// and therefore do not block local scheduling, unless they match a skipped
+    /// output whose run dependencies are planned.
     fn collect_spec_install_closure(
         &self,
         spec: &MatchSpec,
         visited: &mut HashSet<usize>,
         availability: &mut HashMap<usize, bool>,
         closure: &mut Vec<usize>,
-    ) -> bool {
+    ) -> Result<bool, BuildQueueError> {
         if !self
             .planned_outputs
             .iter()
             .any(|output| Self::identifier_matches_spec(spec, output))
         {
-            return true;
+            return self.skipped_dependency_is_installable(
+                spec.name.as_exact(),
+                |output| Self::output_matches_spec(spec, output),
+                availability,
+            );
         }
 
         for (output_index, output) in self.done_outputs.iter().enumerate() {
@@ -192,20 +238,101 @@ impl<'a> BuildReadiness<'a> {
                 &mut candidate_visited,
                 availability,
                 &mut candidate_closure,
-            ) {
+            )? {
                 *visited = candidate_visited;
                 *closure = candidate_closure;
-                return true;
+                return Ok(true);
             }
         }
 
-        false
+        Ok(false)
+    }
+
+    /// Checks a dependency that no planned output provides.
+    ///
+    /// When it matches outputs skipped because they already exist, the solver
+    /// installs one of them, and with it its run dependencies, which may be
+    /// planned. Which variant it picks is not known before solving, so every
+    /// matching skipped output must be installable. Anything else is left to
+    /// the solver.
+    fn skipped_dependency_is_installable(
+        &self,
+        name: Option<&PackageName>,
+        matches: impl Fn(&Output) -> bool,
+        availability: &mut HashMap<usize, bool>,
+    ) -> Result<bool, BuildQueueError> {
+        let candidates: Vec<usize> = match name {
+            Some(name) => self.skipped_by_name.get(name).cloned().unwrap_or_default(),
+            None => (0..self.skipped_outputs.len()).collect(),
+        };
+        for index in candidates {
+            if matches(&self.skipped_outputs[index])
+                && !self.skipped_output_is_installable(index, availability)?
+            {
+                return Ok(false);
+            }
+        }
+        Ok(true)
+    }
+
+    /// Checks whether a skipped output can be installed: whether its planned
+    /// dependencies are built. Its run requirements are installed with it; its
+    /// host and build requirements are checked too, because their run exports
+    /// are part of the published package's dependencies.
+    fn skipped_output_is_installable(
+        &self,
+        index: usize,
+        availability: &mut HashMap<usize, bool>,
+    ) -> Result<bool, BuildQueueError> {
+        if let Some(&installable) = self.skipped_installable.borrow().get(&index) {
+            return Ok(installable);
+        }
+        if !self.skipped_being_checked.borrow_mut().insert(index) {
+            // a dependency cycle: the check of `index` further up decides
+            self.reached_cycle.set(true);
+            return Ok(true);
+        }
+        let reached_cycle_before = self.reached_cycle.replace(false);
+
+        let skipped = &self.skipped_outputs[index];
+        let requirements = skipped.recipe.requirements();
+        let mut installable = Ok(true);
+        for dependency in requirements
+            .run
+            .iter()
+            .chain(&requirements.host)
+            .chain(&requirements.build)
+        {
+            match self.collect_dependency_install_closure(
+                dependency,
+                skipped,
+                &mut HashSet::new(),
+                availability,
+                &mut Vec::new(),
+            ) {
+                Ok(true) => {}
+                other => {
+                    installable = other;
+                    break;
+                }
+            }
+        }
+
+        self.skipped_being_checked.borrow_mut().remove(&index);
+        let reached_cycle = self.reached_cycle.get();
+        if !reached_cycle && let Ok(result) = installable {
+            self.skipped_installable.borrow_mut().insert(index, result);
+        }
+        self.reached_cycle
+            .set(reached_cycle_before || reached_cycle);
+        installable
     }
 
     /// Collects the installable sibling closure for a recipe dependency.
     ///
     /// Dependencies without a matching planned sibling are left for the solver and
-    /// therefore do not block local scheduling.
+    /// therefore do not block local scheduling, unless they match a skipped output
+    /// whose run dependencies are planned.
     fn collect_dependency_install_closure(
         &self,
         dependency: &Dependency,
@@ -219,16 +346,20 @@ impl<'a> BuildReadiness<'a> {
             Some(spec) => Self::identifier_matches_spec(spec, output),
             None => dependency.name().is_some_and(|name| name == &output.name),
         };
+        let matches_output = |output: &Output| match &match_spec {
+            Some(spec) => Self::output_matches_spec(spec, output),
+            None => dependency.name().is_some_and(|name| name == output.name()),
+        };
         if !self.planned_outputs.iter().any(matches_identifier) {
-            return Ok(true);
+            return self.skipped_dependency_is_installable(
+                dependency.name(),
+                matches_output,
+                availability,
+            );
         }
 
         for (output_index, output) in self.done_outputs.iter().enumerate() {
-            let matches_output = match &match_spec {
-                Some(spec) => Self::output_matches_spec(spec, output),
-                None => dependency.name().is_some_and(|name| name == output.name()),
-            };
-            if !matches_output {
+            if !matches_output(output) {
                 continue;
             }
 
@@ -239,7 +370,7 @@ impl<'a> BuildReadiness<'a> {
                 &mut candidate_visited,
                 availability,
                 &mut candidate_closure,
-            ) {
+            )? {
                 *visited = candidate_visited;
                 *closure = candidate_closure;
                 return Ok(true);
@@ -295,7 +426,7 @@ impl<'a> BuildReadiness<'a> {
                     &mut HashSet::new(),
                     availability,
                     &mut Vec::new(),
-                ) {
+                )? {
                     return Ok(false);
                 }
             }
@@ -367,7 +498,7 @@ impl<'a> BuildReadiness<'a> {
             &mut HashSet::new(),
             &mut availability,
             &mut Vec::new(),
-        ) {
+        )? {
             return Ok(false);
         }
 
@@ -502,9 +633,12 @@ pub(crate) struct OutputBuildQueue {
     planned_outputs: Vec<PackageIdentifier>,
     /// Attempted outputs used to determine which local artifacts are available.
     processed_outputs: Vec<Output>,
+    /// Outputs not built because they already exist; their run dependencies may
+    /// be planned.
+    skipped_outputs: Vec<Output>,
     /// For every planned output, the planned packages that must be built
     /// before it can build: its build and host dependencies plus their run
-    /// dependency closure.
+    /// dependency closure, also through skipped outputs.
     required_planned: HashMap<PackageName, HashSet<PackageName>>,
     /// Planned packages that failed to build or were skipped.
     failed: HashSet<PackageName>,
@@ -515,7 +649,10 @@ pub(crate) struct OutputBuildQueue {
 
 impl OutputBuildQueue {
     /// Creates a queue in render order and records every output in the sibling plan.
-    pub(crate) fn new(outputs: Vec<Output>) -> Self {
+    ///
+    /// `skipped_outputs` are the rendered outputs that are not built because they
+    /// already exist (see `skip_existing`).
+    pub(crate) fn new(outputs: Vec<Output>, skipped_outputs: Vec<Output>) -> Self {
         let planned_outputs = outputs
             .iter()
             .map(|output| PackageIdentifier {
@@ -524,7 +661,7 @@ impl OutputBuildQueue {
                 build_string: output.build_string().into_owned(),
             })
             .collect();
-        let required_planned = required_planned_packages(&outputs);
+        let required_planned = required_planned_packages(&outputs, &skipped_outputs);
         let dependents = count_dependents(outputs.iter().map(|output| {
             let requirements = output.recipe.requirements();
             let needs = requirements
@@ -541,6 +678,7 @@ impl OutputBuildQueue {
             queue: BuildQueue::new(outputs),
             planned_outputs,
             processed_outputs: Vec::new(),
+            skipped_outputs,
             required_planned,
             failed: HashSet::new(),
             dependents,
@@ -579,7 +717,12 @@ impl OutputBuildQueue {
 
     /// Checks whether an output and its command-test dependencies are installable.
     pub(crate) fn can_test(&self, output: &Output) -> Result<bool, BuildQueueError> {
-        BuildReadiness::new(&self.planned_outputs, &self.processed_outputs).can_test(output)
+        BuildReadiness::new(
+            &self.planned_outputs,
+            &self.processed_outputs,
+            &self.skipped_outputs,
+        )
+        .can_test(output)
     }
 
     /// Like [`Self::next_ready`], for a build loop with `in_flight` builds
@@ -604,7 +747,11 @@ impl OutputBuildQueue {
         can_start: impl Fn(&Output) -> bool,
     ) -> Result<Option<Output>, BuildQueueError> {
         if prioritize {
-            let readiness = BuildReadiness::new(&self.planned_outputs, &self.processed_outputs);
+            let readiness = BuildReadiness::new(
+                &self.planned_outputs,
+                &self.processed_outputs,
+                &self.skipped_outputs,
+            );
             let dependents = &self.dependents;
             if let Some(output) = self.queue.best_ready(
                 |output| Ok(can_start(output) && readiness.can_build(output)?),
@@ -616,7 +763,11 @@ impl OutputBuildQueue {
         if in_flight == 0 {
             return self.next_ready();
         }
-        let readiness = BuildReadiness::new(&self.planned_outputs, &self.processed_outputs);
+        let readiness = BuildReadiness::new(
+            &self.planned_outputs,
+            &self.processed_outputs,
+            &self.skipped_outputs,
+        );
         match self
             .queue
             .next_ready(|output| Ok(can_start(output) && readiness.can_build(output)?))?
@@ -628,7 +779,11 @@ impl OutputBuildQueue {
 
     /// Removes the next buildable output, or the first blocked output as a fallback.
     pub(crate) fn next_ready(&mut self) -> Result<Option<Output>, BuildQueueError> {
-        let readiness = BuildReadiness::new(&self.planned_outputs, &self.processed_outputs);
+        let readiness = BuildReadiness::new(
+            &self.planned_outputs,
+            &self.processed_outputs,
+            &self.skipped_outputs,
+        );
         match self
             .queue
             .next_ready(|output| readiness.can_build(output))?
@@ -701,33 +856,43 @@ fn dependency_name(dependency: &Dependency) -> Option<&PackageName> {
 
 /// For every planned output, the planned packages that must be built before
 /// it can build: its build and host dependencies plus their run dependency
-/// closure. This follows the rule of [`BuildReadiness::can_build`], but
-/// matches packages by name only; variants that share a name are merged.
-fn required_planned_packages(outputs: &[Output]) -> HashMap<PackageName, HashSet<PackageName>> {
+/// closure, also through the run dependencies of skipped outputs. This follows
+/// the rule of [`BuildReadiness::can_build`], but matches packages by name
+/// only; variants that share a name are merged.
+fn required_planned_packages(
+    outputs: &[Output],
+    skipped_outputs: &[Output],
+) -> HashMap<PackageName, HashSet<PackageName>> {
     let planned: HashSet<&PackageName> = outputs.iter().map(|output| output.name()).collect();
-    let planned_only = |dependencies: &[Dependency]| -> Vec<PackageName> {
+    let local: HashSet<&PackageName> = planned
+        .iter()
+        .copied()
+        .chain(skipped_outputs.iter().map(|output| output.name()))
+        .collect();
+    let local_only = |dependencies: &[Dependency]| -> Vec<PackageName> {
         dependencies
             .iter()
             .filter_map(dependency_name)
-            .filter(|name| planned.contains(name))
+            .filter(|name| local.contains(name))
             .cloned()
             .collect()
     };
     let mut run: HashMap<PackageName, Vec<PackageName>> = HashMap::new();
-    for output in outputs {
+    for output in outputs.iter().chain(skipped_outputs) {
         run.entry(output.name().clone())
             .or_default()
-            .extend(planned_only(&output.recipe.requirements().run));
+            .extend(local_only(&output.recipe.requirements().run));
     }
     let mut required: HashMap<PackageName, HashSet<PackageName>> = HashMap::new();
     for output in outputs {
         let requirements = output.recipe.requirements();
-        let mut direct = planned_only(&requirements.build);
-        direct.extend(planned_only(&requirements.host));
-        required
-            .entry(output.name().clone())
-            .or_default()
-            .extend(closure_without(direct, &run, output.name()));
+        let mut direct = local_only(&requirements.build);
+        direct.extend(local_only(&requirements.host));
+        required.entry(output.name().clone()).or_default().extend(
+            closure_without(direct, &run, output.name())
+                .into_iter()
+                .filter(|name| planned.contains(name)),
+        );
     }
     required
 }
@@ -790,7 +955,10 @@ mod tests {
 
     use rattler_conda_types::PackageName;
 
-    use super::{BuildQueue, NextReady, closure_without, count_dependents, skip_blocked};
+    use super::{
+        BuildQueue, NextReady, OutputBuildQueue, closure_without, count_dependents, skip_blocked,
+    };
+    use crate::metadata::Output;
 
     fn name(name: &str) -> PackageName {
         PackageName::new_unchecked(name)
@@ -798,6 +966,113 @@ mod tests {
 
     fn names(list: &[&str]) -> HashSet<PackageName> {
         list.iter().map(|n| name(n)).collect()
+    }
+
+    /// A rendered output with the given host and run requirements. A `built`
+    /// output also has finalized dependencies, so it counts as installable.
+    fn output(name: &str, build_string: &str, host: &[&str], run: &[&str], built: bool) -> Output {
+        let list = |specs: &[&str]| format!("[{}]", specs.join(", "));
+        let finalized = if built {
+            let depends: Vec<String> = run
+                .iter()
+                .map(|spec| format!("{{source: \"{spec}\"}}"))
+                .collect();
+            format!(
+                "finalized_dependencies:\n  build: null\n  host: null\n  run:\n    depends: [{}]\n    constraints: []\n",
+                depends.join(", ")
+            )
+        } else {
+            String::new()
+        };
+        let yaml = format!(
+            r#"recipe:
+  schema_version: 1
+  context: {{}}
+  package:
+    name: {name}
+    version: "1"
+  build:
+    number: 0
+    string: {build_string}
+  requirements:
+    host: {host}
+    run: {run}
+build_configuration:
+  target_platform: linux-64
+  host_platform: linux-64
+  build_platform: linux-64
+  variant: {{}}
+  hash:
+    hash: "0"
+  directories:
+    host_prefix: /bld/host
+    build_prefix: /bld/build
+    work_dir: /bld/work
+    build_dir: /bld
+  channels: []
+  channel_priority: strict
+  solve_strategy: highest
+  timestamp: 2024-01-01T00:00:00Z
+  subpackages: {{}}
+  packaging_settings:
+    archive_type: conda
+    compression_level: 1
+system_tools: {{}}
+{finalized}"#,
+            host = list(host),
+            run = list(run),
+        );
+        serde_yaml::from_str(&yaml).unwrap()
+    }
+
+    /// The `sx` example: `sx-a` needs the skipped `sx-b` in its host
+    /// environment, and installing `sx-b` needs the planned `sx-c`. `sx-a`
+    /// must wait until `sx-c` is built, also while another build runs.
+    fn assert_waits_for_dependency_of_skipped(skipped: Vec<Output>, sx_c_run: &[&str]) {
+        let sx_a = output("sx-a", "h0_0", &["sx-b"], &[], false);
+        let sx_c = output("sx-c", "h0_0", &[], sx_c_run, false);
+        let mut queue = OutputBuildQueue::new(vec![sx_a, sx_c], skipped);
+        let ready = |queue: &mut OutputBuildQueue, in_flight| {
+            queue
+                .next_ready_parallel(in_flight, true, |_| true)
+                .unwrap()
+                .map(|output| output.name().as_normalized().to_string())
+        };
+
+        assert_eq!(ready(&mut queue, 0).as_deref(), Some("sx-c"));
+        // `sx-c` is building
+        assert_eq!(ready(&mut queue, 1), None);
+
+        queue.record_processed(output("sx-c", "h0_0", &[], sx_c_run, true));
+        // still one build in flight, so the serial fallback cannot start it
+        assert_eq!(ready(&mut queue, 1).as_deref(), Some("sx-a"));
+    }
+
+    #[test]
+    fn waits_for_run_dependencies_of_skipped_outputs() {
+        let sx_b = output("sx-b", "h0_0", &[], &["sx-c"], false);
+        assert_waits_for_dependency_of_skipped(vec![sx_b], &[]);
+    }
+
+    #[test]
+    fn waits_for_host_dependencies_of_skipped_outputs() {
+        // `sx-c` reaches `sx-b`'s run dependencies through a run export
+        let sx_b = output("sx-b", "h0_0", &["sx-c"], &[], false);
+        assert_waits_for_dependency_of_skipped(vec![sx_b], &[]);
+    }
+
+    #[test]
+    fn waits_for_dependencies_of_skipped_outputs_in_a_cycle() {
+        let sx_b = output("sx-b", "h0_0", &[], &["sx-c"], false);
+        assert_waits_for_dependency_of_skipped(vec![sx_b], &["sx-b"]);
+    }
+
+    #[test]
+    fn waits_for_dependencies_of_every_skipped_variant() {
+        // the solver may pick either variant of `sx-b`; only one needs `sx-c`
+        let needs_sx_c = output("sx-b", "h1_0", &[], &["sx-c"], false);
+        let standalone = output("sx-b", "h2_0", &[], &[], false);
+        assert_waits_for_dependency_of_skipped(vec![standalone, needs_sx_c], &[]);
     }
 
     #[test]
