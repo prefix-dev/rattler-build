@@ -56,11 +56,6 @@ pub(crate) trait ShellDialect: Send + Sync {
     /// Returns the replacement template used when streaming process output.
     fn replacements_template(&self) -> &'static str;
 
-    /// Returns whether this shell dialect supports rattler-sandbox execution.
-    fn supports_sandbox(&self) -> bool {
-        true
-    }
-
     /// Returns a native-shell command that invokes a section script file, if
     /// native sections must be run indirectly. `cmd.exe` uses this so
     /// `exit /b` exits only the called section script, not the whole wrapper.

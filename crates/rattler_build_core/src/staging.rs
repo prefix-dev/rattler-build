@@ -349,7 +349,7 @@ impl Output {
             self.build_configuration.directories.work_dir.clone(),
             &self.build_configuration.directories.recipe_dir,
             context,
-            self.build_configuration.sandbox_config().cloned(),
+            self.build_configuration.directories.session_mounts(),
             self.build_configuration.env_isolation,
             self.build_configuration.experimental,
         )
@@ -651,7 +651,7 @@ mod tests {
                 Subdir::current().unwrap(),
                 Subdir::current().unwrap(),
             ),
-            None,
+            rattler_build_script::runner::Mounts::new(),
             EnvironmentIsolation::default(),
             true,
         )

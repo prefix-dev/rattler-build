@@ -58,7 +58,10 @@ use package_test::TestConfiguration;
 use parallel_builds::{Event, ParallelBuilds};
 use rattler_build_core::consts;
 use rattler_build_recipe::stage0;
-use rattler_build_script::EnvironmentIsolation;
+use rattler_build_script::{
+    EnvironmentIsolation, SandboxConfiguration,
+    runner::{LocalRunner, Runner, RunnerError, SandboxRunner},
+};
 use rattler_build_variant_config::VariantConfig;
 use rattler_conda_types::{
     NamedChannelOrUrl, NoArchType, RepodataRevision, Subdir, compression_level::CompressionLevel,
@@ -225,6 +228,36 @@ pub fn get_recipe_path(path: &Path) -> miette::Result<PathBuf> {
     Ok(recipe_path)
 }
 
+/// Selects the runner that executes build, staging, and test scripts: the
+/// sandbox runner when a sandbox is configured and this platform supports
+/// it, the local runner otherwise. A configured sandbox whose
+/// `rattler-sandbox` executable is missing is an error, reported before any
+/// environment is solved.
+fn script_runner(
+    sandbox_configuration: Option<SandboxConfiguration>,
+) -> miette::Result<Arc<dyn Runner>> {
+    let Some(configuration) = sandbox_configuration else {
+        return Ok(Arc::new(LocalRunner::new()));
+    };
+    match SandboxRunner::new(configuration) {
+        Ok(runner) => Ok(Arc::new(runner)),
+        Err(RunnerError::UnsupportedPlatform { platform, .. }) => {
+            tracing::warn!(
+                %platform,
+                "The sandbox is not available on this platform; scripts run without it"
+            );
+            Ok(Arc::new(LocalRunner::new()))
+        }
+        Err(
+            error @ (RunnerError::Io(_)
+            | RunnerError::MissingExecutable { .. }
+            | RunnerError::UnsupportedMount { .. }),
+        ) => Err(error)
+            .into_diagnostic()
+            .context("cannot run scripts in the sandbox"),
+    }
+}
+
 /// Returns the tool configuration.
 pub fn get_tool_config(
     build_data: &BuildData,
@@ -258,7 +291,8 @@ pub fn get_tool_config(
         .with_io_concurrency_limit(Some(build_data.io_concurrency_limit))
         .with_zstd_repodata_enabled(build_data.common.use_zstd)
         .with_bz2_repodata_enabled(build_data.common.use_bz2)
-        .with_sharded_repodata_enabled(build_data.common.use_sharded);
+        .with_sharded_repodata_enabled(build_data.common.use_sharded)
+        .with_runner(script_runner(build_data.sandbox_configuration.clone())?);
 
     let configuration_builder = if let Some(fancy_log_handler) = fancy_log_handler {
         configuration_builder.with_logging_output_handler(fancy_log_handler.clone())
@@ -614,7 +648,6 @@ pub async fn get_build_output(
                 force_colors: build_data.color_build_log && console::colors_enabled(),
                 experimental: build_data.common.experimental,
                 env_isolation: build_data.env_isolation,
-                sandbox_config: build_data.sandbox_configuration.clone(),
                 exclude_newer: build_data.exclude_newer.map(Into::into),
                 repodata_revision: repodata_revision_from_v3_flag(build_data.common.v3),
             },

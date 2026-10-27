@@ -13,6 +13,12 @@ In particular, with the default configuration, the build process can read the en
 but it cannot write outside of the build directories. The build process also cannot access the network.
 In the future, we plan to enable the sandbox per default and restrict it further.
 
+On top of the configured policy, every build grants write and execute access to its build directory
+(which holds the work directory and the host and build prefixes) and read access to the recipe
+directory. The recipe grant matters with `--overwrite-default-sandbox-config`, which otherwise
+leaves the recipe unreadable. Package tests run under the same policy, with the test prefix and the
+test directory writable and the extracted package readable.
+
 On macOS this is achieved by using the `sandbox-exec` command, which is part of the macOS system.
 On Linux the sandbox is created using Linux namespaces.
 
@@ -57,4 +63,8 @@ On Linux, by default, the sandbox configuration is as follows:
 
 ### Windows
 
-Sandboxing the build process is not yet supported on Windows, and thus all passed sandbox flags are entirely ignored.
+Sandboxing the build process is not supported on Windows. Passing `--sandbox` logs a warning and the build runs without a sandbox.
+
+## Requirements
+
+The sandbox is provided by the `rattler-sandbox` executable, which has to be on the `PATH`. Install it with `pixi global install rattler-sandbox`. A build with `--sandbox` fails before solving any environment when the executable is missing.

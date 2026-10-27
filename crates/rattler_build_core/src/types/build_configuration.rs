@@ -12,7 +12,7 @@ use crate::types::{
     Directories, PackageIdentifier, PackagingSettings, PlatformWithVirtualPackages,
 };
 
-use rattler_build_script::{EnvironmentIsolation, SandboxConfiguration};
+use rattler_build_script::EnvironmentIsolation;
 
 /// Default value for store recipe for backwards compatibility
 fn default_true() -> bool {
@@ -73,9 +73,6 @@ pub struct BuildConfiguration {
     #[serde(skip_serializing, default)]
     pub env_isolation: EnvironmentIsolation,
 
-    /// The configuration for the sandbox
-    #[serde(skip_serializing, default)]
-    pub sandbox_config: Option<SandboxConfiguration>,
     /// Exclude packages according to global, channel, and package cutoff dates.
     #[serde(
         skip_serializing,
@@ -106,11 +103,6 @@ impl BuildConfiguration {
     /// true if the build is cross-compiling
     pub fn cross_compilation(&self) -> bool {
         self.target_platform != self.build_platform.platform
-    }
-
-    /// Retrieve the sandbox configuration for this output
-    pub fn sandbox_config(&self) -> Option<&SandboxConfiguration> {
-        self.sandbox_config.as_ref()
     }
 
     /// Construct a `JinjaConfig` from the given `BuildConfiguration`

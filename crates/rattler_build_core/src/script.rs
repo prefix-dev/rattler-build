@@ -19,8 +19,8 @@ pub use rattler_build_script::{
     RuntimeEnv, SandboxArguments, SandboxConfiguration, Script, ScriptContent,
     platform_script_extensions,
     runner::{
-        ExecSpec, ExecStatus, GuestInfo, GuestPath, HostPath, LocalRunner, Mount, OutputSink,
-        OutputStream, Runner, RunnerError, Session, SessionSpec,
+        ExecSpec, ExecStatus, GuestInfo, GuestPath, HostPath, LocalRunner, Mount, Mounts,
+        OutputSink, OutputStream, Runner, RunnerError, SandboxRunner, Session, SessionSpec,
     },
 };
 
@@ -51,7 +51,7 @@ pub(crate) fn prepare_build_plan_execution_args(
     work_dir: PathBuf,
     recipe_dir: &Path,
     context: ExecutionContext,
-    sandbox_config: Option<SandboxConfiguration>,
+    mounts: Mounts,
     env_isolation: rattler_build_script::EnvironmentIsolation,
     experimental: bool,
 ) -> Result<ExecutionArgs, std::io::Error> {
@@ -143,7 +143,7 @@ pub(crate) fn prepare_build_plan_execution_args(
         secrets,
         context,
         work_dir,
-        sandbox_config,
+        mounts,
         env_isolation,
     })
 }
@@ -204,7 +204,7 @@ impl Output {
             self.build_configuration.directories.work_dir.clone(),
             &self.build_configuration.directories.recipe_dir,
             context,
-            self.build_configuration.sandbox_config().cloned(),
+            self.build_configuration.directories.session_mounts(),
             env_isolation,
             self.build_configuration.experimental,
         )
@@ -214,7 +214,9 @@ impl Output {
     ///
     /// This method executes the build script with the configured environment variables,
     /// working directory, and other build settings. The script execution respects the
-    /// configured interpreter (bash/cmd/nushell) and sandbox settings.
+    /// configured interpreter (bash/cmd/nushell) and runs through the runner of the
+    /// tool configuration with the build directory writable and the recipe
+    /// directory read-only.
     ///
     /// # Errors
     ///
