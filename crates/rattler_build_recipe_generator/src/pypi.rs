@@ -871,7 +871,10 @@ pub async fn create_recipe(
         Ok(build_reqs) => {
             for req in build_reqs {
                 let mapped_req = map_requirement(&req, mapping, opts.use_mapping).await;
-                recipe.requirements.host.push(mapped_req.into());
+                recipe
+                    .requirements
+                    .host
+                    .push(format_requirement(&mapped_req).into());
             }
         }
         Err(e) => {
@@ -1034,6 +1037,34 @@ mod tests {
         insta::assert_snapshot!(
             "flask_noarch_rendered",
             post_process_markers(recipe.to_string())
+        );
+    }
+
+    #[tokio::test]
+    async fn test_build_requirements_with_markers() {
+        let opts = PyPIOpts {
+            package: "xarm-python-sdk".into(),
+            version: Some("1.18.4".into()),
+            write: false,
+            use_mapping: true,
+            tree: false,
+            pypi_index_urls: vec!["https://pypi.org/pypi".to_string()],
+        };
+
+        let client = reqwest::Client::new();
+        let metadata = fetch_pypi_metadata(&opts, &client).await.unwrap();
+        let recipe = create_recipe(&opts, &metadata, &client).await.unwrap();
+
+        // Markers are commented out like in the run requirements, so the recipe still parses
+        assert_eq!(
+            recipe.requirements.host,
+            [
+                "python >=3.5",
+                "hatchling ;MARKER; python_full_version >= '3.8'",
+                "setuptools >= 40.8.0 ;MARKER; python_full_version < '3.8'",
+                "pip",
+            ]
+            .map(serialize::Requirement::from)
         );
     }
 
