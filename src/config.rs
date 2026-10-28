@@ -24,6 +24,8 @@
 use rattler_config::config::{ConfigBase, LoadError, MergeError};
 use rattler_config::locations::ConfigLocation;
 
+pub(crate) mod exclude_newer;
+
 /// rattler-build specific configuration keys.
 /// Extend this struct to add configuration that only makes sense for
 /// rattler-build.

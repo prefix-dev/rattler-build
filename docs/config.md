@@ -36,6 +36,28 @@ You can specify custom channels via the `default-channels` option.
 default-channels = ["conda-forge", "bioconda"]
 ```
 
+## Exclude newer packages
+
+Set `exclude-newer` to exclude recently published packages when resolving dependencies for builds, publishing, tests, and debug setup:
+
+```toml title="config.toml"
+exclude-newer = "7d"
+```
+
+The cutoff can be an RFC3339 timestamp, a quoted date (midnight UTC), or a non-negative duration such as `7d` or `2h30m`. Durations are relative to the current time; days are 24 hours. Calendar months and years are not supported.
+
+To exempt vetted releases, use the table form:
+
+```toml title="config.toml"
+[exclude-newer]
+cutoff = "7d"
+exemptions = { ruff = "==0.14.0", python = { version = "3.13.*", cutoff = "2026-10-12" } }
+```
+
+Exemptions accept a version constraint or a table of match-spec fields (for example `version`, `build`, `channel`, or `flags`). An optional `cutoff` limits the exemption to releases published up to that time. A `"*"` exemption permits all releases of a package, including future ones. Packages built locally remain eligible for downstream builds and tests.
+
+An explicit `--exclude-newer` replaces the configured policy, including its exemptions. Use `--no-config` to ignore the configuration entirely. Rebuilds retain their recorded dependencies rather than re-solving with this default. No policy is applied when neither the configuration nor the caller supplies one.
+
 ## Package format
 
 You can define the default package format to use for builds.

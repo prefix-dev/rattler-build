@@ -463,6 +463,7 @@ pub struct CommonData {
     pub use_zstd: bool,
     pub use_bz2: bool,
     pub use_sharded: bool,
+    pub exclude_newer: Option<rattler_config::config::exclude_newer::ExcludeNewerConfig>,
 }
 
 impl CommonData {
@@ -525,6 +526,7 @@ impl CommonData {
             use_zstd,
             use_bz2,
             use_sharded,
+            exclude_newer: config.exclude_newer.clone(),
         }
     }
 
