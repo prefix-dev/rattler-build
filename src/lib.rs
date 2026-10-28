@@ -276,6 +276,10 @@ pub async fn get_build_output(
     recipe_path: &Path,
     tool_config: &Configuration,
 ) -> miette::Result<Vec<Output>> {
+    let exclude_newer = config::exclude_newer::resolve(
+        build_data.common.exclude_newer.as_ref(),
+        build_data.exclude_newer.map(Into::into),
+    )?;
     let mut output_dir = build_data.common.output_dir.clone();
     if output_dir.exists() {
         output_dir = canonicalize(&output_dir).into_diagnostic()?;
@@ -616,7 +620,7 @@ pub async fn get_build_output(
                 experimental: build_data.common.experimental,
                 env_isolation: build_data.env_isolation,
                 sandbox_config: build_data.sandbox_configuration.clone(),
-                exclude_newer: build_data.exclude_newer.map(Into::into),
+                exclude_newer: exclude_newer.clone(),
                 repodata_revision: repodata_revision_from_v3_flag(build_data.common.v3),
             },
             finalized_dependencies: None,
@@ -943,6 +947,10 @@ pub async fn run_test(
     test_data: TestData,
     fancy_log_handler: Option<LoggingOutputHandler>,
 ) -> miette::Result<()> {
+    let exclude_newer = config::exclude_newer::resolve(
+        test_data.common.exclude_newer.as_ref(),
+        test_data.exclude_newer,
+    )?;
     let package_file = canonicalize(test_data.package_file).into_diagnostic()?;
 
     let mut tool_config_builder = Configuration::builder();
@@ -1003,7 +1011,7 @@ pub async fn run_test(
         solve_strategy: SolveStrategy::Highest,
         tool_configuration: tool_config,
         output_dir: test_data.common.output_dir,
-        exclude_newer: test_data.exclude_newer,
+        exclude_newer,
         env_isolation: rattler_build_script::EnvironmentIsolation::default(),
     };
 
