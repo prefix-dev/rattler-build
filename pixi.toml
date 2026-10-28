@@ -3,7 +3,7 @@ description = "Conda package builder, using the rattler rust backend"
 authors = ["Wolf Vollprecht <w.vollprecht@gmail.com>"]
 channels = ["https://prefix.dev/conda-forge"]
 platforms = ["linux-64", "win-64", "osx-64", "osx-arm64"]
-preview = ['pixi-build']
+preview = ["pixi-build"]
 name = "rattler-build"
 
 [workspace.build-variants]
@@ -19,17 +19,24 @@ c_compiler_version = ["2026"]
 [tasks]
 build-release = "cargo build --release"
 install = "cargo install --path . --locked"
-test-end-to-end = { cmd = "pytest test/end-to-end --snapshot-warn-unused --snapshot-details --numprocesses=auto --durations=0", depends-on = [
-  "build-release",
-] }
+test-end-to-end = {
+  cmd = "pytest test/end-to-end --snapshot-warn-unused --snapshot-details --numprocesses=auto --durations=0",
+  depends-on = [
+    "build-release",
+  ]
+}
 test-end-to-end-ci = "pytest test/end-to-end --snapshot-warn-unused --snapshot-details --numprocesses=auto --durations=0 -v"
 test = "cargo test --workspace --all-targets"
 test-slow = "cargo test --release --workspace --all-targets"
 test-patch-extra = "cargo test --features patch-test-extra"
 test-all = { depends-on = ["test-slow", "test-end-to-end"] }
-install-as = { cmd = "python scripts/install.py", depends-on = [
-  "build-release",
-], description = "Install release build to a custom location" }
+install-as = {
+  cmd = "python scripts/install.py",
+  depends-on = [
+    "build-release",
+  ],
+  description = "Install release build to a custom location"
+}
 generate-cli-docs = "cargo run --manifest-path crates/rattler_build_docs/Cargo.toml"
 generate-test-data = "cargo r --release --bin patch-apply-gen-test-data"
 update-snapshots = "pytest test/end-to-end --snapshot-update"
@@ -60,6 +67,9 @@ mold = ">=2.40.4,<3"
 patchelf = ">=0.18.0,<0.19"
 openssl = ">=3.6.4,<4"
 
+[target.linux.activation]
+scripts = ["scripts/activate.sh"]
+
 [target.linux-64.dependencies]
 make = ">=4.4.1,<5"
 clang = ">=23.1.0,<24"
@@ -75,21 +85,18 @@ make = ">=4.4.1,<5"
 patchelf = ">=0.19.1,<0.20"
 make = ">=4.4.1,<5"
 
+[target.osx.activation]
+scripts = ["scripts/activate.sh"]
+
+[target.win.activation]
+scripts = ["scripts/activate.bat"]
+
 [dev]
 rattler-build = { path = "." }
 
 [activation.env]
 RUSTC_WRAPPER = "sccache"
 PYTHONIOENCODING = "utf-8"
-
-[target.linux.activation]
-scripts = ["scripts/activate.sh"]
-
-[target.osx.activation]
-scripts = ["scripts/activate.sh"]
-
-[target.win.activation]
-scripts = ["scripts/activate.bat"]
 
 [environments.default]
 solve-group = "default"
@@ -121,40 +128,60 @@ zensical = ">=0.0.59,<0.0.60"
 mike = { git = "https://github.com/squidfunk/mike" }
 
 [environments.docs.tasks]
-convert-notebooks = { cmd = "jupyter nbconvert --execute --to markdown py-rattler-build/notebooks/*.ipynb --output-dir docs/py-rattler-build/tutorials", inputs = [
-  "py-rattler-build/notebooks/*.ipynb",
-  "py-rattler-build/rust/src/**/*.rs",
-  "py-rattler-build/src/**/*.py",
-  "src/**/*.rs",
-  "crates/**/*.rs",
-], outputs = [
-  "docs/py-rattler-build/tutorials/*.md",
-] }
+convert-notebooks = {
+  cmd = "jupyter nbconvert --execute --to markdown py-rattler-build/notebooks/*.ipynb --output-dir docs/py-rattler-build/tutorials",
+  inputs = [
+    "py-rattler-build/notebooks/*.ipynb",
+    "py-rattler-build/rust/src/**/*.rs",
+    "py-rattler-build/src/**/*.py",
+    "src/**/*.rs",
+    "crates/**/*.rs",
+  ],
+  outputs = [
+    "docs/py-rattler-build/tutorials/*.md",
+  ]
+}
 validate-recipes = "python docs/scripts/validate_recipes.py"
-generate-llmstxt = { cmd = "python scripts/generate_llmstxt.py", depends-on = [
-  "convert-notebooks",
-], description = "Generate llms.txt and llms-full.txt" }
-build-docs = { cmd = "zensical build --strict", depends-on = [
-  "convert-notebooks",
-  "validate-recipes",
-  "generate-llmstxt",
-] }
-docs = { cmd = "zensical serve", depends-on = [
-  "convert-notebooks",
-  "validate-recipes",
-  "generate-llmstxt",
-] }
+generate-llmstxt = {
+  cmd = "python scripts/generate_llmstxt.py",
+  depends-on = [
+    "convert-notebooks",
+  ],
+  description = "Generate llms.txt and llms-full.txt"
+}
+build-docs = {
+  cmd = "zensical build --strict",
+  depends-on = [
+    "convert-notebooks",
+    "validate-recipes",
+    "generate-llmstxt",
+  ]
+}
+docs = {
+  cmd = "zensical serve",
+  depends-on = [
+    "convert-notebooks",
+    "validate-recipes",
+    "generate-llmstxt",
+  ]
+}
 mike-serve = { cmd = "mike serve", description = "Serve versioned docs with mike" }
-deploy-latest = { cmd = "mike deploy --push --update-aliases $RELEASE_VERSION latest", depends-on = [
-  "convert-notebooks",
-  "validate-recipes",
-  "generate-llmstxt",
-] }
-deploy-dev = { cmd = "mike deploy --push dev devel", depends-on = [
-  "convert-notebooks",
-  "validate-recipes",
-  "generate-llmstxt",
-] }
+deploy-latest = {
+  cmd = "mike deploy --push --update-aliases $RELEASE_VERSION latest",
+  depends-on = [
+    "convert-notebooks",
+    "validate-recipes",
+    "generate-llmstxt",
+  ]
+}
+deploy-dev = {
+  cmd = "mike deploy --push dev devel",
+  depends-on = [
+    "convert-notebooks",
+    "validate-recipes",
+    "generate-llmstxt",
+  ]
+}
 
 [environments.lint]
 solve-group = "default"
@@ -165,7 +192,7 @@ cargo-deny = ">=0.20.2,<0.21"
 prettier = ">=3.9.6,<4"
 ruff = ">=0.16.6,<0.17"
 shellcheck = ">=0.11.0,<0.12"
-taplo = ">=0.10.0,<0.11"
+tombi = ">=1.8.4,<2"
 typos = ">=1.50.1,<2"
 zizmor = ">=1.30.0,<2"
 nbstripout = ">=0.9.1,<0.10"
@@ -181,8 +208,8 @@ prettier-fmt = { cmd = "prettier --write", description = "Format YAML with prett
 nbstripout = "nbstripout"
 ruff-format = "ruff format --force-exclude"
 ruff-lint = "ruff check --fix --exit-non-zero-on-fix --force-exclude"
-toml-format = { cmd = "taplo fmt", env = { RUST_LOG = "warn" } }
-toml-lint = "taplo lint --verbose **/pixi.toml"
+toml-format = { cmd = "tombi format", description = "Format TOML files" }
+toml-lint = { cmd = "tombi lint", description = "Lint TOML files" }
 typos = "typos --force-exclude"
 zizmor = { cmd = "zizmor --quiet --min-severity=low .github/", description = "Security audit GitHub Actions" }
 
@@ -198,10 +225,13 @@ RUSTC_WRAPPER = "sccache"
 
 [environments.pre-commit.tasks]
 lefthook = { cmd = "lefthook", description = "Run lefthook" }
-lint = { depends-on = [
-  "lint-fast",
-  "lint-slow",
-], description = "Run all linters and formatters on all code" }
+lint = {
+  depends-on = [
+    "lint-fast",
+    "lint-slow",
+  ],
+  description = "Run all linters and formatters on all code"
+}
 lint-fast = { cmd = "lefthook run pre-commit --all-files --force", description = "Run all fast linters and formatters on all code (no clippy)" }
 lint-slow = { cmd = "lefthook run pre-push --all-files --force", description = "Run all slow linters and formatters on all code" }
 pre-commit-install = "lefthook install"
@@ -234,16 +264,25 @@ rust = ">=1.98.0,<2"
 rust-std-wasm32-unknown-unknown = ">=1.98.0,<2"
 
 [environments.playground.tasks]
-playground-build = { cmd = "python scripts/build_playground.py", description = "Build the WASM playground", inputs = [
-  "crates/**",
-  "scripts/build_playground.py",
-  "Cargo.lock",
-], outputs = [
-  "deploy/*",
-] }
-playground-serve = { cmd = "python scripts/serve_playground.py", depends-on = [
-  "playground-build",
-], description = "Serve the playground with live reload on source changes" }
+playground-build = {
+  cmd = "python scripts/build_playground.py",
+  description = "Build the WASM playground",
+  inputs = [
+    "crates/**",
+    "scripts/build_playground.py",
+    "Cargo.lock",
+  ],
+  outputs = [
+    "deploy/*",
+  ]
+}
+playground-serve = {
+  cmd = "python scripts/serve_playground.py",
+  depends-on = [
+    "playground-build",
+  ],
+  description = "Serve the playground with live reload on source changes"
+}
 
 [environments.release]
 no-default-feature = true
@@ -281,8 +320,8 @@ channels = [
   "https://prefix.dev/conda-forge",
 ]
 
-[package.build-dependencies]
-cmake = ">=4.3.0,<5"
-
 [package.build.config]
 compilers = ["rust", "c"]
+
+[package.build-dependencies]
+cmake = ">=4.3.0,<5"

@@ -3,15 +3,10 @@ name = "rattler_build_package"
 version = "0.1.22"
 authors.workspace = true
 edition.workspace = true
-license.workspace = true
-repository.workspace = true
-readme = "README.md"
 description = "A library for creating conda packages from files and metadata, supporting .tar.bz2 and .conda formats"
-
-[features]
-default = ["recipe"]
-# Support for building from rattler_build_recipe structures
-recipe = ["dep:rattler_build_recipe", "dep:rattler_build_jinja"]
+readme = "README.md"
+repository.workspace = true
+license.workspace = true
 
 [dependencies]
 # Core dependencies
@@ -19,19 +14,19 @@ rattler_conda_types = { workspace = true }
 rattler_digest = { workspace = true }
 rattler_package_streaming = { workspace = true, default-features = false }
 
+rattler_build_jinja = { workspace = true, optional = true }
 # Optional: Recipe support
 rattler_build_recipe = { workspace = true, optional = true }
-rattler_build_jinja = { workspace = true, optional = true }
 rattler_build_types = { workspace = true, optional = true }
 
+content_inspector = { workspace = true }
 # File operations
 fs-err = { workspace = true }
-walkdir = { workspace = true }
 globset = { workspace = true }
-content_inspector = { workspace = true }
-memmap2 = { workspace = true }
 memchr = { workspace = true }
+memmap2 = { workspace = true }
 pathdiff = { workspace = true }
+walkdir = { workspace = true }
 
 # Serialization
 serde = { workspace = true }
@@ -40,15 +35,20 @@ serde_json = { workspace = true }
 # Parallelism
 rayon = { workspace = true }
 
+indicatif = { workspace = true }
 # Utilities
 jiff = { workspace = true }
-thiserror = { workspace = true }
-tracing = { workspace = true }
 sha2 = { workspace = true }
 tempfile = { workspace = true }
-indicatif = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
 url = { workspace = true }
 
 [dev-dependencies]
 insta = { workspace = true }
 rstest = { workspace = true }
+
+[features]
+default = ["recipe"]
+# Support for building from rattler_build_recipe structures
+recipe = ["dep:rattler_build_jinja", "dep:rattler_build_recipe"]

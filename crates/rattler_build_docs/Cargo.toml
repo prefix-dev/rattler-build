@@ -3,10 +3,10 @@ name = "rattler_build_docs"
 version = "0.1.0"
 authors.workspace = true
 edition.workspace = true
-license.workspace = true
-repository.workspace = true
-readme = "README.md"
 description = "CLI documentation generator for rattler-build, producing markdown files from clap command definitions"
+readme = "README.md"
+repository.workspace = true
+license.workspace = true
 publish = false
 
 [dependencies]
