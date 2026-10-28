@@ -2489,6 +2489,63 @@ mod tests {
     }
 
     #[test]
+    fn date_filters_context_overrides() {
+        // 2026-10-16T12:16:58Z
+        let ev = |jinja: &Jinja, s: &str| jinja.eval(s).unwrap().to_string();
+
+        // no context: "medium" formats, UTC for timestamps, offsets retained
+        let jinja = Jinja::new(JinjaConfig::default());
+        assert_eq!(
+            ev(&jinja, "1792153018 | datetimeformat"),
+            "Oct 16 2026 12:16"
+        );
+        assert_eq!(ev(&jinja, "1792153018 | dateformat"), "Oct 16 2026");
+        assert_eq!(ev(&jinja, "1792153018 | timeformat"), "12:16");
+        assert_eq!(
+            ev(
+                &jinja,
+                "'2026-10-16T12:16:58+02:00' | datetimeformat(format='%H %z')"
+            ),
+            "12 +0200"
+        );
+
+        // recipe context sets the defaults
+        let context = IndexMap::from([
+            ("TIMEZONE".to_string(), Variable::from("America/New_York")),
+            (
+                "DATETIME_FORMAT".to_string(),
+                Variable::from("%Y-%m-%d %H %z"),
+            ),
+            ("DATE_FORMAT".to_string(), Variable::from("%Y%m%d")),
+            ("TIME_FORMAT".to_string(), Variable::from("%H.%M")),
+        ]);
+        let jinja = Jinja::new(JinjaConfig::default()).with_context(&context);
+        assert_eq!(
+            ev(&jinja, "1792153018 | datetimeformat"),
+            "2026-10-16 08 -0400"
+        );
+        assert_eq!(ev(&jinja, "1792153018 | dateformat"), "20261016");
+        assert_eq!(ev(&jinja, "1792153018 | timeformat"), "08.16");
+        assert_eq!(
+            ev(&jinja, "'2026-10-16T12:16:58+02:00' | datetimeformat"),
+            "2026-10-16 06 -0400"
+        );
+
+        // explicit kwargs win over context
+        assert_eq!(
+            ev(&jinja, "1792153018 | datetimeformat(format='%H', tz='UTC')"),
+            "12"
+        );
+        assert_eq!(
+            ev(
+                &jinja,
+                "'2026-10-16T12:16:58+02:00' | datetimeformat(format='%H', tz='original')"
+            ),
+            "12"
+        );
+    }
+
+    #[test]
     fn tojson_and_sequence_stringification() {
         let jinja = Jinja::new(JinjaConfig::default());
         assert_eq!(
