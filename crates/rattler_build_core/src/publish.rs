@@ -367,33 +367,72 @@ fn parse_cloudsmith_owner_repo(url: &url::Url) -> Option<(String, String)> {
 /// Resolve a publish target to the channel URL used for repodata operations: build-time
 /// dependency resolution, build-number lookups, and repodata cache clearing.
 ///
-/// The repodata resolver can't read the `cloudsmith://` scheme, so a
-/// `cloudsmith://owner/repo` target is rewritten to `https://<host>/owner/repo` (host from
-/// `CLOUDSMITH_CHANNEL_HOST`, default [`DEFAULT_CLOUDSMITH_CHANNEL_HOST`]). The original
-/// `cloudsmith://` target is kept as the upload target elsewhere so upload dispatch stays
-/// host-independent. Any target that isn't a well-formed `cloudsmith://owner/repo` URL is
-/// returned unchanged.
+/// The repodata resolver can't read the upload-only schemes, so they are rewritten to the
+/// `https://` URL that serves the channel:
+/// - `cloudsmith://owner/repo` becomes `https://<host>/owner/repo` (host from
+///   `CLOUDSMITH_CHANNEL_HOST`, default [`DEFAULT_CLOUDSMITH_CHANNEL_HOST`]).
+/// - `artifactory://server/path/repo` and `prefix://server/channel` keep their host and path.
+/// - `quetz://server/channel` becomes `https://server/get/channel`.
+///
+/// The original target is kept as the upload target elsewhere so upload dispatch stays
+/// host-independent. Malformed targets are returned unchanged.
 pub fn resolve_channel_for_repodata(target: &NamedChannelOrUrl) -> NamedChannelOrUrl {
     let NamedChannelOrUrl::Url(url) = target else {
         return target.clone();
     };
-    if url.scheme() != "cloudsmith" {
-        return target.clone();
-    }
-    let Some((owner, repo)) = parse_cloudsmith_owner_repo(url) else {
-        return target.clone();
+    let resolved = match url.scheme() {
+        "cloudsmith" => resolve_cloudsmith_channel(url),
+        "artifactory" | "prefix" => rewrite_scheme_to_https(url, url.scheme()).ok(),
+        "quetz" => resolve_quetz_channel(url),
+        _ => None,
     };
+    resolved.map_or_else(|| target.clone(), NamedChannelOrUrl::Url)
+}
+
+/// The `https://` URL serving a `quetz://server/channel` target's repodata.
+fn resolve_quetz_channel(url: &url::Url) -> Option<url::Url> {
+    let channel = url.path_segments()?.rfind(|segment| !segment.is_empty())?;
+    let mut channel_url = rewrite_scheme_to_https(url, "quetz").ok()?;
+    channel_url.set_path(&format!("/get/{channel}"));
+    channel_url.set_query(None);
+    channel_url.set_fragment(None);
+    Some(channel_url)
+}
+
+/// The `https://` URL serving a `cloudsmith://owner/repo` target's repodata.
+fn resolve_cloudsmith_channel(url: &url::Url) -> Option<url::Url> {
+    let (owner, repo) = parse_cloudsmith_owner_repo(url)?;
 
     let host = std::env::var("CLOUDSMITH_CHANNEL_HOST")
         .unwrap_or_else(|_| DEFAULT_CLOUDSMITH_CHANNEL_HOST.to_string());
 
-    match url::Url::parse(&format!(
+    url::Url::parse(&format!(
         "https://{}/{owner}/{repo}",
         host.trim_end_matches('/')
-    )) {
-        Ok(converted) => NamedChannelOrUrl::Url(converted),
-        Err(_) => target.clone(),
+    ))
+    .ok()
+}
+
+/// Rewrite a custom-scheme URL (`prefix://`, `quetz://`, `artifactory://`) to `https://`.
+///
+/// `Url::set_scheme` refuses to convert between a non-special scheme and a special scheme
+/// such as `https`, so the scheme is replaced in the URL's string form and the result
+/// re-parsed. This preserves the host, port, and path. URLs with any other scheme are
+/// returned unchanged.
+fn rewrite_scheme_to_https(url: &url::Url, custom_scheme: &str) -> miette::Result<url::Url> {
+    if url.scheme() != custom_scheme {
+        return Ok(url.clone());
     }
+
+    let rest = url
+        .as_str()
+        .strip_prefix(custom_scheme)
+        .and_then(|rest| rest.strip_prefix(':'))
+        .ok_or_else(|| miette::miette!("Expected a {custom_scheme}:// URL, got '{url}'"))?;
+
+    format!("https:{rest}").parse().map_err(|err| {
+        miette::miette!("Failed to convert {custom_scheme}:// URL '{url}' to https://: {err}")
+    })
 }
 
 /// Upload packages to Cloudsmith.
@@ -535,12 +574,7 @@ async fn upload_to_quetz(
     // Convert quetz:// to https:// if needed, and strip the channel path from the URL
     // The server_url should only contain the base URL (e.g., https://quetz.example.com/)
     // without the channel path, since the channel is passed separately to QuetzData
-    let mut server_url = url.clone();
-    if server_url.scheme() == "quetz" {
-        server_url
-            .set_scheme("https")
-            .map_err(|_| miette::miette!("Failed to convert quetz:// URL to https://"))?;
-    }
+    let mut server_url = rewrite_scheme_to_https(url, "quetz")?;
     // Remove the channel path from the URL to get just the base server URL
     server_url.set_path("");
 
@@ -577,24 +611,7 @@ async fn upload_to_artifactory(
     let auth_storage = tool_configuration::get_auth_store(publish_config.auth_file.clone())
         .map_err(|e| miette::miette!("Failed to get authentication storage: {}", e))?;
 
-    // Extract channel name from URL path
-    let channel = url
-        .path_segments()
-        .and_then(|mut segments| segments.next_back())
-        .ok_or_else(|| miette::miette!("Invalid Artifactory URL: missing repository name"))?
-        .to_string();
-
-    // Convert artifactory:// to https:// if needed, and strip the channel path from the URL
-    // The server_url should only contain the base URL (e.g., https://artifactory.example.com/)
-    // without the channel path, since the channel is passed separately to ArtifactoryData
-    let mut server_url = url.clone();
-    if server_url.scheme() == "artifactory" {
-        server_url
-            .set_scheme("https")
-            .map_err(|_| miette::miette!("Failed to convert artifactory:// URL to https://"))?;
-    }
-    // Remove the channel path from the URL to get just the base server URL
-    server_url.set_path("");
+    let (server_url, channel) = artifactory_server_and_channel(url)?;
 
     // Create ArtifactoryData with server URL and channel; credentials are
     // resolved from the auth storage during upload
@@ -608,6 +625,37 @@ async fn upload_to_artifactory(
     tracing::info!("Successfully uploaded packages to Artifactory");
     tracing::info!("Note: Artifactory handles indexing automatically on the server side");
     Ok(())
+}
+
+/// Split an Artifactory channel URL into the base URL and the repository name.
+///
+/// The repository is the last path segment; anything before it (e.g. an `/artifactory/`
+/// context path) stays in the base URL, so packages are uploaded to
+/// `<base>/<repository>/<subdir>/<file>` — the same location the channel is read from.
+fn artifactory_server_and_channel(url: &url::Url) -> miette::Result<(url::Url, String)> {
+    let mut server_url = rewrite_scheme_to_https(url, "artifactory")?;
+    let mut segments: Vec<String> = server_url
+        .path_segments()
+        .map(|segments| {
+            segments
+                .filter(|segment| !segment.is_empty())
+                .map(str::to_string)
+                .collect()
+        })
+        .unwrap_or_default();
+    let channel = segments
+        .pop()
+        .ok_or_else(|| miette::miette!("Invalid Artifactory URL: missing repository name"))?;
+
+    let prefix: String = segments
+        .iter()
+        .map(|segment| format!("{segment}/"))
+        .collect();
+    server_url.set_path(&format!("/{prefix}"));
+    server_url.set_query(None);
+    server_url.set_fragment(None);
+
+    Ok((server_url, channel))
 }
 
 /// Split a Prefix channel URL into the server URL and channel identifier.
@@ -627,13 +675,7 @@ fn prefix_server_and_channel(url: &url::Url) -> miette::Result<(url::Url, String
         .filter(|channel| !channel.is_empty())
         .ok_or_else(|| miette::miette!("Invalid Prefix URL: missing channel name"))?;
 
-    let mut server_url = if url.scheme() == "prefix" {
-        url::Url::parse(&url.as_str().replacen("prefix:", "https:", 1))
-            .into_diagnostic()
-            .wrap_err("Failed to convert prefix:// URL to https://")?
-    } else {
-        url.clone()
-    };
+    let mut server_url = rewrite_scheme_to_https(url, "prefix")?;
     server_url.set_path("");
     server_url.set_query(None);
     server_url.set_fragment(None);
@@ -923,6 +965,82 @@ mod tests {
                 "{raw} should be passed through unchanged"
             );
         }
+    }
+
+    #[test]
+    fn resolve_channel_rewrites_upload_only_schemes_to_https() {
+        for (raw, expected) in [
+            (
+                "artifactory://files.example.com/conda-internal",
+                "https://files.example.com/conda-internal",
+            ),
+            (
+                "artifactory://example.jfrog.io:8443/artifactory/api/conda/repo/",
+                "https://example.jfrog.io:8443/artifactory/api/conda/repo/",
+            ),
+            (
+                "prefix://prefix.dev/my-channel",
+                "https://prefix.dev/my-channel",
+            ),
+            (
+                "quetz://quetz.example.com/my-channel",
+                "https://quetz.example.com/get/my-channel",
+            ),
+        ] {
+            assert_eq!(
+                resolve(raw),
+                NamedChannelOrUrl::Url(url::Url::parse(expected).unwrap()),
+                "{raw} should resolve to {expected}"
+            );
+        }
+    }
+
+    #[test]
+    fn rewrite_scheme_to_https_preserves_host_port_and_path() {
+        for scheme in ["artifactory", "quetz", "prefix"] {
+            let url = url::Url::parse(&format!("{scheme}://host.example.com:8443/a/b")).unwrap();
+            assert_eq!(
+                rewrite_scheme_to_https(&url, scheme).unwrap().as_str(),
+                "https://host.example.com:8443/a/b"
+            );
+        }
+    }
+
+    #[test]
+    fn artifactory_url_splits_into_base_and_repository() {
+        for (raw, expected_server, expected_channel) in [
+            (
+                "artifactory://files.example.com/conda-internal",
+                "https://files.example.com/",
+                "conda-internal",
+            ),
+            (
+                "artifactory://files.example.com/conda-internal/",
+                "https://files.example.com/",
+                "conda-internal",
+            ),
+            (
+                "artifactory://example.jfrog.io/artifactory/conda-local",
+                "https://example.jfrog.io/artifactory/",
+                "conda-local",
+            ),
+            (
+                "https://example.jfrog.io/artifactory/conda-local",
+                "https://example.jfrog.io/artifactory/",
+                "conda-local",
+            ),
+        ] {
+            let (server, channel) =
+                artifactory_server_and_channel(&url::Url::parse(raw).unwrap()).unwrap();
+            assert_eq!(server.as_str(), expected_server, "{raw}");
+            assert_eq!(channel, expected_channel, "{raw}");
+        }
+        assert!(
+            artifactory_server_and_channel(
+                &url::Url::parse("artifactory://files.example.com/").unwrap()
+            )
+            .is_err()
+        );
     }
 
     #[test]
