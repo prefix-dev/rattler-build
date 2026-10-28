@@ -166,7 +166,7 @@ mod tests {
     #[test]
     fn invalid_exemptions_are_not_silently_ignored() {
         for exemption in [
-            r#"{ verison = "==1" }"#,
+            r#"{ unknown_field = "==1" }"#,
             r#"{ version = "not a version!" }"#,
             r#"{ cutoff = ["7d"] }"#,
             r#"{ name = "another-package" }"#,
