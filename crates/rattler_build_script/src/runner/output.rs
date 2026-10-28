@@ -57,26 +57,19 @@ impl<S: OutputSink> OutputSink for ReplacingSink<S> {
 }
 
 /// Records script output on the host: every line is appended to the build log
-/// file, emitted as a `tracing` info event, and kept in memory per stream.
+/// file and emitted as a `tracing` info event.
 ///
 /// A failed log write is reported with a warning and never interrupts the
-/// script, so the captured text stays complete even when the log file does
-/// not. Lines are written to the log unbuffered, so the file reflects the
+/// script. Lines are written to the log unbuffered, so the file reflects the
 /// script progress while it runs.
 pub struct BuildLogSink {
     log_file: fs::File,
-    stdout: String,
-    stderr: String,
 }
 
 impl BuildLogSink {
     /// Creates a sink that appends to `log_file`.
     fn new(log_file: fs::File) -> Self {
-        Self {
-            log_file,
-            stdout: String::new(),
-            stderr: String::new(),
-        }
+        Self { log_file }
     }
 
     /// Opens the build log at `path` for appending, creating it if needed.
@@ -87,23 +80,11 @@ impl BuildLogSink {
             .open(path)?;
         Ok(Self::new(log_file))
     }
-
-    /// Returns the captured standard output and standard error, in that
-    /// order, with each line followed by a newline.
-    pub fn into_captured(self) -> (String, String) {
-        (self.stdout, self.stderr)
-    }
 }
 
 impl OutputSink for BuildLogSink {
-    fn line(&mut self, stream: OutputStream, line: &str) {
+    fn line(&mut self, _stream: OutputStream, line: &str) {
         let line_with_newline = format!("{line}\n");
-        let captured = match stream {
-            OutputStream::Stdout => &mut self.stdout,
-            OutputStream::Stderr => &mut self.stderr,
-        };
-        captured.push_str(&line_with_newline);
-
         if let Err(error) = self.log_file.write_all(line_with_newline.as_bytes()) {
             tracing::warn!("Failed to write to build log: {:?}", error);
         }
@@ -180,7 +161,7 @@ mod tests {
     }
 
     #[test]
-    fn build_log_sink_appends_to_log_and_captures_per_stream() {
+    fn build_log_sink_appends_both_streams_to_log() {
         let temp_dir = tempfile::tempdir().unwrap();
         let log_path = temp_dir.path().join("conda_build.log");
         fs::write(&log_path, "existing\n").unwrap();
@@ -194,13 +175,6 @@ mod tests {
             fs::read_to_string(&log_path).unwrap(),
             "existing\nfirst out\nfirst err\nsecond out\n"
         );
-        assert_eq!(
-            sink.into_captured(),
-            (
-                "first out\nsecond out\n".to_string(),
-                "first err\n".to_string()
-            )
-        );
     }
 
     #[test]
@@ -211,10 +185,10 @@ mod tests {
         assert!(BuildLogSink::open(&log_path).is_err());
     }
 
-    /// A log file that rejects writes must not interrupt the script: the line
-    /// is still captured and the sink keeps accepting output.
+    /// A log file that rejects writes must not interrupt the script: the sink
+    /// keeps accepting output.
     #[test]
-    fn build_log_sink_keeps_capturing_when_log_write_fails() {
+    fn build_log_sink_keeps_accepting_output_when_log_write_fails() {
         let temp_dir = tempfile::tempdir().unwrap();
         let log_path = temp_dir.path().join("conda_build.log");
         fs::write(&log_path, "").unwrap();
@@ -225,9 +199,5 @@ mod tests {
         sink.line(OutputStream::Stderr, "err");
 
         assert_eq!(fs::read_to_string(&log_path).unwrap(), "");
-        assert_eq!(
-            sink.into_captured(),
-            ("out\n".to_string(), "err\n".to_string())
-        );
     }
 }

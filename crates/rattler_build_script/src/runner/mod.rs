@@ -2,7 +2,9 @@
 
 mod environment;
 mod local;
+mod mounts;
 mod output;
+mod sandbox;
 #[cfg(test)]
 mod test_support;
 
@@ -16,7 +18,9 @@ use crate::EnvironmentIsolation;
 
 pub(crate) use environment::resolve_process_env;
 pub use local::LocalRunner;
+pub use mounts::Mounts;
 pub use output::{BuildLogSink, ReplacingSink};
+pub use sandbox::SandboxRunner;
 
 /// Error returned while preparing or driving a runner session.
 #[derive(Debug, thiserror::Error)]
@@ -24,6 +28,37 @@ pub enum RunnerError {
     /// An I/O failure while starting or driving a process.
     #[error(transparent)]
     Io(#[from] std::io::Error),
+    /// The runner cannot execute on the platform rattler-build runs on.
+    #[error("the {runner} runner is not supported on {platform}")]
+    UnsupportedPlatform {
+        /// The [`Runner::name`] of the runner.
+        runner: &'static str,
+        /// The platform rattler-build runs on.
+        platform: Subdir,
+    },
+    /// An executable the runner depends on is not on the runtime `PATH`.
+    #[error("{name} executable not found. Please install it with: {install_hint}")]
+    MissingExecutable {
+        /// The name of the executable that was looked up.
+        name: &'static str,
+        /// The command that installs the executable.
+        install_hint: &'static str,
+    },
+    /// A session asked for a mount the runner cannot provide, because it
+    /// exposes host paths unchanged.
+    #[error(
+        "the {runner} runner cannot mount {} at the different guest path {}",
+        host.0.display(),
+        guest.0.display()
+    )]
+    UnsupportedMount {
+        /// The [`Runner::name`] of the runner.
+        runner: &'static str,
+        /// The source path on the host.
+        host: HostPath,
+        /// The requested destination path in the guest.
+        guest: GuestPath,
+    },
 }
 
 /// A path on the machine rattler-build runs on.
@@ -41,7 +76,7 @@ pub struct GuestPath(
 );
 
 /// One bind mount from host into guest.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Mount {
     /// The source path on the host.
     pub host: HostPath,
@@ -51,13 +86,26 @@ pub struct Mount {
     pub writable: bool,
 }
 
+impl Mount {
+    /// A mount that exposes the host directory `path` at the same path in the
+    /// guest.
+    pub fn mirrored(path: impl Into<PathBuf>, writable: bool) -> Self {
+        let path = path.into();
+        Self {
+            host: HostPath(path.clone()),
+            guest: GuestPath(path),
+            writable,
+        }
+    }
+}
+
 /// Everything needed to start a session.
 #[derive(Debug, Clone)]
 pub struct SessionSpec {
     /// The platform scripts execute on.
     pub platform: Subdir,
     /// The bind mounts the session must provide.
-    pub mounts: Vec<Mount>,
+    pub mounts: Mounts,
     /// The container image for runners that need one.
     pub image: Option<String>,
     /// The session working directory as a guest path.

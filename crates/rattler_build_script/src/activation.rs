@@ -122,7 +122,7 @@ mod tests {
                 Subdir::WinArm64,
             ),
             work_dir: tmp.path().to_path_buf(),
-            sandbox_config: None,
+            mounts: crate::runner::Mounts::new(),
             env_isolation: EnvironmentIsolation::Strict,
         };
 
@@ -157,7 +157,7 @@ mod tests {
                 Subdir::current().unwrap(),
             ),
             work_dir: tmp.path().to_path_buf(),
-            sandbox_config: None,
+            mounts: crate::runner::Mounts::new(),
             env_isolation: EnvironmentIsolation::None,
         };
 

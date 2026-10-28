@@ -105,6 +105,11 @@ jobs:
             core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
       - name: Build release binary
         run: pixi run build-release
+      - name: Allow unprivileged user namespaces
+        # The sandbox creates Linux namespaces, which Ubuntu 24.04 denies to
+        # unprivileged processes by default.
+        if: ${{ matrix.os == 'ubuntu-latest' }}
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - name: Run end-to-end tests
         run: pixi run test-end-to-end-ci
         env:

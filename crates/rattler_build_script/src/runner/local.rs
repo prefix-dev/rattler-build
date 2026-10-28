@@ -188,12 +188,12 @@ mod tests {
     use super::*;
     use crate::EnvironmentIsolation;
     use crate::runner::test_support::VecSink;
-    use crate::runner::{Mount, SessionSpec};
+    use crate::runner::{Mounts, SessionSpec};
 
     fn session_spec(work_dir: &Path, env_isolation: EnvironmentIsolation) -> SessionSpec {
         SessionSpec {
             platform: Subdir::current().unwrap(),
-            mounts: Vec::<Mount>::new(),
+            mounts: Mounts::new(),
             image: None,
             work_dir: GuestPath(work_dir.to_path_buf()),
             env_isolation,
@@ -319,6 +319,45 @@ mod tests {
                 .any(|line| line.starts_with("RB_RUNNER_HIDDEN=")),
             "unexpected output: {stdout:?}"
         );
+    }
+
+    /// A failing command still delivers every line of both streams, in order
+    /// within each stream, together with its exit code.
+    #[tokio::test]
+    async fn local_session_keeps_output_on_failure() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let runner = LocalRunner::new();
+        let mut session =
+            start_local_session(&runner, temp_dir.path(), EnvironmentIsolation::None).await;
+        let mut sink = VecSink::default();
+
+        #[cfg(unix)]
+        let argv = shell_command("echo out1; echo err1 >&2; echo out2; echo err2 >&2; exit 7");
+        #[cfg(windows)]
+        let argv = shell_command("echo out1&1>&2 echo err1&echo out2&1>&2 echo err2&exit 7");
+
+        let status = session
+            .exec(
+                ExecSpec {
+                    argv,
+                    cwd: GuestPath(temp_dir.path().to_path_buf()),
+                    env: IndexMap::new(),
+                },
+                &mut sink,
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(status.code, Some(7));
+        let lines_on = |stream: OutputStream| {
+            sink.0
+                .iter()
+                .filter(|(line_stream, _)| *line_stream == stream)
+                .map(|(_, line)| line.trim())
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(lines_on(OutputStream::Stdout), vec!["out1", "out2"]);
+        assert_eq!(lines_on(OutputStream::Stderr), vec!["err1", "err2"]);
     }
 
     /// Non-UTF-8 output — Windows tools writing in the active code page, or a

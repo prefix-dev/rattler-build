@@ -101,10 +101,6 @@ IF "%CONDA_BUILD%" == "" (
         "%((var))%"
     }
 
-    fn supports_sandbox(&self) -> bool {
-        false
-    }
-
     fn native_section_script_command(&self, script_path: &Path) -> Option<Vec<String>> {
         // Activated build environments can replace PATH entirely. Resolve the
         // command processor before entering the wrapper so nested native

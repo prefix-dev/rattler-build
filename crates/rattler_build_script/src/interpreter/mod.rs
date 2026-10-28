@@ -43,16 +43,11 @@ pub enum InterpreterError {
     /// does not support (e.g. a typo like `brus` instead of `brush`).
     #[error("unsupported interpreter '{0}'")]
     UnsupportedInterpreter(String),
-}
 
-/// A runner failure while starting a session or executing the wrapper is a
-/// failed execution; the script itself was not at fault.
-impl From<RunnerError> for InterpreterError {
-    fn from(error: RunnerError) -> Self {
-        match error {
-            RunnerError::Io(error) => Self::ExecutionFailed(error),
-        }
-    }
+    /// The runner failed to start a session or to execute the wrapper; the
+    /// script itself was not at fault.
+    #[error(transparent)]
+    Runner(#[from] RunnerError),
 }
 
 /// Constructs the invocation behavior for a supported interpreter.
@@ -358,7 +353,7 @@ mod tests {
                 Subdir::current().unwrap(),
             ),
             work_dir,
-            sandbox_config: None,
+            mounts: crate::runner::Mounts::new(),
             env_isolation: crate::execution::EnvironmentIsolation::None,
         }
     }

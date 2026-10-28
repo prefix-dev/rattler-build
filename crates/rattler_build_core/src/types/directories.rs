@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 
 use fs_err as fs;
 use jiff::Timestamp;
+use rattler_build_script::runner::Mounts;
 use rattler_conda_types::Subdir;
 use serde::{Deserialize, Serialize};
 
@@ -267,6 +268,19 @@ impl Directories {
         self.build_dir.join(crate::consts::PACKAGE_FILES_LIST_NAME)
     }
 
+    /// The mounts a build or staging script session needs: the build
+    /// directory writable and the recipe directory read-only.
+    ///
+    /// The host prefix, the build prefix, and the work directory live under
+    /// `build_dir` in every layout (with or without a build id, with separate
+    /// or merged prefixes), so the one writable mount covers them. Scripts
+    /// observe the physical layout, so every mount mirrors its host path.
+    pub fn session_mounts(&self) -> Mounts {
+        Mounts::new()
+            .writable(self.build_dir.clone())
+            .read_only(self.recipe_dir.clone())
+    }
+
     /// The path strings the build script observes.
     pub fn exec_view(&self) -> ExecutionDirectories {
         ExecutionDirectories {
@@ -504,6 +518,51 @@ mod tests {
             execution.package_files_list_path(),
             directories.package_files_list_path()
         );
+    }
+
+    /// Every layout keeps the prefixes and the work directory under the build
+    /// directory, so the session mounts are the writable build directory and
+    /// the read-only recipe directory.
+    #[test]
+    fn session_mounts_cover_every_layout() {
+        let tempdir = tempfile::tempdir().unwrap();
+        let recipe_path = tempdir.path().join("recipe").join("recipe.yaml");
+
+        for (no_build_id, merge_build_and_host) in
+            [(false, false), (true, false), (false, true), (true, true)]
+        {
+            let directories = Directories::builder(
+                "name",
+                &recipe_path,
+                &tempdir.path().join("output"),
+                &Timestamp::now(),
+                Subdir::current().unwrap(),
+            )
+            .no_build_id(no_build_id)
+            .merge_build_and_host(merge_build_and_host)
+            .skip_directory_creation(true)
+            .build()
+            .unwrap();
+
+            for directory in [
+                &directories.host_prefix,
+                &directories.build_prefix,
+                &directories.work_dir,
+            ] {
+                assert!(
+                    directory.starts_with(&directories.build_dir),
+                    "{} is outside {}",
+                    directory.display(),
+                    directories.build_dir.display()
+                );
+            }
+            assert_eq!(
+                directories.session_mounts(),
+                Mounts::new()
+                    .writable(directories.build_dir.clone())
+                    .read_only(tempdir.path().join("recipe"))
+            );
+        }
     }
 
     #[test]
