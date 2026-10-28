@@ -967,6 +967,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#exclude-newer-packages" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Exclude newer packages
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#package-format" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -3989,6 +4000,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#exclude-newer-packages" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Exclude newer packages
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#package-format" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -4067,25 +4089,37 @@
 <p>You can specify custom channels via the <code>default-channels</code> option.</p>
 <div class="language-toml highlight"><span class="filename">config.toml</span><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">default-channels</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;conda-forge&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;bioconda&quot;</span><span class="p">]</span>
 </span></code></pre></div>
+<h2 id="exclude-newer-packages">Exclude newer packages<a class="headerlink" href="#exclude-newer-packages" title="Permanent link">#</a></h2>
+<p>Set <code>exclude-newer</code> to exclude recently published packages when resolving dependencies for builds, publishing, tests, and debug setup:</p>
+<div class="language-toml highlight"><span class="filename">config.toml</span><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">exclude-newer</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;7d&quot;</span>
+</span></code></pre></div>
+<p>The cutoff can be an RFC3339 timestamp, a quoted date (midnight UTC), or a non-negative duration such as <code>7d</code> or <code>2h30m</code>. Durations are relative to the current time; days are 24 hours. Calendar months and years are not supported.</p>
+<p>To exempt vetted releases, use the table form:</p>
+<div class="language-toml highlight"><span class="filename">config.toml</span><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">[exclude-newer]</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">cutoff</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;7d&quot;</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">exemptions</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">ruff</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s2">&quot;==0.14.0&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">python</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">version</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s2">&quot;3.13.*&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">cutoff</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s2">&quot;2026-10-12&quot;</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="p">}</span>
+</span></code></pre></div>
+<p>Exemptions accept a version constraint or a table of match-spec fields (for example <code>version</code>, <code>build</code>, <code>channel</code>, or <code>flags</code>). An optional <code>cutoff</code> limits the exemption to releases published up to that time. A <code>"*"</code> exemption permits all releases of a package, including future ones. Packages built locally remain eligible for downstream builds and tests.</p>
+<p>An explicit <code>--exclude-newer</code> replaces the configured policy, including its exemptions. Use <code>--no-config</code> to ignore the configuration entirely. Rebuilds retain their recorded dependencies rather than re-solving with this default. No policy is applied when neither the configuration nor the caller supplies one.</p>
 <h2 id="package-format">Package format<a class="headerlink" href="#package-format" title="Permanent link">#</a></h2>
 <p>You can define the default package format to use for builds.
 It can be one of <code>tar-bz2</code> or <code>conda</code>.
 You can also add a compression level to the package format, e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number&gt;</code> (from -7 to 22).</p>
-<div class="language-toml highlight"><span class="filename">config.toml</span><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">[build]</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">package-format</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;conda:22&quot;</span>
+<div class="language-toml highlight"><span class="filename">config.toml</span><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">[build]</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">package-format</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;conda:22&quot;</span>
 </span></code></pre></div>
 <h2 id="mirror-configuration">Mirror configuration<a class="headerlink" href="#mirror-configuration" title="Permanent link">#</a></h2>
 <p>By specifying the <code>mirrors</code> section, you can instruct Rattler-Build to use mirrors when building.
 For more information, see <a href="https://pixi.sh/latest/reference/pixi_configuration/#mirror-configuration">pixi's documentation</a>.</p>
-<div class="language-toml highlight"><span class="filename">config.toml</span><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">[mirrors]</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="s2">&quot;https://conda.anaconda.org/conda-forge&quot;</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;https://prefix.dev/conda-forge&quot;</span><span class="p">]</span>
+<div class="language-toml highlight"><span class="filename">config.toml</span><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="k">[mirrors]</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="s2">&quot;https://conda.anaconda.org/conda-forge&quot;</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;https://prefix.dev/conda-forge&quot;</span><span class="p">]</span>
 </span></code></pre></div>
 <h2 id="s3-configuration">S3 configuration<a class="headerlink" href="#s3-configuration" title="Permanent link">#</a></h2>
 <p>You can configure your S3 buckets that are used during build by specifying <code>s3-options</code>. For more information, consult <a href="https://pixi.sh/latest/deployment/s3/">pixi's documentation</a>.</p>
-<div class="language-toml highlight"><span class="filename">config.toml</span><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">[s3-options.my-bucket]</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">endpoint-url</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;https://fsn1.your-objectstorage.com&quot;</span>
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;US&quot;</span>
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="n">addressing-style</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;virtual-host&quot;</span>
+<div class="language-toml highlight"><span class="filename">config.toml</span><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="k">[s3-options.my-bucket]</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="n">endpoint-url</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;https://fsn1.your-objectstorage.com&quot;</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="n">region</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;US&quot;</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="n">addressing-style</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;virtual-host&quot;</span>
 </span></code></pre></div>
 
 
