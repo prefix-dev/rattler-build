@@ -12,6 +12,8 @@ use async_trait::async_trait;
 use indexmap::IndexMap;
 use rattler_conda_types::Subdir;
 
+use crate::EnvironmentIsolation;
+
 pub(crate) use environment::resolve_process_env;
 pub use local::LocalRunner;
 pub use output::{BuildLogSink, ReplacingSink};
@@ -60,6 +62,15 @@ pub struct SessionSpec {
     pub image: Option<String>,
     /// The session working directory as a guest path.
     pub work_dir: GuestPath,
+    /// How the session builds the environment of every executed command.
+    ///
+    /// [`EnvironmentIsolation::Strict`] and [`EnvironmentIsolation::CondaBuild`]
+    /// start from an empty environment plus the host passthrough allowlist
+    /// (certificates, proxies, the SSH agent, and the platform's system
+    /// variables); [`EnvironmentIsolation::None`] starts from the complete host
+    /// environment. In every mode the explicit [`ExecSpec::env`] is applied
+    /// last and overrides whatever the session started from.
+    pub env_isolation: EnvironmentIsolation,
 }
 
 /// One command execution inside a session.

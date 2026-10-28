@@ -32,7 +32,10 @@ fn platform_passthrough_vars(platform: Subdir) -> &'static [&'static str] {
 
 /// Computes the complete child environment for the given isolation mode.
 ///
-/// This reads only its arguments and never the ambient process environment.
+/// Every mode applies `env_vars` and then `secrets` on top of the environment
+/// it starts from, so a declared secret wins over a build variable of the
+/// same name. This reads only its arguments and never the ambient process
+/// environment.
 pub(crate) fn resolve_process_env(
     env_isolation: EnvironmentIsolation,
     env_vars: &IndexMap<String, String>,
@@ -62,6 +65,7 @@ pub(crate) fn resolve_process_env(
                 .map(|(name, value)| (name.to_owned(), value.to_owned()))
                 .collect::<IndexMap<_, _>>();
             process_env.extend(env_vars.clone());
+            process_env.extend(secrets.clone());
             process_env
         }
     }
