@@ -55,18 +55,81 @@ struct BuildReadiness<'a> {
     planned_outputs: &'a [PackageIdentifier],
     /// Outputs already processed by the build loop.
     done_outputs: &'a [Output],
-    /// Outputs not built because they already exist. They are installed from a
-    /// channel, together with their run dependencies, which may be planned.
-    skipped_outputs: &'a [Output],
-    /// Indices into `skipped_outputs` by package name.
-    skipped_by_name: HashMap<&'a PackageName, Vec<usize>>,
-    /// Whether a skipped output is installable, per index. Only results that
-    /// did not depend on the cycle guard are kept.
-    skipped_installable: RefCell<HashMap<usize, bool>>,
-    /// Skipped outputs whose dependencies are being checked (cycle guard).
-    skipped_being_checked: RefCell<HashSet<usize>>,
+    /// Outputs not built because they already exist.
+    skipped: SkippedOutputs<'a>,
+}
+
+/// Outputs not built because they already exist. They are installed from a
+/// channel, together with their run dependencies, which may be planned.
+///
+/// Keeps, for one scheduling pass, which of them are installable, so shared
+/// dependencies are checked once.
+struct SkippedOutputs<'a> {
+    outputs: &'a [Output],
+    /// Indices into `outputs` by package name.
+    by_name: HashMap<&'a PackageName, Vec<usize>>,
+    /// Whether an output is installable, per index. Only results that did not
+    /// depend on the cycle guard are kept.
+    installable: RefCell<HashMap<usize, bool>>,
+    /// Outputs whose dependencies are being checked (cycle guard).
+    being_checked: RefCell<HashSet<usize>>,
     /// Set when the cycle guard answered for an output still being checked.
     reached_cycle: Cell<bool>,
+}
+
+impl<'a> SkippedOutputs<'a> {
+    fn new(outputs: &'a [Output]) -> Self {
+        let mut by_name: HashMap<&PackageName, Vec<usize>> = HashMap::new();
+        for (index, output) in outputs.iter().enumerate() {
+            by_name.entry(output.name()).or_default().push(index);
+        }
+        Self {
+            outputs,
+            by_name,
+            installable: RefCell::new(HashMap::new()),
+            being_checked: RefCell::new(HashSet::new()),
+            reached_cycle: Cell::new(false),
+        }
+    }
+
+    /// The indices of the outputs named `name`, or of all outputs when the
+    /// name is not known.
+    fn candidates(&self, name: Option<&PackageName>) -> Vec<usize> {
+        match name {
+            Some(name) => self.by_name.get(name).cloned().unwrap_or_default(),
+            None => (0..self.outputs.len()).collect(),
+        }
+    }
+
+    /// Whether the output at `index` is installable, as decided by
+    /// `installable` and cached. In a dependency cycle, the check of an output
+    /// that is already being checked answers `true`: the check further up
+    /// decides.
+    fn check<E>(
+        &self,
+        index: usize,
+        installable: impl FnOnce(&'a Output) -> Result<bool, E>,
+    ) -> Result<bool, E> {
+        if let Some(&result) = self.installable.borrow().get(&index) {
+            return Ok(result);
+        }
+        if !self.being_checked.borrow_mut().insert(index) {
+            self.reached_cycle.set(true);
+            return Ok(true);
+        }
+        let reached_cycle_before = self.reached_cycle.replace(false);
+
+        let result = installable(&self.outputs[index]);
+
+        self.being_checked.borrow_mut().remove(&index);
+        let reached_cycle = self.reached_cycle.get();
+        if !reached_cycle && let Ok(result) = result {
+            self.installable.borrow_mut().insert(index, result);
+        }
+        self.reached_cycle
+            .set(reached_cycle_before || reached_cycle);
+        result
+    }
 }
 
 impl<'a> BuildReadiness<'a> {
@@ -77,21 +140,10 @@ impl<'a> BuildReadiness<'a> {
         done_outputs: &'a [Output],
         skipped_outputs: &'a [Output],
     ) -> Self {
-        let mut skipped_by_name: HashMap<&PackageName, Vec<usize>> = HashMap::new();
-        for (index, output) in skipped_outputs.iter().enumerate() {
-            skipped_by_name
-                .entry(output.name())
-                .or_default()
-                .push(index);
-        }
         Self {
             planned_outputs,
             done_outputs,
-            skipped_outputs,
-            skipped_by_name,
-            skipped_installable: RefCell::new(HashMap::new()),
-            skipped_being_checked: RefCell::new(HashSet::new()),
-            reached_cycle: Cell::new(false),
+            skipped: SkippedOutputs::new(skipped_outputs),
         }
     }
 
@@ -261,12 +313,8 @@ impl<'a> BuildReadiness<'a> {
         matches: impl Fn(&Output) -> bool,
         availability: &mut HashMap<usize, bool>,
     ) -> Result<bool, BuildQueueError> {
-        let candidates: Vec<usize> = match name {
-            Some(name) => self.skipped_by_name.get(name).cloned().unwrap_or_default(),
-            None => (0..self.skipped_outputs.len()).collect(),
-        };
-        for index in candidates {
-            if matches(&self.skipped_outputs[index])
+        for index in self.skipped.candidates(name) {
+            if matches(&self.skipped.outputs[index])
                 && !self.skipped_output_is_installable(index, availability)?
             {
                 return Ok(false);
@@ -284,48 +332,26 @@ impl<'a> BuildReadiness<'a> {
         index: usize,
         availability: &mut HashMap<usize, bool>,
     ) -> Result<bool, BuildQueueError> {
-        if let Some(&installable) = self.skipped_installable.borrow().get(&index) {
-            return Ok(installable);
-        }
-        if !self.skipped_being_checked.borrow_mut().insert(index) {
-            // a dependency cycle: the check of `index` further up decides
-            self.reached_cycle.set(true);
-            return Ok(true);
-        }
-        let reached_cycle_before = self.reached_cycle.replace(false);
-
-        let skipped = &self.skipped_outputs[index];
-        let requirements = skipped.recipe.requirements();
-        let mut installable = Ok(true);
-        for dependency in requirements
-            .run
-            .iter()
-            .chain(&requirements.host)
-            .chain(&requirements.build)
-        {
-            match self.collect_dependency_install_closure(
-                dependency,
-                skipped,
-                &mut HashSet::new(),
-                availability,
-                &mut Vec::new(),
-            ) {
-                Ok(true) => {}
-                other => {
-                    installable = other;
-                    break;
+        self.skipped.check(index, |skipped| {
+            let requirements = skipped.recipe.requirements();
+            for dependency in requirements
+                .run
+                .iter()
+                .chain(&requirements.host)
+                .chain(&requirements.build)
+            {
+                if !self.collect_dependency_install_closure(
+                    dependency,
+                    skipped,
+                    &mut HashSet::new(),
+                    availability,
+                    &mut Vec::new(),
+                )? {
+                    return Ok(false);
                 }
             }
-        }
-
-        self.skipped_being_checked.borrow_mut().remove(&index);
-        let reached_cycle = self.reached_cycle.get();
-        if !reached_cycle && let Ok(result) = installable {
-            self.skipped_installable.borrow_mut().insert(index, result);
-        }
-        self.reached_cycle
-            .set(reached_cycle_before || reached_cycle);
-        installable
+            Ok(true)
+        })
     }
 
     /// Collects the installable sibling closure for a recipe dependency.
