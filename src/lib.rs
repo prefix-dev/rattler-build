@@ -40,7 +40,7 @@ pub use rattler_build_recipe::stage1::{HashInfo, HashInput};
 pub use rattler_build_types::NormalizedKey;
 
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, HashMap, HashSet},
     path::{Path, PathBuf},
     process::Command,
     str::FromStr,
@@ -757,6 +757,16 @@ fn check_outputs(
         ))
 }
 
+/// The rendered outputs that `skip_existing` removed because they already exist.
+fn skipped_outputs(all_outputs: &[Output], outputs_to_build: &[Output]) -> Vec<Output> {
+    let to_build: HashSet<String> = outputs_to_build.iter().map(Output::identifier).collect();
+    all_outputs
+        .iter()
+        .filter(|output| !to_build.contains(&output.identifier()))
+        .cloned()
+        .collect()
+}
+
 /// Runs build.
 pub async fn run_build_from_args(
     build_output: Vec<Output>,
@@ -768,7 +778,8 @@ pub async fn run_build_from_args(
     // Missing consumers suppress the unused-cache check.
     let all_outputs = build_output.clone();
     let outputs_to_build = skip_existing(build_output, &tool_configuration).await?;
-    let mut build_queue = OutputBuildQueue::new(outputs_to_build);
+    let skipped = skipped_outputs(&all_outputs, &outputs_to_build);
+    let mut build_queue = OutputBuildQueue::new(outputs_to_build, skipped);
 
     tracing::info!(
         "Starting build of {} outputs ({} at a time)",
@@ -1394,7 +1405,8 @@ async fn build_and_collect_packages(
     // Missing consumers suppress the unused-cache check.
     let all_outputs = build_output.clone();
     let outputs_to_build = skip_existing(build_output, tool_configuration).await?;
-    let mut build_queue = OutputBuildQueue::new(outputs_to_build);
+    let skipped = skipped_outputs(&all_outputs, &outputs_to_build);
+    let mut build_queue = OutputBuildQueue::new(outputs_to_build, skipped);
     let mut builds = ParallelBuilds::new(tool_configuration);
 
     loop {
