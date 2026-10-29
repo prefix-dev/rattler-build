@@ -36,6 +36,8 @@ getrandom_02 = { package = "getrandom", version = "0.2", features = ["js"] }
 getrandom_03 = { package = "getrandom", version = "0.3", features = [
   "wasm_js",
 ] }
+# `now()` (minijinja-contrib) needs jiff's `js` feature to read the clock on wasm
+jiff = { version = "0.2", features = ["js"] }
 
 [profile.release]
 opt-level = "s"

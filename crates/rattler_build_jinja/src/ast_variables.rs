@@ -148,17 +148,12 @@ fn panic_payload_message(payload: &(dyn std::any::Any + Send)) -> String {
 /// Extract variable names from a Jinja2 template string using minijinja's AST parsing
 /// Returns Result for validation during construction of JinjaTemplate
 fn extract_variables_from_template(template: &str) -> Result<Vec<String>, minijinja::Error> {
-    use minijinja::machinery::{WhitespaceConfig, parse};
+    use minijinja::machinery::parse;
 
     let mut variables = BTreeSet::new();
 
     // Parse the template directly
-    let ast = parse(
-        template,
-        "template",
-        Default::default(),
-        WhitespaceConfig::default(),
-    )?;
+    let ast = parse(template, "template", Default::default())?;
 
     // Walk the AST and collect variable names
     collect_variables_from_ast(&ast, &mut variables);
@@ -466,6 +461,11 @@ fn collect_variables_from_expr(
         Expr::Map(map) => {
             for expr in &map.keys {
                 collect_variables_from_expr(expr, variables);
+            }
+        }
+        Expr::Tuple(tuple) => {
+            for item in &tuple.items {
+                collect_variables_from_expr(item, variables);
             }
         }
     }

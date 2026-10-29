@@ -13,6 +13,7 @@ indexmap = { workspace = true }
 itertools = { workspace = true }
 lazy_static = { workspace = true }
 minijinja = { workspace = true }
+minijinja-contrib = { workspace = true, features = ["datetime", "timezone"] }
 rattler_build_types = { workspace = true }
 rattler_conda_types = { workspace = true, default-features = false }
 serde = { workspace = true }

@@ -7,6 +7,7 @@ use minijinja::{
     syntax::SyntaxConfig,
     value::{Kwargs, Object},
 };
+
 use rattler_build_types::{NormalizedKey, Pin, PinArgs};
 #[cfg(not(target_arch = "wasm32"))]
 use std::io::Read;
@@ -44,6 +45,7 @@ const KNOWN_FUNCTIONS: &[&str] = &[
     "env",
     "cmp",
     "hash",
+    "now",
 ];
 
 /// Configuration for Jinja template rendering in Rattler-Build
@@ -624,6 +626,12 @@ fn default_filters(env: &mut Environment) {
     env.add_filter("trim", minijinja::filters::trim);
     env.add_filter("unique", minijinja::filters::unique);
     env.add_filter("split", minijinja::filters::split);
+    env.add_filter("tojson", minijinja::filters::tojson);
+
+    // Add the date/time functions
+    env.add_filter("dateformat", minijinja_contrib::filters::dateformat);
+    env.add_filter("datetimeformat", minijinja_contrib::filters::datetimeformat);
+    env.add_filter("timeformat", minijinja_contrib::filters::timeformat);
 }
 
 fn parse_platform(platform: &str) -> Result<Subdir, minijinja::Error> {
@@ -945,6 +953,9 @@ fn set_jinja(
     env.add_function("is_android", |platform: &str| {
         Ok(parse_platform(platform)?.is_android())
     });
+
+    // Add date/time functions
+    env.add_function("now", minijinja_contrib::globals::now);
 
     register_io_functions(&mut env, experimental, recipe_path);
 
@@ -1914,7 +1925,7 @@ mod tests {
             };
 
             jinja
-                .eval(&format!("var | {func} | list"))
+                .eval(&format!("var | {func} | list | tojson"))
                 .unwrap()
                 .to_string()
         };
@@ -1944,11 +1955,17 @@ mod tests {
             "2"
         );
         assert_eq!(
-            jinja.eval("(var | split('.'))[-1:]").unwrap().to_string(),
+            jinja
+                .eval("(var | split('.'))[-1:] | tojson")
+                .unwrap()
+                .to_string(),
             "[\"3\"]"
         );
         assert_eq!(
-            jinja.eval("(var | split('.'))[1:]").unwrap().to_string(),
+            jinja
+                .eval("(var | split('.'))[1:] | tojson")
+                .unwrap()
+                .to_string(),
             "[\"2\", \"3\"]"
         );
         assert_eq!(
@@ -2409,5 +2426,139 @@ mod tests {
         assert!(jinja.eval("is_unix('android-64')").unwrap().is_true());
         assert!(!jinja.eval("is_linux('android-64')").unwrap().is_true());
         assert!(!jinja.eval("is_osx('ios-arm64')").unwrap().is_true());
+    }
+
+    #[test]
+    fn eval_date_functions() {
+        let jinja = Jinja::new(JinjaConfig::default());
+        assert_eq!(
+            jinja
+                .eval("1792153018.1234 | datetimeformat(format='%Y%m%d.%H.%M.%S', tz='UTC')")
+                .unwrap()
+                .to_string(),
+            "20261016.12.16.58",
+            "datetime not formatted as expected"
+        );
+        assert_eq!(
+            jinja
+                .eval("1792153018.1234 | dateformat(format='%Y%m%d', tz='UTC')")
+                .unwrap()
+                .to_string(),
+            "20261016",
+            "date not formatted as expected"
+        );
+        assert_eq!(
+            jinja
+                .eval("1792153018.1234 | timeformat(format='%H.%M.%S', tz='UTC')")
+                .unwrap()
+                .to_string(),
+            "12.16.58",
+            "time not formatted as expected"
+        );
+        assert!(
+            jinja.eval("now() <= now()").unwrap().is_true(),
+            "unexpected now comparison"
+        );
+    }
+
+    #[test]
+    fn date_filters_defaults_and_timezones() {
+        let jinja = Jinja::new(JinjaConfig::default());
+        let ev = |s: &str| jinja.eval(s).unwrap().to_string();
+        // no tz => UTC regardless of host TZ
+        assert_eq!(ev("1792153018 | datetimeformat(format='%H')"), "12");
+        assert_eq!(
+            ev("1792153018 | datetimeformat(format='%H %z', tz='America/New_York')"),
+            "08 -0400"
+        );
+        assert_eq!(
+            ev("'2026-10-16T12:16:58Z' | dateformat(format='%Y.%m.%d')"),
+            "2026.10.16"
+        );
+        assert_eq!(
+            ev("1792153018 | datetimeformat(format='iso', tz='UTC')"),
+            "2026-10-16T12:16:58+00:00"
+        );
+        assert!(
+            jinja
+                .eval("1792153018 | datetimeformat(tz='Not/AZone')")
+                .is_err()
+        );
+        assert!(jinja.eval("'garbage' | dateformat").is_err());
+        assert!(jinja.eval("now() > 1700000000").unwrap().is_true());
+    }
+
+    #[test]
+    fn date_filters_context_overrides() {
+        // 2026-10-16T12:16:58Z
+        let ev = |jinja: &Jinja, s: &str| jinja.eval(s).unwrap().to_string();
+
+        // no context: "medium" formats, UTC for timestamps, offsets retained
+        let jinja = Jinja::new(JinjaConfig::default());
+        assert_eq!(
+            ev(&jinja, "1792153018 | datetimeformat"),
+            "Oct 16 2026 12:16"
+        );
+        assert_eq!(ev(&jinja, "1792153018 | dateformat"), "Oct 16 2026");
+        assert_eq!(ev(&jinja, "1792153018 | timeformat"), "12:16");
+        assert_eq!(
+            ev(
+                &jinja,
+                "'2026-10-16T12:16:58+02:00' | datetimeformat(format='%H %z')"
+            ),
+            "12 +0200"
+        );
+
+        // recipe context sets the defaults
+        let context = IndexMap::from([
+            ("TIMEZONE".to_string(), Variable::from("America/New_York")),
+            (
+                "DATETIME_FORMAT".to_string(),
+                Variable::from("%Y-%m-%d %H %z"),
+            ),
+            ("DATE_FORMAT".to_string(), Variable::from("%Y%m%d")),
+            ("TIME_FORMAT".to_string(), Variable::from("%H.%M")),
+        ]);
+        let jinja = Jinja::new(JinjaConfig::default()).with_context(&context);
+        assert_eq!(
+            ev(&jinja, "1792153018 | datetimeformat"),
+            "2026-10-16 08 -0400"
+        );
+        assert_eq!(ev(&jinja, "1792153018 | dateformat"), "20261016");
+        assert_eq!(ev(&jinja, "1792153018 | timeformat"), "08.16");
+        assert_eq!(
+            ev(&jinja, "'2026-10-16T12:16:58+02:00' | datetimeformat"),
+            "2026-10-16 06 -0400"
+        );
+
+        // explicit kwargs win over context
+        assert_eq!(
+            ev(&jinja, "1792153018 | datetimeformat(format='%H', tz='UTC')"),
+            "12"
+        );
+        assert_eq!(
+            ev(
+                &jinja,
+                "'2026-10-16T12:16:58+02:00' | datetimeformat(format='%H', tz='original')"
+            ),
+            "12"
+        );
+    }
+
+    #[test]
+    fn tojson_and_sequence_stringification() {
+        let jinja = Jinja::new(JinjaConfig::default());
+        assert_eq!(
+            jinja.render_str("${{ [1, 'a'] | tojson }}").unwrap(),
+            "[1, \"a\"]"
+        );
+        // minijinja 3 renders sequences in strings with Python repr
+        assert_eq!(
+            jinja
+                .render_str("x=${{ '1.2' | split('.') | list }}")
+                .unwrap(),
+            "x=['1', '2']"
+        );
+        assert_eq!(jinja.render_str("${{ (1, 2) }}").unwrap(), "(1, 2)");
     }
 }

@@ -68,10 +68,12 @@ md-5 = "0.11"
 memchr = "2.8.3"
 memmap2 = "0.9.11"
 miette = "7.6.0"
-minijinja = { version = "2.24.0", features = [
-  "custom_syntax",
+minijinja = { version = "3.0.1", features = [
+  "json",
+  "serde",
   "unstable_machinery",
 ] }
+minijinja-contrib = { version = "3.0.1", features = ["datetime", "timezone"] }
 pathdiff = "0.2.3"
 petgraph = { version = "0.8.3", default-features = false }
 rayon = "1.12.0"
