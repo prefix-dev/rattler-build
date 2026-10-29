@@ -1,6 +1,6 @@
 [package]
 name = "rattler_build_types"
-version = "0.1.20"
+version = "0.1.21"
 authors.workspace = true
 edition.workspace = true
 description = "Common types shared across rattler-build crates, including glob matching, version pinning, and variant configuration keys"

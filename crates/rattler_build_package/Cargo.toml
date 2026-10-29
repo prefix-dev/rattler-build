@@ -1,6 +1,6 @@
 [package]
 name = "rattler_build_package"
-version = "0.1.22"
+version = "0.1.23"
 authors.workspace = true
 edition.workspace = true
 description = "A library for creating conda packages from files and metadata, supporting .tar.bz2 and .conda formats"
