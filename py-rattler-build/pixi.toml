@@ -7,7 +7,11 @@ platforms = ["win-64", "linux-64", "osx-64", "osx-arm64"]
 license = "BSD-3-Clause"
 preview = ["pixi-build"]
 # We are using the oldest supported python version as the build variant here
-build-variants = { python = ["3.10"], rust_compiler_version = [">=1.98.1,<1.99"] }
+build-variants = { python = [
+  "3.10",
+], rust_compiler_version = [
+  ">=1.98.1,<1.99",
+] }
 
 [dependencies]
 requests = ">=2.34.2,<3"
@@ -60,7 +64,6 @@ rust = ">=1.98.1,<1.99"
 ruff = ">=0.16.6,<0.17"
 
 [environments.lint.tasks]
-
 fmt-rust = "cargo fmt --all --manifest-path rust/Cargo.toml"
 # checks for the CI
 fmt-rust-check = "cargo fmt --all --check --manifest-path rust/Cargo.toml"

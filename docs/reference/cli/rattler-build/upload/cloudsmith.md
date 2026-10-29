@@ -26,3 +26,6 @@ rattler-build upload cloudsmith [OPTIONS] --owner <OWNER> --repo <REPO>
 - <a id="arg---url" href="#arg---url">`--url (-u) <URL>`</a>
 :  The URL to the Cloudsmith API server
 <br>**env**: `CLOUDSMITH_API_URL`
+- <a id="arg---force" href="#arg---force">`--force`</a>
+:  Force overwrite existing packages
+<br>**env**: `CLOUDSMITH_FORCE`

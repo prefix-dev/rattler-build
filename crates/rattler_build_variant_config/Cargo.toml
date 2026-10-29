@@ -1,16 +1,12 @@
 [package]
 name = "rattler_build_variant_config"
-version = "0.1.20"
+version = "0.1.22"
 authors.workspace = true
 edition.workspace = true
-license.workspace = true
-repository.workspace = true
-readme = "README.md"
 description = "Variant configuration system for rattler-build, handling build matrices, zip keys, and loading of variant YAML files"
-
-[features]
-default = ["parser"]
-parser = ["minijinja"]
+readme = "README.md"
+repository.workspace = true
+license.workspace = true
 
 [dependencies]
 # Core serde
@@ -20,9 +16,9 @@ serde_yaml = { workspace = true }
 # Rattler crates
 rattler_conda_types = { workspace = true }
 
+rattler_build_jinja = { workspace = true }
 # Rattler-build crates
 rattler_build_types = { workspace = true }
-rattler_build_jinja = { workspace = true }
 rattler_build_yaml_parser = { workspace = true }
 
 # YAML parsing
@@ -31,20 +27,24 @@ marked-yaml = { workspace = true }
 # Template rendering (optional with 'parser' feature)
 minijinja = { workspace = true, optional = true }
 
+miette = { workspace = true }
 # Error handling
 thiserror = { workspace = true }
-miette = { workspace = true }
 
 # Utilities
 tracing = { workspace = true }
+
+[dev-dependencies]
+insta = { workspace = true, features = ["filters", "yaml"] }
+miette = { workspace = true, features = ["fancy"] }
+rattler_build_yaml_parser = { workspace = true }
+rstest = { workspace = true }
+serial_test = { workspace = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 fs-err = { workspace = true }
 regex = { workspace = true }
 
-[dev-dependencies]
-insta = { workspace = true, features = ["yaml", "filters"] }
-rstest = { workspace = true }
-serial_test = { workspace = true }
-rattler_build_yaml_parser = { workspace = true }
-miette = { workspace = true, features = ["fancy"] }
+[features]
+default = ["parser"]
+parser = ["minijinja"]

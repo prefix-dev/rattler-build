@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.20](https://github.com/prefix-dev/rattler-build/compare/rattler_build_types-v0.1.19...rattler_build_types-v0.1.20) - 2026-10-27
+
+### Other
+
+- update Cargo.toml dependencies
+
+## [0.1.19](https://github.com/prefix-dev/rattler-build/compare/rattler_build_types-v0.1.18...rattler_build_types-v0.1.19) - 2026-10-27
+
+### Fixed
+
+- ignore wildcards and build strings when computing variant build-string prefix ([#2893](https://github.com/prefix-dev/rattler-build/pull/2893))
+
 ## [0.1.18](https://github.com/prefix-dev/rattler-build/compare/rattler_build_types-v0.1.17...rattler_build_types-v0.1.18) - 2026-10-14
 
 ### Other

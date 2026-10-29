@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.22](https://github.com/prefix-dev/rattler-build/compare/rattler_build_recipe-v0.1.21...rattler_build_recipe-v0.1.22) - 2026-10-27
+
+### Other
+
+- update Cargo.toml dependencies
+
+## [0.1.21](https://github.com/prefix-dev/rattler-build/compare/rattler_build_recipe-v0.1.20...rattler_build_recipe-v0.1.21) - 2026-10-27
+
+### Added
+
+- allow build.flags without --v3 ([#2882](https://github.com/prefix-dev/rattler-build/pull/2882))
+
+### Fixed
+
+- ignore wildcards and build strings when computing variant build-string prefix ([#2893](https://github.com/prefix-dev/rattler-build/pull/2893))
+
 ## [0.1.20](https://github.com/prefix-dev/rattler-build/compare/rattler_build_recipe-v0.1.19...rattler_build_recipe-v0.1.20) - 2026-10-14
 
 ### Other

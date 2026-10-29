@@ -22,11 +22,9 @@ regex = '''
 message_template = "Bump version: {new_version}"
 tag_template = "v{new_version}"
 
-
 [[file]]
 search = '^version = "{current_version}"'
 src = "Cargo.toml"
-
 
 [[file]]
 search = '^version = "{current_version}"'

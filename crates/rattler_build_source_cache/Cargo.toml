@@ -1,42 +1,40 @@
 [package]
 name = "rattler_build_source_cache"
-version = "0.1.17"
-edition.workspace = true
+version = "0.1.19"
 authors.workspace = true
-license.workspace = true
-repository.workspace = true
-readme = "README.md"
+edition.workspace = true
 description = "Source cache management for rattler-build"
-
-[features]
-default = ["rustls", "sigstore"]
-sigstore = [
-  "dep:sigstore-verify",
-  "dep:sigstore-trust-root",
-  "dep:sigstore-types",
-  "sigstore-verify/tuf",
-  "sigstore-trust-root/tuf",
-]
-native-tls = [
-  "rattler_build_networking/native-tls",
-  "sigstore-verify?/native-tls",
-]
-rustls = ["rattler_build_networking/rustls", "sigstore-verify?/rustls"]
+readme = "README.md"
+repository.workspace = true
+license.workspace = true
 
 [dependencies]
 async-trait = { workspace = true }
-jiff = { workspace = true }
+bzip2 = { workspace = true }
+dunce = { workspace = true }
+flate2 = { workspace = true }
 fs-err = { workspace = true, features = ["tokio"] }
 futures = { workspace = true }
+hex = { workspace = true }
+indicatif = { workspace = true }
+jiff = { workspace = true }
+lzma-rust2 = { workspace = true }
+md-5 = { workspace = true }
+rattler_build_networking = { workspace = true }
+rattler_git = { workspace = true }
 rattler_prefix_guard = { workspace = true }
 reqwest = { workspace = true, features = ["stream"] }
 reqwest-middleware = { workspace = true }
 reqwest-retry = { workspace = true }
-rattler_build_networking = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+sevenz-rust2 = { workspace = true }
 sha2 = { workspace = true }
-md-5 = { workspace = true }
+sigstore-trust-root = { version = "0.15.1", default-features = false, optional = true }
+sigstore-types = { version = "0.15.1", optional = true }
+sigstore-verify = { version = "0.15.1", default-features = false, optional = true }
+tar = { workspace = true }
+tempfile = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = [
   "fs",
@@ -50,22 +48,24 @@ tracing = { workspace = true }
 url = { workspace = true, features = ["serde"] }
 walkdir = { workspace = true }
 zip = { workspace = true }
-sevenz-rust2 = { workspace = true }
-tar = { workspace = true }
-flate2 = { workspace = true }
-bzip2 = { workspace = true }
-lzma-rust2 = { workspace = true }
 zstd = { workspace = true }
-indicatif = { workspace = true }
-tempfile = { workspace = true }
-dunce = { workspace = true }
-rattler_git = { workspace = true }
-hex = { workspace = true }
-sigstore-verify = { version = "0.15.1", default-features = false, optional = true }
-sigstore-trust-root = { version = "0.15.1", default-features = false, optional = true }
-sigstore-types = { version = "0.15.1", optional = true }
 
 [dev-dependencies]
 base64 = "0.23"
-tokio = { workspace = true, features = ["rt", "macros", "test-util"] }
 tempfile.workspace = true
+tokio = { workspace = true, features = ["macros", "rt", "test-util"] }
+
+[features]
+default = ["rustls", "sigstore"]
+native-tls = [
+  "rattler_build_networking/native-tls",
+  "sigstore-verify?/native-tls",
+]
+rustls = ["rattler_build_networking/rustls", "sigstore-verify?/rustls"]
+sigstore = [
+  "dep:sigstore-trust-root",
+  "dep:sigstore-types",
+  "dep:sigstore-verify",
+  "sigstore-trust-root/tuf",
+  "sigstore-verify/tuf",
+]
