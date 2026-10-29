@@ -3886,6 +3886,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#datetime-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Date/time Functions
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#the-hash-variable" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -4112,6 +4123,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#datetime-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Date/time Functions
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#the-hash-variable" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -4244,9 +4266,9 @@ influence. See below for an example:</p>
 </span></code></pre></div>
 <p>With a corresponding variant_configuration:</p>
 <div class="language-yaml highlight"><span class="filename">variant_configuration.yaml</span><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">c_compiler</span><span class="p">:</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">clang</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">clang</span>
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="nt">c_compiler_version</span><span class="p">:</span>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">9.0</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">9.0</span>
 </span></code></pre></div>
 <p>The variables shown above would select the <code>clang</code> compiler in version <code>9.0</code>.
 Note that the final output will still contain the <code>target_platform</code>, so that the
@@ -4292,9 +4314,9 @@ variables <code>&lt;lang&gt;_stdlib</code> and <code>&lt;lang&gt;_stdlib_version
 <div class="language-yaml highlight"><span class="filename">variant_configuration.yaml</span><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># these are the values `conda-forge` uses in their pinning file</span>
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="c1"># found at https://github.com/conda-forge/conda-forge-pinning-feedstock/blob/main/recipe/conda_build_config.yaml</span>
 </span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="nt">c_stdlib</span><span class="p">:</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sysroot</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sysroot</span>
 </span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="nt">c_stdlib_version</span><span class="p">:</span>
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2.17</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2.17</span>
 </span></code></pre></div>
 <h3 id="the-pin-functions">The <code>pin</code> functions<a class="headerlink" href="#the-pin-functions" title="Permanent link">#</a></h3>
 <p>A pin is created based on the version input (from a subpackage or a package
@@ -4310,7 +4332,7 @@ resolution).</p>
 <p>The lower bound and upper bound can either be a "pin expression" (only <code>x</code> and
 <code>.</code> are allowed) or a hard-coded version string.</p>
 <p>A "pin expression" is applied to the version input to create the lower and upper
-bounds. For example, if the version is <code>3.10.5</code> with a  <code>lower_bound="x.x",
+bounds. For example, if the version is <code>3.10.5</code> with a <code>lower_bound="x.x",
 upper_bound="x.x.x"</code>, the lower bound will be <code>3.10</code> and the upper bound will be
 <code>3.10.6.0a0</code>. A pin expression for the <code>upper_bound</code> will increment the last
 selected segment of the version by <code>1</code>, and append <code>.0a0</code> to the end to prevent
@@ -4370,14 +4392,16 @@ example of how this function can be used:</p>
 <h3 id="the-match-function">The <code>match</code> function<a class="headerlink" href="#the-match-function" title="Permanent link">#</a></h3>
 <p>The <code>match</code> function allows you to perform version comparisons using conda's version matching syntax. This is particularly useful for conditionally including dependencies or skipping builds based on variants.</p>
 <p><strong>Syntax:</strong> <code>match(version, version_spec)</code></p>
-<p><strong>Parameters:</strong>
-- <code>version</code>: A version string (typically from a variant variable like <code>python</code>)
-- <code>version_spec</code>: A conda version specification string supporting operators like <code>==</code>, <code>!=</code>, <code>&lt;</code>, <code>&lt;=</code>, <code>&gt;</code>, <code>&gt;=</code>, wildcards (<code>*</code>), and comma-separated combinations (e.g., <code>"&gt;=3.8"</code>, <code>"3.14.*"</code>, <code>"&gt;=3.7,&lt;3.9"</code>)</p>
+<p><strong>Parameters:</strong></p>
+<ul>
+<li><code>version</code>: A version string (typically from a variant variable like <code>python</code>)</li>
+<li><code>version_spec</code>: A conda version specification string supporting operators like <code>==</code>, <code>!=</code>, <code>&lt;</code>, <code>&lt;=</code>, <code>&gt;</code>, <code>&gt;=</code>, wildcards (<code>*</code>), and comma-separated combinations (e.g., <code>"&gt;=3.8"</code>, <code>"3.14.*"</code>, <code>"&gt;=3.7,&lt;3.9"</code>)</li>
+</ul>
 <p>The function returns <code>true</code> if the version matches the specification, <code>false</code> otherwise.</p>
 <h4 id="usage-examples">Usage examples<a class="headerlink" href="#usage-examples" title="Permanent link">#</a></h4>
 <p>Using <code>match</code> to conditionally skip builds:</p>
 <div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nt">build</span><span class="p">:</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="nt">skip</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">match(python, &quot;&lt;3.8&quot;)</span><span class="w">  </span><span class="c1"># skip builds for Python &lt; 3.8</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="nt">skip</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">match(python, &quot;&lt;3.8&quot;)</span><span class="w"> </span><span class="c1"># skip builds for Python &lt; 3.8</span>
 </span></code></pre></div>
 <p>Using <code>match</code> with conditional dependencies:</p>
 <div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nt">requirements</span><span class="p">:</span>
@@ -4391,7 +4415,7 @@ example of how this function can be used:</p>
 </div>
 <p>Checking exact version matches:</p>
 <div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nt">build</span><span class="p">:</span>
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="nt">skip</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">match(root_base, &quot;&lt;6.36&quot;)</span><span class="w">  </span><span class="c1"># skip if root_base is older than 6.36</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="nt">skip</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">match(root_base, &quot;&lt;6.36&quot;)</span><span class="w"> </span><span class="c1"># skip if root_base is older than 6.36</span>
 </span></code></pre></div>
 <p>Using version ranges:</p>
 <div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nt">requirements</span><span class="p">:</span>
@@ -4406,6 +4430,11 @@ example of how this function can be used:</p>
 </span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">      </span><span class="nt">then</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python-3.14-specific-package</span>
 </span></code></pre></div>
 <p><strong>Note:</strong> The <code>match</code> function follows conda's standard version matching rules, making it more reliable than manual string parsing or comparison operations.</p>
+<h3 id="datetime-functions">Date/time Functions<a class="headerlink" href="#datetime-functions" title="Permanent link">#</a></h3>
+<ul>
+<li><code>now</code>: return the current UNIX timestamp in seconds as a float with microsecond precision (e.g. <code>${{ now() }}</code> returns <code>1792153018.1234</code>).
+  Note that using <code>now()</code> makes the rendered recipe non-reproducible: it is evaluated separately for each variant and on every build.</li>
+</ul>
 <h3 id="the-hash-variable">The <code>hash</code> variable<a class="headerlink" href="#the-hash-variable" title="Permanent link">#</a></h3>
 <ul>
 <li><code>${{ hash }}</code> is the variant hash and is useful in the build string
@@ -4476,9 +4505,16 @@ library:</p>
 <li><code>reverse</code>: reverse a list (e.g. <code>"${{ [1, 2, 3] | reverse }}"</code> will return <code>[3, 2, 1]</code>)</li>
 <li><code>sort</code>: sort a list (e.g. <code>"${{ [3, 1, 2] | sort }}"</code> will return <code>[1, 2, 3]</code>)</li>
 <li><code>trim</code>: remove leading and trailing whitespace from a string (e.g. <code>"${{ ' foo ' | trim }}"</code> will return <code>"foo"</code>)</li>
-<li><code>unique</code>: remove duplicates from a list (e.g. <code>"${{ [1, 2, 1, 3] | unique }}"</code> will return <code>[1, 2, 3]</code>)</li>
-<li><code>split</code>: split a string into a list (e.g. <code>"${{ '1.2.3' | split('.') | list }}"</code> will return <code>['1', '2', '3']</code>). By default, splits on whitespace.</li>
+<li><code>unique</code>: remove duplicates from a list (e.g. <code>"${{ [1, 2, 1, 3] | unique }}"</code> will return <code>"[1, 2, 3]"</code>)</li>
+<li><code>split</code>: split a string into a list (e.g. <code>"${{ '1.2.3' | split('.') | list }}"</code> will return <code>"['1', '2', '3']"</code>). By default, splits on whitespace.</li>
+<li><code>tojson</code>: return the JSON string of an input (e.g. <code>${{ {'foo': [{"bar": '"1"'}]} | tojson }}</code> will return <code>{"foo": [{"bar": "\"1\""}]}</code>)</li>
+<li><code>datetimeformat</code>: format a UNIX epoch timestamp or ISO-8601 string with <code>strftime</code> syntax (e.g. <code>"${{ 1792153018.1234 | datetimeformat(format='%Y%m%d.%H.%M.%S', tz='UTC') }}"</code> will return <code>"20261016.12.16.58"</code>)</li>
+<li><code>dateformat</code>: as <code>datetimeformat</code>, but discards the time portion</li>
+<li><code>timeformat</code>: as <code>datetimeformat</code>, but discards the date portion</li>
 </ul>
+<p>The date/time filters default to UTC and a "medium" format (e.g. <code>Oct 16 2026 12:16</code>).
+These defaults can be changed by defining <code>TIMEZONE</code>, <code>DATETIME_FORMAT</code>, <code>DATE_FORMAT</code>
+or <code>TIME_FORMAT</code> in the recipe <code>context</code>.</p>
 <details>
 <summary>Removed filters</summary>
 <p>The following filters are removed from the builtins:</p>
@@ -4500,7 +4536,6 @@ library:</p>
 <li><code>safe</code></li>
 <li><code>items</code></li>
 <li><code>float</code></li>
-<li><code>tojson</code></li>
 </ul>
 </details>
 <h3 id="extra-filters-for-recipes">Extra filters for recipes<a class="headerlink" href="#extra-filters-for-recipes" title="Permanent link">#</a></h3>
@@ -4557,8 +4592,13 @@ empty (null) and thus filtered from the final list.</p>
 </span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a><span class="w">  </span><span class="c1">#}</span>
 </span><span id="__span-14-7"><a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a><span class="nt">  version</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;1.0&quot;</span>
 </span></code></pre></div>
+<h4 id="lists-and-dictionaries-in-strings">Lists and dictionaries in strings<a class="headerlink" href="#lists-and-dictionaries-in-strings" title="Permanent link">#</a></h4>
+<p>When a list, tuple or dictionary is rendered as part of a string, it is
+formatted like a Python <code>repr</code>, e.g. <code>${{ "1.2" | split(".") | list }}</code> renders
+as <code>['1', '2']</code>. Use the <code>tojson</code> filter to get JSON output instead
+(<code>["1", "2"]</code>).</p>
 <h4 id="slicing-lists">Slicing lists<a class="headerlink" href="#slicing-lists" title="Permanent link">#</a></h4>
-<p>Lists can be spliced using the regular Python <code>[i:j]</code> syntax.  Note that when
+<p>Lists can be spliced using the regular Python <code>[i:j]</code> syntax. Note that when
 lists are obtained through using filters such as <code>split</code>, the whole filter
 expression needs to be parenthesized.</p>
 <p>For example, to slice a version string from <code>x.y.z</code> to <code>x.y</code>:</p>

@@ -8473,7 +8473,7 @@ session = DebugSession.create(
 print(f"Work directory:  {session.work_dir}")
 ```
 
-    Work directory:  /tmp/rattler_build_c3ca0cf7321ee1ce/output/bld/rattler-build_debug-demo/work
+    Work directory:  /tmp/rattler_build_16c0726bf0f09083/output/bld/rattler-build_debug-demo/work
 
 
 ## Read the Build Script
@@ -8495,7 +8495,7 @@ for p in sorted(session.work_dir.iterdir()):
     set -e
     ## Start of bash preamble
     if [ -z ${CONDA_BUILD+x} ]; then
-        source "/tmp/rattler_build_c3ca0cf7321ee1ce/output/bld/rattler-build_debug-demo/work/build_env.sh"
+        source "/tmp/rattler_build_16c0726bf0f09083/output/bld/rattler-build_debug-demo/work/build_env.sh"
     fi
     ## End of preamble
     # Trace each command as it runs so a failing line is visible (see #2264).
@@ -8540,7 +8540,7 @@ if result.stderr:
     + '[' -z x ']'
     + set -x
     + echo 'Hello from the build script!'
-    + mkdir -p /tmp/rattler_build_c3ca0cf7321ee1ce/output/bld/rattler-build_debug-demo/host_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_plac/bin
+    + mkdir -p /tmp/rattler_build_16c0726bf0f09083/output/bld/rattler-build_debug-demo/host_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_plac/bin
     + echo 'hello from debug-demo'
     
 
@@ -8713,7 +8713,7 @@ print(f"Built: {built_package_path}")
     Version: 1.0.0
     
     Building package...
-    Built: /tmp/rattler_build_q_srsora/output/noarch/test-demo-package-1.0.0-pyh4616a5c_0.conda
+    Built: /tmp/rattler_build_9qqlcqz9/output/noarch/test-demo-package-1.0.0-pyh4616a5c_0.conda
 
 
 ## Step 2: Loading a Package
@@ -8734,7 +8734,7 @@ print(f"\nString representation: {pkg!r}")
 
     Package Loaded Successfully!
     ============================================================
-    Path: /tmp/rattler_build_q_srsora/output/noarch/test-demo-package-1.0.0-pyh4616a5c_0.conda
+    Path: /tmp/rattler_build_9qqlcqz9/output/noarch/test-demo-package-1.0.0-pyh4616a5c_0.conda
     Type: Package
     
     String representation: Package(test-demo-package-1.0.0-pyh4616a5c_0)
@@ -8789,7 +8789,7 @@ else:
     License:        MIT
     Arch:           None
     Platform:       None
-    Timestamp:      2026-10-28 17:54:08.012000+00:00
+    Timestamp:      2026-10-29 07:58:41.113000+00:00
     
     Archive Information
     ----------------------------------------
@@ -8831,10 +8831,10 @@ print(json.dumps(metadata_dict, indent=2, default=str))
       "constrains": [],
       "license": "MIT",
       "license_family": null,
-      "timestamp": "2026-10-28 17:54:08.012000+00:00",
+      "timestamp": "2026-10-29 07:58:41.113000+00:00",
       "arch": null,
       "platform": null,
-      "path": "/tmp/rattler_build_q_srsora/output/noarch/test-demo-package-1.0.0-pyh4616a5c_0.conda",
+      "path": "/tmp/rattler_build_9qqlcqz9/output/noarch/test-demo-package-1.0.0-pyh4616a5c_0.conda",
       "archive_type": "conda",
       "filename": "test-demo-package-1.0.0-pyh4616a5c_0.conda"
     }
@@ -9199,11 +9199,11 @@ print(f"Identical (reproducible): {rebuild_result.is_identical}")
 
     Rebuilding Package
     ============================================================
-    Original package: /tmp/rattler_build_q_srsora/output/noarch/test-demo-package-1.0.0-pyh4616a5c_0.conda
-    Rebuilt package:  output/test-demo-package-1.0.0-pyh4616a5c_0-rebuilt-20261028-175412.conda
+    Original package: /tmp/rattler_build_9qqlcqz9/output/noarch/test-demo-package-1.0.0-pyh4616a5c_0.conda
+    Rebuilt package:  output/test-demo-package-1.0.0-pyh4616a5c_0-rebuilt-20261029-075846.conda
     
-    Original SHA256:  f2c7d73cd4c8b03155e56179d601a42b72a6ba6bc723f8b7aceeac0c5ad7e227
-    Rebuilt SHA256:   f2c7d73cd4c8b03155e56179d601a42b72a6ba6bc723f8b7aceeac0c5ad7e227
+    Original SHA256:  1e810851bb5ec5da94f40b118eff2c0b356df612b7241c716d6f7b218981a833
+    Rebuilt SHA256:   1e810851bb5ec5da94f40b118eff2c0b356df612b7241c716d6f7b218981a833
     
     Identical (reproducible): True
 
@@ -9229,7 +9229,7 @@ print(f"Files:        {len(rebuilt_pkg.files)} files")
     Name:         test-demo-package
     Version:      1.0.0
     Build string: pyh4616a5c_0
-    Path:         output/test-demo-package-1.0.0-pyh4616a5c_0-rebuilt-20261028-175412.conda
+    Path:         output/test-demo-package-1.0.0-pyh4616a5c_0-rebuilt-20261029-075846.conda
     Files:        1 files
 
 
@@ -9425,14 +9425,14 @@ print(f"\nBuilt packages are available in: {result.output_dir}")
 
     Building Example 1 packages...
     ============================================================
-    Recipe path: /tmp/rattler_build__2wjqnyt/recipe.yaml
+    Recipe path: /tmp/rattler_build_gnf9g18a/recipe.yaml
     
     Building variant 1/2
       Package: myproject-lib
       Version: 2.0.0
       Build string: hb0f4dca_0
-      Build complete in 1.14s!
-      Package: /tmp/rattler_build__2wjqnyt/output/linux-64/myproject-lib-2.0.0-hb0f4dca_0.conda
+      Build complete in 0.81s!
+      Package: /tmp/rattler_build_gnf9g18a/output/linux-64/myproject-lib-2.0.0-hb0f4dca_0.conda
       Variant: {'target_platform': 'linux-64'}
       Build log: 34 messages captured
     
@@ -9440,15 +9440,15 @@ print(f"\nBuilt packages are available in: {result.output_dir}")
       Package: myproject-tools
       Version: 2.0.0
       Build string: hb0f4dca_0
-      Build complete in 0.46s!
-      Package: /tmp/rattler_build__2wjqnyt/output/linux-64/myproject-tools-2.0.0-hb0f4dca_0.conda
+      Build complete in 0.35s!
+      Package: /tmp/rattler_build_gnf9g18a/output/linux-64/myproject-tools-2.0.0-hb0f4dca_0.conda
       Variant: {'target_platform': 'linux-64'}
       Build log: 43 messages captured
     
     ============================================================
     Example 1 builds completed successfully!
     
-    Built packages are available in: /tmp/rattler_build__2wjqnyt/output
+    Built packages are available in: /tmp/rattler_build_gnf9g18a/output
 
 
 ## Example 2: Staging Outputs - Shared Build Artifacts
@@ -9635,15 +9635,15 @@ print(f"\nBuilt packages are available in: {result.output_dir}")
 
     Building Example 2 packages (with staging)...
     ============================================================
-    Recipe path: /tmp/rattler_build_1ey702ls/recipe.yaml
+    Recipe path: /tmp/rattler_build_lhvgs9o6/recipe.yaml
     
     Building variant 1/2
       Package: compiled-project-python
       Version: 1.5.0
       Build string: hb0f4dca_0
       Staging caches: ['shared-build']
-      Build complete in 0.62s!
-      Package: /tmp/rattler_build_1ey702ls/output/linux-64/compiled-project-python-1.5.0-hb0f4dca_0.conda
+      Build complete in 0.46s!
+      Package: /tmp/rattler_build_lhvgs9o6/output/linux-64/compiled-project-python-1.5.0-hb0f4dca_0.conda
       Variant: {'target_platform': 'linux-64'}
       Build log: 56 messages captured
     
@@ -9652,15 +9652,17 @@ print(f"\nBuilt packages are available in: {result.output_dir}")
       Version: 1.5.0
       Build string: hb0f4dca_0
       Staging caches: ['shared-build']
-      Build complete in 1.00s!
-      Package: /tmp/rattler_build_1ey702ls/output/linux-64/compiled-project-cli-1.5.0-hb0f4dca_0.conda
+
+
+      Build complete in 0.47s!
+      Package: /tmp/rattler_build_lhvgs9o6/output/linux-64/compiled-project-cli-1.5.0-hb0f4dca_0.conda
       Variant: {'target_platform': 'linux-64'}
       Build log: 61 messages captured
     
     ============================================================
     Example 2 builds completed successfully!
     
-    Built packages are available in: /tmp/rattler_build_1ey702ls/output
+    Built packages are available in: /tmp/rattler_build_lhvgs9o6/output
 
 
 ## Summary
@@ -10401,14 +10403,14 @@ print(f"\nBuilt packages are available in: {result.output_dir}")
 
     Building packages...
     ============================================================
-    Recipe path: /tmp/rattler_build_bqqigjqq/recipe.yaml
+    Recipe path: /tmp/rattler_build_s5tfz9os/recipe.yaml
     
     Building variant 1/3
       Package: my-simple-package
       Version: 1.0.0
       Build string: np121py39h13fef27_0
-      Build complete in 1.56s!
-      Package: /tmp/rattler_build_bqqigjqq/output/linux-64/my-simple-package-1.0.0-np121py39h13fef27_0.conda
+      Build complete in 1.52s!
+      Package: /tmp/rattler_build_s5tfz9os/output/linux-64/my-simple-package-1.0.0-np121py39h13fef27_0.conda
       Variant: {'numpy': '1.21', 'python': '3.9', 'target_platform': 'linux-64'}
       Build log: 35 messages captured
     
@@ -10420,18 +10422,18 @@ print(f"\nBuilt packages are available in: {result.output_dir}")
         Adding 0 packages to subdir noarch.
         Successfully added 0 packages to subdir noarch.
         Writing repodata to noarch/repodata.json
-          Platform: linux-64 [2m[__unix=0=0, __linux=7.0.0=0, __glibc=2.39=0, __archspec=1=x86_64_v4][0m
+          Platform: linux-64 [2m[__unix=0=0, __linux=7.0.0=0, __glibc=2.39=0, __archspec=1=zen2][0m
           Channels: 
-           - file:///tmp/rattler_build_bqqigjqq/output/
+           - file:///tmp/rattler_build_s5tfz9os/output/
         ... and 25 more messages
     
     Building variant 2/3
       Package: my-simple-package
       Version: 1.0.0
       Build string: np122py310h27bf20f_0
-      Build complete in 1.22s!
-      Package: /tmp/rattler_build_bqqigjqq/output/linux-64/my-simple-package-1.0.0-np122py310h27bf20f_0.conda
-      Variant: {'target_platform': 'linux-64', 'python': '3.10', 'numpy': '1.22'}
+      Build complete in 1.40s!
+      Package: /tmp/rattler_build_s5tfz9os/output/linux-64/my-simple-package-1.0.0-np122py310h27bf20f_0.conda
+      Variant: {'python': '3.10', 'numpy': '1.22', 'target_platform': 'linux-64'}
       Build log: 36 messages captured
     
       Build log details:
@@ -10451,9 +10453,11 @@ print(f"\nBuilt packages are available in: {result.output_dir}")
       Package: my-simple-package
       Version: 1.0.0
       Build string: np123py311hadc6f11_0
-      Build complete in 0.87s!
-      Package: /tmp/rattler_build_bqqigjqq/output/linux-64/my-simple-package-1.0.0-np123py311hadc6f11_0.conda
-      Variant: {'target_platform': 'linux-64', 'numpy': '1.23', 'python': '3.11'}
+
+
+      Build complete in 0.80s!
+      Package: /tmp/rattler_build_s5tfz9os/output/linux-64/my-simple-package-1.0.0-np123py311hadc6f11_0.conda
+      Variant: {'numpy': '1.23', 'python': '3.11', 'target_platform': 'linux-64'}
       Build log: 36 messages captured
     
       Build log details:
@@ -10472,7 +10476,7 @@ print(f"\nBuilt packages are available in: {result.output_dir}")
     ============================================================
     All builds completed successfully!
     
-    Built packages are available in: /tmp/rattler_build_bqqigjqq/output
+    Built packages are available in: /tmp/rattler_build_s5tfz9os/output
 
 
 ## Summary
@@ -10586,9 +10590,9 @@ With a corresponding variant_configuration:
 
 ```yaml title="variant_configuration.yaml"
 c_compiler:
-- clang
+  - clang
 c_compiler_version:
-- 9.0
+  - 9.0
 ```
 
 The variables shown above would select the `clang` compiler in version `9.0`.
@@ -10646,9 +10650,9 @@ With a corresponding variant_configuration:
 # these are the values `conda-forge` uses in their pinning file
 # found at https://github.com/conda-forge/conda-forge-pinning-feedstock/blob/main/recipe/conda_build_config.yaml
 c_stdlib:
-- sysroot
+  - sysroot
 c_stdlib_version:
-- 2.17
+  - 2.17
 ```
 
 ### The `pin` functions
@@ -10668,7 +10672,7 @@ The lower bound and upper bound can either be a "pin expression" (only `x` and
 `.` are allowed) or a hard-coded version string.
 
 A "pin expression" is applied to the version input to create the lower and upper
-bounds. For example, if the version is `3.10.5` with a  `lower_bound="x.x",
+bounds. For example, if the version is `3.10.5` with a `lower_bound="x.x",
 upper_bound="x.x.x"`, the lower bound will be `3.10` and the upper bound will be
 `3.10.6.0a0`. A pin expression for the `upper_bound` will increment the last
 selected segment of the version by `1`, and append `.0a0` to the end to prevent
@@ -10738,6 +10742,7 @@ The `match` function allows you to perform version comparisons using conda's ver
 **Syntax:** `match(version, version_spec)`
 
 **Parameters:**
+
 - `version`: A version string (typically from a variant variable like `python`)
 - `version_spec`: A conda version specification string supporting operators like `==`, `!=`, `<`, `<=`, `>`, `>=`, wildcards (`*`), and comma-separated combinations (e.g., `">=3.8"`, `"3.14.*"`, `">=3.7,<3.9"`)
 
@@ -10749,7 +10754,7 @@ Using `match` to conditionally skip builds:
 
 ```yaml title="recipe.yaml"
 build:
-  skip: match(python, "<3.8")  # skip builds for Python < 3.8
+  skip: match(python, "<3.8") # skip builds for Python < 3.8
 ```
 
 Using `match` with conditional dependencies:
@@ -10768,7 +10773,7 @@ Checking exact version matches:
 
 ```yaml title="recipe.yaml"
 build:
-  skip: match(root_base, "<6.36")  # skip if root_base is older than 6.36
+  skip: match(root_base, "<6.36") # skip if root_base is older than 6.36
 ```
 
 Using version ranges:
@@ -10790,6 +10795,11 @@ requirements:
 ```
 
 **Note:** The `match` function follows conda's standard version matching rules, making it more reliable than manual string parsing or comparison operations.
+
+### Date/time Functions
+
+- `now`: return the current UNIX timestamp in seconds as a float with microsecond precision (e.g. `${{ now() }}` returns `1792153018.1234`).
+  Note that using `now()` makes the rendered recipe non-reproducible: it is evaluated separately for each variant and on every build.
 
 ### The `hash` variable
 
@@ -10868,8 +10878,16 @@ library:
 - `reverse`: reverse a list (e.g. `"${{ [1, 2, 3] | reverse }}"` will return `[3, 2, 1]`)
 - `sort`: sort a list (e.g. `"${{ [3, 1, 2] | sort }}"` will return `[1, 2, 3]`)
 - `trim`: remove leading and trailing whitespace from a string (e.g. `"${{ ' foo ' | trim }}"` will return `"foo"`)
-- `unique`: remove duplicates from a list (e.g. `"${{ [1, 2, 1, 3] | unique }}"` will return `[1, 2, 3]`)
-- `split`: split a string into a list (e.g. `"${{ '1.2.3' | split('.') | list }}"` will return `['1', '2', '3']`). By default, splits on whitespace.
+- `unique`: remove duplicates from a list (e.g. `"${{ [1, 2, 1, 3] | unique }}"` will return `"[1, 2, 3]"`)
+- `split`: split a string into a list (e.g. `"${{ '1.2.3' | split('.') | list }}"` will return `"['1', '2', '3']"`). By default, splits on whitespace.
+- `tojson`: return the JSON string of an input (e.g. `${{ {'foo': [{"bar": '"1"'}]} | tojson }}` will return `{"foo": [{"bar": "\"1\""}]}`)
+- `datetimeformat`: format a UNIX epoch timestamp or ISO-8601 string with `strftime` syntax (e.g. `"${{ 1792153018.1234 | datetimeformat(format='%Y%m%d.%H.%M.%S', tz='UTC') }}"` will return `"20261016.12.16.58"`)
+- `dateformat`: as `datetimeformat`, but discards the time portion
+- `timeformat`: as `datetimeformat`, but discards the date portion
+
+The date/time filters default to UTC and a "medium" format (e.g. `Oct 16 2026 12:16`).
+These defaults can be changed by defining `TIMEZONE`, `DATETIME_FORMAT`, `DATE_FORMAT`
+or `TIME_FORMAT` in the recipe `context`.
 
 ??? "Removed filters"
 
@@ -10892,7 +10910,6 @@ library:
     - `safe`
     - `items`
     - `float`
-    - `tojson`
 
 ### Extra filters for recipes
 
@@ -10970,9 +10987,16 @@ package:
   version: "1.0"
 ```
 
+#### Lists and dictionaries in strings
+
+When a list, tuple or dictionary is rendered as part of a string, it is
+formatted like a Python `repr`, e.g. `${{ "1.2" | split(".") | list }}` renders
+as `['1', '2']`. Use the `tojson` filter to get JSON output instead
+(`["1", "2"]`).
+
 #### Slicing lists
 
-Lists can be spliced using the regular Python `[i:j]` syntax.  Note that when
+Lists can be spliced using the regular Python `[i:j]` syntax. Note that when
 lists are obtained through using filters such as `split`, the whole filter
 expression needs to be parenthesized.
 
