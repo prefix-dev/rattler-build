@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.22](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.21...rattler_build_core-v0.2.22) - 2026-10-29
+
+### Fixed
+
+- resolve artifactory/prefix/quetz publish targets to https channels ([#2907](https://github.com/prefix-dev/rattler-build/pull/2907))
+
+### Other
+
+- *(lint)* switch from taplo to tombi ([#2904](https://github.com/prefix-dev/rattler-build/pull/2904))
+
 ## [0.2.21](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.20...rattler_build_core-v0.2.21) - 2026-10-27
 
 ### Other

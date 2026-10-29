@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.20](https://github.com/prefix-dev/rattler-build/compare/rattler_build_recipe_generator-v0.1.19...rattler_build_recipe_generator-v0.1.20) - 2026-10-29
+
+### Fixed
+
+- comment out markers of build requirements in generated PyPI recipes ([#2897](https://github.com/prefix-dev/rattler-build/pull/2897))
+
+### Other
+
+- *(lint)* switch from taplo to tombi ([#2904](https://github.com/prefix-dev/rattler-build/pull/2904))
+
 ## [0.1.19](https://github.com/prefix-dev/rattler-build/compare/rattler_build_recipe_generator-v0.1.18...rattler_build_recipe_generator-v0.1.19) - 2026-10-27
 
 ### Other

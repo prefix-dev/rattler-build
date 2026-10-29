@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.3](https://github.com/prefix-dev/rattler-build/compare/rattler_build_allocator-v0.1.2...rattler_build_allocator-v0.1.3) - 2026-10-29
+
+### Other
+
+- *(lint)* switch from taplo to tombi ([#2904](https://github.com/prefix-dev/rattler-build/pull/2904))
+
 ## [0.1.2](https://github.com/prefix-dev/rattler-build/compare/rattler_build_allocator-v0.1.1...rattler_build_allocator-v0.1.2) - 2026-07-25
 
 ### Other
