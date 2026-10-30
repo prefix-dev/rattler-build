@@ -5,6 +5,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.80.0] - 2026-10-30
+### ✨ Highlights
+
+Recipes can use Jinja date/time filters and `now()` with minijinja 3.0.1. The CRAN recipe generator now adds a Fortran compiler when a package contains Fortran sources.
+
+Skipped outputs wait for their planned dependencies before downstream builds proceed. This release also fixes upload channel resolution and PyPI recipe generation.
+
+The workspace now requires `zip` 9.1.3 or newer. The playground also updates `rustls`, `ctutils`, `tokio`, and the `zstd` crates, addressing all five open Dependabot alerts and additional RustSec advisories.
+
+### Features
+
+- Update to minijinja 3.0.1, add date/time filters and functions by @bollwyvl in [#2880](https://github.com/prefix-dev/rattler-build/pull/2880)
+- Require the Fortran compiler for CRAN packages with Fortran sources by @matthewfeickert in [#2901](https://github.com/prefix-dev/rattler-build/pull/2901)
+
+
+### Fixes
+
+- Resolve artifactory/prefix/quetz publish targets to https channels by @wolfv in [#2907](https://github.com/prefix-dev/rattler-build/pull/2907)
+- Comment out markers of build requirements in generated PyPI recipes by @wleeaf in [#2897](https://github.com/prefix-dev/rattler-build/pull/2897)
+- Wait for planned dependencies of skipped outputs by @ruben-arts in [#2909](https://github.com/prefix-dev/rattler-build/pull/2909)
+- Update conda-forge PyPI mapping URL by @wolfv in [#2912](https://github.com/prefix-dev/rattler-build/pull/2912)
+- Fix the CRAN recipe generator's `Path` import for WASM builds.
+
+
+### Maintenance
+
+- Bump rattler crates to rattler_solve 12 and rattler_conda_types 0.58 by @pavelzw in [#2905](https://github.com/prefix-dev/rattler-build/pull/2905)
+- lint: Switch from taplo to tombi by @lucascolley in [#2904](https://github.com/prefix-dev/rattler-build/pull/2904)
+- Bump rattler crates to rattler_config 0.10 by @pavelzw in [#2908](https://github.com/prefix-dev/rattler-build/pull/2908)
+- Drop the skipped-output end-to-end smoke test by @ruben-arts in [#2911](https://github.com/prefix-dev/rattler-build/pull/2911)
+
+
+### New Contributors
+* @wleeaf made their first contribution in [#2897](https://github.com/prefix-dev/rattler-build/pull/2897)
+
 ## [0.79.0] - 2026-10-26
 ### ✨ Highlights
 
