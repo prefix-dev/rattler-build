@@ -4093,7 +4093,7 @@
 <p>Set <code>exclude-newer</code> to exclude recently published packages when resolving dependencies for builds, publishing, tests, and debug setup:</p>
 <div class="language-toml highlight"><span class="filename">config.toml</span><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">exclude-newer</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;7d&quot;</span>
 </span></code></pre></div>
-<p>The cutoff can be an RFC3339 timestamp, a quoted date (midnight UTC), or a non-negative duration such as <code>7d</code> or <code>2h30m</code>. Durations are relative to the current time; days are 24 hours. Calendar months and years are not supported.</p>
+<p>The cutoff can be an RFC3339 timestamp, a quoted date, which includes the entire day in UTC, or a non-negative duration such as <code>7d</code> or <code>2h30m</code>. Durations are relative to the current time; days are 24 hours.</p>
 <p>To exempt vetted releases, use the table form:</p>
 <div class="language-toml highlight"><span class="filename">config.toml</span><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">[exclude-newer]</span>
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">cutoff</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;7d&quot;</span>

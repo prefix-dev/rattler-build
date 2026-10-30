@@ -4257,7 +4257,7 @@ Package: test-demo-package
 Version: 1.0.0
 
 Building package...
-Built: /tmp/rattler_build_f8ogbp40/output/noarch/test-demo-package-1.0.0-pyh4616a5c_0.conda
+Built: /tmp/rattler_build_ox66281m/output/noarch/test-demo-package-1.0.0-pyh4616a5c_0.conda
 </code></pre></div>
 <h2 id="step-2-loading-a-package">Step 2: Loading a Package<a class="headerlink" href="#step-2-loading-a-package" title="Permanent link">#</a></h2>
 <p>Use <code>Package.from_file()</code> to load a built package. This reads the package metadata without extracting the entire archive.</p>
@@ -4272,7 +4272,7 @@ Built: /tmp/rattler_build_f8ogbp40/output/noarch/test-demo-package-1.0.0-pyh4616
 </span></code></pre></div>
 <div class="language-text highlight"><pre><span></span><code>Package Loaded Successfully!
 ============================================================
-Path: /tmp/rattler_build_f8ogbp40/output/noarch/test-demo-package-1.0.0-pyh4616a5c_0.conda
+Path: /tmp/rattler_build_ox66281m/output/noarch/test-demo-package-1.0.0-pyh4616a5c_0.conda
 Type: Package
 
 String representation: Package(test-demo-package-1.0.0-pyh4616a5c_0)
@@ -4321,7 +4321,7 @@ NoArch:         python
 License:        MIT
 Arch:           None
 Platform:       None
-Timestamp:      2026-10-30 09:54:38.756000+00:00
+Timestamp:      2026-10-30 20:44:11.065000+00:00
 
 Archive Information
 ----------------------------------------
@@ -4359,10 +4359,10 @@ Constraints (constrains):
   &quot;constrains&quot;: [],
   &quot;license&quot;: &quot;MIT&quot;,
   &quot;license_family&quot;: null,
-  &quot;timestamp&quot;: &quot;2026-10-30 09:54:38.756000+00:00&quot;,
+  &quot;timestamp&quot;: &quot;2026-10-30 20:44:11.065000+00:00&quot;,
   &quot;arch&quot;: null,
   &quot;platform&quot;: null,
-  &quot;path&quot;: &quot;/tmp/rattler_build_f8ogbp40/output/noarch/test-demo-package-1.0.0-pyh4616a5c_0.conda&quot;,
+  &quot;path&quot;: &quot;/tmp/rattler_build_ox66281m/output/noarch/test-demo-package-1.0.0-pyh4616a5c_0.conda&quot;,
   &quot;archive_type&quot;: &quot;conda&quot;,
   &quot;filename&quot;: &quot;test-demo-package-1.0.0-pyh4616a5c_0.conda&quot;
 }
@@ -4659,8 +4659,6 @@ Available options for run_test() and run_tests():
 
 
 Example: Running test with conda-forge channel:
-
-
   Result: PASS
 </code></pre></div>
 <h2 id="step-10-rebuilding-packages">Step 10: Rebuilding Packages<a class="headerlink" href="#step-10-rebuilding-packages" title="Permanent link">#</a></h2>
@@ -4682,11 +4680,11 @@ Example: Running test with conda-forge channel:
 </span></code></pre></div>
 <div class="language-text highlight"><pre><span></span><code>Rebuilding Package
 ============================================================
-Original package: /tmp/rattler_build_f8ogbp40/output/noarch/test-demo-package-1.0.0-pyh4616a5c_0.conda
-Rebuilt package:  output/test-demo-package-1.0.0-pyh4616a5c_0-rebuilt-20261030-095442.conda
+Original package: /tmp/rattler_build_ox66281m/output/noarch/test-demo-package-1.0.0-pyh4616a5c_0.conda
+Rebuilt package:  output/test-demo-package-1.0.0-pyh4616a5c_0-rebuilt-20261030-204416.conda
 
-Original SHA256:  d8d7559406b32e89f6f3ead46c3a59cac24bb88048dd06e6dfab6745b1e234f3
-Rebuilt SHA256:   d8d7559406b32e89f6f3ead46c3a59cac24bb88048dd06e6dfab6745b1e234f3
+Original SHA256:  c45c6d9e51d0a06500140f633e041592a113a46192dd9d49f8a6dcdcf60dd7d7
+Rebuilt SHA256:   c45c6d9e51d0a06500140f633e041592a113a46192dd9d49f8a6dcdcf60dd7d7
 
 Identical (reproducible): True
 </code></pre></div>
@@ -4707,7 +4705,7 @@ Identical (reproducible): True
 Name:         test-demo-package
 Version:      1.0.0
 Build string: pyh4616a5c_0
-Path:         output/test-demo-package-1.0.0-pyh4616a5c_0-rebuilt-20261030-095442.conda
+Path:         output/test-demo-package-1.0.0-pyh4616a5c_0-rebuilt-20261030-204416.conda
 Files:        1 files
 </code></pre></div>
 <h2 id="summary">Summary<a class="headerlink" href="#summary" title="Permanent link">#</a></h2>
