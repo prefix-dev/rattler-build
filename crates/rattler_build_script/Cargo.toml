@@ -1,6 +1,6 @@
 [package]
 name = "rattler_build_script"
-version = "0.2.18"
+version = "0.2.19"
 authors.workspace = true
 edition.workspace = true
 description = "Script execution and sandbox configuration for rattler-build, supporting bash, cmd, python, and other interpreters"
