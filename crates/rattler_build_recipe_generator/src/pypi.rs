@@ -220,7 +220,7 @@ async fn extract_build_requirements(
 pub async fn conda_pypi_name_mapping() -> miette::Result<&'static HashMap<String, String>> {
     static MAPPING: OnceCell<HashMap<String, String>> = OnceCell::new();
     MAPPING.get_or_try_init(async {
-        let response = reqwest::get("https://raw.githubusercontent.com/regro/cf-graph-countyfair/master/mappings/pypi/name_mapping.json").await
+        let response = reqwest::get("https://raw.githubusercontent.com/conda-forge/conda-forge-bot-data/main/mappings/pypi/name_mapping.json").await
             .into_diagnostic()
             .context("failed to download pypi name mapping")?;
         let mapping: Vec<CondaPyPiNameMapping> = response
