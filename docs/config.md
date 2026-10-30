@@ -44,7 +44,7 @@ Set `exclude-newer` to exclude recently published packages when resolving depend
 exclude-newer = "7d"
 ```
 
-The cutoff can be an RFC3339 timestamp, a quoted date (midnight UTC), or a non-negative duration such as `7d` or `2h30m`. Durations are relative to the current time; days are 24 hours. Calendar months and years are not supported.
+The cutoff can be an RFC3339 timestamp, a quoted date, which includes the entire day in UTC, or a non-negative duration such as `7d` or `2h30m`. Durations are relative to the current time; days are 24 hours.
 
 To exempt vetted releases, use the table form:
 
