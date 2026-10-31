@@ -121,7 +121,7 @@ jobs:
 
       - name: Install cross
         if: matrix.use-cross
-        uses: taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283 # v2.87.29
+        uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2.87.31
         with:
           tool: cross
 
@@ -287,7 +287,7 @@ jobs:
           path: dist/
           merge-multiple: true
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # release/v1
+        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # release/v1
         with:
           skip-existing: true
           packages-dir: dist/
