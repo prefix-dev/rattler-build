@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.21](https://github.com/prefix-dev/rattler-build/compare/rattler_build_recipe_generator-v0.1.20...rattler_build_recipe_generator-v0.1.21) - 2026-10-30
+
+### Added
+
+- Require the Fortran compiler for CRAN packages with Fortran sources ([#2901](https://github.com/prefix-dev/rattler-build/pull/2901))
+
+### Fixed
+
+- update conda-forge PyPI mapping URL ([#2912](https://github.com/prefix-dev/rattler-build/pull/2912))
+
+### Other
+
+- release 0.80.0 ([#2913](https://github.com/prefix-dev/rattler-build/pull/2913))
+
 ## [0.1.20](https://github.com/prefix-dev/rattler-build/compare/rattler_build_recipe_generator-v0.1.19...rattler_build_recipe_generator-v0.1.20) - 2026-10-29
 
 ### Fixed
