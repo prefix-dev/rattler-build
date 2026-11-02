@@ -37,12 +37,12 @@ rattler_build_script = { path = "../../crates/rattler_build_script" }
 rattler_build_types = { path = "../../crates/rattler_build_types" }
 rattler_build_variant_config = { path = "../../crates/rattler_build_variant_config" }
 rattler_conda_types = "0.58.1"
-rattler_config = "0.11.0"
-rattler_networking = { version = "0.34.5" }
-rattler_package_streaming = { version = "0.28.2", default-features = false }
+rattler_config = "0.12.0"
+rattler_networking = { version = "0.34.6" }
+rattler_package_streaming = { version = "0.28.3", default-features = false }
 rattler_redaction = { version = "0.2.7", default-features = false }
 rattler_solve = "12.0.3"
-rattler_upload = "0.15.2"
+rattler_upload = "0.15.3"
 rattler_virtual_packages = "8.1.5"
 serde_json = "1.0.151"
 serde_yaml = "0.9"
