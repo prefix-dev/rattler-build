@@ -52,6 +52,18 @@ pub enum StagingError {
     InvalidReference(String),
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum StagingCacheState {
+    Built,
+    Restored,
+}
+
+type StagingCacheResult = (
+    FinalizedDependencies,
+    Vec<rattler_build_recipe::stage1::Source>,
+    LibraryNameMap,
+);
+
 /// Metadata for a built staging cache
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StagingCacheMetadata {
@@ -173,6 +185,16 @@ impl Output {
         ),
         miette::Error,
     > {
+        self.build_or_restore_staging_cache_with_state(staging, tool_configuration)
+            .await
+            .map(|(result, _)| result)
+    }
+
+    async fn build_or_restore_staging_cache_with_state(
+        &self,
+        staging: &StagingCache,
+        tool_configuration: &crate::tool_configuration::Configuration,
+    ) -> Result<(StagingCacheResult, StagingCacheState), miette::Error> {
         let span = tracing::info_span!("Building or restoring staging cache", cache = staging.name);
         async {
 
@@ -197,7 +219,9 @@ impl Output {
                     Ok(text) => match serde_json::from_str::<StagingCacheMetadata>(&text) {
                         Ok(metadata) => {
                             tracing::info!("Restoring staging cache from {}", cache_dir.display());
-                            return self.restore_staging_cache(metadata, &cache_dir).await;
+                            return self.restore_staging_cache(metadata, &cache_dir)
+                                .await
+                                .map(|result| (result, StagingCacheState::Restored));
                         }
                         Err(e) => {
                             tracing::error!(
@@ -224,6 +248,7 @@ impl Output {
         // Build new cache
         self.build_staging_cache(staging, &cache_dir, tool_configuration)
             .await
+            .map(|result| (result, StagingCacheState::Built))
         }
         .instrument(span)
         .await
@@ -535,18 +560,33 @@ impl Output {
             self.recipe.inherits_from.as_ref().map(|i| &i.cache_name)
         );
 
-        // Build all staging caches that are dependencies
+        let mut inherited_result = None;
         for staging_cache in &self.recipe.staging_caches {
             tracing::info!(
                 "Building or restoring staging cache: {}",
                 staging_cache.name
             );
-            let (_deps, _sources, _lib_map) = self
-                .build_or_restore_staging_cache(staging_cache, tool_configuration)
+            let (result, state) = self
+                .build_or_restore_staging_cache_with_state(staging_cache, tool_configuration)
                 .await?;
+
+            // Only a restored cache has a clean prefix. A fresh build still has
+            // its dependencies installed, and a later cache replaces both directories.
+            inherited_result = if state == StagingCacheState::Restored
+                && self.recipe.inherits_from.as_ref().is_some_and(|inherits| {
+                    inherits.cache_name == staging_cache.name
+                })
+            {
+                Some(result)
+            } else {
+                None
+            };
         }
 
-        // If this output inherits from a staging cache, we need to find it and restore it
+        if let Some(result) = inherited_result {
+            return Ok(Some(result));
+        }
+
         if let Some(inherits) = &self.recipe.inherits_from {
             // Find the staging cache by name
             let staging = self
