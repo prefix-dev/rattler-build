@@ -573,9 +573,11 @@ impl Output {
             // Only a restored cache has a clean prefix. A fresh build still has
             // its dependencies installed, and a later cache replaces both directories.
             inherited_result = if state == StagingCacheState::Restored
-                && self.recipe.inherits_from.as_ref().is_some_and(|inherits| {
-                    inherits.cache_name == staging_cache.name
-                })
+                && self
+                    .recipe
+                    .inherits_from
+                    .as_ref()
+                    .is_some_and(|inherits| inherits.cache_name == staging_cache.name)
             {
                 Some(result)
             } else {
