@@ -1,14 +1,14 @@
 //! Script execution types and utilities.
 //!
 //! This module resolves script contents, generates build scripts with
-//! [`generate_build_script`], executes them with [`run_script`], and provides
-//! subprocess output handling via [`run_process_with_replacements`].
+//! [`generate_build_script`], and executes them with [`run_script`]. Process
+//! output is streamed by [`run_process_with_replacements`] into the sinks from
+//! [`crate::runner`].
 
+use crate::runner::{BuildLogSink, OutputSink, OutputStream, ReplacingSink, resolve_process_env};
 use crate::sandbox::SandboxConfiguration;
 use crate::script::{Script, ScriptContent};
-use crate::{
-    execution_context::ExecutionContext, runner::resolve_process_env, runtime::RuntimeEnv,
-};
+use crate::{execution_context::ExecutionContext, runtime::RuntimeEnv};
 use fs_err as fs;
 use futures::{StreamExt, TryStreamExt};
 use indexmap::IndexMap;
@@ -21,7 +21,7 @@ use std::fmt;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
-use tokio::io::{AsyncRead, AsyncWriteExt};
+use tokio::io::AsyncRead;
 use tokio_util::bytes::{Buf, BytesMut};
 use tokio_util::codec::{Decoder, FramedRead};
 use tokio_util::compat::FuturesAsyncReadCompatExt;
@@ -846,7 +846,7 @@ pub async fn run_script(exec_args: ExecutionArgs) -> Result<(), crate::Interpret
     let output = crate::execution::run_process_with_replacements(
         &command_spec,
         &exec_args.work_dir,
-        &exec_args.replacements(dialect.replacements_template()),
+        exec_args.replacements(dialect.replacements_template()),
         &process_env,
         if dialect.supports_sandbox() {
             exec_args.sandbox_config.as_ref()
@@ -909,24 +909,20 @@ fn find_rattler_sandbox(runtime: &RuntimeEnv) -> Option<PathBuf> {
         .next()
 }
 
-/// Spawns a process and replaces the given strings in the output with the given replacements.
-/// This is used to replace the host prefix with $PREFIX and the build prefix with $BUILD_PREFIX
-#[allow(clippy::too_many_arguments)]
+/// Spawns a process and streams its output through a [`ReplacingSink`] into a
+/// [`BuildLogSink`], so the host prefix shows up as `$PREFIX`, the build prefix
+/// as `$BUILD_PREFIX`, and secrets are masked in the log, the tracing output,
+/// and the returned [`std::process::Output`].
 pub(crate) async fn run_process_with_replacements(
     command_spec: &crate::shell_dialect::CommandSpec,
     cwd: &Path,
-    replacements: &HashMap<String, String>,
+    replacements: HashMap<String, String>,
     process_env: &IndexMap<String, String>,
     sandbox_config: Option<&SandboxConfiguration>,
     runtime: &RuntimeEnv,
 ) -> Result<std::process::Output, std::io::Error> {
-    // Create or open the build log file
-    let log_file_path = cwd.join("conda_build.log");
-    let mut log_file = tokio::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&log_file_path)
-        .await?;
+    let log_sink = BuildLogSink::open(&cwd.join("conda_build.log"))?;
+    let mut sink = ReplacingSink::new(replacements, log_sink);
     let (program, process_args) = if let Some(sandbox_config) = sandbox_config {
         tracing::info!("{}", sandbox_config);
 
@@ -956,32 +952,15 @@ pub(crate) async fn run_process_with_replacements(
 
     let mut process = spawn_process(&program, &process_args, cwd, process_env)?;
 
-    let mut stdout_log = String::new();
-    let mut stderr_log = String::new();
     while let Some(line) = process.next_line().await {
         match line {
             Ok(line) => {
-                let filtered_line = replacements
-                    .iter()
-                    .fold(line.text, |acc, (from, to)| acc.replace(from, to));
-
-                if line.is_stderr {
-                    stderr_log.push_str(&filtered_line);
-                    stderr_log.push('\n');
+                let stream = if line.is_stderr {
+                    OutputStream::Stderr
                 } else {
-                    stdout_log.push_str(&filtered_line);
-                    stdout_log.push('\n');
-                }
-
-                // Write to log file
-                if let Err(e) = log_file.write_all(filtered_line.as_bytes()).await {
-                    tracing::warn!("Failed to write to build log: {:?}", e);
-                }
-                if let Err(e) = log_file.write_all(b"\n").await {
-                    tracing::warn!("Failed to write newline to build log: {:?}", e);
-                }
-
-                tracing::info!("{}", filtered_line);
+                    OutputStream::Stdout
+                };
+                sink.line(stream, &line.text);
             }
             Err(e) => {
                 tracing::warn!("Error reading output: {:?}", e);
@@ -996,16 +975,12 @@ pub(crate) async fn run_process_with_replacements(
     }
 
     let status = process.wait().await?;
-
-    // Flush and close the log file
-    if let Err(e) = log_file.flush().await {
-        tracing::warn!("Failed to flush build log: {:?}", e);
-    }
+    let (stdout, stderr) = sink.into_inner().into_captured();
 
     Ok(std::process::Output {
         status,
-        stdout: stdout_log.into_bytes(),
-        stderr: stderr_log.into_bytes(),
+        stdout: stdout.into_bytes(),
+        stderr: stderr.into_bytes(),
     })
 }
 
@@ -1669,7 +1644,7 @@ mod tests {
         let output = run_process_with_replacements(
             &command_spec,
             tmp.path(),
-            &replacements,
+            replacements,
             &process_env,
             None,
             &RuntimeEnv::for_test(Subdir::current().unwrap()),
@@ -1686,6 +1661,105 @@ mod tests {
             assert!(!content.contains("RAW_PREFIX"), "got:\n{content}");
             assert!(!content.contains("raw-secret"), "got:\n{content}");
         }
+    }
+
+    /// A failing script still yields the complete captured output, with the
+    /// line order within each stream preserved, and the log holds both streams.
+    #[tokio::test]
+    async fn test_run_process_with_replacements_keeps_output_on_failure() {
+        let tmp = tempfile::tempdir().unwrap();
+        let process_env = IndexMap::new();
+        let mut replacements = HashMap::new();
+        replacements.insert("raw-secret".to_string(), "***".to_string());
+
+        #[cfg(windows)]
+        let command = [
+            "cmd".to_string(),
+            "/d".to_string(),
+            "/c".to_string(),
+            "echo out1 raw-secret&1>&2 echo err1 raw-secret&echo out2&1>&2 echo err2&exit 7"
+                .to_string(),
+        ];
+        #[cfg(not(windows))]
+        let command = [
+            "sh".to_string(),
+            "-c".to_string(),
+            "printf 'out1 raw-secret\\n'; printf 'err1 raw-secret\\n' >&2; printf 'out2\\n'; printf 'err2\\n' >&2; exit 7"
+                .to_string(),
+        ];
+        let command_spec = crate::shell_dialect::CommandSpec {
+            program: command[0].clone(),
+            args: command[1..].to_vec(),
+        };
+
+        let output = run_process_with_replacements(
+            &command_spec,
+            tmp.path(),
+            replacements,
+            &process_env,
+            None,
+            &RuntimeEnv::for_test(Subdir::current().unwrap()),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(output.status.code(), Some(7));
+        assert_eq!(
+            String::from_utf8(output.stdout).unwrap(),
+            "out1 ***\nout2\n"
+        );
+        assert_eq!(
+            String::from_utf8(output.stderr).unwrap(),
+            "err1 ***\nerr2\n"
+        );
+        let log = fs::read_to_string(tmp.path().join("conda_build.log")).unwrap();
+        let mut log_lines: Vec<&str> = log.lines().collect();
+        log_lines.sort_unstable();
+        assert_eq!(log_lines, ["err1 ***", "err2", "out1 ***", "out2"]);
+    }
+
+    /// When the build log cannot be opened the call fails before the process
+    /// is spawned.
+    #[tokio::test]
+    async fn test_run_process_with_replacements_fails_before_spawn_without_log() {
+        let tmp = tempfile::tempdir().unwrap();
+        // A directory in the way of the log file makes opening it fail.
+        fs::create_dir(tmp.path().join("conda_build.log")).unwrap();
+        let process_env = IndexMap::new();
+
+        #[cfg(windows)]
+        let command = [
+            "cmd".to_string(),
+            "/d".to_string(),
+            "/c".to_string(),
+            "echo spawned > marker.txt".to_string(),
+        ];
+        #[cfg(not(windows))]
+        let command = [
+            "sh".to_string(),
+            "-c".to_string(),
+            "echo spawned > marker.txt".to_string(),
+        ];
+        let command_spec = crate::shell_dialect::CommandSpec {
+            program: command[0].clone(),
+            args: command[1..].to_vec(),
+        };
+
+        let error = run_process_with_replacements(
+            &command_spec,
+            tmp.path(),
+            HashMap::new(),
+            &process_env,
+            None,
+            &RuntimeEnv::for_test(Subdir::current().unwrap()),
+        )
+        .await
+        .unwrap_err();
+
+        assert!(
+            !tmp.path().join("marker.txt").exists(),
+            "process must not be spawned when the log cannot be opened: {error}"
+        );
     }
 
     /// The PowerShell prologue is written verbatim into the generated script

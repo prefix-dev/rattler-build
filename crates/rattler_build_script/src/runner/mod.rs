@@ -2,6 +2,9 @@
 
 mod environment;
 mod local;
+mod output;
+#[cfg(test)]
+mod test_support;
 
 use std::path::PathBuf;
 
@@ -11,6 +14,7 @@ use rattler_conda_types::Subdir;
 
 pub(crate) use environment::resolve_process_env;
 pub use local::LocalRunner;
+pub use output::{BuildLogSink, ReplacingSink};
 
 /// Error returned while preparing or driving a runner session.
 #[derive(Debug, thiserror::Error)]
