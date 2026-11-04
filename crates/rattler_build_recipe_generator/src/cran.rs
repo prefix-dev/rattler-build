@@ -296,6 +296,8 @@ struct CranTarball {
     /// in subdirectories are built by the package's own make rules, and also
     /// need the Fortran compiler.
     has_fortran_sources: bool,
+    /// Whether `src/` holds C++ sources, at any depth, as for Fortran.
+    has_cxx_sources: bool,
 }
 
 impl CranTarball {
@@ -304,30 +306,43 @@ impl CranTarball {
         // failure here means the bytes are not a source archive at all, so
         // nothing about them — the checksum included — can be trusted.
         let mut scan = tarball::scan_archive(bytes, &["DESCRIPTION", "tests/testthat.R"])?;
+        let src_files: Vec<PathBuf> = scan
+            .paths
+            .iter()
+            .filter_map(|path| tarball::strip_archive_prefix(path, "src"))
+            .collect();
         Ok(Self {
             sha256: Some(hex::encode(compute_bytes_digest::<Sha256>(bytes))),
             description: scan.files.remove("DESCRIPTION"),
             has_testthat_runner: scan.files.contains_key("tests/testthat.R"),
-            has_fortran_sources: scan
-                .paths
+            has_fortran_sources: src_files
                 .iter()
-                .filter_map(|path| tarball::strip_archive_prefix(path, "src"))
-                .any(|path| is_fortran_source(&path)),
+                .any(|path| has_extension(path, FORTRAN_EXTENSIONS)),
+            has_cxx_sources: src_files
+                .iter()
+                .any(|path| has_extension(path, CXX_EXTENSIONS)),
         })
     }
 }
 
-/// Whether `path` names a Fortran source file. R compiles `.f`, `.f90` and
-/// `.f95` files itself; the other extensions, and the upper-case forms that
-/// ask for preprocessing, show up in vendored code built by the package's own
-/// make rules.
-fn is_fortran_source(path: &Path) -> bool {
+/// Extensions of Fortran source files. R compiles `.f`, `.f90` and `.f95`
+/// files itself; the other extensions, and the upper-case forms that ask for
+/// preprocessing, show up in vendored code built by the package's own make
+/// rules.
+const FORTRAN_EXTENSIONS: &[&str] = &["f", "f90", "f95", "f03", "f08"];
+
+/// Extensions of C++ source files. R compiles `.cc` and `.cpp` files itself;
+/// the others show up in vendored code, as for [`FORTRAN_EXTENSIONS`].
+const CXX_EXTENSIONS: &[&str] = &["cc", "cpp", "cxx", "c++"];
+
+/// Whether the extension of `path` is one of `extensions`, ignoring case.
+fn has_extension(path: &Path, extensions: &[&str]) -> bool {
     path.extension()
         .and_then(|extension| extension.to_str())
         .is_some_and(|extension| {
-            ["f", "f90", "f95", "f03", "f08"]
+            extensions
                 .iter()
-                .any(|fortran| extension.eq_ignore_ascii_case(fortran))
+                .any(|wanted| extension.eq_ignore_ascii_case(wanted))
         })
 }
 
@@ -751,11 +766,15 @@ fn package_info_to_recipe(
     if needs_compilation {
         // Compiled packages need a toolchain, `cross-r-base` for cross builds,
         // and rpaths so the linker can find R's shared libraries.
-        let mut build = vec![
-            cross_r_base_requirement(),
-            "${{ compiler(\"c\") }}".into(),
-            "${{ compiler(\"cxx\") }}".into(),
-        ];
+        // The C compiler is always needed: R links shared objects with it,
+        // even those built from Fortran sources.
+        let mut build = vec![cross_r_base_requirement(), "${{ compiler(\"c\") }}".into()];
+        // A C-only package must not get the C++ compiler, or the C++ runtime
+        // it adds to the run requirements is reported as unused. Without the
+        // tarball the sources are unknown, so C++ is assumed.
+        if tarball.is_none_or(|tarball| tarball.has_cxx_sources) {
+            build.push("${{ compiler(\"cxx\") }}".into());
+        }
         if tarball.is_some_and(|tarball| tarball.has_fortran_sources) {
             build.push("${{ compiler(\"fortran\") }}".into());
         }
@@ -1132,6 +1151,7 @@ mod tests {
     fn fortran_sources_require_the_fortran_compiler() {
         let tarball = CranTarball {
             has_fortran_sources: true,
+            has_cxx_sources: true,
             ..Default::default()
         };
         let options = RecipeOptions {
@@ -1152,13 +1172,62 @@ mod tests {
         );
     }
 
+    /// The C++ compiler is only required for C++ sources, or when the
+    /// tarball, and with it the sources, is unknown.
     #[test]
-    fn fortran_source_extensions() {
-        for fortran in ["dgesv.f", "mod.f90", "old.f95", "new.F90", "lapack/zlarf.F"] {
-            assert!(is_fortran_source(Path::new(fortran)), "{fortran}");
-        }
-        for other in ["init.c", "rcpp.cpp", "Makevars", "shim.for.c", "f90"] {
-            assert!(!is_fortran_source(Path::new(other)), "{other}");
+    fn only_cxx_sources_require_the_cxx_compiler() {
+        let build_of = |tarball: Option<&CranTarball>| {
+            package_info_to_recipe(&fixture("gmp"), tarball, &RecipeOptions::default())
+                .0
+                .requirements
+                .build
+        };
+        let cxx = || Requirement::from("${{ compiler(\"cxx\") }}");
+
+        let c_only = CranTarball::default();
+        assert_eq!(
+            build_of(Some(&c_only)),
+            vec![
+                cross_r_base_requirement(),
+                "${{ compiler(\"c\") }}".into(),
+                "make".into(),
+            ]
+        );
+        let with_cxx = CranTarball {
+            has_cxx_sources: true,
+            ..Default::default()
+        };
+        assert!(build_of(Some(&with_cxx)).contains(&cxx()));
+        assert!(build_of(None).contains(&cxx()));
+    }
+
+    #[test]
+    fn source_extensions() {
+        let cases: [(&[&str], &[&str], &[&str]); 2] = [
+            (
+                FORTRAN_EXTENSIONS,
+                &["dgesv.f", "mod.f90", "old.f95", "new.F90", "lapack/zlarf.F"],
+                &["init.c", "rcpp.cpp", "Makevars", "shim.for.c", "f90"],
+            ),
+            (
+                CXX_EXTENSIONS,
+                &[
+                    "rcpp.cpp",
+                    "init.cc",
+                    "vendor/lib.cxx",
+                    "old.c++",
+                    "Win.CPP",
+                ],
+                &["init.c", "header.hpp", "dgesv.f", "cpp"],
+            ),
+        ];
+        for (extensions, sources, others) in cases {
+            for source in sources {
+                assert!(has_extension(Path::new(source), extensions), "{source}");
+            }
+            for other in others {
+                assert!(!has_extension(Path::new(other), extensions), "{other}");
+            }
         }
     }
 
