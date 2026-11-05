@@ -104,6 +104,16 @@ pub enum SubCommands {
 
     /// Migrate a recipe from the deprecated `cache:` format to `staging:` outputs
     MigrateRecipe(MigrateRecipeOpts),
+
+    /// Download all sources of a recipe without building it
+    ///
+    /// Renders the recipe, fetches every source (including the sources of
+    /// staging outputs) into the source cache (`<output-dir>/src_cache`) and
+    /// prints a JSON document that maps each output to the on-disk location
+    /// of its pristine (unpatched) sources. No build scripts are executed and
+    /// no dependencies are resolved, so the sources can be inspected before
+    /// running the recipe. A subsequent build re-uses the cached sources.
+    FetchSources(FetchSourcesOpts),
 }
 
 /// Arguments for the `debug` command.
@@ -213,6 +223,52 @@ pub struct DebugSetupOpts {
     /// Do not read the `variants.yaml` file next to a recipe.
     #[arg(long)]
     pub ignore_recipe_variants: bool,
+
+    /// Common options (provides --output-dir among others)
+    #[clap(flatten)]
+    pub common: CommonOpts,
+}
+
+/// Options for the `fetch-sources` command.
+#[derive(Parser, Debug, Clone)]
+pub struct FetchSourcesOpts {
+    /// Recipe file or directory
+    #[arg(short, long, default_value = ".")]
+    pub recipe: PathBuf,
+
+    /// The target platform to render the recipe for
+    #[arg(long)]
+    pub target_platform: Option<Subdir>,
+
+    /// The host platform to render the recipe for (defaults to target_platform)
+    #[arg(long)]
+    pub host_platform: Option<Subdir>,
+
+    /// The build platform to render the recipe for (defaults to current platform)
+    #[arg(long)]
+    pub build_platform: Option<Subdir>,
+
+    /// Only fetch the sources of the output with this name
+    #[arg(long)]
+    pub output_name: Option<String>,
+
+    /// Variant configuration files for the build.
+    #[arg(short = 'm', long)]
+    pub variant_config: Option<Vec<PathBuf>>,
+
+    /// Override specific variant values (e.g. --variant python=3.12 or --variant
+    /// python=3.12,3.11). Multiple values separated by commas will create multiple
+    /// build variants.
+    #[arg(long = "variant", value_parser = parse_variant_override, action = clap::ArgAction::Append)]
+    pub variant_overrides: Vec<(String, Vec<String>)>,
+
+    /// Do not read the `variants.yaml` file next to a recipe.
+    #[arg(long)]
+    pub ignore_recipe_variants: bool,
+
+    /// Write the JSON result to this file instead of stdout
+    #[arg(long)]
+    pub json_output: Option<PathBuf>,
 
     /// Common options (provides --output-dir among others)
     #[clap(flatten)]
@@ -1352,6 +1408,40 @@ impl DebugData {
             variant_config: opts.variant_config.unwrap_or_default(),
             variant_overrides: opts.variant_overrides.into_iter().collect(),
             ignore_recipe_variants: opts.ignore_recipe_variants,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+/// Data structure containing the configuration for fetching the sources of a
+/// recipe
+pub struct FetchSourcesData {
+    /// Recipe options (shared with `debug setup`). `channels` is unused.
+    pub recipe: DebugData,
+    /// Write the JSON result to this file instead of stdout
+    pub json_output: Option<PathBuf>,
+}
+
+impl FetchSourcesData {
+    /// Generate a new FetchSourcesData struct from FetchSourcesOpts and an
+    /// optional config.
+    pub fn from_opts_and_config(opts: FetchSourcesOpts, config: Option<Config>) -> Self {
+        let json_output = opts.json_output;
+        let setup = DebugSetupOpts {
+            recipe: opts.recipe,
+            target_platform: opts.target_platform,
+            host_platform: opts.host_platform,
+            build_platform: opts.build_platform,
+            channels: None,
+            output_name: opts.output_name,
+            variant_config: opts.variant_config,
+            variant_overrides: opts.variant_overrides,
+            ignore_recipe_variants: opts.ignore_recipe_variants,
+            common: opts.common,
+        };
+        Self {
+            recipe: DebugData::from_setup_opts_and_config(setup, config),
+            json_output,
         }
     }
 }
