@@ -1671,28 +1671,23 @@ pub async fn publish_packages(
     Ok(())
 }
 
-/// Debug a recipe by setting up the environment without running the build script
-pub async fn debug_recipe(
-    debug_data: DebugData,
-    log_handler: &Option<LoggingOutputHandler>,
-) -> miette::Result<()> {
-    let recipe_path = get_recipe_path(&debug_data.recipe_path)?;
-
-    let build_data = BuildData {
+/// Create the [`BuildData`] used by `debug setup` and `fetch-sources`.
+fn build_data_from_debug_data(debug_data: &DebugData, render_only: bool) -> BuildData {
+    BuildData {
         build_platform: debug_data.build_platform,
         target_platform: debug_data.target_platform,
         host_platform: debug_data.host_platform,
-        channels: debug_data.channels,
+        channels: debug_data.channels.clone(),
         channels_from_config: false,
-        common: debug_data.common,
+        common: debug_data.common.clone(),
         keep_build: true,
         test: TestStrategy::Skip,
         up_to: None,
-        variant_config: debug_data.variant_config,
-        variant_overrides: debug_data.variant_overrides,
+        variant_config: debug_data.variant_config.clone(),
+        variant_overrides: debug_data.variant_overrides.clone(),
         ignore_recipe_variants: debug_data.ignore_recipe_variants,
-        render_only: false,
-        with_solve: true,
+        render_only,
+        with_solve: !render_only,
         no_build_id: false,
         package_format: PackageFormatAndCompression {
             archive_type: CondaArchiveType::Conda,
@@ -1718,7 +1713,17 @@ pub async fn debug_recipe(
         build_num_override: None,
         build_string_prefix: None,
         markdown_summary: None,
-    };
+    }
+}
+
+/// Debug a recipe by setting up the environment without running the build script
+pub async fn debug_recipe(
+    debug_data: DebugData,
+    log_handler: &Option<LoggingOutputHandler>,
+) -> miette::Result<()> {
+    let recipe_path = get_recipe_path(&debug_data.recipe_path)?;
+
+    let build_data = build_data_from_debug_data(&debug_data, false);
 
     let tool_config = get_tool_config(&build_data, log_handler)?;
 
@@ -1802,4 +1807,63 @@ pub fn show_package_info(args: InspectOpts) -> miette::Result<()> {
 /// Extract a conda package to a directory
 pub async fn extract_package(args: opt::ExtractOpts) -> miette::Result<()> {
     rattler_build_core::package_info::extract_package(args.into()).await
+}
+
+/// Fetch all sources of a recipe into the source cache without building it.
+///
+/// Returns, for every (variant of an) output, the on-disk location of its
+/// pristine sources. See [`metadata::Output::fetch_sources_only`].
+pub async fn fetch_recipe_sources(
+    debug_data: &DebugData,
+    log_handler: &Option<LoggingOutputHandler>,
+) -> miette::Result<Vec<source::fetch_only::FetchedOutputSources>> {
+    let recipe_path = get_recipe_path(&debug_data.recipe_path)?;
+    let build_data = build_data_from_debug_data(debug_data, true);
+    let tool_config = get_tool_config(&build_data, log_handler)?;
+
+    let mut outputs = get_build_output(&build_data, &recipe_path, &tool_config).await?;
+
+    if let Some(output_name) = &debug_data.output_name {
+        let available: Vec<String> = outputs
+            .iter()
+            .map(|o| o.name().as_normalized().to_string())
+            .collect();
+        outputs.retain(|output| output.name().as_normalized() == output_name);
+        if outputs.is_empty() {
+            return Err(miette::miette!(
+                "Output with name '{}' not found in recipe. Available outputs: {}",
+                output_name,
+                available.join(", ")
+            ));
+        }
+    }
+
+    let mut results = Vec::with_capacity(outputs.len());
+    for output in &outputs {
+        results.push(
+            output
+                .fetch_sources_only(&tool_config)
+                .await
+                .into_diagnostic()?,
+        );
+    }
+    Ok(results)
+}
+
+/// Entry point for the `fetch-sources` subcommand: fetches the sources and
+/// writes the JSON result to stdout or to the requested file.
+pub async fn fetch_sources_from_args(
+    data: FetchSourcesData,
+    log_handler: &Option<LoggingOutputHandler>,
+) -> miette::Result<()> {
+    let results = fetch_recipe_sources(&data.recipe, log_handler).await?;
+    let json = serde_json::to_string_pretty(&results).into_diagnostic()?;
+    match &data.json_output {
+        Some(path) => {
+            fs::write(path, json).into_diagnostic()?;
+            tracing::info!("Wrote source locations to {}", path.display());
+        }
+        None => println!("{json}"),
+    }
+    Ok(())
 }

@@ -138,6 +138,7 @@ nav = [
       ] },
       { "bump-recipe" = "reference/cli/rattler-build/bump-recipe.md" },
       { "migrate-recipe" = "reference/cli/rattler-build/migrate-recipe.md" },
+      { "fetch-sources" = "reference/cli/rattler-build/fetch-sources.md" },
     ] },
     # End of generated CLI nav.
     { "Jinja" = "reference/jinja.md" },

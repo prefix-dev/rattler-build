@@ -19,10 +19,11 @@ use rattler_build::config::{Config, load_default_config};
 use rattler_build::{
     build_recipes, bump_recipe,
     console_utils::init_logging,
-    debug_recipe, extract_package, get_recipe_path, migrate_recipe,
+    debug_recipe, extract_package, fetch_sources_from_args, get_recipe_path, migrate_recipe,
     opt::{
-        App, BuildData, BumpRecipeOpts, DebugData, DebugSubCommands, MigrateRecipeOpts,
-        PackageCommands, PublishData, RebuildData, ShellCompletion, SubCommands, TestData,
+        App, BuildData, BumpRecipeOpts, DebugData, DebugSubCommands, FetchSourcesData,
+        MigrateRecipeOpts, PackageCommands, PublishData, RebuildData, ShellCompletion, SubCommands,
+        TestData,
     },
     publish_packages, rebuild, run_test, show_package_info,
     tool_configuration::APP_USER_AGENT,
@@ -306,6 +307,11 @@ async fn async_main() -> miette::Result<()> {
         },
         Some(SubCommands::BumpRecipe(opts)) => run_bump_recipe(opts).await,
         Some(SubCommands::MigrateRecipe(opts)) => run_migrate_recipe(opts),
+        Some(SubCommands::FetchSources(opts)) => {
+            let config = load_config(app.no_config, app.config_file)?;
+            let data = FetchSourcesData::from_opts_and_config(opts, config);
+            fetch_sources_from_args(data, &Some(log_handler)).await
+        }
         None => {
             _ = App::command().print_long_help();
             Ok(())
