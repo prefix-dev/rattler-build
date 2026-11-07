@@ -195,44 +195,7 @@ impl BuildOutput {
         }
 
         if let Some(paths) = &summary.paths {
-            if paths.paths.is_empty() {
-                md.push_str("Included files: **No files included**\n");
-            } else {
-                fn format_entry(entry: &PathsEntry) -> String {
-                    let mut extra_info = Vec::new();
-                    if entry.prefix_placeholder.is_some() {
-                        extra_info.push("contains prefix");
-                    }
-                    if entry.no_link {
-                        extra_info.push("no link");
-                    }
-                    match entry.path_type {
-                        PathType::SoftLink => extra_info.push("soft link"),
-                        PathType::HardLink => {}
-                        PathType::Directory => extra_info.push("directory"),
-                    }
-                    let bytes = entry.size_in_bytes.unwrap_or(0);
-
-                    format!(
-                        "| `{}` | {} | {} |",
-                        entry.relative_path.to_string_lossy(),
-                        HumanBytes(bytes),
-                        extra_info.join(", ")
-                    )
-                }
-
-                md.push_str("<details>\n");
-                md.push_str(&format!(
-                    "<summary>Included files ({} files)</summary>\n\n",
-                    paths.paths.len()
-                ));
-                md.push_str("| Path | Size | Extra info |\n");
-                md.push_str("| --- | --- | --- |\n");
-                for path in &paths.paths {
-                    md.push_str(&format!("{}\n", format_entry(path)));
-                }
-                md.push_str("\n</details>\n\n");
-            }
+            md.push_str(&included_files_markdown(&paths.paths));
         }
 
         // Track features (down_prioritize_variant)
@@ -405,5 +368,111 @@ impl Display for BuildOutput {
 impl crate::post_process::path_checks::WarningRecorder for BuildOutput {
     fn record_warning(&self, warning: &str) {
         self.record_warning(warning);
+    }
+}
+
+/// GitHub drops a step summary larger than 1 MiB in full, and every output of a
+/// build appends to the same file, so the file table gets a fraction of that.
+const MAX_FILE_TABLE_BYTES: usize = 256 * 1024;
+
+fn included_files_markdown(paths: &[PathsEntry]) -> String {
+    if paths.is_empty() {
+        return "Included files: **No files included**\n".to_string();
+    }
+
+    fn format_entry(entry: &PathsEntry) -> String {
+        let mut extra_info = Vec::new();
+        if entry.prefix_placeholder.is_some() {
+            extra_info.push("contains prefix");
+        }
+        if entry.no_link {
+            extra_info.push("no link");
+        }
+        match entry.path_type {
+            PathType::SoftLink => extra_info.push("soft link"),
+            PathType::HardLink => {}
+            PathType::Directory => extra_info.push("directory"),
+        }
+        let bytes = entry.size_in_bytes.unwrap_or(0);
+
+        format!(
+            "| `{}` | {} | {} |\n",
+            entry.relative_path.to_string_lossy(),
+            HumanBytes(bytes),
+            extra_info.join(", ")
+        )
+    }
+
+    let mut table = String::new();
+    let mut shown = 0;
+    for path in paths {
+        let row = format_entry(path);
+        if table.len() + row.len() > MAX_FILE_TABLE_BYTES {
+            break;
+        }
+        table.push_str(&row);
+        shown += 1;
+    }
+
+    let mut md = String::new();
+    md.push_str("<details>\n");
+    md.push_str(&format!(
+        "<summary>Included files ({} files)</summary>\n\n",
+        paths.len()
+    ));
+    md.push_str("| Path | Size | Extra info |\n");
+    md.push_str("| --- | --- | --- |\n");
+    md.push_str(&table);
+    if shown < paths.len() {
+        md.push_str(&format!(
+            "\n{} more files not shown to keep the summary under GitHub's size limit.\n",
+            paths.len() - shown
+        ));
+    }
+    md.push_str("\n</details>\n\n");
+    md
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn entries(count: usize) -> Vec<PathsEntry> {
+        (0..count)
+            .map(|i| PathsEntry {
+                relative_path: PathBuf::from(format!("lib/zig/libc/include/header_{i}.h")),
+                no_link: false,
+                path_type: PathType::HardLink,
+                prefix_placeholder: None,
+                sha256: None,
+                size_in_bytes: Some(1024),
+            })
+            .collect()
+    }
+
+    #[test]
+    fn small_file_table_lists_every_file() {
+        let md = included_files_markdown(&entries(3));
+        assert!(md.contains("Included files (3 files)"));
+        assert!(md.contains("header_2.h"));
+        assert!(!md.contains("not shown"));
+    }
+
+    #[test]
+    fn large_file_table_stays_under_budget() {
+        let md = included_files_markdown(&entries(50_000));
+        assert!(md.len() < MAX_FILE_TABLE_BYTES + 1024);
+        assert!(md.contains("Included files (50000 files)"));
+        assert!(md.contains("header_0.h"));
+        assert!(!md.contains("header_49999.h"));
+        assert!(md.contains("more files not shown"));
+    }
+
+    #[test]
+    fn no_files() {
+        assert_eq!(
+            included_files_markdown(&[]),
+            "Included files: **No files included**\n"
+        );
     }
 }
