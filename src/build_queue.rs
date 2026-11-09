@@ -5,11 +5,12 @@
 
 use std::{
     cell::{Cell, RefCell},
-    collections::{HashMap, HashSet, VecDeque},
+    collections::{BTreeMap, HashMap, HashSet, VecDeque},
 };
 
+use rattler_build_core::Variable;
 use rattler_build_recipe::stage1::{Dependency, TestType};
-use rattler_build_types::PinError;
+use rattler_build_types::{NormalizedKey, PinError};
 use rattler_conda_types::{
     MatchSpec, PackageName, ParseMatchSpecError, ParseMatchSpecOptions, RepodataRevision,
 };
@@ -45,6 +46,28 @@ pub(crate) enum BuildQueueError {
     },
 }
 
+/// A planned output: its package identity and the variant it is built for.
+struct PlannedOutput {
+    identifier: PackageIdentifier,
+    variant: BTreeMap<NormalizedKey, Variable>,
+}
+
+/// Variant keys that describe where a package is built or installed, not which
+/// variant it is: a `noarch` consumer can use a dependency built for any platform.
+const PLATFORM_VARIANT_KEYS: [&str; 3] = ["target_platform", "host_platform", "build_platform"];
+
+/// Whether two variants agree on every key they both use (other than the
+/// platform keys), e.g. are built for the same Python version.
+fn variants_agree(
+    left: &BTreeMap<NormalizedKey, Variable>,
+    right: &BTreeMap<NormalizedKey, Variable>,
+) -> bool {
+    left.iter().all(|(key, value)| {
+        PLATFORM_VARIANT_KEYS.contains(&key.normalize().as_str())
+            || right.get(key).is_none_or(|other| other == value)
+    })
+}
+
 /// Evaluates build and test readiness against sibling outputs from the current build.
 ///
 /// The complete plan distinguishes sibling dependencies from packages supplied by
@@ -52,7 +75,7 @@ pub(crate) enum BuildQueueError {
 /// closures are currently installable.
 struct BuildReadiness<'a> {
     /// Package identities that participate in this local build.
-    planned_outputs: &'a [PackageIdentifier],
+    planned_outputs: &'a [PlannedOutput],
     /// Outputs already processed by the build loop.
     done_outputs: &'a [Output],
     /// Outputs not built because they already exist.
@@ -136,7 +159,7 @@ impl<'a> BuildReadiness<'a> {
     /// Creates a readiness view over the complete plan, the outputs processed so
     /// far and the outputs skipped because they already exist.
     fn new(
-        planned_outputs: &'a [PackageIdentifier],
+        planned_outputs: &'a [PlannedOutput],
         done_outputs: &'a [Output],
         skipped_outputs: &'a [Output],
     ) -> Self {
@@ -269,7 +292,7 @@ impl<'a> BuildReadiness<'a> {
         if !self
             .planned_outputs
             .iter()
-            .any(|output| Self::identifier_matches_spec(spec, output))
+            .any(|output| Self::identifier_matches_spec(spec, &output.identifier))
         {
             return self.skipped_dependency_is_installable(
                 spec.name.as_exact(),
@@ -376,16 +399,31 @@ impl<'a> BuildReadiness<'a> {
             Some(spec) => Self::output_matches_spec(spec, output),
             None => dependency.name().is_some_and(|name| name == output.name()),
         };
-        if !self.planned_outputs.iter().any(matches_identifier) {
+        if !self
+            .planned_outputs
+            .iter()
+            .any(|output| matches_identifier(&output.identifier))
+        {
             return self.skipped_dependency_is_installable(
                 dependency.name(),
                 matches_output,
                 availability,
             );
         }
+        // When the plan has a variant of the dependency that agrees with the
+        // consumer's variant (e.g. the same Python version), only that one can
+        // be installed with the consumer: another variant being built does not
+        // make it ready. Without such a variant, any matching one will do.
+        let agreeing_variant_planned = self.planned_outputs.iter().any(|output| {
+            matches_identifier(&output.identifier)
+                && variants_agree(consumer.variant(), &output.variant)
+        });
 
         for (output_index, output) in self.done_outputs.iter().enumerate() {
-            if !matches_output(output) {
+            if !matches_output(output)
+                || (agreeing_variant_planned
+                    && !variants_agree(consumer.variant(), output.variant()))
+            {
                 continue;
             }
 
@@ -656,7 +694,7 @@ pub(crate) struct OutputBuildQueue {
     /// Outputs awaiting a build attempt.
     queue: BuildQueue<Output>,
     /// Complete local plan, including outputs not processed yet.
-    planned_outputs: Vec<PackageIdentifier>,
+    planned_outputs: Vec<PlannedOutput>,
     /// Attempted outputs used to determine which local artifacts are available.
     processed_outputs: Vec<Output>,
     /// Outputs not built because they already exist; their run dependencies may
@@ -681,10 +719,13 @@ impl OutputBuildQueue {
     pub(crate) fn new(outputs: Vec<Output>, skipped_outputs: Vec<Output>) -> Self {
         let planned_outputs = outputs
             .iter()
-            .map(|output| PackageIdentifier {
-                name: output.name().clone(),
-                version: output.version().clone(),
-                build_string: output.build_string().into_owned(),
+            .map(|output| PlannedOutput {
+                identifier: PackageIdentifier {
+                    name: output.name().clone(),
+                    version: output.version().clone(),
+                    build_string: output.build_string().into_owned(),
+                },
+                variant: output.variant().clone(),
             })
             .collect();
         let required_planned = required_planned_packages(&outputs, &skipped_outputs);
@@ -981,6 +1022,9 @@ mod tests {
 
     use rattler_conda_types::PackageName;
 
+    use rattler_build_core::Variable;
+    use rattler_build_types::NormalizedKey;
+
     use super::{
         BuildQueue, NextReady, OutputBuildQueue, closure_without, count_dependents, skip_blocked,
     };
@@ -1072,6 +1116,79 @@ system_tools: {{}}
         queue.record_processed(output("sx-c", "h0_0", &[], sx_c_run, true));
         // still one build in flight, so the serial fallback cannot start it
         assert_eq!(ready(&mut queue, 1).as_deref(), Some("sx-a"));
+    }
+
+    /// `output` with a variant, e.g. `[("python", "3.12")]`.
+    fn with_variant(mut output: Output, variant: &[(&str, &str)]) -> Output {
+        output.build_configuration.variant = variant
+            .iter()
+            .map(|(key, value)| (NormalizedKey::from(*key), Variable::from(*value)))
+            .collect();
+        output
+    }
+
+    #[test]
+    fn waits_for_the_dependency_variant_of_the_same_python() {
+        // `lib` and its consumer `app` are both built for two Python versions
+        let python = |v| [("python", v), ("target_platform", "linux-64")];
+        let lib_312 = with_variant(output("lib", "py312_0", &[], &[], false), &python("3.12"));
+        let lib_313 = with_variant(output("lib", "py313_0", &[], &[], false), &python("3.13"));
+        let app_312 = with_variant(
+            output("app", "py312_0", &["lib"], &[], false),
+            &python("3.12"),
+        );
+        let mut queue =
+            OutputBuildQueue::new(vec![lib_313.clone(), lib_312.clone(), app_312], Vec::new());
+        let ready = |queue: &mut OutputBuildQueue, in_flight| {
+            queue
+                .next_ready_parallel(in_flight, true, |_| true)
+                .unwrap()
+                .map(|output| output.identifier())
+        };
+
+        assert_eq!(ready(&mut queue, 0), Some(lib_313.identifier()));
+        assert_eq!(ready(&mut queue, 1), Some(lib_312.identifier()));
+        let built = |planned: Output, run: &[&str]| {
+            let mut done = output("lib", &planned.build_string(), &[], run, true);
+            done.build_configuration.variant = planned.variant().clone();
+            done
+        };
+        queue.record_processed(built(lib_313, &[]));
+        // the Python 3.13 `lib` cannot be installed with the Python 3.12 `app`
+        assert_eq!(ready(&mut queue, 1), None);
+        queue.record_processed(built(lib_312, &[]));
+        assert_eq!(
+            ready(&mut queue, 0).map(|id| id.starts_with("app")),
+            Some(true)
+        );
+    }
+
+    #[test]
+    fn noarch_consumer_takes_any_platform_variant() {
+        let lib = with_variant(
+            output("lib", "h0_0", &[], &[], false),
+            &[("target_platform", "linux-64")],
+        );
+        let app = with_variant(
+            output("app", "h0_0", &["lib"], &[], false),
+            &[("target_platform", "noarch")],
+        );
+        let mut queue = OutputBuildQueue::new(vec![lib.clone(), app], Vec::new());
+        assert!(
+            queue
+                .next_ready_parallel(0, true, |_| true)
+                .unwrap()
+                .is_some()
+        );
+        let mut done = output("lib", "h0_0", &[], &[], true);
+        done.build_configuration.variant = lib.variant().clone();
+        queue.record_processed(done);
+        let next = queue.next_ready_parallel(1, true, |_| true).unwrap();
+        assert_eq!(
+            next.map(|output| output.name().as_normalized().to_string())
+                .as_deref(),
+            Some("app")
+        );
     }
 
     #[test]
