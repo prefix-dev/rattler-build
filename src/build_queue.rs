@@ -262,9 +262,11 @@ impl<'a> BuildReadiness<'a> {
         closure.push(output_index);
 
         let mut available = true;
+        let variant = self.done_outputs[output_index].variant();
         for dependency in &finalized_dependencies.run.depends {
             if !self.collect_spec_install_closure(
                 dependency.spec(),
+                variant,
                 visited,
                 availability,
                 closure,
@@ -281,10 +283,13 @@ impl<'a> BuildReadiness<'a> {
     ///
     /// Specifications without a matching planned sibling are external dependencies
     /// and therefore do not block local scheduling, unless they match a skipped
-    /// output whose run dependencies are planned.
+    /// output whose run dependencies are planned. `variant` is the variant of the
+    /// package that needs the specification: as for direct dependencies, when the
+    /// plan has an agreeing variant of the match, only that one makes it available.
     fn collect_spec_install_closure(
         &self,
         spec: &MatchSpec,
+        variant: &BTreeMap<NormalizedKey, Variable>,
         visited: &mut HashSet<usize>,
         availability: &mut HashMap<usize, bool>,
         closure: &mut Vec<usize>,
@@ -301,8 +306,15 @@ impl<'a> BuildReadiness<'a> {
             );
         }
 
+        let agreeing_variant_planned = self.planned_outputs.iter().any(|output| {
+            Self::identifier_matches_spec(spec, &output.identifier)
+                && variants_agree(variant, &output.variant)
+        });
+
         for (output_index, output) in self.done_outputs.iter().enumerate() {
-            if !Self::output_matches_spec(spec, output) {
+            if !Self::output_matches_spec(spec, output)
+                || (agreeing_variant_planned && !variants_agree(variant, output.variant()))
+            {
                 continue;
             }
 
@@ -487,6 +499,7 @@ impl<'a> BuildReadiness<'a> {
 
                 if !self.collect_spec_install_closure(
                     &spec,
+                    consumer.variant(),
                     &mut HashSet::new(),
                     availability,
                     &mut Vec::new(),
@@ -1161,6 +1174,46 @@ system_tools: {{}}
             ready(&mut queue, 0).map(|id| id.starts_with("app")),
             Some(true)
         );
+    }
+
+    #[test]
+    fn waits_for_the_same_python_variant_of_a_run_dependency() {
+        // `app` needs `mid`, whose run dependency `lib` is built for two Pythons;
+        // the Python 3.13 `mid` is built, but only the Python 3.12 `lib`
+        let python = |v| [("python", v), ("target_platform", "linux-64")];
+        let lib_312 = with_variant(output("lib", "py312_0", &[], &[], false), &python("3.12"));
+        let lib_313 = with_variant(output("lib", "py313_0", &[], &[], false), &python("3.13"));
+        let mid_313 = with_variant(output("mid", "py313_0", &[], &[], false), &python("3.13"));
+        let app_313 = with_variant(
+            output("app", "py313_0", &["mid"], &[], false),
+            &python("3.13"),
+        );
+        let mut queue = OutputBuildQueue::new(
+            vec![lib_312.clone(), lib_313.clone(), mid_313.clone(), app_313],
+            Vec::new(),
+        );
+        let built = |planned: &Output, run: &[&str]| {
+            let mut done = output(
+                &planned.name().as_normalized().to_string(),
+                &planned.build_string(),
+                &[],
+                run,
+                true,
+            );
+            done.build_configuration.variant = planned.variant().clone();
+            done
+        };
+        let app_ready = |queue: &mut OutputBuildQueue| {
+            std::iter::from_fn(|| queue.next_ready_parallel(1, true, |_| true).unwrap())
+                .any(|output| output.name().as_normalized() == "app")
+        };
+
+        queue.record_processed(built(&lib_312, &[]));
+        queue.record_processed(built(&mid_313, &["lib"]));
+        // the Python 3.12 `lib` cannot be installed with the Python 3.13 `mid`
+        assert!(!app_ready(&mut queue));
+        queue.record_processed(built(&lib_313, &[]));
+        assert!(app_ready(&mut queue));
     }
 
     #[test]
