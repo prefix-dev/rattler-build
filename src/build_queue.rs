@@ -1194,7 +1194,7 @@ system_tools: {{}}
         );
         let built = |planned: &Output, run: &[&str]| {
             let mut done = output(
-                &planned.name().as_normalized().to_string(),
+                planned.name().as_normalized(),
                 &planned.build_string(),
                 &[],
                 run,
