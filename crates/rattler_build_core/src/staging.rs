@@ -478,6 +478,17 @@ impl Output {
             remove_dir_all_force(self.prefix()).into_diagnostic()?;
         }
 
+        // Clean the build prefix as well. It is not part of the staging cache,
+        // and the output's own build environment is installed into it afterwards.
+        // Without this, files the staging script added to (or changed in)
+        // `$BUILD_PREFIX` would leak into the inheriting output, but only when the
+        // cache was built in the same run (or by a sibling output).
+        let build_prefix = &self.build_configuration.directories.build_prefix;
+        if build_prefix != self.prefix() && build_prefix.exists() {
+            tracing::debug!("Removing existing build prefix before cache restoration");
+            remove_dir_all_force(build_prefix).into_diagnostic()?;
+        }
+
         // Clean the work directory as well
         if self.build_configuration.directories.work_dir.exists() {
             tracing::debug!("Removing existing work directory before cache restoration");
