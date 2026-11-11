@@ -11,8 +11,8 @@ permissions:
 jobs:
   pixi-update:
     permissions:
-      contents: write
-      pull-requests: write
+      contents: read
+      id-token: write # Octo STS
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -39,10 +39,18 @@ jobs:
           set -o pipefail
           pixi update --json --no-install --manifest-path ${{ matrix.manifest-path }} \
             | pixi exec pixi-diff-to-markdown >> diff.md
+      # A token from Octo STS (rather than GITHUB_TOKEN) is needed so that the
+      # created pull request triggers CI workflows.
+      - name: Obtain GitHub app token
+        id: octo-sts
+        uses: octo-sts/action@f603d3be9d8dd9871a265776e625a27b00effe05 # v1.1.1
+        with:
+          scope: ${{ github.repository }}
+          identity: update-lockfiles
       - name: Create pull request
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ steps.octo-sts.outputs.token }}
           commit-message: "chore: update ${{ matrix.name }} pixi lock file"
           title: "chore: update ${{ matrix.name }} pixi lock file"
           body-path: diff.md
