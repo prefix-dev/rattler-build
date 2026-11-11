@@ -1284,18 +1284,21 @@ system_tools: {{}}
 
     #[test]
     fn noarch_consumer_takes_any_platform_variant() {
-        let lib = with_variant(
-            output("lib", "h0_0", &[], &[], false),
-            &[("target_platform", "linux-64")],
-        );
+        // the noarch `app` agrees with the linux-64 Python 3.12 `lib` only
+        // when the platform is ignored; otherwise no `lib` variant agrees
+        // and any would do
+        let lib_312 = py_output("lib", "3.12", &[]);
+        let lib_313 = py_output("lib", "3.13", &[]);
         let app = with_variant(
-            output("app", "h0_0", &["lib"], &[], false),
-            &[("target_platform", "noarch")],
+            output("app", "pyh0_0", &["lib"], &[], false),
+            &[("python", "3.12"), ("target_platform", "noarch")],
         );
-        let mut queue = OutputBuildQueue::new(vec![lib.clone(), app], Vec::new());
+        let mut queue =
+            OutputBuildQueue::new(vec![lib_312.clone(), lib_313.clone(), app], Vec::new());
 
+        queue.record_processed(built(&lib_313, &[]));
         assert!(!can_start(&mut queue, "app"));
-        queue.record_processed(built(&lib, &[]));
+        queue.record_processed(built(&lib_312, &[]));
         assert!(can_start(&mut queue, "app"));
     }
 
