@@ -353,19 +353,19 @@ impl ResolvedDependencies {
         result
     }
 
-    /// Collect the flags exported by the direct dependencies of this
-    /// environment, plus the records named in `extra_direct` (the build
-    /// requirements when build and host environments are merged).
+    /// Collect the flags that the records of this environment export to
+    /// packages using them from `env`. Only records named in `direct` count:
+    /// the requirements of `env`, which are not the specs of this
+    /// environment when build and host environments are merged.
     fn exported_flags(
         &self,
-        env: &str,
-        extra_direct: &[DependencyInfo],
+        env: FlagExportEnv,
+        direct: &[DependencyInfo],
         ignore: &IgnoreFlagExports,
     ) -> Vec<ExportedFlag> {
         let is_direct = |name: &PackageName| {
-            self.specs
+            direct
                 .iter()
-                .chain(extra_direct)
                 // Run export dependencies are not direct dependencies
                 .filter(|s| !matches!(s, DependencyInfo::RunExport(_)))
                 .any(|s| s.spec().name.as_exact() == Some(name))
@@ -377,21 +377,21 @@ impl ResolvedDependencies {
             let Some(run_exports) = &record.package_record.run_exports else {
                 continue;
             };
-            if run_exports.flags.is_empty()
-                || !is_direct(name)
-                || ignore.from_package.contains(name)
-            {
+            let flags = match env {
+                FlagExportEnv::Build => &run_exports.flags_from_build,
+                FlagExportEnv::Host => &run_exports.flags_from_host,
+            };
+            if flags.is_empty() || !is_direct(name) || ignore.from_package.contains(name) {
                 continue;
             }
             result.extend(
-                run_exports
-                    .flags
+                flags
                     .iter()
                     .filter(|flag| !ignore.by_name.contains(flag))
                     .map(|flag| ExportedFlag {
                         flag: flag.clone(),
                         from: name.clone(),
-                        env: env.to_string(),
+                        env: env.as_str().to_string(),
                     }),
             );
         }
@@ -399,9 +399,27 @@ impl ResolvedDependencies {
     }
 }
 
-/// A flag exported by a build or host dependency through the `flags` key of
-/// its `run_exports.json`. Exported flags are added to the flags of the
-/// package being built.
+/// The environment a dependency exports flags from: `flags_from_build`
+/// applies to its use as a build dependency, `flags_from_host` to its use as
+/// a host dependency.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum FlagExportEnv {
+    Build,
+    Host,
+}
+
+impl FlagExportEnv {
+    fn as_str(self) -> &'static str {
+        match self {
+            FlagExportEnv::Build => "build",
+            FlagExportEnv::Host => "host",
+        }
+    }
+}
+
+/// A flag exported by a build or host dependency through the
+/// `flags_from_build` or `flags_from_host` key of its `run_exports.json`.
+/// Exported flags are added to the flags of the package being built.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ExportedFlag {
     /// The exported flag
@@ -863,7 +881,8 @@ fn render_run_exports(
             noarch: render_run_exports(&run_exports.noarch)?,
             strong_constrains: render_run_exports(&run_exports.strong_constraints)?,
             weak_constrains: render_run_exports(&run_exports.weak_constraints)?,
-            flags: flag_exports.clone(),
+            flags_from_build: flag_exports.from_build.clone(),
+            flags_from_host: flag_exports.from_host.clone(),
         })
     } else {
         Ok(RunExportsJson::default())
@@ -1232,10 +1251,26 @@ fn collect_exported_flags(
         );
     }
     if let Some(build_env) = build_env {
-        exported_flags.extend(build_env.exported_flags("build", &[], ignore));
+        exported_flags.extend(build_env.exported_flags(
+            FlagExportEnv::Build,
+            &build_env.specs,
+            ignore,
+        ));
     }
     if let Some(host_env) = host_env {
-        exported_flags.extend(host_env.exported_flags("host", merged_build_specs, ignore));
+        // With merged build and host environments the build requirements are
+        // resolved in the host environment, but still export as build
+        // dependencies.
+        exported_flags.extend(host_env.exported_flags(
+            FlagExportEnv::Build,
+            merged_build_specs,
+            ignore,
+        ));
+        exported_flags.extend(host_env.exported_flags(
+            FlagExportEnv::Host,
+            &host_env.specs,
+            ignore,
+        ));
     }
 
     if exported_flags.is_empty() {

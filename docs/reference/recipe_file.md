@@ -1273,10 +1273,35 @@ Using a runtime dependency name:
     and are only accepted when Rattler-Build is invoked with `--v3`.
 
 A package can export [flags](#package-variant-flags-v3-beta) to the packages
-built with it, the same way it exports run dependencies. Every package that
-has it as a direct `build` or `host` dependency gets the exported flags added
-to its own `flags` in `index.json`. For example, a debug compiler package can
-tag everything compiled with it as `debug`:
+built with it, the same way it exports run dependencies. A package that has
+it as a direct dependency gets the exported flags added to its own `flags` in
+`index.json`. Which flags apply depends on the environment the exporting
+package is used from:
+
+- `from_build`: flags for packages that have it as a direct `build`
+  dependency.
+- `from_host`: flags for packages that have it as a direct `host` dependency.
+
+For example, a debug compiler package can tag everything compiled with it as
+`debug`, and a debug build of a library can tag everything linked against it:
+
+```yaml
+# debug compiler
+requirements:
+  flag_exports:
+    from_build:
+      - debug
+
+# debug build of a library
+requirements:
+  flag_exports:
+    from_host:
+      - debug
+```
+
+The two lists are independent: unlike `strong` run exports, `from_build` does
+not imply `from_host`. A plain list is a shorthand that exports the flags from
+both environments:
 
 ```yaml
 requirements:
@@ -1284,15 +1309,20 @@ requirements:
     - debug
 ```
 
-The list is conditional and templated like `build.flags`. The flags are
-written to a `flags` key in `info/run_exports.json`, so they are available
-from repodata without downloading the package:
+The lists are conditional and templated like `build.flags`. The flags are
+written to the `flags_from_build` and `flags_from_host` keys in
+`info/run_exports.json`, so they are available from repodata without
+downloading the package:
 
 ```json
 {
-  "flags": ["debug"]
+  "flags_from_build": ["debug"],
+  "flags_from_host": ["debug"]
 }
 ```
+
+When build and host environments are merged, build requirements still export
+their `from_build` flags and host requirements their `from_host` flags.
 
 A package that is built with the debug compiler and declares `build.flags:
 [cuda]` ends up with `flags: ["cuda", "debug"]`. Like run exports, only

@@ -233,6 +233,27 @@ impl IgnoreRunExports {
     }
 }
 
+/// Flag exports configuration
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct FlagExports {
+    /// Flags added to any package that has this package as a direct build
+    /// dependency
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub from_build: Vec<Flag>,
+
+    /// Flags added to any package that has this package as a direct host
+    /// dependency
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub from_host: Vec<Flag>,
+}
+
+impl FlagExports {
+    /// Check if empty
+    pub fn is_empty(&self) -> bool {
+        self.from_build.is_empty() && self.from_host.is_empty()
+    }
+}
+
 /// Ignore flag exports configuration
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct IgnoreFlagExports {
@@ -283,10 +304,10 @@ pub struct Requirements {
     #[serde(default, skip_serializing_if = "IgnoreRunExports::is_empty")]
     pub ignore_run_exports: IgnoreRunExports,
 
-    /// Flags added to any package that has this package as a direct build or
-    /// host dependency
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub flag_exports: Vec<Flag>,
+    /// Flags added to the packages that have this package as a direct build
+    /// or host dependency
+    #[serde(default, skip_serializing_if = "FlagExports::is_empty")]
+    pub flag_exports: FlagExports,
 
     /// Ignore flag exports by flag or from specific packages
     #[serde(default, skip_serializing_if = "IgnoreFlagExports::is_empty")]

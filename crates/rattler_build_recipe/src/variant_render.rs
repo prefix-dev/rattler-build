@@ -2034,8 +2034,11 @@ package:
 
 requirements:
   flag_exports:
-    - debug
-    - ${{ "asan" if unix }}
+    from_build:
+      - debug
+      - ${{ "asan" if unix }}
+    from_host:
+      - debug
   ignore_flag_exports:
     by_name:
       - cuda
@@ -2061,12 +2064,14 @@ requirements:
         .unwrap();
         assert_eq!(rendered.len(), 1);
         let requirements = &rendered[0].recipe.requirements;
-        let flags = requirements
-            .flag_exports
-            .iter()
-            .map(|flag| flag.as_str())
-            .collect::<Vec<_>>();
-        assert_eq!(flags, vec!["debug", "asan"]);
+        let flags = |flags: &[rattler_conda_types::Flag]| {
+            flags.iter().map(ToString::to_string).collect::<Vec<_>>()
+        };
+        assert_eq!(
+            flags(&requirements.flag_exports.from_build),
+            vec!["debug", "asan"]
+        );
+        assert_eq!(flags(&requirements.flag_exports.from_host), vec!["debug"]);
         assert_eq!(requirements.ignore_flag_exports.by_name[0].as_str(), "cuda");
         assert_eq!(
             requirements.ignore_flag_exports.from_package[0].as_normalized(),

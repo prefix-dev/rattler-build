@@ -42,10 +42,10 @@ pub struct Requirements {
     #[serde(default, skip_serializing_if = "IgnoreRunExports::is_empty")]
     pub ignore_run_exports: IgnoreRunExports,
 
-    /// Flags added to any package that has this package as a direct build or
-    /// host dependency (V3 only)
-    #[serde(default, skip_serializing_if = "ConditionalList::is_empty")]
-    pub flag_exports: ConditionalList<Flag>,
+    /// Flags added to the packages that have this package as a direct build
+    /// or host dependency (V3 only)
+    #[serde(default, skip_serializing_if = "FlagExports::is_empty")]
+    pub flag_exports: FlagExports,
 
     /// Ignore flag-exports configuration
     #[serde(default, skip_serializing_if = "IgnoreFlagExports::is_empty")]
@@ -262,6 +262,44 @@ impl IgnoreRunExports {
 
         vars.extend(by_name.used_variables());
         vars.extend(from_package.used_variables());
+
+        vars.sort();
+        vars.dedup();
+        vars
+    }
+}
+
+/// Flag exports configuration (before rendering)
+#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
+pub struct FlagExports {
+    /// Flags added to any package that has this package as a direct build
+    /// dependency (can contain templates/conditionals)
+    #[serde(default, skip_serializing_if = "ConditionalList::is_empty")]
+    pub from_build: ConditionalList<Flag>,
+
+    /// Flags added to any package that has this package as a direct host
+    /// dependency (can contain templates/conditionals)
+    #[serde(default, skip_serializing_if = "ConditionalList::is_empty")]
+    pub from_host: ConditionalList<Flag>,
+}
+
+impl FlagExports {
+    /// Check if both fields are empty
+    pub fn is_empty(&self) -> bool {
+        self.from_build.is_empty() && self.from_host.is_empty()
+    }
+
+    /// Collect all variables used in the flag exports
+    pub fn used_variables(&self) -> Vec<String> {
+        let FlagExports {
+            from_build,
+            from_host,
+        } = self;
+
+        let mut vars = Vec::new();
+
+        vars.extend(from_build.used_variables());
+        vars.extend(from_host.used_variables());
 
         vars.sort();
         vars.dedup();

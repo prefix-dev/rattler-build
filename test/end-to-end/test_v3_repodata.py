@@ -316,8 +316,10 @@ def test_v3_flag_exports(rattler_build: RattlerBuild, tmp_path: Path):
 
     # The exporting package records its flag exports in run_exports.json but
     # does not carry them itself.
+    # A plain list exports from both the build and the host environment.
     assert read_info("debug-toolchain", "run_exports.json") == {
-        "flags": ["debug", "sanitizers"]
+        "flags_from_build": ["debug", "sanitizers"],
+        "flags_from_host": ["debug", "sanitizers"],
     }
     assert read_info("debug-toolchain", "index.json")["flags"] == ["toolchain"]
 
@@ -329,6 +331,19 @@ def test_v3_flag_exports(rattler_build: RattlerBuild, tmp_path: Path):
     ]
     assert read_info("flag-consumer-ignore-by-name", "index.json")["flags"] == ["debug"]
     assert "flags" not in read_info("flag-consumer-ignore-from-package", "index.json")
+
+    # `from_build` flags only reach packages that use the exporter as a build
+    # dependency, `from_host` flags only those that use it as a host dependency.
+    assert read_info("split-toolchain", "run_exports.json") == {
+        "flags_from_build": ["built_with_split"],
+        "flags_from_host": ["linked_with_split"],
+    }
+    assert read_info("split-consumer-build", "index.json")["flags"] == [
+        "built_with_split"
+    ]
+    assert read_info("split-consumer-host", "index.json")["flags"] == [
+        "linked_with_split"
+    ]
 
     # The rendered recipe records where each exported flag came from.
     rendered = (

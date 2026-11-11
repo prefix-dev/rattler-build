@@ -18,6 +18,28 @@ outputs:
         - debug
         - sanitizers
 
+  # Exports different flags depending on the environment it is used from.
+  - package:
+      name: split-toolchain
+    requirements:
+      flag_exports:
+        from_build:
+          - built_with_split
+        from_host:
+          - linked_with_split
+
+  - package:
+      name: split-consumer-build
+    requirements:
+      build:
+        - split-toolchain
+
+  - package:
+      name: split-consumer-host
+    requirements:
+      host:
+        - split-toolchain
+
   - package:
       name: flag-consumer
     build:

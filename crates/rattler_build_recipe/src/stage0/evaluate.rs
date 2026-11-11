@@ -49,7 +49,7 @@ use crate::{
         },
         match_spec::matchspec_parse_options,
         requirements::{
-            IgnoreFlagExports as Stage0IgnoreFlagExports,
+            FlagExports as Stage0FlagExports, IgnoreFlagExports as Stage0IgnoreFlagExports,
             IgnoreRunExports as Stage0IgnoreRunExports, RunExports as Stage0RunExports,
         },
         source::{
@@ -80,7 +80,7 @@ use crate::{
             VariantKeyUsage as Stage1VariantKeyUsage,
         },
         requirements::{
-            IgnoreFlagExports as Stage1IgnoreFlagExports,
+            FlagExports as Stage1FlagExports, IgnoreFlagExports as Stage1IgnoreFlagExports,
             IgnoreRunExports as Stage1IgnoreRunExports, RunExports as Stage1RunExports,
         },
         source::{
@@ -1849,6 +1849,17 @@ impl Evaluate for Stage0IgnoreRunExports {
     }
 }
 
+impl Evaluate for Stage0FlagExports {
+    type Output = Stage1FlagExports;
+
+    fn evaluate(&self, context: &EvaluationContext) -> Result<Self::Output, ParseError> {
+        Ok(Stage1FlagExports {
+            from_build: evaluate_flag_list(&self.from_build, "requirements.flag_exports", context)?,
+            from_host: evaluate_flag_list(&self.from_host, "requirements.flag_exports", context)?,
+        })
+    }
+}
+
 impl Evaluate for Stage0IgnoreFlagExports {
     type Output = Stage1IgnoreFlagExports;
 
@@ -1883,11 +1894,7 @@ impl Evaluate for Stage0Requirements {
             extras,
             run_exports: self.run_exports.evaluate(context)?,
             ignore_run_exports: self.ignore_run_exports.evaluate(context)?,
-            flag_exports: evaluate_flag_list(
-                &self.flag_exports,
-                "requirements.flag_exports",
-                context,
-            )?,
+            flag_exports: self.flag_exports.evaluate(context)?,
             ignore_flag_exports: self.ignore_flag_exports.evaluate(context)?,
         })
     }

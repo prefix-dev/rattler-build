@@ -4,7 +4,7 @@ use marked_yaml::Node as MarkedNode;
 use rattler_build_yaml_parser::{
     NodeConverter, ParseMapping, parse_conditional_list, parse_conditional_list_with_converter,
 };
-use rattler_conda_types::{MatchSpec, PackageName, ParseStrictness, RepodataRevision};
+use rattler_conda_types::{Flag, MatchSpec, PackageName, ParseStrictness, RepodataRevision};
 
 use crate::{
     error::{ParseError, ParseResult},
@@ -12,7 +12,9 @@ use crate::{
         SerializableMatchSpec,
         parser::ParseConfig,
         parser::helpers::get_span,
-        requirements::{IgnoreFlagExports, IgnoreRunExports, Requirements, RunExports},
+        requirements::{
+            FlagExports, IgnoreFlagExports, IgnoreRunExports, Requirements, RunExports,
+        },
         supports_v3_repodata_features,
     },
 };
@@ -140,7 +142,7 @@ pub(crate) fn parse_requirements_with_config(
     }
 
     if let Some(flag_exports) = mapping.get("flag_exports") {
-        requirements.flag_exports = parse_conditional_list(flag_exports)?;
+        requirements.flag_exports = parse_flag_exports(flag_exports)?;
     }
 
     if let Some(ignore_flag_exports) = mapping.get("ignore_flag_exports") {
@@ -282,6 +284,36 @@ pub(crate) fn parse_ignore_run_exports(yaml: &MarkedNode) -> ParseResult<IgnoreR
     }
 
     Ok(ignore)
+}
+
+/// Parse a FlagExports section
+fn parse_flag_exports(yaml: &MarkedNode) -> ParseResult<FlagExports> {
+    // A direct list exports the flags from both the build and the host
+    // environment.
+    if yaml.as_sequence().is_some() {
+        let flags: rattler_build_yaml_parser::ConditionalList<Flag> = parse_conditional_list(yaml)?;
+        return Ok(FlagExports {
+            from_build: flags.clone(),
+            from_host: flags,
+        });
+    }
+
+    yaml.validate_keys("flag_exports", &["from_build", "from_host"])?;
+
+    let mut flag_exports = FlagExports::default();
+    let mapping = yaml
+        .as_mapping()
+        .ok_or_else(|| ParseError::expected_type("list or mapping", "scalar", get_span(yaml)))?;
+
+    if let Some(from_build) = mapping.get("from_build") {
+        flag_exports.from_build = parse_conditional_list(from_build)?;
+    }
+
+    if let Some(from_host) = mapping.get("from_host") {
+        flag_exports.from_host = parse_conditional_list(from_host)?;
+    }
+
+    Ok(flag_exports)
 }
 
 /// Parse an IgnoreFlagExports section
@@ -431,7 +463,9 @@ mod tests {
         let yaml = parse_yaml_requirements(yaml_str);
         let reqs = parse_requirements(&yaml).unwrap();
 
-        assert_eq!(reqs.flag_exports.len(), 3);
+        // A plain list exports from both the build and the host environment.
+        assert_eq!(reqs.flag_exports.from_build.len(), 3);
+        assert_eq!(reqs.flag_exports.from_host, reqs.flag_exports.from_build);
         assert_eq!(reqs.ignore_flag_exports.by_name.len(), 1);
         assert_eq!(reqs.ignore_flag_exports.from_package.len(), 1);
         assert!(!reqs.is_empty());
@@ -439,6 +473,44 @@ mod tests {
         let vars = reqs.used_variables();
         assert!(vars.contains(&"unix".to_string()));
         assert!(vars.contains(&"lto".to_string()));
+    }
+
+    #[test]
+    fn test_parse_flag_exports_per_environment() {
+        let yaml_str = r#"
+  flag_exports:
+    from_build:
+      - debug
+      - if: unix
+        then: sanitizers
+    from_host:
+      - '${{ "lto" if lto }}'"#;
+        let yaml = parse_yaml_requirements(yaml_str);
+        let reqs = parse_requirements(&yaml).unwrap();
+
+        assert_eq!(reqs.flag_exports.from_build.len(), 2);
+        assert_eq!(reqs.flag_exports.from_host.len(), 1);
+        assert!(!reqs.is_empty());
+
+        let vars = reqs.used_variables();
+        assert!(vars.contains(&"unix".to_string()));
+        assert!(vars.contains(&"lto".to_string()));
+
+        // Only one environment can be set.
+        let yaml = parse_yaml_requirements("\n  flag_exports:\n    from_host:\n      - debug");
+        let reqs = parse_requirements(&yaml).unwrap();
+        assert!(reqs.flag_exports.from_build.is_empty());
+        assert_eq!(reqs.flag_exports.from_host.len(), 1);
+    }
+
+    #[test]
+    fn test_parse_flag_exports_rejects_unknown_keys() {
+        let yaml_str = r#"
+  flag_exports:
+    from_run:
+      - debug"#;
+        let yaml = parse_yaml_requirements(yaml_str);
+        assert!(parse_requirements(&yaml).is_err());
     }
 
     #[test]
