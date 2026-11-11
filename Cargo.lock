@@ -4912,7 +4912,7 @@ dependencies = [
 
 [[package]]
 name = "rattler_build_core"
-version = "0.2.24"
+version = "0.2.25"
 dependencies = [
  "anyhow",
  "arwen-codesign",
@@ -5011,7 +5011,7 @@ dependencies = [
 
 [[package]]
 name = "rattler_build_jinja"
-version = "0.1.24"
+version = "0.1.25"
 dependencies = [
  "anyhow",
  "fs-err",
@@ -5035,7 +5035,7 @@ dependencies = [
 
 [[package]]
 name = "rattler_build_networking"
-version = "0.1.20"
+version = "0.1.21"
 dependencies = [
  "astral-reqwest-middleware",
  "astral-reqwest-retry",
@@ -5047,7 +5047,7 @@ dependencies = [
 
 [[package]]
 name = "rattler_build_package"
-version = "0.1.25"
+version = "0.1.26"
 dependencies = [
  "content_inspector",
  "fs-err",
@@ -5078,7 +5078,7 @@ dependencies = [
 
 [[package]]
 name = "rattler_build_recipe"
-version = "0.1.24"
+version = "0.1.25"
 dependencies = [
  "clap",
  "fs-err",
@@ -5114,7 +5114,7 @@ dependencies = [
 
 [[package]]
 name = "rattler_build_recipe_generator"
-version = "0.1.22"
+version = "0.1.23"
 dependencies = [
  "async-once-cell",
  "async-recursion",
@@ -5147,7 +5147,7 @@ dependencies = [
 
 [[package]]
 name = "rattler_build_script"
-version = "0.2.19"
+version = "0.2.20"
 dependencies = [
  "async-trait",
  "clap",
@@ -5174,7 +5174,7 @@ dependencies = [
 
 [[package]]
 name = "rattler_build_source_cache"
-version = "0.1.22"
+version = "0.1.23"
 dependencies = [
  "astral-reqwest-middleware",
  "astral-reqwest-retry",
@@ -5214,7 +5214,7 @@ dependencies = [
 
 [[package]]
 name = "rattler_build_types"
-version = "0.1.22"
+version = "0.1.23"
 dependencies = [
  "fs-err",
  "globset",
@@ -5230,7 +5230,7 @@ dependencies = [
 
 [[package]]
 name = "rattler_build_variant_config"
-version = "0.1.24"
+version = "0.1.25"
 dependencies = [
  "fs-err",
  "insta",
@@ -5252,7 +5252,7 @@ dependencies = [
 
 [[package]]
 name = "rattler_build_yaml_parser"
-version = "0.1.24"
+version = "0.1.25"
 dependencies = [
  "insta",
  "marked-yaml",
