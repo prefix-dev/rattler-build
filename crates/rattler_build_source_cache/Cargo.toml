@@ -1,6 +1,6 @@
 [package]
 name = "rattler_build_source_cache"
-version = "0.1.22"
+version = "0.1.23"
 authors.workspace = true
 edition.workspace = true
 description = "Source cache management for rattler-build"

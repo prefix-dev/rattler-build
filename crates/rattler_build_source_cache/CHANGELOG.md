@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.23](https://github.com/prefix-dev/rattler-build/compare/rattler_build_source_cache-v0.1.22...rattler_build_source_cache-v0.1.23) - 2026-11-11
+
+### Other
+
+- update dependencies and drop getrandom 0.2 pin from playground ([#2934](https://github.com/prefix-dev/rattler-build/pull/2934))
+
 ## [0.1.22](https://github.com/prefix-dev/rattler-build/compare/rattler_build_source_cache-v0.1.21...rattler_build_source_cache-v0.1.22) - 2026-11-02
 
 ### Other

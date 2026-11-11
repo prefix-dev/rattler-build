@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.23](https://github.com/prefix-dev/rattler-build/compare/rattler_build_recipe_generator-v0.1.22...rattler_build_recipe_generator-v0.1.23) - 2026-11-11
+
+### Added
+
+- Require BLAS and LAPACK for CRAN packages that link them ([#2929](https://github.com/prefix-dev/rattler-build/pull/2929))
+- Require the C++ compiler only for CRAN packages with C++ sources ([#2918](https://github.com/prefix-dev/rattler-build/pull/2918))
+
+### Other
+
+- update dependencies and drop getrandom 0.2 pin from playground ([#2934](https://github.com/prefix-dev/rattler-build/pull/2934))
+
 ## [0.1.22](https://github.com/prefix-dev/rattler-build/compare/rattler_build_recipe_generator-v0.1.21...rattler_build_recipe_generator-v0.1.22) - 2026-11-02
 
 ### Other
