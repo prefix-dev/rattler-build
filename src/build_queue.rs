@@ -130,11 +130,11 @@ struct SkippedOutputs<'a> {
     outputs: &'a [Output],
     /// Indices into `outputs` by package name.
     by_name: HashMap<&'a PackageName, Vec<usize>>,
-    /// Whether an output is installable, per index. Only results that did not
-    /// depend on the cycle guard are kept.
-    installable: RefCell<HashMap<usize, bool>>,
+    /// Whether an output is installable, per output and inherited keys. Only
+    /// results that did not depend on the cycle guard are kept.
+    installable: RefCell<HashMap<InstallKey, bool>>,
     /// Outputs whose dependencies are being checked (cycle guard).
-    being_checked: RefCell<HashSet<usize>>,
+    being_checked: RefCell<HashSet<InstallKey>>,
     /// Set when the cycle guard answered for an output still being checked.
     reached_cycle: Cell<bool>,
 }
@@ -163,30 +163,30 @@ impl<'a> SkippedOutputs<'a> {
         }
     }
 
-    /// Whether the output at `index` is installable, as decided by
+    /// Whether the output at `key` is installable, as decided by
     /// `installable` and cached. In a dependency cycle, the check of an output
     /// that is already being checked answers `true`: the check further up
     /// decides.
     fn check<E>(
         &self,
-        index: usize,
+        key: InstallKey,
         installable: impl FnOnce(&'a Output) -> Result<bool, E>,
     ) -> Result<bool, E> {
-        if let Some(&result) = self.installable.borrow().get(&index) {
+        if let Some(&result) = self.installable.borrow().get(&key) {
             return Ok(result);
         }
-        if !self.being_checked.borrow_mut().insert(index) {
+        if !self.being_checked.borrow_mut().insert(key.clone()) {
             self.reached_cycle.set(true);
             return Ok(true);
         }
         let reached_cycle_before = self.reached_cycle.replace(false);
 
-        let result = installable(&self.outputs[index]);
+        let result = installable(&self.outputs[key.0]);
 
-        self.being_checked.borrow_mut().remove(&index);
+        self.being_checked.borrow_mut().remove(&key);
         let reached_cycle = self.reached_cycle.get();
         if !reached_cycle && let Ok(result) = result {
-            self.installable.borrow_mut().insert(index, result);
+            self.installable.borrow_mut().insert(key, result);
         }
         self.reached_cycle
             .set(reached_cycle_before || reached_cycle);
@@ -343,11 +343,13 @@ impl<'a> BuildReadiness<'a> {
     }
 
     /// Collects the installable sibling closure for a recipe dependency of
-    /// `consumer`.
+    /// `consumer`, installed for a package built for `variant`.
+    #[allow(clippy::too_many_arguments)]
     fn collect_dependency_install_closure(
         &self,
         dependency: &Dependency,
         consumer: &Output,
+        variant: &Variant,
         visited: &mut HashSet<InstallKey>,
         availability: &mut HashMap<InstallKey, bool>,
         closure: &mut Vec<usize>,
@@ -363,7 +365,7 @@ impl<'a> BuildReadiness<'a> {
                 Some(spec) => Self::output_matches_spec(spec, output),
                 None => dependency.name().is_some_and(|name| name == output.name()),
             },
-            consumer.variant(),
+            variant,
             visited,
             availability,
             closure,
@@ -417,10 +419,10 @@ impl<'a> BuildReadiness<'a> {
                 .filter(|&index| variants_agree(variant, self.skipped.outputs[index].variant()))
                 .collect();
             if !agreeing_skipped.is_empty() {
-                return self.skipped_outputs_are_installable(&agreeing_skipped);
+                return self.skipped_outputs_are_installable(&agreeing_skipped, variant);
             }
             if !planned {
-                return self.skipped_outputs_are_installable(&skipped);
+                return self.skipped_outputs_are_installable(&skipped, variant);
             }
         }
 
@@ -453,9 +455,13 @@ impl<'a> BuildReadiness<'a> {
     /// one of them, and with it its run dependencies, which may be planned.
     /// Which one it picks is not known before solving, so all of them must be
     /// installable.
-    fn skipped_outputs_are_installable(&self, indices: &[usize]) -> Result<bool, BuildQueueError> {
+    fn skipped_outputs_are_installable(
+        &self,
+        indices: &[usize],
+        requirer: &Variant,
+    ) -> Result<bool, BuildQueueError> {
         for &index in indices {
-            if !self.skipped_output_is_installable(index)? {
+            if !self.skipped_output_is_installable(index, requirer)? {
                 return Ok(false);
             }
         }
@@ -465,11 +471,17 @@ impl<'a> BuildReadiness<'a> {
     /// Checks whether a skipped output can be installed: whether its planned
     /// dependencies are built. Its run requirements are installed with it; its
     /// host and build requirements are checked too, because their run exports
-    /// are part of the published package's dependencies.
-    fn skipped_output_is_installable(&self, index: usize) -> Result<bool, BuildQueueError> {
-        self.skipped.check(index, |skipped| {
-            // A separate availability map: availability depends on the variant
-            // a package is installed for, and this is `skipped`'s variant.
+    /// are part of the published package's dependencies. `requirer` is the
+    /// variant of the package it is installed for (see [`installed_variant`]).
+    fn skipped_output_is_installable(
+        &self,
+        index: usize,
+        requirer: &Variant,
+    ) -> Result<bool, BuildQueueError> {
+        let own_variant = self.skipped.outputs[index].variant();
+        let key = (index, inherited_keys(own_variant, requirer));
+        self.skipped.check(key, |skipped| {
+            let variant = installed_variant(skipped.variant(), requirer);
             let mut availability = HashMap::new();
             let requirements = skipped.recipe.requirements();
             for dependency in requirements
@@ -481,6 +493,7 @@ impl<'a> BuildReadiness<'a> {
                 if !self.collect_dependency_install_closure(
                     dependency,
                     skipped,
+                    &variant,
                     &mut HashSet::new(),
                     &mut availability,
                     &mut Vec::new(),
@@ -559,6 +572,7 @@ impl<'a> BuildReadiness<'a> {
             if !self.collect_dependency_install_closure(
                 dependency,
                 output,
+                output.variant(),
                 &mut HashSet::new(),
                 &mut availability,
                 &mut closure,
@@ -574,6 +588,7 @@ impl<'a> BuildReadiness<'a> {
             if !self.collect_dependency_install_closure(
                 dependency,
                 output,
+                output.variant(),
                 &mut HashSet::new(),
                 &mut availability,
                 &mut Vec::new(),
@@ -627,6 +642,7 @@ impl<'a> BuildReadiness<'a> {
                     if !self.collect_dependency_install_closure(
                         dependency,
                         output,
+                        output.variant(),
                         &mut HashSet::new(),
                         &mut availability,
                         &mut Vec::new(),
@@ -1280,6 +1296,26 @@ system_tools: {{}}
 
         assert!(!can_start(&mut queue, "app"));
         queue.record_processed(built(&lib, &[]));
+        assert!(can_start(&mut queue, "app"));
+    }
+
+    #[test]
+    fn keeps_the_python_variant_through_a_skipped_noarch_dependency() {
+        // as `keeps_the_python_variant_through_a_noarch_dependency`, but the
+        // noarch `mid` already exists
+        let lib_312 = py_output("lib", "3.12", &[]);
+        let lib_313 = py_output("lib", "3.13", &[]);
+        let mid = with_variant(
+            output("mid", "pyh0_0", &[], &["lib"], false),
+            &[("target_platform", "noarch")],
+        );
+        let app_313 = py_output("app", "3.13", &["mid"]);
+        let mut queue =
+            OutputBuildQueue::new(vec![lib_312.clone(), lib_313.clone(), app_313], vec![mid]);
+
+        queue.record_processed(built(&lib_312, &[]));
+        assert!(!can_start(&mut queue, "app"));
+        queue.record_processed(built(&lib_313, &[]));
         assert!(can_start(&mut queue, "app"));
     }
 
