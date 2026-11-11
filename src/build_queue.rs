@@ -83,15 +83,29 @@ fn variants_agree(left: &Variant, right: &Variant) -> bool {
 /// plus the keys it does not use from `requirer`. This keeps, for example, the
 /// Python version across a `noarch` package in between.
 fn installed_variant<'v>(output: &'v Variant, requirer: &Variant) -> Cow<'v, Variant> {
-    if requirer.keys().all(|key| output.contains_key(key)) {
+    let inherited = inherited_keys(output, requirer);
+    if inherited.is_empty() {
         return Cow::Borrowed(output);
     }
     let mut variant = output.clone();
-    for (key, value) in requirer {
-        variant.entry(key.clone()).or_insert_with(|| value.clone());
-    }
+    variant.extend(inherited);
     Cow::Owned(variant)
 }
+
+/// The keys of `requirer` that `output` does not use, which
+/// [`installed_variant`] adds to the output's variant.
+fn inherited_keys(output: &Variant, requirer: &Variant) -> Variant {
+    requirer
+        .iter()
+        .filter(|(key, _)| !output.contains_key(*key))
+        .map(|(key, value)| (key.clone(), value.clone()))
+        .collect()
+}
+
+/// Identifies an output installed for a requirer: the output's index and the
+/// keys it inherits from the requirer (see [`installed_variant`]). Whether the
+/// output is installable depends on both, so results are cached by this key.
+type InstallKey = (usize, Variant);
 
 /// Evaluates build and test readiness against sibling outputs from the current build.
 ///
@@ -267,23 +281,24 @@ impl<'a> BuildReadiness<'a> {
         &self,
         output_index: usize,
         requirer: &Variant,
-        visited: &mut HashSet<usize>,
-        availability: &mut HashMap<usize, bool>,
+        visited: &mut HashSet<InstallKey>,
+        availability: &mut HashMap<InstallKey, bool>,
         closure: &mut Vec<usize>,
     ) -> Result<bool, BuildQueueError> {
-        if !visited.insert(output_index) {
+        let output = &self.done_outputs[output_index];
+        let key = (output_index, inherited_keys(output.variant(), requirer));
+        if !visited.insert(key.clone()) {
             return Ok(true);
         }
-        if let Some(&available) = availability.get(&output_index) {
+        if let Some(&available) = availability.get(&key) {
             if available {
                 closure.push(output_index);
             }
             return Ok(available);
         }
 
-        let output = &self.done_outputs[output_index];
         let Some(finalized_dependencies) = &output.finalized_dependencies else {
-            availability.insert(output_index, false);
+            availability.insert(key, false);
             return Ok(false);
         };
         closure.push(output_index);
@@ -302,7 +317,7 @@ impl<'a> BuildReadiness<'a> {
                 break;
             }
         }
-        availability.insert(output_index, available);
+        availability.insert(key, available);
         Ok(available)
     }
 
@@ -312,8 +327,8 @@ impl<'a> BuildReadiness<'a> {
         &self,
         spec: &MatchSpec,
         variant: &Variant,
-        visited: &mut HashSet<usize>,
-        availability: &mut HashMap<usize, bool>,
+        visited: &mut HashSet<InstallKey>,
+        availability: &mut HashMap<InstallKey, bool>,
         closure: &mut Vec<usize>,
     ) -> Result<bool, BuildQueueError> {
         self.collect_matching_install_closure(
@@ -333,8 +348,8 @@ impl<'a> BuildReadiness<'a> {
         &self,
         dependency: &Dependency,
         consumer: &Output,
-        visited: &mut HashSet<usize>,
-        availability: &mut HashMap<usize, bool>,
+        visited: &mut HashSet<InstallKey>,
+        availability: &mut HashMap<InstallKey, bool>,
         closure: &mut Vec<usize>,
     ) -> Result<bool, BuildQueueError> {
         let match_spec = Self::dependency_match_spec(dependency, consumer)?;
@@ -373,8 +388,8 @@ impl<'a> BuildReadiness<'a> {
         matches_identifier: impl Fn(&PackageIdentifier) -> bool,
         matches_output: impl Fn(&Output) -> bool,
         variant: &Variant,
-        visited: &mut HashSet<usize>,
-        availability: &mut HashMap<usize, bool>,
+        visited: &mut HashSet<InstallKey>,
+        availability: &mut HashMap<InstallKey, bool>,
         closure: &mut Vec<usize>,
     ) -> Result<bool, BuildQueueError> {
         let mut planned = false;
@@ -485,7 +500,7 @@ impl<'a> BuildReadiness<'a> {
         &self,
         build_environment_outputs: &[usize],
         consumer: &Output,
-        availability: &mut HashMap<usize, bool>,
+        availability: &mut HashMap<InstallKey, bool>,
     ) -> Result<bool, BuildQueueError> {
         let ignore_run_exports = &consumer.recipe.requirements().ignore_run_exports;
 
@@ -1265,6 +1280,46 @@ system_tools: {{}}
 
         assert!(!can_start(&mut queue, "app"));
         queue.record_processed(built(&lib, &[]));
+        assert!(can_start(&mut queue, "app"));
+    }
+
+    #[test]
+    fn checks_a_dependency_again_for_each_variant_it_is_installed_for() {
+        // `app` reaches the noarch `mid` directly, where any `lib` will do, and
+        // through `x`, where `mid` needs the numpy 1.26 `lib`
+        let numpy = |name: &str, version: &str, platform: &str| {
+            with_variant(
+                output(name, "h0_0", &[], &[], false),
+                &[("numpy", version), ("target_platform", platform)],
+            )
+        };
+        let lib_126 = numpy("lib", "1.26", "linux-64");
+        let lib_200 = numpy("lib", "2.0", "linux-64");
+        let x = numpy("x", "1.26", "linux-64");
+        let mid = with_variant(
+            output("mid", "h0_0", &[], &[], false),
+            &[("target_platform", "noarch")],
+        );
+        let app = with_variant(
+            output("app", "h0_0", &["mid", "x"], &[], false),
+            &[("target_platform", "linux-64")],
+        );
+        let mut queue = OutputBuildQueue::new(
+            vec![
+                lib_126.clone(),
+                lib_200.clone(),
+                x.clone(),
+                mid.clone(),
+                app,
+            ],
+            Vec::new(),
+        );
+
+        queue.record_processed(built(&lib_200, &[]));
+        queue.record_processed(built(&mid, &["lib"]));
+        queue.record_processed(built(&x, &["mid"]));
+        assert!(!can_start(&mut queue, "app"));
+        queue.record_processed(built(&lib_126, &[]));
         assert!(can_start(&mut queue, "app"));
     }
 
