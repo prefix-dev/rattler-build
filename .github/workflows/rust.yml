@@ -1,16 +1,10 @@
 on:
   push:
     branches: [main]
+  # No `paths:` filter here: a workflow skipped by a path filter never reports
+  # its checks, which leaves required checks pending forever. The `changes`
+  # job below decides whether the expensive jobs need to run instead.
   pull_request:
-    paths:
-      - ".github/workflows/rust.yml"
-      - "src/**"
-      - "crates/**"
-      - "Cargo.*"
-      - "pixi.toml"
-      - "pixi.lock"
-      - "test/end-to-end/**"
-      - "test-data/**"
   workflow_dispatch:
 
 name: CI
@@ -31,9 +25,43 @@ env:
   ACTIONS_CACHE_SERVICE_V2: on
 
 jobs:
+  # Decide whether the PR touches anything the tests below depend on.
+  # Pushes and manual runs always run everything.
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    outputs:
+      code: ${{ github.event_name != 'pull_request' || steps.filter.outputs.code == 'true' }}
+    steps:
+      # On pull_request this uses the GitHub API, so no checkout is needed.
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        if: github.event_name == 'pull_request'
+        id: filter
+        with:
+          filters: |
+            code:
+              - ".github/workflows/rust.yml"
+              - "src/**"
+              - "crates/**"
+              - "benches/**"
+              - "examples/**"
+              - "scripts/**"
+              - "test/end-to-end/**"
+              - "test-data/**"
+              - "Cargo.*"
+              - "pixi.toml"
+              - "pixi.lock"
+              - "rust-toolchain.toml"
+              - "pytest.ini"
+              - ".gitmodules"
+
   # Run Rust unit/integration tests (debug mode)
   test:
     name: Test (${{ matrix.os }})
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -81,6 +109,8 @@ jobs:
   # Run end-to-end tests
   e2e-test:
     name: End-to-end (${{ matrix.os }})
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -136,11 +166,11 @@ jobs:
 
   windows-arm-e2e-test:
     name: End-to-end (windows-11-arm)
-    needs: e2e-test
+    needs: [changes, e2e-test]
     # e2e-test is a matrix job. Run this when another platform fails, provided
     # the workflow itself was not cancelled, so an unrelated failure does not
     # skip validation of the successfully uploaded Windows x64 binary.
-    if: ${{ always() && !cancelled() }}
+    if: ${{ always() && !cancelled() && needs.changes.outputs.code == 'true' }}
     runs-on: windows-11-arm
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -202,3 +232,19 @@ jobs:
       - name: Show sccache stats
         if: always()
         run: pixi run sccache --show-stats
+
+  # Single, always-reporting check to mark as required in branch protection.
+  # Skipped jobs (no relevant changes) count as passing; failures and
+  # cancellations do not.
+  ci-result:
+    name: CI result
+    needs: [changes, test, e2e-test]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check job results
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          echo "$RESULTS"
+          jq -e 'all(.[]; .result == "success" or .result == "skipped")' <<< "$RESULTS"
