@@ -1,11 +1,14 @@
 //! The build module contains the code for running the build process for a given
 //! [`Output`]
-use std::{path::PathBuf, vec};
+use std::{collections::HashSet, path::PathBuf, vec};
 
 use miette::{Context, IntoDiagnostic};
 use rattler_build_recipe::stage1::TestType;
 use rattler_build_script::InterpreterError;
-use rattler_conda_types::{Channel, MatchSpec, Subdir, package::PathsJson};
+use rattler_conda_types::{
+    Channel, ChannelUrl, MatchSpec, PackageName, PackageRecord, Subdir, package::PathsJson,
+};
+use rattler_repodata_gateway::{Gateway, GatewayError};
 use tracing::Instrument;
 
 use crate::{
@@ -23,6 +26,101 @@ pub enum WorkingDirectoryBehavior {
     Preserve,
     /// Clean up the working directory after build
     Cleanup,
+}
+
+/// The name, version and build string of a package.
+///
+/// Two packages with the same identity are considered the same build by
+/// `--skip-existing`.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct PackageIdentity {
+    /// The package name
+    pub name: PackageName,
+    /// The package version, as written in the package record
+    pub version: String,
+    /// The build string
+    pub build_string: String,
+}
+
+impl PackageIdentity {
+    /// Create a new identity from a name, version and build string.
+    pub fn new(name: PackageName, version: impl ToString, build_string: impl Into<String>) -> Self {
+        Self {
+            name,
+            version: version.to_string(),
+            build_string: build_string.into(),
+        }
+    }
+}
+
+impl From<&PackageRecord> for PackageIdentity {
+    fn from(record: &PackageRecord) -> Self {
+        Self::new(record.name.clone(), &record.version, record.build.clone())
+    }
+}
+
+impl From<&Output> for PackageIdentity {
+    fn from(output: &Output) -> Self {
+        Self::new(
+            output.name().clone(),
+            output.version(),
+            output.build_string().into_owned(),
+        )
+    }
+}
+
+/// Return the `packages` that have a record with the same name, version and
+/// build string in `records` (e.g. the records of a gateway query, filtered by
+/// the caller).
+pub fn existing_packages<'a>(
+    records: impl IntoIterator<Item = &'a PackageRecord>,
+    packages: &[PackageIdentity],
+) -> HashSet<PackageIdentity> {
+    let wanted = packages.iter().collect::<HashSet<_>>();
+    records
+        .into_iter()
+        .map(PackageIdentity::from)
+        .filter(|identity| wanted.contains(identity))
+        .collect()
+}
+
+/// Return the `packages` that already exist in `channels` for `platform` (or
+/// `noarch`).
+///
+/// Only the records of the given package names are fetched, and nothing is
+/// rendered, solved or reindexed, so this can be used to check a large number
+/// of outputs against a channel without constructing [`Output`]s.
+pub async fn find_existing_packages(
+    gateway: &Gateway,
+    channels: &[ChannelUrl],
+    platform: Subdir,
+    packages: &[PackageIdentity],
+) -> Result<HashSet<PackageIdentity>, GatewayError> {
+    if packages.is_empty() {
+        return Ok(HashSet::new());
+    }
+    let channels = channels
+        .iter()
+        .map(|url| Channel::from_url(url.clone()))
+        .collect::<Vec<_>>();
+    let specs = packages
+        .iter()
+        .map(|p| MatchSpec::from(p.name.clone()))
+        .collect::<Vec<_>>();
+    let result = gateway
+        .query(channels, [platform, Subdir::NoArch], specs)
+        .await?;
+    for warning in &result.warnings {
+        tracing::warn!("{warning}");
+    }
+    Ok(existing_packages(
+        result
+            .repodata
+            .iter()
+            .flatten()
+            .map(|record| &record.package_record),
+        packages,
+    ))
 }
 
 /// Check if the build should be skipped because it already exists in any of the
@@ -57,8 +155,14 @@ pub async fn skip_existing(
         .collect::<Vec<MatchSpec>>();
 
     let channels = if only_local {
+        // Nothing has been built yet (`--render-only` does not create the
+        // output directory)
+        let output_dir = &first_output.build_configuration.directories.output_dir;
+        if !output_dir.exists() {
+            return Ok(outputs);
+        }
         vec![
-            Channel::try_from_directory(&first_output.build_configuration.directories.output_dir)
+            Channel::try_from_directory(output_dir)
                 .expect("could not create channel from directory")
                 .base_url,
         ]
@@ -66,6 +170,8 @@ pub async fn skip_existing(
         all_channels
     };
 
+    // Uses `load_repodatas` rather than `find_existing_packages` to keep the
+    // progress bars and channel notices of a regular build.
     let existing = load_repodatas(
         &channels,
         first_output.host_platform().platform,
@@ -75,27 +181,23 @@ pub async fn skip_existing(
     .await
     .map_err(|e| miette::miette!("Failed to load repodata: {e}."))?;
 
-    let existing_set = existing
+    let identities = outputs
         .iter()
-        .flatten()
-        .map(|p| {
-            format!(
-                "{}-{}-{}",
-                p.package_record.name.as_normalized(),
-                p.package_record.version,
-                p.package_record.build
-            )
-        })
-        .collect::<std::collections::HashSet<_>>();
+        .map(PackageIdentity::from)
+        .collect::<Vec<_>>();
+    let existing_set = existing_packages(
+        existing
+            .iter()
+            .flatten()
+            .map(|record| &record.package_record),
+        &identities,
+    );
 
     // Retain only the outputs that do not exist yet
+    let mut identities = identities.into_iter();
     outputs.retain(|output| {
-        let exists = existing_set.contains(&format!(
-            "{}-{}-{}",
-            output.name().as_normalized(),
-            output.version(),
-            output.build_string()
-        ));
+        let identity = identities.next().expect("one identity per output");
+        let exists = existing_set.contains(&identity);
         if exists {
             // The identifier should always be set at this point
             tracing::info!("Skipping build for {}", output.identifier());
@@ -355,4 +457,88 @@ fn check_for_symlinks_on_windows(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn write_repodata(channel: &std::path::Path, subdir: &str, packages: &[(&str, &str, &str)]) {
+        let packages = packages
+            .iter()
+            .map(|(name, version, build)| {
+                (
+                    format!("{name}-{version}-{build}.conda"),
+                    serde_json::json!({
+                        "name": name,
+                        "version": version,
+                        "build": build,
+                        "build_number": 0,
+                        "depends": [],
+                    }),
+                )
+            })
+            .collect::<serde_json::Map<_, _>>();
+        let dir = channel.join(subdir);
+        fs_err::create_dir_all(&dir).unwrap();
+        fs_err::write(
+            dir.join("repodata.json"),
+            serde_json::json!({
+                "info": { "subdir": subdir },
+                "packages": {},
+                "packages.conda": packages,
+                "repodata_version": 1,
+            })
+            .to_string(),
+        )
+        .unwrap();
+    }
+
+    fn identity(name: &str, version: &str, build: &str) -> PackageIdentity {
+        PackageIdentity::new(name.parse().unwrap(), version, build)
+    }
+
+    #[tokio::test]
+    async fn finds_existing_packages_in_platform_and_noarch() {
+        let channel_dir = tempfile::tempdir().unwrap();
+        write_repodata(
+            channel_dir.path(),
+            "linux-64",
+            &[("foo", "1.0", "h123_0"), ("foo", "1.0", "h123_1")],
+        );
+        write_repodata(channel_dir.path(), "noarch", &[("bar", "2.0", "pyh_0")]);
+        write_repodata(channel_dir.path(), "osx-64", &[("baz", "1.0", "0")]);
+        let channel = Channel::try_from_directory(channel_dir.path()).unwrap();
+
+        let packages = [
+            identity("foo", "1.0", "h123_0"),
+            // Same name and version, different build string
+            identity("foo", "1.0", "h456_0"),
+            // Same name and build string, different version
+            identity("foo", "1.1", "h123_1"),
+            // From noarch
+            identity("bar", "2.0", "pyh_0"),
+            // Only exists for another platform
+            identity("baz", "1.0", "0"),
+            // Not in the channel at all
+            identity("qux", "1.0", "0"),
+        ];
+
+        let cache_dir = tempfile::tempdir().unwrap();
+        let gateway = Gateway::builder()
+            .with_cache_dir(cache_dir.path().to_path_buf())
+            .finish();
+        let existing =
+            find_existing_packages(&gateway, &[channel.base_url], Subdir::Linux64, &packages)
+                .await
+                .unwrap();
+
+        assert_eq!(
+            existing,
+            HashSet::from([
+                identity("foo", "1.0", "h123_0"),
+                identity("bar", "2.0", "pyh_0"),
+            ])
+        );
+    }
 }
