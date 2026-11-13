@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.80.1] - 2026-11-11
+
+### Features
+
+- Require the C++ compiler only for CRAN packages with C++ sources by @matthewfeickert in [#2918](https://github.com/prefix-dev/rattler-build/pull/2918)
+- Require BLAS and LAPACK for CRAN packages that link them by @matthewfeickert in [#2929](https://github.com/prefix-dev/rattler-build/pull/2929)
+
+
+### Fixes
+
+- Clean the build prefix when restoring a staging cache by @lucascolley in [#2933](https://github.com/prefix-dev/rattler-build/pull/2933)
+- Wait for the variant of a dependency the build can install with by @Tobias-Fischer in [#2931](https://github.com/prefix-dev/rattler-build/pull/2931)
+
+
+### Maintenance
+
+- Bump rattler crates to rattler_config 0.11 by @pavelzw in [#2914](https://github.com/prefix-dev/rattler-build/pull/2914)
+- Bump rattler crates to rattler_config 0.12 by @pavelzw in [#2920](https://github.com/prefix-dev/rattler-build/pull/2920)
+- Setup octo-sts by @lucascolley in [#2932](https://github.com/prefix-dev/rattler-build/pull/2932)
+- Report required checks when Rust CI is not needed by @lucascolley in [#2936](https://github.com/prefix-dev/rattler-build/pull/2936)
+- Update dependencies and drop getrandom 0.2 pin from playground by @wolfv in [#2934](https://github.com/prefix-dev/rattler-build/pull/2934)
+
+
+
 ## [0.80.0] - 2026-10-30
 ### ✨ Highlights
 
