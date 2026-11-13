@@ -8,7 +8,7 @@ use rattler_build_script::InterpreterError;
 use rattler_conda_types::{
     Channel, ChannelUrl, MatchSpec, PackageName, PackageRecord, Subdir, package::PathsJson,
 };
-use rattler_repodata_gateway::{Gateway, GatewayError, RepoData};
+use rattler_repodata_gateway::{Gateway, GatewayError};
 use tracing::Instrument;
 
 use crate::{
@@ -70,16 +70,16 @@ impl From<&Output> for PackageIdentity {
 }
 
 /// Return the `packages` that have a record with the same name, version and
-/// build string in `repodata`.
+/// build string in `records` (e.g. the records of a gateway query, filtered by
+/// the caller).
 pub fn existing_packages<'a>(
-    repodata: impl IntoIterator<Item = &'a RepoData>,
+    records: impl IntoIterator<Item = &'a PackageRecord>,
     packages: &[PackageIdentity],
 ) -> HashSet<PackageIdentity> {
     let wanted = packages.iter().collect::<HashSet<_>>();
-    repodata
+    records
         .into_iter()
-        .flatten()
-        .map(|record| PackageIdentity::from(&record.package_record))
+        .map(PackageIdentity::from)
         .filter(|identity| wanted.contains(identity))
         .collect()
 }
@@ -113,7 +113,14 @@ pub async fn find_existing_packages(
     for warning in &result.warnings {
         tracing::warn!("{warning}");
     }
-    Ok(existing_packages(&result.repodata, packages))
+    Ok(existing_packages(
+        result
+            .repodata
+            .iter()
+            .flatten()
+            .map(|record| &record.package_record),
+        packages,
+    ))
 }
 
 /// Check if the build should be skipped because it already exists in any of the
@@ -178,7 +185,13 @@ pub async fn skip_existing(
         .iter()
         .map(PackageIdentity::from)
         .collect::<Vec<_>>();
-    let existing_set = existing_packages(&existing, &identities);
+    let existing_set = existing_packages(
+        existing
+            .iter()
+            .flatten()
+            .map(|record| &record.package_record),
+        &identities,
+    );
 
     // Retain only the outputs that do not exist yet
     let mut identities = identities.into_iter();
