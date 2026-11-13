@@ -1884,6 +1884,46 @@ def test_sibling_run_dep_with_skipped_local_output(
     )
 
 
+def test_render_only_skip_existing_and_continue_on_failure(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Render-only leaves out existing outputs and outputs that fail to solve."""
+    recipe = recipes / "race-condition" / "recipe-sibling-run-dep.yaml"
+    names = ["repro-runtime", "repro-wrapper", "repro-consumer"]
+
+    # Nothing is built yet, and render-only does not create the output directory
+    rendered = rattler_build.render(
+        recipe, tmp_path / "missing", extra_args=["--skip-existing", "local"]
+    )
+    assert [output["recipe"]["package"]["name"] for output in rendered] == names
+
+    rattler_build.build(
+        recipe,
+        tmp_path,
+        extra_args=["--test=skip", "--up-to", "repro-runtime"],
+    )
+
+    rendered = rattler_build.render(
+        recipe, tmp_path, extra_args=["--skip-existing", "local"]
+    )
+    assert [output["recipe"]["package"]["name"] for output in rendered] == names[1:]
+
+    # `repro-consumer` needs `repro-wrapper` in its host environment, which
+    # was never built, so its solve fails.
+    solve_args = ["--skip-existing", "local", "--with-solve"]
+    failed = rattler_build.render(
+        recipe, tmp_path, with_solve=False, extra_args=solve_args, raw=True
+    )
+    assert failed.returncode != 0
+
+    rendered = rattler_build.render(
+        recipe, tmp_path, extra_args=[*solve_args, "--continue-on-failure"]
+    )
+    assert [output["recipe"]["package"]["name"] for output in rendered] == [
+        "repro-wrapper"
+    ]
+
+
 def test_sibling_strong_run_export_up_to(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
