@@ -401,3 +401,64 @@ pub fn build_rendered_variant_py(
         log: captured_logs,
     })
 }
+
+/// Fetch the sources of a single rendered variant into the source cache
+/// (`<output_dir>/src_cache`) without building it.
+///
+/// No patches are applied and no build scripts are run. Returns a dict that
+/// maps the output to the on-disk location of its pristine sources (same
+/// schema as `rattler-build fetch-sources`).
+#[pyfunction]
+#[pyo3(signature = (rendered_variant, tool_config, output_dir, recipe_path=None, progress_callback=None))]
+pub fn fetch_rendered_variant_sources_py(
+    py: Python<'_>,
+    rendered_variant: render::PyRenderedVariant,
+    tool_config: tool_config::PyToolConfiguration,
+    output_dir: PathBuf,
+    recipe_path: Option<PathBuf>,
+    progress_callback: Option<Py<PyAny>>,
+) -> PyResult<Py<PyAny>> {
+    let tool_config = tool_config.inner;
+
+    let output = output_from_rendered_variant(
+        &rendered_variant,
+        &tool_config,
+        &output_dir,
+        &[],
+        true,
+        None,
+        true,
+        recipe_path.as_deref(),
+        None,
+        EnvironmentIsolation::default(),
+        PyRepodataRevision::default(),
+        BTreeMap::new(),
+    )?;
+
+    let (result, log_buffer) = tracing_subscriber::with_log_capture(progress_callback, || {
+        run_async_task(async {
+            output
+                .fetch_sources_only(&tool_config)
+                .await
+                .map_err(|e| miette::miette!("{e}"))
+        })
+    });
+
+    let fetched = match result {
+        Ok(fetched) => fetched,
+        Err(err) => {
+            let logs = log_buffer.lock().map(|b| b.clone()).unwrap_or_default();
+            return Err(crate::error::build_error_with_log(
+                py,
+                err.to_string(),
+                logs,
+            ));
+        }
+    };
+
+    let value = serde_json::to_value(&fetched)
+        .map_err(|e| RattlerBuildError::Other(format!("serialization error: {e}")))?;
+    Ok(pythonize::pythonize(py, &value)
+        .map_err(|e| RattlerBuildError::Other(format!("conversion error: {e}")))?
+        .unbind())
+}

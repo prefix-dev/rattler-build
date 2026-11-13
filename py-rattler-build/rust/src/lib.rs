@@ -62,6 +62,7 @@ fn rattler_build<'py>(_py: Python<'py>, m: Bound<'py, PyModule>) -> PyResult<()>
     )?;
     m.add_function(wrap_pyfunction!(cli_api::build_recipes_py, &m).unwrap())?;
     m.add_function(wrap_pyfunction!(build::build_rendered_variant_py, &m).unwrap())?;
+    m.add_function(wrap_pyfunction!(build::fetch_rendered_variant_sources_py, &m).unwrap())?;
     m.add_function(wrap_pyfunction!(cli_api::test_package_py, &m).unwrap())?;
     m.add_function(wrap_pyfunction!(upload::upload_package_to_quetz_py, &m).unwrap())?;
     m.add_function(wrap_pyfunction!(upload::upload_package_to_artifactory_py, &m).unwrap())?;

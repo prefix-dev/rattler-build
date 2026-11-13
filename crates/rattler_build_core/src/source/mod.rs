@@ -22,6 +22,7 @@ use serde::{Deserialize, Serialize};
 use crate::system_tools::SystemTools;
 pub mod copy_dir;
 pub mod create_patch;
+pub mod fetch_only;
 pub mod patch;
 
 #[allow(missing_docs)]
