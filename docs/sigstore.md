@@ -242,17 +242,23 @@ It verifies both the SHA-256 subject and the signed repository subject `pkg:gith
 
 GitHub's dynamically generated source archives (the "Source code" `.zip` and `.tar.gz` links) are **not** covered by a release attestation. Their release attestation contains the source commit's SHA-1, but that does not cryptographically authenticate the generated archive bytes. To make source verification possible, upload a `source.tar.gz` as a release asset; GitHub then includes its SHA-256 in the immutable release attestation.
 
-You can still provide `bundle_url` explicitly for projects that publish a standalone `.sigstore.json` bundle alongside an asset:
+You can also point `bundle_url` at any other attestation. For example, uv additionally publishes SLSA build provenance (via `actions/attest-build-provenance`), which is signed on the Sigstore public-good instance by the release workflow's identity. Query the attestations API with a different `predicate_type` to verify that instead:
 
 ```yaml
+context:
+  version: "0.12.1"
+  sha256: 5f0503f896f1209f6114835a7754369c2484331b0caab4c1ecd4579dfd2a31b0
+
 source:
-  url: https://github.com/facebook/zstd/releases/download/v1.5.7/zstd-1.5.7.tar.gz
-  sha256: "eb33e5..."
+  url: https://github.com/astral-sh/uv/releases/download/${{ version }}/source.tar.gz
+  sha256: ${{ sha256 }}
   attestation:
-    bundle_url: https://github.com/facebook/zstd/releases/download/v1.5.7/zstd-1.5.7.tar.gz.sigstore.json
+    bundle_url: https://api.github.com/repos/astral-sh/uv/attestations/sha256:${{ sha256 }}?predicate_type=provenance
     publishers:
-      - github:facebook/zstd
+      - github:astral-sh/uv@refs/heads/main
 ```
+
+A standalone `.sigstore.json` file published next to a release asset works the same way. Both DSSE (in-toto) bundles and message-signature bundles (e.g. from `cosign sign-blob --bundle`) are supported.
 
 GitHub's API allows 60 unauthenticated requests per hour. Set `GITHUB_TOKEN` (or `GH_TOKEN`) to authenticate these requests, e.g. in CI. The token is only ever sent to `api.github.com`.
 
@@ -268,7 +274,7 @@ attestation:
     - github:pallets/flask@refs/tags/${{ version }}
 ```
 
-For workflow-produced attestations (PyPI, `.sigstore.json` bundles), the ref is compared with the ref encoded at the end of the certificate SAN (`...workflow.yml@refs/tags/3.1.1`). For GitHub release attestations, only tag refs (`refs/tags/<tag>`) are supported and are compared with the release tag.
+For workflow-produced attestations (PyPI, build provenance, `.sigstore.json` bundles), the ref is compared with the ref encoded at the end of the certificate SAN (`...workflow.yml@refs/tags/3.1.1`). This is the ref of the signing *workflow run*: projects that release through `workflow_dispatch` on a branch are signed with that branch ref (e.g. `refs/heads/main`), not the tag. For GitHub release attestations, only tag refs (`refs/tags/<tag>`) are supported and are compared with the release tag.
 
 ## Verifying attestations
 

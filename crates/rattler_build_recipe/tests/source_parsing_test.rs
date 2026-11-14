@@ -809,11 +809,11 @@ fn test_parse_uv_attestation_example() {
 }
 
 #[test]
-fn test_parse_zstd_attestation_example() {
-    let yaml = include_str!("../../../examples/zstd-attestation/recipe.yaml");
+fn test_parse_build_provenance_attestation_example() {
+    let yaml = include_str!("../../../examples/uv-build-provenance-attestation/recipe.yaml");
     let recipe = parse_recipe_from_source(yaml).unwrap();
 
-    assert_eq!(recipe.package.name.as_concrete().unwrap().as_str(), "zstd");
+    assert_eq!(recipe.package.name.as_concrete().unwrap().as_str(), "uv");
 
     let source = get_concrete_source(&recipe.source.as_slice()[0]).unwrap();
     match source {
@@ -824,7 +824,7 @@ fn test_parse_zstd_attestation_example() {
                 .expect("attestation should be set");
             assert!(
                 att.bundle_url.is_some(),
-                "zstd example has explicit bundle_url"
+                "build provenance example has explicit bundle_url"
             );
             assert_eq!(att.publishers.len(), 1);
         }

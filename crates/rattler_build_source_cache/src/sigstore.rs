@@ -21,7 +21,7 @@ use std::path::Path;
 
 use sha2::{Digest, Sha256};
 use sigstore_trust_root::{TrustedRoot, TufConfig};
-use sigstore_types::{Sha256Hash, SignatureContent};
+use sigstore_types::{Artifact, Sha256Hash, SignatureContent};
 use sigstore_verify::{VerificationPolicy, VerificationResult, verify};
 
 use crate::error::CacheError;
@@ -132,14 +132,23 @@ fn derive_github_attestations_url(
     Some(api_url)
 }
 
-/// Whether a URL points at GitHub's repository attestations API.
-fn is_github_attestations_api_url(url: &url::Url) -> bool {
+/// Whether a URL queries GitHub's repository attestations API for immutable
+/// release attestations (`predicate_type=release`).
+///
+/// Other queries of the same API (e.g. SLSA build provenance created by
+/// `actions/attest-build-provenance` in public repositories) are signed on the
+/// Sigstore public-good instance by the workflow identity and are verified
+/// like any other bundle.
+fn is_github_release_attestations_url(url: &url::Url) -> bool {
     url.scheme() == "https"
         && url.host_str() == Some("api.github.com")
         && url.path_segments().is_some_and(|segments| {
             let segments: Vec<_> = segments.collect();
             segments.len() == 5 && segments[0] == "repos" && segments[3] == "attestations"
         })
+        && url
+            .query_pairs()
+            .any(|(key, value)| key == "predicate_type" && value == "release")
 }
 
 /// Parse an attestation response into one or more sigstore bundles.
@@ -323,22 +332,35 @@ async fn download_attestation_bundle(
     };
 
     let is_github_api = url.scheme() == "https" && url.host_str() == Some("api.github.com");
-    let mut request = client.for_host(url).client().get(url.clone());
-    if is_github_api {
-        request = request
-            .header(reqwest::header::ACCEPT, "application/vnd.github+json")
-            .header(reqwest::header::USER_AGENT, "rattler-build")
-            .header("X-GitHub-Api-Version", "2022-11-28");
-        // Only ever send the token to the GitHub API host itself.
-        if let Some(token) = github_token() {
-            request = request.bearer_auth(token);
+    let send = |token: Option<&str>| {
+        let mut request = client.for_host(url).client().get(url.clone());
+        if is_github_api {
+            request = request
+                .header(reqwest::header::ACCEPT, "application/vnd.github+json")
+                .header(reqwest::header::USER_AGENT, "rattler-build")
+                .header("X-GitHub-Api-Version", "2022-11-28");
+            // Only ever send the token to the GitHub API host itself.
+            if let Some(token) = token {
+                request = request.bearer_auth(token);
+            }
         }
-    }
+        request.send()
+    };
 
-    let response = request
-        .send()
+    let token = if is_github_api { github_token() } else { None };
+    let mut response = send(token.as_deref())
         .await
         .map_err(|e| download_err(e.to_string()))?;
+
+    // An invalid or expired token turns a public request into a failure;
+    // fall back to an unauthenticated request in that case.
+    if token.is_some() && response.status() == reqwest::StatusCode::UNAUTHORIZED {
+        tracing::warn!(
+            "GitHub rejected the token from GITHUB_TOKEN/GH_TOKEN (401); retrying the \
+             attestation request unauthenticated"
+        );
+        response = send(None).await.map_err(|e| download_err(e.to_string()))?;
+    }
 
     let status = response.status();
     if !status.is_success() {
@@ -386,10 +408,20 @@ fn bundle_statement(bundle: &sigstore_types::Bundle) -> Option<serde_json::Value
 /// This is a pre-flight check that yields a helpful error message. The
 /// binding between artifact and *verified* bundle is enforced again by
 /// `sigstore_verify::verify` for every bundle that is accepted.
+///
+/// Message-signature bundles (e.g. produced by `cosign sign-blob`) carry no
+/// in-toto statement; their digest binding is checked by `verify` alone.
 fn verify_artifact_subject(
     artifact_sha256: &Sha256Hash,
     bundles: &[sigstore_types::Bundle],
 ) -> Result<(), CacheError> {
+    if bundles
+        .iter()
+        .any(|b| matches!(b.content, SignatureContent::MessageSignature(_)))
+    {
+        return Ok(());
+    }
+
     let mut found_any_subjects = false;
     let mut found_subject_digests: Vec<String> = Vec::new();
 
@@ -568,7 +600,7 @@ impl VerifiedBundle<'_> {
 /// Cryptographically verify every bundle and return the ones that pass,
 /// together with the errors of the ones that did not.
 fn verify_bundles<'a>(
-    artifact_bytes: &[u8],
+    artifact: &Artifact<'_>,
     bundles: &'a [sigstore_types::Bundle],
     kind: AttestationKind,
     trusted_root: &TrustedRoot,
@@ -607,7 +639,7 @@ fn verify_bundles<'a>(
             }
         }
 
-        match verify(artifact_bytes, bundle, &policy, trusted_root) {
+        match verify(artifact.clone(), bundle, &policy, trusted_root) {
             Ok(result) => verified.push(VerifiedBundle { bundle, result }),
             Err(e) => errors.push(e.to_string()),
         }
@@ -643,7 +675,7 @@ pub(crate) async fn verify_attestation(
                 )
             })?,
     };
-    let kind = if is_github_attestations_api_url(&bundle_url) {
+    let kind = if is_github_release_attestations_url(&bundle_url) {
         AttestationKind::GitHubRelease
     } else {
         AttestationKind::PublicGood
@@ -651,10 +683,6 @@ pub(crate) async fn verify_attestation(
 
     tracing::info!("Downloading attestation bundle from {}", bundle_url);
     let response_json = download_attestation_bundle(client, &bundle_url, kind).await?;
-    let bundles = parse_attestation_response(&response_json)?;
-
-    // Give a precise error early if the attestation is for a different file.
-    verify_artifact_subject(&artifact_sha256, &bundles)?;
 
     // Load trust material through TUF so it is fresh rather than embedded.
     let tuf_config = match kind {
@@ -665,7 +693,42 @@ pub(crate) async fn verify_attestation(
         CacheError::SigstoreTrustRoot(format!("Failed to load Sigstore trusted root via TUF: {e}"))
     })?;
 
-    let (verified, errors) = verify_bundles(&artifact_bytes, &bundles, kind, &trusted_root);
+    check_attestation_response(
+        Artifact::from_blob(&artifact_bytes),
+        &artifact_sha256,
+        &response_json,
+        kind,
+        &trusted_root,
+        attestation_config,
+    )?;
+
+    tracing::info!(
+        "\u{2714} All attestation checks passed for {}",
+        file_path
+            .file_name()
+            .map(|f| f.to_string_lossy())
+            .unwrap_or_else(|| file_path.to_string_lossy())
+    );
+    Ok(())
+}
+
+/// Verify a downloaded attestation response against an artifact: parse it,
+/// verify every bundle cryptographically against `trusted_root`, and check
+/// every configured publisher against a verified bundle.
+fn check_attestation_response(
+    artifact: Artifact<'_>,
+    artifact_sha256: &Sha256Hash,
+    response_json: &str,
+    kind: AttestationKind,
+    trusted_root: &TrustedRoot,
+    attestation_config: &AttestationVerification,
+) -> Result<(), CacheError> {
+    let bundles = parse_attestation_response(response_json)?;
+
+    // Give a precise error early if the attestation is for a different file.
+    verify_artifact_subject(artifact_sha256, &bundles)?;
+
+    let (verified, errors) = verify_bundles(&artifact, &bundles, kind, trusted_root);
     if verified.is_empty() {
         let mut msg = String::from("no attestation bundle passed signature verification");
         for err in &errors {
@@ -676,9 +739,8 @@ pub(crate) async fn verify_attestation(
 
     if attestation_config.identity_checks.is_empty() {
         tracing::warn!(
-            "attestation for {} was verified cryptographically, but no `publishers` are \
-             configured, so any signer is accepted",
-            source_url
+            "attestation was verified cryptographically, but no `publishers` are configured, \
+             so any signer is accepted"
         );
     }
 
@@ -731,13 +793,6 @@ pub(crate) async fn verify_attestation(
         return Err(CacheError::AttestationVerification(msg));
     }
 
-    tracing::info!(
-        "\u{2714} All attestation checks passed for {}",
-        file_path
-            .file_name()
-            .map(|f| f.to_string_lossy())
-            .unwrap_or_else(|| file_path.to_string_lossy())
-    );
     Ok(())
 }
 
@@ -840,7 +895,7 @@ mod tests {
         );
         let query: std::collections::HashMap<_, _> = result.query_pairs().collect();
         assert_eq!(query.get("predicate_type").unwrap(), "release");
-        assert!(is_github_attestations_api_url(&result));
+        assert!(is_github_release_attestations_url(&result));
     }
 
     #[test]
@@ -856,10 +911,21 @@ mod tests {
     fn test_github_attestations_api_url_detection() {
         let bundle =
             url::Url::parse("https://github.com/o/r/releases/download/v1/x.sigstore.json").unwrap();
-        assert!(!is_github_attestations_api_url(&bundle));
-        let api =
+        assert!(!is_github_release_attestations_url(&bundle));
+        let api = url::Url::parse(
+            "https://api.github.com/repos/o/r/attestations/sha256:abc?predicate_type=release",
+        )
+        .unwrap();
+        assert!(is_github_release_attestations_url(&api));
+        // Build provenance from the same API is a public-good attestation.
+        let provenance = url::Url::parse(
+            "https://api.github.com/repos/o/r/attestations/sha256:abc?predicate_type=provenance",
+        )
+        .unwrap();
+        assert!(!is_github_release_attestations_url(&provenance));
+        let unfiltered =
             url::Url::parse("https://api.github.com/repos/o/r/attestations/sha256:abc").unwrap();
-        assert!(is_github_attestations_api_url(&api));
+        assert!(!is_github_release_attestations_url(&unfiltered));
     }
 
     #[test]
@@ -1162,10 +1228,277 @@ mod tests {
             ),
         ] {
             let trusted_root = TrustedRoot::from_json(root).unwrap();
-            let (verified, errors) = verify_bundles(artifact, &bundles, kind, &trusted_root);
+            let (verified, errors) = verify_bundles(
+                &Artifact::from_blob(artifact),
+                &bundles,
+                kind,
+                &trusted_root,
+            );
             assert!(verified.is_empty());
             assert_eq!(errors.len(), 1);
         }
+    }
+
+    // ---- Offline tests against recorded real-world attestations ----
+    //
+    // These run in CI and exercise the full cryptographic path (certificate
+    // chain, transparency log / timestamp, signature, identity) with the
+    // trust roots embedded in sigstore-trust-root.
+
+    const FLASK_SHA: &str = "284c7b8f2f58cb737f0cf1c30fd7eaf0ccfcde196099d24ecede3fc2005aa59e";
+    const FLASK_PROVENANCE: &str =
+        include_str!("../tests/data/attestations/flask-3.1.1.tar.gz.provenance.json");
+    const UV_SHA: &str = "5f0503f896f1209f6114835a7754369c2484331b0caab4c1ecd4579dfd2a31b0";
+    const UV_ATTESTATIONS: &str =
+        include_str!("../tests/data/attestations/uv-0.12.1-source.tar.gz.github-attestations.json");
+    const COSIGN_SHA: &str = "424e2c97d0b45fd7a6b608a87f090f35633f4c23ece5f092d48bba11aaf4bbfa";
+    const COSIGN_BUNDLE: &str =
+        include_str!("../tests/data/attestations/cosign-v3.1.4-linux-amd64.sigstore.json");
+
+    fn offline_check(
+        sha256_hex: &str,
+        response: &str,
+        kind: AttestationKind,
+        cfg: &AttestationVerification,
+    ) -> Result<(), CacheError> {
+        let root = match kind {
+            AttestationKind::PublicGood => sigstore_trust_root::SIGSTORE_PRODUCTION_TRUSTED_ROOT,
+            AttestationKind::GitHubRelease => sigstore_trust_root::SIGSTORE_GITHUB_TRUSTED_ROOT,
+        };
+        let trusted_root = TrustedRoot::from_json(root).unwrap();
+        let digest = sha(sha256_hex);
+        check_attestation_response(
+            Artifact::from_digest(digest),
+            &digest,
+            response,
+            kind,
+            &trusted_root,
+            cfg,
+        )
+    }
+
+    fn no_publishers() -> AttestationVerification {
+        AttestationVerification {
+            bundle_url: None,
+            identity_checks: vec![],
+        }
+    }
+
+    #[test]
+    fn test_offline_pypi_provenance() {
+        let kind = AttestationKind::PublicGood;
+        let repo = "https://github.com/pallets/flask";
+        for cfg in [
+            config(repo, None),
+            config(repo, Some("refs/tags/3.1.1")),
+            config("https://github.com/PALLETS/flask", None),
+            no_publishers(),
+        ] {
+            offline_check(FLASK_SHA, FLASK_PROVENANCE, kind, &cfg)
+                .unwrap_or_else(|e| panic!("{cfg:?}: {e}"));
+        }
+
+        let err = offline_check(
+            FLASK_SHA,
+            FLASK_PROVENANCE,
+            kind,
+            &config("https://github.com/pallets/flask-cors", None),
+        )
+        .unwrap_err()
+        .to_string();
+        assert!(err.contains("identity mismatch"), "{err}");
+        assert!(err.contains("publish.yaml@refs/tags/3.1.1"), "{err}");
+
+        let err = offline_check(
+            FLASK_SHA,
+            FLASK_PROVENANCE,
+            kind,
+            &config(repo, Some("refs/tags/3.1.0")),
+        )
+        .unwrap_err()
+        .to_string();
+        assert!(err.contains("expected ref: refs/tags/3.1.0"), "{err}");
+
+        // A GitLab publisher with the same path must not match a GitHub issuer.
+        let gitlab = IdentityCheck {
+            identity: "https://github.com/pallets/flask".to_string(),
+            issuer: "https://gitlab.com".to_string(),
+            ref_constraint: None,
+        };
+        let cfg = AttestationVerification {
+            bundle_url: None,
+            identity_checks: vec![gitlab],
+        };
+        assert!(offline_check(FLASK_SHA, FLASK_PROVENANCE, kind, &cfg).is_err());
+
+        let err = offline_check(ABC_SHA, FLASK_PROVENANCE, kind, &config(repo, None))
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("does not match any subject"), "{err}");
+    }
+
+    #[test]
+    fn test_offline_pypi_provenance_tampered_tlog_is_rejected() {
+        // Corrupt the transparency log inclusion proof: verification must
+        // fail rather than fall back to skipping the transparency log.
+        let mut value: serde_json::Value = serde_json::from_str(FLASK_PROVENANCE).unwrap();
+        let entry = &mut value["attestation_bundles"][0]["attestations"][0]["verification_material"]
+            ["transparency_entries"][0];
+        let root_hash = entry["inclusionProof"]["rootHash"]
+            .as_str()
+            .unwrap()
+            .to_string();
+        let mut chars: Vec<char> = root_hash.chars().collect();
+        chars[0] = if chars[0] == 'A' { 'B' } else { 'A' };
+        entry["inclusionProof"]["rootHash"] = chars.into_iter().collect::<String>().into();
+
+        let err = offline_check(
+            FLASK_SHA,
+            &value.to_string(),
+            AttestationKind::PublicGood,
+            &no_publishers(),
+        )
+        .unwrap_err()
+        .to_string();
+        assert!(err.contains("signature verification"), "{err}");
+    }
+
+    #[test]
+    fn test_offline_github_release_attestation() {
+        let kind = AttestationKind::GitHubRelease;
+        let repo = "https://github.com/astral-sh/uv";
+        for cfg in [
+            config(repo, None),
+            config(repo, Some("refs/tags/0.12.1")),
+            no_publishers(),
+        ] {
+            offline_check(UV_SHA, UV_ATTESTATIONS, kind, &cfg)
+                .unwrap_or_else(|e| panic!("{cfg:?}: {e}"));
+        }
+
+        let err = offline_check(
+            UV_SHA,
+            UV_ATTESTATIONS,
+            kind,
+            &config("https://github.com/astral-sh/ruff", None),
+        )
+        .unwrap_err()
+        .to_string();
+        assert!(err.contains("pkg:github/astral-sh/uv@0.12.1"), "{err}");
+
+        let err = offline_check(
+            UV_SHA,
+            UV_ATTESTATIONS,
+            kind,
+            &config(repo, Some("refs/heads/main")),
+        )
+        .unwrap_err()
+        .to_string();
+        assert!(err.contains("expected ref: refs/heads/main"), "{err}");
+    }
+
+    /// Keep only the bundles of the recorded GitHub response whose statement
+    /// has the given predicate type prefix.
+    fn uv_attestations_with_predicate(prefix: &str) -> String {
+        let mut value: serde_json::Value = serde_json::from_str(UV_ATTESTATIONS).unwrap();
+        value["attestations"]
+            .as_array_mut()
+            .unwrap()
+            .retain(|attestation| {
+                let bundle_json = serde_json::to_string(&attestation["bundle"]).unwrap();
+                let bundle = sigstore_types::Bundle::from_json(&bundle_json).unwrap();
+                bundle_statement(&bundle).unwrap()["predicateType"]
+                    .as_str()
+                    .unwrap()
+                    .starts_with(prefix)
+            });
+        assert_eq!(value["attestations"].as_array().unwrap().len(), 1);
+        value.to_string()
+    }
+
+    #[test]
+    fn test_offline_github_release_attestation_requires_github_trust_domain() {
+        // A release attestation must not verify against the public-good root:
+        // the trust domain follows from the requested URL, not the response.
+        let err = offline_check(
+            UV_SHA,
+            &uv_attestations_with_predicate(RELEASE_PREDICATE_PREFIX),
+            AttestationKind::PublicGood,
+            &no_publishers(),
+        )
+        .unwrap_err()
+        .to_string();
+        assert!(err.contains("signature verification"), "{err}");
+
+        // Conversely, build provenance is not accepted as a release attestation.
+        let err = offline_check(
+            UV_SHA,
+            &uv_attestations_with_predicate("https://slsa.dev/provenance/"),
+            AttestationKind::GitHubRelease,
+            &no_publishers(),
+        )
+        .unwrap_err()
+        .to_string();
+        assert!(err.contains("not a release attestation"), "{err}");
+    }
+
+    #[test]
+    fn test_offline_github_build_provenance() {
+        // `bundle_url` pointing at the attestations API without the release
+        // filter verifies SLSA build provenance against the workflow identity.
+        // uv releases via `workflow_dispatch` on main, so the workflow ref in
+        // the certificate is the branch, not the tag.
+        let kind = AttestationKind::PublicGood;
+        let repo = "https://github.com/astral-sh/uv";
+        for cfg in [config(repo, None), config(repo, Some("refs/heads/main"))] {
+            offline_check(UV_SHA, UV_ATTESTATIONS, kind, &cfg)
+                .unwrap_or_else(|e| panic!("{cfg:?}: {e}"));
+        }
+        let err = offline_check(
+            UV_SHA,
+            UV_ATTESTATIONS,
+            kind,
+            &config("https://github.com/astral-sh/ruff", None),
+        )
+        .unwrap_err()
+        .to_string();
+        assert!(err.contains("https://github.com/astral-sh/uv/"), "{err}");
+
+        let err = offline_check(
+            UV_SHA,
+            UV_ATTESTATIONS,
+            kind,
+            &config(repo, Some("refs/tags/0.12.1")),
+        )
+        .unwrap_err()
+        .to_string();
+        assert!(err.contains("release.yml@refs/heads/main"), "{err}");
+    }
+
+    #[test]
+    fn test_offline_message_signature_bundle() {
+        // cosign signs its release binaries keylessly with a Google service
+        // account; the bundle is a message signature, not an in-toto statement.
+        let kind = AttestationKind::PublicGood;
+        offline_check(COSIGN_SHA, COSIGN_BUNDLE, kind, &no_publishers()).unwrap();
+
+        let err = offline_check(
+            COSIGN_SHA,
+            COSIGN_BUNDLE,
+            kind,
+            &config("https://github.com/sigstore/cosign", None),
+        )
+        .unwrap_err()
+        .to_string();
+        assert!(
+            err.contains("keyless@projectsigstore.iam.gserviceaccount.com"),
+            "{err}"
+        );
+
+        let err = offline_check(ABC_SHA, COSIGN_BUNDLE, kind, &no_publishers())
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("signature verification"), "{err}");
     }
 
     // ---- Network tests (run with `cargo test -- --ignored`) ----
