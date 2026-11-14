@@ -192,11 +192,14 @@ source:
 
 When Rattler-Build downloads the source, it will:
 
-1. Fetch the Sigstore attestation bundle (automatically derived for PyPI packages, or from `bundle_url`)
-2. Verify the bundle signature against the Sigstore transparency log
-3. Check that the attestation identity matches one of the listed publishers
+1. Fetch the Sigstore attestation bundle (automatically derived for PyPI packages and uploaded GitHub release assets, or from `bundle_url`)
+2. Verify the bundle cryptographically against the Sigstore trust root (fetched via TUF): the signing certificate chain at a verified signing time, the transparency log inclusion proof (or, for GitHub release attestations, an RFC 3161 timestamp), and the signature over the in-toto statement
+3. Verify that the downloaded archive's SHA-256 is a subject of that signed statement
+4. Check that **every** listed publisher matches a verified attestation
 
-If verification fails, the build is aborted.
+If any step fails, the build is aborted. A cached source is re-verified whenever the `attestation` configuration changes.
+
+If `publishers` is omitted, the attestation must still verify cryptographically, but any signer is accepted and a warning is printed. Always list the publishers you expect.
 
 ### PyPI sources
 
@@ -213,7 +216,33 @@ source:
 
 ### GitHub release sources
 
-For source archives from GitHub releases, specify the `bundle_url` pointing to the `.sigstore.json` bundle:
+For an archive **uploaded as a GitHub release asset**, Rattler-Build queries the repository attestations API for a release attestation whose subject is the archive's SHA-256. No unstable attestation download ID or `bundle_url` is needed.
+
+For example, uv publishes an attested `source.tar.gz`. This binds verification to the `astral-sh/uv` repository:
+
+```yaml
+context:
+  version: "0.12.1"
+
+source:
+  url: https://github.com/astral-sh/uv/releases/download/${{ version }}/source.tar.gz
+  sha256: 5f0503f896f1209f6114835a7754369c2484331b0caab4c1ecd4579dfd2a31b0
+  attestation:
+    publishers:
+      - github:astral-sh/uv
+```
+
+Internally, Rattler-Build requests:
+
+```text
+https://api.github.com/repos/astral-sh/uv/attestations/sha256:5f0503f896f1209f6114835a7754369c2484331b0caab4c1ecd4579dfd2a31b0?predicate_type=release
+```
+
+It verifies both the SHA-256 subject and the signed repository subject `pkg:github/astral-sh/uv@0.12.1`. The release certificate itself has GitHub's fixed identity `https://dotcom.releases.github.com`, so repository binding comes from that signed package URL rather than a workflow SAN.
+
+GitHub's dynamically generated source archives (the "Source code" `.zip` and `.tar.gz` links) are **not** covered by a release attestation. Their release attestation contains the source commit's SHA-1, but that does not cryptographically authenticate the generated archive bytes. To make source verification possible, upload a `source.tar.gz` as a release asset; GitHub then includes its SHA-256 in the immutable release attestation.
+
+You can still provide `bundle_url` explicitly for projects that publish a standalone `.sigstore.json` bundle alongside an asset:
 
 ```yaml
 source:
@@ -225,9 +254,21 @@ source:
       - github:facebook/zstd
 ```
 
+GitHub's API allows 60 unauthenticated requests per hour. Set `GITHUB_TOKEN` (or `GH_TOKEN`) to authenticate these requests, e.g. in CI. The token is only ever sent to `api.github.com`.
+
 ### Publisher format
 
-Publishers are specified in `github:owner/repo` format. The identity is matched against the Sigstore certificate's Subject Alternative Name (SAN), which for GitHub Actions is the workflow identity.
+Publishers are specified in `github:owner/repo` or `gitlab:owner/repo` format (owner and repository are matched case-insensitively). For workflow-produced attestations, the repository is matched against the Sigstore certificate's Subject Alternative Name (SAN) and the OIDC issuer must be GitHub Actions or GitLab respectively. For GitHub immutable release attestations, the certificate identifies GitHub's release service, so the repository is instead matched against the signed `pkg:github/owner/repo@tag` subject.
+
+You can additionally pin the git ref the attestation was produced from by appending `@<ref>`:
+
+```yaml
+attestation:
+  publishers:
+    - github:pallets/flask@refs/tags/${{ version }}
+```
+
+For workflow-produced attestations (PyPI, `.sigstore.json` bundles), the ref is compared with the ref encoded at the end of the certificate SAN (`...workflow.yml@refs/tags/3.1.1`). For GitHub release attestations, only tag refs (`refs/tags/<tag>`) are supported and are compared with the release tag.
 
 ## Verifying attestations
 

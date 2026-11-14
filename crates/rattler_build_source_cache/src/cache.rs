@@ -168,7 +168,7 @@ impl SourceCache {
             last_accessed: jiff::Timestamp::now(),
             created: jiff::Timestamp::now(),
             lock_file: Some(_lock.path().to_path_buf()),
-            attestation_verified: false,
+            verified_attestations: Vec::new(),
         };
 
         self.index.insert(key, entry).await?;
@@ -233,12 +233,14 @@ impl SourceCache {
             {
                 // Re-verify attestation if configured but not yet verified for this entry
                 if let Some(attestation_config) = attestation
-                    && !entry.attestation_verified
+                    && !entry.attestation_verified(&attestation_config.fingerprint())
                 {
                     let archive_path = self.index.get_cache_path(&entry);
                     self.verify_attestation(&archive_path, url, attestation_config)
                         .await?;
-                    self.index.set_attestation_verified(&key).await?;
+                    self.index
+                        .set_attestation_verified(&key, &attestation_config.fingerprint())
+                        .await?;
                 }
                 self.index.touch(&key).await?;
                 tracing::info!(
@@ -261,11 +263,13 @@ impl SourceCache {
                     } else {
                         // Re-verify attestation if configured but not yet verified for this entry
                         if let Some(attestation_config) = attestation
-                            && !entry.attestation_verified
+                            && !entry.attestation_verified(&attestation_config.fingerprint())
                         {
                             self.verify_attestation(&cache_path, url, attestation_config)
                                 .await?;
-                            self.index.set_attestation_verified(&key).await?;
+                            self.index
+                                .set_attestation_verified(&key, &attestation_config.fingerprint())
+                                .await?;
                         }
                         self.index.touch(&key).await?;
                         tracing::info!("Found source in cache: {}", cache_path.display());
@@ -274,11 +278,13 @@ impl SourceCache {
                 } else {
                     // Re-verify attestation if configured but not yet verified for this entry
                     if let Some(attestation_config) = attestation
-                        && !entry.attestation_verified
+                        && !entry.attestation_verified(&attestation_config.fingerprint())
                     {
                         self.verify_attestation(&cache_path, url, attestation_config)
                             .await?;
-                        self.index.set_attestation_verified(&key).await?;
+                        self.index
+                            .set_attestation_verified(&key, &attestation_config.fingerprint())
+                            .await?;
                     }
                     self.index.touch(&key).await?;
                     tracing::info!("Found source in cache: {}", cache_path.display());
@@ -371,7 +377,9 @@ impl SourceCache {
             last_accessed: jiff::Timestamp::now(),
             created: jiff::Timestamp::now(),
             lock_file: Some(_lock.path().to_path_buf()),
-            attestation_verified: attestation.is_some(),
+            verified_attestations: attestation
+                .map(|config| vec![config.fingerprint()])
+                .unwrap_or_default(),
         };
 
         self.index.insert(key, entry).await?;
@@ -560,7 +568,8 @@ impl SourceCache {
     /// Verify a downloaded file using attestation (sigstore-based).
     ///
     /// When the `sigstore` feature is enabled, delegates to the full verification
-    /// implementation. When disabled, logs a warning and skips verification.
+    /// implementation. When disabled, verification fails: a recipe that asks for
+    /// attestation verification must never silently build unverified sources.
     async fn verify_attestation(
         &self,
         file_path: &Path,
@@ -575,18 +584,17 @@ impl SourceCache {
                 source_url,
                 attestation_config,
             )
-            .await?;
+            .await
         }
         #[cfg(not(feature = "sigstore"))]
         {
+            // Fail closed: the recipe asks for verification we cannot perform.
             let _ = (file_path, attestation_config);
-            tracing::warn!(
-                url = %source_url,
-                "sigstore verification is disabled at compile time — \
-                 attestation will NOT be verified"
-            );
+            Err(CacheError::AttestationVerification(format!(
+                "the recipe requires attestation verification for {source_url}, but this \
+                 build of rattler-build was compiled without the `sigstore` feature"
+            )))
         }
-        Ok(())
     }
 
     /// Clean up stale locks (manual cleanup only, cache entries are kept indefinitely)

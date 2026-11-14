@@ -175,15 +175,30 @@ pub struct IdentityCheck {
     pub identity: String,
     /// Expected OIDC issuer (e.g., "https://token.actions.githubusercontent.com")
     pub issuer: String,
+    /// Optional git ref the signing workflow must have run on
+    /// (e.g., "refs/tags/v1.0"). For GitHub release attestations this must be
+    /// a tag and is compared against the release tag.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ref_constraint: Option<String>,
 }
 
 /// Attestation verification configuration for the cache layer
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AttestationVerification {
-    /// URL to download the attestation bundle from, or None for auto-derived PyPI URLs
+    /// URL to download the attestation bundle from, or None for automatic provider discovery
     pub bundle_url: Option<url::Url>,
     /// Identity checks to perform. All must pass.
     pub identity_checks: Vec<IdentityCheck>,
+}
+
+impl AttestationVerification {
+    /// A stable fingerprint of this configuration. A cached artifact is only
+    /// considered verified for configurations with the same fingerprint.
+    pub fn fingerprint(&self) -> String {
+        use sha2::{Digest, Sha256};
+        let json = serde_json::to_string(self).unwrap_or_default();
+        hex::encode(Sha256::digest(json.as_bytes()))
+    }
 }
 
 /// URL source specification

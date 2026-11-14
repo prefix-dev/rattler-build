@@ -54,9 +54,17 @@ pub struct CacheEntry {
     /// Lock file path for this entry
     pub lock_file: Option<PathBuf>,
 
-    /// Whether attestation has been verified for this entry
-    #[serde(default)]
-    pub attestation_verified: bool,
+    /// Fingerprints of the attestation configurations this entry has been
+    /// verified against (see [`crate::AttestationVerification::fingerprint`]).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub verified_attestations: Vec<String>,
+}
+
+impl CacheEntry {
+    /// Whether this entry was verified against the given attestation config.
+    pub fn attestation_verified(&self, fingerprint: &str) -> bool {
+        self.verified_attestations.iter().any(|f| f == fingerprint)
+    }
 }
 
 /// The cache index that manages content-addressable cache metadata
@@ -189,11 +197,19 @@ impl CacheIndex {
         Ok(())
     }
 
-    /// Mark an entry's attestation as verified and persist it
-    pub async fn set_attestation_verified(&self, key: &str) -> Result<(), CacheError> {
+    /// Mark an entry's attestation as verified for a configuration
+    /// fingerprint and persist it
+    pub async fn set_attestation_verified(
+        &self,
+        key: &str,
+        fingerprint: &str,
+    ) -> Result<(), CacheError> {
         let mut entries = self.entries.write().await;
         if let Some(entry) = entries.get_mut(key) {
-            entry.attestation_verified = true;
+            if entry.attestation_verified(fingerprint) {
+                return Ok(());
+            }
+            entry.verified_attestations.push(fingerprint.to_string());
             let updated_entry = entry.clone();
             drop(entries);
 

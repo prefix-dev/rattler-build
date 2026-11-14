@@ -189,7 +189,8 @@ impl Publisher {
     /// Convert to identity prefix and issuer for sigstore verification.
     ///
     /// The identity is a URL prefix that must match the certificate's SAN.
-    /// The ref_constraint is not used here — it can be checked separately if needed.
+    /// The `ref_constraint` is checked separately against the signing
+    /// workflow ref (or, for GitHub release attestations, the release tag).
     pub fn to_identity_and_issuer(&self) -> (String, String) {
         match self.provider {
             PublisherProvider::GitHub => {
@@ -269,7 +270,7 @@ pub fn parse_publisher_string(s: &str) -> Result<Publisher, String> {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AttestationConfig {
     /// URL to download the attestation bundle from (e.g., .sigstore.json file)
-    /// Auto-derived for PyPI sources if not specified.
+    /// Auto-derived for PyPI sources and uploaded GitHub release assets if not specified.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bundle_url: Option<Url>,
 

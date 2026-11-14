@@ -11,7 +11,7 @@ Or, use the environment variable, `RATTLER_BUILD_EXPERIMENTAL=true`.
 
 ## Sigstore source attestation
 
-The `attestation` field on URL sources allows verifying that downloaded source archives were produced by a trusted publisher using [Sigstore](https://sigstore.dev) attestations. This is supported for PyPI packages (where the bundle URL is automatically derived) and GitHub releases (where you specify the `bundle_url` manually).
+The `attestation` field on URL sources allows verifying that downloaded source archives were produced by a trusted publisher using [Sigstore](https://sigstore.dev) attestations. The bundle is discovered automatically for PyPI packages and uploaded GitHub release assets. GitHub's dynamically generated source archives are not covered by release attestations.
 
 ```yaml
 source:

@@ -204,7 +204,11 @@ pub(crate) fn convert_url_source(
             .iter()
             .map(|pub_info| {
                 let (identity, issuer) = pub_info.to_identity_and_issuer();
-                IdentityCheck { identity, issuer }
+                IdentityCheck {
+                    identity,
+                    issuer,
+                    ref_constraint: pub_info.ref_constraint.clone(),
+                }
             })
             .collect();
         AttestationVerification {
