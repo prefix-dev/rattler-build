@@ -53,7 +53,7 @@ use crate::{
         },
         source::{
             AttestationConfig as Stage0AttestationConfig, GitRev as Stage0GitRev,
-            GitSource as Stage0GitSource, PathSource as Stage0PathSource,
+            GitSource as Stage0GitSource, PathSource as Stage0PathSource, PublisherSpec,
             UrlSource as Stage0UrlSource,
         },
         tests::{
@@ -84,7 +84,8 @@ use crate::{
         source::{
             AttestationConfig as Stage1AttestationConfig, GitRev as Stage1GitRev,
             GitSource as Stage1GitSource, GitUrl as Stage1GitUrl, PathSource as Stage1PathSource,
-            Source as Stage1Source, UrlSource as Stage1UrlSource, parse_publisher_string,
+            PublisherProvider, Source as Stage1Source, UrlSource as Stage1UrlSource,
+            parse_publisher_string, publisher_from_parts,
         },
         tests::{
             CommandsTest as Stage1CommandsTest, CommandsTestFiles as Stage1CommandsTestFiles,
@@ -2510,9 +2511,33 @@ impl Evaluate for Stage0AttestationConfig {
 
         // Evaluate and parse publisher strings
         let mut publishers = Vec::new();
-        for pub_value in &self.publishers {
-            let pub_str = evaluate_string_value(pub_value, context)?;
-            let publisher = parse_publisher_string(&pub_str).map_err(|e| {
+        for spec in &self.publishers {
+            let publisher = match spec {
+                PublisherSpec::Short(value) => {
+                    parse_publisher_string(&evaluate_string_value(value, context)?)
+                }
+                PublisherSpec::Detailed(d) => {
+                    let eval = |v: &Option<Value<String>>| {
+                        v.as_ref()
+                            .map(|v| evaluate_string_value(v, context))
+                            .transpose()
+                    };
+                    let (provider, owner_repo) = match (&d.github, &d.gitlab) {
+                        (Some(repo), _) => (PublisherProvider::GitHub, repo),
+                        (None, Some(repo)) => (PublisherProvider::GitLab, repo),
+                        (None, None) => unreachable!("validated by the parser"),
+                    };
+                    publisher_from_parts(
+                        provider,
+                        &evaluate_string_value(owner_repo, context)?,
+                        eval(&d.ref_constraint)?,
+                        eval(&d.repository_id)?,
+                        eval(&d.owner_id)?,
+                        eval(&d.environment)?,
+                    )
+                }
+            }
+            .map_err(|e| {
                 ParseError::invalid_value("attestation.publishers", &e, Span::new_blank())
             })?;
             publishers.push(publisher);

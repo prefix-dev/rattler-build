@@ -208,6 +208,9 @@ pub(crate) fn convert_url_source(
                     identity,
                     issuer,
                     ref_constraint: pub_info.ref_constraint.clone(),
+                    repository_id: pub_info.repository_id.clone(),
+                    owner_id: pub_info.owner_id.clone(),
+                    environment: pub_info.environment.clone(),
                 }
             })
             .collect();

@@ -180,6 +180,15 @@ pub struct IdentityCheck {
     /// a tag and is compared against the release tag.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ref_constraint: Option<String>,
+    /// Optional immutable repository ID the attestation must be for
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repository_id: Option<String>,
+    /// Optional immutable repository owner ID the attestation must be for
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub owner_id: Option<String>,
+    /// Optional deployment environment the signing workflow must have run in
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub environment: Option<String>,
 }
 
 /// Attestation verification configuration for the cache layer

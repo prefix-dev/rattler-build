@@ -183,6 +183,16 @@ pub struct Publisher {
     pub repo: String,
     /// Optional ref constraint (e.g., "refs/tags/v1.0")
     pub ref_constraint: Option<String>,
+    /// Optional immutable repository ID. Unlike the name, it does not move to
+    /// a new repository when the original is renamed, transferred or deleted.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repository_id: Option<String>,
+    /// Optional immutable ID of the repository owner (user or organization)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub owner_id: Option<String>,
+    /// Optional deployment environment the signing workflow must have run in
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub environment: Option<String>,
 }
 
 impl Publisher {
@@ -214,8 +224,55 @@ impl fmt::Display for Publisher {
         if let Some(ref_constraint) = &self.ref_constraint {
             write!(f, "@{}", ref_constraint)?;
         }
+        let pins = [
+            ("repository_id", &self.repository_id),
+            ("owner_id", &self.owner_id),
+            ("environment", &self.environment),
+        ];
+        let pins: Vec<_> = pins
+            .iter()
+            .filter_map(|(key, value)| value.as_ref().map(|v| format!("{key}: {v}")))
+            .collect();
+        if !pins.is_empty() {
+            write!(f, " ({})", pins.join(", "))?;
+        }
         Ok(())
     }
+}
+
+/// Build a publisher from the mapping form. `owner_repo` is the value of the
+/// `github` / `gitlab` key and must not carry a ref; that goes in `ref`.
+pub fn publisher_from_parts(
+    provider: PublisherProvider,
+    owner_repo: &str,
+    ref_constraint: Option<String>,
+    repository_id: Option<String>,
+    owner_id: Option<String>,
+    environment: Option<String>,
+) -> Result<Publisher, String> {
+    if owner_repo.contains('@') {
+        return Err(format!(
+            "Invalid publisher repository '{owner_repo}': put the ref in the `ref` field instead of after `@`"
+        ));
+    }
+    let mut publisher = parse_publisher_string(&format!("{provider}:{owner_repo}"))?;
+    for (key, id) in [("repository_id", &repository_id), ("owner_id", &owner_id)] {
+        if let Some(id) = id
+            && (id.is_empty() || !id.bytes().all(|b| b.is_ascii_digit()))
+        {
+            return Err(format!(
+                "Invalid publisher {key} '{id}': expected the numeric ID (e.g. 596892)"
+            ));
+        }
+    }
+    if environment.as_deref() == Some("") {
+        return Err("Invalid publisher environment: must not be empty".to_string());
+    }
+    publisher.ref_constraint = ref_constraint;
+    publisher.repository_id = repository_id;
+    publisher.owner_id = owner_id;
+    publisher.environment = environment;
+    Ok(publisher)
 }
 
 /// Parse a publisher string like "github:owner/repo" or "github:owner/repo@refs/tags/v1.0"
@@ -263,6 +320,9 @@ pub fn parse_publisher_string(s: &str) -> Result<Publisher, String> {
         owner: owner.to_string(),
         repo: repo.to_string(),
         ref_constraint,
+        repository_id: None,
+        owner_id: None,
+        environment: None,
     })
 }
 
@@ -472,6 +532,52 @@ mod tests {
         assert_eq!(p.provider, PublisherProvider::GitLab);
         assert_eq!(p.owner, "org");
         assert_eq!(p.repo, "project");
+    }
+
+    #[test]
+    fn test_publisher_from_parts_pins_ids() {
+        let p = publisher_from_parts(
+            PublisherProvider::GitHub,
+            "pallets/flask",
+            Some("refs/tags/3.1.1".to_string()),
+            Some("596892".to_string()),
+            Some("16748505".to_string()),
+            Some("publish".to_string()),
+        )
+        .unwrap();
+        assert_eq!(p.owner, "pallets");
+        assert_eq!(p.repo, "flask");
+        assert_eq!(p.repository_id.as_deref(), Some("596892"));
+        assert_eq!(
+            p.to_string(),
+            "github:pallets/flask@refs/tags/3.1.1 (repository_id: 596892, owner_id: 16748505, environment: publish)"
+        );
+    }
+
+    #[test]
+    fn test_publisher_from_parts_rejects_bad_values() {
+        let parts = |repo: &str, id: &str| {
+            publisher_from_parts(
+                PublisherProvider::GitHub,
+                repo,
+                None,
+                Some(id.to_string()),
+                None,
+                None,
+            )
+        };
+        assert!(
+            parts("pallets/flask@refs/tags/1", "1")
+                .unwrap_err()
+                .contains("`ref`")
+        );
+        assert!(
+            parts("pallets/flask", "pallets")
+                .unwrap_err()
+                .contains("numeric")
+        );
+        assert!(parts("pallets/flask", "").unwrap_err().contains("numeric"));
+        assert!(parts("flask", "1").is_err());
     }
 
     #[test]

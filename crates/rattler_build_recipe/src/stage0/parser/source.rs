@@ -4,7 +4,10 @@ use rattler_digest::{Md5Hash, Sha256Hash};
 
 use crate::stage0::{
     parser::helpers::get_span,
-    source::{AttestationConfig, GitRev, GitSource, GitUrl, PathSource, Source, UrlSource},
+    source::{
+        AttestationConfig, DetailedPublisher, GitRev, GitSource, GitUrl, PathSource, PublisherSpec,
+        Source, UrlSource,
+    },
     types::{ConditionalList, IncludeExclude, Item, JinjaTemplate, NestedItemList, Value},
 };
 
@@ -388,11 +391,11 @@ fn parse_attestation_config(
             "publishers" => {
                 if let Some(seq) = value_node.as_sequence() {
                     for item in seq.iter() {
-                        publishers.push(parse_value(item)?);
+                        publishers.push(parse_publisher(item)?);
                     }
                 } else {
-                    // Single publisher as a string
-                    publishers.push(parse_value(value_node)?);
+                    // Single publisher
+                    publishers.push(parse_publisher(value_node)?);
                 }
             }
             _ => {
@@ -410,6 +413,54 @@ fn parse_attestation_config(
         bundle_url,
         publishers,
     })
+}
+
+/// Parse one publisher: a `provider:owner/repo[@ref]` string, or a mapping
+/// with `github`/`gitlab`, `ref`, `repository_id`, `owner_id` and `environment`.
+fn parse_publisher(node: &Node) -> Result<PublisherSpec, ParseError> {
+    const VALID: &str =
+        "Valid fields are: github, gitlab, ref, repository_id, owner_id, environment";
+    let Some(mapping) = node.as_mapping() else {
+        return Ok(PublisherSpec::Short(parse_value(node)?));
+    };
+
+    let mut publisher = DetailedPublisher {
+        github: None,
+        gitlab: None,
+        ref_constraint: None,
+        repository_id: None,
+        owner_id: None,
+        environment: None,
+    };
+    for (key_node, value_node) in mapping.iter() {
+        let slot = match key_node.as_str() {
+            "github" => &mut publisher.github,
+            "gitlab" => &mut publisher.gitlab,
+            "ref" => &mut publisher.ref_constraint,
+            "repository_id" => &mut publisher.repository_id,
+            "owner_id" => &mut publisher.owner_id,
+            "environment" => &mut publisher.environment,
+            key => {
+                return Err(ParseError::invalid_value(
+                    "attestation.publishers",
+                    format!("unknown field '{key}'"),
+                    *key_node.span(),
+                )
+                .with_suggestion(VALID));
+            }
+        };
+        *slot = Some(parse_value(value_node)?);
+    }
+
+    if publisher.github.is_some() == publisher.gitlab.is_some() {
+        return Err(ParseError::invalid_value(
+            "attestation.publishers",
+            "a publisher mapping needs exactly one of `github: owner/repo` or `gitlab: owner/repo`",
+            get_span(node),
+        )
+        .with_suggestion(VALID));
+    }
+    Ok(PublisherSpec::Detailed(Box::new(publisher)))
 }
 
 fn parse_url_source(

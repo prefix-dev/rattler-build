@@ -117,10 +117,76 @@ pub struct AttestationConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bundle_url: Option<Value<String>>,
 
-    /// Publisher identities to verify (e.g., "github:owner/repo" or "github:owner/repo@refs/tags/v1.0")
+    /// Publisher identities to verify, either as a string
+    /// (e.g., "github:owner/repo" or "github:owner/repo@refs/tags/v1.0") or as
+    /// a mapping that can also pin immutable repository and owner IDs.
     /// All specified publishers must match.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub publishers: Vec<Value<String>>,
+    pub publishers: Vec<PublisherSpec>,
+}
+
+/// A publisher identity in an attestation config.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum PublisherSpec {
+    /// Shorthand string: `provider:owner/repo[@ref]`
+    Short(Value<String>),
+    /// Mapping form, which can pin more than the shorthand
+    Detailed(Box<DetailedPublisher>),
+}
+
+/// The mapping form of a publisher identity, e.g.
+///
+/// ```yaml
+/// - github: pallets/flask
+///   ref: refs/tags/3.1.1
+///   repository_id: 596892
+///   owner_id: 16748505
+///   environment: pypi
+/// ```
+///
+/// Exactly one of `github` / `gitlab` is set.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct DetailedPublisher {
+    /// `owner/repo` on GitHub
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub github: Option<Value<String>>,
+    /// `owner/repo` on GitLab
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gitlab: Option<Value<String>>,
+    /// Git ref the signing workflow must have run on (e.g. `refs/tags/v1.0`)
+    #[serde(default, rename = "ref", skip_serializing_if = "Option::is_none")]
+    pub ref_constraint: Option<Value<String>>,
+    /// Immutable numeric ID of the repository
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repository_id: Option<Value<String>>,
+    /// Immutable numeric ID of the repository owner (user or organization)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub owner_id: Option<Value<String>>,
+    /// Deployment environment the signing workflow ran in (e.g. `release`)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub environment: Option<Value<String>>,
+}
+
+impl PublisherSpec {
+    /// Collect all variables used in this publisher
+    pub fn used_variables(&self) -> Vec<String> {
+        match self {
+            Self::Short(value) => value.used_variables(),
+            Self::Detailed(d) => [
+                &d.github,
+                &d.gitlab,
+                &d.ref_constraint,
+                &d.repository_id,
+                &d.owner_id,
+                &d.environment,
+            ]
+            .into_iter()
+            .flatten()
+            .flat_map(|v| v.used_variables())
+            .collect(),
+        }
+    }
 }
 
 impl AttestationConfig {

@@ -553,6 +553,47 @@ fn github_release_matches(repository_subjects: &[String], check: &IdentityCheck)
     })
 }
 
+/// Repository facts beyond name and ref that a publisher can pin: the
+/// immutable repository and owner IDs, and the deployment environment.
+#[derive(Debug, Default)]
+struct Pins {
+    repository_id: Option<String>,
+    owner_id: Option<String>,
+    environment: Option<String>,
+}
+
+impl Pins {
+    /// Whether every value the check pins is present here and equal.
+    fn satisfy(&self, check: &IdentityCheck) -> bool {
+        let pinned = |expected: &Option<String>, actual: &Option<String>| {
+            expected.is_none() || expected == actual
+        };
+        pinned(&check.repository_id, &self.repository_id)
+            && pinned(&check.owner_id, &self.owner_id)
+            && pinned(&check.environment, &self.environment)
+    }
+
+    fn describe(&self) -> String {
+        [
+            ("repository_id", &self.repository_id),
+            ("owner_id", &self.owner_id),
+            ("environment", &self.environment),
+        ]
+        .iter()
+        .filter_map(|(key, value)| value.as_ref().map(|v| format!(", {key}: {v}")))
+        .collect()
+    }
+}
+
+/// Read a string-or-number field from a JSON object as a string.
+fn json_id(value: &serde_json::Value, key: &str) -> Option<String> {
+    match value.get(key)? {
+        serde_json::Value::String(s) => Some(s.clone()),
+        serde_json::Value::Number(n) => Some(n.to_string()),
+        _ => None,
+    }
+}
+
 /// A bundle that passed cryptographic verification against the artifact.
 struct VerifiedBundle<'a> {
     bundle: &'a sigstore_types::Bundle,
@@ -564,14 +605,51 @@ impl VerifiedBundle<'_> {
         self.result.identity().map(|identity| identity.as_str())
     }
 
+    /// The pinnable repository facts of this bundle. For public-good
+    /// attestations they come from the Fulcio CI claims of the verified signing
+    /// certificate; for GitHub release attestations from the signed release
+    /// predicate, which records no deployment environment.
+    fn pins(&self, kind: AttestationKind) -> Pins {
+        match kind {
+            AttestationKind::GitHubRelease => bundle_statement(self.bundle)
+                .and_then(|s| s.get("predicate").cloned())
+                .map(|predicate| Pins {
+                    repository_id: json_id(&predicate, "repositoryId"),
+                    owner_id: json_id(&predicate, "ownerId"),
+                    environment: None,
+                })
+                .unwrap_or_default(),
+            AttestationKind::PublicGood => self
+                .result
+                .certificate()
+                .filter(|_| self.result.certificate_verified())
+                .map(|cert| Pins {
+                    repository_id: cert.ci_claims.source_repository_identifier.clone(),
+                    owner_id: cert.ci_claims.source_repository_owner_identifier.clone(),
+                    environment: cert.ci_claims.deployment_environment.clone(),
+                })
+                .unwrap_or_default(),
+        }
+    }
+
     fn describe(&self, kind: AttestationKind) -> Vec<String> {
+        let pins = self.pins(kind).describe();
         match kind {
             AttestationKind::GitHubRelease => bundle_statement(self.bundle)
                 .map(|s| github_release_repository_subjects(&s))
-                .unwrap_or_default(),
+                .unwrap_or_default()
+                .into_iter()
+                .map(|subject| {
+                    if pins.is_empty() {
+                        subject
+                    } else {
+                        format!("{subject} ({})", &pins[2..])
+                    }
+                })
+                .collect(),
             AttestationKind::PublicGood => {
                 vec![format!(
-                    "{} (issuer: {})",
+                    "{} (issuer: {}{pins})",
                     self.identity().unwrap_or("<none>"),
                     self.result.issuer().unwrap_or("<none>")
                 )]
@@ -580,7 +658,7 @@ impl VerifiedBundle<'_> {
     }
 
     fn satisfies(&self, check: &IdentityCheck, kind: AttestationKind) -> bool {
-        match kind {
+        let identity_ok = match kind {
             // The policy already pinned the certificate to GitHub's release
             // attester; the repository is bound by the signed statement of this
             // same bundle. Never combine evidence across bundles.
@@ -593,7 +671,8 @@ impl VerifiedBundle<'_> {
                         .identity()
                         .is_some_and(|identity| identity_matches(check, identity))
             }
-        }
+        };
+        identity_ok && self.pins(kind).satisfy(check)
     }
 }
 
@@ -751,6 +830,19 @@ fn check_attestation_response(
                 "\u{2714} Attestation verified (identity={})",
                 bundle.identity().unwrap_or("<none>")
             );
+            let pins = bundle.pins(kind);
+            if let (None, None, Some(repository_id), Some(owner_id)) = (
+                &check.repository_id,
+                &check.owner_id,
+                &pins.repository_id,
+                &pins.owner_id,
+            ) {
+                tracing::info!(
+                    "Tip: pin this publisher to its immutable repository, which a renamed or \
+                     recreated repository cannot match, by adding `repository_id: {repository_id}` \
+                     and `owner_id: {owner_id}` to its mapping form (`- github: owner/repo`)"
+                );
+            }
             continue;
         }
 
@@ -774,6 +866,21 @@ fn check_attestation_response(
         };
         if let Some(git_ref) = &check.ref_constraint {
             msg.push_str(&format!("\n  expected ref: {git_ref}"));
+        }
+        for (key, value) in [
+            ("repository_id", &check.repository_id),
+            ("owner_id", &check.owner_id),
+            ("environment", &check.environment),
+        ] {
+            if let Some(value) = value {
+                msg.push_str(&format!("\n  expected {key}: {value}"));
+            }
+        }
+        if kind == AttestationKind::GitHubRelease && check.environment.is_some() {
+            msg.push_str(
+                "\n  note: GitHub release attestations do not record a deployment environment, \
+                 so an `environment` pin can never match them",
+            );
         }
         let label = match kind {
             AttestationKind::GitHubRelease => "found signed repository subjects",
@@ -805,6 +912,9 @@ mod tests {
             identity: identity.to_string(),
             issuer: "https://token.actions.githubusercontent.com".to_string(),
             ref_constraint: ref_constraint.map(ToOwned::to_owned),
+            repository_id: None,
+            owner_id: None,
+            environment: None,
         }
     }
 
@@ -1324,6 +1434,9 @@ mod tests {
             identity: "https://github.com/pallets/flask".to_string(),
             issuer: "https://gitlab.com".to_string(),
             ref_constraint: None,
+            repository_id: None,
+            owner_id: None,
+            environment: None,
         };
         let cfg = AttestationVerification {
             bundle_url: None,
@@ -1335,6 +1448,124 @@ mod tests {
             .unwrap_err()
             .to_string();
         assert!(err.contains("does not match any subject"), "{err}");
+    }
+
+    /// A single-publisher config that also pins IDs and an environment.
+    fn pinned(
+        identity: &str,
+        repository_id: Option<&str>,
+        owner_id: Option<&str>,
+        environment: Option<&str>,
+    ) -> AttestationVerification {
+        let mut cfg = config(identity, None);
+        let check = &mut cfg.identity_checks[0];
+        check.repository_id = repository_id.map(ToOwned::to_owned);
+        check.owner_id = owner_id.map(ToOwned::to_owned);
+        check.environment = environment.map(ToOwned::to_owned);
+        cfg
+    }
+
+    #[test]
+    fn test_offline_pinned_ids_pypi_provenance() {
+        let kind = AttestationKind::PublicGood;
+        let repo = "https://github.com/pallets/flask";
+        for cfg in [
+            pinned(repo, Some("596892"), None, None),
+            pinned(repo, None, Some("16748505"), None),
+            pinned(repo, Some("596892"), Some("16748505"), None),
+        ] {
+            offline_check(FLASK_SHA, FLASK_PROVENANCE, kind, &cfg)
+                .unwrap_or_else(|e| panic!("{cfg:?}: {e}"));
+        }
+
+        // Right name, wrong repository: what a recreated `pallets/flask` would
+        // look like after the original was deleted or renamed.
+        for (cfg, expected) in [
+            (
+                pinned(repo, Some("596893"), Some("16748505"), None),
+                "expected repository_id: 596893",
+            ),
+            (
+                pinned(repo, Some("596892"), Some("1"), None),
+                "expected owner_id: 1",
+            ),
+            // The flask certificate carries no deployment environment, so an
+            // environment pin fails closed.
+            (
+                pinned(repo, None, None, Some("publish")),
+                "expected environment: publish",
+            ),
+        ] {
+            let err = offline_check(FLASK_SHA, FLASK_PROVENANCE, kind, &cfg)
+                .unwrap_err()
+                .to_string();
+            assert!(err.contains(expected), "{err}");
+            assert!(
+                err.contains("repository_id: 596892, owner_id: 16748505)"),
+                "{err}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_offline_pinned_ids_github_attestations() {
+        let repo = "https://github.com/astral-sh/uv";
+        let uv_ids = (Some("699532645"), Some("115962839"));
+
+        // Build provenance: IDs and environment from the signing certificate.
+        let kind = AttestationKind::PublicGood;
+        for cfg in [
+            pinned(repo, uv_ids.0, uv_ids.1, None),
+            pinned(repo, uv_ids.0, uv_ids.1, Some("release")),
+        ] {
+            offline_check(UV_SHA, UV_ATTESTATIONS, kind, &cfg)
+                .unwrap_or_else(|e| panic!("{cfg:?}: {e}"));
+        }
+        for cfg in [
+            pinned(repo, Some("1"), uv_ids.1, None),
+            pinned(repo, uv_ids.0, uv_ids.1, Some("staging")),
+        ] {
+            let err = offline_check(UV_SHA, UV_ATTESTATIONS, kind, &cfg)
+                .unwrap_err()
+                .to_string();
+            assert!(err.contains("environment: release)"), "{err}");
+        }
+
+        // Release attestation: IDs from the signed release predicate.
+        let kind = AttestationKind::GitHubRelease;
+        offline_check(
+            UV_SHA,
+            UV_ATTESTATIONS,
+            kind,
+            &pinned(repo, uv_ids.0, uv_ids.1, None),
+        )
+        .unwrap();
+        let err = offline_check(
+            UV_SHA,
+            UV_ATTESTATIONS,
+            kind,
+            &pinned(repo, uv_ids.0, Some("1"), None),
+        )
+        .unwrap_err()
+        .to_string();
+        assert!(
+            err.contains(
+                "pkg:github/astral-sh/uv@0.12.1 (repository_id: 699532645, owner_id: 115962839)"
+            ),
+            "{err}"
+        );
+        let err = offline_check(
+            UV_SHA,
+            UV_ATTESTATIONS,
+            kind,
+            &pinned(repo, uv_ids.0, uv_ids.1, Some("release")),
+        )
+        .unwrap_err()
+        .to_string();
+        assert!(
+            err.contains("do not record a deployment environment"),
+            "{err}"
+        );
     }
 
     #[test]

@@ -318,7 +318,16 @@ The attestation config has the following fields:
 
 - **`publishers`** - A list of publisher identities in `github:owner/repo` or `gitlab:owner/repo`
   format, optionally followed by `@<ref>` (e.g. `github:pallets/flask@refs/tags/3.1.1`). Every
-  listed publisher must match a verified attestation.
+  listed publisher must match a verified attestation. A publisher can also be a mapping that pins
+  the immutable repository and owner IDs and the deployment environment:
+
+  ```yaml
+  publishers:
+    - github: pallets/flask
+      ref: refs/tags/3.1.1
+      repository_id: 596892
+      owner_id: 16748505
+  ```
 - **`bundle_url`** (optional) - URL to the Sigstore bundle file. It is automatically derived
   from the PyPI attestation API and, for uploaded GitHub release assets, from the GitHub
   repository attestations API. GitHub's dynamically generated source archives are not covered

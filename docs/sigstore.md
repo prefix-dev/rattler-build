@@ -276,6 +276,30 @@ attestation:
 
 For workflow-produced attestations (PyPI, build provenance, `.sigstore.json` bundles), the ref is compared with the ref encoded at the end of the certificate SAN (`...workflow.yml@refs/tags/3.1.1`). This is the ref of the signing *workflow run*: projects that release through `workflow_dispatch` on a branch are signed with that branch ref (e.g. `refs/heads/main`), not the tag. For GitHub release attestations, only tag refs (`refs/tags/<tag>`) are supported and are compared with the release tag.
 
+### Pinning the repository ID, owner ID and environment
+
+A repository name is not permanent: if the owner renames or deletes the account or repository, someone else can register the same name and publish attestations that match `github:owner/repo`. GitHub and GitLab give every repository and owner an immutable numeric ID that is never reused, and Sigstore records them in the attestation. Use the mapping form of a publisher to pin them:
+
+```yaml
+attestation:
+  publishers:
+    - github: pallets/flask
+      ref: refs/tags/${{ version }}  # optional, same as the `@<ref>` suffix
+      repository_id: 596892
+      owner_id: 16748505
+```
+
+The mapping takes exactly one of `github` or `gitlab` (`owner/repo`), and optionally:
+
+- `ref`: the git ref, as described above
+- `repository_id`: the immutable ID of the repository
+- `owner_id`: the immutable ID of the user or organization that owns it
+- `environment`: the deployment environment the signing workflow ran in, e.g. `release`. Environments can require reviewers or restrict which branches deploy, so pinning one means the attestation passed those protections.
+
+Every pinned value must be present in the attestation and equal, in addition to the repository name. For workflow-produced attestations the values come from the signing certificate; for GitHub release attestations the IDs come from the signed release statement, which does not record an environment, so an `environment` pin never matches a release attestation.
+
+You don't need to look the IDs up: when a publisher without pinned IDs verifies, Rattler-Build logs the `repository_id` and `owner_id` to add. They match the IDs in GitHub's immutable OIDC subject claims (`repo:pallets@16748505/flask@596892:...`).
+
 ## Verifying attestations
 
 Once packages are published with attestations, they can be verified using several tools:

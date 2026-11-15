@@ -647,6 +647,15 @@ fn test_parse_nested_conditionals() {
     );
 }
 
+fn short_publisher(spec: &rattler_build_recipe::stage0::source::PublisherSpec) -> &str {
+    match spec {
+        rattler_build_recipe::stage0::source::PublisherSpec::Short(value) => {
+            value.as_concrete().expect("concrete publisher string")
+        }
+        other => panic!("expected a publisher string, got {other:?}"),
+    }
+}
+
 #[test]
 fn test_parse_url_source_with_attestation() {
     let yaml = r#"
@@ -680,10 +689,7 @@ build:
                 "bundle_url should be None for PyPI"
             );
             assert_eq!(att.publishers.len(), 1);
-            assert_eq!(
-                att.publishers[0].as_concrete().unwrap(),
-                "github:pallets/flask"
-            );
+            assert_eq!(short_publisher(&att.publishers[0]), "github:pallets/flask");
         }
         _ => panic!("Expected URL source"),
     }
@@ -752,10 +758,98 @@ build:
                 .as_ref()
                 .expect("attestation should be set");
             assert_eq!(att.publishers.len(), 2);
-            assert_eq!(att.publishers[0].as_concrete().unwrap(), "github:org/repo");
-            assert_eq!(att.publishers[1].as_concrete().unwrap(), "gitlab:org/repo");
+            assert_eq!(short_publisher(&att.publishers[0]), "github:org/repo");
+            assert_eq!(short_publisher(&att.publishers[1]), "gitlab:org/repo");
         }
         _ => panic!("Expected URL source"),
+    }
+}
+
+#[test]
+fn test_parse_publisher_mapping_with_pinned_ids() {
+    use rattler_build_recipe::stage0::source::PublisherSpec;
+
+    let yaml = r#"
+package:
+  name: test
+  version: 1.0.0
+
+source:
+  url: https://pypi.io/packages/source/f/flask/flask-3.1.1.tar.gz
+  sha256: 284c7b8f2f58cb737f0cf1c30fd7eaf0ccfcde196099d24ecede3fc2005aa59e
+  attestation:
+    publishers:
+      - github:pallets/flask
+      - github: pallets/flask
+        ref: refs/tags/${{ version }}
+        repository_id: 596892
+        owner_id: 16748505
+        environment: publish
+
+build:
+  number: 0
+"#;
+
+    let recipe = parse_recipe_from_source(yaml).unwrap();
+    let source = get_concrete_source(&recipe.source.as_slice()[0]).unwrap();
+    let Source::Url(url_src) = source else {
+        panic!("Expected URL source");
+    };
+    let att = url_src.attestation.as_ref().unwrap();
+    assert_eq!(att.publishers.len(), 2);
+    assert_eq!(short_publisher(&att.publishers[0]), "github:pallets/flask");
+    let PublisherSpec::Detailed(d) = &att.publishers[1] else {
+        panic!("expected the mapping form");
+    };
+    assert_eq!(
+        d.github.as_ref().unwrap().as_concrete().unwrap(),
+        "pallets/flask"
+    );
+    assert!(d.gitlab.is_none());
+    assert!(d.ref_constraint.as_ref().unwrap().is_template());
+    assert_eq!(
+        d.repository_id.as_ref().unwrap().as_concrete().unwrap(),
+        "596892"
+    );
+    assert_eq!(
+        d.owner_id.as_ref().unwrap().as_concrete().unwrap(),
+        "16748505"
+    );
+    assert_eq!(
+        d.environment.as_ref().unwrap().as_concrete().unwrap(),
+        "publish"
+    );
+    assert!(att.used_variables().contains(&"version".to_string()));
+}
+
+#[test]
+fn test_parse_publisher_mapping_errors() {
+    let recipe = |publisher: &str| {
+        format!(
+            r#"
+package:
+  name: test
+  version: 1.0.0
+
+source:
+  url: https://example.com/archive.tar.gz
+  sha256: e03c8123866dd68f129e8a29082011db418ce90863948f563c01b814670782c6
+  attestation:
+    publishers:
+      - {publisher}
+"#
+        )
+    };
+    for (publisher, expected) in [
+        ("{ repository_id: 1 }", "exactly one of"),
+        ("{ github: a/b, gitlab: a/b }", "exactly one of"),
+        ("{ github: a/b, repo_id: 1 }", "unknown field 'repo_id'"),
+    ] {
+        let err = parse_recipe_from_source(&recipe(publisher)).unwrap_err();
+        assert!(
+            format!("{err:?}").contains(expected),
+            "{publisher}: expected '{expected}' in {err:?}"
+        );
     }
 }
 
@@ -799,10 +893,7 @@ fn test_parse_uv_attestation_example() {
                 "GitHub release attestation should be discovered automatically"
             );
             assert_eq!(att.publishers.len(), 1);
-            assert_eq!(
-                att.publishers[0].as_concrete().unwrap(),
-                "github:astral-sh/uv"
-            );
+            assert_eq!(short_publisher(&att.publishers[0]), "github:astral-sh/uv");
         }
         _ => panic!("Expected URL source"),
     }
