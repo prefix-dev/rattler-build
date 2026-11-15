@@ -1,6 +1,6 @@
 //! The build module contains the code for running the build process for a given
 //! [`Output`]
-use std::{collections::HashSet, path::PathBuf, vec};
+use std::{path::PathBuf, vec};
 
 use miette::{Context, IntoDiagnostic};
 use rattler_build_recipe::stage1::TestType;
@@ -9,6 +9,7 @@ use rattler_conda_types::{
     Channel, ChannelUrl, MatchSpec, PackageName, PackageRecord, Subdir, package::PathsJson,
 };
 use rattler_repodata_gateway::{Gateway, GatewayError};
+use rustc_hash::FxHashSet;
 use tracing::Instrument;
 
 use crate::{
@@ -75,8 +76,8 @@ impl From<&Output> for PackageIdentity {
 pub fn existing_packages<'a>(
     records: impl IntoIterator<Item = &'a PackageRecord>,
     packages: &[PackageIdentity],
-) -> HashSet<PackageIdentity> {
-    let wanted = packages.iter().collect::<HashSet<_>>();
+) -> FxHashSet<PackageIdentity> {
+    let wanted = packages.iter().collect::<FxHashSet<_>>();
     records
         .into_iter()
         .map(PackageIdentity::from)
@@ -95,9 +96,9 @@ pub async fn find_existing_packages(
     channels: &[ChannelUrl],
     platform: Subdir,
     packages: &[PackageIdentity],
-) -> Result<HashSet<PackageIdentity>, GatewayError> {
+) -> Result<FxHashSet<PackageIdentity>, GatewayError> {
     if packages.is_empty() {
-        return Ok(HashSet::new());
+        return Ok(FxHashSet::default());
     }
     let channels = channels
         .iter()
@@ -535,7 +536,7 @@ mod tests {
 
         assert_eq!(
             existing,
-            HashSet::from([
+            FxHashSet::from_iter([
                 identity("foo", "1.0", "h123_0"),
                 identity("bar", "2.0", "pyh_0"),
             ])
