@@ -1333,6 +1333,39 @@ pub fn get_rattler_build_version() -> &'static str {
     env!("CARGO_PKG_VERSION")
 }
 
+/// The outputs to print for `--render-only`.
+///
+/// Leaves out the outputs that `--skip-existing` would skip, like a build
+/// would. With `with_solve`, the dependencies are resolved, and with
+/// `--continue-on-failure` an output that fails to resolve is logged and left
+/// out instead of aborting the run.
+async fn render_only_outputs(
+    outputs: Vec<Output>,
+    with_solve: bool,
+    tool_config: &Configuration,
+) -> miette::Result<Vec<Output>> {
+    let outputs = skip_existing(outputs, tool_config).await?;
+    if !with_solve {
+        return Ok(outputs);
+    }
+
+    let mut resolved = Vec::with_capacity(outputs.len());
+    for output in outputs {
+        let identifier = output.identifier();
+        match output
+            .resolve_dependencies(tool_config, RunExportsDownload::DownloadMissing)
+            .await
+        {
+            Ok(output) => resolved.push(output),
+            Err(e) if tool_config.continue_on_failure.continues() => {
+                tracing::error!("Failed to resolve dependencies for {identifier}: {e}");
+            }
+            Err(e) => return Err(e).into_diagnostic(),
+        }
+    }
+    Ok(resolved)
+}
+
 /// Build Rattler-Build recipes
 pub async fn build_recipes(
     recipe_paths: Vec<std::path::PathBuf>,
@@ -1360,20 +1393,7 @@ pub async fn build_recipes(
             include_test_dependencies,
         )?;
 
-        let outputs = if build_data.with_solve {
-            let mut updated_outputs = Vec::new();
-            for output in outputs {
-                updated_outputs.push(
-                    output
-                        .resolve_dependencies(&tool_config, RunExportsDownload::DownloadMissing)
-                        .await
-                        .into_diagnostic()?,
-                );
-            }
-            updated_outputs
-        } else {
-            outputs
-        };
+        let outputs = render_only_outputs(outputs, build_data.with_solve, &tool_config).await?;
 
         println!(
             "{}",
@@ -1610,20 +1630,8 @@ pub async fn publish_packages(
         }
 
         if publish_data.build.render_only {
-            let outputs = if publish_data.build.with_solve {
-                let mut updated_outputs = Vec::new();
-                for output in outputs {
-                    updated_outputs.push(
-                        output
-                            .resolve_dependencies(&tool_config, RunExportsDownload::DownloadMissing)
-                            .await
-                            .into_diagnostic()?,
-                    );
-                }
-                updated_outputs
-            } else {
-                outputs
-            };
+            let outputs =
+                render_only_outputs(outputs, publish_data.build.with_solve, &tool_config).await?;
 
             println!(
                 "{}",

@@ -625,6 +625,7 @@ pub struct BuildOpts {
     pub ignore_recipe_variants: bool,
 
     /// Render the recipe files without executing the build.
+    /// Outputs that `--skip-existing` would skip are left out.
     #[arg(long)]
     pub render_only: bool,
 
@@ -717,7 +718,8 @@ pub struct BuildOpts {
     /// With `=skip-dependents`, also skip every package that needs a package
     /// whose build failed in this run (as a build or host dependency, or
     /// through their run dependencies), instead of building it later against
-    /// the configured channels.
+    /// the configured channels. With `--render-only --with-solve`, leave out
+    /// the outputs whose dependencies cannot be resolved instead of stopping.
     #[clap(
         long,
         num_args = 0..=1,
