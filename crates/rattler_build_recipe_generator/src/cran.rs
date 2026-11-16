@@ -302,6 +302,8 @@ struct CranTarball {
     has_cxx_sources: bool,
     /// Whether a `src/Makevars*` file links R's BLAS or LAPACK.
     links_blas_lapack: bool,
+    /// Whether a `src/Makevars*` file uses R's OpenMP flags.
+    uses_openmp: bool,
 }
 
 /// The Makevars files R reads from `src/`: `Makevars.in` is the template a
@@ -334,14 +336,24 @@ impl CranTarball {
             .iter()
             .filter_map(|file| scan.files.get(file).map(String::as_str))
             .collect();
+        // Whether a Makevars file references any of the make variables `names`.
+        let makevars_reference = |names: &[&str]| {
+            makevars.iter().any(|contents| {
+                names
+                    .iter()
+                    .any(|name| references_make_variable(contents, name))
+            })
+        };
         // Writing R Extensions asks for `$(BLAS_LIBS)` wherever
         // `$(LAPACK_LIBS)` is used, as some implementations ship LAPACK apart
         // from BLAS, so either one needs both libraries.
-        let links_blas_lapack = makevars.iter().any(|contents| {
-            ["BLAS_LIBS", "LAPACK_LIBS"]
-                .iter()
-                .any(|name| references_make_variable(contents, name))
-        });
+        let links_blas_lapack = makevars_reference(&["BLAS_LIBS", "LAPACK_LIBS"]);
+        let uses_openmp = makevars_reference(&[
+            "SHLIB_OPENMP_CFLAGS",
+            "SHLIB_OPENMP_CXXFLAGS",
+            "SHLIB_OPENMP_FFLAGS",
+            "SHLIB_OPENMP_FCFLAGS",
+        ]);
         let src_files: Vec<PathBuf> = scan
             .paths
             .iter()
@@ -358,6 +370,7 @@ impl CranTarball {
                 .iter()
                 .any(|path| has_extension(path, CXX_EXTENSIONS)),
             links_blas_lapack,
+            uses_openmp,
         })
     }
 }
@@ -797,6 +810,20 @@ fn package_info_to_recipe(
         .unique()
         .map(Requirement::from)
         .collect();
+    if tarball.is_some_and(|tarball| tarball.uses_openmp) {
+        // The OpenMP runtime of the platform's compilers: clang on macOS, GCC
+        // (MinGW on Windows) everywhere else.
+        recipe.requirements.host.extend([
+            Requirement::Conditional {
+                condition: "osx".to_string(),
+                then: vec!["llvm-openmp".to_string()],
+            },
+            Requirement::Conditional {
+                condition: "not osx".to_string(),
+                then: vec!["libgomp".to_string()],
+            },
+        ]);
+    }
     recipe.requirements.run = std::iter::once(r_base)
         .chain(run)
         .unique()
@@ -1277,6 +1304,53 @@ mod tests {
         };
         assert!(build_of(Some(&with_cxx)).contains(&cxx()));
         assert!(build_of(None).contains(&cxx()));
+    }
+
+    /// Any of R's OpenMP flags in a Makevars file requires the OpenMP runtime
+    /// that matches the platform's compilers.
+    #[test]
+    fn makevars_using_openmp_require_the_openmp_runtime() {
+        let parse = |contents: &[u8]| {
+            CranTarball::parse(&crate::tarball::tarball_with(&[(
+                "pkg/src/Makevars",
+                contents,
+            )]))
+            .unwrap()
+        };
+        for contents in [
+            &b"PKG_CFLAGS = $(SHLIB_OPENMP_CFLAGS)\n"[..],
+            b"PKG_CXXFLAGS = ${SHLIB_OPENMP_CXXFLAGS}\n",
+            b"PKG_FFLAGS = $(SHLIB_OPENMP_FFLAGS)\n",
+            b"PKG_FCFLAGS = $(SHLIB_OPENMP_FCFLAGS)\n",
+        ] {
+            assert!(
+                parse(contents).uses_openmp,
+                "{}",
+                String::from_utf8_lossy(contents)
+            );
+        }
+        assert!(!parse(b"PKG_CFLAGS = -O2\n").uses_openmp);
+
+        let tarball = CranTarball {
+            uses_openmp: true,
+            ..Default::default()
+        };
+        let (recipe, _) =
+            package_info_to_recipe(&fixture("gmp"), Some(&tarball), &RecipeOptions::default());
+        assert_eq!(
+            recipe.requirements.host,
+            vec![
+                "r-base".into(),
+                Requirement::Conditional {
+                    condition: "osx".to_string(),
+                    then: vec!["llvm-openmp".to_string()],
+                },
+                Requirement::Conditional {
+                    condition: "not osx".to_string(),
+                    then: vec!["libgomp".to_string()],
+                },
+            ]
+        );
     }
 
     #[test]
