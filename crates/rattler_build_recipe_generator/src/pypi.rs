@@ -297,6 +297,21 @@ async fn is_noarch_python(urls: &[PyPiRelease]) -> bool {
         .all(|wheel| wheel.filename.contains("-none-any.whl"))
 }
 
+/// Some PyPI-compatible indexes (e.g. Artifactory) return file URLs relative to
+/// the package directory `<index>/<package>/`, for both the `<package>/json`
+/// and `<package>/<version>/json` endpoints. Resolve them against that
+/// directory; absolute URLs are left untouched.
+fn resolve_release_urls(package_url: &str, releases: &mut [PyPiRelease]) {
+    let Ok(base) = url::Url::parse(package_url) else {
+        return;
+    };
+    for release in releases {
+        if let Ok(resolved) = base.join(&release.url) {
+            release.url = resolved.to_string();
+        }
+    }
+}
+
 async fn fetch_pypi_metadata(
     opts: &PyPIOpts,
     client: &reqwest::Client,
@@ -329,7 +344,9 @@ async fn fetch_pypi_metadata(
                 }
 
                 let release: PyPrReleaseResponse = response.json().await.into_diagnostic()?;
-                Ok((release.info, release.urls))
+                let mut urls = release.urls;
+                resolve_release_urls(&format!("{}{}/", base_url, opts.package), &mut urls);
+                Ok((release.info, urls))
             } else {
                 let url = format!("{}{}/json", base_url, opts.package);
                 let response = client
@@ -353,7 +370,9 @@ async fn fetch_pypi_metadata(
                     .releases
                     .get(&response.info.version)
                     .ok_or_else(|| miette::miette!("No source distribution found"))?;
-                Ok((response.info, urls.clone()))
+                let mut urls = urls.clone();
+                resolve_release_urls(&format!("{}{}/", base_url, opts.package), &mut urls);
+                Ok((response.info, urls))
             }
         }
         .await;
@@ -995,6 +1014,33 @@ mod tests {
         assert_eq!(
             format_requirement("numpy>=2.0.0; extra == 'foo'"),
             "numpy >=2.0.0 ;MARKER; extra == 'foo'"
+        );
+    }
+
+    #[test]
+    fn test_resolve_release_urls() {
+        let release = |url: &str| PyPiRelease {
+            filename: "msgpack-1.2.4.tar.gz".into(),
+            url: url.into(),
+            digests: HashMap::new(),
+        };
+        // Artifactory returns the same relative URL for `<pkg>/json` and
+        // `<pkg>/<version>/json`, relative to `<index>/<pkg>/`.
+        let package_url =
+            "https://jfrog.example.com/artifactory/api/pypi/pypi_remote/pypi/msgpack/";
+        let mut releases = vec![
+            release("../../packages/packages/cc/52/abcdef/msgpack-1.2.4.tar.gz"),
+            release("https://files.example.org/msgpack-1.2.4-py3-none-any.whl"),
+        ];
+        resolve_release_urls(package_url, &mut releases);
+        assert_eq!(
+            releases[0].url,
+            "https://jfrog.example.com/artifactory/api/pypi/pypi_remote/packages/packages/cc/52/abcdef/msgpack-1.2.4.tar.gz"
+        );
+        // Absolute URLs (pypi.org style) stay unchanged.
+        assert_eq!(
+            releases[1].url,
+            "https://files.example.org/msgpack-1.2.4-py3-none-any.whl"
         );
     }
 
