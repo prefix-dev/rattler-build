@@ -1,7 +1,11 @@
 use rattler_build_types::LateBoundPath;
 use rattler_digest::{Md5, Md5Hash, Sha256, Sha256Hash, serde::SerializableHash};
 use serde::{Deserialize, Serialize};
-use serde_with::{OneOrMany, formats::PreferOne, serde_as};
+use serde_with::{
+    OneOrMany,
+    formats::{PreferMany, PreferOne},
+    serde_as,
+};
 use std::{fmt, path::PathBuf, str::FromStr};
 use url::Url;
 
@@ -392,10 +396,6 @@ impl AttestationConfig {
     }
 }
 
-fn attestation_is_none_or_empty(s: &Option<AttestationConfig>) -> bool {
-    s.as_ref().map(|c| c.is_empty()).unwrap_or(true)
-}
-
 fn default_submodules() -> bool {
     true
 }
@@ -431,9 +431,10 @@ pub struct UrlSource {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub target_directory: Option<PathBuf>,
 
-    /// Optional attestation verification configuration
-    #[serde(default, skip_serializing_if = "attestation_is_none_or_empty")]
-    pub attestation: Option<AttestationConfig>,
+    /// Attestations the downloaded file must have. Every entry must verify.
+    #[serde_as(as = "OneOrMany<_, PreferMany>")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub attestations: Vec<AttestationConfig>,
 
     /// Only take certain files from the extracted source (validated glob patterns)
     #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
@@ -509,6 +510,32 @@ impl Source {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_url_source_attestations_round_trip() {
+        // A single mapping is read as a one-entry list, and written as a list
+        let single: UrlSource = serde_yaml::from_str(
+            r#"
+url: https://example.com/a.tar.gz
+attestations:
+  publishers:
+    - provider: github
+      owner: pallets
+      repo: flask
+"#,
+        )
+        .unwrap();
+        assert_eq!(single.attestations.len(), 1);
+        assert_eq!(single.attestations[0].publishers[0].repo, "flask");
+
+        let written = serde_yaml::to_string(&single).unwrap();
+        assert!(
+            written.contains("attestations:\n- publishers:"),
+            "{written}"
+        );
+        let read_back: UrlSource = serde_yaml::from_str(&written).unwrap();
+        assert_eq!(read_back, single);
+    }
 
     #[test]
     fn test_git_rev_from_str() {

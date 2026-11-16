@@ -2453,12 +2453,11 @@ impl Evaluate for Stage0UrlSource {
             urls.push(url);
         }
 
-        // Evaluate attestation config if present
-        let attestation = self
-            .attestation
-            .as_ref()
+        let attestations = self
+            .attestations
+            .iter()
             .map(|config| config.evaluate(context))
-            .transpose()?;
+            .collect::<Result<Vec<_>, _>>()?;
 
         Ok(Stage1UrlSource {
             url: urls,
@@ -2483,7 +2482,7 @@ impl Evaluate for Stage0UrlSource {
                 .as_ref()
                 .map(|v| v.evaluate(context))
                 .transpose()?,
-            attestation,
+            attestations,
             filter: evaluate_glob_vec(&self.filter, context)?,
         })
     }
@@ -2501,7 +2500,7 @@ impl Evaluate for Stage0AttestationConfig {
                 let url_str = evaluate_string_value(v, context)?;
                 url::Url::parse(&url_str).map_err(|e| {
                     ParseError::invalid_value(
-                        "attestation.bundle_url",
+                        "attestations.bundle_url",
                         format!("Invalid URL '{}': {}", url_str, e),
                         Span::new_blank(),
                     )
@@ -2538,7 +2537,7 @@ impl Evaluate for Stage0AttestationConfig {
                 }
             }
             .map_err(|e| {
-                ParseError::invalid_value("attestation.publishers", &e, Span::new_blank())
+                ParseError::invalid_value("attestations.publishers", &e, Span::new_blank())
             })?;
             publishers.push(publisher);
         }
@@ -6721,8 +6720,8 @@ package:
             let Stage1Source::Url(url) = &recipe.source[0] else {
                 panic!("expected a URL source");
             };
-            url.attestation
-                .as_ref()
+            url.attestations
+                .first()
                 .unwrap()
                 .publishers
                 .iter()
@@ -6738,7 +6737,7 @@ package:
 source:
   url: https://pypi.io/packages/source/f/flask/flask-3.1.1.tar.gz
   sha256: 284c7b8f2f58cb737f0cf1c30fd7eaf0ccfcde196099d24ecede3fc2005aa59e
-  attestation:
+  attestations:
     publishers:
       - github:pallets(16748505)/flask(596892)@refs/tags/${{ version }}
       - github:pallets/flask(${{ repo_id }})
@@ -6759,7 +6758,7 @@ package:
 source:
   url: https://pypi.io/packages/source/f/flask/flask-3.1.1.tar.gz
   sha256: 284c7b8f2f58cb737f0cf1c30fd7eaf0ccfcde196099d24ecede3fc2005aa59e
-  attestation:
+  attestations:
     publishers: [github:pallets(16748505)/flask(596892)]
 "#;
         assert_eq!(publishers(flow), ["github:pallets(16748505)/flask(596892)"]);

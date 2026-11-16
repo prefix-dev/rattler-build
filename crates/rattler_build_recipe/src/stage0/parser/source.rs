@@ -374,8 +374,39 @@ fn parse_git_source(
     })
 }
 
-/// Parse an attestation configuration section
+/// Parse the `attestations` section of a URL source: one attestation mapping,
+/// or a list of them that must all verify.
+fn parse_attestations(key: &str, node: &Node) -> Result<Vec<AttestationConfig>, ParseError> {
+    const EXPECTED: &str =
+        "expected a mapping with `bundle_url` and/or `publishers`, or a list of them";
+    let Some(seq) = node.as_sequence() else {
+        let Some(mapping) = node.as_mapping() else {
+            return Err(ParseError::invalid_value(key, EXPECTED, get_span(node)));
+        };
+        return Ok(vec![parse_attestation_config(key, mapping)?]);
+    };
+    if seq.is_empty() {
+        return Err(ParseError::invalid_value(
+            key,
+            "the list of attestations is empty; remove the key to skip verification",
+            get_span(node),
+        ));
+    }
+    seq.iter()
+        .enumerate()
+        .map(|(i, item)| {
+            let label = format!("{key}[{i}]");
+            let Some(mapping) = item.as_mapping() else {
+                return Err(ParseError::invalid_value(&label, EXPECTED, get_span(item)));
+            };
+            parse_attestation_config(&label, mapping)
+        })
+        .collect()
+}
+
+/// Parse one attestation configuration mapping
 fn parse_attestation_config(
+    label: &str,
     mapping: &marked_yaml::types::MarkedMappingNode,
 ) -> Result<AttestationConfig, ParseError> {
     let mut bundle_url = None;
@@ -391,16 +422,16 @@ fn parse_attestation_config(
             "publishers" => {
                 if let Some(seq) = value_node.as_sequence() {
                     for item in seq.iter() {
-                        publishers.push(parse_publisher(item)?);
+                        publishers.push(parse_publisher(label, item)?);
                     }
                 } else {
                     // Single publisher
-                    publishers.push(parse_publisher(value_node)?);
+                    publishers.push(parse_publisher(label, value_node)?);
                 }
             }
             _ => {
                 return Err(ParseError::invalid_value(
-                    "attestation",
+                    label,
                     format!("unknown field '{}'", key),
                     *key_node.span(),
                 )
@@ -417,9 +448,10 @@ fn parse_attestation_config(
 
 /// Parse one publisher: a `provider:owner/repo[@ref]` string, or a mapping
 /// with `github`/`gitlab`, `ref`, `repository_id`, `owner_id` and `environment`.
-fn parse_publisher(node: &Node) -> Result<PublisherSpec, ParseError> {
+fn parse_publisher(label: &str, node: &Node) -> Result<PublisherSpec, ParseError> {
     const VALID: &str =
         "Valid fields are: github, gitlab, ref, repository_id, owner_id, environment";
+    let field = format!("{label}.publishers");
     let Some(mapping) = node.as_mapping() else {
         return Ok(PublisherSpec::Short(parse_value(node)?));
     };
@@ -442,7 +474,7 @@ fn parse_publisher(node: &Node) -> Result<PublisherSpec, ParseError> {
             "environment" => &mut publisher.environment,
             key => {
                 return Err(ParseError::invalid_value(
-                    "attestation.publishers",
+                    &field,
                     format!("unknown field '{key}'"),
                     *key_node.span(),
                 )
@@ -454,7 +486,7 @@ fn parse_publisher(node: &Node) -> Result<PublisherSpec, ParseError> {
 
     if publisher.github.is_some() == publisher.gitlab.is_some() {
         return Err(ParseError::invalid_value(
-            "attestation.publishers",
+            &field,
             "a publisher mapping needs exactly one of `github: owner/repo` or `gitlab: owner/repo`",
             get_span(node),
         )
@@ -474,7 +506,7 @@ fn parse_url_source(
     let mut file_name = None;
     let mut patches = ConditionalList::default();
     let mut target_directory = None;
-    let mut attestation = None;
+    let mut attestations = Vec::new();
     let mut filter = IncludeExclude::default();
 
     for (key_node, value_node) in mapping.iter() {
@@ -506,16 +538,18 @@ fn parse_url_source(
             "target_directory" => {
                 target_directory = Some(parse_value(value_node)?);
             }
+            "attestations" => {
+                attestations = parse_attestations(key, value_node)?;
+            }
             "attestation" => {
-                if let Some(att_mapping) = value_node.as_mapping() {
-                    attestation = Some(parse_attestation_config(att_mapping)?);
-                } else {
-                    return Err(ParseError::invalid_value(
-                        "attestation",
-                        "expected a mapping with bundle_url and/or publishers",
-                        get_span(value_node),
-                    ));
-                }
+                return Err(ParseError::invalid_value(
+                    "url source",
+                    "the `attestation` field was renamed to `attestations`",
+                    *key_node.span(),
+                )
+                .with_suggestion(
+                    "Rename it to `attestations`; it takes one mapping or a list of them",
+                ));
             }
             "filter" => {
                 filter = parse_source_filter(value_node)?;
@@ -527,7 +561,7 @@ fn parse_url_source(
                     *key_node.span(),
                 )
                 .with_suggestion(
-                    "Valid fields are: url, sha256, md5, file_name, patches, target_directory, attestation, filter",
+                    "Valid fields are: url, sha256, md5, file_name, patches, target_directory, attestations, filter",
                 ));
             }
         }
@@ -547,7 +581,7 @@ fn parse_url_source(
         file_name,
         patches,
         target_directory,
-        attestation,
+        attestations,
         filter,
     })
 }

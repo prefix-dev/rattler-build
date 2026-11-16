@@ -1449,7 +1449,7 @@ fn source_list_has_attestation(
 ) -> bool {
     sources.iter().any(|item| match item {
         rattler_build_yaml_parser::Item::Value(v) => match v.as_concrete() {
-            Some(stage0::Source::Url(url_src)) => url_src.attestation.is_some(),
+            Some(stage0::Source::Url(url_src)) => !url_src.attestations.is_empty(),
             _ => false,
         },
         rattler_build_yaml_parser::Item::Conditional(cond) => {
@@ -1458,7 +1458,7 @@ fn source_list_has_attestation(
                 matches!(
                     item,
                     rattler_build_yaml_parser::Item::Value(v)
-                        if matches!(v.as_concrete(), Some(stage0::Source::Url(u)) if u.attestation.is_some())
+                        if matches!(v.as_concrete(), Some(stage0::Source::Url(u)) if !u.attestations.is_empty())
                 )
             })
         }
@@ -3025,7 +3025,7 @@ package:
 source:
   url: https://files.pythonhosted.org/packages/test/test-1.0.tar.gz
   sha256: "0000000000000000000000000000000000000000000000000000000000000000"
-  attestation:
+  attestations:
     publishers:
       - github:test/test
 "#;

@@ -11,13 +11,13 @@ Or, use the environment variable, `RATTLER_BUILD_EXPERIMENTAL=true`.
 
 ## Sigstore source attestation
 
-The `attestation` field on URL sources allows verifying that downloaded source archives were produced by a trusted publisher using [Sigstore](https://sigstore.dev) attestations. The bundle is discovered automatically for PyPI packages and uploaded GitHub release assets. GitHub's dynamically generated source archives are not covered by release attestations.
+The `attestations` field on URL sources allows verifying that downloaded source archives were produced by a trusted publisher using [Sigstore](https://sigstore.dev) attestations. The bundle is discovered automatically for PyPI packages and uploaded GitHub release assets. GitHub's dynamically generated source archives are not covered by release attestations.
 
 ```yaml
 source:
   url: https://files.pythonhosted.org/packages/.../flask-3.1.1.tar.gz
   sha256: "6489f1..."
-  attestation:
+  attestations:
     publishers:
       - github:pallets/flask
 ```

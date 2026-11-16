@@ -18,7 +18,7 @@ package:
 source:
   url: https://github.com/astral-sh/uv/releases/download/${{ version }}/source.tar.gz
   sha256: 5f0503f896f1209f6114835a7754369c2484331b0caab4c1ecd4579dfd2a31b0
-  attestation:
+  attestations:
     publishers:
       - github:astral-sh/uv
 

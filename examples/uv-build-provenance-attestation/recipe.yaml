@@ -22,7 +22,7 @@ package:
 source:
   url: https://github.com/astral-sh/uv/releases/download/${{ version }}/source.tar.gz
   sha256: ${{ sha256 }}
-  attestation:
+  attestations:
     bundle_url: https://api.github.com/repos/astral-sh/uv/attestations/sha256:${{ sha256 }}?predicate_type=provenance
     publishers:
       - github:astral-sh/uv@refs/heads/main

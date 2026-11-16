@@ -174,7 +174,7 @@ mod source_cache_tests {
             urls: vec![url::Url::parse(&format!("{base_url}/payload.txt")).unwrap()],
             checksums: vec![Checksum::Sha256(Sha256::digest(checksum_of).to_vec())],
             file_name: None,
-            attestation: None,
+            attestations: Vec::new(),
         });
 
         (cache.get_source(&source).await, hits)

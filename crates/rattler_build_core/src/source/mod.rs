@@ -197,8 +197,7 @@ pub(crate) fn convert_url_source(
         checksums.push(Checksum::Md5(md5.to_vec()));
     }
 
-    // Convert attestation config if present
-    let attestation = url_src.attestation.as_ref().map(|config| {
+    let attestations = url_src.attestations.iter().map(|config| {
         let identity_checks = config
             .publishers
             .iter()
@@ -224,20 +223,19 @@ pub(crate) fn convert_url_source(
         urls: url_src.url.clone(),
         checksums,
         file_name: url_src.file_name.clone(),
-        attestation,
+        attestations: attestations.collect(),
     })
 }
 
-/// Convert a stage1 PathSource checksums to cache Checksums
 /// The URL source with the repository and owner IDs that verification
 /// observed filled into every publisher that did not pin them, so the rendered
 /// recipe records exactly which repository the source was attested by.
 fn with_attested_ids(
     url_src: &rattler_build_recipe::stage1::source::UrlSource,
-    attested_ids: &[rattler_build_source_cache::AttestedIds],
+    attested_ids: &[Vec<rattler_build_source_cache::AttestedIds>],
 ) -> rattler_build_recipe::stage1::source::UrlSource {
     let mut url_src = url_src.clone();
-    if let Some(attestation) = &mut url_src.attestation {
+    for (attestation, attested_ids) in url_src.attestations.iter_mut().zip(attested_ids) {
         for (publisher, ids) in attestation.publishers.iter_mut().zip(attested_ids) {
             if publisher.repository_id.is_none() {
                 publisher.repository_id = ids.repository_id.clone();
@@ -250,6 +248,7 @@ fn with_attested_ids(
     url_src
 }
 
+/// Convert a stage1 PathSource checksums to cache Checksums
 fn convert_path_checksums(
     path_src: &rattler_build_recipe::stage1::source::PathSource,
 ) -> Vec<Checksum> {
@@ -447,7 +446,7 @@ async fn fetch_source(
                         patches: path_src.patches.clone(),
                         file_name: None,
                         target_directory: path_src.target_directory.clone(),
-                        attestation: None,
+                        attestations: Vec::new(),
                         filter: path_src.filter.clone(),
                     };
 

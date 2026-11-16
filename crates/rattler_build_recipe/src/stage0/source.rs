@@ -248,9 +248,11 @@ pub struct UrlSource {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub target_directory: Option<Value<PathBuf>>,
 
-    /// Optional attestation verification configuration
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub attestation: Option<AttestationConfig>,
+    /// Attestations the downloaded file must have. Every entry must verify.
+    /// Written as one mapping or a list.
+    #[serde_as(as = "OneOrMany<_, PreferMany>")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub attestations: Vec<AttestationConfig>,
 
     /// Filter for files to include/exclude from the extracted source
     #[serde(default)]
@@ -461,7 +463,7 @@ impl UrlSource {
             file_name,
             patches,
             target_directory,
-            attestation,
+            attestations,
             filter,
         } = self;
 
@@ -485,7 +487,7 @@ impl UrlSource {
         if let Some(td) = target_directory {
             vars.extend(td.used_variables());
         }
-        if let Some(attestation) = attestation {
+        for attestation in attestations {
             vars.extend(attestation.used_variables());
         }
         vars.extend(filter.used_variables());

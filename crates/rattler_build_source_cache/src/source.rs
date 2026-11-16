@@ -227,8 +227,8 @@ pub struct UrlSource {
     pub urls: Vec<url::Url>,
     pub checksums: Vec<Checksum>,
     pub file_name: Option<String>,
-    /// Optional attestation verification
-    pub attestation: Option<AttestationVerification>,
+    /// Attestations the file must have. Every entry must verify.
+    pub attestations: Vec<AttestationVerification>,
 }
 
 /// Source types that can be cached
