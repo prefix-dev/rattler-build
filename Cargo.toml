@@ -12,6 +12,125 @@ default-run = "rattler-build"
 rust-version = "1.98"
 publish = true
 
+[features]
+default = ["recipe-generation", "rustls", "s3", "sigstore"]
+native-tls = [
+  "rattler_build_core/native-tls",
+  "rattler_build_recipe_generator?/native-tls",
+]
+patch-test-extra = []
+# Enable optimized memory allocators for release builds.
+# This provides significant performance improvements, especially on Linux musl.
+# Disabled by default due to increased compile time.
+performance = ["rattler_build_allocator"]
+recipe-generation = ["rattler_build_recipe_generator"]
+rustls = ["rattler_build_core/rustls", "rattler_build_recipe_generator?/rustls"]
+s3 = ["rattler_build_core/s3"]
+sigstore = ["rattler_build_core/sigstore"]
+
+[[bin]]
+name = "rattler-build"
+required-features = ["recipe-generation"]
+
+[[bin]]
+name = "patch-apply-gen-test-data"
+path = "./scripts/patch-apply-gen-test-data.rs"
+
+[[bench]]
+harness = false
+name = "parse_file"
+
+[dependencies]
+anyhow = { workspace = true }
+async-compression = { version = "0.4", features = ["tokio", "zstd"] }
+async_http_range_reader = { package = "astral_async_http_range_reader", version = "0.12.0" }
+async_zip = { package = "astral_async_zip", version = "0.0.22", features = [
+  "tokio",
+  "zstd",
+] }
+clap = { workspace = true, features = ["cargo", "env", "suggestions"] }
+clap_complete = "4.6.11"
+clap_complete_nushell = "4.6.2"
+clap-verbosity-flag = { workspace = true }
+comfy-table = { workspace = true }
+console = { workspace = true }
+dialoguer = "0.12.0"
+dunce = { workspace = true }
+fs-err = { workspace = true }
+futures = { workspace = true }
+globset = { workspace = true }
+hex = { workspace = true }
+http = "1"
+ignore = { workspace = true }
+indexmap = { workspace = true }
+jiff = { workspace = true }
+memmap2 = { workspace = true }
+miette = { workspace = true, features = ["fancy"] }
+minijinja = { workspace = true }
+num_cpus = { workspace = true }
+reqwest = { workspace = true, features = ["multipart"] }
+reqwest-middleware = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+sha2 = { workspace = true }
+tempfile = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true, features = [
+  "io-util",
+  "macros",
+  "net",
+  "process",
+  "rt",
+  "rt-multi-thread",
+  "time",
+] }
+tokio_tar = { package = "astral-tokio-tar", version = "0.7", default-features = false }
+tokio-util = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+url = { workspace = true }
+
+# Rattler crates
+rattler = { workspace = true }
+rattler_conda_types = { workspace = true, features = ["rayon"] }
+rattler_config = { workspace = true }
+rattler_digest = { workspace = true }
+rattler_index = { workspace = true }
+rattler_networking = { workspace = true, features = ["rattler_config"] }
+rattler_package_streaming = { workspace = true, default-features = false }
+rattler_repodata_gateway = { workspace = true }
+rattler_solve = { workspace = true }
+rattler_upload = { workspace = true }
+rattler_virtual_packages = { workspace = true }
+
+rattler_build_allocator = { workspace = true, optional = true }
+# Local rattler-build crates
+rattler_build_core = { workspace = true }
+rattler_build_recipe = { workspace = true, features = ["variant-config"] }
+rattler_build_recipe_generator = { workspace = true, features = [
+  "cli",
+], optional = true }
+rattler_build_script = { workspace = true, features = ["execution"] }
+rattler_build_types = { workspace = true }
+rattler_build_variant_config = { workspace = true, features = ["parser"] }
+
+[dev-dependencies]
+criterion = { version = "0.8.2", features = ["html_reports"] }
+insta = { workspace = true, features = ["filters", "yaml"] }
+pretty_assertions = { workspace = true }
+rstest = { workspace = true }
+serial_test = { workspace = true }
+tracing-indicatif = "0.3"
+tracing-test = { workspace = true }
+
+[target."cfg(unix)".dependencies]
+libc = { workspace = true }
+
+# cc >= 1.5.0 passes `-Tp` as a separate argument for `.cc` sources on MSVC (https://github.com/rust-lang/cc-rs/pull/1930), which sccache does not support and breaks the mimalloc build (https://github.com/mozilla/sccache/issues/2062).
+[target."cfg(windows)".dependencies]
+cc = "=1.4.7"
+
 [workspace]
 members = [
   "crates/rattler_build_allocator",
@@ -180,122 +299,3 @@ rattler_build_source_cache = { path = "crates/rattler_build_source_cache", versi
 rattler_build_types = { path = "crates/rattler_build_types", version = "=0.1.23" }
 rattler_build_variant_config = { path = "crates/rattler_build_variant_config", version = "=0.1.25" }
 rattler_build_yaml_parser = { path = "crates/rattler_build_yaml_parser", version = "=0.1.25" }
-
-[[bin]]
-name = "rattler-build"
-required-features = ["recipe-generation"]
-
-[[bin]]
-name = "patch-apply-gen-test-data"
-path = "./scripts/patch-apply-gen-test-data.rs"
-
-[[bench]]
-harness = false
-name = "parse_file"
-
-[dependencies]
-anyhow = { workspace = true }
-async-compression = { version = "0.4", features = ["tokio", "zstd"] }
-async_http_range_reader = { package = "astral_async_http_range_reader", version = "0.12.0" }
-async_zip = { package = "astral_async_zip", version = "0.0.22", features = [
-  "tokio",
-  "zstd",
-] }
-clap = { workspace = true, features = ["cargo", "env", "suggestions"] }
-clap_complete = "4.6.11"
-clap_complete_nushell = "4.6.2"
-clap-verbosity-flag = { workspace = true }
-comfy-table = { workspace = true }
-console = { workspace = true }
-dialoguer = "0.12.0"
-dunce = { workspace = true }
-fs-err = { workspace = true }
-futures = { workspace = true }
-globset = { workspace = true }
-hex = { workspace = true }
-http = "1"
-ignore = { workspace = true }
-indexmap = { workspace = true }
-jiff = { workspace = true }
-memmap2 = { workspace = true }
-miette = { workspace = true, features = ["fancy"] }
-minijinja = { workspace = true }
-num_cpus = { workspace = true }
-reqwest = { workspace = true, features = ["multipart"] }
-reqwest-middleware = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
-serde_yaml = { workspace = true }
-sha2 = { workspace = true }
-tempfile = { workspace = true }
-thiserror = { workspace = true }
-tokio = { workspace = true, features = [
-  "io-util",
-  "macros",
-  "net",
-  "process",
-  "rt",
-  "rt-multi-thread",
-  "time",
-] }
-tokio_tar = { package = "astral-tokio-tar", version = "0.7", default-features = false }
-tokio-util = { workspace = true }
-tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
-url = { workspace = true }
-
-# Rattler crates
-rattler = { workspace = true }
-rattler_conda_types = { workspace = true, features = ["rayon"] }
-rattler_config = { workspace = true }
-rattler_digest = { workspace = true }
-rattler_index = { workspace = true }
-rattler_networking = { workspace = true, features = ["rattler_config"] }
-rattler_package_streaming = { workspace = true, default-features = false }
-rattler_repodata_gateway = { workspace = true }
-rattler_solve = { workspace = true }
-rattler_upload = { workspace = true }
-rattler_virtual_packages = { workspace = true }
-
-rattler_build_allocator = { workspace = true, optional = true }
-# Local rattler-build crates
-rattler_build_core = { workspace = true }
-rattler_build_recipe = { workspace = true, features = ["variant-config"] }
-rattler_build_recipe_generator = { workspace = true, features = [
-  "cli",
-], optional = true }
-rattler_build_script = { workspace = true, features = ["execution"] }
-rattler_build_types = { workspace = true }
-rattler_build_variant_config = { workspace = true, features = ["parser"] }
-
-[dev-dependencies]
-criterion = { version = "0.8.2", features = ["html_reports"] }
-insta = { workspace = true, features = ["filters", "yaml"] }
-pretty_assertions = { workspace = true }
-rstest = { workspace = true }
-serial_test = { workspace = true }
-tracing-indicatif = "0.3"
-tracing-test = { workspace = true }
-
-[target."cfg(unix)".dependencies]
-libc = { workspace = true }
-
-# cc >= 1.5.0 passes `-Tp` as a separate argument for `.cc` sources on MSVC (https://github.com/rust-lang/cc-rs/pull/1930), which sccache does not support and breaks the mimalloc build (https://github.com/mozilla/sccache/issues/2062).
-[target."cfg(windows)".dependencies]
-cc = "=1.4.7"
-
-[features]
-default = ["recipe-generation", "rustls", "s3", "sigstore"]
-native-tls = [
-  "rattler_build_core/native-tls",
-  "rattler_build_recipe_generator?/native-tls",
-]
-patch-test-extra = []
-# Enable optimized memory allocators for release builds.
-# This provides significant performance improvements, especially on Linux musl.
-# Disabled by default due to increased compile time.
-performance = ["rattler_build_allocator"]
-recipe-generation = ["rattler_build_recipe_generator"]
-rustls = ["rattler_build_core/rustls", "rattler_build_recipe_generator?/rustls"]
-s3 = ["rattler_build_core/s3"]
-sigstore = ["rattler_build_core/sigstore"]

@@ -21,5 +21,3 @@ thiserror = { workspace = true }
 [dev-dependencies]
 fs-err = { workspace = true }
 insta = { workspace = true, features = ["yaml"] }
-
-[features]
