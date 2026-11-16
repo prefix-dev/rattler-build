@@ -286,6 +286,9 @@
         <loc>https://rattler-build.prefix.dev/latest/reference/cli/rattler-build/package/extract/</loc>
       </url>
       <url>
+        <loc>https://rattler-build.prefix.dev/latest/reference/cli/rattler-build/package/attest/</loc>
+      </url>
+      <url>
         <loc>https://rattler-build.prefix.dev/latest/reference/cli/rattler-build/bump-recipe/</loc>
       </url>
       <url>
