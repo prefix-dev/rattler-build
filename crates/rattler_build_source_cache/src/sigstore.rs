@@ -25,7 +25,7 @@ use sigstore_types::{Artifact, Sha256Hash, SignatureContent};
 use sigstore_verify::{VerificationPolicy, VerificationResult, verify};
 
 use crate::error::CacheError;
-use crate::source::{AttestationVerification, IdentityCheck};
+use crate::source::{AttestationVerification, AttestedIds, IdentityCheck};
 use rattler_build_networking::BaseClient;
 
 /// The fixed certificate identity of GitHub's immutable release attester.
@@ -737,7 +737,7 @@ pub(crate) async fn verify_attestation(
     file_path: &Path,
     source_url: &url::Url,
     attestation_config: &AttestationVerification,
-) -> Result<(), CacheError> {
+) -> Result<Vec<AttestedIds>, CacheError> {
     // Hash the artifact first: GitHub's API is queried by the asset digest.
     let artifact_bytes = fs_err::tokio::read(file_path).await?;
     let artifact_sha256 = Sha256Hash::new(Sha256::digest(&artifact_bytes).into());
@@ -772,7 +772,7 @@ pub(crate) async fn verify_attestation(
         CacheError::SigstoreTrustRoot(format!("Failed to load Sigstore trusted root via TUF: {e}"))
     })?;
 
-    check_attestation_response(
+    let ids = check_attestation_response(
         Artifact::from_blob(&artifact_bytes),
         &artifact_sha256,
         &response_json,
@@ -788,12 +788,15 @@ pub(crate) async fn verify_attestation(
             .map(|f| f.to_string_lossy())
             .unwrap_or_else(|| file_path.to_string_lossy())
     );
-    Ok(())
+    Ok(ids)
 }
 
 /// Verify a downloaded attestation response against an artifact: parse it,
 /// verify every bundle cryptographically against `trusted_root`, and check
 /// every configured publisher against a verified bundle.
+///
+/// Returns, for each publisher in order, the repository and owner IDs of the
+/// bundle that satisfied it.
 fn check_attestation_response(
     artifact: Artifact<'_>,
     artifact_sha256: &Sha256Hash,
@@ -801,7 +804,7 @@ fn check_attestation_response(
     kind: AttestationKind,
     trusted_root: &TrustedRoot,
     attestation_config: &AttestationVerification,
-) -> Result<(), CacheError> {
+) -> Result<Vec<AttestedIds>, CacheError> {
     let bundles = parse_attestation_response(response_json)?;
 
     // Give a precise error early if the attestation is for a different file.
@@ -824,6 +827,7 @@ fn check_attestation_response(
     }
 
     // Every configured publisher must be satisfied by a verified bundle.
+    let mut attested = Vec::with_capacity(attestation_config.identity_checks.len());
     for check in &attestation_config.identity_checks {
         if let Some(bundle) = verified.iter().find(|b| b.satisfies(check, kind)) {
             tracing::info!(
@@ -831,18 +835,19 @@ fn check_attestation_response(
                 bundle.identity().unwrap_or("<none>")
             );
             let pins = bundle.pins(kind);
-            if let (None, None, Some(repository_id), Some(owner_id)) = (
-                &check.repository_id,
-                &check.owner_id,
-                &pins.repository_id,
-                &pins.owner_id,
-            ) {
+            if check.repository_id.is_none()
+                && check.owner_id.is_none()
+                && let Some(hint) = pin_hint(check, &pins)
+            {
                 tracing::info!(
-                    "Tip: pin this publisher to its immutable repository, which a renamed or \
-                     recreated repository cannot match, by adding `repository_id: {repository_id}` \
-                     and `owner_id: {owner_id}` to its mapping form (`- github: owner/repo`)"
+                    "Tip: pin this publisher to its immutable repository and owner IDs, which a \
+                     renamed or recreated repository cannot match: {hint}"
                 );
             }
+            attested.push(AttestedIds {
+                repository_id: pins.repository_id,
+                owner_id: pins.owner_id,
+            });
             continue;
         }
 
@@ -900,7 +905,32 @@ fn check_attestation_response(
         return Err(CacheError::AttestationVerification(msg));
     }
 
-    Ok(())
+    Ok(attested)
+}
+
+/// How to pin `check` to the IDs in `pins`, in the form the recipe most likely
+/// uses: the compact string, or the mapping keys when an `environment` shows
+/// the mapping form is in use.
+fn pin_hint(check: &IdentityCheck, pins: &Pins) -> Option<String> {
+    let (repository_id, owner_id) = (pins.repository_id.as_ref()?, pins.owner_id.as_ref()?);
+    if check.environment.is_some() {
+        return Some(format!(
+            "add `repository_id: {repository_id}` and `owner_id: {owner_id}`"
+        ));
+    }
+    let (provider, path) = match check.identity.strip_prefix("https://github.com/") {
+        Some(path) => ("github", path),
+        None => (
+            "gitlab",
+            check.identity.strip_prefix("https://gitlab.com/")?,
+        ),
+    };
+    let (owner, repo) = path.split_once('/')?;
+    let mut hint = format!("`{provider}:{owner}({owner_id})/{repo}({repository_id})`");
+    if check.ref_constraint.is_some() {
+        hint.push_str(" (keep your `@ref`)");
+    }
+    Some(hint)
 }
 
 #[cfg(test)]
@@ -1370,7 +1400,7 @@ mod tests {
         response: &str,
         kind: AttestationKind,
         cfg: &AttestationVerification,
-    ) -> Result<(), CacheError> {
+    ) -> Result<Vec<AttestedIds>, CacheError> {
         let root = match kind {
             AttestationKind::PublicGood => sigstore_trust_root::SIGSTORE_PRODUCTION_TRUSTED_ROOT,
             AttestationKind::GitHubRelease => sigstore_trust_root::SIGSTORE_GITHUB_TRUSTED_ROOT,
@@ -1505,6 +1535,75 @@ mod tests {
                 "{err}"
             );
         }
+    }
+
+    #[test]
+    fn test_offline_returns_attested_ids() {
+        let flask = AttestedIds {
+            repository_id: Some("596892".into()),
+            owner_id: Some("16748505".into()),
+        };
+        // One entry per publisher, also when the publisher pins nothing.
+        let mut cfg = config("https://github.com/pallets/flask", Some("refs/tags/3.1.1"));
+        cfg.identity_checks.push(cfg.identity_checks[0].clone());
+        let ids = offline_check(
+            FLASK_SHA,
+            FLASK_PROVENANCE,
+            AttestationKind::PublicGood,
+            &cfg,
+        )
+        .unwrap();
+        assert_eq!(ids, [flask.clone(), flask]);
+
+        // GitHub release attestations: from the signed release predicate.
+        let ids = offline_check(
+            UV_SHA,
+            UV_ATTESTATIONS,
+            AttestationKind::GitHubRelease,
+            &config("https://github.com/astral-sh/uv", None),
+        )
+        .unwrap();
+        assert_eq!(
+            ids,
+            [AttestedIds {
+                repository_id: Some("699532645".into()),
+                owner_id: Some("115962839".into()),
+            }]
+        );
+
+        let ids = offline_check(
+            FLASK_SHA,
+            FLASK_PROVENANCE,
+            AttestationKind::PublicGood,
+            &no_publishers(),
+        )
+        .unwrap();
+        assert!(ids.is_empty());
+    }
+
+    #[test]
+    fn test_pin_hint() {
+        let pins = Pins {
+            repository_id: Some("596892".into()),
+            owner_id: Some("16748505".into()),
+            environment: None,
+        };
+        let repo = "https://github.com/pallets/flask";
+        assert_eq!(
+            pin_hint(&check(repo, None), &pins).unwrap(),
+            "`github:pallets(16748505)/flask(596892)`"
+        );
+        assert_eq!(
+            pin_hint(&check(repo, Some("refs/tags/3.1.1")), &pins).unwrap(),
+            "`github:pallets(16748505)/flask(596892)` (keep your `@ref`)"
+        );
+        let mut mapping = check(repo, None);
+        mapping.environment = Some("publish".into());
+        assert_eq!(
+            pin_hint(&mapping, &pins).unwrap(),
+            "add `repository_id: 596892` and `owner_id: 16748505`"
+        );
+        assert!(pin_hint(&check(repo, None), &Pins::default()).is_none());
     }
 
     #[test]

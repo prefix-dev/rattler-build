@@ -68,7 +68,7 @@ mod source_cache_tests {
             last_accessed: jiff::Timestamp::now(),
             created: jiff::Timestamp::now(),
             lock_file: None,
-            verified_attestations: Vec::new(),
+            verified_attestations: Default::default(),
         };
 
         let key = "test_key";

@@ -6704,4 +6704,64 @@ package:
         assert!(r.is_ok(), "is defined test must not error: {:?}", r.err());
         assert_eq!(r.unwrap(), "no");
     }
+
+    #[test]
+    fn test_evaluate_compact_publisher_with_ids() {
+        use crate::stage1::Source as Stage1Source;
+
+        let publishers = |recipe_yaml: &str| {
+            let recipe = evaluate_recipe_with_vars(
+                recipe_yaml,
+                &[
+                    ("version", Variable::from_string("3.1.1")),
+                    ("repo_id", Variable::from_string("596892")),
+                ],
+            )
+            .unwrap();
+            let Stage1Source::Url(url) = &recipe.source[0] else {
+                panic!("expected a URL source");
+            };
+            url.attestation
+                .as_ref()
+                .unwrap()
+                .publishers
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+        };
+
+        // An ID can come from a template.
+        let block = r#"
+package:
+  name: flask
+  version: 3.1.1
+source:
+  url: https://pypi.io/packages/source/f/flask/flask-3.1.1.tar.gz
+  sha256: 284c7b8f2f58cb737f0cf1c30fd7eaf0ccfcde196099d24ecede3fc2005aa59e
+  attestation:
+    publishers:
+      - github:pallets(16748505)/flask(596892)@refs/tags/${{ version }}
+      - github:pallets/flask(${{ repo_id }})
+"#;
+        assert_eq!(
+            publishers(block),
+            [
+                "github:pallets(16748505)/flask(596892)@refs/tags/3.1.1",
+                "github:pallets/flask(596892)",
+            ]
+        );
+
+        // Parentheses have no meaning in YAML, so flow lists need no quotes.
+        let flow = r#"
+package:
+  name: flask
+  version: 3.1.1
+source:
+  url: https://pypi.io/packages/source/f/flask/flask-3.1.1.tar.gz
+  sha256: 284c7b8f2f58cb737f0cf1c30fd7eaf0ccfcde196099d24ecede3fc2005aa59e
+  attestation:
+    publishers: [github:pallets(16748505)/flask(596892)]
+"#;
+        assert_eq!(publishers(flow), ["github:pallets(16748505)/flask(596892)"]);
+    }
 }

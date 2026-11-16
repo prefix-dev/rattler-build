@@ -219,25 +219,64 @@ impl Publisher {
 }
 
 impl fmt::Display for Publisher {
+    /// Formats the compact form, e.g.
+    /// `github:pallets(16748505)/flask(596892)@refs/tags/3.1.1`, which
+    /// [`parse_publisher_string`] reads back. The environment has no slot in
+    /// the string and is appended as ` (environment: …)`.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}:{}/{}", self.provider, self.owner, self.repo)?;
+        let with_id = |name: &str, id: &Option<String>| match id {
+            Some(id) => format!("{name}({id})"),
+            None => name.to_string(),
+        };
+        write!(
+            f,
+            "{}:{}/{}",
+            self.provider,
+            with_id(&self.owner, &self.owner_id),
+            with_id(&self.repo, &self.repository_id)
+        )?;
         if let Some(ref_constraint) = &self.ref_constraint {
             write!(f, "@{}", ref_constraint)?;
         }
-        let pins = [
-            ("repository_id", &self.repository_id),
-            ("owner_id", &self.owner_id),
-            ("environment", &self.environment),
-        ];
-        let pins: Vec<_> = pins
-            .iter()
-            .filter_map(|(key, value)| value.as_ref().map(|v| format!("{key}: {v}")))
-            .collect();
-        if !pins.is_empty() {
-            write!(f, " ({})", pins.join(", "))?;
+        if let Some(environment) = &self.environment {
+            write!(f, " (environment: {environment})")?;
         }
         Ok(())
     }
+}
+
+/// Check that a repository or owner ID is a plain number.
+fn validate_numeric_id(key: &str, id: &str) -> Result<(), String> {
+    if id.is_empty() || !id.bytes().all(|b| b.is_ascii_digit()) {
+        return Err(format!(
+            "Invalid publisher {key} '{id}': expected the numeric ID (e.g. 596892)"
+        ));
+    }
+    Ok(())
+}
+
+/// Split `name{id}` into the name and the optional numeric ID.
+fn split_pinned_name<'a>(
+    part: &'a str,
+    key: &str,
+    s: &str,
+) -> Result<(&'a str, Option<String>), String> {
+    let (name, id) = match part.split_once('(') {
+        Some((name, rest)) => {
+            let id = rest.strip_suffix(')').ok_or_else(|| {
+                format!("Invalid publisher format '{s}': expected `name(id)` with the ID last")
+            })?;
+            validate_numeric_id(key, id)?;
+            (name, Some(id.to_string()))
+        }
+        None => (part, None),
+    };
+    if name.contains(['(', ')']) {
+        return Err(format!(
+            "Invalid publisher format '{s}': unexpected parenthesis in '{name}'"
+        ));
+    }
+    Ok((name, id))
 }
 
 /// Build a publisher from the mapping form. `owner_repo` is the value of the
@@ -255,14 +294,15 @@ pub fn publisher_from_parts(
             "Invalid publisher repository '{owner_repo}': put the ref in the `ref` field instead of after `@`"
         ));
     }
+    if owner_repo.contains(['(', ')']) {
+        return Err(format!(
+            "Invalid publisher repository '{owner_repo}': put the IDs in the `repository_id` and `owner_id` fields instead of in parentheses"
+        ));
+    }
     let mut publisher = parse_publisher_string(&format!("{provider}:{owner_repo}"))?;
     for (key, id) in [("repository_id", &repository_id), ("owner_id", &owner_id)] {
-        if let Some(id) = id
-            && (id.is_empty() || !id.bytes().all(|b| b.is_ascii_digit()))
-        {
-            return Err(format!(
-                "Invalid publisher {key} '{id}': expected the numeric ID (e.g. 596892)"
-            ));
+        if let Some(id) = id {
+            validate_numeric_id(key, id)?;
         }
     }
     if environment.as_deref() == Some("") {
@@ -275,7 +315,10 @@ pub fn publisher_from_parts(
     Ok(publisher)
 }
 
-/// Parse a publisher string like "github:owner/repo" or "github:owner/repo@refs/tags/v1.0"
+/// Parse a publisher string like "github:owner/repo" or "github:owner/repo@refs/tags/v1.0".
+///
+/// The owner and repository can each carry their immutable numeric ID in
+/// parentheses: "github:pallets(16748505)/flask(596892)@refs/tags/3.1.1".
 pub fn parse_publisher_string(s: &str) -> Result<Publisher, String> {
     let (provider_str, rest) = s.split_once(':').ok_or_else(|| {
         format!(
@@ -308,6 +351,9 @@ pub fn parse_publisher_string(s: &str) -> Result<Publisher, String> {
         )
     })?;
 
+    let (owner, owner_id) = split_pinned_name(owner, "owner_id", s)?;
+    let (repo, repository_id) = split_pinned_name(repo, "repository_id", s)?;
+
     if owner.is_empty() || repo.is_empty() {
         return Err(format!(
             "Invalid publisher format '{}': owner and repo must not be empty",
@@ -320,8 +366,8 @@ pub fn parse_publisher_string(s: &str) -> Result<Publisher, String> {
         owner: owner.to_string(),
         repo: repo.to_string(),
         ref_constraint,
-        repository_id: None,
-        owner_id: None,
+        repository_id,
+        owner_id,
         environment: None,
     })
 }
@@ -550,7 +596,7 @@ mod tests {
         assert_eq!(p.repository_id.as_deref(), Some("596892"));
         assert_eq!(
             p.to_string(),
-            "github:pallets/flask@refs/tags/3.1.1 (repository_id: 596892, owner_id: 16748505, environment: publish)"
+            "github:pallets(16748505)/flask(596892)@refs/tags/3.1.1 (environment: publish)"
         );
     }
 
@@ -578,6 +624,66 @@ mod tests {
         );
         assert!(parts("pallets/flask", "").unwrap_err().contains("numeric"));
         assert!(parts("flask", "1").is_err());
+        assert!(
+            parts("pallets(1)/flask", "2")
+                .unwrap_err()
+                .contains("`repository_id`")
+        );
+    }
+
+    #[test]
+    fn test_parse_publisher_with_ids() {
+        let p = parse_publisher_string("github:pallets(16748505)/flask(596892)@refs/tags/3.1.1")
+            .unwrap();
+        assert_eq!(p.owner, "pallets");
+        assert_eq!(p.owner_id.as_deref(), Some("16748505"));
+        assert_eq!(p.repo, "flask");
+        assert_eq!(p.repository_id.as_deref(), Some("596892"));
+        assert_eq!(p.ref_constraint.as_deref(), Some("refs/tags/3.1.1"));
+
+        // Each ID is optional on its own.
+        let p = parse_publisher_string("github:pallets/flask(596892)").unwrap();
+        assert_eq!(
+            (p.owner_id, p.repository_id.as_deref()),
+            (None, Some("596892"))
+        );
+        let p = parse_publisher_string("github:pallets(16748505)/flask").unwrap();
+        assert_eq!(
+            (p.owner_id.as_deref(), p.repository_id),
+            (Some("16748505"), None)
+        );
+    }
+
+    #[test]
+    fn test_parse_publisher_rejects_bad_ids() {
+        for bad in [
+            "github:pallets/flask()",
+            "github:pallets/flask(abc)",
+            "github:pallets/flask(596892",
+            "github:pallets/flask596892)",
+            "github:pallets/flask(1)x",
+            "github:pallets/fl(1)ask(2)",
+            "github:(1)/flask",
+            "github:pallets/(1)",
+        ] {
+            assert!(
+                parse_publisher_string(bad).is_err(),
+                "{bad} should not parse"
+            );
+        }
+    }
+
+    #[test]
+    fn test_publisher_display_round_trips() {
+        for s in [
+            "github:pallets/flask",
+            "github:pallets/flask@refs/tags/3.1.1",
+            "github:pallets(16748505)/flask(596892)@refs/tags/3.1.1",
+            "github:pallets/flask(596892)",
+            "gitlab:org(7)/project(8)@refs/heads/main",
+        ] {
+            assert_eq!(parse_publisher_string(s).unwrap().to_string(), s);
+        }
     }
 
     #[test]

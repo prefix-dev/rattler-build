@@ -229,6 +229,27 @@ pub(crate) fn convert_url_source(
 }
 
 /// Convert a stage1 PathSource checksums to cache Checksums
+/// The URL source with the repository and owner IDs that verification
+/// observed filled into every publisher that did not pin them, so the rendered
+/// recipe records exactly which repository the source was attested by.
+fn with_attested_ids(
+    url_src: &rattler_build_recipe::stage1::source::UrlSource,
+    attested_ids: &[rattler_build_source_cache::AttestedIds],
+) -> rattler_build_recipe::stage1::source::UrlSource {
+    let mut url_src = url_src.clone();
+    if let Some(attestation) = &mut url_src.attestation {
+        for (publisher, ids) in attestation.publishers.iter_mut().zip(attested_ids) {
+            if publisher.repository_id.is_none() {
+                publisher.repository_id = ids.repository_id.clone();
+            }
+            if publisher.owner_id.is_none() {
+                publisher.owner_id = ids.owner_id.clone();
+            }
+        }
+    }
+    url_src
+}
+
 fn convert_path_checksums(
     path_src: &rattler_build_recipe::stage1::source::PathSource,
 ) -> Vec<Checksum> {
@@ -368,7 +389,7 @@ async fn fetch_source(
             )?;
 
             Ok(FetchResult {
-                rendered_source: source.clone(),
+                rendered_source: Source::Url(with_attested_ids(url_src, &result.attested_ids)),
                 extracted_path,
             })
         }

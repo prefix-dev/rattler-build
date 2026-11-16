@@ -191,6 +191,17 @@ pub struct IdentityCheck {
     pub environment: Option<String>,
 }
 
+/// The immutable repository and owner IDs a verified attestation was signed
+/// for, as recorded in the signing certificate or the signed release
+/// predicate.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AttestedIds {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repository_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub owner_id: Option<String>,
+}
+
 /// Attestation verification configuration for the cache layer
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AttestationVerification {

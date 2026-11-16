@@ -278,7 +278,17 @@ For workflow-produced attestations (PyPI, build provenance, `.sigstore.json` bun
 
 ### Pinning the repository ID, owner ID and environment
 
-A repository name is not permanent: if the owner renames or deletes the account or repository, someone else can register the same name and publish attestations that match `github:owner/repo`. GitHub and GitLab give every repository and owner an immutable numeric ID that is never reused, and Sigstore records them in the attestation. Use the mapping form of a publisher to pin them:
+A repository name is not permanent: if the owner renames or deletes the account or repository, someone else can register the same name and publish attestations that match `github:owner/repo`. GitHub and GitLab give every repository and owner an immutable numeric ID that is never reused, and Sigstore records them in the attestation. Pin them by writing each ID in parentheses after its name:
+
+```yaml
+attestation:
+  publishers:
+    - github:pallets(16748505)/flask(596892)@refs/tags/${{ version }}
+```
+
+The ID after the owner is the `owner_id` (the user or organization), the one after the repository is the `repository_id`. Each is optional on its own.
+
+To also pin the deployment environment, use the mapping form of a publisher:
 
 ```yaml
 attestation:
@@ -287,9 +297,10 @@ attestation:
       ref: refs/tags/${{ version }}  # optional, same as the `@<ref>` suffix
       repository_id: 596892
       owner_id: 16748505
+      environment: release
 ```
 
-The mapping takes exactly one of `github` or `gitlab` (`owner/repo`), and optionally:
+The mapping takes exactly one of `github` or `gitlab` (`owner/repo`, without IDs in parentheses), and optionally:
 
 - `ref`: the git ref, as described above
 - `repository_id`: the immutable ID of the repository
@@ -298,7 +309,9 @@ The mapping takes exactly one of `github` or `gitlab` (`owner/repo`), and option
 
 Every pinned value must be present in the attestation and equal, in addition to the repository name. For workflow-produced attestations the values come from the signing certificate; for GitHub release attestations the IDs come from the signed release statement, which does not record an environment, so an `environment` pin never matches a release attestation.
 
-You don't need to look the IDs up: when a publisher without pinned IDs verifies, Rattler-Build logs the `repository_id` and `owner_id` to add. They match the IDs in GitHub's immutable OIDC subject claims (`repo:pallets@16748505/flask@596892:...`).
+You don't need to look the IDs up: when a publisher without pinned IDs verifies, Rattler-Build logs the pinned publisher string to paste into the recipe. The IDs match the ones in GitHub's immutable OIDC subject claims (`repo:pallets@16748505/flask@596892:...`).
+
+The rendered recipe stored in the package (`info/recipe/rendered_recipe.yaml`) always records the IDs the attestation was verified with: its `finalized_sources` section fills in the `repository_id` and `owner_id` of every publisher that did not pin them, so you can later check exactly which repository a package's source was attested by.
 
 ## Verifying attestations
 
