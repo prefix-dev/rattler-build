@@ -4133,7 +4133,7 @@
 <li>
 <dl>
 <dt><a id="arg---render-only" href="#arg---render-only"><code>--render-only</code></a></dt>
-<dd>Render the recipe files without executing the build</dd>
+<dd>Render the recipe files without executing the build. Outputs that <code>--skip-existing</code> would skip are left out</dd>
 </dl>
 </li>
 <li>
@@ -4203,7 +4203,7 @@
 <li>
 <dl>
 <dt><a id="arg---continue-on-failure" href="#arg---continue-on-failure"><code>--continue-on-failure=&lt;MODE&gt;</code></a></dt>
-<dd>Continue building even if (one) of the packages fails to build. This is useful when building many packages with <code>--recipe-dir</code>. With <code>=skip-dependents</code>, also skip every package that needs a package whose build failed in this run (as a build or host dependency, or through their run dependencies), instead of building it later against the configured channels
+<dd>Continue building even if (one) of the packages fails to build. This is useful when building many packages with <code>--recipe-dir</code>. With <code>=skip-dependents</code>, also skip every package that needs a package whose build failed in this run (as a build or host dependency, or through their run dependencies), instead of building it later against the configured channels. With <code>--render-only --with-solve</code>, leave out the outputs whose dependencies cannot be resolved instead of stopping
 <br><strong>options</strong>: <code>yes</code>, <code>skip-dependents</code></dd>
 </dl>
 </li>
