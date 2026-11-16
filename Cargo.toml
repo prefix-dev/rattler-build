@@ -1,6 +1,6 @@
 [package]
 name = "rattler-build"
-version = "0.80.1"
+version = "0.80.2"
 authors = ["rattler-build contributors <hi@prefix.dev>"]
 repository = "https://github.com/prefix-dev/rattler-build"
 edition = "2024"
@@ -177,7 +177,7 @@ indexmap = "2.14.2"
 indicatif = "0.18.6"
 insta = "1.49.0"
 itertools = "0.15.0"
-jiff = { version = "0.2.42", features = ["serde"] }
+jiff = { version = "0.2.46", features = ["serde"] }
 lazy_static = "1.5.1"
 libc = "0.2"
 line-ending = "1.6.0"
@@ -229,8 +229,8 @@ urlencoding = "2.1"
 walkdir = "2.5.0"
 which = "8.0.6"
 windows-sys = "0.61"
-zip = { version = "9.5.1", default-features = false, features = ["deflate"] }
-zstd = "0.14.3"
+zip = { version = "9.6.0", default-features = false, features = ["deflate"] }
+zstd = "0.14.4"
 
 # Dependencies used in subcrates (workspace-level)
 clap-verbosity-flag = "3.0.4"
@@ -240,7 +240,7 @@ goblin = "0.10.7"
 ignore = "0.4.34"
 num_cpus = "1.17.0"
 pretty_assertions = "1.4.1"
-reflink-copy = "0.1.32"
+reflink-copy = "0.1.33"
 scroll = "0.13.0"
 serde-untagged = "0.1.9"
 terminal_size = "0.4.4"
@@ -255,37 +255,37 @@ tracing-subscriber = { version = "0.3", features = [
 tracing-test = "0.2.6"
 
 # Rattler crates
-rattler_conda_types = { version = "0.58.3", default-features = false }
+rattler_conda_types = { version = "0.58.4", default-features = false }
 rattler_digest = { version = "2.1", default-features = false, features = [
   "serde",
 ] }
-rattler_git = { version = "0.3.20" }
-rattler_networking = { version = "0.34.8", default-features = false }
-rattler_package_streaming = { version = "0.28.5", default-features = false }
+rattler_git = { version = "0.3.21" }
+rattler_networking = { version = "0.34.9", default-features = false }
+rattler_package_streaming = { version = "0.28.6", default-features = false }
 rattler_prefix_guard = { version = "0.1.2" }
-rattler_shell = { version = "0.29.9", default-features = false, features = [
+rattler_shell = { version = "0.29.10", default-features = false, features = [
   "sysinfo",
 ] }
 
-rattler = { version = "0.55.7", default-features = false, features = [
+rattler = { version = "0.55.8", default-features = false, features = [
   "cli-tools",
   "indicatif",
 ] }
-rattler_cache = { version = "0.12.3", default-features = false }
-rattler_config = { version = "0.12.2" }
-rattler_index = { version = "0.34.7", default-features = false }
+rattler_cache = { version = "0.12.4", default-features = false }
+rattler_config = { version = "0.12.3" }
+rattler_index = { version = "0.34.8", default-features = false }
 rattler_menuinst = "0.5.0"
 rattler_redaction = { version = "0.2.7", default-features = false }
-rattler_repodata_gateway = { version = "0.38.3", default-features = false, features = [
+rattler_repodata_gateway = { version = "0.38.4", default-features = false, features = [
   "gateway",
 ] }
-rattler_s3 = { version = "0.4.6" }
-rattler_solve = { version = "13.0.0", default-features = false, features = [
+rattler_s3 = { version = "0.4.7" }
+rattler_solve = { version = "13.0.1", default-features = false, features = [
   "resolvo",
   "serde",
 ] }
-rattler_upload = { version = "0.15.5", default-features = false }
-rattler_virtual_packages = { version = "8.1.7", default-features = false }
+rattler_upload = { version = "0.15.6", default-features = false }
+rattler_virtual_packages = { version = "8.1.8", default-features = false }
 
 # Internal rattler-build crates
 rattler_build_allocator = { path = "crates/rattler_build_allocator", version = "=0.1.3" }
