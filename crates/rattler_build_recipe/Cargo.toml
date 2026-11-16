@@ -12,6 +12,11 @@ license.workspace = true
 # Auto-enable features for examples
 always_include_features = ["variant-config"]
 
+[features]
+default = ["script-execution", "variant-config"]
+script-execution = ["rattler_build_script/execution"]
+variant-config = ["dep:petgraph", "dep:rattler_build_variant_config"]
+
 # Examples automatically enable required features
 [[example]]
 name = "parse_recipe"
@@ -56,8 +61,3 @@ walkdir = { workspace = true }
 [dev-dependencies.miette]
 workspace = true
 features = ["fancy"]
-
-[features]
-default = ["script-execution", "variant-config"]
-script-execution = ["rattler_build_script/execution"]
-variant-config = ["dep:petgraph", "dep:rattler_build_variant_config"]

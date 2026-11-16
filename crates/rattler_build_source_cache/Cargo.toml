@@ -8,6 +8,21 @@ readme = "README.md"
 repository.workspace = true
 license.workspace = true
 
+[features]
+default = ["rustls", "sigstore"]
+native-tls = [
+  "rattler_build_networking/native-tls",
+  "sigstore-verify?/native-tls",
+]
+rustls = ["rattler_build_networking/rustls", "sigstore-verify?/rustls"]
+sigstore = [
+  "dep:sigstore-trust-root",
+  "dep:sigstore-types",
+  "dep:sigstore-verify",
+  "sigstore-trust-root/tuf",
+  "sigstore-verify/tuf",
+]
+
 [dependencies]
 async-trait = { workspace = true }
 bzip2 = { workspace = true }
@@ -54,18 +69,3 @@ zstd = { workspace = true }
 base64 = "0.23"
 tempfile.workspace = true
 tokio = { workspace = true, features = ["macros", "rt", "test-util"] }
-
-[features]
-default = ["rustls", "sigstore"]
-native-tls = [
-  "rattler_build_networking/native-tls",
-  "sigstore-verify?/native-tls",
-]
-rustls = ["rattler_build_networking/rustls", "sigstore-verify?/rustls"]
-sigstore = [
-  "dep:sigstore-trust-root",
-  "dep:sigstore-types",
-  "dep:sigstore-verify",
-  "sigstore-trust-root/tuf",
-  "sigstore-verify/tuf",
-]

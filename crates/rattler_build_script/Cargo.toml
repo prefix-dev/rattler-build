@@ -8,6 +8,24 @@ readme = "README.md"
 repository.workspace = true
 license.workspace = true
 
+[features]
+default = ["execution"]
+execution = [
+  "async-trait",
+  "fs-err",
+  "futures",
+  "itertools",
+  "minijinja",
+  "rattler_conda_types",
+  "rattler_shell",
+  "strsim",
+  "thiserror",
+  "tokio",
+  "tokio-util",
+  "tracing",
+  "which",
+]
+
 [dependencies]
 # Core dependencies (always needed)
 indexmap = { workspace = true }
@@ -47,21 +65,3 @@ windows-sys = { workspace = true, features = [
   "Win32_System_SystemInformation",
   "Win32_System_Threading",
 ] }
-
-[features]
-default = ["execution"]
-execution = [
-  "async-trait",
-  "fs-err",
-  "futures",
-  "itertools",
-  "minijinja",
-  "rattler_conda_types",
-  "rattler_shell",
-  "strsim",
-  "thiserror",
-  "tokio",
-  "tokio-util",
-  "tracing",
-  "which",
-]

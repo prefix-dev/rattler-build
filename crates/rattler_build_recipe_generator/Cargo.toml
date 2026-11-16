@@ -8,6 +8,12 @@ readme = "README.md"
 repository.workspace = true
 license.workspace = true
 
+[features]
+default = ["rustls"]
+cli = ["dep:clap"]
+native-tls = ["reqwest/native-tls"]
+rustls = ["reqwest/rustls"]
+
 [dependencies]
 async-once-cell = { workspace = true }
 async-recursion = { workspace = true }
@@ -40,9 +46,3 @@ tokio = { workspace = true }
 fs-err = { workspace = true }
 rattler_repodata_gateway = { workspace = true }
 tempfile = { workspace = true }
-
-[features]
-default = ["rustls"]
-cli = ["dep:clap"]
-native-tls = ["reqwest/native-tls"]
-rustls = ["reqwest/rustls"]

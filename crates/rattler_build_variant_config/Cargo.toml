@@ -8,6 +8,10 @@ readme = "README.md"
 repository.workspace = true
 license.workspace = true
 
+[features]
+default = ["parser"]
+parser = ["minijinja"]
+
 [dependencies]
 # Core serde
 serde = { workspace = true }
@@ -44,7 +48,3 @@ serial_test = { workspace = true }
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 fs-err = { workspace = true }
 regex = { workspace = true }
-
-[features]
-default = ["parser"]
-parser = ["minijinja"]

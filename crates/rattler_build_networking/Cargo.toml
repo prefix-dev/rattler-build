@@ -8,16 +8,6 @@ readme = "README.md"
 repository.workspace = true
 license.workspace = true
 
-[dependencies]
-rattler_networking = { workspace = true, default-features = false }
-reqwest = { workspace = true, features = ["multipart"] }
-reqwest-middleware = { workspace = true }
-reqwest-retry = { workspace = true }
-url = { workspace = true, features = ["serde"] }
-
-[dev-dependencies]
-tokio = { workspace = true, features = ["macros", "rt", "test-util"] }
-
 [features]
 default = []
 native-tls = ["rattler_networking/native-tls", "reqwest/native-tls"]
@@ -27,3 +17,13 @@ rustls = [
   "reqwest/rustls",
 ]
 s3 = ["rattler_networking/s3"]
+
+[dependencies]
+rattler_networking = { workspace = true, default-features = false }
+reqwest = { workspace = true, features = ["multipart"] }
+reqwest-middleware = { workspace = true }
+reqwest-retry = { workspace = true }
+url = { workspace = true, features = ["serde"] }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt", "test-util"] }
