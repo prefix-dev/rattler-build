@@ -1910,6 +1910,8 @@ def test_render_only_skip_existing_and_continue_on_failure(
 
     # `repro-consumer` needs `repro-wrapper` in its host environment, which
     # was never built, so its solve fails.
+    # `--with-solve` goes through `extra_args` so that `raw=True` returns the
+    # failed process instead of parsing its output.
     solve_args = ["--skip-existing", "local", "--with-solve"]
     failed = rattler_build.render(
         recipe, tmp_path, with_solve=False, extra_args=solve_args, raw=True

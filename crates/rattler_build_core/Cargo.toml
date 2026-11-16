@@ -41,7 +41,6 @@ reflink-copy = { workspace = true }
 regex = { workspace = true }
 reqwest = { workspace = true, features = ["multipart"] }
 reqwest-middleware = { workspace = true }
-rustc-hash = { workspace = true }
 scroll = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

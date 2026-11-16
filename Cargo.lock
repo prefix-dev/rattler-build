@@ -4974,7 +4974,6 @@ dependencies = [
  "reqwest",
  "retry-policies",
  "rstest",
- "rustc-hash",
  "scroll",
  "serde",
  "serde-untagged",
