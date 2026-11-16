@@ -135,6 +135,7 @@ nav = [
         "reference/cli/rattler-build/package/index.md",
         { "inspect" = "reference/cli/rattler-build/package/inspect.md" },
         { "extract" = "reference/cli/rattler-build/package/extract.md" },
+        { "attest" = "reference/cli/rattler-build/package/attest.md" },
       ] },
       { "bump-recipe" = "reference/cli/rattler-build/bump-recipe.md" },
       { "migrate-recipe" = "reference/cli/rattler-build/migrate-recipe.md" },

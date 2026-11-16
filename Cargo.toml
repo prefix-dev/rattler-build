@@ -26,7 +26,7 @@ performance = ["rattler_build_allocator"]
 recipe-generation = ["rattler_build_recipe_generator"]
 rustls = ["rattler_build_core/rustls", "rattler_build_recipe_generator?/rustls"]
 s3 = ["rattler_build_core/s3"]
-sigstore = ["rattler_build_core/sigstore"]
+sigstore = ["rattler_build_core/sigstore", "rattler_upload/sigstore-sign"]
 
 [[bin]]
 name = "rattler-build"
