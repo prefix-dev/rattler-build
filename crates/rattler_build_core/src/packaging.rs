@@ -92,6 +92,9 @@ pub enum PackagingError {
     #[error("No license files were copied")]
     LicensesNotFound,
 
+    #[error("The following license files were not found: {}", .0.join(", "))]
+    LicenseFilesNotFound(Vec<String>),
+
     #[error("Invalid Metadata: {0}")]
     InvalidMetadata(String),
 
@@ -359,12 +362,7 @@ fn copy_license_files(
     }
 
     if !missing_globs.is_empty() {
-        let error_str = format!(
-            "The following license files were not found: {}",
-            missing_globs.join(", ")
-        );
-        tracing::error!(error_str);
-        return Err(PackagingError::LicensesNotFound);
+        return Err(PackagingError::LicenseFilesNotFound(missing_globs));
     }
 
     if copied_files.is_empty() {
@@ -1337,5 +1335,36 @@ mod packaging_tests {
         let path = Path::new(r"foo/bar\baz");
         let normalized = normalize_path_for_comparison(path, false).unwrap();
         assert_eq!(normalized, "foo/bar/baz");
+    }
+
+    #[test]
+    fn test_missing_license_files_are_named_in_error() {
+        let tmp = tempfile::tempdir().unwrap();
+        let work_dir = tmp.path().join("work");
+        let recipe_dir = tmp.path().join("recipe");
+        fs::create_dir_all(&work_dir).unwrap();
+        fs::create_dir_all(&recipe_dir).unwrap();
+        fs::write(work_dir.join("LICENSE"), "MIT").unwrap();
+
+        let recipe = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/rendered_recipes/rich_recipe.yaml");
+        let mut output: Output =
+            serde_yaml::from_str(&fs::read_to_string(recipe).unwrap()).unwrap();
+        output.build_configuration.directories.work_dir = work_dir;
+        output.build_configuration.directories.recipe_dir = recipe_dir;
+
+        // One of the two license files exists, so the error must not claim that
+        // nothing was copied, and must say which file is missing.
+        output.recipe.about.license_file = Some(
+            LateBoundGlobVec::from_sources(
+                vec!["LICENSE".to_string(), "COPYING.txt".to_string()],
+                vec![],
+            )
+            .unwrap(),
+        );
+        let err = copy_license_files(&output, tmp.path(), false).unwrap_err();
+        let message = err.to_string();
+        assert!(message.contains("COPYING.txt"), "{message}");
+        assert!(!message.contains("LICENSE"), "{message}");
     }
 }
