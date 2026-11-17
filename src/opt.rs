@@ -700,7 +700,7 @@ pub struct BuildOpts {
     /// Whether to skip packages that already exist in any channel
     /// If set to `none`, do not skip any packages, default when not specified.
     /// If set to `local`, only skip packages that already exist locally,
-    /// default when using `--skip-existing. If set to `all`, skip packages
+    /// default when using `--skip-existing`. If set to `all`, skip packages
     /// that already exist in any channel.
     #[arg(long, default_missing_value = "local", num_args = 0..=1, help_heading = "Modifying result"
     )]
