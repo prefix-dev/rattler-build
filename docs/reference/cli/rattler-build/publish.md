@@ -96,7 +96,7 @@ e.g. `tar-bz2:<number>` (from 1 to 9) or `conda:<number>` (from -7 to
 :  Output directory for build artifacts.
 <br>**env**: `CONDA_BLD_PATH`
 - <a id="arg---skip-existing" href="#arg---skip-existing">`--skip-existing <SKIP_EXISTING>`</a>
-:  Whether to skip packages that already exist in any channel If set to `none`, do not skip any packages, default when not specified. If set to `local`, only skip packages that already exist locally, default when using `--skip-existing. If set to `all`, skip packages that already exist in any channel
+:  Whether to skip packages that already exist in any channel If set to `none`, do not skip any packages, default when not specified. If set to `local`, only skip packages that already exist locally, default when using `--skip-existing`. If set to `all`, skip packages that already exist in any channel
 <br>**options**: `none`, `local`, `all`
 - <a id="arg---noarch-build-platform" href="#arg---noarch-build-platform">`--noarch-build-platform <NOARCH_BUILD_PLATFORM>`</a>
 :  Define a "noarch platform" for which the noarch packages will be built for. The noarch builds will be skipped on the other platforms
