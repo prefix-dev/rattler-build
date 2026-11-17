@@ -46,9 +46,12 @@ pub use rattler_build_recipe::variant_render::RenderConfig;
 
 use std::collections::BTreeMap;
 
+use indexmap::IndexSet;
 use rattler_build_recipe::{stage1::HashInfo, variant_render::PinSubpackageInfo};
 use rattler_build_types::NormalizedKey;
-use rattler_conda_types::{NoArchType, Subdir};
+use rattler_conda_types::{NoArchType, PackageName, Subdir};
+
+use crate::types::PackageIdentifier;
 
 /// A discovered output from variant expansion
 #[allow(missing_docs)]
@@ -85,4 +88,46 @@ impl std::hash::Hash for DiscoveredOutput {
         self.noarch_type.hash(state);
         self.target_platform.hash(state);
     }
+}
+
+/// Returns the subpackages that `pin_subpackage` can resolve against when
+/// building the output at `index` of the topologically sorted `outputs`.
+///
+/// These are the non-skipped outputs up to and including `index`, overlaid
+/// with the variant-matched exact pins of the output at `index`.
+pub fn subpackages_for_output(
+    outputs: &IndexSet<DiscoveredOutput>,
+    index: usize,
+) -> BTreeMap<PackageName, PackageIdentifier> {
+    let mut subpackages: BTreeMap<_, _> = outputs
+        .iter()
+        .take(index + 1)
+        .filter(|output| !output.recipe.build().skip)
+        .map(|output| {
+            let name = output.recipe.package().name().clone();
+            let identifier = PackageIdentifier {
+                name: name.clone(),
+                version: output.recipe.package().version().clone(),
+                build_string: output.build_string.clone(),
+            };
+            (name, identifier)
+        })
+        .collect();
+
+    if let Some(output) = outputs.get_index(index) {
+        for pin in output.pin_subpackages.values() {
+            if let Some(build_string) = &pin.build_string {
+                subpackages.insert(
+                    pin.name.clone(),
+                    PackageIdentifier {
+                        name: pin.name.clone(),
+                        version: pin.version.clone(),
+                        build_string: build_string.clone(),
+                    },
+                );
+            }
+        }
+    }
+
+    subpackages
 }
