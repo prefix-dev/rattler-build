@@ -57,6 +57,13 @@ pub struct CacheEntry {
     /// Whether attestation has been verified for this entry
     #[serde(default)]
     pub attestation_verified: bool,
+
+    /// SHA-256 content hash of the extracted directory tree (if computed).
+    ///
+    /// Unlike the archive checksum, this hash is computed over the actual file
+    /// contents and is independent of how the archive was packed.  It therefore
+    /// remains stable even if the upstream archive is re-packed.
+    pub content_sha256: Option<String>,
 }
 
 /// The cache index that manages content-addressable cache metadata
