@@ -92,6 +92,9 @@ pub enum PackagingError {
     #[error("No license files were copied")]
     LicensesNotFound,
 
+    #[error("The following license files were not found: {}", .0.join(", "))]
+    LicenseFilesNotFound(Vec<String>),
+
     #[error("Invalid Metadata: {0}")]
     InvalidMetadata(String),
 
@@ -359,12 +362,9 @@ fn copy_license_files(
     }
 
     if !missing_globs.is_empty() {
-        let error_str = format!(
-            "The following license files were not found: {}",
-            missing_globs.join(", ")
-        );
-        tracing::error!(error_str);
-        return Err(PackagingError::LicensesNotFound);
+        let err = PackagingError::LicenseFilesNotFound(missing_globs);
+        tracing::error!("{err}");
+        return Err(err);
     }
 
     if copied_files.is_empty() {
@@ -1102,6 +1102,18 @@ mod packaging_tests {
     use std::os::unix::ffi::OsStrExt;
     #[cfg(windows)]
     use std::os::windows::ffi::OsStringExt;
+
+    #[test]
+    fn test_missing_license_files_error_names_files() {
+        let err = PackagingError::LicenseFilesNotFound(vec![
+            "LICENSE".to_string(),
+            "docs/NOTICE".to_string(),
+        ]);
+        assert_eq!(
+            err.to_string(),
+            "The following license files were not found: LICENSE, docs/NOTICE"
+        );
+    }
 
     #[test]
     fn test_split_glob_base() {
