@@ -244,6 +244,10 @@ paths = ["py-rattler-build"]
 separate_signature = true
 show_source = false
 
+[project.plugins.social]
+cards_layout_options.background_color = "#001838"
+cards_layout_options.color = "#F8F6F2"
+
 # Read by the mike fork with Zensical support when deploying versioned docs.
 [project.plugins.mike]
 canonical_version = "latest"
