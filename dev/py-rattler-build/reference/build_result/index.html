@@ -13,6 +13,7 @@
         <link rel="canonical" href="https://rattler-build.prefix.dev/latest/py-rattler-build/reference/build_result/">
       
       
+      
         <link rel="prev" href="../package/">
       
       
@@ -23,7 +24,7 @@
       
       
       <link rel="icon" href="../../../assets/favicon.png">
-      <meta name="generator" content="zensical-0.0.59">
+      <meta name="generator" content="zensical-0.1.2">
     
     
       
@@ -34,12 +35,12 @@
       
         
       
-      <link rel="stylesheet" href="../../../assets/stylesheets/classic/main.38807bfb.min.css">
+      <link rel="stylesheet" href="../../../assets/stylesheets/classic/main.0006804e.min.css">
       
         
           
         
-        <link rel="stylesheet" href="../../../assets/stylesheets/classic/palette.c7ab7c71.min.css">
+        <link rel="stylesheet" href="../../../assets/stylesheets/classic/palette.813d4b3f.min.css">
       
       
 
@@ -66,7 +67,19 @@
 
     
     
-  </head>
+  <meta property="og:type" content="website" />
+<meta property="og:title" content="Build Result - Rattler-Build" />
+<meta property="og:description" content="Rattler-Build Documentation — A fast conda package builder that creates cross-platform relocatable packages from a simple recipe format" />
+<meta property="og:image" content="https://rattler-build.prefix.dev/latest/assets/images/social/py-rattler-build/reference/build_result.png" />
+<meta property="og:image:type" content="image/png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:url" content="https://rattler-build.prefix.dev/latest/py-rattler-build/reference/build_result/" />
+<meta property="twitter:card" content="summary_large_image" />
+<meta property="twitter:title" content="Build Result - Rattler-Build" />
+<meta property="twitter:description" content="Rattler-Build Documentation — A fast conda package builder that creates cross-platform relocatable packages from a simple recipe format" />
+<meta property="twitter:image" content="https://rattler-build.prefix.dev/latest/assets/images/social/py-rattler-build/reference/build_result.png" />
+</head>
   
   
     
@@ -81,14 +94,11 @@
     
     <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
     <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
-    <label class="md-overlay" for="__drawer" aria-label="Navigation"></label>
+    <label class="md-overlay" for="__drawer" aria-hidden="true"></label>
     <div data-md-component="skip">
-      
-        
-        <a href="#build-result" class="md-skip">
-          Skip to content
-        </a>
-      
+      <a href="#__skip" class="md-skip">
+        Skip to content
+      </a>
     </div>
     <div data-md-component="announce">
       
@@ -110,9 +120,10 @@
   <img src="../../../assets/rattler-build-logo-no-padding.svg" alt="Rattler-Build">
 
     </a>
-    <label class="md-header__button md-icon" for="__drawer" aria-label="Navigation">
+    <label class="md-header__button md-icon" for="__drawer">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+      <span class="md-visually-hidden">Navigation</span>
     </label>
     <div class="md-header__title" data-md-component="header-title">
       <div class="md-header__ellipsis">
@@ -174,9 +185,10 @@
     
       
       
-        <label class="md-header__button md-icon" for="__search" aria-label="Search">
+        <label class="md-header__button md-icon" for="__search">
           
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+          <span class="md-visually-hidden">Search</span>
         </label>
         <div class="md-search" data-md-component="search" role="dialog" aria-label="Search">
   <button type="button" class="md-search__button">
@@ -415,20 +427,21 @@
             
           </div>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5">
-            <span class="md-nav__icon md-icon"></span>
-            
+        
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_5">
+              <span class="md-nav__icon md-icon"></span>
+              
   
   Examples
 
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-            
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
               
                 
+              
+                
+                  
   
   
   
@@ -452,10 +465,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -479,10 +492,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -506,10 +519,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -533,10 +546,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -560,10 +573,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -587,10 +600,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -614,10 +627,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -641,10 +654,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -668,10 +681,11 @@
     </li>
   
 
+                
               
-            
-          </ul>
-        </nav>
+            </ul>
+          </nav>
+        
       
     </li>
   
@@ -746,18 +760,19 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_6">
-            <span class="md-nav__icon md-icon"></span>
-            
+        
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_6">
+              <span class="md-nav__icon md-icon"></span>
+              
   
   Build options
 
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
               
                 
+                  
   
   
   
@@ -781,10 +796,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -808,10 +823,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -835,10 +850,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -862,10 +877,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -889,10 +904,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -916,10 +931,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -943,10 +958,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -970,10 +985,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -997,10 +1012,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -1024,10 +1039,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -1051,10 +1066,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -1078,10 +1093,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -1105,10 +1120,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -1132,10 +1147,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -1159,10 +1174,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -1186,10 +1201,11 @@
     </li>
   
 
+                
               
-            
-          </ul>
-        </nav>
+            </ul>
+          </nav>
+        
       
     </li>
   
@@ -1236,18 +1252,19 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_7">
-            <span class="md-nav__icon md-icon"></span>
-            
+        
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_7">
+              <span class="md-nav__icon md-icon"></span>
+              
   
   Testing
 
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
               
                 
+                  
   
   
   
@@ -1271,10 +1288,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -1298,10 +1315,11 @@
     </li>
   
 
+                
               
-            
-          </ul>
-        </nav>
+            </ul>
+          </nav>
+        
       
     </li>
   
@@ -1354,18 +1372,19 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_8">
-            <span class="md-nav__icon md-icon"></span>
-            
+        
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_8">
+              <span class="md-nav__icon md-icon"></span>
+              
   
   Publishing packages
 
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
               
                 
+                  
   
   
   
@@ -1389,10 +1408,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -1416,10 +1435,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -1443,10 +1462,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -1470,10 +1489,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -1497,10 +1516,11 @@
     </li>
   
 
+                
               
-            
-          </ul>
-        </nav>
+            </ul>
+          </nav>
+        
       
     </li>
   
@@ -1551,18 +1571,19 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_9">
-            <span class="md-nav__icon md-icon"></span>
-            
+        
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_9">
+              <span class="md-nav__icon md-icon"></span>
+              
   
   Package
 
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
               
                 
+                  
   
   
   
@@ -1586,10 +1607,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -1613,10 +1634,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -1640,10 +1661,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -1667,10 +1688,11 @@
     </li>
   
 
+                
               
-            
-          </ul>
-        </nav>
+            </ul>
+          </nav>
+        
       
     </li>
   
@@ -1719,18 +1741,19 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="true">
-          <label class="md-nav__title" for="__nav_10">
-            <span class="md-nav__icon md-icon"></span>
-            
+        
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="true">
+            <label class="md-nav__title" for="__nav_10">
+              <span class="md-nav__icon md-icon"></span>
+              
   
   Python Bindings
 
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
               
                 
+                  
   
   
     
@@ -1801,20 +1824,21 @@
             
           </div>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_10_1_label" aria-expanded="true">
-          <label class="md-nav__title" for="__nav_10_1">
-            <span class="md-nav__icon md-icon"></span>
-            
+        
+          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_10_1_label" aria-expanded="true">
+            <label class="md-nav__title" for="__nav_10_1">
+              <span class="md-nav__icon md-icon"></span>
+              
   
   Reference
 
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-            
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
               
                 
+              
+                
+                  
   
   
   
@@ -1838,10 +1862,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -1865,10 +1889,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -1892,10 +1916,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -1919,10 +1943,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
     
@@ -2105,10 +2129,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -2132,10 +2156,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -2159,10 +2183,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -2186,10 +2210,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -2213,10 +2237,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -2240,10 +2264,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -2267,18 +2291,19 @@
     </li>
   
 
+                
               
-            
-          </ul>
-        </nav>
+            </ul>
+          </nav>
+        
       
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -2324,18 +2349,19 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_10_2_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_10_2">
-            <span class="md-nav__icon md-icon"></span>
-            
+        
+          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_10_2_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_10_2">
+              <span class="md-nav__icon md-icon"></span>
+              
   
   Tutorials
 
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
               
                 
+                  
   
   
   
@@ -2359,10 +2385,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -2386,10 +2412,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -2413,10 +2439,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -2440,10 +2466,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -2467,18 +2493,20 @@
     </li>
   
 
+                
               
-            
-          </ul>
-        </nav>
+            </ul>
+          </nav>
+        
       
     </li>
   
 
+                
               
-            
-          </ul>
-        </nav>
+            </ul>
+          </nav>
+        
       
     </li>
   
@@ -2533,18 +2561,19 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_11">
-            <span class="md-nav__icon md-icon"></span>
-            
+        
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_11">
+              <span class="md-nav__icon md-icon"></span>
+              
   
   References
 
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
               
                 
+                  
   
   
   
@@ -2568,10 +2597,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -2595,10 +2624,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -2622,10 +2651,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -2696,20 +2725,21 @@
             
           </div>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_11_4_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_11_4">
-            <span class="md-nav__icon md-icon"></span>
-            
+        
+          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_11_4_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_11_4">
+              <span class="md-nav__icon md-icon"></span>
+              
   
   CLI
 
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-            
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
               
                 
+              
+                
+                  
   
   
   
@@ -2733,10 +2763,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -2760,10 +2790,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -2787,10 +2817,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -2814,10 +2844,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -2876,20 +2906,21 @@
             
           </div>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_11_4_6_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_11_4_6">
-            <span class="md-nav__icon md-icon"></span>
-            
+        
+          <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_11_4_6_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_11_4_6">
+              <span class="md-nav__icon md-icon"></span>
+              
   
   upload
 
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-            
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
               
                 
+              
+                
+                  
   
   
   
@@ -2913,10 +2944,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -2940,10 +2971,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -2967,10 +2998,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -2994,10 +3025,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3021,10 +3052,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3048,18 +3079,19 @@
     </li>
   
 
+                
               
-            
-          </ul>
-        </nav>
+            </ul>
+          </nav>
+        
       
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3083,10 +3115,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3141,20 +3173,21 @@
             
           </div>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_11_4_8_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_11_4_8">
-            <span class="md-nav__icon md-icon"></span>
-            
+        
+          <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_11_4_8_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_11_4_8">
+              <span class="md-nav__icon md-icon"></span>
+              
   
   generate-recipe
 
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-            
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
               
                 
+              
+                
+                  
   
   
   
@@ -3178,10 +3211,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3205,10 +3238,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3232,10 +3265,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3259,18 +3292,19 @@
     </li>
   
 
+                
               
-            
-          </ul>
-        </nav>
+            </ul>
+          </nav>
+        
       
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3325,20 +3359,21 @@
             
           </div>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_11_4_9_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_11_4_9">
-            <span class="md-nav__icon md-icon"></span>
-            
+        
+          <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_11_4_9_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_11_4_9">
+              <span class="md-nav__icon md-icon"></span>
+              
   
   auth
 
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-            
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
               
                 
+              
+                
+                  
   
   
   
@@ -3362,10 +3397,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3389,10 +3424,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3416,10 +3451,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3443,18 +3478,19 @@
     </li>
   
 
+                
               
-            
-          </ul>
-        </nav>
+            </ul>
+          </nav>
+        
       
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3515,20 +3551,21 @@
             
           </div>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_11_4_10_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_11_4_10">
-            <span class="md-nav__icon md-icon"></span>
-            
+        
+          <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_11_4_10_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_11_4_10">
+              <span class="md-nav__icon md-icon"></span>
+              
   
   debug
 
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-            
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
               
                 
+              
+                
+                  
   
   
   
@@ -3552,10 +3589,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3579,10 +3616,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3606,10 +3643,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3633,10 +3670,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3660,10 +3697,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3687,10 +3724,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3714,18 +3751,19 @@
     </li>
   
 
+                
               
-            
-          </ul>
-        </nav>
+            </ul>
+          </nav>
+        
       
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3778,20 +3816,21 @@
             
           </div>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_11_4_11_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_11_4_11">
-            <span class="md-nav__icon md-icon"></span>
-            
+        
+          <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_11_4_11_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_11_4_11">
+              <span class="md-nav__icon md-icon"></span>
+              
   
   package
 
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-            
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
               
                 
+              
+                
+                  
   
   
   
@@ -3815,10 +3854,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3842,10 +3881,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3869,18 +3908,19 @@
     </li>
   
 
+                
               
-            
-          </ul>
-        </nav>
+            </ul>
+          </nav>
+        
       
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3904,10 +3944,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3931,18 +3971,19 @@
     </li>
   
 
+                
               
-            
-          </ul>
-        </nav>
+            </ul>
+          </nav>
+        
       
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3966,10 +4007,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3993,10 +4034,11 @@
     </li>
   
 
+                
               
-            
-          </ul>
-        </nav>
+            </ul>
+          </nav>
+        
       
     </li>
   
@@ -4152,8 +4194,10 @@
             <div class="md-content" data-md-component="content">
               
               <article class="md-content__inner md-typeset">
+                <a id="__skip" tabindex="-1"></a>
                 
                   
+
   
     <a href="https://github.com/prefix-dev/rattler-build/edit/main/docs/py-rattler-build/reference/build_result.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
       
@@ -4199,7 +4243,7 @@
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-instance-attribute&quot;&gt;&lt;code&gt;instance-attribute&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="./#rattler_build.BuildResult.packages">packages</a></code></td>
+  &lt;/span&gt; (&lt;code&gt;rattler_build.BuildResult.packages&lt;/code&gt;)" href="./#rattler_build.BuildResult.packages">packages</a></code></td>
             <td>
             </td>
             <td>
@@ -4214,7 +4258,7 @@
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-instance-attribute&quot;&gt;&lt;code&gt;instance-attribute&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="./#rattler_build.BuildResult.name">name</a></code></td>
+  &lt;/span&gt; (&lt;code&gt;rattler_build.BuildResult.name&lt;/code&gt;)" href="./#rattler_build.BuildResult.name">name</a></code></td>
             <td>
             </td>
             <td>
@@ -4229,7 +4273,7 @@
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-instance-attribute&quot;&gt;&lt;code&gt;instance-attribute&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="./#rattler_build.BuildResult.version">version</a></code></td>
+  &lt;/span&gt; (&lt;code&gt;rattler_build.BuildResult.version&lt;/code&gt;)" href="./#rattler_build.BuildResult.version">version</a></code></td>
             <td>
             </td>
             <td>
@@ -4244,7 +4288,7 @@
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-instance-attribute&quot;&gt;&lt;code&gt;instance-attribute&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="./#rattler_build.BuildResult.build_string">build_string</a></code></td>
+  &lt;/span&gt; (&lt;code&gt;rattler_build.BuildResult.build_string&lt;/code&gt;)" href="./#rattler_build.BuildResult.build_string">build_string</a></code></td>
             <td>
             </td>
             <td>
@@ -4259,7 +4303,7 @@
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-instance-attribute&quot;&gt;&lt;code&gt;instance-attribute&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="./#rattler_build.BuildResult.platform">platform</a></code></td>
+  &lt;/span&gt; (&lt;code&gt;rattler_build.BuildResult.platform&lt;/code&gt;)" href="./#rattler_build.BuildResult.platform">platform</a></code></td>
             <td>
             </td>
             <td>
@@ -4274,7 +4318,7 @@
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-instance-attribute&quot;&gt;&lt;code&gt;instance-attribute&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="./#rattler_build.BuildResult.variant">variant</a></code></td>
+  &lt;/span&gt; (&lt;code&gt;rattler_build.BuildResult.variant&lt;/code&gt;)" href="./#rattler_build.BuildResult.variant">variant</a></code></td>
             <td>
             </td>
             <td>
@@ -4289,7 +4333,7 @@
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-instance-attribute&quot;&gt;&lt;code&gt;instance-attribute&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="./#rattler_build.BuildResult.build_time">build_time</a></code></td>
+  &lt;/span&gt; (&lt;code&gt;rattler_build.BuildResult.build_time&lt;/code&gt;)" href="./#rattler_build.BuildResult.build_time">build_time</a></code></td>
             <td>
             </td>
             <td>
@@ -4304,7 +4348,7 @@
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-instance-attribute&quot;&gt;&lt;code&gt;instance-attribute&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="./#rattler_build.BuildResult.log">log</a></code></td>
+  &lt;/span&gt; (&lt;code&gt;rattler_build.BuildResult.log&lt;/code&gt;)" href="./#rattler_build.BuildResult.log">log</a></code></td>
             <td>
             </td>
             <td>
@@ -4721,20 +4765,25 @@
   </footer>
       
     </div>
-    <div class="md-dialog" data-md-component="dialog">
+    <div class="md-dialog" data-md-component="dialog" role="status" aria-atomic="true">
       <div class="md-dialog__inner md-typeset"></div>
     </div>
     
-      <div class="md-progress" data-md-component="progress" role="progressbar"></div>
+      
+<div class="md-progress" data-md-component="progress" role="progressbar" aria-label="Loading"></div>
     
     
     
       
       
-      <script id="__config" type="application/json">{"annotate":null,"base":"../../..","features":["content.tabs.link","content.code.copy","content.action.edit","content.code.annotate","content.tooltips","navigation.instant","navigation.instant.progress","navigation.tracking","navigation.indexes","navigation.top","navigation.footer"],"search":"../../../assets/javascripts/workers/search.7d14d953.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":{"provider":"mike"}}</script>
+      
+      
+        
+        
+      <script id="__config" type="application/json">{"annotate":null,"base":"../../..","features":["content.tabs.link","content.code.copy","content.action.edit","content.code.annotate","content.tooltips","navigation.instant","navigation.instant.progress","navigation.tracking","navigation.indexes","navigation.top","navigation.footer"],"redirect":null,"search":"../../../assets/javascripts/workers/search.719e0d91.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","clipboard.error":"Could not copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":{"provider":"mike"}}</script>
     
     
-      <script src="../../../assets/javascripts/bundle.6970bfe9.min.js"></script>
+      <script src="../../../assets/javascripts/bundle.3cb411a8.min.js"></script>
       
     
   </body>

@@ -13,6 +13,7 @@
         <link rel="canonical" href="https://rattler-build.prefix.dev/latest/py-rattler-build/reference/package/">
       
       
+      
         <link rel="prev" href="../configuration/">
       
       
@@ -23,7 +24,7 @@
       
       
       <link rel="icon" href="../../../assets/favicon.png">
-      <meta name="generator" content="zensical-0.0.59">
+      <meta name="generator" content="zensical-0.1.2">
     
     
       
@@ -34,12 +35,12 @@
       
         
       
-      <link rel="stylesheet" href="../../../assets/stylesheets/classic/main.38807bfb.min.css">
+      <link rel="stylesheet" href="../../../assets/stylesheets/classic/main.0006804e.min.css">
       
         
           
         
-        <link rel="stylesheet" href="../../../assets/stylesheets/classic/palette.c7ab7c71.min.css">
+        <link rel="stylesheet" href="../../../assets/stylesheets/classic/palette.813d4b3f.min.css">
       
       
 
@@ -66,7 +67,19 @@
 
     
     
-  </head>
+  <meta property="og:type" content="website" />
+<meta property="og:title" content="Package - Rattler-Build" />
+<meta property="og:description" content="Rattler-Build Documentation — A fast conda package builder that creates cross-platform relocatable packages from a simple recipe format" />
+<meta property="og:image" content="https://rattler-build.prefix.dev/latest/assets/images/social/py-rattler-build/reference/package.png" />
+<meta property="og:image:type" content="image/png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:url" content="https://rattler-build.prefix.dev/latest/py-rattler-build/reference/package/" />
+<meta property="twitter:card" content="summary_large_image" />
+<meta property="twitter:title" content="Package - Rattler-Build" />
+<meta property="twitter:description" content="Rattler-Build Documentation — A fast conda package builder that creates cross-platform relocatable packages from a simple recipe format" />
+<meta property="twitter:image" content="https://rattler-build.prefix.dev/latest/assets/images/social/py-rattler-build/reference/package.png" />
+</head>
   
   
     
@@ -81,14 +94,11 @@
     
     <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
     <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
-    <label class="md-overlay" for="__drawer" aria-label="Navigation"></label>
+    <label class="md-overlay" for="__drawer" aria-hidden="true"></label>
     <div data-md-component="skip">
-      
-        
-        <a href="#package" class="md-skip">
-          Skip to content
-        </a>
-      
+      <a href="#__skip" class="md-skip">
+        Skip to content
+      </a>
     </div>
     <div data-md-component="announce">
       
@@ -110,9 +120,10 @@
   <img src="../../../assets/rattler-build-logo-no-padding.svg" alt="Rattler-Build">
 
     </a>
-    <label class="md-header__button md-icon" for="__drawer" aria-label="Navigation">
+    <label class="md-header__button md-icon" for="__drawer">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+      <span class="md-visually-hidden">Navigation</span>
     </label>
     <div class="md-header__title" data-md-component="header-title">
       <div class="md-header__ellipsis">
@@ -174,9 +185,10 @@
     
       
       
-        <label class="md-header__button md-icon" for="__search" aria-label="Search">
+        <label class="md-header__button md-icon" for="__search">
           
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+          <span class="md-visually-hidden">Search</span>
         </label>
         <div class="md-search" data-md-component="search" role="dialog" aria-label="Search">
   <button type="button" class="md-search__button">
@@ -415,20 +427,21 @@
             
           </div>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5">
-            <span class="md-nav__icon md-icon"></span>
-            
+        
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_5">
+              <span class="md-nav__icon md-icon"></span>
+              
   
   Examples
 
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-            
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
               
                 
+              
+                
+                  
   
   
   
@@ -452,10 +465,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -479,10 +492,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -506,10 +519,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -533,10 +546,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -560,10 +573,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -587,10 +600,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -614,10 +627,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -641,10 +654,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -668,10 +681,11 @@
     </li>
   
 
+                
               
-            
-          </ul>
-        </nav>
+            </ul>
+          </nav>
+        
       
     </li>
   
@@ -746,18 +760,19 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_6">
-            <span class="md-nav__icon md-icon"></span>
-            
+        
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_6">
+              <span class="md-nav__icon md-icon"></span>
+              
   
   Build options
 
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
               
                 
+                  
   
   
   
@@ -781,10 +796,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -808,10 +823,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -835,10 +850,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -862,10 +877,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -889,10 +904,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -916,10 +931,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -943,10 +958,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -970,10 +985,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -997,10 +1012,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -1024,10 +1039,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -1051,10 +1066,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -1078,10 +1093,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -1105,10 +1120,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -1132,10 +1147,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -1159,10 +1174,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -1186,10 +1201,11 @@
     </li>
   
 
+                
               
-            
-          </ul>
-        </nav>
+            </ul>
+          </nav>
+        
       
     </li>
   
@@ -1236,18 +1252,19 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_7">
-            <span class="md-nav__icon md-icon"></span>
-            
+        
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_7">
+              <span class="md-nav__icon md-icon"></span>
+              
   
   Testing
 
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
               
                 
+                  
   
   
   
@@ -1271,10 +1288,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -1298,10 +1315,11 @@
     </li>
   
 
+                
               
-            
-          </ul>
-        </nav>
+            </ul>
+          </nav>
+        
       
     </li>
   
@@ -1354,18 +1372,19 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_8">
-            <span class="md-nav__icon md-icon"></span>
-            
+        
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_8">
+              <span class="md-nav__icon md-icon"></span>
+              
   
   Publishing packages
 
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
               
                 
+                  
   
   
   
@@ -1389,10 +1408,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -1416,10 +1435,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -1443,10 +1462,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -1470,10 +1489,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -1497,10 +1516,11 @@
     </li>
   
 
+                
               
-            
-          </ul>
-        </nav>
+            </ul>
+          </nav>
+        
       
     </li>
   
@@ -1551,18 +1571,19 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_9">
-            <span class="md-nav__icon md-icon"></span>
-            
+        
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_9">
+              <span class="md-nav__icon md-icon"></span>
+              
   
   Package
 
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
               
                 
+                  
   
   
   
@@ -1586,10 +1607,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -1613,10 +1634,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -1640,10 +1661,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -1667,10 +1688,11 @@
     </li>
   
 
+                
               
-            
-          </ul>
-        </nav>
+            </ul>
+          </nav>
+        
       
     </li>
   
@@ -1719,18 +1741,19 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="true">
-          <label class="md-nav__title" for="__nav_10">
-            <span class="md-nav__icon md-icon"></span>
-            
+        
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="true">
+            <label class="md-nav__title" for="__nav_10">
+              <span class="md-nav__icon md-icon"></span>
+              
   
   Python Bindings
 
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
               
                 
+                  
   
   
     
@@ -1801,20 +1824,21 @@
             
           </div>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_10_1_label" aria-expanded="true">
-          <label class="md-nav__title" for="__nav_10_1">
-            <span class="md-nav__icon md-icon"></span>
-            
+        
+          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_10_1_label" aria-expanded="true">
+            <label class="md-nav__title" for="__nav_10_1">
+              <span class="md-nav__icon md-icon"></span>
+              
   
   Reference
 
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-            
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
               
                 
+              
+                
+                  
   
   
   
@@ -1838,10 +1862,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -1865,10 +1889,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -1892,10 +1916,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
     
@@ -3029,10 +3053,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3056,10 +3080,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3083,10 +3107,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3110,10 +3134,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3137,10 +3161,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3164,10 +3188,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3191,10 +3215,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3218,18 +3242,19 @@
     </li>
   
 
+                
               
-            
-          </ul>
-        </nav>
+            </ul>
+          </nav>
+        
       
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3275,18 +3300,19 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_10_2_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_10_2">
-            <span class="md-nav__icon md-icon"></span>
-            
+        
+          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_10_2_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_10_2">
+              <span class="md-nav__icon md-icon"></span>
+              
   
   Tutorials
 
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
               
                 
+                  
   
   
   
@@ -3310,10 +3336,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3337,10 +3363,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3364,10 +3390,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3391,10 +3417,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3418,18 +3444,20 @@
     </li>
   
 
+                
               
-            
-          </ul>
-        </nav>
+            </ul>
+          </nav>
+        
       
     </li>
   
 
+                
               
-            
-          </ul>
-        </nav>
+            </ul>
+          </nav>
+        
       
     </li>
   
@@ -3484,18 +3512,19 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_11">
-            <span class="md-nav__icon md-icon"></span>
-            
+        
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_11">
+              <span class="md-nav__icon md-icon"></span>
+              
   
   References
 
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
               
                 
+                  
   
   
   
@@ -3519,10 +3548,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3546,10 +3575,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3573,10 +3602,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3647,20 +3676,21 @@
             
           </div>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_11_4_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_11_4">
-            <span class="md-nav__icon md-icon"></span>
-            
+        
+          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_11_4_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_11_4">
+              <span class="md-nav__icon md-icon"></span>
+              
   
   CLI
 
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-            
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
               
                 
+              
+                
+                  
   
   
   
@@ -3684,10 +3714,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3711,10 +3741,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3738,10 +3768,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3765,10 +3795,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3827,20 +3857,21 @@
             
           </div>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_11_4_6_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_11_4_6">
-            <span class="md-nav__icon md-icon"></span>
-            
+        
+          <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_11_4_6_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_11_4_6">
+              <span class="md-nav__icon md-icon"></span>
+              
   
   upload
 
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-            
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
               
                 
+              
+                
+                  
   
   
   
@@ -3864,10 +3895,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3891,10 +3922,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3918,10 +3949,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3945,10 +3976,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3972,10 +4003,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -3999,18 +4030,19 @@
     </li>
   
 
+                
               
-            
-          </ul>
-        </nav>
+            </ul>
+          </nav>
+        
       
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -4034,10 +4066,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -4092,20 +4124,21 @@
             
           </div>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_11_4_8_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_11_4_8">
-            <span class="md-nav__icon md-icon"></span>
-            
+        
+          <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_11_4_8_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_11_4_8">
+              <span class="md-nav__icon md-icon"></span>
+              
   
   generate-recipe
 
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-            
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
               
                 
+              
+                
+                  
   
   
   
@@ -4129,10 +4162,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -4156,10 +4189,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -4183,10 +4216,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -4210,18 +4243,19 @@
     </li>
   
 
+                
               
-            
-          </ul>
-        </nav>
+            </ul>
+          </nav>
+        
       
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -4276,20 +4310,21 @@
             
           </div>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_11_4_9_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_11_4_9">
-            <span class="md-nav__icon md-icon"></span>
-            
+        
+          <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_11_4_9_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_11_4_9">
+              <span class="md-nav__icon md-icon"></span>
+              
   
   auth
 
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-            
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
               
                 
+              
+                
+                  
   
   
   
@@ -4313,10 +4348,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -4340,10 +4375,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -4367,10 +4402,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -4394,18 +4429,19 @@
     </li>
   
 
+                
               
-            
-          </ul>
-        </nav>
+            </ul>
+          </nav>
+        
       
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -4466,20 +4502,21 @@
             
           </div>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_11_4_10_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_11_4_10">
-            <span class="md-nav__icon md-icon"></span>
-            
+        
+          <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_11_4_10_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_11_4_10">
+              <span class="md-nav__icon md-icon"></span>
+              
   
   debug
 
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-            
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
               
                 
+              
+                
+                  
   
   
   
@@ -4503,10 +4540,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -4530,10 +4567,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -4557,10 +4594,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -4584,10 +4621,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -4611,10 +4648,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -4638,10 +4675,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -4665,18 +4702,19 @@
     </li>
   
 
+                
               
-            
-          </ul>
-        </nav>
+            </ul>
+          </nav>
+        
       
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -4729,20 +4767,21 @@
             
           </div>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_11_4_11_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_11_4_11">
-            <span class="md-nav__icon md-icon"></span>
-            
+        
+          <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_11_4_11_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_11_4_11">
+              <span class="md-nav__icon md-icon"></span>
+              
   
   package
 
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-            
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
               
                 
+              
+                
+                  
   
   
   
@@ -4766,10 +4805,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -4793,10 +4832,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -4820,18 +4859,19 @@
     </li>
   
 
+                
               
-            
-          </ul>
-        </nav>
+            </ul>
+          </nav>
+        
       
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -4855,10 +4895,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -4882,18 +4922,19 @@
     </li>
   
 
+                
               
-            
-          </ul>
-        </nav>
+            </ul>
+          </nav>
+        
       
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -4917,10 +4958,10 @@
     </li>
   
 
-              
-            
+                
               
                 
+                  
   
   
   
@@ -4944,10 +4985,11 @@
     </li>
   
 
+                
               
-            
-          </ul>
-        </nav>
+            </ul>
+          </nav>
+        
       
     </li>
   
@@ -6054,8 +6096,10 @@
             <div class="md-content" data-md-component="content">
               
               <article class="md-content__inner md-typeset">
+                <a id="__skip" tabindex="-1"></a>
                 
                   
+
   
     <a href="https://github.com/prefix-dev/rattler-build/edit/main/docs/py-rattler-build/reference/package.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
       
@@ -6113,7 +6157,7 @@ The package is lazily extracted when needed (e.g., when accessing files or tests
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-property&quot;&gt;&lt;code&gt;property&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="./#rattler_build.Package.name">name</a></code></td>
+  &lt;/span&gt; (&lt;code&gt;rattler_build.Package.name&lt;/code&gt;)" href="./#rattler_build.Package.name">name</a></code></td>
             <td>
                   <code><span title="str">str</span></code>
             </td>
@@ -6129,7 +6173,7 @@ The package is lazily extracted when needed (e.g., when accessing files or tests
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-property&quot;&gt;&lt;code&gt;property&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="./#rattler_build.Package.version">version</a></code></td>
+  &lt;/span&gt; (&lt;code&gt;rattler_build.Package.version&lt;/code&gt;)" href="./#rattler_build.Package.version">version</a></code></td>
             <td>
                   <code><span title="str">str</span></code>
             </td>
@@ -6145,7 +6189,7 @@ The package is lazily extracted when needed (e.g., when accessing files or tests
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-property&quot;&gt;&lt;code&gt;property&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="./#rattler_build.Package.build_string">build_string</a></code></td>
+  &lt;/span&gt; (&lt;code&gt;rattler_build.Package.build_string&lt;/code&gt;)" href="./#rattler_build.Package.build_string">build_string</a></code></td>
             <td>
                   <code><span title="str">str</span></code>
             </td>
@@ -6161,7 +6205,7 @@ The package is lazily extracted when needed (e.g., when accessing files or tests
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-property&quot;&gt;&lt;code&gt;property&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="./#rattler_build.Package.build_number">build_number</a></code></td>
+  &lt;/span&gt; (&lt;code&gt;rattler_build.Package.build_number&lt;/code&gt;)" href="./#rattler_build.Package.build_number">build_number</a></code></td>
             <td>
                   <code><span title="int">int</span></code>
             </td>
@@ -6177,7 +6221,7 @@ The package is lazily extracted when needed (e.g., when accessing files or tests
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-property&quot;&gt;&lt;code&gt;property&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="./#rattler_build.Package.subdir">subdir</a></code></td>
+  &lt;/span&gt; (&lt;code&gt;rattler_build.Package.subdir&lt;/code&gt;)" href="./#rattler_build.Package.subdir">subdir</a></code></td>
             <td>
                   <code><span title="str">str</span> | None</code>
             </td>
@@ -6193,7 +6237,7 @@ The package is lazily extracted when needed (e.g., when accessing files or tests
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-property&quot;&gt;&lt;code&gt;property&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="./#rattler_build.Package.noarch">noarch</a></code></td>
+  &lt;/span&gt; (&lt;code&gt;rattler_build.Package.noarch&lt;/code&gt;)" href="./#rattler_build.Package.noarch">noarch</a></code></td>
             <td>
                   <code><span title="str">str</span> | None</code>
             </td>
@@ -6209,7 +6253,7 @@ The package is lazily extracted when needed (e.g., when accessing files or tests
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-property&quot;&gt;&lt;code&gt;property&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="./#rattler_build.Package.depends">depends</a></code></td>
+  &lt;/span&gt; (&lt;code&gt;rattler_build.Package.depends&lt;/code&gt;)" href="./#rattler_build.Package.depends">depends</a></code></td>
             <td>
                   <code><span title="list">list</span>[<span title="str">str</span>]</code>
             </td>
@@ -6225,7 +6269,7 @@ The package is lazily extracted when needed (e.g., when accessing files or tests
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-property&quot;&gt;&lt;code&gt;property&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="./#rattler_build.Package.constrains">constrains</a></code></td>
+  &lt;/span&gt; (&lt;code&gt;rattler_build.Package.constrains&lt;/code&gt;)" href="./#rattler_build.Package.constrains">constrains</a></code></td>
             <td>
                   <code><span title="list">list</span>[<span title="str">str</span>]</code>
             </td>
@@ -6241,7 +6285,7 @@ The package is lazily extracted when needed (e.g., when accessing files or tests
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-property&quot;&gt;&lt;code&gt;property&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="./#rattler_build.Package.license">license</a></code></td>
+  &lt;/span&gt; (&lt;code&gt;rattler_build.Package.license&lt;/code&gt;)" href="./#rattler_build.Package.license">license</a></code></td>
             <td>
                   <code><span title="str">str</span> | None</code>
             </td>
@@ -6257,7 +6301,7 @@ The package is lazily extracted when needed (e.g., when accessing files or tests
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-property&quot;&gt;&lt;code&gt;property&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="./#rattler_build.Package.license_family">license_family</a></code></td>
+  &lt;/span&gt; (&lt;code&gt;rattler_build.Package.license_family&lt;/code&gt;)" href="./#rattler_build.Package.license_family">license_family</a></code></td>
             <td>
                   <code><span title="str">str</span> | None</code>
             </td>
@@ -6273,7 +6317,7 @@ The package is lazily extracted when needed (e.g., when accessing files or tests
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-property&quot;&gt;&lt;code&gt;property&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="./#rattler_build.Package.timestamp">timestamp</a></code></td>
+  &lt;/span&gt; (&lt;code&gt;rattler_build.Package.timestamp&lt;/code&gt;)" href="./#rattler_build.Package.timestamp">timestamp</a></code></td>
             <td>
                   <code><span title="datetime.datetime">datetime</span> | None</code>
             </td>
@@ -6289,7 +6333,7 @@ The package is lazily extracted when needed (e.g., when accessing files or tests
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-property&quot;&gt;&lt;code&gt;property&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="./#rattler_build.Package.arch">arch</a></code></td>
+  &lt;/span&gt; (&lt;code&gt;rattler_build.Package.arch&lt;/code&gt;)" href="./#rattler_build.Package.arch">arch</a></code></td>
             <td>
                   <code><span title="str">str</span> | None</code>
             </td>
@@ -6305,7 +6349,7 @@ The package is lazily extracted when needed (e.g., when accessing files or tests
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-property&quot;&gt;&lt;code&gt;property&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="./#rattler_build.Package.platform">platform</a></code></td>
+  &lt;/span&gt; (&lt;code&gt;rattler_build.Package.platform&lt;/code&gt;)" href="./#rattler_build.Package.platform">platform</a></code></td>
             <td>
                   <code><span title="str">str</span> | None</code>
             </td>
@@ -6321,7 +6365,7 @@ The package is lazily extracted when needed (e.g., when accessing files or tests
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-property&quot;&gt;&lt;code&gt;property&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="./#rattler_build.Package.path">path</a></code></td>
+  &lt;/span&gt; (&lt;code&gt;rattler_build.Package.path&lt;/code&gt;)" href="./#rattler_build.Package.path">path</a></code></td>
             <td>
                   <code><span title="pathlib.Path">Path</span></code>
             </td>
@@ -6337,7 +6381,7 @@ The package is lazily extracted when needed (e.g., when accessing files or tests
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-property&quot;&gt;&lt;code&gt;property&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="./#rattler_build.Package.archive_type">archive_type</a></code></td>
+  &lt;/span&gt; (&lt;code&gt;rattler_build.Package.archive_type&lt;/code&gt;)" href="./#rattler_build.Package.archive_type">archive_type</a></code></td>
             <td>
                   <code><span title="str">str</span></code>
             </td>
@@ -6353,7 +6397,7 @@ The package is lazily extracted when needed (e.g., when accessing files or tests
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-property&quot;&gt;&lt;code&gt;property&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="./#rattler_build.Package.filename">filename</a></code></td>
+  &lt;/span&gt; (&lt;code&gt;rattler_build.Package.filename&lt;/code&gt;)" href="./#rattler_build.Package.filename">filename</a></code></td>
             <td>
                   <code><span title="str">str</span></code>
             </td>
@@ -6369,7 +6413,7 @@ The package is lazily extracted when needed (e.g., when accessing files or tests
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-property&quot;&gt;&lt;code&gt;property&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="./#rattler_build.Package.files">files</a></code></td>
+  &lt;/span&gt; (&lt;code&gt;rattler_build.Package.files&lt;/code&gt;)" href="./#rattler_build.Package.files">files</a></code></td>
             <td>
                   <code><span title="list">list</span>[<span title="str">str</span>]</code>
             </td>
@@ -6385,7 +6429,7 @@ The package is lazily extracted when needed (e.g., when accessing files or tests
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-property&quot;&gt;&lt;code&gt;property&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="./#rattler_build.Package.tests">tests</a></code></td>
+  &lt;/span&gt; (&lt;code&gt;rattler_build.Package.tests&lt;/code&gt;)" href="./#rattler_build.Package.tests">tests</a></code></td>
             <td>
                   <code><span title="list">list</span>[<span title="rattler_build.package.PackageTestType">PackageTestType</span>]</code>
             </td>
@@ -6947,7 +6991,7 @@ The package is lazily extracted when needed (e.g., when accessing files or tests
       <tbody>
           <tr class="doc-section-item">
             <td>
-                  <code><a class="autorefs autorefs-internal" title="rattler_build.package.Package" href="./#rattler_build.Package">Package</a></code>
+                  <code><a class="autorefs autorefs-internal" title="&lt;code&gt;rattler_build.package.Package&lt;/code&gt;" href="./#rattler_build.Package">Package</a></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -7183,7 +7227,7 @@ The package is lazily extracted when needed (e.g., when accessing files or tests
                 <code>progress_callback</code>
             </td>
             <td>
-                  <code><a class="autorefs autorefs-internal" title="rattler_build.progress.ProgressCallback" href="../progress/#rattler_build.progress.ProgressCallback">ProgressCallback</a> | None</code>
+                  <code><a class="autorefs autorefs-internal" title="&lt;code&gt;rattler_build.progress.ProgressCallback&lt;/code&gt;" href="../progress/#rattler_build.progress.ProgressCallback">ProgressCallback</a> | None</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -7225,7 +7269,7 @@ The package is lazily extracted when needed (e.g., when accessing files or tests
       <tbody>
           <tr class="doc-section-item">
             <td>
-                  <code><a class="autorefs autorefs-internal" title="rattler_build.package.TestResult" href="./#rattler_build.TestResult">TestResult</a></code>
+                  <code><a class="autorefs autorefs-internal" title="&lt;code&gt;rattler_build.package.TestResult&lt;/code&gt;" href="./#rattler_build.TestResult">TestResult</a></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -7444,7 +7488,7 @@ The package is lazily extracted when needed (e.g., when accessing files or tests
                 <code>progress_callback</code>
             </td>
             <td>
-                  <code><a class="autorefs autorefs-internal" title="rattler_build.progress.ProgressCallback" href="../progress/#rattler_build.progress.ProgressCallback">ProgressCallback</a> | None</code>
+                  <code><a class="autorefs autorefs-internal" title="&lt;code&gt;rattler_build.progress.ProgressCallback&lt;/code&gt;" href="../progress/#rattler_build.progress.ProgressCallback">ProgressCallback</a> | None</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -7486,7 +7530,7 @@ The package is lazily extracted when needed (e.g., when accessing files or tests
       <tbody>
           <tr class="doc-section-item">
             <td>
-                  <code><span title="list">list</span>[<a class="autorefs autorefs-internal" title="rattler_build.package.TestResult" href="./#rattler_build.TestResult">TestResult</a>]</code>
+                  <code><span title="list">list</span>[<a class="autorefs autorefs-internal" title="&lt;code&gt;rattler_build.package.TestResult&lt;/code&gt;" href="./#rattler_build.TestResult">TestResult</a>]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -7575,7 +7619,7 @@ The package is lazily extracted when needed (e.g., when accessing files or tests
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-property&quot;&gt;&lt;code&gt;property&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="./#rattler_build.TestResult.success">success</a></code></td>
+  &lt;/span&gt; (&lt;code&gt;rattler_build.TestResult.success&lt;/code&gt;)" href="./#rattler_build.TestResult.success">success</a></code></td>
             <td>
                   <code><span title="bool">bool</span></code>
             </td>
@@ -7591,7 +7635,7 @@ The package is lazily extracted when needed (e.g., when accessing files or tests
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-property&quot;&gt;&lt;code&gt;property&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="./#rattler_build.TestResult.output">output</a></code></td>
+  &lt;/span&gt; (&lt;code&gt;rattler_build.TestResult.output&lt;/code&gt;)" href="./#rattler_build.TestResult.output">output</a></code></td>
             <td>
                   <code><span title="list">list</span>[<span title="str">str</span>]</code>
             </td>
@@ -7607,7 +7651,7 @@ The package is lazily extracted when needed (e.g., when accessing files or tests
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-property&quot;&gt;&lt;code&gt;property&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="./#rattler_build.TestResult.test_index">test_index</a></code></td>
+  &lt;/span&gt; (&lt;code&gt;rattler_build.TestResult.test_index&lt;/code&gt;)" href="./#rattler_build.TestResult.test_index">test_index</a></code></td>
             <td>
                   <code><span title="int">int</span></code>
             </td>
@@ -7751,7 +7795,7 @@ The package is lazily extracted when needed (e.g., when accessing files or tests
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-property&quot;&gt;&lt;code&gt;property&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="./#rattler_build.PythonTest.index">index</a></code></td>
+  &lt;/span&gt; (&lt;code&gt;rattler_build.PythonTest.index&lt;/code&gt;)" href="./#rattler_build.PythonTest.index">index</a></code></td>
             <td>
                   <code><span title="int">int</span></code>
             </td>
@@ -7767,7 +7811,7 @@ The package is lazily extracted when needed (e.g., when accessing files or tests
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-property&quot;&gt;&lt;code&gt;property&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="./#rattler_build.PythonTest.imports">imports</a></code></td>
+  &lt;/span&gt; (&lt;code&gt;rattler_build.PythonTest.imports&lt;/code&gt;)" href="./#rattler_build.PythonTest.imports">imports</a></code></td>
             <td>
                   <code><span title="list">list</span>[<span title="str">str</span>]</code>
             </td>
@@ -7783,7 +7827,7 @@ The package is lazily extracted when needed (e.g., when accessing files or tests
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-property&quot;&gt;&lt;code&gt;property&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="./#rattler_build.PythonTest.pip_check">pip_check</a></code></td>
+  &lt;/span&gt; (&lt;code&gt;rattler_build.PythonTest.pip_check&lt;/code&gt;)" href="./#rattler_build.PythonTest.pip_check">pip_check</a></code></td>
             <td>
                   <code><span title="bool">bool</span></code>
             </td>
@@ -7799,9 +7843,9 @@ The package is lazily extracted when needed (e.g., when accessing files or tests
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-property&quot;&gt;&lt;code&gt;property&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="./#rattler_build.PythonTest.python_version">python_version</a></code></td>
+  &lt;/span&gt; (&lt;code&gt;rattler_build.PythonTest.python_version&lt;/code&gt;)" href="./#rattler_build.PythonTest.python_version">python_version</a></code></td>
             <td>
-                  <code><a class="autorefs autorefs-internal" title="rattler_build.package.PythonVersion" href="./#rattler_build.PythonVersion">PythonVersion</a> | None</code>
+                  <code><a class="autorefs autorefs-internal" title="&lt;code&gt;rattler_build.package.PythonVersion&lt;/code&gt;" href="./#rattler_build.PythonVersion">PythonVersion</a> | None</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -8088,7 +8132,7 @@ The package is lazily extracted when needed (e.g., when accessing files or tests
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-property&quot;&gt;&lt;code&gt;property&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="./#rattler_build.CommandsTest.index">index</a></code></td>
+  &lt;/span&gt; (&lt;code&gt;rattler_build.CommandsTest.index&lt;/code&gt;)" href="./#rattler_build.CommandsTest.index">index</a></code></td>
             <td>
                   <code><span title="int">int</span></code>
             </td>
@@ -8104,7 +8148,7 @@ The package is lazily extracted when needed (e.g., when accessing files or tests
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-property&quot;&gt;&lt;code&gt;property&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="./#rattler_build.CommandsTest.script">script</a></code></td>
+  &lt;/span&gt; (&lt;code&gt;rattler_build.CommandsTest.script&lt;/code&gt;)" href="./#rattler_build.CommandsTest.script">script</a></code></td>
             <td>
                   <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>]</code>
             </td>
@@ -8120,7 +8164,7 @@ The package is lazily extracted when needed (e.g., when accessing files or tests
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-property&quot;&gt;&lt;code&gt;property&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="./#rattler_build.CommandsTest.requirements_run">requirements_run</a></code></td>
+  &lt;/span&gt; (&lt;code&gt;rattler_build.CommandsTest.requirements_run&lt;/code&gt;)" href="./#rattler_build.CommandsTest.requirements_run">requirements_run</a></code></td>
             <td>
                   <code><span title="list">list</span>[<span title="str">str</span>]</code>
             </td>
@@ -8136,7 +8180,7 @@ The package is lazily extracted when needed (e.g., when accessing files or tests
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-property&quot;&gt;&lt;code&gt;property&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="./#rattler_build.CommandsTest.requirements_build">requirements_build</a></code></td>
+  &lt;/span&gt; (&lt;code&gt;rattler_build.CommandsTest.requirements_build&lt;/code&gt;)" href="./#rattler_build.CommandsTest.requirements_build">requirements_build</a></code></td>
             <td>
                   <code><span title="list">list</span>[<span title="str">str</span>]</code>
             </td>
@@ -8323,7 +8367,7 @@ The package is lazily extracted when needed (e.g., when accessing files or tests
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-property&quot;&gt;&lt;code&gt;property&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="./#rattler_build.PerlTest.index">index</a></code></td>
+  &lt;/span&gt; (&lt;code&gt;rattler_build.PerlTest.index&lt;/code&gt;)" href="./#rattler_build.PerlTest.index">index</a></code></td>
             <td>
                   <code><span title="int">int</span></code>
             </td>
@@ -8339,7 +8383,7 @@ The package is lazily extracted when needed (e.g., when accessing files or tests
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-property&quot;&gt;&lt;code&gt;property&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="./#rattler_build.PerlTest.uses">uses</a></code></td>
+  &lt;/span&gt; (&lt;code&gt;rattler_build.PerlTest.uses&lt;/code&gt;)" href="./#rattler_build.PerlTest.uses">uses</a></code></td>
             <td>
                   <code><span title="list">list</span>[<span title="str">str</span>]</code>
             </td>
@@ -8478,7 +8522,7 @@ The package is lazily extracted when needed (e.g., when accessing files or tests
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-property&quot;&gt;&lt;code&gt;property&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="./#rattler_build.RTest.index">index</a></code></td>
+  &lt;/span&gt; (&lt;code&gt;rattler_build.RTest.index&lt;/code&gt;)" href="./#rattler_build.RTest.index">index</a></code></td>
             <td>
                   <code><span title="int">int</span></code>
             </td>
@@ -8494,7 +8538,7 @@ The package is lazily extracted when needed (e.g., when accessing files or tests
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-property&quot;&gt;&lt;code&gt;property&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="./#rattler_build.RTest.libraries">libraries</a></code></td>
+  &lt;/span&gt; (&lt;code&gt;rattler_build.RTest.libraries&lt;/code&gt;)" href="./#rattler_build.RTest.libraries">libraries</a></code></td>
             <td>
                   <code><span title="list">list</span>[<span title="str">str</span>]</code>
             </td>
@@ -8633,7 +8677,7 @@ The package is lazily extracted when needed (e.g., when accessing files or tests
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-property&quot;&gt;&lt;code&gt;property&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="./#rattler_build.RubyTest.index">index</a></code></td>
+  &lt;/span&gt; (&lt;code&gt;rattler_build.RubyTest.index&lt;/code&gt;)" href="./#rattler_build.RubyTest.index">index</a></code></td>
             <td>
                   <code><span title="int">int</span></code>
             </td>
@@ -8649,7 +8693,7 @@ The package is lazily extracted when needed (e.g., when accessing files or tests
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-property&quot;&gt;&lt;code&gt;property&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="./#rattler_build.RubyTest.requires">requires</a></code></td>
+  &lt;/span&gt; (&lt;code&gt;rattler_build.RubyTest.requires&lt;/code&gt;)" href="./#rattler_build.RubyTest.requires">requires</a></code></td>
             <td>
                   <code><span title="list">list</span>[<span title="str">str</span>]</code>
             </td>
@@ -8788,7 +8832,7 @@ The package is lazily extracted when needed (e.g., when accessing files or tests
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-property&quot;&gt;&lt;code&gt;property&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="./#rattler_build.DownstreamTest.index">index</a></code></td>
+  &lt;/span&gt; (&lt;code&gt;rattler_build.DownstreamTest.index&lt;/code&gt;)" href="./#rattler_build.DownstreamTest.index">index</a></code></td>
             <td>
                   <code><span title="int">int</span></code>
             </td>
@@ -8804,7 +8848,7 @@ The package is lazily extracted when needed (e.g., when accessing files or tests
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-property&quot;&gt;&lt;code&gt;property&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="./#rattler_build.DownstreamTest.downstream">downstream</a></code></td>
+  &lt;/span&gt; (&lt;code&gt;rattler_build.DownstreamTest.downstream&lt;/code&gt;)" href="./#rattler_build.DownstreamTest.downstream">downstream</a></code></td>
             <td>
                   <code><span title="str">str</span></code>
             </td>
@@ -8943,7 +8987,7 @@ The package is lazily extracted when needed (e.g., when accessing files or tests
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-property&quot;&gt;&lt;code&gt;property&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="./#rattler_build.PackageContentsTest.index">index</a></code></td>
+  &lt;/span&gt; (&lt;code&gt;rattler_build.PackageContentsTest.index&lt;/code&gt;)" href="./#rattler_build.PackageContentsTest.index">index</a></code></td>
             <td>
                   <code><span title="int">int</span></code>
             </td>
@@ -8959,9 +9003,9 @@ The package is lazily extracted when needed (e.g., when accessing files or tests
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-property&quot;&gt;&lt;code&gt;property&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="./#rattler_build.PackageContentsTest.files">files</a></code></td>
+  &lt;/span&gt; (&lt;code&gt;rattler_build.PackageContentsTest.files&lt;/code&gt;)" href="./#rattler_build.PackageContentsTest.files">files</a></code></td>
             <td>
-                  <code><a class="autorefs autorefs-internal" title="rattler_build.package.FileChecks" href="./#rattler_build.FileChecks">FileChecks</a></code>
+                  <code><a class="autorefs autorefs-internal" title="&lt;code&gt;rattler_build.package.FileChecks&lt;/code&gt;" href="./#rattler_build.FileChecks">FileChecks</a></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -8975,9 +9019,9 @@ The package is lazily extracted when needed (e.g., when accessing files or tests
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-property&quot;&gt;&lt;code&gt;property&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="./#rattler_build.PackageContentsTest.site_packages">site_packages</a></code></td>
+  &lt;/span&gt; (&lt;code&gt;rattler_build.PackageContentsTest.site_packages&lt;/code&gt;)" href="./#rattler_build.PackageContentsTest.site_packages">site_packages</a></code></td>
             <td>
-                  <code><a class="autorefs autorefs-internal" title="rattler_build.package.FileChecks" href="./#rattler_build.FileChecks">FileChecks</a></code>
+                  <code><a class="autorefs autorefs-internal" title="&lt;code&gt;rattler_build.package.FileChecks&lt;/code&gt;" href="./#rattler_build.FileChecks">FileChecks</a></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -8991,9 +9035,9 @@ The package is lazily extracted when needed (e.g., when accessing files or tests
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-property&quot;&gt;&lt;code&gt;property&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="./#rattler_build.PackageContentsTest.bin">bin</a></code></td>
+  &lt;/span&gt; (&lt;code&gt;rattler_build.PackageContentsTest.bin&lt;/code&gt;)" href="./#rattler_build.PackageContentsTest.bin">bin</a></code></td>
             <td>
-                  <code><a class="autorefs autorefs-internal" title="rattler_build.package.FileChecks" href="./#rattler_build.FileChecks">FileChecks</a></code>
+                  <code><a class="autorefs autorefs-internal" title="&lt;code&gt;rattler_build.package.FileChecks&lt;/code&gt;" href="./#rattler_build.FileChecks">FileChecks</a></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -9007,9 +9051,9 @@ The package is lazily extracted when needed (e.g., when accessing files or tests
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-property&quot;&gt;&lt;code&gt;property&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="./#rattler_build.PackageContentsTest.lib">lib</a></code></td>
+  &lt;/span&gt; (&lt;code&gt;rattler_build.PackageContentsTest.lib&lt;/code&gt;)" href="./#rattler_build.PackageContentsTest.lib">lib</a></code></td>
             <td>
-                  <code><a class="autorefs autorefs-internal" title="rattler_build.package.FileChecks" href="./#rattler_build.FileChecks">FileChecks</a></code>
+                  <code><a class="autorefs autorefs-internal" title="&lt;code&gt;rattler_build.package.FileChecks&lt;/code&gt;" href="./#rattler_build.FileChecks">FileChecks</a></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -9023,9 +9067,9 @@ The package is lazily extracted when needed (e.g., when accessing files or tests
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-property&quot;&gt;&lt;code&gt;property&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="./#rattler_build.PackageContentsTest.include">include</a></code></td>
+  &lt;/span&gt; (&lt;code&gt;rattler_build.PackageContentsTest.include&lt;/code&gt;)" href="./#rattler_build.PackageContentsTest.include">include</a></code></td>
             <td>
-                  <code><a class="autorefs autorefs-internal" title="rattler_build.package.FileChecks" href="./#rattler_build.FileChecks">FileChecks</a></code>
+                  <code><a class="autorefs autorefs-internal" title="&lt;code&gt;rattler_build.package.FileChecks&lt;/code&gt;" href="./#rattler_build.FileChecks">FileChecks</a></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -9039,7 +9083,7 @@ The package is lazily extracted when needed (e.g., when accessing files or tests
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-property&quot;&gt;&lt;code&gt;property&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="./#rattler_build.PackageContentsTest.strict">strict</a></code></td>
+  &lt;/span&gt; (&lt;code&gt;rattler_build.PackageContentsTest.strict&lt;/code&gt;)" href="./#rattler_build.PackageContentsTest.strict">strict</a></code></td>
             <td>
                   <code><span title="bool">bool</span></code>
             </td>
@@ -9298,7 +9342,7 @@ The package is lazily extracted when needed (e.g., when accessing files or tests
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-property&quot;&gt;&lt;code&gt;property&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="./#rattler_build.FileChecks.exists">exists</a></code></td>
+  &lt;/span&gt; (&lt;code&gt;rattler_build.FileChecks.exists&lt;/code&gt;)" href="./#rattler_build.FileChecks.exists">exists</a></code></td>
             <td>
                   <code><span title="list">list</span>[<span title="str">str</span>]</code>
             </td>
@@ -9314,7 +9358,7 @@ The package is lazily extracted when needed (e.g., when accessing files or tests
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-property&quot;&gt;&lt;code&gt;property&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="./#rattler_build.FileChecks.not_exists">not_exists</a></code></td>
+  &lt;/span&gt; (&lt;code&gt;rattler_build.FileChecks.not_exists&lt;/code&gt;)" href="./#rattler_build.FileChecks.not_exists">not_exists</a></code></td>
             <td>
                   <code><span title="list">list</span>[<span title="str">str</span>]</code>
             </td>
@@ -9433,7 +9477,7 @@ The package is lazily extracted when needed (e.g., when accessing files or tests
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-property&quot;&gt;&lt;code&gt;property&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="./#rattler_build.PathEntry.relative_path">relative_path</a></code></td>
+  &lt;/span&gt; (&lt;code&gt;rattler_build.PathEntry.relative_path&lt;/code&gt;)" href="./#rattler_build.PathEntry.relative_path">relative_path</a></code></td>
             <td>
                   <code><span title="str">str</span></code>
             </td>
@@ -9449,7 +9493,7 @@ The package is lazily extracted when needed (e.g., when accessing files or tests
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-property&quot;&gt;&lt;code&gt;property&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="./#rattler_build.PathEntry.no_link">no_link</a></code></td>
+  &lt;/span&gt; (&lt;code&gt;rattler_build.PathEntry.no_link&lt;/code&gt;)" href="./#rattler_build.PathEntry.no_link">no_link</a></code></td>
             <td>
                   <code><span title="bool">bool</span></code>
             </td>
@@ -9465,7 +9509,7 @@ The package is lazily extracted when needed (e.g., when accessing files or tests
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-property&quot;&gt;&lt;code&gt;property&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="./#rattler_build.PathEntry.path_type">path_type</a></code></td>
+  &lt;/span&gt; (&lt;code&gt;rattler_build.PathEntry.path_type&lt;/code&gt;)" href="./#rattler_build.PathEntry.path_type">path_type</a></code></td>
             <td>
                   <code><span title="str">str</span></code>
             </td>
@@ -9481,7 +9525,7 @@ The package is lazily extracted when needed (e.g., when accessing files or tests
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-property&quot;&gt;&lt;code&gt;property&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="./#rattler_build.PathEntry.size_in_bytes">size_in_bytes</a></code></td>
+  &lt;/span&gt; (&lt;code&gt;rattler_build.PathEntry.size_in_bytes&lt;/code&gt;)" href="./#rattler_build.PathEntry.size_in_bytes">size_in_bytes</a></code></td>
             <td>
                   <code><span title="int">int</span> | None</code>
             </td>
@@ -9497,7 +9541,7 @@ The package is lazily extracted when needed (e.g., when accessing files or tests
 
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-property&quot;&gt;&lt;code&gt;property&lt;/code&gt;&lt;/small&gt;
-  &lt;/span&gt;" href="./#rattler_build.PathEntry.sha256">sha256</a></code></td>
+  &lt;/span&gt; (&lt;code&gt;rattler_build.PathEntry.sha256&lt;/code&gt;)" href="./#rattler_build.PathEntry.sha256">sha256</a></code></td>
             <td>
                   <code><span title="str">str</span> | None</code>
             </td>
@@ -9849,20 +9893,25 @@ The package is lazily extracted when needed (e.g., when accessing files or tests
   </footer>
       
     </div>
-    <div class="md-dialog" data-md-component="dialog">
+    <div class="md-dialog" data-md-component="dialog" role="status" aria-atomic="true">
       <div class="md-dialog__inner md-typeset"></div>
     </div>
     
-      <div class="md-progress" data-md-component="progress" role="progressbar"></div>
+      
+<div class="md-progress" data-md-component="progress" role="progressbar" aria-label="Loading"></div>
     
     
     
       
       
-      <script id="__config" type="application/json">{"annotate":null,"base":"../../..","features":["content.tabs.link","content.code.copy","content.action.edit","content.code.annotate","content.tooltips","navigation.instant","navigation.instant.progress","navigation.tracking","navigation.indexes","navigation.top","navigation.footer"],"search":"../../../assets/javascripts/workers/search.7d14d953.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":{"provider":"mike"}}</script>
+      
+      
+        
+        
+      <script id="__config" type="application/json">{"annotate":null,"base":"../../..","features":["content.tabs.link","content.code.copy","content.action.edit","content.code.annotate","content.tooltips","navigation.instant","navigation.instant.progress","navigation.tracking","navigation.indexes","navigation.top","navigation.footer"],"redirect":null,"search":"../../../assets/javascripts/workers/search.719e0d91.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","clipboard.error":"Could not copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":{"provider":"mike"}}</script>
     
     
-      <script src="../../../assets/javascripts/bundle.6970bfe9.min.js"></script>
+      <script src="../../../assets/javascripts/bundle.3cb411a8.min.js"></script>
       
     
   </body>
