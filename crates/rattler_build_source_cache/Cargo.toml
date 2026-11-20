@@ -21,6 +21,9 @@ sigstore = [
   "dep:sigstore-verify",
   "sigstore-trust-root/tuf",
   "sigstore-verify/tuf",
+  # sigstore-crypto has no built-in crypto backend without this; verification
+  # would panic at runtime with "no sigstore-crypto CryptoProvider installed".
+  "sigstore-verify/aws-lc-rs",
 ]
 
 [dependencies]

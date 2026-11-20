@@ -208,24 +208,27 @@ In addition to signing built packages, Rattler-Build can also **verify** the att
 
 ### How it works
 
-Add an `attestation` block to a URL source in your recipe:
+Add an `attestations` block to a URL source in your recipe:
 
 ```yaml title="recipe.yaml"
 source:
   url: https://files.pythonhosted.org/packages/.../flask-3.1.1.tar.gz
   sha256: "6489f1..."
-  attestation:
+  attestations:
     publishers:
       - github:pallets/flask
 ```
 
 When Rattler-Build downloads the source, it will:
 
-1. Fetch the Sigstore attestation bundle (automatically derived for PyPI packages, or from `bundle_url`)
-2. Verify the bundle signature against the Sigstore transparency log
-3. Check that the attestation identity matches one of the listed publishers
+1. Fetch the Sigstore attestation bundle (automatically derived for PyPI packages and uploaded GitHub release assets, or from `bundle_url`)
+2. Verify the bundle cryptographically against the Sigstore trust root (fetched via TUF): the signing certificate chain at a verified signing time, the transparency log inclusion proof (or, for GitHub release attestations, an RFC 3161 timestamp), and the signature over the in-toto statement
+3. Verify that the downloaded archive's SHA-256 is a subject of that signed statement
+4. Check that **every** listed publisher matches a verified attestation
 
-If verification fails, the build is aborted.
+If any step fails, the build is aborted. A cached source is re-verified whenever its `attestations` configuration changes.
+
+If `publishers` is omitted, the attestation must still verify cryptographically, but any signer is accepted and a warning is printed. Always list the publishers you expect.
 
 ### PyPI sources
 
@@ -235,28 +238,129 @@ For packages hosted on PyPI, the attestation bundle URL is automatically derived
 source:
   url: https://files.pythonhosted.org/packages/.../flask-3.1.1.tar.gz
   sha256: "6489f1..."
-  attestation:
+  attestations:
     publishers:
       - github:pallets/flask
 ```
 
 ### GitHub release sources
 
-For source archives from GitHub releases, specify the `bundle_url` pointing to the `.sigstore.json` bundle:
+For an archive **uploaded as a GitHub release asset**, Rattler-Build queries the repository attestations API for a release attestation whose subject is the archive's SHA-256. No unstable attestation download ID or `bundle_url` is needed.
+
+For example, uv publishes an attested `source.tar.gz`. This binds verification to the `astral-sh/uv` repository:
+
+```yaml
+context:
+  version: "0.12.1"
+
+source:
+  url: https://github.com/astral-sh/uv/releases/download/${{ version }}/source.tar.gz
+  sha256: 5f0503f896f1209f6114835a7754369c2484331b0caab4c1ecd4579dfd2a31b0
+  attestations:
+    publishers:
+      - github:astral-sh/uv
+```
+
+Internally, Rattler-Build requests:
+
+```text
+https://api.github.com/repos/astral-sh/uv/attestations/sha256:5f0503f896f1209f6114835a7754369c2484331b0caab4c1ecd4579dfd2a31b0?predicate_type=release
+```
+
+It verifies both the SHA-256 subject and the signed repository subject `pkg:github/astral-sh/uv@0.12.1`. The release certificate itself has GitHub's fixed identity `https://dotcom.releases.github.com`, so repository binding comes from that signed package URL rather than a workflow SAN.
+
+GitHub's dynamically generated source archives (the "Source code" `.zip` and `.tar.gz` links) are **not** covered by a release attestation. Their release attestation contains the source commit's SHA-1, but that does not cryptographically authenticate the generated archive bytes. To make source verification possible, upload a `source.tar.gz` as a release asset; GitHub then includes its SHA-256 in the immutable release attestation.
+
+You can also point `bundle_url` at any other attestation. For example, uv additionally publishes SLSA build provenance (via `actions/attest-build-provenance`), which is signed on the Sigstore public-good instance by the release workflow's identity. Query the attestations API with a different `predicate_type` to verify that instead:
+
+```yaml
+context:
+  version: "0.12.1"
+  sha256: 5f0503f896f1209f6114835a7754369c2484331b0caab4c1ecd4579dfd2a31b0
+
+source:
+  url: https://github.com/astral-sh/uv/releases/download/${{ version }}/source.tar.gz
+  sha256: ${{ sha256 }}
+  attestations:
+    bundle_url: https://api.github.com/repos/astral-sh/uv/attestations/sha256:${{ sha256 }}?predicate_type=provenance
+    publishers:
+      - github:astral-sh/uv@refs/heads/main
+```
+
+A standalone `.sigstore.json` file published next to a release asset works the same way. Both DSSE (in-toto) bundles and message-signature bundles (e.g. from `cosign sign-blob --bundle`) are supported.
+
+GitHub's API allows 60 unauthenticated requests per hour. Set `GITHUB_TOKEN` (or `GH_TOKEN`) to authenticate these requests, e.g. in CI. The token is only ever sent to `api.github.com`.
+
+### Requiring more than one attestation
+
+`attestations` also takes a list. Every entry is verified on its own and all of them must pass, so you can require independent kinds of evidence for the same file. A release attestation only proves the asset is part of the immutable release at a tag; build provenance proves which workflow and ref built it. Requiring both says that the file in the release was built by the release workflow:
 
 ```yaml
 source:
-  url: https://github.com/facebook/zstd/releases/download/v1.5.7/zstd-1.5.7.tar.gz
-  sha256: "eb33e5..."
-  attestation:
-    bundle_url: https://github.com/facebook/zstd/releases/download/v1.5.7/zstd-1.5.7.tar.gz.sigstore.json
-    publishers:
-      - github:facebook/zstd
+  url: https://github.com/astral-sh/uv/releases/download/${{ version }}/source.tar.gz
+  sha256: ${{ sha256 }}
+  attestations:
+    # The release attestation, found automatically
+    - publishers:
+        - github:astral-sh(115962839)/uv(699532645)@refs/tags/${{ version }}
+    # The build provenance of the release workflow
+    - bundle_url: https://api.github.com/repos/astral-sh/uv/attestations/sha256:${{ sha256 }}?predicate_type=provenance
+      publishers:
+        - github:astral-sh(115962839)/uv(699532645)@refs/heads/main
 ```
+
+Each entry has its own publishers, because a ref means something different for each kind of attestation: the release tag for a release attestation, the ref of the signing workflow run for build provenance.
 
 ### Publisher format
 
-Publishers are specified in `github:owner/repo` format. The identity is matched against the Sigstore certificate's Subject Alternative Name (SAN), which for GitHub Actions is the workflow identity.
+Publishers are specified in `github:owner/repo` or `gitlab:owner/repo` format (owner and repository are matched case-insensitively). For workflow-produced attestations, the repository is matched against the Sigstore certificate's Subject Alternative Name (SAN) and the OIDC issuer must be GitHub Actions or GitLab respectively. For GitHub immutable release attestations, the certificate identifies GitHub's release service, so the repository is instead matched against the signed `pkg:github/owner/repo@tag` subject.
+
+You can additionally pin the git ref the attestation was produced from by appending `@<ref>`:
+
+```yaml
+attestations:
+  publishers:
+    - github:pallets/flask@refs/tags/${{ version }}
+```
+
+For workflow-produced attestations (PyPI, build provenance, `.sigstore.json` bundles), the ref is compared with the ref encoded at the end of the certificate SAN (`...workflow.yml@refs/tags/3.1.1`). This is the ref of the signing *workflow run*: projects that release through `workflow_dispatch` on a branch are signed with that branch ref (e.g. `refs/heads/main`), not the tag. For GitHub release attestations, only tag refs (`refs/tags/<tag>`) are supported and are compared with the release tag.
+
+### Pinning the repository ID, owner ID and environment
+
+A repository name is not permanent: if the owner renames or deletes the account or repository, someone else can register the same name and publish attestations that match `github:owner/repo`. GitHub and GitLab give every repository and owner an immutable numeric ID that is never reused, and Sigstore records them in the attestation. Pin them by writing each ID in parentheses after its name:
+
+```yaml
+attestations:
+  publishers:
+    - github:pallets(16748505)/flask(596892)@refs/tags/${{ version }}
+```
+
+The ID after the owner is the `owner_id` (the user or organization), the one after the repository is the `repository_id`. Each is optional on its own.
+
+To also pin the deployment environment, use the mapping form of a publisher:
+
+```yaml
+attestations:
+  publishers:
+    - github: pallets/flask
+      ref: refs/tags/${{ version }}  # optional, same as the `@<ref>` suffix
+      repository_id: 596892
+      owner_id: 16748505
+      environment: release
+```
+
+The mapping takes exactly one of `github` or `gitlab` (`owner/repo`, without IDs in parentheses), and optionally:
+
+- `ref`: the git ref, as described above
+- `repository_id`: the immutable ID of the repository
+- `owner_id`: the immutable ID of the user or organization that owns it
+- `environment`: the deployment environment the signing workflow ran in, e.g. `release`. Environments can require reviewers or restrict which branches deploy, so pinning one means the attestation passed those protections.
+
+Every pinned value must be present in the attestation and equal, in addition to the repository name. For workflow-produced attestations the values come from the signing certificate; for GitHub release attestations the IDs come from the signed release statement, which does not record an environment, so an `environment` pin never matches a release attestation.
+
+You don't need to look the IDs up: when a publisher without pinned IDs verifies, Rattler-Build logs the pinned publisher string to paste into the recipe. The IDs match the ones in GitHub's immutable OIDC subject claims (`repo:pallets@16748505/flask@596892:...`).
+
+The rendered recipe stored in the package (`info/recipe/rendered_recipe.yaml`) always records the IDs the attestation was verified with: its `finalized_sources` section fills in the `repository_id` and `owner_id` of every publisher that did not pin them, so you can later check exactly which repository a package's source was attested by.
 
 ## Verifying attestations
 

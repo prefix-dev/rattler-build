@@ -175,15 +175,50 @@ pub struct IdentityCheck {
     pub identity: String,
     /// Expected OIDC issuer (e.g., "https://token.actions.githubusercontent.com")
     pub issuer: String,
+    /// Optional git ref the signing workflow must have run on
+    /// (e.g., "refs/tags/v1.0"). For GitHub release attestations this must be
+    /// a tag and is compared against the release tag.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ref_constraint: Option<String>,
+    /// Optional immutable repository ID the attestation must be for
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repository_id: Option<String>,
+    /// Optional immutable repository owner ID the attestation must be for
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub owner_id: Option<String>,
+    /// Optional deployment environment the signing workflow must have run in
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub environment: Option<String>,
+}
+
+/// The immutable repository and owner IDs a verified attestation was signed
+/// for, as recorded in the signing certificate or the signed release
+/// predicate.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AttestedIds {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repository_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub owner_id: Option<String>,
 }
 
 /// Attestation verification configuration for the cache layer
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AttestationVerification {
-    /// URL to download the attestation bundle from, or None for auto-derived PyPI URLs
+    /// URL to download the attestation bundle from, or None for automatic provider discovery
     pub bundle_url: Option<url::Url>,
     /// Identity checks to perform. All must pass.
     pub identity_checks: Vec<IdentityCheck>,
+}
+
+impl AttestationVerification {
+    /// A stable fingerprint of this configuration. A cached artifact is only
+    /// considered verified for configurations with the same fingerprint.
+    pub fn fingerprint(&self) -> String {
+        use sha2::{Digest, Sha256};
+        let json = serde_json::to_string(self).unwrap_or_default();
+        hex::encode(Sha256::digest(json.as_bytes()))
+    }
 }
 
 /// URL source specification
@@ -192,8 +227,8 @@ pub struct UrlSource {
     pub urls: Vec<url::Url>,
     pub checksums: Vec<Checksum>,
     pub file_name: Option<String>,
-    /// Optional attestation verification
-    pub attestation: Option<AttestationVerification>,
+    /// Attestations the file must have. Every entry must verify.
+    pub attestations: Vec<AttestationVerification>,
 }
 
 /// Source types that can be cached

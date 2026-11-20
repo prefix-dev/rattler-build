@@ -302,25 +302,41 @@ source:
 !!! note
     This feature requires the `--experimental` flag.
 
-For URL sources, you can specify an `attestation` block to verify that the downloaded archive
+For URL sources, you can specify an `attestations` block to verify that the downloaded archive
 was built by an expected publisher using [Sigstore](https://sigstore.dev) attestations.
 
 ```yaml
 source:
   url: https://files.pythonhosted.org/packages/.../flask-3.1.1.tar.gz
   sha256: "..."
-  attestation:
+  attestations:
     publishers:
       - github:pallets/flask
 ```
 
-The attestation config has the following fields:
+`attestations` takes one mapping, or a list of them that must all verify (see
+[requiring more than one attestation](../sigstore.md#requiring-more-than-one-attestation)). Each mapping
+has the following fields:
 
-- **`publishers`** - A list of publisher identities in `github:owner/repo` format. At least one
-  publisher must match for verification to succeed.
-- **`bundle_url`** (optional) - URL to the Sigstore bundle file. For PyPI sources, this is
-  automatically derived from the PyPI attestation API. For GitHub releases, use the pattern
-  `https://github.com/{owner}/{repo}/releases/download/{tag}/{filename}.sigstore.json`.
+- **`publishers`** - A list of publisher identities in `github:owner/repo` or `gitlab:owner/repo`
+  format, optionally followed by `@<ref>` (e.g. `github:pallets/flask@refs/tags/3.1.1`). Every
+  listed publisher must match a verified attestation. The immutable owner and repository IDs
+  can be pinned in parentheses, e.g. `github:pallets(16748505)/flask(596892)@refs/tags/3.1.1`. A
+  publisher can also be a mapping, which can additionally pin the deployment environment:
+
+  ```yaml
+  publishers:
+    - github: pallets/flask
+      ref: refs/tags/3.1.1
+      repository_id: 596892
+      owner_id: 16748505
+      environment: release
+  ```
+- **`bundle_url`** (optional) - URL to the Sigstore bundle file. It is automatically derived
+  from the PyPI attestation API and, for uploaded GitHub release assets, from the GitHub
+  repository attestations API. GitHub's dynamically generated source archives are not covered
+  by release attestations; upload the source archive as a release asset instead. A direct bundle
+  URL can still be used when a project publishes a standalone `.sigstore.json` file.
 
 See the [Sigstore source attestation documentation](../sigstore.md#source-attestation-verification)
 for more details and examples.

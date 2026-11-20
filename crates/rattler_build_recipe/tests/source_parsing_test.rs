@@ -647,6 +647,15 @@ fn test_parse_nested_conditionals() {
     );
 }
 
+fn short_publisher(spec: &rattler_build_recipe::stage0::source::PublisherSpec) -> &str {
+    match spec {
+        rattler_build_recipe::stage0::source::PublisherSpec::Short(value) => {
+            value.as_concrete().expect("concrete publisher string")
+        }
+        other => panic!("expected a publisher string, got {other:?}"),
+    }
+}
+
 #[test]
 fn test_parse_url_source_with_attestation() {
     let yaml = r#"
@@ -657,7 +666,7 @@ package:
 source:
   url: https://pypi.io/packages/source/f/flask/flask-1.0.tar.gz
   sha256: e03c8123866dd68f129e8a29082011db418ce90863948f563c01b814670782c6
-  attestation:
+  attestations:
     publishers:
       - github:pallets/flask
 
@@ -672,18 +681,15 @@ build:
     match source {
         Source::Url(url_src) => {
             let att = url_src
-                .attestation
-                .as_ref()
-                .expect("attestation should be set");
+                .attestations
+                .first()
+                .expect("an attestation should be set");
             assert!(
                 att.bundle_url.is_none(),
                 "bundle_url should be None for PyPI"
             );
             assert_eq!(att.publishers.len(), 1);
-            assert_eq!(
-                att.publishers[0].as_concrete().unwrap(),
-                "github:pallets/flask"
-            );
+            assert_eq!(short_publisher(&att.publishers[0]), "github:pallets/flask");
         }
         _ => panic!("Expected URL source"),
     }
@@ -699,7 +705,7 @@ package:
 source:
   url: https://github.com/facebook/zstd/releases/download/v1.5.7/zstd-1.5.7.tar.gz
   sha256: e03c8123866dd68f129e8a29082011db418ce90863948f563c01b814670782c6
-  attestation:
+  attestations:
     bundle_url: https://github.com/facebook/zstd/releases/download/v1.5.7/zstd-1.5.7.tar.gz.sigstore.json
     publishers:
       - github:facebook/zstd
@@ -713,9 +719,9 @@ build:
     match source {
         Source::Url(url_src) => {
             let att = url_src
-                .attestation
-                .as_ref()
-                .expect("attestation should be set");
+                .attestations
+                .first()
+                .expect("an attestation should be set");
             assert!(att.bundle_url.is_some(), "bundle_url should be set");
             assert_eq!(att.publishers.len(), 1);
         }
@@ -733,7 +739,7 @@ package:
 source:
   url: https://example.com/archive.tar.gz
   sha256: e03c8123866dd68f129e8a29082011db418ce90863948f563c01b814670782c6
-  attestation:
+  attestations:
     bundle_url: https://example.com/archive.tar.gz.sigstore.json
     publishers:
       - github:org/repo
@@ -748,14 +754,164 @@ build:
     match source {
         Source::Url(url_src) => {
             let att = url_src
-                .attestation
-                .as_ref()
-                .expect("attestation should be set");
+                .attestations
+                .first()
+                .expect("an attestation should be set");
             assert_eq!(att.publishers.len(), 2);
-            assert_eq!(att.publishers[0].as_concrete().unwrap(), "github:org/repo");
-            assert_eq!(att.publishers[1].as_concrete().unwrap(), "gitlab:org/repo");
+            assert_eq!(short_publisher(&att.publishers[0]), "github:org/repo");
+            assert_eq!(short_publisher(&att.publishers[1]), "gitlab:org/repo");
         }
         _ => panic!("Expected URL source"),
+    }
+}
+
+#[test]
+fn test_parse_publisher_mapping_with_pinned_ids() {
+    use rattler_build_recipe::stage0::source::PublisherSpec;
+
+    let yaml = r#"
+package:
+  name: test
+  version: 1.0.0
+
+source:
+  url: https://pypi.io/packages/source/f/flask/flask-3.1.1.tar.gz
+  sha256: 284c7b8f2f58cb737f0cf1c30fd7eaf0ccfcde196099d24ecede3fc2005aa59e
+  attestations:
+    publishers:
+      - github:pallets/flask
+      - github: pallets/flask
+        ref: refs/tags/${{ version }}
+        repository_id: 596892
+        owner_id: 16748505
+        environment: publish
+
+build:
+  number: 0
+"#;
+
+    let recipe = parse_recipe_from_source(yaml).unwrap();
+    let source = get_concrete_source(&recipe.source.as_slice()[0]).unwrap();
+    let Source::Url(url_src) = source else {
+        panic!("Expected URL source");
+    };
+    let att = url_src.attestations.first().unwrap();
+    assert_eq!(att.publishers.len(), 2);
+    assert_eq!(short_publisher(&att.publishers[0]), "github:pallets/flask");
+    let PublisherSpec::Detailed(d) = &att.publishers[1] else {
+        panic!("expected the mapping form");
+    };
+    assert_eq!(
+        d.github.as_ref().unwrap().as_concrete().unwrap(),
+        "pallets/flask"
+    );
+    assert!(d.gitlab.is_none());
+    assert!(d.ref_constraint.as_ref().unwrap().is_template());
+    assert_eq!(
+        d.repository_id.as_ref().unwrap().as_concrete().unwrap(),
+        "596892"
+    );
+    assert_eq!(
+        d.owner_id.as_ref().unwrap().as_concrete().unwrap(),
+        "16748505"
+    );
+    assert_eq!(
+        d.environment.as_ref().unwrap().as_concrete().unwrap(),
+        "publish"
+    );
+    assert!(att.used_variables().contains(&"version".to_string()));
+}
+
+/// Wrap an `attestations`-like block in a recipe with one URL source
+fn url_recipe_with(block: &str) -> String {
+    format!(
+        r#"
+package:
+  name: test
+  version: 1.0.0
+
+source:
+  url: https://github.com/astral-sh/uv/releases/download/0.12.1/source.tar.gz
+  sha256: e03c8123866dd68f129e8a29082011db418ce90863948f563c01b814670782c6
+{block}
+"#
+    )
+}
+
+#[test]
+fn test_parse_attestation_list() {
+    let yaml = url_recipe_with(
+        r#"  attestations:
+    - publishers:
+        - github:astral-sh/uv@refs/tags/0.12.1
+    - bundle_url: https://api.github.com/repos/astral-sh/uv/attestations/sha256:abc
+      publishers:
+        - github:astral-sh/uv@refs/heads/main"#,
+    );
+    let recipe = parse_recipe_from_source(&yaml).unwrap();
+    let Some(Source::Url(url_src)) = get_concrete_source(&recipe.source.as_slice()[0]) else {
+        panic!("Expected URL source");
+    };
+    assert_eq!(url_src.attestations.len(), 2);
+    assert!(url_src.attestations[0].bundle_url.is_none());
+    assert!(url_src.attestations[1].bundle_url.is_some());
+    assert_eq!(
+        short_publisher(&url_src.attestations[1].publishers[0]),
+        "github:astral-sh/uv@refs/heads/main"
+    );
+}
+
+#[test]
+fn test_parse_attestations_errors() {
+    for (block, expected) in [
+        ("  attestations: []", "the list of attestations is empty"),
+        ("  attestations: github:a/b", "expected a mapping"),
+        ("  attestations:\n    - github:a/b", "expected a mapping"),
+        (
+            "  attestations:\n    - publishers: [github:a/b]\n    - { publisher: github:a/b }",
+            "attestations[1]",
+        ),
+        (
+            "  attestation:\n    publishers: [github:a/b]",
+            "renamed to `attestations`",
+        ),
+    ] {
+        let err = parse_recipe_from_source(&url_recipe_with(block)).unwrap_err();
+        assert!(
+            format!("{err:?}").contains(expected),
+            "{block}: expected '{expected}' in {err:?}"
+        );
+    }
+}
+
+#[test]
+fn test_parse_publisher_mapping_errors() {
+    let recipe = |publisher: &str| {
+        format!(
+            r#"
+package:
+  name: test
+  version: 1.0.0
+
+source:
+  url: https://example.com/archive.tar.gz
+  sha256: e03c8123866dd68f129e8a29082011db418ce90863948f563c01b814670782c6
+  attestations:
+    publishers:
+      - {publisher}
+"#
+        )
+    };
+    for (publisher, expected) in [
+        ("{ repository_id: 1 }", "exactly one of"),
+        ("{ github: a/b, gitlab: a/b }", "exactly one of"),
+        ("{ github: a/b, repo_id: 1 }", "unknown field 'repo_id'"),
+    ] {
+        let err = parse_recipe_from_source(&recipe(publisher)).unwrap_err();
+        assert!(
+            format!("{err:?}").contains(expected),
+            "{publisher}: expected '{expected}' in {err:?}"
+        );
     }
 }
 
@@ -770,9 +926,9 @@ fn test_parse_flask_attestation_example() {
     match source {
         Source::Url(url_src) => {
             let att = url_src
-                .attestation
-                .as_ref()
-                .expect("attestation should be set");
+                .attestations
+                .first()
+                .expect("an attestation should be set");
             assert!(att.bundle_url.is_none());
             assert_eq!(att.publishers.len(), 1);
         }
@@ -781,22 +937,47 @@ fn test_parse_flask_attestation_example() {
 }
 
 #[test]
-fn test_parse_zstd_attestation_example() {
-    let yaml = include_str!("../../../examples/zstd-attestation/recipe.yaml");
+fn test_parse_uv_attestation_example() {
+    let yaml = include_str!("../../../examples/uv-attestation/recipe.yaml");
     let recipe = parse_recipe_from_source(yaml).unwrap();
 
-    assert_eq!(recipe.package.name.as_concrete().unwrap().as_str(), "zstd");
+    assert_eq!(recipe.package.name.as_concrete().unwrap().as_str(), "uv");
 
     let source = get_concrete_source(&recipe.source.as_slice()[0]).unwrap();
     match source {
         Source::Url(url_src) => {
             let att = url_src
-                .attestation
-                .as_ref()
-                .expect("attestation should be set");
+                .attestations
+                .first()
+                .expect("an attestation should be set");
+            assert!(
+                att.bundle_url.is_none(),
+                "GitHub release attestation should be discovered automatically"
+            );
+            assert_eq!(att.publishers.len(), 1);
+            assert_eq!(short_publisher(&att.publishers[0]), "github:astral-sh/uv");
+        }
+        _ => panic!("Expected URL source"),
+    }
+}
+
+#[test]
+fn test_parse_build_provenance_attestation_example() {
+    let yaml = include_str!("../../../examples/uv-build-provenance-attestation/recipe.yaml");
+    let recipe = parse_recipe_from_source(yaml).unwrap();
+
+    assert_eq!(recipe.package.name.as_concrete().unwrap().as_str(), "uv");
+
+    let source = get_concrete_source(&recipe.source.as_slice()[0]).unwrap();
+    match source {
+        Source::Url(url_src) => {
+            let att = url_src
+                .attestations
+                .first()
+                .expect("an attestation should be set");
             assert!(
                 att.bundle_url.is_some(),
-                "zstd example has explicit bundle_url"
+                "build provenance example has explicit bundle_url"
             );
             assert_eq!(att.publishers.len(), 1);
         }
