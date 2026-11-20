@@ -1,6 +1,6 @@
 [package]
 name = "rattler_build_types"
-version = "0.1.22"
+version = "0.1.24"
 authors.workspace = true
 edition.workspace = true
 description = "Common types shared across rattler-build crates, including glob matching, version pinning, and variant configuration keys"
@@ -21,5 +21,3 @@ thiserror = { workspace = true }
 [dev-dependencies]
 fs-err = { workspace = true }
 insta = { workspace = true, features = ["yaml"] }
-
-[features]

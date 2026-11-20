@@ -304,6 +304,8 @@ async fn async_main() -> miette::Result<()> {
         Some(SubCommands::Package(cmd)) => match cmd {
             PackageCommands::Inspect(opts) => show_package_info(opts),
             PackageCommands::Extract(opts) => extract_package(opts).await,
+            #[cfg(feature = "sigstore")]
+            PackageCommands::Attest(opts) => rattler_build::attest_packages(opts).await.map(|_| ()),
         },
         Some(SubCommands::BumpRecipe(opts)) => run_bump_recipe(opts).await,
         Some(SubCommands::MigrateRecipe(opts)) => run_migrate_recipe(opts),

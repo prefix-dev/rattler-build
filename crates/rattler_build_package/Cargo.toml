@@ -1,12 +1,17 @@
 [package]
 name = "rattler_build_package"
-version = "0.1.25"
+version = "0.1.27"
 authors.workspace = true
 edition.workspace = true
 description = "A library for creating conda packages from files and metadata, supporting .tar.bz2 and .conda formats"
 readme = "README.md"
 repository.workspace = true
 license.workspace = true
+
+[features]
+default = ["recipe"]
+# Support for building from rattler_build_recipe structures
+recipe = ["dep:rattler_build_jinja", "dep:rattler_build_recipe"]
 
 [dependencies]
 # Core dependencies
@@ -47,8 +52,3 @@ url = { workspace = true }
 [dev-dependencies]
 insta = { workspace = true }
 rstest = { workspace = true }
-
-[features]
-default = ["recipe"]
-# Support for building from rattler_build_recipe structures
-recipe = ["dep:rattler_build_jinja", "dep:rattler_build_recipe"]

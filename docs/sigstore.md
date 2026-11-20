@@ -100,6 +100,35 @@ jobs:
             --generate-attestation
 ```
 
+## Attesting without uploading
+
+When packages reach their channel through a different path, for example via a
+staging channel and a separate service that copies them, you can sign the
+attestation in CI without uploading anything:
+
+```bash
+rattler-build package attest output/linux-64/*.conda \
+  --target-channel https://prefix.dev/my-channel \
+  --store-github-attestation
+```
+
+For every package this writes a `<filename>.sigstore.json` bundle next to the
+package (or into `--output-dir`). It uses the same CEP-27 conda publish
+predicate as `--generate-attestation`, with `targetChannel` set to
+`--target-channel`. With `--store-github-attestation`, the bundle is also
+stored in the GitHub attestation API of `GITHUB_REPOSITORY`, using
+`GITHUB_TOKEN`. A channel can later retrieve it by the package's SHA-256
+digest:
+
+```bash
+gh api repos/OWNER/REPO/attestations/sha256:<digest>
+```
+
+The job needs `id-token: write` to sign, and `attestations: write` to store
+the bundle on GitHub. Set `--target-channel` to the channel the package will
+finally be served from, because prefix.dev checks it when the attestation is
+attached.
+
 ## Manual attestation with GitHub Actions
 
 !!! tip "Prefer `--generate-attestation` when possible"

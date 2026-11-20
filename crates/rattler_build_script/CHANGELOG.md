@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.21](https://github.com/prefix-dev/rattler-build/compare/rattler_build_script-v0.2.20...rattler_build_script-v0.2.21) - 2026-11-16
+
+### Other
+
+- bump `rattler_menuinst` to `0.5.0` ([#2948](https://github.com/prefix-dev/rattler-build/pull/2948))
+
+## [0.2.20](https://github.com/prefix-dev/rattler-build/compare/rattler_build_script-v0.2.19...rattler_build_script-v0.2.20) - 2026-11-11
+
+### Other
+
+- update Cargo.toml dependencies
+
 ## [0.2.19](https://github.com/prefix-dev/rattler-build/compare/rattler_build_script-v0.2.18...rattler_build_script-v0.2.19) - 2026-10-30
 
 ### Other

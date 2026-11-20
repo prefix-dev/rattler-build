@@ -1,0 +1,10 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/octo-sts/app/refs/heads/main/pkg/octosts/octosts.TrustPolicy.json
+issuer: https://token.actions.githubusercontent.com
+subject_pattern: ^repo:prefix-dev@111356225/rattler-build@532922814:ref:refs/heads/main$
+claim_pattern:
+  ref: ^refs/heads/main$
+  job_workflow_ref: ^prefix-dev/rattler-build/\.github/workflows/update-lockfiles\.yml@refs/heads/main$
+
+permissions:
+  contents: write
+  pull_requests: write

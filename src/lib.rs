@@ -1333,6 +1333,39 @@ pub fn get_rattler_build_version() -> &'static str {
     env!("CARGO_PKG_VERSION")
 }
 
+/// The outputs to print for `--render-only`.
+///
+/// Leaves out the outputs that `--skip-existing` would skip, like a build
+/// would. With `with_solve`, the dependencies are resolved, and with
+/// `--continue-on-failure` an output that fails to resolve is logged and left
+/// out instead of aborting the run.
+async fn render_only_outputs(
+    outputs: Vec<Output>,
+    with_solve: bool,
+    tool_config: &Configuration,
+) -> miette::Result<Vec<Output>> {
+    let outputs = skip_existing(outputs, tool_config).await?;
+    if !with_solve {
+        return Ok(outputs);
+    }
+
+    let mut resolved = Vec::with_capacity(outputs.len());
+    for output in outputs {
+        let identifier = output.identifier();
+        match output
+            .resolve_dependencies(tool_config, RunExportsDownload::DownloadMissing)
+            .await
+        {
+            Ok(output) => resolved.push(output),
+            Err(e) if tool_config.continue_on_failure.continues() => {
+                tracing::error!("Failed to resolve dependencies for {identifier}: {e}");
+            }
+            Err(e) => return Err(e).into_diagnostic(),
+        }
+    }
+    Ok(resolved)
+}
+
 /// Build Rattler-Build recipes
 pub async fn build_recipes(
     recipe_paths: Vec<std::path::PathBuf>,
@@ -1360,20 +1393,7 @@ pub async fn build_recipes(
             include_test_dependencies,
         )?;
 
-        let outputs = if build_data.with_solve {
-            let mut updated_outputs = Vec::new();
-            for output in outputs {
-                updated_outputs.push(
-                    output
-                        .resolve_dependencies(&tool_config, RunExportsDownload::DownloadMissing)
-                        .await
-                        .into_diagnostic()?,
-                );
-            }
-            updated_outputs
-        } else {
-            outputs
-        };
+        let outputs = render_only_outputs(outputs, build_data.with_solve, &tool_config).await?;
 
         println!(
             "{}",
@@ -1610,20 +1630,8 @@ pub async fn publish_packages(
         }
 
         if publish_data.build.render_only {
-            let outputs = if publish_data.build.with_solve {
-                let mut updated_outputs = Vec::new();
-                for output in outputs {
-                    updated_outputs.push(
-                        output
-                            .resolve_dependencies(&tool_config, RunExportsDownload::DownloadMissing)
-                            .await
-                            .into_diagnostic()?,
-                    );
-                }
-                updated_outputs
-            } else {
-                outputs
-            };
+            let outputs =
+                render_only_outputs(outputs, publish_data.build.with_solve, &tool_config).await?;
 
             println!(
                 "{}",
@@ -1804,6 +1812,101 @@ pub fn show_package_info(args: InspectOpts) -> miette::Result<()> {
     rattler_build_core::package_info::package_info(args.into())
 }
 
+/// Sign Sigstore attestations for already-built packages without uploading
+/// them. Returns the paths of the written bundles.
+#[cfg(feature = "sigstore")]
+pub async fn attest_packages(args: opt::AttestOpts) -> miette::Result<Vec<PathBuf>> {
+    use rattler_upload::upload::attestation::{AttestationConfig, create_attestation};
+
+    let config = if args.store_github_attestation {
+        let repository = args.github_repository.as_deref().ok_or_else(|| {
+            miette::miette!(
+                "--store-github-attestation requires --github-repository or the GITHUB_REPOSITORY environment variable"
+            )
+        })?;
+        let (owner, repo) = repository
+            .split_once('/')
+            .filter(|(owner, repo)| !owner.is_empty() && !repo.is_empty() && !repo.contains('/'))
+            .ok_or_else(|| {
+                miette::miette!("invalid GitHub repository '{repository}', expected 'owner/repo'")
+            })?;
+        let token = args
+            .github_token
+            .clone()
+            .filter(|t| !t.is_empty())
+            .ok_or_else(|| {
+                miette::miette!(
+                    "--store-github-attestation requires the GITHUB_TOKEN environment variable"
+                )
+            })?;
+        AttestationConfig {
+            repo_owner: Some(owner.to_string()),
+            repo_name: Some(repo.to_string()),
+            github_token: Some(token),
+        }
+    } else {
+        AttestationConfig {
+            repo_owner: None,
+            repo_name: None,
+            github_token: None,
+        }
+    };
+
+    // Validate every input before signing anything, so a typo does not leave
+    // a partially attested set of packages behind.
+    let mut packages = Vec::with_capacity(args.package_files.len());
+    for package_file in &args.package_files {
+        let file_name = package_file
+            .file_name()
+            .and_then(|name| name.to_str())
+            .filter(|name| name.ends_with(".conda") || name.ends_with(".tar.bz2"))
+            .ok_or_else(|| {
+                miette::miette!(
+                    "{} is not a conda package (.conda or .tar.bz2)",
+                    package_file.display()
+                )
+            })?;
+        if !package_file.is_file() {
+            miette::bail!("package file {} does not exist", package_file.display());
+        }
+        let bundle_dir = match &args.output_dir {
+            Some(dir) => dir.clone(),
+            None => package_file.parent().map(PathBuf::from).unwrap_or_default(),
+        };
+        packages.push((
+            package_file,
+            bundle_dir.join(format!("{file_name}.sigstore.json")),
+        ));
+    }
+
+    if let Some(output_dir) = &args.output_dir {
+        fs::create_dir_all(output_dir).into_diagnostic()?;
+    }
+
+    let client = reqwest_middleware::ClientBuilder::new(
+        reqwest::Client::builder()
+            .user_agent(tool_configuration::APP_USER_AGENT)
+            .build()
+            .into_diagnostic()?,
+    )
+    .build();
+
+    let mut written = Vec::with_capacity(packages.len());
+    for (package_file, bundle_path) in packages {
+        tracing::info!("Creating attestation for {}", package_file.display());
+        let bundle_json =
+            create_attestation(package_file, args.target_channel.as_str(), &config, &client)
+                .await
+                .with_context(|| format!("failed to attest {}", package_file.display()))?;
+
+        fs::write(&bundle_path, bundle_json).into_diagnostic()?;
+        tracing::info!("Wrote attestation bundle to {}", bundle_path.display());
+        written.push(bundle_path);
+    }
+
+    Ok(written)
+}
+
 /// Extract a conda package to a directory
 pub async fn extract_package(args: opt::ExtractOpts) -> miette::Result<()> {
     rattler_build_core::package_info::extract_package(args.into()).await
@@ -1866,4 +1969,55 @@ pub async fn fetch_sources_from_args(
         None => println!("{json}"),
     }
     Ok(())
+}
+
+#[cfg(all(test, feature = "sigstore"))]
+mod attest_tests {
+    use super::*;
+
+    fn opts(package_files: Vec<PathBuf>) -> opt::AttestOpts {
+        opt::AttestOpts {
+            package_files,
+            target_channel: "https://prefix.dev/conda-forge".parse().unwrap(),
+            output_dir: None,
+            store_github_attestation: false,
+            github_repository: None,
+            github_token: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn rejects_non_package_files_before_signing() {
+        let dir = tempfile::tempdir().unwrap();
+        let not_a_package = dir.path().join("recipe.yaml");
+        fs::write(&not_a_package, "").unwrap();
+        let err = attest_packages(opts(vec![not_a_package]))
+            .await
+            .unwrap_err();
+        assert!(err.to_string().contains("is not a conda package"), "{err}");
+    }
+
+    #[tokio::test]
+    async fn rejects_missing_package_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let missing = dir.path().join("foo-1.0-h123_0.conda");
+        let err = attest_packages(opts(vec![missing])).await.unwrap_err();
+        assert!(err.to_string().contains("does not exist"), "{err}");
+    }
+
+    #[tokio::test]
+    async fn store_github_attestation_requires_repository_and_token() {
+        let mut args = opts(vec![PathBuf::from("foo-1.0-h123_0.conda")]);
+        args.store_github_attestation = true;
+        let err = attest_packages(args.clone()).await.unwrap_err();
+        assert!(err.to_string().contains("--github-repository"), "{err}");
+
+        args.github_repository = Some("conda-forge".to_string());
+        let err = attest_packages(args.clone()).await.unwrap_err();
+        assert!(err.to_string().contains("expected 'owner/repo'"), "{err}");
+
+        args.github_repository = Some("conda-forge/foo-feedstock".to_string());
+        let err = attest_packages(args).await.unwrap_err();
+        assert!(err.to_string().contains("GITHUB_TOKEN"), "{err}");
+    }
 }

@@ -4,12 +4,14 @@
 //! rendered-output dependency policy used by the build and publish loops.
 
 use std::{
+    borrow::Cow,
     cell::{Cell, RefCell},
-    collections::{HashMap, HashSet, VecDeque},
+    collections::{BTreeMap, HashMap, HashSet, VecDeque},
 };
 
+use rattler_build_core::Variable;
 use rattler_build_recipe::stage1::{Dependency, TestType};
-use rattler_build_types::PinError;
+use rattler_build_types::{NormalizedKey, PinError};
 use rattler_conda_types::{
     MatchSpec, PackageName, ParseMatchSpecError, ParseMatchSpecOptions, RepodataRevision,
 };
@@ -45,6 +47,66 @@ pub(crate) enum BuildQueueError {
     },
 }
 
+/// The variant an output is built for.
+type Variant = BTreeMap<NormalizedKey, Variable>;
+
+/// A planned output: its package identity and the variant it is built for.
+struct PlannedOutput {
+    identifier: PackageIdentifier,
+    variant: Variant,
+}
+
+/// Variant keys that describe where a package is built or installed. They are
+/// ignored when one side is `noarch`, which can be used with any platform.
+const PLATFORM_VARIANT_KEYS: [&str; 3] = ["target_platform", "host_platform", "build_platform"];
+
+/// Whether a variant is for a `noarch` package.
+fn is_noarch(variant: &Variant) -> bool {
+    variant
+        .get(&NormalizedKey::from("target_platform"))
+        .and_then(Variable::as_str)
+        == Some("noarch")
+}
+
+/// Whether two variants agree on every key they both use, e.g. are built for
+/// the same Python version. Platform keys only count when neither is `noarch`.
+fn variants_agree(left: &Variant, right: &Variant) -> bool {
+    let ignore_platform = is_noarch(left) || is_noarch(right);
+    left.iter().all(|(key, value)| {
+        (ignore_platform && PLATFORM_VARIANT_KEYS.contains(&key.normalize().as_str()))
+            || right.get(key).is_none_or(|other| other == value)
+    })
+}
+
+/// The variant that the run dependencies of `output` must agree with when it
+/// is installed for a package built for `requirer`: the output's own variant,
+/// plus the keys it does not use from `requirer`. This keeps, for example, the
+/// Python version across a `noarch` package in between.
+fn installed_variant<'v>(output: &'v Variant, requirer: &Variant) -> Cow<'v, Variant> {
+    let inherited = inherited_keys(output, requirer);
+    if inherited.is_empty() {
+        return Cow::Borrowed(output);
+    }
+    let mut variant = output.clone();
+    variant.extend(inherited);
+    Cow::Owned(variant)
+}
+
+/// The keys of `requirer` that `output` does not use, which
+/// [`installed_variant`] adds to the output's variant.
+fn inherited_keys(output: &Variant, requirer: &Variant) -> Variant {
+    requirer
+        .iter()
+        .filter(|(key, _)| !output.contains_key(*key))
+        .map(|(key, value)| (key.clone(), value.clone()))
+        .collect()
+}
+
+/// Identifies an output installed for a requirer: the output's index and the
+/// keys it inherits from the requirer (see [`installed_variant`]). Whether the
+/// output is installable depends on both, so results are cached by this key.
+type InstallKey = (usize, Variant);
+
 /// Evaluates build and test readiness against sibling outputs from the current build.
 ///
 /// The complete plan distinguishes sibling dependencies from packages supplied by
@@ -52,7 +114,7 @@ pub(crate) enum BuildQueueError {
 /// closures are currently installable.
 struct BuildReadiness<'a> {
     /// Package identities that participate in this local build.
-    planned_outputs: &'a [PackageIdentifier],
+    planned_outputs: &'a [PlannedOutput],
     /// Outputs already processed by the build loop.
     done_outputs: &'a [Output],
     /// Outputs not built because they already exist.
@@ -68,11 +130,11 @@ struct SkippedOutputs<'a> {
     outputs: &'a [Output],
     /// Indices into `outputs` by package name.
     by_name: HashMap<&'a PackageName, Vec<usize>>,
-    /// Whether an output is installable, per index. Only results that did not
-    /// depend on the cycle guard are kept.
-    installable: RefCell<HashMap<usize, bool>>,
+    /// Whether an output is installable, per output and inherited keys. Only
+    /// results that did not depend on the cycle guard are kept.
+    installable: RefCell<HashMap<InstallKey, bool>>,
     /// Outputs whose dependencies are being checked (cycle guard).
-    being_checked: RefCell<HashSet<usize>>,
+    being_checked: RefCell<HashSet<InstallKey>>,
     /// Set when the cycle guard answered for an output still being checked.
     reached_cycle: Cell<bool>,
 }
@@ -101,30 +163,30 @@ impl<'a> SkippedOutputs<'a> {
         }
     }
 
-    /// Whether the output at `index` is installable, as decided by
+    /// Whether the output at `key` is installable, as decided by
     /// `installable` and cached. In a dependency cycle, the check of an output
     /// that is already being checked answers `true`: the check further up
     /// decides.
     fn check<E>(
         &self,
-        index: usize,
+        key: InstallKey,
         installable: impl FnOnce(&'a Output) -> Result<bool, E>,
     ) -> Result<bool, E> {
-        if let Some(&result) = self.installable.borrow().get(&index) {
+        if let Some(&result) = self.installable.borrow().get(&key) {
             return Ok(result);
         }
-        if !self.being_checked.borrow_mut().insert(index) {
+        if !self.being_checked.borrow_mut().insert(key.clone()) {
             self.reached_cycle.set(true);
             return Ok(true);
         }
         let reached_cycle_before = self.reached_cycle.replace(false);
 
-        let result = installable(&self.outputs[index]);
+        let result = installable(&self.outputs[key.0]);
 
-        self.being_checked.borrow_mut().remove(&index);
+        self.being_checked.borrow_mut().remove(&key);
         let reached_cycle = self.reached_cycle.get();
         if !reached_cycle && let Ok(result) = result {
-            self.installable.borrow_mut().insert(index, result);
+            self.installable.borrow_mut().insert(key, result);
         }
         self.reached_cycle
             .set(reached_cycle_before || reached_cycle);
@@ -136,7 +198,7 @@ impl<'a> BuildReadiness<'a> {
     /// Creates a readiness view over the complete plan, the outputs processed so
     /// far and the outputs skipped because they already exist.
     fn new(
-        planned_outputs: &'a [PackageIdentifier],
+        planned_outputs: &'a [PlannedOutput],
         done_outputs: &'a [Output],
         skipped_outputs: &'a [Output],
     ) -> Self {
@@ -213,35 +275,40 @@ impl<'a> BuildReadiness<'a> {
     /// Collects an output's installable sibling runtime closure.
     ///
     /// Returns `false` when the output or any planned sibling in its finalized
-    /// runtime dependencies is not available.
+    /// runtime dependencies is not available. `requirer` is the variant of the
+    /// package the output is installed for (see [`installed_variant`]).
     fn collect_install_closure(
         &self,
         output_index: usize,
-        visited: &mut HashSet<usize>,
-        availability: &mut HashMap<usize, bool>,
+        requirer: &Variant,
+        visited: &mut HashSet<InstallKey>,
+        availability: &mut HashMap<InstallKey, bool>,
         closure: &mut Vec<usize>,
     ) -> Result<bool, BuildQueueError> {
-        if !visited.insert(output_index) {
+        let output = &self.done_outputs[output_index];
+        let key = (output_index, inherited_keys(output.variant(), requirer));
+        if !visited.insert(key.clone()) {
             return Ok(true);
         }
-        if let Some(&available) = availability.get(&output_index) {
+        if let Some(&available) = availability.get(&key) {
             if available {
                 closure.push(output_index);
             }
             return Ok(available);
         }
 
-        let Some(finalized_dependencies) = &self.done_outputs[output_index].finalized_dependencies
-        else {
-            availability.insert(output_index, false);
+        let Some(finalized_dependencies) = &output.finalized_dependencies else {
+            availability.insert(key, false);
             return Ok(false);
         };
         closure.push(output_index);
 
+        let variant = installed_variant(output.variant(), requirer);
         let mut available = true;
         for dependency in &finalized_dependencies.run.depends {
             if !self.collect_spec_install_closure(
                 dependency.spec(),
+                &variant,
                 visited,
                 availability,
                 closure,
@@ -250,36 +317,119 @@ impl<'a> BuildReadiness<'a> {
                 break;
             }
         }
-        availability.insert(output_index, available);
+        availability.insert(key, available);
         Ok(available)
     }
 
-    /// Collects the installable sibling closure for a match specification.
-    ///
-    /// Specifications without a matching planned sibling are external dependencies
-    /// and therefore do not block local scheduling, unless they match a skipped
-    /// output whose run dependencies are planned.
+    /// Collects the installable sibling closure for a match specification
+    /// needed by a package built for `variant`.
     fn collect_spec_install_closure(
         &self,
         spec: &MatchSpec,
-        visited: &mut HashSet<usize>,
-        availability: &mut HashMap<usize, bool>,
+        variant: &Variant,
+        visited: &mut HashSet<InstallKey>,
+        availability: &mut HashMap<InstallKey, bool>,
         closure: &mut Vec<usize>,
     ) -> Result<bool, BuildQueueError> {
-        if !self
-            .planned_outputs
-            .iter()
-            .any(|output| Self::identifier_matches_spec(spec, output))
-        {
-            return self.skipped_dependency_is_installable(
-                spec.name.as_exact(),
-                |output| Self::output_matches_spec(spec, output),
-                availability,
-            );
+        self.collect_matching_install_closure(
+            spec.name.as_exact(),
+            |output| Self::identifier_matches_spec(spec, output),
+            |output| Self::output_matches_spec(spec, output),
+            variant,
+            visited,
+            availability,
+            closure,
+        )
+    }
+
+    /// Collects the installable sibling closure for a recipe dependency of
+    /// `consumer`, installed for a package built for `variant`.
+    #[allow(clippy::too_many_arguments)]
+    fn collect_dependency_install_closure(
+        &self,
+        dependency: &Dependency,
+        consumer: &Output,
+        variant: &Variant,
+        visited: &mut HashSet<InstallKey>,
+        availability: &mut HashMap<InstallKey, bool>,
+        closure: &mut Vec<usize>,
+    ) -> Result<bool, BuildQueueError> {
+        let match_spec = Self::dependency_match_spec(dependency, consumer)?;
+        self.collect_matching_install_closure(
+            dependency.name(),
+            |output| match &match_spec {
+                Some(spec) => Self::identifier_matches_spec(spec, output),
+                None => dependency.name().is_some_and(|name| name == &output.name),
+            },
+            |output| match &match_spec {
+                Some(spec) => Self::output_matches_spec(spec, output),
+                None => dependency.name().is_some_and(|name| name == output.name()),
+            },
+            variant,
+            visited,
+            availability,
+            closure,
+        )
+    }
+
+    /// Collects the installable sibling closure for a dependency, named `name`
+    /// if known, of a package built for `variant`.
+    ///
+    /// Only the variants of the dependency that agree with `variant` (e.g. are
+    /// built for the same Python version) can be installed with the package, so
+    /// when the plan or the skipped outputs have such a variant, the others are
+    /// not considered. Without one, any matching variant will do.
+    ///
+    /// Dependencies that are neither planned nor skipped are left to the solver
+    /// and do not block local scheduling. Skipped outputs are installed from a
+    /// channel, but their run dependencies may be planned.
+    #[allow(clippy::too_many_arguments)]
+    fn collect_matching_install_closure(
+        &self,
+        name: Option<&PackageName>,
+        matches_identifier: impl Fn(&PackageIdentifier) -> bool,
+        matches_output: impl Fn(&Output) -> bool,
+        variant: &Variant,
+        visited: &mut HashSet<InstallKey>,
+        availability: &mut HashMap<InstallKey, bool>,
+        closure: &mut Vec<usize>,
+    ) -> Result<bool, BuildQueueError> {
+        let mut planned = false;
+        let mut agreeing_planned = false;
+        for output in self.planned_outputs {
+            if matches_identifier(&output.identifier) {
+                planned = true;
+                if variants_agree(variant, &output.variant) {
+                    agreeing_planned = true;
+                    break;
+                }
+            }
+        }
+
+        if !agreeing_planned {
+            let skipped: Vec<usize> = self
+                .skipped
+                .candidates(name)
+                .into_iter()
+                .filter(|&index| matches_output(&self.skipped.outputs[index]))
+                .collect();
+            let agreeing_skipped: Vec<usize> = skipped
+                .iter()
+                .copied()
+                .filter(|&index| variants_agree(variant, self.skipped.outputs[index].variant()))
+                .collect();
+            if !agreeing_skipped.is_empty() {
+                return self.skipped_outputs_are_installable(&agreeing_skipped, variant);
+            }
+            if !planned {
+                return self.skipped_outputs_are_installable(&skipped, variant);
+            }
         }
 
         for (output_index, output) in self.done_outputs.iter().enumerate() {
-            if !Self::output_matches_spec(spec, output) {
+            if !matches_output(output)
+                || (agreeing_planned && !variants_agree(variant, output.variant()))
+            {
                 continue;
             }
 
@@ -287,6 +437,7 @@ impl<'a> BuildReadiness<'a> {
             let mut candidate_closure = closure.clone();
             if self.collect_install_closure(
                 output_index,
+                variant,
                 &mut candidate_visited,
                 availability,
                 &mut candidate_closure,
@@ -300,23 +451,17 @@ impl<'a> BuildReadiness<'a> {
         Ok(false)
     }
 
-    /// Checks a dependency that no planned output provides.
-    ///
-    /// When it matches outputs skipped because they already exist, the solver
-    /// installs one of them, and with it its run dependencies, which may be
-    /// planned. Which variant it picks is not known before solving, so every
-    /// matching skipped output must be installable. Anything else is left to
-    /// the solver.
-    fn skipped_dependency_is_installable(
+    /// Checks skipped outputs that a dependency matches. The solver installs
+    /// one of them, and with it its run dependencies, which may be planned.
+    /// Which one it picks is not known before solving, so all of them must be
+    /// installable.
+    fn skipped_outputs_are_installable(
         &self,
-        name: Option<&PackageName>,
-        matches: impl Fn(&Output) -> bool,
-        availability: &mut HashMap<usize, bool>,
+        indices: &[usize],
+        requirer: &Variant,
     ) -> Result<bool, BuildQueueError> {
-        for index in self.skipped.candidates(name) {
-            if matches(&self.skipped.outputs[index])
-                && !self.skipped_output_is_installable(index, availability)?
-            {
+        for &index in indices {
+            if !self.skipped_output_is_installable(index, requirer)? {
                 return Ok(false);
             }
         }
@@ -326,13 +471,18 @@ impl<'a> BuildReadiness<'a> {
     /// Checks whether a skipped output can be installed: whether its planned
     /// dependencies are built. Its run requirements are installed with it; its
     /// host and build requirements are checked too, because their run exports
-    /// are part of the published package's dependencies.
+    /// are part of the published package's dependencies. `requirer` is the
+    /// variant of the package it is installed for (see [`installed_variant`]).
     fn skipped_output_is_installable(
         &self,
         index: usize,
-        availability: &mut HashMap<usize, bool>,
+        requirer: &Variant,
     ) -> Result<bool, BuildQueueError> {
-        self.skipped.check(index, |skipped| {
+        let own_variant = self.skipped.outputs[index].variant();
+        let key = (index, inherited_keys(own_variant, requirer));
+        self.skipped.check(key, |skipped| {
+            let variant = installed_variant(skipped.variant(), requirer);
+            let mut availability = HashMap::new();
             let requirements = skipped.recipe.requirements();
             for dependency in requirements
                 .run
@@ -343,8 +493,9 @@ impl<'a> BuildReadiness<'a> {
                 if !self.collect_dependency_install_closure(
                     dependency,
                     skipped,
+                    &variant,
                     &mut HashSet::new(),
-                    availability,
+                    &mut availability,
                     &mut Vec::new(),
                 )? {
                     return Ok(false);
@@ -352,58 +503,6 @@ impl<'a> BuildReadiness<'a> {
             }
             Ok(true)
         })
-    }
-
-    /// Collects the installable sibling closure for a recipe dependency.
-    ///
-    /// Dependencies without a matching planned sibling are left for the solver and
-    /// therefore do not block local scheduling, unless they match a skipped output
-    /// whose run dependencies are planned.
-    fn collect_dependency_install_closure(
-        &self,
-        dependency: &Dependency,
-        consumer: &Output,
-        visited: &mut HashSet<usize>,
-        availability: &mut HashMap<usize, bool>,
-        closure: &mut Vec<usize>,
-    ) -> Result<bool, BuildQueueError> {
-        let match_spec = Self::dependency_match_spec(dependency, consumer)?;
-        let matches_identifier = |output: &PackageIdentifier| match &match_spec {
-            Some(spec) => Self::identifier_matches_spec(spec, output),
-            None => dependency.name().is_some_and(|name| name == &output.name),
-        };
-        let matches_output = |output: &Output| match &match_spec {
-            Some(spec) => Self::output_matches_spec(spec, output),
-            None => dependency.name().is_some_and(|name| name == output.name()),
-        };
-        if !self.planned_outputs.iter().any(matches_identifier) {
-            return self.skipped_dependency_is_installable(
-                dependency.name(),
-                matches_output,
-                availability,
-            );
-        }
-
-        for (output_index, output) in self.done_outputs.iter().enumerate() {
-            if !matches_output(output) {
-                continue;
-            }
-
-            let mut candidate_visited = visited.clone();
-            let mut candidate_closure = closure.clone();
-            if self.collect_install_closure(
-                output_index,
-                &mut candidate_visited,
-                availability,
-                &mut candidate_closure,
-            )? {
-                *visited = candidate_visited;
-                *closure = candidate_closure;
-                return Ok(true);
-            }
-        }
-
-        Ok(false)
     }
 
     /// Checks strong run exports contributed by direct build dependencies.
@@ -414,7 +513,7 @@ impl<'a> BuildReadiness<'a> {
         &self,
         build_environment_outputs: &[usize],
         consumer: &Output,
-        availability: &mut HashMap<usize, bool>,
+        availability: &mut HashMap<InstallKey, bool>,
     ) -> Result<bool, BuildQueueError> {
         let ignore_run_exports = &consumer.recipe.requirements().ignore_run_exports;
 
@@ -449,6 +548,7 @@ impl<'a> BuildReadiness<'a> {
 
                 if !self.collect_spec_install_closure(
                     &spec,
+                    consumer.variant(),
                     &mut HashSet::new(),
                     availability,
                     &mut Vec::new(),
@@ -472,6 +572,7 @@ impl<'a> BuildReadiness<'a> {
             if !self.collect_dependency_install_closure(
                 dependency,
                 output,
+                output.variant(),
                 &mut HashSet::new(),
                 &mut availability,
                 &mut closure,
@@ -487,6 +588,7 @@ impl<'a> BuildReadiness<'a> {
             if !self.collect_dependency_install_closure(
                 dependency,
                 output,
+                output.variant(),
                 &mut HashSet::new(),
                 &mut availability,
                 &mut Vec::new(),
@@ -521,6 +623,7 @@ impl<'a> BuildReadiness<'a> {
         let mut availability = HashMap::new();
         if !self.collect_install_closure(
             output_index,
+            output.variant(),
             &mut HashSet::new(),
             &mut availability,
             &mut Vec::new(),
@@ -539,6 +642,7 @@ impl<'a> BuildReadiness<'a> {
                     if !self.collect_dependency_install_closure(
                         dependency,
                         output,
+                        output.variant(),
                         &mut HashSet::new(),
                         &mut availability,
                         &mut Vec::new(),
@@ -656,7 +760,7 @@ pub(crate) struct OutputBuildQueue {
     /// Outputs awaiting a build attempt.
     queue: BuildQueue<Output>,
     /// Complete local plan, including outputs not processed yet.
-    planned_outputs: Vec<PackageIdentifier>,
+    planned_outputs: Vec<PlannedOutput>,
     /// Attempted outputs used to determine which local artifacts are available.
     processed_outputs: Vec<Output>,
     /// Outputs not built because they already exist; their run dependencies may
@@ -681,10 +785,13 @@ impl OutputBuildQueue {
     pub(crate) fn new(outputs: Vec<Output>, skipped_outputs: Vec<Output>) -> Self {
         let planned_outputs = outputs
             .iter()
-            .map(|output| PackageIdentifier {
-                name: output.name().clone(),
-                version: output.version().clone(),
-                build_string: output.build_string().into_owned(),
+            .map(|output| PlannedOutput {
+                identifier: PackageIdentifier {
+                    name: output.name().clone(),
+                    version: output.version().clone(),
+                    build_string: output.build_string().into_owned(),
+                },
+                variant: output.variant().clone(),
             })
             .collect();
         let required_planned = required_planned_packages(&outputs, &skipped_outputs);
@@ -981,6 +1088,9 @@ mod tests {
 
     use rattler_conda_types::PackageName;
 
+    use rattler_build_core::Variable;
+    use rattler_build_types::NormalizedKey;
+
     use super::{
         BuildQueue, NextReady, OutputBuildQueue, closure_without, count_dependents, skip_blocked,
     };
@@ -1072,6 +1182,221 @@ system_tools: {{}}
         queue.record_processed(output("sx-c", "h0_0", &[], sx_c_run, true));
         // still one build in flight, so the serial fallback cannot start it
         assert_eq!(ready(&mut queue, 1).as_deref(), Some("sx-a"));
+    }
+
+    /// `output` with a variant, e.g. `[("python", "3.12")]`.
+    fn with_variant(mut output: Output, variant: &[(&str, &str)]) -> Output {
+        output.build_configuration.variant = variant
+            .iter()
+            .map(|(key, value)| (NormalizedKey::from(*key), Variable::from(*value)))
+            .collect();
+        output
+    }
+
+    /// A planned output in a variant for the given Python version on linux-64.
+    fn py_output(name: &str, python: &str, host: &[&str]) -> Output {
+        let build_string = format!("py{}_0", python.replace('.', ""));
+        with_variant(
+            output(name, &build_string, host, &[], false),
+            &[("python", python), ("target_platform", "linux-64")],
+        )
+    }
+
+    /// `planned` after it was built, with the given run dependencies.
+    fn built(planned: &Output, run: &[&str]) -> Output {
+        let mut done = output(
+            planned.name().as_normalized(),
+            &planned.build_string(),
+            &[],
+            run,
+            true,
+        );
+        done.build_configuration.variant = planned.variant().clone();
+        done
+    }
+
+    /// Whether `name` is among the outputs that can start now, while another
+    /// build is in flight (so the serial fallback does not apply).
+    fn can_start(queue: &mut OutputBuildQueue, name: &str) -> bool {
+        std::iter::from_fn(|| queue.next_ready_parallel(1, true, |_| true).unwrap())
+            .any(|output| output.name().as_normalized() == name)
+    }
+
+    #[test]
+    fn waits_for_the_dependency_variant_of_the_same_python() {
+        // `lib` and its consumer `app` are both built for two Python versions
+        let lib_312 = py_output("lib", "3.12", &[]);
+        let lib_313 = py_output("lib", "3.13", &[]);
+        let app_312 = py_output("app", "3.12", &["lib"]);
+        let mut queue =
+            OutputBuildQueue::new(vec![lib_313.clone(), lib_312.clone(), app_312], Vec::new());
+
+        queue.record_processed(built(&lib_313, &[]));
+        // the Python 3.13 `lib` cannot be installed with the Python 3.12 `app`
+        assert!(!can_start(&mut queue, "app"));
+        queue.record_processed(built(&lib_312, &[]));
+        assert!(can_start(&mut queue, "app"));
+    }
+
+    #[test]
+    fn waits_for_the_same_python_variant_of_a_run_dependency() {
+        // `app` needs `mid`, whose run dependency `lib` is built for two Pythons;
+        // the Python 3.13 `mid` is built, but only the Python 3.12 `lib`
+        let lib_312 = py_output("lib", "3.12", &[]);
+        let lib_313 = py_output("lib", "3.13", &[]);
+        let mid_313 = py_output("mid", "3.13", &[]);
+        let app_313 = py_output("app", "3.13", &["mid"]);
+        let mut queue = OutputBuildQueue::new(
+            vec![lib_312.clone(), lib_313.clone(), mid_313.clone(), app_313],
+            Vec::new(),
+        );
+
+        queue.record_processed(built(&lib_312, &[]));
+        queue.record_processed(built(&mid_313, &["lib"]));
+        // the Python 3.12 `lib` cannot be installed with the Python 3.13 `mid`
+        assert!(!can_start(&mut queue, "app"));
+        queue.record_processed(built(&lib_313, &[]));
+        assert!(can_start(&mut queue, "app"));
+    }
+
+    #[test]
+    fn keeps_the_python_variant_through_a_noarch_dependency() {
+        // `app` (Python 3.13) needs the noarch `mid`, which runs with `lib`,
+        // built for two Pythons; only the Python 3.12 `lib` is built
+        let lib_312 = py_output("lib", "3.12", &[]);
+        let lib_313 = py_output("lib", "3.13", &[]);
+        let mid = with_variant(
+            output("mid", "pyh0_0", &[], &[], false),
+            &[("target_platform", "noarch")],
+        );
+        let app_313 = py_output("app", "3.13", &["mid"]);
+        let mut queue = OutputBuildQueue::new(
+            vec![lib_312.clone(), lib_313.clone(), mid.clone(), app_313],
+            Vec::new(),
+        );
+
+        queue.record_processed(built(&lib_312, &[]));
+        queue.record_processed(built(&mid, &["lib"]));
+        assert!(!can_start(&mut queue, "app"));
+        queue.record_processed(built(&lib_313, &[]));
+        assert!(can_start(&mut queue, "app"));
+    }
+
+    #[test]
+    fn noarch_consumer_takes_any_platform_variant() {
+        // the noarch `app` agrees with the linux-64 Python 3.12 `lib` only
+        // when the platform is ignored; otherwise no `lib` variant agrees
+        // and any would do
+        let lib_312 = py_output("lib", "3.12", &[]);
+        let lib_313 = py_output("lib", "3.13", &[]);
+        let app = with_variant(
+            output("app", "pyh0_0", &["lib"], &[], false),
+            &[("python", "3.12"), ("target_platform", "noarch")],
+        );
+        let mut queue =
+            OutputBuildQueue::new(vec![lib_312.clone(), lib_313.clone(), app], Vec::new());
+
+        queue.record_processed(built(&lib_313, &[]));
+        assert!(!can_start(&mut queue, "app"));
+        queue.record_processed(built(&lib_312, &[]));
+        assert!(can_start(&mut queue, "app"));
+    }
+
+    #[test]
+    fn keeps_the_python_variant_through_a_skipped_noarch_dependency() {
+        // as `keeps_the_python_variant_through_a_noarch_dependency`, but the
+        // noarch `mid` already exists
+        let lib_312 = py_output("lib", "3.12", &[]);
+        let lib_313 = py_output("lib", "3.13", &[]);
+        let mid = with_variant(
+            output("mid", "pyh0_0", &[], &["lib"], false),
+            &[("target_platform", "noarch")],
+        );
+        let app_313 = py_output("app", "3.13", &["mid"]);
+        let mut queue =
+            OutputBuildQueue::new(vec![lib_312.clone(), lib_313.clone(), app_313], vec![mid]);
+
+        queue.record_processed(built(&lib_312, &[]));
+        assert!(!can_start(&mut queue, "app"));
+        queue.record_processed(built(&lib_313, &[]));
+        assert!(can_start(&mut queue, "app"));
+    }
+
+    #[test]
+    fn checks_a_dependency_again_for_each_variant_it_is_installed_for() {
+        // `app` reaches the noarch `mid` directly, where any `lib` will do, and
+        // through `x`, where `mid` needs the numpy 1.26 `lib`
+        let numpy = |name: &str, version: &str, platform: &str| {
+            with_variant(
+                output(name, "h0_0", &[], &[], false),
+                &[("numpy", version), ("target_platform", platform)],
+            )
+        };
+        let lib_126 = numpy("lib", "1.26", "linux-64");
+        let lib_200 = numpy("lib", "2.0", "linux-64");
+        let x = numpy("x", "1.26", "linux-64");
+        let mid = with_variant(
+            output("mid", "h0_0", &[], &[], false),
+            &[("target_platform", "noarch")],
+        );
+        let app = with_variant(
+            output("app", "h0_0", &["mid", "x"], &[], false),
+            &[("target_platform", "linux-64")],
+        );
+        let mut queue = OutputBuildQueue::new(
+            vec![
+                lib_126.clone(),
+                lib_200.clone(),
+                x.clone(),
+                mid.clone(),
+                app,
+            ],
+            Vec::new(),
+        );
+
+        queue.record_processed(built(&lib_200, &[]));
+        queue.record_processed(built(&mid, &["lib"]));
+        queue.record_processed(built(&x, &["mid"]));
+        assert!(!can_start(&mut queue, "app"));
+        queue.record_processed(built(&lib_126, &[]));
+        assert!(can_start(&mut queue, "app"));
+    }
+
+    #[test]
+    fn waits_for_the_dependency_of_the_same_target_platform() {
+        let platform = |p| [("target_platform", p)];
+        let lib_x64 = with_variant(
+            output("lib", "h0_0", &[], &[], false),
+            &platform("linux-64"),
+        );
+        let lib_arm = with_variant(
+            output("lib", "h1_0", &[], &[], false),
+            &platform("linux-aarch64"),
+        );
+        let app_arm = with_variant(
+            output("app", "h1_0", &["lib"], &[], false),
+            &platform("linux-aarch64"),
+        );
+        let mut queue =
+            OutputBuildQueue::new(vec![lib_x64.clone(), lib_arm.clone(), app_arm], Vec::new());
+
+        queue.record_processed(built(&lib_x64, &[]));
+        // the linux-64 `lib` cannot be installed with the linux-aarch64 `app`
+        assert!(!can_start(&mut queue, "app"));
+        queue.record_processed(built(&lib_arm, &[]));
+        assert!(can_start(&mut queue, "app"));
+    }
+
+    #[test]
+    fn uses_an_existing_dependency_of_the_same_python() {
+        // the Python 3.12 `lib` already exists (skipped), the Python 3.13 one
+        // is planned: the Python 3.12 `app` does not wait for it
+        let lib_312 = py_output("lib", "3.12", &[]);
+        let lib_313 = py_output("lib", "3.13", &[]);
+        let app_312 = py_output("app", "3.12", &["lib"]);
+        let mut queue = OutputBuildQueue::new(vec![lib_313, app_312], vec![lib_312]);
+
+        assert!(can_start(&mut queue, "app"));
     }
 
     #[test]

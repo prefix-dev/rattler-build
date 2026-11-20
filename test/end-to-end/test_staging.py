@@ -16,7 +16,12 @@ from helpers import (
 
 def test_basic_staging(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     """Test basic staging output with multiple package outputs inheriting from it."""
-    rattler_build.build(recipes / "staging/basic-staging.yaml", tmp_path)
+    output = rattler_build(
+        *rattler_build.build_args(recipes / "staging/basic-staging.yaml", tmp_path),
+        stderr=STDOUT,
+    )
+    # The cold build needs a clean-prefix restore; the next output needs only one.
+    assert output.count("from staging cache 'foo-build'") == 2
 
     # Both package outputs should be built
     pkg1 = get_extracted_package(tmp_path, "foo-split-1")
@@ -762,6 +767,24 @@ def test_staging_overlinking(
         assert (pkg / "bin/test_zlib.exe").exists()
     else:
         assert (pkg / "bin/test_zlib").exists()
+
+
+def test_staging_build_prefix_isolation(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """Files written to $BUILD_PREFIX by the staging script or a sibling output
+    must not leak into an inheriting output's build environment, whether the
+    staging cache was just built or restored from disk."""
+    recipe = recipes / "staging/staging-build-prefix-isolation.yaml"
+    # The first run builds the cache, the second one restores it.
+    for _ in range(2):
+        rattler_build.build(recipe, tmp_path)
+        assert (
+            get_extracted_package(tmp_path, "build-prefix-isolation-a") / "a.txt"
+        ).exists()
+        assert (
+            get_extracted_package(tmp_path, "build-prefix-isolation-b") / "b.txt"
+        ).exists()
 
 
 if __name__ == "__main__":

@@ -5,6 +5,65 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.80.2] - 2026-11-16
+### ✨ Highlights
+
+The new `rattler-build package attest` command signs attestations for packages without uploading them. `--render-only` now honours `--skip-existing` and continues past solve failures.
+
+The Python bindings now use pyo3 0.30. The rattler crates and other Cargo dependencies are bumped to their latest compatible releases.
+
+### Features
+
+- Require the OpenMP runtime for CRAN packages that use OpenMP by @matthewfeickert in [#2935](https://github.com/prefix-dev/rattler-build/pull/2935)
+- Honour --skip-existing in --render-only and continue past solve failures by @Tobias-Fischer in [#2943](https://github.com/prefix-dev/rattler-build/pull/2943)
+- Add `package attest` command to sign attestations without uploading by @wolfv in [#2950](https://github.com/prefix-dev/rattler-build/pull/2950)
+
+
+### Fixes
+
+- recipe-generator: Resolve relative file URLs from PyPI-compatible indexes by @pcbeingused333 in [#2941](https://github.com/prefix-dev/rattler-build/pull/2941)
+- Cap the file table in the GitHub step summary by @Atishyy27 in [#2928](https://github.com/prefix-dev/rattler-build/pull/2928)
+
+
+### Performance
+
+- staging: Avoid restoring the inherited cache twice by @vyasr in [#2922](https://github.com/prefix-dev/rattler-build/pull/2922)
+
+
+### Maintenance
+
+- Bump `rattler_menuinst` to `0.5.0` by @lucascolley in [#2948](https://github.com/prefix-dev/rattler-build/pull/2948)
+- Bump Cargo dependencies (rattler crates, `zip`, `zstd`, `pyo3` 0.30, `pythonize` 0.30)
+
+
+### New Contributors
+* @Atishyy27 made their first contribution in [#2928](https://github.com/prefix-dev/rattler-build/pull/2928)
+* @pcbeingused333 made their first contribution in [#2941](https://github.com/prefix-dev/rattler-build/pull/2941)
+
+## [0.80.1] - 2026-11-11
+
+### Features
+
+- Require the C++ compiler only for CRAN packages with C++ sources by @matthewfeickert in [#2918](https://github.com/prefix-dev/rattler-build/pull/2918)
+- Require BLAS and LAPACK for CRAN packages that link them by @matthewfeickert in [#2929](https://github.com/prefix-dev/rattler-build/pull/2929)
+
+
+### Fixes
+
+- Clean the build prefix when restoring a staging cache by @lucascolley in [#2933](https://github.com/prefix-dev/rattler-build/pull/2933)
+- Wait for the variant of a dependency the build can install with by @Tobias-Fischer in [#2931](https://github.com/prefix-dev/rattler-build/pull/2931)
+
+
+### Maintenance
+
+- Bump rattler crates to rattler_config 0.11 by @pavelzw in [#2914](https://github.com/prefix-dev/rattler-build/pull/2914)
+- Bump rattler crates to rattler_config 0.12 by @pavelzw in [#2920](https://github.com/prefix-dev/rattler-build/pull/2920)
+- Setup octo-sts by @lucascolley in [#2932](https://github.com/prefix-dev/rattler-build/pull/2932)
+- Report required checks when Rust CI is not needed by @lucascolley in [#2936](https://github.com/prefix-dev/rattler-build/pull/2936)
+- Update dependencies and drop getrandom 0.2 pin from playground by @wolfv in [#2934](https://github.com/prefix-dev/rattler-build/pull/2934)
+
+
+
 ## [0.80.0] - 2026-10-30
 ### ✨ Highlights
 

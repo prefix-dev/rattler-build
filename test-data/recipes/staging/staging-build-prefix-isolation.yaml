@@ -1,0 +1,50 @@
+# Files written to $BUILD_PREFIX by the staging script (or by a sibling output)
+# must not leak into the build environment of an inheriting output.
+
+schema_version: 1
+
+recipe:
+  name: staging-build-prefix-isolation
+  version: 1.0.0
+
+outputs:
+  - staging:
+      name: stage
+    build:
+      script:
+        - if: unix
+          then: touch $BUILD_PREFIX/leaked-from-staging
+        - if: win
+          then: echo leaked > %BUILD_PREFIX%\leaked-from-staging
+
+  - package:
+      name: build-prefix-isolation-a
+    inherit: stage
+    build:
+      script:
+        - if: unix
+          then:
+            - test ! -e $BUILD_PREFIX/leaked-from-staging
+            - touch $BUILD_PREFIX/leaked-from-a
+            - echo a > $PREFIX/a.txt
+        - if: win
+          then:
+            - if exist %BUILD_PREFIX%\leaked-from-staging exit 1
+            - echo leaked > %BUILD_PREFIX%\leaked-from-a
+            - echo a > %PREFIX%\a.txt
+
+  - package:
+      name: build-prefix-isolation-b
+    inherit: stage
+    build:
+      script:
+        - if: unix
+          then:
+            - test ! -e $BUILD_PREFIX/leaked-from-staging
+            - test ! -e $BUILD_PREFIX/leaked-from-a
+            - echo b > $PREFIX/b.txt
+        - if: win
+          then:
+            - if exist %BUILD_PREFIX%\leaked-from-staging exit 1
+            - if exist %BUILD_PREFIX%\leaked-from-a exit 1
+            - echo b > %PREFIX%\b.txt

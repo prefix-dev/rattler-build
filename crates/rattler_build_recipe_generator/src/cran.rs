@@ -1,6 +1,8 @@
-#[cfg(not(target_arch = "wasm32"))]
-use std::path::PathBuf;
-use std::{collections::HashMap, collections::HashSet, path::Path};
+use std::{
+    collections::HashMap,
+    collections::HashSet,
+    path::{Path, PathBuf},
+};
 
 #[cfg(feature = "cli")]
 use clap::Parser;
@@ -298,6 +300,26 @@ struct CranTarball {
     has_fortran_sources: bool,
     /// Whether `src/` holds C++ sources, at any depth, as for Fortran.
     has_cxx_sources: bool,
+    /// Whether a `src/Makevars*` file links R's BLAS or LAPACK.
+    links_blas_lapack: bool,
+    /// Whether a `src/Makevars*` file uses R's OpenMP flags.
+    uses_openmp: bool,
+}
+
+/// The Makevars files R reads from `src/`: `Makevars.in` is the template a
+/// `configure` script turns into `Makevars`, and Windows builds prefer
+/// `Makevars.ucrt` over `Makevars.win` over `Makevars`.
+const MAKEVARS: &[&str] = &[
+    "src/Makevars",
+    "src/Makevars.in",
+    "src/Makevars.win",
+    "src/Makevars.ucrt",
+];
+
+/// Whether the make file `contents` reference the make variable `name`, as
+/// `$(name)` or `${name}`.
+fn references_make_variable(contents: &str, name: &str) -> bool {
+    contents.contains(&format!("$({name})")) || contents.contains(&format!("${{{name}}}"))
 }
 
 impl CranTarball {
@@ -305,7 +327,33 @@ impl CranTarball {
         // One decompression pass for everything the tarball can tell us. A
         // failure here means the bytes are not a source archive at all, so
         // nothing about them — the checksum included — can be trusted.
-        let mut scan = tarball::scan_archive(bytes, &["DESCRIPTION", "tests/testthat.R"])?;
+        let wanted: Vec<&str> = ["DESCRIPTION", "tests/testthat.R"]
+            .into_iter()
+            .chain(MAKEVARS.iter().copied())
+            .collect();
+        let mut scan = tarball::scan_archive(bytes, &wanted)?;
+        let makevars: Vec<&str> = MAKEVARS
+            .iter()
+            .filter_map(|file| scan.files.get(file).map(String::as_str))
+            .collect();
+        // Whether a Makevars file references any of the make variables `names`.
+        let makevars_reference = |names: &[&str]| {
+            makevars.iter().any(|contents| {
+                names
+                    .iter()
+                    .any(|name| references_make_variable(contents, name))
+            })
+        };
+        // Writing R Extensions asks for `$(BLAS_LIBS)` wherever
+        // `$(LAPACK_LIBS)` is used, as some implementations ship LAPACK apart
+        // from BLAS, so either one needs both libraries.
+        let links_blas_lapack = makevars_reference(&["BLAS_LIBS", "LAPACK_LIBS"]);
+        let uses_openmp = makevars_reference(&[
+            "SHLIB_OPENMP_CFLAGS",
+            "SHLIB_OPENMP_CXXFLAGS",
+            "SHLIB_OPENMP_FFLAGS",
+            "SHLIB_OPENMP_FCFLAGS",
+        ]);
         let src_files: Vec<PathBuf> = scan
             .paths
             .iter()
@@ -321,6 +369,8 @@ impl CranTarball {
             has_cxx_sources: src_files
                 .iter()
                 .any(|path| has_extension(path, CXX_EXTENSIONS)),
+            links_blas_lapack,
+            uses_openmp,
         })
     }
 }
@@ -750,11 +800,30 @@ fn package_info_to_recipe(
             .map(r_skip_condition);
     }
 
+    if tarball.is_some_and(|tarball| tarball.links_blas_lapack) {
+        // conda-forge's BLAS and LAPACK interfaces; the implementation behind
+        // them is chosen at install time.
+        host.extend(["libblas".to_string(), "liblapack".to_string()]);
+    }
     recipe.requirements.host = std::iter::once(r_base.clone())
         .chain(host)
         .unique()
         .map(Requirement::from)
         .collect();
+    if tarball.is_some_and(|tarball| tarball.uses_openmp) {
+        // The OpenMP runtime of the platform's compilers: clang on macOS, GCC
+        // (MinGW on Windows) everywhere else.
+        recipe.requirements.host.extend([
+            Requirement::Conditional {
+                condition: "osx".to_string(),
+                then: vec!["llvm-openmp".to_string()],
+            },
+            Requirement::Conditional {
+                condition: "not osx".to_string(),
+                then: vec!["libgomp".to_string()],
+            },
+        ]);
+    }
     recipe.requirements.run = std::iter::once(r_base)
         .chain(run)
         .unique()
@@ -1172,6 +1241,42 @@ mod tests {
         );
     }
 
+    /// `$(BLAS_LIBS)` or `$(LAPACK_LIBS)` in any of the Makevars files R
+    /// reads requires conda-forge's BLAS and LAPACK interfaces.
+    #[test]
+    fn makevars_linking_blas_or_lapack_require_both() {
+        let parse = |files: &[(&str, &[u8])]| {
+            CranTarball::parse(&crate::tarball::tarball_with(files)).unwrap()
+        };
+        for (makevars, contents) in [
+            (
+                "pkg/src/Makevars",
+                &b"PKG_LIBS = $(LAPACK_LIBS) $(BLAS_LIBS) $(FLIBS)\n"[..],
+            ),
+            ("pkg/src/Makevars.in", b"PKG_LIBS = @LIBS@ ${BLAS_LIBS}\n"),
+            ("pkg/src/Makevars.win", b"PKG_LIBS = $(LAPACK_LIBS)\n"),
+        ] {
+            assert!(
+                parse(&[(makevars, contents)]).links_blas_lapack,
+                "{makevars}"
+            );
+        }
+        // Not R's variable, and not a Makevars file R reads.
+        assert!(!parse(&[("pkg/src/Makevars", b"PKG_LIBS = -lMYBLAS_LIBS\n")]).links_blas_lapack);
+        assert!(!parse(&[("pkg/src/lib/Makevars", b"LIBS = $(BLAS_LIBS)\n")]).links_blas_lapack);
+
+        let tarball = CranTarball {
+            links_blas_lapack: true,
+            ..Default::default()
+        };
+        let (recipe, _) =
+            package_info_to_recipe(&fixture("gmp"), Some(&tarball), &RecipeOptions::default());
+        assert_eq!(
+            recipe.requirements.host,
+            vec!["r-base".into(), "libblas".into(), "liblapack".into()]
+        );
+    }
+
     /// The C++ compiler is only required for C++ sources, or when the
     /// tarball, and with it the sources, is unknown.
     #[test]
@@ -1199,6 +1304,53 @@ mod tests {
         };
         assert!(build_of(Some(&with_cxx)).contains(&cxx()));
         assert!(build_of(None).contains(&cxx()));
+    }
+
+    /// Any of R's OpenMP flags in a Makevars file requires the OpenMP runtime
+    /// that matches the platform's compilers.
+    #[test]
+    fn makevars_using_openmp_require_the_openmp_runtime() {
+        let parse = |contents: &[u8]| {
+            CranTarball::parse(&crate::tarball::tarball_with(&[(
+                "pkg/src/Makevars",
+                contents,
+            )]))
+            .unwrap()
+        };
+        for contents in [
+            &b"PKG_CFLAGS = $(SHLIB_OPENMP_CFLAGS)\n"[..],
+            b"PKG_CXXFLAGS = ${SHLIB_OPENMP_CXXFLAGS}\n",
+            b"PKG_FFLAGS = $(SHLIB_OPENMP_FFLAGS)\n",
+            b"PKG_FCFLAGS = $(SHLIB_OPENMP_FCFLAGS)\n",
+        ] {
+            assert!(
+                parse(contents).uses_openmp,
+                "{}",
+                String::from_utf8_lossy(contents)
+            );
+        }
+        assert!(!parse(b"PKG_CFLAGS = -O2\n").uses_openmp);
+
+        let tarball = CranTarball {
+            uses_openmp: true,
+            ..Default::default()
+        };
+        let (recipe, _) =
+            package_info_to_recipe(&fixture("gmp"), Some(&tarball), &RecipeOptions::default());
+        assert_eq!(
+            recipe.requirements.host,
+            vec![
+                "r-base".into(),
+                Requirement::Conditional {
+                    condition: "osx".to_string(),
+                    then: vec!["llvm-openmp".to_string()],
+                },
+                Requirement::Conditional {
+                    condition: "not osx".to_string(),
+                    then: vec!["libgomp".to_string()],
+                },
+            ]
+        );
     }
 
     #[test]
