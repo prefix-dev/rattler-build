@@ -186,7 +186,7 @@ pub async fn fetch_sources_to_cache(
                         patches: Vec::new(),
                         file_name: None,
                         target_directory: None,
-                        attestation: None,
+                        attestations: Vec::new(),
                         filter: path_src.filter.clone(),
                     };
                     source_cache
