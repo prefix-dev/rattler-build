@@ -432,8 +432,12 @@ pub struct UrlSource {
     pub target_directory: Option<PathBuf>,
 
     /// Attestations the downloaded file must have. Every entry must verify.
+    ///
+    /// Rendered recipes written before the rename carry a single
+    /// `attestation` mapping; read it too, so `rebuild` of such a package
+    /// does not silently drop verification.
     #[serde_as(as = "OneOrMany<_, PreferMany>")]
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(default, alias = "attestation", skip_serializing_if = "Vec::is_empty")]
     pub attestations: Vec<AttestationConfig>,
 
     /// Only take certain files from the extracted source (validated glob patterns)
@@ -535,6 +539,31 @@ attestations:
         );
         let read_back: UrlSource = serde_yaml::from_str(&written).unwrap();
         assert_eq!(read_back, single);
+    }
+
+    #[test]
+    fn test_url_source_reads_legacy_attestation_key() {
+        // Rendered recipes from before the rename (e.g. in packages built with
+        // 0.80) use a singular `attestation` mapping. `rebuild` must keep
+        // verifying them rather than silently dropping the unknown key.
+        let legacy: UrlSource = serde_yaml::from_str(
+            r#"
+url: https://example.com/a.tar.gz
+attestation:
+  bundle_url: https://example.com/a.tar.gz.sigstore.json
+  publishers:
+    - provider: github
+      owner: pallets
+      repo: flask
+      ref_constraint: refs/tags/3.1.1
+"#,
+        )
+        .unwrap();
+        assert_eq!(legacy.attestations.len(), 1);
+        let publisher = &legacy.attestations[0].publishers[0];
+        assert_eq!(publisher.repo, "flask");
+        assert_eq!(publisher.ref_constraint.as_deref(), Some("refs/tags/3.1.1"));
+        assert_eq!(publisher.repository_id, None);
     }
 
     #[test]
