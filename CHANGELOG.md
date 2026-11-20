@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.80.3] - 2026-11-20
+### ✨ Highlights
+
+The Python bindings now release the GIL while a build runs. Before this fix, Python progress callbacks could deadlock during a build.
+
+### Fixes
+
+- py: Release the GIL while a build runs, so progress callbacks do not deadlock by @mini-1235 in [#2954](https://github.com/prefix-dev/rattler-build/pull/2954)
+
+
+### Documentation
+
+- Close unbalanced backtick in --skip-existing help text by @mini-1235 in [#2953](https://github.com/prefix-dev/rattler-build/pull/2953)
+
+
+### Maintenance
+
+- Build the playground when the recipe generator changes by @matthewfeickert in [#2958](https://github.com/prefix-dev/rattler-build/pull/2958)
+
+
+
 ## [0.80.2] - 2026-11-16
 ### ✨ Highlights
 
