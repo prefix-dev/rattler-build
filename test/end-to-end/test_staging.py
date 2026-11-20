@@ -437,7 +437,7 @@ def test_staging_checks_skip_failed_packaging_consumer(
     )
     output = rattler_build(*args, stderr=STDOUT)
     assert "Build failed for libb" in output
-    assert "No license files were copied" in output
+    assert "The following license files were not found: missing-license.txt" in output
     assert "were not included" not in output
     assert list((tmp_path / "output").glob("*/liba-*.tar.bz2"))
     assert not list((tmp_path / "output").glob("*/libb-*.tar.bz2"))
