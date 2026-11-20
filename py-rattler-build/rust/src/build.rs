@@ -438,12 +438,16 @@ pub fn fetch_rendered_variant_sources_py(
         BTreeMap::new(),
     )?;
 
-    let (result, log_buffer) = tracing_subscriber::with_log_capture(progress_callback, || {
-        run_async_task(async {
-            output
-                .fetch_sources_only(&tool_config)
-                .await
-                .map_err(|e| miette::miette!("{e}"))
+    // Release the GIL while fetching: downloads run on tokio worker threads,
+    // and the progress callback needs the GIL to call back into Python.
+    let (result, log_buffer) = py.detach(|| {
+        tracing_subscriber::with_log_capture(progress_callback, || {
+            run_async_task(async {
+                output
+                    .fetch_sources_only(&tool_config)
+                    .await
+                    .map_err(|e| miette::miette!("{e}"))
+            })
         })
     });
 
