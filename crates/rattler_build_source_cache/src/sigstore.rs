@@ -503,10 +503,14 @@ fn identity_matches(check: &IdentityCheck, actual: &str) -> bool {
         return false;
     }
 
+    // The ref is everything after the *first* `@`: git refs may themselves
+    // contain `@`, so splitting at the last one would let a branch named
+    // `x@refs/tags/1.0` (SAN `...@refs/heads/x@refs/tags/1.0`) satisfy a
+    // `refs/tags/1.0` constraint.
     match &check.ref_constraint {
         None => true,
         Some(git_ref) => suffix
-            .rsplit_once('@')
+            .split_once('@')
             .is_some_and(|(_, actual_ref)| actual_ref == git_ref),
     }
 }
@@ -1192,6 +1196,17 @@ mod tests {
         assert!(!identity_matches(
             &check(repo, Some("refs/tags/3.1.1")),
             "https://github.com/pallets/flask"
+        ));
+        // Git refs may contain `@`: a branch named so that the SAN ends in the
+        // constrained tag must not satisfy the tag constraint.
+        let branch_san = "https://github.com/pallets/flask/.github/workflows/release.yml@refs/heads/x@refs/tags/3.1.1";
+        assert!(!identity_matches(
+            &check(repo, Some("refs/tags/3.1.1")),
+            branch_san
+        ));
+        assert!(identity_matches(
+            &check(repo, Some("refs/heads/x@refs/tags/3.1.1")),
+            branch_san
         ));
     }
 
