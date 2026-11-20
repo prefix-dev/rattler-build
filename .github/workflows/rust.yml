@@ -128,10 +128,12 @@ jobs:
           cache: true
           cache-write: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
       # cmd.exe rejects lines over 8191 characters after variable expansion.
-      # The build scripts prepend the build prefix to %Path% in a single `SET`,
-      # so a long runner PATH fails every Windows build with "The input line
-      # is too long" (first seen with the windows-2025 image of 2026-11-16).
-      # Drop duplicate and missing entries to keep PATH short.
+      # build_env.bat prepends the host and build prefixes to %Path% with
+      # `SET "Path=...;%Path%"`, and in the test environment %Path% already
+      # holds the runner PATH plus the MSVC paths of the pixi environment's
+      # vs2026 activation. Since the windows-2025 image of 2026-11-16, tests
+      # with long temp paths fail with "The input line is too long". Drop
+      # duplicate and missing entries to keep PATH short.
       - name: Shorten PATH
         if: runner.os == 'Windows'
         shell: pwsh
@@ -159,24 +161,13 @@ jobs:
       - name: Run end-to-end tests
         run: pixi run test-end-to-end-ci
         env:
+          # A short temp directory on Windows: every prefix path appears many
+          # times in build_env.bat, which must stay below cmd.exe's line limit
+          # (see "Shorten PATH").
+          PYTEST_ADDOPTS: ${{ runner.os == 'Windows' && format('--basetemp={0}\e2e', runner.temp) || '' }}
           PREFIX_DEV_READ_ONLY_TOKEN: ${{ secrets.PREFIX_DEV_READ_ONLY_TOKEN }}
           S3_ACCESS_KEY_ID: ${{ secrets.S3_UPLOAD_ACCESS_KEY_ID }}
           S3_SECRET_ACCESS_KEY: ${{ secrets.S3_UPLOAD_ACCESS_KEY_SECRET }}
-      # TEMPORARY diagnostic: show which build_env.bat lines are too long.
-      - name: Inspect long build_env.bat lines
-        if: failure() && matrix.os == 'windows-latest'
-        shell: pwsh
-        run: |
-          Write-Host "Runner PATH length: $($env:PATH.Length)"
-          $files = Get-ChildItem pytest-temp -Recurse -Filter build_env.bat -ErrorAction SilentlyContinue | Select-Object -First 3
-          foreach ($f in $files) {
-            Write-Host "=== $($f.FullName)"
-            $lines = Get-Content -LiteralPath $f.FullName
-            Write-Host "lines: $($lines.Count), total chars: $(($lines | Measure-Object -Property Length -Sum).Sum)"
-            $lines | Sort-Object Length -Descending | Select-Object -First 5 | ForEach-Object {
-              Write-Host "len=$($_.Length): $($_.Substring(0, [Math]::Min(400, $_.Length)))"
-            }
-          }
       - name: Stage x64 release binary
         if: matrix.os == 'windows-latest'
         shell: pwsh
@@ -218,10 +209,12 @@ jobs:
           cache: true
           cache-write: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
       # cmd.exe rejects lines over 8191 characters after variable expansion.
-      # The build scripts prepend the build prefix to %Path% in a single `SET`,
-      # so a long runner PATH fails every Windows build with "The input line
-      # is too long" (first seen with the windows-2025 image of 2026-11-16).
-      # Drop duplicate and missing entries to keep PATH short.
+      # build_env.bat prepends the host and build prefixes to %Path% with
+      # `SET "Path=...;%Path%"`, and in the test environment %Path% already
+      # holds the runner PATH plus the MSVC paths of the pixi environment's
+      # vs2026 activation. Since the windows-2025 image of 2026-11-16, tests
+      # with long temp paths fail with "The input line is too long". Drop
+      # duplicate and missing entries to keep PATH short.
       - name: Shorten PATH
         if: runner.os == 'Windows'
         shell: pwsh
