@@ -297,10 +297,7 @@ source:
   target_directory: my-destination/folder
 ```
 
-### Attestation verification (experimental)
-
-!!! note
-    This feature requires the `--experimental` flag.
+### Attestation verification
 
 For URL sources, you can specify an `attestations` block to verify that the downloaded archive
 was built by an expected publisher using [Sigstore](https://sigstore.dev) attestations.

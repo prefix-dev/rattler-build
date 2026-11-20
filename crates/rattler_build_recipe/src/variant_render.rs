@@ -1443,42 +1443,6 @@ pub fn render_recipe_with_variants(
     render_recipe_with_variant_config(&stage0_recipe, &variant_config, config)
 }
 
-/// Check if any source in a conditional list uses attestation verification.
-fn source_list_has_attestation(
-    sources: &rattler_build_yaml_parser::ConditionalList<stage0::Source>,
-) -> bool {
-    sources.iter().any(|item| match item {
-        rattler_build_yaml_parser::Item::Value(v) => match v.as_concrete() {
-            Some(stage0::Source::Url(url_src)) => !url_src.attestations.is_empty(),
-            _ => false,
-        },
-        rattler_build_yaml_parser::Item::Conditional(cond) => {
-            // Check both then and else branches
-            cond.then.iter().any(|item| {
-                matches!(
-                    item,
-                    rattler_build_yaml_parser::Item::Value(v)
-                        if matches!(v.as_concrete(), Some(stage0::Source::Url(u)) if !u.attestations.is_empty())
-                )
-            })
-        }
-    })
-}
-
-/// Check if a recipe contains any source with attestation config.
-fn recipe_has_attestation(recipe: &Stage0Recipe) -> bool {
-    match recipe {
-        Stage0Recipe::SingleOutput(r) => source_list_has_attestation(&r.source),
-        Stage0Recipe::MultiOutput(r) => {
-            source_list_has_attestation(&r.source)
-                || r.outputs.iter().any(|output| match output {
-                    stage0::Output::Staging(s) => source_list_has_attestation(&s.source),
-                    stage0::Output::Package(p) => source_list_has_attestation(&p.source),
-                })
-        }
-    }
-}
-
 /// Render a stage0 recipe with a loaded variant configuration
 ///
 /// This is a lower-level function that works with already-loaded recipe and variant config.
@@ -1497,13 +1461,6 @@ pub fn render_recipe_with_variant_config(
     variant_config: &VariantConfig,
     config: RenderConfig,
 ) -> Result<Vec<RenderedVariant>, RenderError> {
-    // Check if any source has attestation config - requires experimental flag
-    if !config.experimental && recipe_has_attestation(stage0_recipe) {
-        return Err(RenderError::ExperimentalRequired {
-            message: "source attestation verification is an experimental feature: provide the `--experimental` flag to enable this feature".to_string(),
-        });
-    }
-
     // Ensure target_platform and build_platform are in the variant config so they
     // are included in hash computation. Without this, all platforms would produce
     // identical hashes because `collect_used_variables` filters out variables that
@@ -3016,7 +2973,7 @@ variant:
     }
 
     #[test]
-    fn test_attestation_requires_experimental() {
+    fn test_attestation_does_not_require_experimental() {
         let recipe_yaml = r#"
 package:
   name: test-pkg
@@ -3030,36 +2987,14 @@ source:
       - github:test/test
 "#;
 
-        let variant_yaml = r#"{}"#;
-
         let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
-        let variant_config = VariantConfig::from_yaml_str(variant_yaml).unwrap();
+        let variant_config = VariantConfig::from_yaml_str("{}").unwrap();
 
-        // Without experimental flag, should fail
         let result =
             render_recipe_with_variant_config(&stage0_recipe, &variant_config, RenderConfig::new());
-
-        assert!(
-            result.is_err(),
-            "Attestation should require experimental flag"
-        );
-        let err = result.unwrap_err();
-        assert!(
-            err.to_string().contains("experimental"),
-            "Error should mention experimental flag: {}",
-            err
-        );
-
-        // With experimental flag, should succeed
-        let result = render_recipe_with_variant_config(
-            &stage0_recipe,
-            &variant_config,
-            RenderConfig::new().with_experimental(true),
-        );
-
         assert!(
             result.is_ok(),
-            "Attestation should work with experimental flag: {:?}",
+            "attestation verification should not need the experimental flag: {:?}",
             result.err()
         );
     }

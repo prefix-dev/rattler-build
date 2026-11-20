@@ -201,9 +201,6 @@ you to customize the predicate or add additional attestation metadata.
 
 ## Source attestation verification
 
-!!! note "Experimental"
-    This feature requires the `--experimental` flag: `rattler-build build --experimental -r recipe.yaml`
-
 In addition to signing built packages, Rattler-Build can also **verify** the attestations of source archives during the build. This lets you ensure that the source code you're building from was produced by a trusted publisher (e.g., a specific GitHub Actions workflow).
 
 ### How it works
