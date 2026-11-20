@@ -1,8 +1,9 @@
 //! Cache index management for content-addressable storage
 
 use crate::error::CacheError;
+use crate::source::AttestedIds;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
 
 /// Type of source stored in the cache
@@ -54,9 +55,21 @@ pub struct CacheEntry {
     /// Lock file path for this entry
     pub lock_file: Option<PathBuf>,
 
-    /// Whether attestation has been verified for this entry
-    #[serde(default)]
-    pub attestation_verified: bool,
+    /// The attestation configurations this entry has been verified against,
+    /// keyed by [`crate::AttestationVerification::fingerprint`], with the IDs
+    /// the attestation recorded for each of the configuration's publishers.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub verified_attestations: BTreeMap<String, Vec<AttestedIds>>,
+}
+
+impl CacheEntry {
+    /// The IDs recorded when this entry was verified against the given
+    /// attestation config, or `None` if it was not verified against it.
+    pub fn attested_ids(&self, fingerprint: &str) -> Option<&[AttestedIds]> {
+        self.verified_attestations
+            .get(fingerprint)
+            .map(Vec::as_slice)
+    }
 }
 
 /// The cache index that manages content-addressable cache metadata
@@ -189,11 +202,19 @@ impl CacheIndex {
         Ok(())
     }
 
-    /// Mark an entry's attestation as verified and persist it
-    pub async fn set_attestation_verified(&self, key: &str) -> Result<(), CacheError> {
+    /// Mark an entry's attestation as verified for a configuration
+    /// fingerprint, with the IDs it recorded, and persist it
+    pub async fn set_attestation_verified(
+        &self,
+        key: &str,
+        fingerprint: &str,
+        ids: Vec<AttestedIds>,
+    ) -> Result<(), CacheError> {
         let mut entries = self.entries.write().await;
         if let Some(entry) = entries.get_mut(key) {
-            entry.attestation_verified = true;
+            entry
+                .verified_attestations
+                .insert(fingerprint.to_string(), ids);
             let updated_entry = entry.clone();
             drop(entries);
 

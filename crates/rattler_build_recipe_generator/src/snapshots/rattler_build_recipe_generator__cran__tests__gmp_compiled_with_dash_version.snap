@@ -33,9 +33,20 @@ requirements:
     - if: build_platform != target_platform
       then:
         - cross-r-base ${{ r_base }}.*
-    - ${{ compiler("c") }}
-    - ${{ compiler("cxx") }}
-    - make
+    - if: not win
+      then:
+        - ${{ compiler("c") }}
+        - ${{ compiler("cxx") }}
+        - make
+    - if: win
+      then:
+        - ${{ compiler("m2w64_c") }}
+        - ${{ compiler("m2w64_cxx") }}
+        - m2-filesystem
+        - m2-make
+        - m2-sed
+        - m2-coreutils
+        - m2-zip
   host:
     - r-base
   run:

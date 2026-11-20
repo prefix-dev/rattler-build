@@ -121,7 +121,7 @@ ruff = ">=0.16.6,<0.17"
 py-rattler-build = { path = "./py-rattler-build" }
 nbconvert = ">=7.17.1,<8"
 ipykernel = ">=7.3.0,<8"
-zensical = ">=0.0.59,<0.0.60"
+zensical = ">=0.1.0,<0.2"
 
 [environments.docs.pypi-dependencies]
 # Fork of mike with Zensical support, not released on PyPI

@@ -5,7 +5,9 @@
 # is fetched from https://pypi.org/integrity/{project}/{version}/{filename}/provenance
 #
 # The `publishers` list specifies which identities must have signed the
-# artifact. All listed publishers must match.
+# artifact. All listed publishers must match. The IDs in parentheses pin the
+# immutable owner and repository IDs, so a recreated `pallets/flask` would
+# not match.
 
 context:
   version: "3.1.1"
@@ -17,9 +19,9 @@ package:
 source:
   url: https://pypi.io/packages/source/f/flask/flask-${{ version }}.tar.gz
   sha256: 284c7b8f2f58cb737f0cf1c30fd7eaf0ccfcde196099d24ecede3fc2005aa59e
-  attestation:
+  attestations:
     publishers:
-      - github:pallets/flask
+      - github:pallets(16748505)/flask(596892)@refs/tags/${{ version }}
 
 build:
   noarch: python

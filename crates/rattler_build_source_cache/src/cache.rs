@@ -9,7 +9,7 @@ use crate::{
     error::CacheError,
     index::{CacheEntry, CacheIndex, SourceType},
     lock::LockManager,
-    source::{AttestationVerification, Checksum, GitSource, Source, UrlSource},
+    source::{AttestationVerification, AttestedIds, Checksum, GitSource, Source, UrlSource},
 };
 use rattler_build_networking::BaseClient;
 use rattler_git::CheckoutOptions;
@@ -28,6 +28,10 @@ pub struct SourceResult {
     pub path: PathBuf,
     /// For git sources, the resolved commit SHA
     pub git_commit: Option<String>,
+    /// For URL sources with attestation verification, the IDs each verified
+    /// attestation recorded: one list per configured attestation, holding one
+    /// entry per publisher, both in recipe order
+    pub attested_ids: Vec<Vec<AttestedIds>>,
 }
 
 /// The main source cache that handles Git, URL, and Path sources
@@ -72,6 +76,7 @@ impl SourceCache {
                 Ok(SourceResult {
                     path: path.clone(),
                     git_commit: None,
+                    attested_ids: Vec::new(),
                 })
             }
         }
@@ -96,6 +101,7 @@ impl SourceCache {
                 return Ok(SourceResult {
                     path: cache_path,
                     git_commit: entry.git_commit.clone(),
+                    attested_ids: Vec::new(),
                 });
             }
         }
@@ -168,7 +174,7 @@ impl SourceCache {
             last_accessed: jiff::Timestamp::now(),
             created: jiff::Timestamp::now(),
             lock_file: Some(_lock.path().to_path_buf()),
-            attestation_verified: false,
+            verified_attestations: Default::default(),
         };
 
         self.index.insert(key, entry).await?;
@@ -176,6 +182,7 @@ impl SourceCache {
         Ok(SourceResult {
             path: repo_path,
             git_commit: Some(commit_hash),
+            attested_ids: Vec::new(),
         })
     }
 
@@ -190,14 +197,15 @@ impl SourceCache {
                     url,
                     &source.checksums,
                     source.file_name.as_deref(),
-                    source.attestation.as_ref(),
+                    &source.attestations,
                 )
                 .await
             {
-                Ok(path) => {
+                Ok((path, attested_ids)) => {
                     return Ok(SourceResult {
                         path,
                         git_commit: None,
+                        attested_ids,
                     });
                 }
                 Err(e) => {
@@ -216,8 +224,8 @@ impl SourceCache {
         url: &url::Url,
         checksums: &[Checksum],
         file_name: Option<&str>,
-        attestation: Option<&AttestationVerification>,
-    ) -> Result<PathBuf, CacheError> {
+        attestations: &[AttestationVerification],
+    ) -> Result<(PathBuf, Vec<Vec<AttestedIds>>), CacheError> {
         let key = CacheIndex::generate_cache_key(url, checksums);
 
         // Acquire lock for this cache entry
@@ -231,21 +239,15 @@ impl SourceCache {
             if let Some(extracted_path) = self.index.get_extracted_path(&entry)
                 && extracted_path.exists()
             {
-                // Re-verify attestation if configured but not yet verified for this entry
-                if let Some(attestation_config) = attestation
-                    && !entry.attestation_verified
-                {
-                    let archive_path = self.index.get_cache_path(&entry);
-                    self.verify_attestation(&archive_path, url, attestation_config)
-                        .await?;
-                    self.index.set_attestation_verified(&key).await?;
-                }
+                let ids = self
+                    .verify_attestations(&key, Some(&entry), &cache_path, url, attestations)
+                    .await?;
                 self.index.touch(&key).await?;
                 tracing::info!(
                     "Found extracted source in cache: {}",
                     extracted_path.display()
                 );
-                return Ok(extracted_path);
+                return Ok((extracted_path, ids));
             }
 
             // Otherwise return the archive file
@@ -259,30 +261,20 @@ impl SourceCache {
                         tracing::warn!("Checksum validation failed, re-downloading");
                         fs_err::tokio::remove_file(&cache_path).await?;
                     } else {
-                        // Re-verify attestation if configured but not yet verified for this entry
-                        if let Some(attestation_config) = attestation
-                            && !entry.attestation_verified
-                        {
-                            self.verify_attestation(&cache_path, url, attestation_config)
-                                .await?;
-                            self.index.set_attestation_verified(&key).await?;
-                        }
+                        let ids = self
+                            .verify_attestations(&key, Some(&entry), &cache_path, url, attestations)
+                            .await?;
                         self.index.touch(&key).await?;
                         tracing::info!("Found source in cache: {}", cache_path.display());
-                        return Ok(cache_path);
+                        return Ok((cache_path, ids));
                     }
                 } else {
-                    // Re-verify attestation if configured but not yet verified for this entry
-                    if let Some(attestation_config) = attestation
-                        && !entry.attestation_verified
-                    {
-                        self.verify_attestation(&cache_path, url, attestation_config)
-                            .await?;
-                        self.index.set_attestation_verified(&key).await?;
-                    }
+                    let ids = self
+                        .verify_attestations(&key, Some(&entry), &cache_path, url, attestations)
+                        .await?;
                     self.index.touch(&key).await?;
                     tracing::info!("Found source in cache: {}", cache_path.display());
-                    return Ok(cache_path);
+                    return Ok((cache_path, ids));
                 }
             }
         }
@@ -329,11 +321,9 @@ impl SourceCache {
             attempt += 1;
         };
 
-        // Perform attestation verification if configured
-        if let Some(attestation_config) = attestation {
-            self.verify_attestation(&cache_path, url, attestation_config)
-                .await?;
-        }
+        let attested_ids = self
+            .verify_attestations(&key, None, &cache_path, url, attestations)
+            .await?;
 
         // Extract if needed and no explicit filename was provided
         let final_path = if file_name.is_none() && self.should_extract(&cache_path) {
@@ -371,12 +361,16 @@ impl SourceCache {
             last_accessed: jiff::Timestamp::now(),
             created: jiff::Timestamp::now(),
             lock_file: Some(_lock.path().to_path_buf()),
-            attestation_verified: attestation.is_some(),
+            verified_attestations: attestations
+                .iter()
+                .map(AttestationVerification::fingerprint)
+                .zip(attested_ids.iter().cloned())
+                .collect(),
         };
 
         self.index.insert(key, entry).await?;
 
-        Ok(final_path.unwrap_or(cache_path))
+        Ok((final_path.unwrap_or(cache_path), attested_ids))
     }
 
     /// Download a URL to the cache
@@ -557,16 +551,56 @@ impl SourceCache {
         Ok(())
     }
 
+    /// Check that `artifact` has every attestation in `attestations`, and
+    /// return the IDs each one recorded, in order.
+    ///
+    /// For a cached `entry`, attestations it was already verified against
+    /// are not checked again: their recorded IDs are returned, and the
+    /// others are verified and recorded in the index.
+    async fn verify_attestations(
+        &self,
+        key: &str,
+        entry: Option<&CacheEntry>,
+        artifact: &Path,
+        url: &url::Url,
+        attestations: &[AttestationVerification],
+    ) -> Result<Vec<Vec<AttestedIds>>, CacheError> {
+        let mut all_ids = Vec::with_capacity(attestations.len());
+        for (i, config) in attestations.iter().enumerate() {
+            let fingerprint = config.fingerprint();
+            if let Some(ids) = entry.and_then(|entry| entry.attested_ids(&fingerprint)) {
+                all_ids.push(ids.to_vec());
+                continue;
+            }
+            if attestations.len() > 1 {
+                tracing::info!(
+                    "Checking attestation {} of {} for {url}",
+                    i + 1,
+                    attestations.len()
+                );
+            }
+            let ids = self.verify_attestation(artifact, url, config).await?;
+            if entry.is_some() {
+                self.index
+                    .set_attestation_verified(key, &fingerprint, ids.clone())
+                    .await?;
+            }
+            all_ids.push(ids);
+        }
+        Ok(all_ids)
+    }
+
     /// Verify a downloaded file using attestation (sigstore-based).
     ///
     /// When the `sigstore` feature is enabled, delegates to the full verification
-    /// implementation. When disabled, logs a warning and skips verification.
+    /// implementation. When disabled, verification fails: a recipe that asks for
+    /// attestation verification must never silently build unverified sources.
     async fn verify_attestation(
         &self,
         file_path: &Path,
         source_url: &url::Url,
         attestation_config: &AttestationVerification,
-    ) -> Result<(), CacheError> {
+    ) -> Result<Vec<AttestedIds>, CacheError> {
         #[cfg(feature = "sigstore")]
         {
             crate::sigstore::verify_attestation(
@@ -575,18 +609,17 @@ impl SourceCache {
                 source_url,
                 attestation_config,
             )
-            .await?;
+            .await
         }
         #[cfg(not(feature = "sigstore"))]
         {
+            // Fail closed: the recipe asks for verification we cannot perform.
             let _ = (file_path, attestation_config);
-            tracing::warn!(
-                url = %source_url,
-                "sigstore verification is disabled at compile time — \
-                 attestation will NOT be verified"
-            );
+            Err(CacheError::AttestationVerification(format!(
+                "the recipe requires attestation verification for {source_url}, but this \
+                 build of rattler-build was compiled without the `sigstore` feature"
+            )))
         }
-        Ok(())
     }
 
     /// Clean up stale locks (manual cleanup only, cache entries are kept indefinitely)
