@@ -1,6 +1,6 @@
 [package]
 name = "rattler-build"
-version = "0.80.2"
+version = "0.81.0"
 authors = ["rattler-build contributors <hi@prefix.dev>"]
 repository = "https://github.com/prefix-dev/rattler-build"
 edition = "2024"
@@ -49,8 +49,8 @@ async_zip = { package = "astral_async_zip", version = "0.0.22", features = [
   "zstd",
 ] }
 clap = { workspace = true, features = ["cargo", "env", "suggestions"] }
-clap_complete = "4.6.11"
-clap_complete_nushell = "4.6.2"
+clap_complete = "4.6.12"
+clap_complete_nushell = "4.6.3"
 clap-verbosity-flag = { workspace = true }
 comfy-table = { workspace = true }
 console = { workspace = true }
@@ -163,7 +163,7 @@ async-once-cell = "0.5.4"
 async-recursion = "1.2.0"
 async-trait = "0.1"
 bzip2 = "0.6.1"
-clap = { version = "4.6.7", features = ["derive"] }
+clap = { version = "4.6.9", features = ["derive"] }
 console = { version = "0.16.6", features = ["windows-console-colors"] }
 content_inspector = "0.2.4"
 dashmap = "6.2"
@@ -196,7 +196,7 @@ minijinja-contrib = { version = "3.1.0", features = ["datetime", "timezone"] }
 pathdiff = "0.2.3"
 petgraph = { version = "0.8.3", default-features = false }
 rayon = "1.12.0"
-regex = "1.13.1"
+regex = "1.13.2"
 reqwest = { version = "0.13.5", default-features = false, features = ["json"] }
 reqwest-middleware = { package = "astral-reqwest-middleware", version = "0.5.1", features = [
   "json",
@@ -207,7 +207,7 @@ rstest = "0.28.0"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
 serde-value = "0.7.0"
-serde_with = "3.24.0"
+serde_with = "3.25.0"
 serde_yaml = "0.9.34"
 serial_test = "4.0.1"
 sevenz-rust2 = "0.25.0"
@@ -229,7 +229,7 @@ urlencoding = "2.1"
 walkdir = "2.5.0"
 which = "8.0.6"
 windows-sys = "0.61"
-zip = { version = "9.6.0", default-features = false, features = ["deflate"] }
+zip = { version = "9.8.1", default-features = false, features = ["deflate"] }
 zstd = "0.14.4"
 
 # Dependencies used in subcrates (workspace-level)
@@ -263,20 +263,20 @@ rattler_git = { version = "0.3.21" }
 rattler_networking = { version = "0.34.9", default-features = false }
 rattler_package_streaming = { version = "0.28.6", default-features = false }
 rattler_prefix_guard = { version = "0.1.2" }
-rattler_shell = { version = "0.29.10", default-features = false, features = [
+rattler_shell = { version = "0.29.11", default-features = false, features = [
   "sysinfo",
 ] }
 
-rattler = { version = "0.55.8", default-features = false, features = [
+rattler = { version = "0.55.9", default-features = false, features = [
   "cli-tools",
   "indicatif",
 ] }
 rattler_cache = { version = "0.12.4", default-features = false }
 rattler_config = { version = "0.12.3" }
-rattler_index = { version = "0.34.8", default-features = false }
-rattler_menuinst = "0.5.0"
+rattler_index = { version = "0.34.9", default-features = false }
+rattler_menuinst = "0.5.1"
 rattler_redaction = { version = "0.2.7", default-features = false }
-rattler_repodata_gateway = { version = "0.38.4", default-features = false, features = [
+rattler_repodata_gateway = { version = "0.38.5", default-features = false, features = [
   "gateway",
 ] }
 rattler_s3 = { version = "0.4.7" }

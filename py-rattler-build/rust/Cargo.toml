@@ -1,6 +1,6 @@
 [package]
 name = "py-rattler-build"
-version = "0.80.2"
+version = "0.81.0"
 edition = "2024"
 license = "BSD-3-Clause"
 publish = false
@@ -15,7 +15,7 @@ crate-type = ["cdylib"]
 name = "rattler_build"
 
 [dependencies]
-clap = "4.6.7"
+clap = "4.6.9"
 fs-err = "3.3.2"
 hex = "0.4.3"
 indexmap = "2.14.2"
