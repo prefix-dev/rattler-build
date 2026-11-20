@@ -40,7 +40,7 @@ pub use rattler_build_recipe::stage1::{HashInfo, HashInput};
 pub use rattler_build_types::NormalizedKey;
 
 use std::{
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{HashMap, HashSet},
     path::{Path, PathBuf},
     process::Command,
     str::FromStr,
@@ -56,7 +56,7 @@ use miette::{Context, IntoDiagnostic};
 use opt::*;
 use package_test::TestConfiguration;
 use parallel_builds::{Event, ParallelBuilds};
-use rattler_build_core::consts;
+use rattler_build_core::{consts, subpackages_for_output};
 use rattler_build_recipe::stage0;
 use rattler_build_variant_config::VariantConfig;
 use rattler_conda_types::{
@@ -74,10 +74,7 @@ use script::LocalRunner;
 use system_tools::SystemTools;
 use tool_configuration::{Configuration, ContinueOnFailure, SkipExisting, TestStrategy};
 use types::Directories;
-use types::{
-    BuildConfiguration, BuildSummary, PackageIdentifier, PackagingSettings,
-    build_reindexed_channels,
-};
+use types::{BuildConfiguration, BuildSummary, PackagingSettings, build_reindexed_channels};
 
 use crate::metadata::{Output, PlatformWithVirtualPackages};
 use crate::publish::{
@@ -469,7 +466,6 @@ pub async fn get_build_output(
     }
     drop(enter);
 
-    let mut subpackages = BTreeMap::new();
     let mut outputs = Vec::new();
 
     // For multi-output recipes, all outputs (including staging caches) need to use the same
@@ -481,7 +477,7 @@ pub async fn get_build_output(
 
     let timestamp = jiff::Timestamp::now();
 
-    for discovered_output in outputs_and_variants {
+    for (index, discovered_output) in outputs_and_variants.iter().enumerate() {
         let recipe = &discovered_output.recipe;
 
         // Check if this build should be skipped based on skip conditions
@@ -494,28 +490,7 @@ pub async fn get_build_output(
             continue;
         }
 
-        subpackages.insert(
-            recipe.package().name().clone(),
-            PackageIdentifier {
-                name: recipe.package().name().clone(),
-                version: recipe.package().version().clone(),
-                build_string: discovered_output.build_string.clone(),
-            },
-        );
-
-        let mut output_subpackages = subpackages.clone();
-        for pin in discovered_output.pin_subpackages.values() {
-            if let Some(build_string) = &pin.build_string {
-                output_subpackages.insert(
-                    pin.name.clone(),
-                    PackageIdentifier {
-                        name: pin.name.clone(),
-                        version: pin.version.clone(),
-                        build_string: build_string.clone(),
-                    },
-                );
-            }
-        }
+        let output_subpackages = subpackages_for_output(&outputs_and_variants, index);
 
         // Use the global build name for outputs that inherit from staging caches
         // This ensures staging caches and their dependent packages share the same build directory
