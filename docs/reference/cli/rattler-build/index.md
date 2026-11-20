@@ -24,6 +24,7 @@ rattler-build [OPTIONS] [COMMAND]
 | [`package`](package/index.md) | Package-related subcommands |
 | [`bump-recipe`](bump-recipe.md) | Bump a recipe to a new version |
 | [`migrate-recipe`](migrate-recipe.md) | Migrate a recipe from the deprecated `cache:` format to `staging:` outputs |
+| [`fetch-sources`](fetch-sources.md) | Download all sources of a recipe without building it |
 
 
 ## Options

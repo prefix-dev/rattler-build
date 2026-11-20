@@ -9,13 +9,14 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from rattler_build import stage1
 from rattler_build._rattler_build import (
     EnvironmentIsolation,
     RepodataRevision,
     build_rendered_variant_py,
+    fetch_rendered_variant_sources_py,
 )
 from rattler_build._rattler_build import render as _render
 from rattler_build.build_result import BuildResult
@@ -433,8 +434,99 @@ class RenderedVariant:
         # Convert Rust BuildResult to Python BuildResult
         return BuildResult._from_inner(rust_result, output_dir=output_dir)
 
+    def fetch_sources(
+        self,
+        tool_config: ToolConfiguration | None = None,
+        output_dir: str | Path | None = None,
+        progress_callback: ProgressCallback | None = None,
+    ) -> dict[str, Any]:
+        """Download the sources of this variant without building it.
+
+        All sources (including those of the staging output this variant
+        inherits from) are fetched into the source cache at
+        ``<output_dir>/src_cache`` -- the same cache a later :meth:`run_build`
+        with the same ``output_dir`` re-uses. Archives are extracted, but no
+        patches are applied and no build scripts are executed, so the
+        sources can be inspected before the recipe runs.
+
+        Args:
+            tool_config: ToolConfiguration to use. If None, uses defaults.
+            output_dir: Output directory whose ``src_cache`` is used.
+                Defaults to ``<recipe_dir>/output``.
+            progress_callback: Optional progress callback for log events.
+
+        Returns:
+            A dict with the keys ``name``, ``version``, ``build_string``,
+            ``target_platform``, ``variant``, ``recipe_path``,
+            ``source_cache``, ``sources`` and (for outputs that inherit from
+            a staging output) ``staging``. Each entry of ``sources`` has
+            ``kind`` (``"url"``, ``"git"`` or ``"path"``), ``location``,
+            ``path`` (pristine source on disk) and optionally ``git_commit``,
+            ``target_directory`` and ``patches``. This is the same schema
+            as the output of ``rattler-build fetch-sources``.
+
+        Example:
+            ```python
+            from rattler_build import Stage0Recipe, VariantConfig
+
+            recipe = Stage0Recipe.from_file("recipe.yaml")
+            for variant in recipe.render(VariantConfig()):
+                fetched = variant.fetch_sources()
+                for src in fetched["sources"]:
+                    print(fetched["name"], src["path"])
+            ```
+        """
+        if tool_config is None:
+            tool_config = ToolConfiguration()
+
+        if output_dir is None:
+            output_dir = self._recipe_path.parent / "output"
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        return fetch_rendered_variant_sources_py(
+            rendered_variant=self._inner,
+            tool_config=tool_config._inner,
+            output_dir=output_dir,
+            recipe_path=self._recipe_path,
+            progress_callback=progress_callback,
+        )
+
     def __repr__(self) -> str:
         return repr(self._inner)
+
+
+def fetch_rendered_variant_sources(
+    rendered_variants: list[RenderedVariant],
+    *,
+    tool_config: ToolConfiguration | None = None,
+    output_dir: str | Path | None = None,
+    progress_callback: ProgressCallback | None = None,
+) -> list[dict[str, Any]]:
+    """Download the sources of multiple rendered variants without building.
+
+    Convenience wrapper around :meth:`RenderedVariant.fetch_sources`. Returns
+    one dict per variant, mapping the output (``name``) to the on-disk
+    location of its sources.
+
+    Example:
+        ```python
+        from rattler_build import Stage0Recipe, VariantConfig
+        from rattler_build.render import fetch_rendered_variant_sources
+
+        recipe = Stage0Recipe.from_file("recipe.yaml")
+        fetched = fetch_rendered_variant_sources(recipe.render(VariantConfig()))
+        locations = {f["name"]: [s["path"] for s in f["sources"]] for f in fetched}
+        ```
+    """
+    return [
+        variant.fetch_sources(
+            tool_config=tool_config,
+            output_dir=output_dir,
+            progress_callback=progress_callback,
+        )
+        for variant in rendered_variants
+    ]
 
 
 def build_rendered_variants(

@@ -22,6 +22,7 @@ use serde::{Deserialize, Serialize};
 use crate::system_tools::SystemTools;
 pub mod copy_dir;
 pub mod create_patch;
+pub mod fetch_only;
 pub mod patch;
 
 #[allow(missing_docs)]
@@ -249,7 +250,7 @@ fn with_attested_ids(
 }
 
 /// Convert a stage1 PathSource checksums to cache Checksums
-fn convert_path_checksums(
+pub(crate) fn convert_path_checksums(
     path_src: &rattler_build_recipe::stage1::source::PathSource,
 ) -> Vec<Checksum> {
     let mut checksums = Vec::new();
