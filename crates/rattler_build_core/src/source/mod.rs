@@ -223,7 +223,7 @@ pub(crate) fn convert_url_source(
 }
 
 /// Convert a stage1 PathSource checksums to cache Checksums
-fn convert_path_checksums(
+pub(crate) fn convert_path_checksums(
     path_src: &rattler_build_recipe::stage1::source::PathSource,
 ) -> Vec<Checksum> {
     let mut checksums = Vec::new();

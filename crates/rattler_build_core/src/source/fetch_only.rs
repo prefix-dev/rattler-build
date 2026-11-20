@@ -20,7 +20,7 @@ use rattler_build_source_cache::{
 use rattler_build_types::NormalizedKey;
 use serde::Serialize;
 
-use super::{SourceError, convert_git_source, convert_url_source};
+use super::{SourceError, convert_git_source, convert_path_checksums, convert_url_source};
 use crate::{tool_configuration, types::Output};
 
 /// The kind of a source.
@@ -159,7 +159,8 @@ pub async fn fetch_sources_to_cache(
             }
             Source::Path(path_src) => {
                 let src_path = recipe_dir.join(&path_src.path);
-                let src_path = fs_err::canonicalize(&src_path)
+                // `dunce` avoids reporting `\\?\` verbatim paths on Windows.
+                let src_path = dunce::canonicalize(&src_path)
                     .map_err(|_| SourceError::FileNotFound(src_path.clone()))?;
                 let location = src_path.display().to_string();
 
@@ -194,6 +195,19 @@ pub async fn fetch_sources_to_cache(
                         .map_err(|e| SourceError::UnknownError(e.to_string()))?
                         .path
                 } else {
+                    // A build verifies the checksums of single (non-archive)
+                    // files when copying them, so verify them here as well.
+                    if src_path.is_file() {
+                        for checksum in convert_path_checksums(path_src) {
+                            if let Err(mismatch) = checksum.validate(&src_path) {
+                                return Err(SourceError::ValidationFailed {
+                                    expected: mismatch.expected,
+                                    actual: mismatch.actual,
+                                    kind: mismatch.kind.to_string(),
+                                });
+                            }
+                        }
+                    }
                     src_path
                 };
                 (FetchedSourceKind::Path, location, path, None)

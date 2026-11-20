@@ -70,3 +70,37 @@ def test_fetch_sources_stdout_and_output_name(
     )
     assert result.returncode != 0
     assert "does-not-exist" in result.stderr
+
+
+def test_fetch_sources_verifies_path_checksum(
+    rattler_build: RattlerBuild, tmp_path: Path
+):
+    """Checksums of single-file path sources are verified, as in a build."""
+    recipe_dir = tmp_path / "recipe"
+    recipe_dir.mkdir()
+    (recipe_dir / "data.txt").write_text("hello\n")
+    (recipe_dir / "recipe.yaml").write_text(
+        """
+package:
+  name: checksum-test
+  version: "1.0.0"
+
+source:
+  path: data.txt
+  sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+
+build:
+  script: echo hi
+"""
+    )
+
+    result = rattler_build(
+        "fetch-sources",
+        "--recipe",
+        str(recipe_dir),
+        "--output-dir",
+        str(tmp_path / "output"),
+        need_result_object=True,
+    )
+    assert result.returncode != 0
+    assert "0000000000000000" in result.stderr
