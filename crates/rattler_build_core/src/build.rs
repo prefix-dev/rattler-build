@@ -5,7 +5,10 @@ use std::{path::PathBuf, vec};
 use miette::{Context, IntoDiagnostic};
 use rattler_build_recipe::stage1::TestType;
 use rattler_build_script::InterpreterError;
-use rattler_conda_types::{Channel, MatchSpec, Subdir, package::PathsJson};
+use rattler_conda_types::{
+    Channel, MatchSpec, PackageName, PackageRecord, Subdir, package::PathsJson,
+};
+use std::collections::HashSet;
 use tracing::Instrument;
 
 use crate::{
@@ -23,6 +26,62 @@ pub enum WorkingDirectoryBehavior {
     Preserve,
     /// Clean up the working directory after build
     Cleanup,
+}
+
+/// The name, version and build string of a package.
+///
+/// Two packages with the same identity are considered the same build by
+/// `--skip-existing`.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub(crate) struct PackageIdentity {
+    /// The package name
+    name: PackageName,
+    /// The package version, as written in the package record
+    version: String,
+    /// The build string
+    build_string: String,
+}
+
+impl PackageIdentity {
+    /// Create a new identity from a name, version and build string.
+    fn new(name: PackageName, version: impl ToString, build_string: impl Into<String>) -> Self {
+        Self {
+            name,
+            version: version.to_string(),
+            build_string: build_string.into(),
+        }
+    }
+}
+
+impl From<&PackageRecord> for PackageIdentity {
+    fn from(record: &PackageRecord) -> Self {
+        Self::new(record.name.clone(), &record.version, record.build.clone())
+    }
+}
+
+impl From<&Output> for PackageIdentity {
+    fn from(output: &Output) -> Self {
+        Self::new(
+            output.name().clone(),
+            output.version(),
+            output.build_string().into_owned(),
+        )
+    }
+}
+
+/// Return the `packages` that have a record with the same name, version and
+/// build string in `records` (e.g. the records of a gateway query, filtered by
+/// the caller).
+pub(crate) fn existing_packages<'a>(
+    records: impl IntoIterator<Item = &'a PackageRecord>,
+    packages: &[PackageIdentity],
+) -> HashSet<PackageIdentity> {
+    let wanted = packages.iter().collect::<HashSet<_>>();
+    records
+        .into_iter()
+        .map(PackageIdentity::from)
+        .filter(|identity| wanted.contains(identity))
+        .collect()
 }
 
 /// Check if the build should be skipped because it already exists in any of the
@@ -57,8 +116,14 @@ pub async fn skip_existing(
         .collect::<Vec<MatchSpec>>();
 
     let channels = if only_local {
+        // Nothing has been built yet (`--render-only` does not create the
+        // output directory)
+        let output_dir = &first_output.build_configuration.directories.output_dir;
+        if !output_dir.exists() {
+            return Ok(outputs);
+        }
         vec![
-            Channel::try_from_directory(&first_output.build_configuration.directories.output_dir)
+            Channel::try_from_directory(output_dir)
                 .expect("could not create channel from directory")
                 .base_url,
         ]
@@ -75,27 +140,21 @@ pub async fn skip_existing(
     .await
     .map_err(|e| miette::miette!("Failed to load repodata: {e}."))?;
 
-    let existing_set = existing
+    let identities = outputs
         .iter()
-        .flatten()
-        .map(|p| {
-            format!(
-                "{}-{}-{}",
-                p.package_record.name.as_normalized(),
-                p.package_record.version,
-                p.package_record.build
-            )
-        })
-        .collect::<std::collections::HashSet<_>>();
+        .map(PackageIdentity::from)
+        .collect::<Vec<_>>();
+    let existing_set = existing_packages(
+        existing
+            .iter()
+            .flatten()
+            .map(|record| &record.package_record),
+        &identities,
+    );
 
     // Retain only the outputs that do not exist yet
     outputs.retain(|output| {
-        let exists = existing_set.contains(&format!(
-            "{}-{}-{}",
-            output.name().as_normalized(),
-            output.version(),
-            output.build_string()
-        ));
+        let exists = existing_set.contains(&PackageIdentity::from(output));
         if exists {
             // The identifier should always be set at this point
             tracing::info!("Skipping build for {}", output.identifier());
@@ -355,4 +414,54 @@ fn check_for_symlinks_on_windows(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn identity(name: &str, version: &str, build: &str) -> PackageIdentity {
+        PackageIdentity::new(name.parse().unwrap(), version, build)
+    }
+
+    fn record(name: &str, version: &str, build: &str) -> PackageRecord {
+        PackageRecord::new(
+            name.parse().unwrap(),
+            version
+                .parse::<rattler_conda_types::VersionWithSource>()
+                .unwrap(),
+            build.parse().unwrap(),
+        )
+    }
+
+    #[test]
+    fn existing_packages_match_name_version_and_build() {
+        let records = [
+            record("foo", "1.0", "h123_0"),
+            record("foo", "1.0", "h123_1"),
+            record("bar", "2.0", "pyh_0"),
+            record("Mixed-Case", "1.0", "0"),
+        ];
+        let packages = [
+            identity("foo", "1.0", "h123_0"),
+            // Same name and version, different build string
+            identity("foo", "1.0", "h456_0"),
+            // Same name and build string, different version
+            identity("foo", "1.1", "h123_1"),
+            identity("bar", "2.0", "pyh_0"),
+            // Names compare normalized
+            identity("mixed-case", "1.0", "0"),
+            // Not in the records at all
+            identity("qux", "1.0", "0"),
+        ];
+
+        assert_eq!(
+            existing_packages(&records, &packages),
+            HashSet::from_iter([
+                identity("foo", "1.0", "h123_0"),
+                identity("bar", "2.0", "pyh_0"),
+                identity("mixed-case", "1.0", "0"),
+            ])
+        );
+    }
 }

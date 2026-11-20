@@ -5,10 +5,13 @@ on:
     branches:
       - main
       - wasm-support
+    # Keep both lists in sync with the path dependencies of the playground crate: the rattler_build_* packages in crates/rattler_build_playground/Cargo.lock.
     paths:
       - "crates/rattler_build_playground/**"
       - "crates/rattler_build_jinja/**"
       - "crates/rattler_build_recipe/**"
+      - "crates/rattler_build_recipe_generator/**"
+      - "crates/rattler_build_script/**"
       - "crates/rattler_build_variant_config/**"
       - "crates/rattler_build_types/**"
       - "crates/rattler_build_yaml_parser/**"
@@ -22,6 +25,8 @@ on:
       - "crates/rattler_build_playground/**"
       - "crates/rattler_build_jinja/**"
       - "crates/rattler_build_recipe/**"
+      - "crates/rattler_build_recipe_generator/**"
+      - "crates/rattler_build_script/**"
       - "crates/rattler_build_variant_config/**"
       - "crates/rattler_build_types/**"
       - "crates/rattler_build_yaml_parser/**"
@@ -47,7 +52,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup pixi
-        uses: prefix-dev/setup-pixi@ad1da6449d9e506fd127fd67ab2d054a769f6a94 # v0.11.2
+        uses: prefix-dev/setup-pixi@9936258fee697aff89b3fed6ca1f80a382ef694e # v0.11.3
 
       - name: Build WASM playground
         run: pixi run --environment playground playground-build

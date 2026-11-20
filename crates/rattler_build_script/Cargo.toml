@@ -1,12 +1,30 @@
 [package]
 name = "rattler_build_script"
-version = "0.2.20"
+version = "0.2.21"
 authors.workspace = true
 edition.workspace = true
 description = "Script execution and sandbox configuration for rattler-build, supporting bash, cmd, python, and other interpreters"
 readme = "README.md"
 repository.workspace = true
 license.workspace = true
+
+[features]
+default = ["execution"]
+execution = [
+  "async-trait",
+  "fs-err",
+  "futures",
+  "itertools",
+  "minijinja",
+  "rattler_conda_types",
+  "rattler_shell",
+  "strsim",
+  "thiserror",
+  "tokio",
+  "tokio-util",
+  "tracing",
+  "which",
+]
 
 [dependencies]
 # Core dependencies (always needed)
@@ -47,21 +65,3 @@ windows-sys = { workspace = true, features = [
   "Win32_System_SystemInformation",
   "Win32_System_Threading",
 ] }
-
-[features]
-default = ["execution"]
-execution = [
-  "async-trait",
-  "fs-err",
-  "futures",
-  "itertools",
-  "minijinja",
-  "rattler_conda_types",
-  "rattler_shell",
-  "strsim",
-  "thiserror",
-  "tokio",
-  "tokio-util",
-  "tracing",
-  "which",
-]

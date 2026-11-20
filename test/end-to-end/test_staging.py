@@ -16,7 +16,12 @@ from helpers import (
 
 def test_basic_staging(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     """Test basic staging output with multiple package outputs inheriting from it."""
-    rattler_build.build(recipes / "staging/basic-staging.yaml", tmp_path)
+    output = rattler_build(
+        *rattler_build.build_args(recipes / "staging/basic-staging.yaml", tmp_path),
+        stderr=STDOUT,
+    )
+    # The cold build needs a clean-prefix restore; the next output needs only one.
+    assert output.count("from staging cache 'foo-build'") == 2
 
     # Both package outputs should be built
     pkg1 = get_extracted_package(tmp_path, "foo-split-1")

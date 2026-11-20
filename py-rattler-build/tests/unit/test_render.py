@@ -3,6 +3,8 @@ Tests for the render module - converting Stage0 to Stage1 recipes with variants.
 """
 
 import json
+import subprocess
+import sys
 import tarfile
 from pathlib import Path
 
@@ -337,6 +339,37 @@ build:
 
         result = build_rendered_variants(rendered, output_dir=tmp_path, exclude_newer=exclude_newer)[0]
     assert result.name == "datetime-test"
+
+
+def test_run_build_with_progress_callback(tmp_path: Path) -> None:
+    """A progress callback receives log events and does not deadlock the build.
+
+    The build runs on tokio worker threads, which need the GIL to call the
+    callback, so the caller must release it while waiting. Run in a separate
+    process so that a deadlock fails the test instead of hanging the suite.
+    """
+    script = f"""
+from rattler_build import Stage0Recipe
+
+events = []
+
+class Callback:
+    def on_log(self, event):
+        events.append(event.message)
+
+recipe = Stage0Recipe.from_yaml('''
+package:
+  name: progress-callback-test
+  version: 1.0.0
+
+build:
+  noarch: generic
+''')
+result = recipe.render()[0].run_build(output_dir={str(tmp_path)!r}, progress_callback=Callback())
+assert result.name == "progress-callback-test"
+assert events
+"""
+    subprocess.run([sys.executable, "-c", script], check=True, timeout=120)
 
 
 def test_run_build_multi_output_pin_subpackage(tmp_path: Path) -> None:

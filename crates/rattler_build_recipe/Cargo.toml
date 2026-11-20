@@ -1,6 +1,6 @@
 [package]
 name = "rattler_build_recipe"
-version = "0.1.25"
+version = "0.1.26"
 authors.workspace = true
 edition.workspace = true
 description = "Recipe data model and parsing for rattler-build, including multi-stage evaluation and variant rendering"
@@ -11,6 +11,11 @@ license.workspace = true
 [package.metadata.cargo-all-features]
 # Auto-enable features for examples
 always_include_features = ["variant-config"]
+
+[features]
+default = ["script-execution", "variant-config"]
+script-execution = ["rattler_build_script/execution"]
+variant-config = ["dep:petgraph", "dep:rattler_build_variant_config"]
 
 # Examples automatically enable required features
 [[example]]
@@ -56,8 +61,3 @@ walkdir = { workspace = true }
 [dev-dependencies.miette]
 workspace = true
 features = ["fancy"]
-
-[features]
-default = ["script-execution", "variant-config"]
-script-execution = ["rattler_build_script/execution"]
-variant-config = ["dep:petgraph", "dep:rattler_build_variant_config"]

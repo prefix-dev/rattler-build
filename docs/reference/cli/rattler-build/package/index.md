@@ -16,4 +16,5 @@ rattler-build package <COMMAND>
 |---------|-------------|
 | [`inspect`](inspect.md) | Inspect and display information about a built package |
 | [`extract`](extract.md) | Extract a conda package to a directory |
+| [`attest`](attest.md) | Sign Sigstore attestations for already-built packages without uploading them |
 

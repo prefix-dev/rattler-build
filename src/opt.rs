@@ -293,6 +293,17 @@ pub enum PackageCommands {
     Inspect(InspectOpts),
     /// Extract a conda package to a directory
     Extract(ExtractOpts),
+    /// Sign Sigstore attestations for already-built packages without uploading them
+    ///
+    /// Uses the ambient OIDC identity of the CI job (e.g. GitHub Actions with
+    /// `id-token: write`) to sign a conda publish attestation
+    /// (`https://schemas.conda.org/attestations-publish-1.schema.json`) for each
+    /// package. The Sigstore bundle is written next to the package as
+    /// `<filename>.sigstore.json` and can optionally be stored in GitHub's
+    /// attestation API, so a channel can retrieve it later by the package's
+    /// SHA-256 digest.
+    #[cfg(feature = "sigstore")]
+    Attest(AttestOpts),
 }
 
 /// Shell completion options.
@@ -625,6 +636,7 @@ pub struct BuildOpts {
     pub ignore_recipe_variants: bool,
 
     /// Render the recipe files without executing the build.
+    /// Outputs that `--skip-existing` would skip are left out.
     #[arg(long)]
     pub render_only: bool,
 
@@ -688,7 +700,7 @@ pub struct BuildOpts {
     /// Whether to skip packages that already exist in any channel
     /// If set to `none`, do not skip any packages, default when not specified.
     /// If set to `local`, only skip packages that already exist locally,
-    /// default when using `--skip-existing. If set to `all`, skip packages
+    /// default when using `--skip-existing`. If set to `all`, skip packages
     /// that already exist in any channel.
     #[arg(long, default_missing_value = "local", num_args = 0..=1, help_heading = "Modifying result"
     )]
@@ -717,7 +729,8 @@ pub struct BuildOpts {
     /// With `=skip-dependents`, also skip every package that needs a package
     /// whose build failed in this run (as a build or host dependency, or
     /// through their run dependencies), instead of building it later against
-    /// the configured channels.
+    /// the configured channels. With `--render-only --with-solve`, leave out
+    /// the outputs whose dependencies cannot be resolved instead of stopping.
     #[clap(
         long,
         num_args = 0..=1,
@@ -1432,6 +1445,38 @@ impl From<InspectOpts> for rattler_build_core::package_info::InspectOpts {
             json: opts.json,
         }
     }
+}
+
+/// Options for the `package attest` command.
+#[cfg(feature = "sigstore")]
+#[derive(Parser, Debug, Clone)]
+pub struct AttestOpts {
+    /// Package files (.conda, .tar.bz2) to attest
+    #[arg(required = true, num_args = 1..)]
+    pub package_files: Vec<PathBuf>,
+
+    /// URL of the channel the packages are published to, recorded as
+    /// `targetChannel` in the attestation (e.g. `https://prefix.dev/conda-forge`)
+    #[arg(long)]
+    pub target_channel: Url,
+
+    /// Directory to write the `<filename>.sigstore.json` bundles to
+    /// (defaults to the directory of each package)
+    #[arg(short, long)]
+    pub output_dir: Option<PathBuf>,
+
+    /// Also store the attestations in GitHub's attestation API
+    /// (requires `attestations: write` permission)
+    #[arg(long)]
+    pub store_github_attestation: bool,
+
+    /// GitHub repository (`owner/repo`) to store the attestations in
+    #[arg(long, env = "GITHUB_REPOSITORY")]
+    pub github_repository: Option<String>,
+
+    /// GitHub token used to store the attestations
+    #[arg(long, env = "GITHUB_TOKEN", hide_env_values = true, hide = true)]
+    pub github_token: Option<String>,
 }
 
 /// Options for the `package extract` command.

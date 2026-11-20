@@ -1,12 +1,51 @@
 [package]
 name = "rattler_build_core"
-version = "0.2.25"
+version = "0.2.26"
 authors.workspace = true
 edition.workspace = true
 description = "The core engine of rattler-build, providing recipe rendering, source fetching, script execution, package building, testing, and publishing"
 readme = "README.md"
 repository.workspace = true
 license.workspace = true
+
+[features]
+default = ["rustls", "s3"]
+native-tls = [
+  "rattler_build_networking/native-tls",
+  "rattler_build_source_cache/native-tls",
+  "rattler_index/native-tls",
+  "rattler_networking/native-tls",
+  "rattler_package_streaming/native-tls",
+  "rattler_redaction/native-tls",
+  "rattler_repodata_gateway/native-tls",
+  "rattler_upload/native-tls",
+  "rattler/native-tls",
+  "reqwest/native-tls",
+]
+rustls = [
+  "rattler_build_networking/rustls",
+  "rattler_build_source_cache/rustls",
+  "rattler_index/rustls",
+  "rattler_networking/rustls",
+  "rattler_package_streaming/rustls",
+  "rattler_redaction/rustls",
+  "rattler_repodata_gateway/rustls",
+  "rattler_upload/rustls",
+  "rattler/rustls",
+  "reqwest-middleware/rustls",
+  "reqwest/rustls",
+]
+s3 = [
+  "dep:rattler_s3",
+  "rattler_build_networking/s3",
+  "rattler_index/s3",
+  "rattler_networking/s3",
+  "rattler_upload/s3",
+]
+sigstore = [
+  "rattler_build_source_cache/sigstore",
+  "rattler_upload/sigstore-sign",
+]
 
 [dependencies]
 anyhow = { workspace = true }
@@ -114,42 +153,3 @@ pretty_assertions = { workspace = true }
 rstest = { workspace = true }
 serial_test = { workspace = true }
 tracing-test = { workspace = true }
-
-[features]
-default = ["rustls", "s3"]
-native-tls = [
-  "rattler_build_networking/native-tls",
-  "rattler_build_source_cache/native-tls",
-  "rattler_index/native-tls",
-  "rattler_networking/native-tls",
-  "rattler_package_streaming/native-tls",
-  "rattler_redaction/native-tls",
-  "rattler_repodata_gateway/native-tls",
-  "rattler_upload/native-tls",
-  "rattler/native-tls",
-  "reqwest/native-tls",
-]
-rustls = [
-  "rattler_build_networking/rustls",
-  "rattler_build_source_cache/rustls",
-  "rattler_index/rustls",
-  "rattler_networking/rustls",
-  "rattler_package_streaming/rustls",
-  "rattler_redaction/rustls",
-  "rattler_repodata_gateway/rustls",
-  "rattler_upload/rustls",
-  "rattler/rustls",
-  "reqwest-middleware/rustls",
-  "reqwest/rustls",
-]
-s3 = [
-  "dep:rattler_s3",
-  "rattler_build_networking/s3",
-  "rattler_index/s3",
-  "rattler_networking/s3",
-  "rattler_upload/s3",
-]
-sigstore = [
-  "rattler_build_source_cache/sigstore",
-  "rattler_upload/sigstore-sign",
-]

@@ -1,12 +1,30 @@
 [package]
 name = "rattler_build_source_cache"
-version = "0.1.23"
+version = "0.1.24"
 authors.workspace = true
 edition.workspace = true
 description = "Source cache management for rattler-build"
 readme = "README.md"
 repository.workspace = true
 license.workspace = true
+
+[features]
+default = ["rustls", "sigstore"]
+native-tls = [
+  "rattler_build_networking/native-tls",
+  "sigstore-verify?/native-tls",
+]
+rustls = ["rattler_build_networking/rustls", "sigstore-verify?/rustls"]
+sigstore = [
+  "dep:sigstore-trust-root",
+  "dep:sigstore-types",
+  "dep:sigstore-verify",
+  "sigstore-trust-root/tuf",
+  "sigstore-verify/tuf",
+  # sigstore-crypto has no built-in crypto backend without this; verification
+  # would panic at runtime with "no sigstore-crypto CryptoProvider installed".
+  "sigstore-verify/aws-lc-rs",
+]
 
 [dependencies]
 async-trait = { workspace = true }
@@ -54,21 +72,3 @@ zstd = { workspace = true }
 base64 = "0.23"
 tempfile.workspace = true
 tokio = { workspace = true, features = ["macros", "rt", "test-util"] }
-
-[features]
-default = ["rustls", "sigstore"]
-native-tls = [
-  "rattler_build_networking/native-tls",
-  "sigstore-verify?/native-tls",
-]
-rustls = ["rattler_build_networking/rustls", "sigstore-verify?/rustls"]
-sigstore = [
-  "dep:sigstore-trust-root",
-  "dep:sigstore-types",
-  "dep:sigstore-verify",
-  "sigstore-trust-root/tuf",
-  "sigstore-verify/tuf",
-  # sigstore-crypto has no built-in crypto backend without this; verification
-  # would panic at runtime with "no sigstore-crypto CryptoProvider installed".
-  "sigstore-verify/aws-lc-rs",
-]

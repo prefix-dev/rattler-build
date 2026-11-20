@@ -322,13 +322,16 @@ pub fn build_rendered_variant_py(
     // Capture start time for build duration calculation
     let start_time = std::time::Instant::now();
 
-    // Run the build with log capture and optional tracing subscriber
-    let (build_result, log_buffer) =
+    // Run the build with log capture and optional tracing subscriber. The GIL
+    // is released while waiting: builds run on tokio worker threads, and the
+    // progress callback needs the GIL to call back into Python.
+    let (build_result, log_buffer) = py.detach(|| {
         tracing_subscriber::with_log_capture(progress_callback, || {
             run_async_task(async {
                 run_build_from_args(vec![output.clone()], tool_config, None).await
             })
-        });
+        })
+    });
 
     // Extract captured logs
     let captured_logs = log_buffer
