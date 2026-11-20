@@ -4647,10 +4647,6 @@ then uploads the resulting <code>(package, bundle)</code> pair.</p>
 <p>This approach gives you full control over the attestation creation and allows
 you to customize the predicate or add additional attestation metadata.</p>
 <h2 id="source-attestation-verification">Source attestation verification<a class="headerlink" href="#source-attestation-verification" title="Permanent link">#</a></h2>
-<div class="admonition note">
-<p class="admonition-title">Experimental</p>
-<p>This feature requires the <code>--experimental</code> flag: <code>rattler-build build --experimental -r recipe.yaml</code></p>
-</div>
 <p>In addition to signing built packages, Rattler-Build can also <strong>verify</strong> the attestations of source archives during the build. This lets you ensure that the source code you're building from was produced by a trusted publisher (e.g., a specific GitHub Actions workflow).</p>
 <h3 id="how-it-works">How it works<a class="headerlink" href="#how-it-works" title="Permanent link">#</a></h3>
 <p>Add an <code>attestations</code> block to a URL source in your recipe:</p>
