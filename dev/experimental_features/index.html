@@ -4094,11 +4094,11 @@
 <p>To enable them, use the <code>--experimental</code> flag with the command.
 Or, use the environment variable, <code>RATTLER_BUILD_EXPERIMENTAL=true</code>.</p>
 <h2 id="sigstore-source-attestation">Sigstore source attestation<a class="headerlink" href="#sigstore-source-attestation" title="Permanent link">#</a></h2>
-<p>The <code>attestation</code> field on URL sources allows verifying that downloaded source archives were produced by a trusted publisher using <a href="https://sigstore.dev">Sigstore</a> attestations. This is supported for PyPI packages (where the bundle URL is automatically derived) and GitHub releases (where you specify the <code>bundle_url</code> manually).</p>
+<p>The <code>attestations</code> field on URL sources allows verifying that downloaded source archives were produced by a trusted publisher using <a href="https://sigstore.dev">Sigstore</a> attestations. The bundle is discovered automatically for PyPI packages and uploaded GitHub release assets. GitHub's dynamically generated source archives are not covered by release attestations.</p>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">source</span><span class="p">:</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://files.pythonhosted.org/packages/.../flask-3.1.1.tar.gz</span>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="nt">sha256</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;6489f1...&quot;</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span><span class="nt">attestation</span><span class="p">:</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span><span class="nt">attestations</span><span class="p">:</span>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">    </span><span class="nt">publishers</span><span class="p">:</span>
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">github:pallets/flask</span>
 </span></code></pre></div>
