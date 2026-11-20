@@ -1,6 +1,6 @@
 [package]
 name = "rattler_build_jinja"
-version = "0.1.26"
+version = "0.1.27"
 authors.workspace = true
 edition.workspace = true
 description = "Jinja template engine integration for rattler-build, powered by minijinja"

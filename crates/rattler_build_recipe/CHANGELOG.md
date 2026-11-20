@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.27](https://github.com/prefix-dev/rattler-build/compare/rattler_build_recipe-v0.1.26...rattler_build_recipe-v0.1.27) - 2026-11-20
+
+### Added
+
+- verify source attestations without the experimental flag ([#2964](https://github.com/prefix-dev/rattler-build/pull/2964))
+- verify Sigstore source attestations from PyPI and GitHub releases ([#2947](https://github.com/prefix-dev/rattler-build/pull/2947))
+
 ## [0.1.26](https://github.com/prefix-dev/rattler-build/compare/rattler_build_recipe-v0.1.25...rattler_build_recipe-v0.1.26) - 2026-11-16
 
 ### Other

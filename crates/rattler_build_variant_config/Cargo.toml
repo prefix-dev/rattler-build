@@ -1,6 +1,6 @@
 [package]
 name = "rattler_build_variant_config"
-version = "0.1.26"
+version = "0.1.27"
 authors.workspace = true
 edition.workspace = true
 description = "Variant configuration system for rattler-build, handling build matrices, zip keys, and loading of variant YAML files"
