@@ -22,8 +22,12 @@ class RattlerBuild:
             kwds_copy.pop("need_result_object", None)
             if "capture_output" not in kwds_copy:
                 kwds_copy["capture_output"] = True
-            if "text" not in kwds_copy:
-                kwds_copy["text"] = True
+            if "text" not in kwds_copy and "encoding" not in kwds_copy:
+                # Decode as UTF-8 explicitly: the locale encoding (e.g. cp1252
+                # on Windows) cannot decode the box-drawing characters in the
+                # log output, which leaves `stdout`/`stderr` as `None`.
+                kwds_copy["encoding"] = "utf-8"
+                kwds_copy["errors"] = "replace"
 
             result = run([str(self.path), *args], check=False, **kwds_copy)
             return result
