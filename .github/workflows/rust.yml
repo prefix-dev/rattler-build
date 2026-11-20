@@ -127,6 +127,29 @@ jobs:
         with:
           cache: true
           cache-write: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+      # cmd.exe rejects lines over 8191 characters after variable expansion.
+      # build_env.bat prepends the host and build prefixes to %Path% with
+      # `SET "Path=...;%Path%"`, and in the test environment %Path% already
+      # holds the runner PATH plus the MSVC paths of the pixi environment's
+      # vs2026 activation. Since the windows-2025 image of 2026-11-16, tests
+      # with long temp paths fail with "The input line is too long". Drop
+      # duplicate and missing entries to keep PATH short.
+      - name: Shorten PATH
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $seen = @{}
+          $kept = foreach ($entry in $env:PATH -split ';') {
+            $entry = $entry.Trim()
+            if (-not $entry) { continue }
+            $key = $entry.TrimEnd('\').ToLowerInvariant()
+            if ($seen.ContainsKey($key)) { continue }
+            $seen[$key] = $true
+            if (Test-Path -LiteralPath $entry) { $entry }
+          }
+          $path = $kept -join ';'
+          Write-Host "PATH: $($env:PATH.Length) -> $($path.Length) characters"
+          "PATH=$path" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
       - name: Configure sccache
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
@@ -138,6 +161,11 @@ jobs:
       - name: Run end-to-end tests
         run: pixi run test-end-to-end-ci
         env:
+          # A short temp directory on Windows: every prefix path appears many
+          # times in build_env.bat, which must stay below cmd.exe's line limit
+          # (see "Shorten PATH"). Quoted, because pytest splits PYTEST_ADDOPTS
+          # like a POSIX shell, which would drop unquoted backslashes.
+          PYTEST_ADDOPTS: ${{ runner.os == 'Windows' && format('--basetemp="{0}\e2e"', runner.temp) || '' }}
           PREFIX_DEV_READ_ONLY_TOKEN: ${{ secrets.PREFIX_DEV_READ_ONLY_TOKEN }}
           S3_ACCESS_KEY_ID: ${{ secrets.S3_UPLOAD_ACCESS_KEY_ID }}
           S3_SECRET_ACCESS_KEY: ${{ secrets.S3_UPLOAD_ACCESS_KEY_SECRET }}
@@ -181,6 +209,29 @@ jobs:
         with:
           cache: true
           cache-write: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+      # cmd.exe rejects lines over 8191 characters after variable expansion.
+      # build_env.bat prepends the host and build prefixes to %Path% with
+      # `SET "Path=...;%Path%"`, and in the test environment %Path% already
+      # holds the runner PATH plus the MSVC paths of the pixi environment's
+      # vs2026 activation. Since the windows-2025 image of 2026-11-16, tests
+      # with long temp paths fail with "The input line is too long". Drop
+      # duplicate and missing entries to keep PATH short.
+      - name: Shorten PATH
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $seen = @{}
+          $kept = foreach ($entry in $env:PATH -split ';') {
+            $entry = $entry.Trim()
+            if (-not $entry) { continue }
+            $key = $entry.TrimEnd('\').ToLowerInvariant()
+            if ($seen.ContainsKey($key)) { continue }
+            $seen[$key] = $true
+            if (Test-Path -LiteralPath $entry) { $entry }
+          }
+          $path = $kept -join ';'
+          Write-Host "PATH: $($env:PATH.Length) -> $($path.Length) characters"
+          "PATH=$path" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
       - name: Download x64 release binary
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
