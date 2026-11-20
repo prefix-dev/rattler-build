@@ -5,6 +5,45 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.81.0] - 2026-11-20
+### ✨ Highlights
+
+rattler-build now verifies Sigstore attestations of source archives, and the feature no longer needs `--experimental`. An `attestations` block on a URL source names the publishers that must have signed the archive, for example `github:pallets/flask@refs/tags/${{ version }}`. Bundles are found automatically for PyPI files (PEP 740) and GitHub release assets, and any other bundle can be given with `bundle_url`. If verification fails, the build fails. The key is renamed from the experimental `attestation` to `attestations`, which takes one entry or a list. See the [Sigstore documentation](https://rattler-build.prefix.dev/latest/sigstore/#source-attestation-verification).
+
+`generate-recipe cran` now gives compiled packages the MinGW compilers and MSYS2 tools on Windows, as conda-forge's R recipes use.
+
+The Python bindings release the GIL while a build runs, so Python progress callbacks no longer deadlock.
+
+### Features
+
+- Build compiled CRAN packages with the MinGW toolchain on Windows by @matthewfeickert in [#2957](https://github.com/prefix-dev/rattler-build/pull/2957)
+- Verify Sigstore source attestations from PyPI and GitHub releases by @wolfv in [#2947](https://github.com/prefix-dev/rattler-build/pull/2947)
+- Verify source attestations without the experimental flag by @wolfv in [#2964](https://github.com/prefix-dev/rattler-build/pull/2964)
+
+
+### Fixes
+
+- py: Release the GIL while a build runs, so progress callbacks do not deadlock by @mini-1235 in [#2954](https://github.com/prefix-dev/rattler-build/pull/2954)
+- Name the missing license files in the packaging error by @Shriraj1901 in [#2956](https://github.com/prefix-dev/rattler-build/pull/2956)
+
+
+### Documentation
+
+- Close unbalanced backtick in --skip-existing help text by @mini-1235 in [#2953](https://github.com/prefix-dev/rattler-build/pull/2953)
+- Generate social cards with zensical by @Hofer-Julian in [#2959](https://github.com/prefix-dev/rattler-build/pull/2959)
+
+
+### Maintenance
+
+- Build the playground when the recipe generator changes by @matthewfeickert in [#2958](https://github.com/prefix-dev/rattler-build/pull/2958)
+- Extract subpackages_for_output into rattler_build_core by @EzraBrooks in [#2955](https://github.com/prefix-dev/rattler-build/pull/2955)
+- Shorten PATH for the Windows end-to-end tests by @wolfv in [#2963](https://github.com/prefix-dev/rattler-build/pull/2963)
+
+
+### New Contributors
+* @EzraBrooks made their first contribution in [#2955](https://github.com/prefix-dev/rattler-build/pull/2955)
+* @Shriraj1901 made their first contribution in [#2956](https://github.com/prefix-dev/rattler-build/pull/2956)
+
 ## [0.80.2] - 2026-11-16
 ### ✨ Highlights
 
