@@ -5,7 +5,7 @@ For example, a Python package might need multiple variants per Python version
 (especially if it is a binary package such as `numpy`).
 
 For this use case, one can specify _variant_ configuration files. A variant
-configuration file has 2 special entries and a list of packages with variants.
+configuration file can have special entries and a list of packages with variants.
 For example:
 
 ```yaml title="variants.yaml"
@@ -190,6 +190,23 @@ The resulting variants with the zip applied are:
 ```
 - python 3.8, numpy 1.12
 - python 3.9, numpy 1.14
+```
+
+### Force use
+
+The `force_use_keys` key lists variant keys that should be included in every build,
+even when they are not referenced by the recipe. Their values are added to the
+build matrix, hash input, and build-script environment.
+
+```yaml
+force_use_keys:
+  - TARGET
+  - CROSSCOMPILING_EMULATOR
+
+TARGET:
+  - x86_64-conda-linux-gnu
+CROSSCOMPILING_EMULATOR:
+  - qemu-x86_64
 ```
 
 ### Pin run as build
