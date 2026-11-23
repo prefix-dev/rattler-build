@@ -183,16 +183,8 @@ mod tests {
     use rattler_conda_types::Subdir;
 
     use super::*;
-    use crate::runner::{Mount, OutputSink, SessionSpec};
-
-    #[derive(Default)]
-    struct VecSink(Vec<(OutputStream, String)>);
-
-    impl OutputSink for VecSink {
-        fn line(&mut self, stream: OutputStream, line: &str) {
-            self.0.push((stream, line.to_string()));
-        }
-    }
+    use crate::runner::test_support::VecSink;
+    use crate::runner::{Mount, SessionSpec};
 
     fn session_spec(work_dir: &Path) -> SessionSpec {
         SessionSpec {
