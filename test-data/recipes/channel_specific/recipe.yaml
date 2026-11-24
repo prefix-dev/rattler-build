@@ -5,3 +5,9 @@ package:
 requirements:
   host:
     - quantstack::sphinx
+  run:
+    - quantstack::sphinx
+
+tests:
+  - script:
+      - echo "hi!"
