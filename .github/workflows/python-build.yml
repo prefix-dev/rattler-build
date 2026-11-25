@@ -149,14 +149,14 @@ jobs:
         name: Test wheel
         with:
           arch: ${{ matrix.platform.arch }}
-          distro: ubuntu22.04
+          # Ubuntu 24.04 ships Python 3.12; 22.04's 3.10 is below requires-python
+          distro: ubuntu24.04
           githubToken: ${{ github.token }}
           install: |
             apt-get update
             apt-get install -y --no-install-recommends python3 python3-pip
-            pip3 install -U pip
           run: |
-            pip3 install ${{ env.PACKAGE_NAME }} --no-index --find-links py-rattler-build/dist/ --force-reinstall
+            pip3 install ${{ env.PACKAGE_NAME }} --no-index --find-links py-rattler-build/dist/ --force-reinstall --break-system-packages
             python3 -c "import rattler_build; print(rattler_build.rattler_build_version())"
       - name: "Upload wheels"
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
