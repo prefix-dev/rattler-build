@@ -6,6 +6,7 @@ import json
 import subprocess
 import sys
 import tarfile
+from datetime import UTC
 from pathlib import Path
 
 import pytest
@@ -312,7 +313,7 @@ python:
 @pytest.mark.parametrize("entrypoint", ["recipe", "variant", "variants"])
 def test_run_build_exclude_newer_datetime_conversion(tmp_path: Path, entrypoint: str) -> None:
     """Existing build APIs still accept a datetime for the global cutoff."""
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     recipe_yaml = """
 package:
@@ -328,7 +329,7 @@ build:
     variant_config = VariantConfig()
     rendered = recipe.render(variant_config)
 
-    exclude_newer = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+    exclude_newer = datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC)
 
     if entrypoint == "recipe":
         result = recipe.run_build(output_dir=tmp_path, exclude_newer=exclude_newer)[0]

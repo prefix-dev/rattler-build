@@ -9,9 +9,7 @@ ProgressCallback.
 
 from __future__ import annotations
 
-from typing import Literal, Protocol, runtime_checkable
-
-from typing_extensions import Self
+from typing import Literal, Protocol, Self, runtime_checkable
 
 
 class DownloadStartEvent:

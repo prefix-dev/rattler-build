@@ -11,7 +11,7 @@ import shutil
 import sys
 import tarfile
 from collections.abc import Iterator
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
 from urllib.parse import urlsplit
@@ -25,9 +25,9 @@ from rattler_build import ExcludeNewer, Package, Stage0Recipe, ToolConfiguration
 from rattler_build.debug import DebugSession
 from rattler_build.render import build_rendered_variants
 
-CUTOFF = datetime(2024, 1, 1, tzinfo=timezone.utc)
-OLD = datetime(2020, 1, 1, tzinfo=timezone.utc)
-NEW = datetime(2030, 1, 1, tzinfo=timezone.utc)
+CUTOFF = datetime(2024, 1, 1, tzinfo=UTC)
+OLD = datetime(2020, 1, 1, tzinfo=UTC)
+NEW = datetime(2030, 1, 1, tzinfo=UTC)
 
 
 @pytest.fixture

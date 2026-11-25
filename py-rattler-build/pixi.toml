@@ -9,7 +9,7 @@ preview = ["pixi-build"]
 # We are using the oldest supported python version as the build variant here
 build-variants = {
   python = [
-    "3.10",
+    "3.11",
   ],
   rust_compiler_version = [
     ">=1.98.1,<1.99",
@@ -28,8 +28,8 @@ RUSTC_WRAPPER = "sccache"
 py-rattler-build = { path = "." }
 lua = ">=5.5.0,<6"
 
-# Python 3.10 is the minimum supported version, so we use that for testing
-python = ">=3.10.21,<4"
+# Python 3.11 is the minimum supported version, so we use that for testing
+python = ">=3.11,<4"
 
 ty = ">=0.0.78,<0.0.79"
 
