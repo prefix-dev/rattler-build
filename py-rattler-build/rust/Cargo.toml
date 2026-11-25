@@ -23,7 +23,7 @@ indicatif = "0.18"
 jiff = "0.2.46"
 miette = "7.6.0"
 pyo3 = { version = "0.30.1", features = [
-  "abi3-py310",
+  "abi3-py311",
   "extension-module",
   "jiff-02",
   "multiple-pymethods",

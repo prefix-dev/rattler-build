@@ -5,7 +5,7 @@ import json
 import tarfile
 import tempfile
 import zipfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -198,7 +198,7 @@ class TestReproducibleBuilds:
         output_dir.mkdir()
 
         # Fixed timestamp: 2024-01-01 00:00:00 UTC
-        timestamp = datetime(2024, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+        timestamp = datetime(2024, 1, 1, 0, 0, 0, tzinfo=UTC)
 
         output1 = assemble_package(
             name="repro",
