@@ -8,7 +8,7 @@ use rattler_build_script::{
 };
 use rattler_conda_types::{MatchSpec, PackageNameMatcher};
 
-use crate::{metadata::Output, packaging::PackagingError};
+use crate::{metadata::Output, package_test::TEST_FILES_DIR, packaging::PackagingError};
 
 /// Resolve a dependency, converting PinSubpackage/PinCompatible to concrete MatchSpecs
 fn resolve_dependency(dep: &Dependency, output: &Output) -> Dependency {
@@ -128,7 +128,7 @@ pub(crate) fn write_test_files(
             // Resolve pin_subpackage dependencies to concrete MatchSpecs
             resolve_test_requirements(command_test, output);
 
-            let cwd = PathBuf::from(format!("etc/conda/test-files/{name}/{idx}"));
+            let cwd = PathBuf::from(format!("{TEST_FILES_DIR}/{name}/{idx}"));
             let folder = tmp_dir_path.join(&cwd);
             let files = write_command_test_files(command_test, &folder, output)?;
             if !files.is_empty() {

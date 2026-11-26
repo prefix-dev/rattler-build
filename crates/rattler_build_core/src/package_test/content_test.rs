@@ -5,7 +5,10 @@ use rattler_build_recipe::stage1::tests::PackageContentsTest;
 use rattler_build_types::GlobWithSource;
 use rattler_conda_types::{Subdir, package::PathsJson};
 
-use crate::{package_test::TestError, types::Output};
+use crate::{
+    package_test::{TEST_FILES_DIR, TestError},
+    types::Output,
+};
 
 fn build_glob(glob: String) -> Result<Glob, globset::Error> {
     tracing::debug!("Building glob: {}", glob);
@@ -451,9 +454,12 @@ impl PackageContentsTestExt for PackageContentsTest {
 
         // Check strict mode
         let strict_mode_issue = if self.strict {
+            // Test files are added to the package by rattler-build itself
+            // (see `serialize_test`), so they are not subject to strict mode.
             let unmatched: Vec<&PathBuf> = paths
                 .iter()
                 .filter(|p| !matched_paths.contains(*p))
+                .filter(|p| !p.starts_with(TEST_FILES_DIR))
                 .copied()
                 .collect();
 
@@ -772,6 +778,29 @@ mod tests {
             ..Default::default()
         };
         assert!(strict_contents.strict);
+
+        // Test files added by rattler-build are not strict mode violations
+        let output = noarch_output_for_host(Subdir::Linux64);
+        strict_contents
+            .run_test(
+                &make_paths_json(&[
+                    "matched.txt",
+                    "etc/conda/test-files/pkg/0/run_test.sh",
+                    "etc/conda/test-files/pkg/1/data/file.txt",
+                ]),
+                &output,
+            )
+            .unwrap();
+        strict_contents
+            .run_test(&make_paths_json(&["matched.txt", "unmatched.txt"]), &output)
+            .unwrap_err();
+        // ...but other files under `etc/conda` still are
+        strict_contents
+            .run_test(
+                &make_paths_json(&["matched.txt", "etc/conda/activate.d/foo.sh"]),
+                &output,
+            )
+            .unwrap_err();
 
         let non_strict_contents = PackageContentsTest {
             files: make_check_files(vec!["*.txt"], None),
