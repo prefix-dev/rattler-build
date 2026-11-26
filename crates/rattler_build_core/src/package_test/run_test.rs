@@ -42,8 +42,7 @@ use std::{
 use tempfile::TempDir;
 use walkdir::WalkDir;
 
-use rattler::package_cache::PackageCache;
-use rattler_cache::validation::ValidationMode;
+use rattler_cache::package_cache::PackageCacheLayer;
 
 use crate::{
     env_vars, metadata::PlatformWithVirtualPackages, render::solver::create_environment,
@@ -574,21 +573,21 @@ pub async fn run_test(
 
     let pkg = CondaArchiveIdentifier::try_from_path(package_file)
         .ok_or_else(|| TestError::TestFailed("could not get archive identifier".to_string()))?;
+    let match_spec = match_spec_for_identifier(&pkg.identifier)?;
 
-    // Create a layered package cache for test environments:
-    // - Layer 1 (temp dir): writable target for newly downloaded packages
-    // - Layer 2 (global cache): read-only fallback for already-cached packages
+    // Route the package under test exclusively to a temporary cache layer while
+    // keeping test dependencies in the configured persistent package cache.
     // This avoids cache key conflicts with the global package cache while
-    // still reusing packages that have already been downloaded (issue #2236).
+    // still caching downloaded test dependencies across test runs (issue #2236).
     let temp_cache_dir = tempfile::tempdir()?;
-    let global_cache_dir = rattler_cache::default_cache_dir()
-        .map_err(|e| TestError::TestFailed(format!("failed to determine cache directory: {e}")))?
-        .join(rattler_cache::PACKAGE_CACHE_DIR);
-    let temp_package_cache = PackageCache::new_layered(
-        [temp_cache_dir.path().to_path_buf(), global_cache_dir],
-        false,
-        ValidationMode::default(),
-    );
+    let temp_package_cache = config
+        .tool_configuration
+        .package_cache
+        .clone()
+        .excluding_from_all_layers(match_spec.clone())
+        .with_prepended_layer(
+            PackageCacheLayer::new(temp_cache_dir.path()).with_filter(match_spec),
+        );
 
     // Use the package cache to extract the package for reading test metadata.
     // This avoids manual extraction and reuses the cache properly.
@@ -1663,6 +1662,124 @@ mod tests {
         assert_eq!(
             spec.build,
             Some(StringMatcher::Exact("h1234567_0".to_string()))
+        );
+    }
+
+    #[tokio::test]
+    #[allow(deprecated)]
+    async fn run_test_caches_dependencies_in_persistent_cache_and_isolates_tested_package() {
+        let platform = Subdir::current().unwrap();
+
+        // Build a dependency package in a local channel.
+        let dep_src = tempfile::tempdir().unwrap();
+        fs::create_dir_all(dep_src.path().join("info")).unwrap();
+        fs::write(
+            dep_src.path().join("info/index.json"),
+            serde_json::to_vec(&serde_json::json!({
+                "name": "cached-test-dep",
+                "version": "1.0",
+                "build": "0",
+                "build_number": 0,
+                "subdir": platform.to_string(),
+                "depends": [],
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        fs::write(
+            dep_src.path().join("info/paths.json"),
+            r#"{"paths_version":1,"paths":[]}"#,
+        )
+        .unwrap();
+        fs::write(dep_src.path().join("info/files"), "").unwrap();
+
+        let channel_dir = tempfile::tempdir().unwrap();
+        let channel_subdir = channel_dir.path().join(platform.to_string());
+        fs::create_dir_all(&channel_subdir).unwrap();
+        create_conda_from_directory(dep_src.path(), &channel_subdir).unwrap();
+        index_fs(IndexFsConfig {
+            channel: channel_dir.path().to_path_buf(),
+            target_platform: Some(platform),
+            repodata_patch: None,
+            write_zst: false,
+            write_shards: false,
+            repodata_revisions: Vec::new(),
+            package_revision_assignment: Default::default(),
+            force: false,
+            max_parallel: 1,
+            multi_progress: None,
+        })
+        .await
+        .unwrap();
+
+        // Build the package under test which depends on `cached-test-dep`.
+        let package = tempfile::tempdir().unwrap();
+        fs::create_dir_all(package.path().join("info/test")).unwrap();
+        fs::write(
+            package.path().join("info/index.json"),
+            serde_json::to_vec(&serde_json::json!({
+                "name": "tested-pkg",
+                "version": "1.0",
+                "build": "0",
+                "build_number": 0,
+                "subdir": platform.to_string(),
+                "depends": ["cached-test-dep"],
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        fs::write(
+            package.path().join("info/paths.json"),
+            r#"{"paths_version":1,"paths":[]}"#,
+        )
+        .unwrap();
+        fs::write(package.path().join("info/files"), "").unwrap();
+        fs::write(
+            package.path().join("info/test/test_time_dependencies.json"),
+            "[]",
+        )
+        .unwrap();
+
+        let test_dir = tempfile::tempdir().unwrap();
+        let cache_dir = tempfile::tempdir().unwrap();
+        let pkgs_cache_dir = cache_dir.path().join(rattler_cache::PACKAGE_CACHE_DIR);
+
+        let config = TestConfiguration {
+            test_prefix: test_dir.path().join("test"),
+            target_platform: None,
+            host_platform: None,
+            current_platform: PlatformWithVirtualPackages {
+                platform,
+                virtual_packages: Vec::new(),
+            },
+            keep_test_prefix: false,
+            test_index: None,
+            channels: vec![ChannelUrl::from(
+                url::Url::from_directory_path(channel_dir.path()).unwrap(),
+            )],
+            channel_priority: ChannelPriority::Strict,
+            solve_strategy: SolveStrategy::Highest,
+            tool_configuration: tool_configuration::Configuration::builder()
+                .with_cache_dir(cache_dir.path().to_path_buf())
+                .finish(),
+            output_dir: test_dir.path().to_path_buf(),
+            exclude_newer: None,
+            env_isolation: EnvironmentIsolation::default(),
+        };
+
+        run_test(package.path(), &config, None).await.unwrap();
+
+        // The test dependency must be persisted in the configured package cache.
+        assert!(
+            pkgs_cache_dir
+                .join("cached-test-dep-1.0-0/info/index.json")
+                .exists(),
+            "expected test dependency to be cached in persistent package cache"
+        );
+        // The package under test must stay isolated in the temporary cache layer.
+        assert!(
+            !pkgs_cache_dir.join("tested-pkg-1.0-0").exists(),
+            "expected tested package to not be written to persistent package cache"
         );
     }
 }
