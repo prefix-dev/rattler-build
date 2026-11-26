@@ -304,11 +304,9 @@ pub async fn install_packages(
             .with_execute_link_scripts(true)
             .with_package_cache(tool_configuration.package_cache.clone())
             .with_installed_packages(installed_packages)
-            .with_max_concurrent_requests(
-                tool_configuration.io_concurrency_limit.unwrap_or_else(
-                    rattler_config::config::concurrency::default_max_concurrent_downloads,
-                ),
-            )
+            .with_max_concurrent_requests(tool_configuration.io_concurrency_limit.unwrap_or_else(
+                rattler_config::config::concurrency::default_max_concurrent_downloads,
+            ))
             .with_reporter(
                 IndicatifReporter::builder()
                     .with_multi_progress(
