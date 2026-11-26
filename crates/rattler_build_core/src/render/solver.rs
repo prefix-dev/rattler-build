@@ -298,13 +298,15 @@ pub async fn install_packages(
             }
         }
 
-        Installer::new()
+        let mut installer = Installer::new()
             .with_download_client(tool_configuration.client.get_client().clone())
             .with_target_platform(target_platform)
             .with_execute_link_scripts(true)
             .with_package_cache(tool_configuration.package_cache.clone())
             .with_installed_packages(installed_packages)
-            .with_io_concurrency_limit(tool_configuration.io_concurrency_limit.unwrap_or_default())
+            .with_max_concurrent_requests(tool_configuration.io_concurrency_limit.unwrap_or_else(
+                rattler_config::config::concurrency::default_max_concurrent_downloads,
+            ))
             .with_reporter(
                 IndicatifReporter::builder()
                     .with_multi_progress(
@@ -319,7 +321,13 @@ pub async fn install_packages(
                         ),
                     )
                     .finish(),
-            )
+            );
+
+        if let Some(io_concurrency_limit) = tool_configuration.io_concurrency_limit {
+            installer = installer.with_io_concurrency_limit(io_concurrency_limit);
+        }
+
+        installer
             .install(&target_prefix, required_packages.to_owned())
             .await
             .into_diagnostic()?;
