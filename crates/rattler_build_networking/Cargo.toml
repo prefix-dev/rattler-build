@@ -1,6 +1,6 @@
 [package]
 name = "rattler_build_networking"
-version = "0.1.22"
+version = "0.1.23"
 authors.workspace = true
 edition.workspace = true
 description = "Networking utilities for rattler-build, providing shared HTTP client functionality with retry middleware"
