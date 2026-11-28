@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.27](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.26...rattler_build_core-v0.2.27) - 2026-11-28
+
+### Added
+
+- verify Sigstore source attestations from PyPI and GitHub releases ([#2947](https://github.com/prefix-dev/rattler-build/pull/2947))
+
+### Fixed
+
+- name the missing license files in the packaging error ([#2956](https://github.com/prefix-dev/rattler-build/pull/2956))
+- cap the file table in the GitHub step summary ([#2928](https://github.com/prefix-dev/rattler-build/pull/2928))
+
+### Other
+
+- extract subpackages_for_output into rattler_build_core ([#2955](https://github.com/prefix-dev/rattler-build/pull/2955))
+- *(staging)* avoid restoring the inherited cache twice ([#2922](https://github.com/prefix-dev/rattler-build/pull/2922))
+
 ## [0.2.26](https://github.com/prefix-dev/rattler-build/compare/rattler_build_core-v0.2.25...rattler_build_core-v0.2.26) - 2026-11-16
 
 ### Added
