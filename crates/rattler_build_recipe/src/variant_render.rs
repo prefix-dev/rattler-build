@@ -1283,9 +1283,16 @@ fn extract_soft_dependency_names(recipe: &Stage1Recipe) -> Vec<rattler_conda_typ
 fn extract_dependency_names(recipe: &Stage1Recipe) -> Vec<rattler_conda_types::PackageName> {
     let requirements = recipe.requirements();
 
-    // Collect names from build/host dependencies (needed at build time)
+    // Collect names from build/host dependencies (needed at build time),
+    // including those of the staging caches that are built for this output.
     let build_host = requirements
         .build_host()
+        .chain(
+            recipe
+                .staging_caches
+                .iter()
+                .flat_map(|cache| cache.requirements.build_host()),
+        )
         .filter_map(|dep| dep.name().cloned());
 
     // pin_subpackage refs in run/run_exports must be built first to resolve the
@@ -2562,6 +2569,53 @@ outputs:
             .collect();
         // Check that packages are in the right order
         assert_eq!(names, vec!["pkg-a", "pkg-b", "pkg-c"]);
+    }
+
+    /// The build and host requirements of a staging output are build-time
+    /// dependencies of the outputs that inherit from it (issue #2492).
+    #[test]
+    fn test_topological_sort_considers_staging_requirements() {
+        let render = |recipe_yaml: &str| {
+            let stage0_recipe = stage0::parse_recipe_or_multi_from_source(recipe_yaml).unwrap();
+            let variant_config = VariantConfig::from_yaml_str("{}").unwrap();
+            render_recipe_with_variant_config(&stage0_recipe, &variant_config, RenderConfig::new())
+                .unwrap()
+        };
+
+        let mut rendered = render(
+            r#"
+recipe:
+  name: package-a
+  version: "1.0"
+
+outputs:
+  - staging:
+      name: a-staging
+    requirements:
+      host:
+        - package-c
+
+  - package:
+      name: package-a
+    inherit: a-staging
+"#,
+        );
+        rendered.extend(render(
+            r#"
+package:
+  name: package-c
+  version: "1.0"
+"#,
+        ));
+
+        let sorted =
+            topological_sort_by_dependencies(rendered, |variant| &variant.recipe, None, false)
+                .unwrap();
+        let names: Vec<_> = sorted
+            .iter()
+            .map(|variant| variant.recipe.package.name.as_normalized())
+            .collect();
+        assert_eq!(names, vec!["package-c", "package-a"]);
     }
 
     #[test]
